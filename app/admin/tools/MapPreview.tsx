@@ -12,8 +12,8 @@ export default function MapPreview() {
   const [loading, setLoading] = React.useState(true)
 
   React.useEffect(() => {
-    // Fetch a few sample sales to show on the map
-    fetch('/api/sales?lat=39.8283&lng=-98.5795&distanceKm=1000&limit=10')
+    // Fetch ALL sales for world view
+    fetch('/api/admin/sales')
       .then(res => res.json())
       .then(data => {
         if (data?.ok && data?.data) {
@@ -49,7 +49,7 @@ export default function MapPreview() {
       </div>
       <div className="overflow-hidden rounded border" style={{ height: 220 }}>
         <Map
-          initialViewState={{ latitude: DEFAULT_CENTER.lat, longitude: DEFAULT_CENTER.lng, zoom: 3 }}
+          initialViewState={{ latitude: DEFAULT_CENTER.lat, longitude: DEFAULT_CENTER.lng, zoom: 2 }}
           mapboxAccessToken={token}
           mapStyle="mapbox://styles/mapbox/streets-v12"
           onError={() => setErrored(true)}

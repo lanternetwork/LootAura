@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 79292b7 — fix(api): mark dynamic Node runtime for routes that use cookies/request.url/Supabase (by Yard Sale Tracker on 2025-10-05 10:16:56 -0400)
+- **Latest commit:** cf4bef3 — fix(api): mark /api/test-sale-lookup as dynamic node runtime (by Yard Sale Tracker on 2025-10-05 10:18:52 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18259957038
+- **CI status:** running, last run: run 18259979697
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T14:18:00.090Z
+Updated automatically by Cursor on 2025-10-05T14:20:01.108Z

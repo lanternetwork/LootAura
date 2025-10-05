@@ -8,9 +8,24 @@ function maskCoord(n?: number): string {
   return n.toFixed(3)
 }
 
+async function fetchJson(url: string) {
+  try {
+    const res = await fetch(url, { cache: 'no-store' })
+    const ok = res.ok
+    let body: any = null
+    try { body = await res.json() } catch {}
+    return { ok, body }
+  } catch {
+    return { ok: false, body: null }
+  }
+}
+
 export default async function AdminTools() {
   const cookieStore = cookies()
   const headersList = await headers()
+  const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
+  const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
+  const baseUrl = host ? `${protocol}${host}` : ''
 
   // Parse la_loc cookie
   let laLoc: { lat?: number; lng?: number; zip?: string; city?: string; state?: string } | null = null
@@ -21,9 +36,7 @@ export default async function AdminTools() {
     } catch {}
   }
 
-  // Infer source used this load
-  // Priority: cookie → profile.zip (hint via x-la-source header optional) → IP → neutral
-  // We don't have a header plumbed; approximate from available signals
+  // Infer source used this load (best-effort)
   let source: 'cookie' | 'profile.zip' | 'ip' | 'neutral' = 'neutral'
   if (laLoc?.lat && laLoc?.lng) {
     source = 'cookie'
@@ -31,11 +44,35 @@ export default async function AdminTools() {
     source = 'ip'
   }
 
-  return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Admin Tools</h1>
+  // Health checks
+  const [envH, dbH, schemaH, postgisH, searchH] = await Promise.all([
+    baseUrl ? fetchJson(`${baseUrl}/api/health/env`) : Promise.resolve({ ok: false, body: null }),
+    baseUrl ? fetchJson(`${baseUrl}/api/health/db`) : Promise.resolve({ ok: false, body: null }),
+    baseUrl ? fetchJson(`${baseUrl}/api/health/schema`) : Promise.resolve({ ok: false, body: null }),
+    baseUrl ? fetchJson(`${baseUrl}/api/health/postgis`) : Promise.resolve({ ok: false, body: null }),
+    baseUrl ? fetchJson(`${baseUrl}/api/health/search`) : Promise.resolve({ ok: false, body: null }),
+  ])
 
-      <div className="rounded-lg border bg-white p-4">
+  const Badge = ({ ok }: { ok: boolean }) => (
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs ${ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+      {ok ? 'OK' : 'FAIL'}
+    </span>
+  )
+
+  return (
+    <div className="max-w-5xl mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Admin Tools</h1>
+        <nav className="text-sm flex items-center gap-3">
+          <Link href="/admin/usage" className="text-blue-600 hover:underline">Usage Diagnostics</Link>
+          <a href="#location" className="text-blue-600 hover:underline">Location Tools</a>
+          <a href="#health" className="text-blue-600 hover:underline">Health</a>
+          <a href="#diagnostics" className="text-blue-600 hover:underline">Diagnostics</a>
+        </nav>
+      </div>
+
+      {/* Location state */}
+      <div id="location" className="rounded-lg border bg-white p-4">
         <h2 className="text-lg font-medium mb-2">Location state</h2>
         <div className="text-sm text-gray-700 space-y-1">
           <div>
@@ -68,6 +105,40 @@ export default async function AdminTools() {
           >
             Simulate neutral fallback
           </Link>
+          <form action="/api/geocoding/zip" method="get" target="_blank" className="inline-flex items-center gap-2 text-sm">
+            <input name="zip" placeholder="Test ZIP" className="border rounded px-2 py-1" />
+            <button className="px-2 py-1 border rounded hover:bg-gray-50" type="submit">Test ZIP lookup</button>
+          </form>
+        </div>
+      </div>
+
+      {/* Health overview */}
+      <div id="health" className="rounded-lg border bg-white p-4">
+        <h2 className="text-lg font-medium mb-2">Health Overview</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Env</span><Badge ok={!!envH.ok} /></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>DB</span><Badge ok={!!dbH.ok} /></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Schema</span><Badge ok={!!schemaH.ok} /></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>PostGIS</span><Badge ok={!!postgisH.ok} /></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Search</span><Badge ok={!!searchH.ok} /></div>
+        </div>
+        <div className="mt-3 text-xs text-gray-600">Detailed endpoints are available under /api/health/*</div>
+      </div>
+
+      {/* Diagnostics and Seeds */}
+      <div id="diagnostics" className="rounded-lg border bg-white p-4">
+        <h2 className="text-lg font-medium mb-2">Diagnostics & Seeds</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <Link href="/api/debug-tables" className="border rounded px-3 py-2 hover:bg-gray-50">Debug Tables</Link>
+          <Link href="/api/test-db" className="border rounded px-3 py-2 hover:bg-gray-50">Test DB</Link>
+          <Link href="/api/test-rpc" className="border rounded px-3 py-2 hover:bg-gray-50">Test RPC</Link>
+          <Link href="/api/test-sale-lookup" className="border rounded px-3 py-2 hover:bg-gray-50">Test Sale Lookup</Link>
+          <Link href="/api/test-reviews-table" className="border rounded px-3 py-2 hover:bg-gray-50">Test Reviews Table</Link>
+          <Link href="/api/test-reviews-insert" className="border rounded px-3 py-2 hover:bg-gray-50">Test Reviews Insert</Link>
+          <Link href="/api/test-reviews-creation" className="border rounded px-3 py-2 hover:bg-gray-50">Test Reviews Creation</Link>
+          <Link href="/api/test-batch-reviews" className="border rounded px-3 py-2 hover:bg-gray-50">Test Batch Reviews</Link>
+          <Link href="/api/seed-public" className="border rounded px-3 py-2 hover:bg-gray-50">Seed Public</Link>
+          <Link href="/api/seed-direct" className="border rounded px-3 py-2 hover:bg-gray-50">Seed Direct</Link>
         </div>
       </div>
     </div>

@@ -50,3 +50,4 @@
 
 ---
 Updated automatically by Cursor on 2025-10-05T21:51:05.657Z
+Force redeploy: trigger after schema migration.

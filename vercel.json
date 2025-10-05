@@ -1,5 +1,6 @@
 {
   "buildCommand": "npm install --include=dev && npm run build",
   "installCommand": "npm install --include=dev",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "nodeVersion": "20.x"
 }

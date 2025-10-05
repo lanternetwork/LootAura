@@ -1,0 +1,42 @@
+name: Generate package-lock
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps (create lockfile)
+        run: npm install --include=dev
+
+      - name: Commit package-lock.json
+        run: |
+          if [ -f package-lock.json ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            if git diff --cached --quiet; then
+              echo "No lockfile changes"; exit 0; fi
+            git commit -m "chore(lockfile): add/update package-lock.json"
+          else
+            echo "package-lock.json not generated"; exit 1
+          fi
+
+      - name: Push changes
+        uses: ad-m/github-push-action@v0.8.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+

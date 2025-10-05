@@ -50,3 +50,4 @@
 
 ---
 Updated automatically by Cursor on 2025-10-05T21:15:33.063Z
+Force redeploy: status bump.

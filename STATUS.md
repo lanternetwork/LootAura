@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 72093b2 — fix(admin): schema apply tool tries /api/run-migration then falls back to simple (by Yard Sale Tracker on 2025-10-05 17:50:32 -0400)
+- **Latest commit:** 672b2f8 — chore: force redeploy after schema migration (by Yard Sale Tracker on 2025-10-05 19:10:28 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18264804642
+- **CI status:** running, last run: run 18265642225
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,5 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T21:51:05.657Z
-Force redeploy: trigger after schema migration.
+Updated automatically by Cursor on 2025-10-05T23:11:10.497Z

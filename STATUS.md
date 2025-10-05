@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 241a7f4 — fix(ux): eliminate empty-state flicker until first fetch completes (fetchedOnce gate) (by Yard Sale Tracker on 2025-10-05 10:20:41 -0400)
+- **Latest commit:** 94c7e2e — fix(ux): keep loader mounted to prevent animation restart during fetch transitions (by Yard Sale Tracker on 2025-10-05 10:24:19 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18260000958
+- **CI status:** running, last run: run 18260044327
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T14:21:50.072Z
+Updated automatically by Cursor on 2025-10-05T14:25:49.037Z

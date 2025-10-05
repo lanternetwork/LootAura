@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 6d543d7 — feat(admin): add one-click v2 schema apply tool (032â†’035) with token and logs (by Yard Sale Tracker on 2025-10-05 17:46:35 -0400)
+- **Latest commit:** 72093b2 — fix(admin): schema apply tool tries /api/run-migration then falls back to simple (by Yard Sale Tracker on 2025-10-05 17:50:32 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18264767544
+- **CI status:** running, last run: run 18264804642
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T21:47:08.375Z
+Updated automatically by Cursor on 2025-10-05T21:51:05.657Z

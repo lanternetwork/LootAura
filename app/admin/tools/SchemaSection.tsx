@@ -8,7 +8,7 @@ async function fetchCounts() {
     supabase.from('sales_v2').select('*', { count: 'exact' }).limit(0),
     supabase.from('items_v2').select('*', { count: 'exact' }).limit(0),
     supabase.from('favorites_v2').select('*', { count: 'exact' }).limit(0),
-    supabase.from('zipcodes').select('*', { count: 'exact' }).limit(0),
+    supabase.from('zipcodes_v2').select('*', { count: 'exact' }).limit(0),
   ])
   return {
     sales: sales.count ?? 0,
@@ -31,7 +31,7 @@ async function fetchTablePresence() {
     { name: 'sales', view: 'sales_v2' },
     { name: 'items', view: 'items_v2' },
     { name: 'favorites', view: 'favorites_v2' },
-    { name: 'zipcodes', view: 'zipcodes' }
+    { name: 'zipcodes', view: 'zipcodes_v2' }
   ]
   const presence: Record<string, boolean> = {}
   for (const t of tables) {

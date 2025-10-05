@@ -6,6 +6,7 @@ DROP VIEW IF EXISTS public.sales_v2 CASCADE;
 DROP VIEW IF EXISTS public.items_v2 CASCADE;
 DROP VIEW IF EXISTS public.favorites_v2 CASCADE;
 DROP VIEW IF EXISTS public.profiles_v2 CASCADE;
+DROP VIEW IF EXISTS public.zipcodes_v2 CASCADE;
 
 -- Drop existing functions if they exist (all variations)
 DROP FUNCTION IF EXISTS public.search_sales_within_distance CASCADE;
@@ -66,11 +67,24 @@ SELECT
     updated_at
 FROM lootaura_v2.profiles;
 
+CREATE VIEW public.zipcodes_v2 AS
+SELECT 
+    zip_code,
+    city,
+    state,
+    lat,
+    lng,
+    geom,
+    created_at,
+    updated_at
+FROM lootaura_v2.zipcodes;
+
 -- Grant permissions on views
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.sales_v2 TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.items_v2 TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.favorites_v2 TO anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.profiles_v2 TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.zipcodes_v2 TO anon, authenticated;
 
 -- Create distance search RPC function
 CREATE OR REPLACE FUNCTION public.search_sales_within_distance_v2(
@@ -291,13 +305,15 @@ DECLARE
     items_view_count integer;
     favorites_view_count integer;
     profiles_view_count integer;
+    zipcodes_view_count integer;
 BEGIN
     SELECT COUNT(*) INTO sales_view_count FROM public.sales_v2;
     SELECT COUNT(*) INTO items_view_count FROM public.items_v2;
     SELECT COUNT(*) INTO favorites_view_count FROM public.favorites_v2;
     SELECT COUNT(*) INTO profiles_view_count FROM public.profiles_v2;
+    SELECT COUNT(*) INTO zipcodes_view_count FROM public.zipcodes_v2;
     
     RAISE NOTICE 'Public v2 wrappers created successfully!';
-    RAISE NOTICE 'Views: sales_v2=%, items_v2=%, favorites_v2=%, profiles_v2=%', 
-        sales_view_count, items_view_count, favorites_view_count, profiles_view_count;
+    RAISE NOTICE 'Views: sales_v2=%, items_v2=%, favorites_v2=%, profiles_v2=%, zipcodes_v2=%', 
+        sales_view_count, items_view_count, favorites_view_count, profiles_view_count, zipcodes_view_count;
 END $$;

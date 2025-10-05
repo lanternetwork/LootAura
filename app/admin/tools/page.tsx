@@ -8,9 +8,9 @@ function maskCoord(n?: number): string {
   return n.toFixed(3)
 }
 
-async function fetchJson(url: string) {
+async function fetchJson(path: string) {
   try {
-    const res = await fetch(url, { cache: 'no-store' })
+    const res = await fetch(path, { cache: 'no-store' })
     const ok = res.ok
     let body: any = null
     try { body = await res.json() } catch {}
@@ -23,9 +23,7 @@ async function fetchJson(url: string) {
 export default async function AdminTools() {
   const cookieStore = cookies()
   const headersList = await headers()
-  const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
-  const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
-  const baseUrl = host ? `${protocol}${host}` : ''
+  // Use relative paths for in-app API calls to avoid base URL issues
 
   // Parse la_loc cookie
   let laLoc: { lat?: number; lng?: number; zip?: string; city?: string; state?: string } | null = null
@@ -46,11 +44,11 @@ export default async function AdminTools() {
 
   // Health checks (auto-run)
   const [envH, dbH, schemaH, postgisH, searchH] = await Promise.all([
-    baseUrl ? fetchJson(`${baseUrl}/api/health/env`) : Promise.resolve({ ok: false, body: null }),
-    baseUrl ? fetchJson(`${baseUrl}/api/health/db`) : Promise.resolve({ ok: false, body: null }),
-    baseUrl ? fetchJson(`${baseUrl}/api/health/schema`) : Promise.resolve({ ok: false, body: null }),
-    baseUrl ? fetchJson(`${baseUrl}/api/health/postgis`) : Promise.resolve({ ok: false, body: null }),
-    baseUrl ? fetchJson(`${baseUrl}/api/health/search`) : Promise.resolve({ ok: false, body: null }),
+    fetchJson('/api/health/env'),
+    fetchJson('/api/health/db'),
+    fetchJson('/api/health/schema'),
+    fetchJson('/api/health/postgis'),
+    fetchJson('/api/health/search'),
   ])
 
   // Diagnostics tests (auto-run snapshot)
@@ -67,8 +65,7 @@ export default async function AdminTools() {
 
   const diagResults = await Promise.all(
     diagnostics.map(async (t) => {
-      if (!baseUrl) return { name: t.name, path: t.path, ok: false }
-      const r = await fetchJson(`${baseUrl}${t.path}`)
+      const r = await fetchJson(t.path)
       return { name: t.name, path: t.path, ok: !!r.ok }
     })
   )
@@ -79,20 +76,37 @@ export default async function AdminTools() {
     </span>
   )
 
+  const allHealthOk = !!envH.ok && !!dbH.ok && !!schemaH.ok && !!postgisH.ok && !!searchH.ok
+  const allDiagOk = diagResults.every((d) => d.ok)
+  const overallOk = allHealthOk && allDiagOk
+
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Admin Tools</h1>
-        <nav className="text-sm flex items-center gap-3">
-          <Link href="/admin/usage" className="text-blue-600 hover:underline">Usage Diagnostics</Link>
-          <a href="#location" className="text-blue-600 hover:underline">Location Tools</a>
-          <a href="#health" className="text-blue-600 hover:underline">Health</a>
-          <a href="#diagnostics" className="text-blue-600 hover:underline">Diagnostics</a>
-        </nav>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Admin Dashboard</h1>
+          <p className="text-sm text-gray-600">Operational snapshot and diagnostic tools</p>
+        </div>
+        <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm ${overallOk ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          <span className="text-lg">{overallOk ? '✔' : '✖'}</span>
+          <span>{overallOk ? 'All systems nominal' : 'Attention required'}</span>
+        </div>
       </div>
 
-      {/* Location state */}
-      <div id="location" className="rounded-lg border bg-white p-4">
+      {/* Top nav */}
+      <nav className="text-sm flex items-center gap-3 border-b pb-3">
+        <Link href="/admin/usage" className="text-blue-600 hover:underline">Usage Diagnostics</Link>
+        <a href="#location" className="text-blue-600 hover:underline">Location Tools</a>
+        <a href="#health" className="text-blue-600 hover:underline">Health</a>
+        <a href="#diagnostics" className="text-blue-600 hover:underline">Diagnostics</a>
+      </nav>
+
+      {/* Main content grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Location state */}
+          <div id="location" className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="text-lg font-medium mb-2">Location state</h2>
         <div className="text-sm text-gray-700 space-y-1">
           <div>
@@ -111,29 +125,28 @@ export default async function AdminTools() {
             <span className="text-gray-500">Source:</span> {source}
           </div>
         </div>
-
-        <div className="mt-4 flex gap-3">
-          <Link
-            href="/admin/tools/clear"
-            className="px-3 py-1.5 rounded border text-sm hover:bg-gray-50"
-          >
-            Clear la_loc cookie (this browser)
-          </Link>
-          <Link
-            href="/sales?simulateNeutral=1"
-            className="px-3 py-1.5 rounded border text-sm hover:bg-gray-50"
-          >
-            Simulate neutral fallback
-          </Link>
-          <form action="/api/geocoding/zip" method="get" target="_blank" className="inline-flex items-center gap-2 text-sm">
-            <input name="zip" placeholder="Test ZIP" className="border rounded px-2 py-1" />
-            <button className="px-2 py-1 border rounded hover:bg-gray-50" type="submit">Test ZIP lookup</button>
-          </form>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/admin/tools/clear"
+              className="px-3 py-1.5 rounded border text-sm hover:bg-gray-50"
+            >
+              Clear la_loc cookie (this browser)
+            </Link>
+            <Link
+              href="/sales?simulateNeutral=1"
+              className="px-3 py-1.5 rounded border text-sm hover:bg-gray-50"
+            >
+              Simulate neutral fallback
+            </Link>
+            <form action="/api/geocoding/zip" method="get" target="_blank" className="inline-flex items-center gap-2 text-sm">
+              <input name="zip" placeholder="Test ZIP" className="border rounded px-2 py-1" />
+              <button className="px-2 py-1 border rounded hover:bg-gray-50" type="submit">Test ZIP lookup</button>
+            </form>
+          </div>
         </div>
-      </div>
 
-      {/* Health overview (snapshot) */}
-      <div id="health" className="rounded-lg border bg-white p-4">
+          {/* Health overview (snapshot) */}
+          <div id="health" className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="text-lg font-medium mb-2">Health Overview</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
           <div className="flex items-center justify-between border rounded px-3 py-2"><span>Env</span><div className="flex items-center gap-2"><Badge ok={!!envH.ok} /><Link href="/api/health/env" className="underline text-blue-600">Run</Link></div></div>
@@ -143,10 +156,10 @@ export default async function AdminTools() {
           <div className="flex items-center justify-between border rounded px-3 py-2"><span>Search</span><div className="flex items-center gap-2"><Badge ok={!!searchH.ok} /><Link href="/api/health/search" className="underline text-blue-600">Run</Link></div></div>
         </div>
         <div className="mt-3 text-xs text-gray-600">Detailed endpoints are available under /api/health/*</div>
-      </div>
+          </div>
 
-      {/* Diagnostics and Seeds (snapshot) */}
-      <div id="diagnostics" className="rounded-lg border bg-white p-4">
+          {/* Diagnostics and Seeds (snapshot) */}
+          <div id="diagnostics" className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="text-lg font-medium mb-2">Diagnostics & Seeds</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
           {diagResults.map((r) => (
@@ -161,6 +174,26 @@ export default async function AdminTools() {
           <Link href="/api/seed-public" className="border rounded px-3 py-2 hover:bg-gray-50">Seed Public</Link>
           <Link href="/api/seed-direct" className="border rounded px-3 py-2 hover:bg-gray-50">Seed Direct</Link>
         </div>
+          </div>
+        </div>
+        {/* Sidebar quick info */}
+        <aside className="space-y-6">
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <h3 className="font-medium mb-2">Summary</h3>
+            <div className="text-sm text-gray-700 space-y-1">
+              <div className="flex items-center justify-between"><span>Health</span><Badge ok={allHealthOk} /></div>
+              <div className="flex items-center justify-between"><span>Diagnostics</span><Badge ok={allDiagOk} /></div>
+            </div>
+          </div>
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <h3 className="font-medium mb-2">Quick Links</h3>
+            <ul className="space-y-2 text-sm">
+              <li><Link href="/sales" className="text-blue-600 underline">Sales</Link></li>
+              <li><Link href="/favorites" className="text-blue-600 underline">Favorites</Link></li>
+              <li><Link href="/explore" className="text-blue-600 underline">Explore</Link></li>
+            </ul>
+          </div>
+        </aside>
       </div>
     </div>
   )

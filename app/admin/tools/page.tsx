@@ -44,7 +44,7 @@ export default async function AdminTools() {
     source = 'ip'
   }
 
-  // Health checks
+  // Health checks (auto-run)
   const [envH, dbH, schemaH, postgisH, searchH] = await Promise.all([
     baseUrl ? fetchJson(`${baseUrl}/api/health/env`) : Promise.resolve({ ok: false, body: null }),
     baseUrl ? fetchJson(`${baseUrl}/api/health/db`) : Promise.resolve({ ok: false, body: null }),
@@ -53,9 +53,29 @@ export default async function AdminTools() {
     baseUrl ? fetchJson(`${baseUrl}/api/health/search`) : Promise.resolve({ ok: false, body: null }),
   ])
 
+  // Diagnostics tests (auto-run snapshot)
+  const diagnostics = [
+    { name: 'Debug Tables', path: '/api/debug-tables' },
+    { name: 'Test DB', path: '/api/test-db' },
+    { name: 'Test RPC', path: '/api/test-rpc' },
+    { name: 'Test Sale Lookup', path: '/api/test-sale-lookup' },
+    { name: 'Test Reviews Table', path: '/api/test-reviews-table' },
+    { name: 'Test Reviews Insert', path: '/api/test-reviews-insert' },
+    { name: 'Test Reviews Creation', path: '/api/test-reviews-creation' },
+    { name: 'Test Batch Reviews', path: '/api/test-batch-reviews' },
+  ] as const
+
+  const diagResults = await Promise.all(
+    diagnostics.map(async (t) => {
+      if (!baseUrl) return { name: t.name, path: t.path, ok: false }
+      const r = await fetchJson(`${baseUrl}${t.path}`)
+      return { name: t.name, path: t.path, ok: !!r.ok }
+    })
+  )
+
   const Badge = ({ ok }: { ok: boolean }) => (
     <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs ${ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-      {ok ? 'OK' : 'FAIL'}
+      {ok ? '✔' : '✖'}
     </span>
   )
 
@@ -112,31 +132,32 @@ export default async function AdminTools() {
         </div>
       </div>
 
-      {/* Health overview */}
+      {/* Health overview (snapshot) */}
       <div id="health" className="rounded-lg border bg-white p-4">
         <h2 className="text-lg font-medium mb-2">Health Overview</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Env</span><Badge ok={!!envH.ok} /></div>
-          <div className="flex items-center justify-between border rounded px-3 py-2"><span>DB</span><Badge ok={!!dbH.ok} /></div>
-          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Schema</span><Badge ok={!!schemaH.ok} /></div>
-          <div className="flex items-center justify-between border rounded px-3 py-2"><span>PostGIS</span><Badge ok={!!postgisH.ok} /></div>
-          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Search</span><Badge ok={!!searchH.ok} /></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Env</span><div className="flex items-center gap-2"><Badge ok={!!envH.ok} /><Link href="/api/health/env" className="underline text-blue-600">Run</Link></div></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>DB</span><div className="flex items-center gap-2"><Badge ok={!!dbH.ok} /><Link href="/api/health/db" className="underline text-blue-600">Run</Link></div></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Schema</span><div className="flex items-center gap-2"><Badge ok={!!schemaH.ok} /><Link href="/api/health/schema" className="underline text-blue-600">Run</Link></div></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>PostGIS</span><div className="flex items-center gap-2"><Badge ok={!!postgisH.ok} /><Link href="/api/health/postgis" className="underline text-blue-600">Run</Link></div></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Search</span><div className="flex items-center gap-2"><Badge ok={!!searchH.ok} /><Link href="/api/health/search" className="underline text-blue-600">Run</Link></div></div>
         </div>
         <div className="mt-3 text-xs text-gray-600">Detailed endpoints are available under /api/health/*</div>
       </div>
 
-      {/* Diagnostics and Seeds */}
+      {/* Diagnostics and Seeds (snapshot) */}
       <div id="diagnostics" className="rounded-lg border bg-white p-4">
         <h2 className="text-lg font-medium mb-2">Diagnostics & Seeds</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <Link href="/api/debug-tables" className="border rounded px-3 py-2 hover:bg-gray-50">Debug Tables</Link>
-          <Link href="/api/test-db" className="border rounded px-3 py-2 hover:bg-gray-50">Test DB</Link>
-          <Link href="/api/test-rpc" className="border rounded px-3 py-2 hover:bg-gray-50">Test RPC</Link>
-          <Link href="/api/test-sale-lookup" className="border rounded px-3 py-2 hover:bg-gray-50">Test Sale Lookup</Link>
-          <Link href="/api/test-reviews-table" className="border rounded px-3 py-2 hover:bg-gray-50">Test Reviews Table</Link>
-          <Link href="/api/test-reviews-insert" className="border rounded px-3 py-2 hover:bg-gray-50">Test Reviews Insert</Link>
-          <Link href="/api/test-reviews-creation" className="border rounded px-3 py-2 hover:bg-gray-50">Test Reviews Creation</Link>
-          <Link href="/api/test-batch-reviews" className="border rounded px-3 py-2 hover:bg-gray-50">Test Batch Reviews</Link>
+          {diagResults.map((r) => (
+            <div key={r.path} className="flex items-center justify-between border rounded px-3 py-2">
+              <span>{r.name}</span>
+              <div className="flex items-center gap-2">
+                <Badge ok={r.ok} />
+                <Link href={r.path} className="underline text-blue-600">Run</Link>
+              </div>
+            </div>
+          ))}
           <Link href="/api/seed-public" className="border rounded px-3 py-2 hover:bg-gray-50">Seed Public</Link>
           <Link href="/api/seed-direct" className="border rounded px-3 py-2 hover:bg-gray-50">Seed Direct</Link>
         </div>

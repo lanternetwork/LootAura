@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 77919bd — style(admin): polish dashboard layout, summary, and nav for professional snapshot (by Yard Sale Tracker on 2025-10-05 16:02:37 -0400)
+- **Latest commit:** eb2bc3f — chore(branding): replace YardSaleFinder/YSF with Loot Aura/lootaura across docs and source; feat(admin): re-add snapshot tests using relative URLs (by Yard Sale Tracker on 2025-10-05 16:10:04 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18263645150
+- **CI status:** running, last run: run 18263734185
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T20:03:18.531Z
+Updated automatically by Cursor on 2025-10-05T20:10:43.786Z

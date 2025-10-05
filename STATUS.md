@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 674783f — fix(map): feed map with full in-radius set (mapSales) instead of paged sales (by Yard Sale Tracker on 2025-10-05 10:12:07 -0400)
+- **Latest commit:** 79292b7 — fix(api): mark dynamic Node runtime for routes that use cookies/request.url/Supabase (by Yard Sale Tracker on 2025-10-05 10:16:56 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18259900072
+- **CI status:** running, last run: run 18259957038
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T14:13:22.303Z
+Updated automatically by Cursor on 2025-10-05T14:18:00.090Z

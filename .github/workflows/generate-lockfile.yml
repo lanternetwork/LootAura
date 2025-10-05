@@ -2,6 +2,9 @@ name: Generate package-lock
 
 on:
   workflow_dispatch: {}
+  push:
+    branches:
+      - 'milestone/**'
 
 permissions:
   contents: write

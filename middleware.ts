@@ -43,22 +43,27 @@ export async function middleware(req: NextRequest) {
   if (user) {
     try {
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
+        .from('profiles_v2')
+        .select('home_zip')
+        .eq('id', user.id)
+        .maybeSingle()
 
-      // If no profile exists, create one
-      if (!profile) {
-        await supabase
-          .from('profiles')
-          .upsert({
-            user_id: user.id,
-            display_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-            avatar_url: user.user_metadata?.avatar_url || null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
+      // Best-effort: if la_loc cookie missing and profile has home_zip, resolve coordinates and set la_loc
+      const hasCookie = !!cookieStore.get('la_loc')?.value
+      const homeZip = profile?.home_zip as string | undefined
+      if (!hasCookie && homeZip) {
+        try {
+          const url = new URL(req.url)
+          const geoUrl = `${url.origin}/api/geocoding/zip?zip=${encodeURIComponent(homeZip)}`
+          const r = await fetch(geoUrl, { cache: 'no-store' })
+          if (r.ok) {
+            const z = await r.json()
+            if (z?.ok && z.lat && z.lng) {
+              const payload = JSON.stringify({ lat: z.lat, lng: z.lng, zip: z.zip, city: z.city, state: z.state })
+              cookieStore.set({ name: 'la_loc', value: payload, httpOnly: false, maxAge: 60 * 60 * 24, sameSite: 'lax', path: '/' })
+            }
+          }
+        } catch {}
       }
     } catch (error) {
       console.error('Error upserting profile:', error)

@@ -39,10 +39,11 @@ interface SalesClientProps {
     page?: string
     pageSize?: string
   }
+  initialCenter?: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } }
   user: User | null
 }
 
-export default function SalesClient({ initialSales, initialSearchParams, user }: SalesClientProps) {
+export default function SalesClient({ initialSales, initialSearchParams, initialCenter, user }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { location, getLocation, loading: locationLoading, error: locationError } = useLocation()
@@ -59,6 +60,9 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapSales, setMapSales] = useState<Sale[]>([])
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
+
+  // Detect neutral fallback center (do not auto-fetch in this case)
+  const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
 
   const fetchSales = useCallback(async (append = false) => {
     if (append) {
@@ -281,17 +285,12 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
     fetchMapSales()
   }, [fetchMapSales])
 
-  // Don't automatically request location - let user choose
-
+  // Initialize filters from server-provided center first
   useEffect(() => {
-    if (location && location.lat && location.lng) {
-      console.log('[SALES] Location found, updating filters')
-      updateFilters({
-        lat: location.lat,
-        lng: location.lng
-      })
+    if (initialCenter?.lat && initialCenter?.lng && !isNeutralFallback) {
+      updateFilters({ lat: initialCenter.lat, lng: initialCenter.lng })
     }
-  }, [location, updateFilters])
+  }, [initialCenter?.lat, initialCenter?.lng, isNeutralFallback, updateFilters])
 
   // Initialize location from cookie on mount
   useEffect(() => {
@@ -327,6 +326,12 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
       city: city || undefined
     })
     
+    // Persist la_loc cookie for 24h so server can use it on next visit
+    try {
+      const cookiePayload = JSON.stringify({ lat, lng, city, state, zip })
+      document.cookie = `la_loc=${cookiePayload}; Max-Age=${60 * 60 * 24}; Path=/; SameSite=Lax`
+    } catch {}
+
     // Update URL with new location and ZIP
     const params = new URLSearchParams(searchParams.toString())
     params.set('lat', lat.toString())
@@ -380,12 +385,7 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
                     )}
                   </div>
               
-              {/* Location Button */}
-              <UseLocationButton 
-                onClick={handleLocationClick} 
-                loading={locationLoading} 
-                error={locationError?.message || null} 
-              />
+              {/* Location Button removed per server-side auto center */}
               
               {/* Mobile Filter Trigger */}
               <FilterTrigger
@@ -402,14 +402,20 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
             {(!filters.lat || !filters.lng) ? (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">📍</div>
-                <h3 className="text-xl font-semibold text-gray-700 mb-2">Getting Your Location</h3>
-                <p className="text-gray-500 mb-4">We're finding yard sales near you...</p>
-                <div className="flex justify-center">
-                  <UseLocationButton 
-                    onClick={handleLocationClick} 
-                    loading={locationLoading} 
-                    error={locationError?.message || null} 
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                  Location unavailable. Enter a ZIP to see nearby sales.
+                </h3>
+                <p className="text-gray-500 mb-4">We couldn't determine your location automatically.</p>
+                <div className="max-w-md mx-auto">
+                  <ZipInput
+                    onLocationFound={handleZipLocationFound}
+                    onError={handleZipError}
+                    placeholder="Enter ZIP code"
+                    className="w-full"
                   />
+                  {zipError && (
+                    <p className="text-red-500 text-sm mt-2">{zipError}</p>
+                  )}
                 </div>
               </div>
             ) : (

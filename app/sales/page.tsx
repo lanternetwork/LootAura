@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import SalesClient from './SalesClient'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { cookies, headers } from 'next/headers'
 
 interface SalesPageProps {
   searchParams: {
@@ -36,7 +37,84 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const categories = searchParams.categories ? searchParams.categories.split(',') : undefined
   const pageSize = searchParams.pageSize ? parseInt(searchParams.pageSize) : 50
 
-  // Start with empty sales - let client handle the initial fetch
+  // Resolve initial center server-side
+  const cookieStore = cookies()
+  const headersList = await headers()
+  const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
+  const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
+  const baseUrl = host ? `${protocol}${host}` : ''
+
+  let initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null = null
+
+  // 1) la_loc cookie
+  try {
+    const c = cookieStore.get('la_loc')?.value
+    if (c) {
+      const parsed = JSON.parse(c)
+      if (parsed?.lat && parsed?.lng) {
+        initialCenter = {
+          lat: Number(parsed.lat),
+          lng: Number(parsed.lng),
+          label: { zip: parsed.zip, city: parsed.city, state: parsed.state }
+        }
+      }
+    }
+  } catch {}
+
+  // 2) user profile.home_zip → lookup zip
+  if (!initialCenter && user) {
+    try {
+      // Try profiles_v2 view first
+      const { data: profile } = await supabase
+        .from('profiles_v2')
+        .select('home_zip')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      const homeZip: string | undefined = profile?.home_zip || undefined
+      if (homeZip && baseUrl) {
+        const zipRes = await fetch(`${baseUrl}/api/geocoding/zip?zip=${encodeURIComponent(homeZip)}`, { cache: 'no-store' })
+        if (zipRes.ok) {
+          const z = await zipRes.json()
+          if (z?.ok && z.lat && z.lng) {
+            initialCenter = { lat: z.lat, lng: z.lng, label: { zip: z.zip, city: z.city, state: z.state } }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 3) IP geolocation
+  if (!initialCenter && baseUrl) {
+    try {
+      const ipRes = await fetch(`${baseUrl}/api/geolocation/ip`, { cache: 'no-store' })
+      if (ipRes.ok) {
+        const g = await ipRes.json()
+        if (g?.lat && g?.lng) {
+          initialCenter = { lat: Number(g.lat), lng: Number(g.lng), label: { city: g.city, state: g.state } }
+        }
+      }
+    } catch {}
+  }
+
+  // 4) Neutral fallback if still missing
+  if (!initialCenter) {
+    initialCenter = { lat: 39.8283, lng: -98.5795 }
+  } else {
+    // Set/refresh la_loc cookie for 24h when we have a real center
+    try {
+      const val = JSON.stringify({
+        lat: initialCenter.lat,
+        lng: initialCenter.lng,
+        zip: initialCenter.label?.zip,
+        city: initialCenter.label?.city,
+        state: initialCenter.label?.state,
+      })
+      cookieStore.set('la_loc', val, { httpOnly: false, maxAge: 60 * 60 * 24, sameSite: 'lax', path: '/' })
+    } catch {}
+  }
+
+  // Start with empty sales; client fetches immediately using initialCenter
   let initialSales: any[] = []
 
   return (
@@ -45,6 +123,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         <SalesClient 
           initialSales={initialSales}
           initialSearchParams={searchParams}
+          initialCenter={initialCenter}
           user={user}
         />
       </Suspense>

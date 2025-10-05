@@ -1,14 +1,15 @@
 {
-  "extends": ["next/core-web-vitals"]
-}
-{
   "root": true,
   "env": {
     "browser": true,
     "es2022": true,
     "node": true
   },
-  "extends": ["eslint:recommended", "plugin:react/recommended"],
+  "extends": [
+    "next/core-web-vitals",
+    "eslint:recommended",
+    "plugin:react/recommended"
+  ],
   "parserOptions": {
     "ecmaVersion": 2022,
     "sourceType": "module",

@@ -35,7 +35,7 @@ BEGIN
             id, owner_id, title, description, address, city, state, zip_code, 
             lat, lng, date_start, time_start, date_end, time_end, status, created_at
         ) VALUES (
-            'test-sale-' || LPAD(i::TEXT, 3, '0'),
+            gen_random_uuid(),
             '11111111-1111-1111-1111-111111111111',
             'Test Sale ' || LPAD(i::TEXT, 3, '0') || ' - ' || neighborhoods[1 + (i % array_length(neighborhoods, 1))],
             descriptions[1 + (i % array_length(descriptions, 1))],

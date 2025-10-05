@@ -16,7 +16,8 @@
     "test:e2e": "playwright test",
     "format": "prettier -w .",
     "check:storage": "tsx scripts/storage-check.ts",
-    "check:node": "node scripts/check-node-version.js"
+    "check:node": "node scripts/check-node-version.js",
+    "update:status": "tsx scripts/update-status.ts"
   },
   "dependencies": {
     "next": "14.2.4",

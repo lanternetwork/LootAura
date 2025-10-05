@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 2305b6c — feat(admin): add world view map with all sales pins via /api/admin/sales (by Yard Sale Tracker on 2025-10-05 19:21:10 -0400)
+- **Latest commit:** 43dc70c — debug(admin): add console logging and better pin visibility for map preview (by Yard Sale Tracker on 2025-10-05 19:24:41 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18265763657
+- **CI status:** running, last run: run 18265801496
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T23:21:46.155Z
+Updated automatically by Cursor on 2025-10-05T23:25:13.211Z

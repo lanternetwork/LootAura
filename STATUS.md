@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 7029977 — fix(eslint): add eslint-config-next to support next/core-web-vitals (by Yard Sale Tracker on 2025-10-05 10:37:16 -0400)
+- **Latest commit:** 9e07fd1 — chore(vercel): switch to npm ci + npm run build for clean lockfile-based installs (by Yard Sale Tracker on 2025-10-05 10:39:10 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18260192710
+- **CI status:** running, last run: run 18260217469
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T14:38:33.183Z
+Updated automatically by Cursor on 2025-10-05T14:40:33.242Z

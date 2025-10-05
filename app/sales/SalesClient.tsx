@@ -447,14 +447,14 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
               <h2 className="text-xl font-semibold mb-4">Map View</h2>
               <div className="h-[400px] rounded-lg overflow-hidden">
                 <SalesMap
-                  sales={sales}
+                  sales={mapSales}
                   center={filters.lat && filters.lng ? { lat: filters.lat, lng: filters.lng } : { lat: 38.2527, lng: -85.7585 }}
                   zoom={filters.lat && filters.lng ? 12 : 10}
                 />
                 {/* Debug info */}
                 {filters.lat && filters.lng && (
                   <div className="mt-2 text-xs text-gray-500">
-                    Center: {filters.lat.toFixed(4)}, {filters.lng.toFixed(4)} | Sales: {sales.length}
+                    Center: {filters.lat.toFixed(4)}, {filters.lng.toFixed(4)} | Pins: {mapSales.length}
                   </div>
                 )}
               </div>

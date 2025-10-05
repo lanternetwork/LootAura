@@ -31,7 +31,8 @@ export default function SchemaApply() {
     try {
       for (const step of STEPS) {
         log(`▶ ${step.label} (${step.name})`)
-        const res = await fetch('/api/run-simple-migration', {
+        // Prefer the main runner; fallback to simple if not available
+        const doPost = (path: string) => fetch(path, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -39,6 +40,10 @@ export default function SchemaApply() {
           },
           body: JSON.stringify({ name: step.name }),
         })
+        let res = await doPost('/api/run-migration')
+        if (!res.ok && (res.status === 404 || res.status === 405)) {
+          res = await doPost('/api/run-simple-migration')
+        }
         const ok = res.ok
         let body: any = null
         try { body = await res.json() } catch {}

@@ -8,9 +8,9 @@ function maskCoord(n?: number): string {
   return n.toFixed(3)
 }
 
-async function fetchJson(url: string) {
+async function fetchJson(path: string) {
   try {
-    const res = await fetch(url, { cache: 'no-store' })
+    const res = await fetch(path, { cache: 'no-store' })
     const ok = res.ok
     let body: any = null
     try { body = await res.json() } catch {}
@@ -23,9 +23,7 @@ async function fetchJson(url: string) {
 export default async function AdminTools() {
   const cookieStore = cookies()
   const headersList = await headers()
-  const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
-  const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
-  const baseUrl = host ? `${protocol}${host}` : ''
+  // Using relative URLs ensures requests hit the same deployment
 
   // Parse la_loc cookie
   let laLoc: { lat?: number; lng?: number; zip?: string; city?: string; state?: string } | null = null
@@ -46,11 +44,11 @@ export default async function AdminTools() {
 
   // Health checks
   const [envH, dbH, schemaH, postgisH, searchH] = await Promise.all([
-    baseUrl ? fetchJson(`${baseUrl}/api/health/env`) : Promise.resolve({ ok: false, body: null }),
-    baseUrl ? fetchJson(`${baseUrl}/api/health/db`) : Promise.resolve({ ok: false, body: null }),
-    baseUrl ? fetchJson(`${baseUrl}/api/health/schema`) : Promise.resolve({ ok: false, body: null }),
-    baseUrl ? fetchJson(`${baseUrl}/api/health/postgis`) : Promise.resolve({ ok: false, body: null }),
-    baseUrl ? fetchJson(`${baseUrl}/api/health/search`) : Promise.resolve({ ok: false, body: null }),
+    fetchJson('/api/health/env'),
+    fetchJson('/api/health/db'),
+    fetchJson('/api/health/schema'),
+    fetchJson('/api/health/postgis'),
+    fetchJson('/api/health/search'),
   ])
 
   const Badge = ({ ok }: { ok: boolean }) => (

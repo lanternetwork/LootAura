@@ -15,6 +15,7 @@ import DateWindowLabel from '@/components/filters/DateWindowLabel'
 import DegradedBanner from '@/components/DegradedBanner'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
+import LoadMoreButton from '@/components/LoadMoreButton'
 
 // Cookie utility functions
 function getCookie(name: string): string | null {
@@ -53,10 +54,16 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
   const [zipError, setZipError] = useState<string | null>(null)
   const [dateWindow, setDateWindow] = useState<any>(null)
   const [degraded, setDegraded] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
 
-  const fetchSales = useCallback(async () => {
-    setLoading(true)
-    console.log(`[SALES] fetchSales called with location: ${filters.lat}, ${filters.lng}`)
+  const fetchSales = useCallback(async (append = false) => {
+    if (append) {
+      setLoadingMore(true)
+    } else {
+      setLoading(true)
+    }
+    console.log(`[SALES] fetchSales called with location: ${filters.lat}, ${filters.lng}, append: ${append}`)
     
     // If no location, don't try to fetch sales yet
     if (!filters.lat || !filters.lng) {
@@ -64,7 +71,12 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
       setSales([])
       setDateWindow(null)
       setDegraded(false)
-      setLoading(false)
+      setHasMore(true)
+      if (append) {
+        setLoadingMore(false)
+      } else {
+        setLoading(false)
+      }
       return
     }
 
@@ -75,8 +87,8 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
       city: filters.city,
       categories: filters.categories.length > 0 ? filters.categories : undefined,
       dateRange: filters.dateRange !== 'any' ? filters.dateRange : undefined,
-      limit: 50,
-      offset: 0,
+      limit: 24,
+      offset: append ? sales.length : 0,
     }
 
     const queryString = new URLSearchParams(
@@ -99,23 +111,40 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
       console.log(`[SALES] API response:`, data)
       
       if (data.ok) {
-        setSales(data.data || [])
+        const newSales = data.data || []
+        if (append) {
+          setSales(prev => [...prev, ...newSales])
+        } else {
+          setSales(newSales)
+        }
         setDateWindow(data.dateWindow || null)
         setDegraded(data.degraded || false)
-        console.log(`[SALES] Set ${data.data?.length || 0} sales`)
+        setHasMore(newSales.length === 24) // If we got less than 24, no more data
+        console.log(`[SALES] ${append ? 'Appended' : 'Set'} ${newSales.length} sales, hasMore: ${newSales.length === 24}`)
       } else {
         console.error('Sales API error:', data.error)
-        setSales([])
-        setDateWindow(null)
-        setDegraded(false)
+        if (!append) {
+          setSales([])
+          setDateWindow(null)
+          setDegraded(false)
+        }
+        setHasMore(false)
       }
     } catch (error) {
       console.error('Error fetching sales:', error)
       setSales([])
     } finally {
-      setLoading(false)
+      if (append) {
+        setLoadingMore(false)
+      } else {
+        setLoading(false)
+      }
     }
-  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange])
+  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, sales.length])
+
+  const loadMore = useCallback(async () => {
+    await fetchSales(true)
+  }, [fetchSales])
 
   useEffect(() => {
     fetchSales()
@@ -263,11 +292,18 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
                 <p className="text-gray-400 mt-2">Try adjusting your filters or location.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="sales-grid">
-                {sales.map((sale) => (
-                  <SaleCard key={sale.id} sale={sale} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="sales-grid">
+                  {sales.map((sale) => (
+                    <SaleCard key={sale.id} sale={sale} />
+                  ))}
+                </div>
+                <LoadMoreButton
+                  onLoadMore={loadMore}
+                  hasMore={hasMore}
+                  loading={loadingMore}
+                />
+              </>
             )}
           </div>
         </div>

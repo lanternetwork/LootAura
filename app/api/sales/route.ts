@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
     
-    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50, 100)
+    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 24, 48)
     const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0, 0)
     
     // Convert date range to start/end dates
@@ -140,7 +140,8 @@ export async function GET(request: NextRequest) {
       }
       
       const { data: salesData, error: salesError } = await query
-        .order('created_at', { ascending: false })
+        .order('date_start', { ascending: true })
+        .order('id', { ascending: true })
         .limit(limit)
         .range(offset, offset + limit - 1)
       
@@ -170,9 +171,20 @@ export async function GET(request: NextRequest) {
             distance_km: Math.round(distanceKm * 100) / 100
           }
         })
-        .filter((sale: any) => sale.distance_km <= distanceKm)
-        .sort((a: any, b: any) => a.distance_m - b.distance_m)
-        .slice(0, limit)
+                .filter((sale: any) => sale.distance_km <= distanceKm)
+                .sort((a: any, b: any) => {
+                  // Primary sort: distance
+                  if (a.distance_m !== b.distance_m) {
+                    return a.distance_m - b.distance_m
+                  }
+                  // Secondary sort: starts_at
+                  if (a.starts_at !== b.starts_at) {
+                    return new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()
+                  }
+                  // Tertiary sort: id (stable)
+                  return a.id.localeCompare(b.id)
+                })
+                .slice(0, limit)
       
       console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`)
       

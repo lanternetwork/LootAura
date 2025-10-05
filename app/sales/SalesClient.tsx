@@ -50,6 +50,7 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
 
   const [sales, setSales] = useState<Sale[]>(initialSales)
   const [loading, setLoading] = useState(false)
+  const [fetchedOnce, setFetchedOnce] = useState(false)
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [zipError, setZipError] = useState<string | null>(null)
   const [dateWindow, setDateWindow] = useState<any>(null)
@@ -167,9 +168,11 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
         }
         setHasMore(false)
       }
+      setFetchedOnce(true)
     } catch (error) {
       console.error('Error fetching sales:', error)
       setSales([])
+      setFetchedOnce(true)
     } finally {
       if (append) {
         setLoadingMore(false)
@@ -396,12 +399,7 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
 
           {/* Sales Grid */}
           <div className="mb-6">
-            {loading ? (
-              <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-2">Loading sales...</span>
-              </div>
-            ) : (!filters.lat || !filters.lng) ? (
+            {(!filters.lat || !filters.lng) ? (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">📍</div>
                 <h3 className="text-xl font-semibold text-gray-700 mb-2">Getting Your Location</h3>
@@ -413,6 +411,11 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
                     error={locationError?.message || null} 
                   />
                 </div>
+              </div>
+            ) : (loading || !fetchedOnce) ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-2">Loading sales...</span>
               </div>
             ) : sales.length === 0 ? (
               <div className="text-center py-12">

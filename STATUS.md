@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 2b6264d — feat(admin): restore consolidated admin dashboard with location tools and health links (by Yard Sale Tracker on 2025-10-05 15:48:03 -0400)
+- **Latest commit:** a7a4839 — feat(admin): snapshot view auto-runs tests and shows check/x with manual retest links (by Yard Sale Tracker on 2025-10-05 15:55:54 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18263510638
+- **CI status:** running, last run: run 18263581191
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T19:48:49.505Z
+Updated automatically by Cursor on 2025-10-05T19:56:46.604Z

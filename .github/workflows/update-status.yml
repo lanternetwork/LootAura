@@ -19,8 +19,8 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install deps
-        run: npm ci
+      - name: Install deps (no lockfile)
+        run: npm install --include=dev
 
       - name: Generate STATUS.md
         run: npx tsx scripts/update-status.ts

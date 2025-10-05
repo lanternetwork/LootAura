@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 905dd1d — revert(admin): restore full modular dashboard from 69c77d45 (HealthChecks, SchemaSection, MapPreview, ZipLookupTool, SalesTester, SeedingTools, UsageSection, CopyButton) (by Yard Sale Tracker on 2025-10-05 17:14:43 -0400)
+- **Latest commit:** 8fd0654 — chore: bump STATUS.md to trigger redeploy (by Yard Sale Tracker on 2025-10-05 17:38:22 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18264437892
+- **CI status:** running, last run: run 18264697207
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,5 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T21:15:33.063Z
-Force redeploy: status bump.
+Updated automatically by Cursor on 2025-10-05T21:38:59.738Z

@@ -412,28 +412,38 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
                   />
                 </div>
               </div>
-            ) : (loading || !fetchedOnce) ? (
-              <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span className="ml-2">Loading sales...</span>
-              </div>
-            ) : sales.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">No sales found matching your criteria.</p>
-                <p className="text-gray-400 mt-2">Try adjusting your filters or location.</p>
-              </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="sales-grid">
-                  {sales.map((sale) => (
-                    <SaleCard key={sale.id} sale={sale} />
-                  ))}
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={`${(loading || !fetchedOnce) ? 'flex' : 'hidden'} justify-center items-center py-12`}
+                >
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                  <span className="ml-2">Loading sales...</span>
                 </div>
-                <LoadMoreButton
-                  onLoadMore={loadMore}
-                  hasMore={hasMore}
-                  loading={loadingMore}
-                />
+
+                {!(loading || !fetchedOnce) && (
+                  sales.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500 text-lg">No sales found matching your criteria.</p>
+                      <p className="text-gray-400 mt-2">Try adjusting your filters or location.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="sales-grid">
+                        {sales.map((sale) => (
+                          <SaleCard key={sale.id} sale={sale} />
+                        ))}
+                      </div>
+                      <LoadMoreButton
+                        onLoadMore={loadMore}
+                        hasMore={hasMore}
+                        loading={loadingMore}
+                      />
+                    </>
+                  )
+                )}
               </>
             )}
           </div>

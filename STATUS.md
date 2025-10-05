@@ -2,16 +2,16 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 8114b59 — feat(map): show all sale pins within radius via markers API and hook (by LootAura DevBot)
+- **Latest commit:** f5ef8b4 — fix(ci): use npm install instead of npm ci for STATUS updater (by Yard Sale Tracker on 2025-10-05 09:57:43 -0400)
 - **Active PR:** n/a
-- **CI status:** unknown
+- **CI status:** running, last run: run 18259725369
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
 - **Tables present:** profiles, sales, items, favorites, reviews, zipcodes (status: unknown)
 - **RLS:** status unknown per table
 - **Geom & PostGIS:** status unknown (GIST index, trigger)
-- **Last applied migrations:** unknown
+- **Last applied migrations:** unknown (requires DB connectivity)
 
 ## 3. Public Views & RPC (Option A)
 - **Views present:** sales_v2, items_v2, favorites_v2, profiles_v2 (status: unknown)
@@ -24,29 +24,29 @@
 - **/api/reviews:** address_key + seller_id linkage (status: planned)
 - **/api/health/** routes:** env, db, schema, postgis, auth (status: needs verification)
 - **Pagination:** virtualized list; page size varies
-- **Mock/Seed data count:** unknown
-- **Admin Tools:** present; depend on schema
+- **Mock/Seed data count:** unknown (seed migrations present)
+- **Admin Tools:** present; functionality depends on schema application
 
 ## 5. Frontend & UX
-- **Map behavior:** ✅ full-radius pins via markers API (server cap; no clustering yet)
+- **Map behavior:** ✅ full-radius pins via markers API (server cap, no clustering)
 - **Responsiveness:** mobile/tablet friendly
-- **Accessibility score:** not measured
-- **Branding:** Loot Aura mostly applied; verify no YardSaleFinder remnants
+- **Accessibility score:** not measured in this run
+- **Branding:** Loot Aura in progress; verify no YardSaleFinder remnants
 
 ## 6. Deployments
 - **Vercel URLs:** Production/Preview (insert)
-- **Environment vars:** NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, etc. (verify)
-- **Last deploy health:** unknown
+- **Environment vars:** NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, etc. (verify set)
+- **Last deploy health:** unknown in this run
 
 ## 7. Known Issues / TODO
-- Apply 032/033 migrations; restore lootaura_v2
-- Apply 034 views/RPC; verify grants
-- Wire /api/sales fully to Option A RPC; confirm degraded flag
-- Seed minimal data (Louisville, Nashville, Atlanta)
-- Consider marker clustering
+- Apply 032/033 migrations to restore lootaura_v2 schema
+- Apply 034 public views/RPC and verify grants
+- Wire /api/sales fully to Option A RPC, confirm degraded flag
+- Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
+- Consider marker clustering for dense maps
 
 ## 8. Next Milestone
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T00:00:00.000Z
+Updated automatically by Cursor on 2025-10-05T13:58:44.807Z

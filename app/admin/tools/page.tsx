@@ -8,9 +8,9 @@ function maskCoord(n?: number): string {
   return n.toFixed(3)
 }
 
-async function fetchJson(path: string) {
+async function fetchJson(url: string) {
   try {
-    const res = await fetch(path, { cache: 'no-store' })
+    const res = await fetch(url, { cache: 'no-store' })
     const ok = res.ok
     let body: any = null
     try { body = await res.json() } catch {}
@@ -23,7 +23,9 @@ async function fetchJson(path: string) {
 export default async function AdminTools() {
   const cookieStore = cookies()
   const headersList = await headers()
-  // Use relative paths for in-app API calls to avoid base URL issues
+  const host = headersList.get('x-forwarded-host') || headersList.get('host') || ''
+  const protocol = (headersList.get('x-forwarded-proto') || 'https') + '://'
+  const baseUrl = host ? `${protocol}${host}` : ''
 
   // Parse la_loc cookie
   let laLoc: { lat?: number; lng?: number; zip?: string; city?: string; state?: string } | null = null
@@ -42,71 +44,35 @@ export default async function AdminTools() {
     source = 'ip'
   }
 
-  // Health checks (auto-run)
+  // Health checks
   const [envH, dbH, schemaH, postgisH, searchH] = await Promise.all([
-    fetchJson('/api/health/env'),
-    fetchJson('/api/health/db'),
-    fetchJson('/api/health/schema'),
-    fetchJson('/api/health/postgis'),
-    fetchJson('/api/health/search'),
+    baseUrl ? fetchJson(`${baseUrl}/api/health/env`) : Promise.resolve({ ok: false, body: null }),
+    baseUrl ? fetchJson(`${baseUrl}/api/health/db`) : Promise.resolve({ ok: false, body: null }),
+    baseUrl ? fetchJson(`${baseUrl}/api/health/schema`) : Promise.resolve({ ok: false, body: null }),
+    baseUrl ? fetchJson(`${baseUrl}/api/health/postgis`) : Promise.resolve({ ok: false, body: null }),
+    baseUrl ? fetchJson(`${baseUrl}/api/health/search`) : Promise.resolve({ ok: false, body: null }),
   ])
-
-  // Diagnostics tests (auto-run snapshot)
-  const diagnostics = [
-    { name: 'Debug Tables', path: '/api/debug-tables' },
-    { name: 'Test DB', path: '/api/test-db' },
-    { name: 'Test RPC', path: '/api/test-rpc' },
-    { name: 'Test Sale Lookup', path: '/api/test-sale-lookup' },
-    { name: 'Test Reviews Table', path: '/api/test-reviews-table' },
-    { name: 'Test Reviews Insert', path: '/api/test-reviews-insert' },
-    { name: 'Test Reviews Creation', path: '/api/test-reviews-creation' },
-    { name: 'Test Batch Reviews', path: '/api/test-batch-reviews' },
-  ] as const
-
-  const diagResults = await Promise.all(
-    diagnostics.map(async (t) => {
-      const r = await fetchJson(t.path)
-      return { name: t.name, path: t.path, ok: !!r.ok }
-    })
-  )
 
   const Badge = ({ ok }: { ok: boolean }) => (
     <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs ${ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-      {ok ? '✔' : '✖'}
+      {ok ? 'OK' : 'FAIL'}
     </span>
   )
 
-  const allHealthOk = !!envH.ok && !!dbH.ok && !!schemaH.ok && !!postgisH.ok && !!searchH.ok
-  const allDiagOk = diagResults.every((d) => d.ok)
-  const overallOk = allHealthOk && allDiagOk
-
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      {/* Header */}
+    <div className="max-w-5xl mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Admin Dashboard</h1>
-          <p className="text-sm text-gray-600">Operational snapshot and diagnostic tools</p>
-        </div>
-        <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm ${overallOk ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          <span className="text-lg">{overallOk ? '✔' : '✖'}</span>
-          <span>{overallOk ? 'All systems nominal' : 'Attention required'}</span>
-        </div>
+        <h1 className="text-2xl font-semibold">Admin Tools</h1>
+        <nav className="text-sm flex items-center gap-3">
+          <Link href="/admin/usage" className="text-blue-600 hover:underline">Usage Diagnostics</Link>
+          <a href="#location" className="text-blue-600 hover:underline">Location Tools</a>
+          <a href="#health" className="text-blue-600 hover:underline">Health</a>
+          <a href="#diagnostics" className="text-blue-600 hover:underline">Diagnostics</a>
+        </nav>
       </div>
 
-      {/* Top nav */}
-      <nav className="text-sm flex items-center gap-3 border-b pb-3">
-        <Link href="/admin/usage" className="text-blue-600 hover:underline">Usage Diagnostics</Link>
-        <a href="#location" className="text-blue-600 hover:underline">Location Tools</a>
-        <a href="#health" className="text-blue-600 hover:underline">Health</a>
-        <a href="#diagnostics" className="text-blue-600 hover:underline">Diagnostics</a>
-      </nav>
-
-      {/* Main content grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          {/* Location state */}
-          <div id="location" className="rounded-lg border bg-white p-4 shadow-sm">
+      {/* Location state */}
+      <div id="location" className="rounded-lg border bg-white p-4">
         <h2 className="text-lg font-medium mb-2">Location state</h2>
         <div className="text-sm text-gray-700 space-y-1">
           <div>
@@ -125,75 +91,55 @@ export default async function AdminTools() {
             <span className="text-gray-500">Source:</span> {source}
           </div>
         </div>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link
-              href="/admin/tools/clear"
-              className="px-3 py-1.5 rounded border text-sm hover:bg-gray-50"
-            >
-              Clear la_loc cookie (this browser)
-            </Link>
-            <Link
-              href="/sales?simulateNeutral=1"
-              className="px-3 py-1.5 rounded border text-sm hover:bg-gray-50"
-            >
-              Simulate neutral fallback
-            </Link>
-            <form action="/api/geocoding/zip" method="get" target="_blank" className="inline-flex items-center gap-2 text-sm">
-              <input name="zip" placeholder="Test ZIP" className="border rounded px-2 py-1" />
-              <button className="px-2 py-1 border rounded hover:bg-gray-50" type="submit">Test ZIP lookup</button>
-            </form>
-          </div>
-        </div>
 
-          {/* Health overview (snapshot) */}
-          <div id="health" className="rounded-lg border bg-white p-4 shadow-sm">
+        <div className="mt-4 flex gap-3">
+          <Link
+            href="/admin/tools/clear"
+            className="px-3 py-1.5 rounded border text-sm hover:bg-gray-50"
+          >
+            Clear la_loc cookie (this browser)
+          </Link>
+          <Link
+            href="/sales?simulateNeutral=1"
+            className="px-3 py-1.5 rounded border text-sm hover:bg-gray-50"
+          >
+            Simulate neutral fallback
+          </Link>
+          <form action="/api/geocoding/zip" method="get" target="_blank" className="inline-flex items-center gap-2 text-sm">
+            <input name="zip" placeholder="Test ZIP" className="border rounded px-2 py-1" />
+            <button className="px-2 py-1 border rounded hover:bg-gray-50" type="submit">Test ZIP lookup</button>
+          </form>
+        </div>
+      </div>
+
+      {/* Health overview */}
+      <div id="health" className="rounded-lg border bg-white p-4">
         <h2 className="text-lg font-medium mb-2">Health Overview</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Env</span><div className="flex items-center gap-2"><Badge ok={!!envH.ok} /><Link href="/api/health/env" className="underline text-blue-600">Run</Link></div></div>
-          <div className="flex items-center justify-between border rounded px-3 py-2"><span>DB</span><div className="flex items-center gap-2"><Badge ok={!!dbH.ok} /><Link href="/api/health/db" className="underline text-blue-600">Run</Link></div></div>
-          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Schema</span><div className="flex items-center gap-2"><Badge ok={!!schemaH.ok} /><Link href="/api/health/schema" className="underline text-blue-600">Run</Link></div></div>
-          <div className="flex items-center justify-between border rounded px-3 py-2"><span>PostGIS</span><div className="flex items-center gap-2"><Badge ok={!!postgisH.ok} /><Link href="/api/health/postgis" className="underline text-blue-600">Run</Link></div></div>
-          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Search</span><div className="flex items-center gap-2"><Badge ok={!!searchH.ok} /><Link href="/api/health/search" className="underline text-blue-600">Run</Link></div></div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Env</span><Badge ok={!!envH.ok} /></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>DB</span><Badge ok={!!dbH.ok} /></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Schema</span><Badge ok={!!schemaH.ok} /></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>PostGIS</span><Badge ok={!!postgisH.ok} /></div>
+          <div className="flex items-center justify-between border rounded px-3 py-2"><span>Search</span><Badge ok={!!searchH.ok} /></div>
         </div>
         <div className="mt-3 text-xs text-gray-600">Detailed endpoints are available under /api/health/*</div>
-          </div>
+      </div>
 
-          {/* Diagnostics and Seeds (snapshot) */}
-          <div id="diagnostics" className="rounded-lg border bg-white p-4 shadow-sm">
+      {/* Diagnostics and Seeds */}
+      <div id="diagnostics" className="rounded-lg border bg-white p-4">
         <h2 className="text-lg font-medium mb-2">Diagnostics & Seeds</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          {diagResults.map((r) => (
-            <div key={r.path} className="flex items-center justify-between border rounded px-3 py-2">
-              <span>{r.name}</span>
-              <div className="flex items-center gap-2">
-                <Badge ok={r.ok} />
-                <Link href={r.path} className="underline text-blue-600">Run</Link>
-              </div>
-            </div>
-          ))}
+          <Link href="/api/debug-tables" className="border rounded px-3 py-2 hover:bg-gray-50">Debug Tables</Link>
+          <Link href="/api/test-db" className="border rounded px-3 py-2 hover:bg-gray-50">Test DB</Link>
+          <Link href="/api/test-rpc" className="border rounded px-3 py-2 hover:bg-gray-50">Test RPC</Link>
+          <Link href="/api/test-sale-lookup" className="border rounded px-3 py-2 hover:bg-gray-50">Test Sale Lookup</Link>
+          <Link href="/api/test-reviews-table" className="border rounded px-3 py-2 hover:bg-gray-50">Test Reviews Table</Link>
+          <Link href="/api/test-reviews-insert" className="border rounded px-3 py-2 hover:bg-gray-50">Test Reviews Insert</Link>
+          <Link href="/api/test-reviews-creation" className="border rounded px-3 py-2 hover:bg-gray-50">Test Reviews Creation</Link>
+          <Link href="/api/test-batch-reviews" className="border rounded px-3 py-2 hover:bg-gray-50">Test Batch Reviews</Link>
           <Link href="/api/seed-public" className="border rounded px-3 py-2 hover:bg-gray-50">Seed Public</Link>
           <Link href="/api/seed-direct" className="border rounded px-3 py-2 hover:bg-gray-50">Seed Direct</Link>
         </div>
-          </div>
-        </div>
-        {/* Sidebar quick info */}
-        <aside className="space-y-6">
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h3 className="font-medium mb-2">Summary</h3>
-            <div className="text-sm text-gray-700 space-y-1">
-              <div className="flex items-center justify-between"><span>Health</span><Badge ok={allHealthOk} /></div>
-              <div className="flex items-center justify-between"><span>Diagnostics</span><Badge ok={allDiagOk} /></div>
-            </div>
-          </div>
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h3 className="font-medium mb-2">Quick Links</h3>
-            <ul className="space-y-2 text-sm">
-              <li><Link href="/sales" className="text-blue-600 underline">Sales</Link></li>
-              <li><Link href="/favorites" className="text-blue-600 underline">Favorites</Link></li>
-              <li><Link href="/explore" className="text-blue-600 underline">Explore</Link></li>
-            </ul>
-          </div>
-        </aside>
       </div>
     </div>
   )

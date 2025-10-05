@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
         seller_id: sales[0].owner_id, // User 1 is the seller
         rating: 5,
         comment: 'Great sale by User 1!',
+        address: '123 Test Street', // Required field in reviews table
         address_key: '123 test street|test city|TS|12345',
         review_key: '123 test street|test city|TS|12345|11111111-1111-1111-1111-111111111111'
       },
@@ -120,6 +121,7 @@ export async function POST(request: NextRequest) {
         seller_id: sales[0].owner_id, // User 1 is the seller
         rating: 4,
         comment: 'Good selection at User 1 sale',
+        address: '123 Test Street', // Required field in reviews table
         address_key: '123 test street|test city|TS|12345',
         review_key: '123 test street|test city|TS|12345|11111111-1111-1111-1111-111111111111'
       },
@@ -130,6 +132,7 @@ export async function POST(request: NextRequest) {
         seller_id: sales[1].owner_id, // User 2 is the seller
         rating: 3,
         comment: 'User 2 had okay items',
+        address: '123 Test Street', // Required field in reviews table
         address_key: '123 test street|test city|TS|12345',
         review_key: '123 test street|test city|TS|12345|22222222-2222-2222-2222-222222222222'
       },
@@ -139,6 +142,7 @@ export async function POST(request: NextRequest) {
         seller_id: sales[1].owner_id, // User 2 is the seller
         rating: 5,
         comment: 'Excellent sale by User 2!',
+        address: '123 Test Street', // Required field in reviews table
         address_key: '123 test street|test city|TS|12345',
         review_key: '123 test street|test city|TS|12345|22222222-2222-2222-2222-222222222222'
       }

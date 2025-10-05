@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** eb2bc3f — chore(branding): replace YardSaleFinder/YSF with Loot Aura/lootaura across docs and source; feat(admin): re-add snapshot tests using relative URLs (by Yard Sale Tracker on 2025-10-05 16:10:04 -0400)
+- **Latest commit:** 905dd1d — revert(admin): restore full modular dashboard from 69c77d45 (HealthChecks, SchemaSection, MapPreview, ZipLookupTool, SalesTester, SeedingTools, UsageSection, CopyButton) (by Yard Sale Tracker on 2025-10-05 17:14:43 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18263734185
+- **CI status:** running, last run: run 18264437892
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T20:10:43.786Z
+Updated automatically by Cursor on 2025-10-05T21:15:33.063Z

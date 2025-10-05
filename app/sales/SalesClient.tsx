@@ -475,11 +475,7 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
         </div>
       </div>
 
-      {/* Mobile Filters Modal */}
-      <FiltersModal 
-        isOpen={showFiltersModal} 
-        onClose={() => setShowFiltersModal(false)} 
-      />
+      {/* Mobile Filters Modal removed per UX request to avoid duplicate filters */}
     </div>
   )
 }

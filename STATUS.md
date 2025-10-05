@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 305c9cb — fix(eslint): merge configs into a single valid JSON with next/core-web-vitals (by Yard Sale Tracker on 2025-10-05 10:33:07 -0400)
+- **Latest commit:** f399b05 — fix(eslint): switch to .eslintrc.cjs and clear JSON to avoid parse error (by Yard Sale Tracker on 2025-10-05 10:34:38 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18260149892
+- **CI status:** running, last run: run 18260164186
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T14:34:37.934Z
+Updated automatically by Cursor on 2025-10-05T14:35:47.723Z

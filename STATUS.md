@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 0eafef6 — chore: stage package.json change carried locally (by Yard Sale Tracker on 2025-10-05 10:04:43 -0400)
+- **Latest commit:** 1fb5e66 — feat(ui): make Favorite button a heart icon only (no bg/text) (by Yard Sale Tracker on 2025-10-05 10:06:03 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18259807174
+- **CI status:** running, last run: run 18259826593
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T14:05:39.077Z
+Updated automatically by Cursor on 2025-10-05T14:07:16.224Z

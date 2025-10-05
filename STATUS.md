@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** a7a4839 — feat(admin): snapshot view auto-runs tests and shows check/x with manual retest links (by Yard Sale Tracker on 2025-10-05 15:55:54 -0400)
+- **Latest commit:** 77919bd — style(admin): polish dashboard layout, summary, and nav for professional snapshot (by Yard Sale Tracker on 2025-10-05 16:02:37 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18263581191
+- **CI status:** running, last run: run 18263645150
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T19:56:46.604Z
+Updated automatically by Cursor on 2025-10-05T20:03:18.531Z

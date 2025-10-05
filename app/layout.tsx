@@ -11,11 +11,11 @@ export const revalidate = 0
 export const fetchCache = 'force-no-store'
 
 export const metadata: Metadata = {
-  title: 'YardSaleFinder - Find Amazing Yard Sale Treasures',
+  title: 'Loot Aura - Find Amazing Yard Sale Treasures',
   description: 'Discover local yard sales, garage sales, and estate sales in your area. Never miss a great deal again!',
   keywords: 'yard sale, garage sale, estate sale, local sales, treasure hunting',
   openGraph: {
-    title: 'YardSaleFinder - Find Amazing Yard Sale Treasures',
+    title: 'Loot Aura - Find Amazing Yard Sale Treasures',
     description: 'Discover local yard sales, garage sales, and estate sales in your area.',
     type: 'website',
   },

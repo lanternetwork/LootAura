@@ -39,7 +39,7 @@ export default function SignIn() {
     <div className="min-h-screen flex items-center justify-center bg-neutral-50">
       <div className="max-w-md w-full space-y-8 p-8">
         <div>
-          <h1 className="text-3xl font-bold text-center">Welcome to YardSaleFinder</h1>
+          <h1 className="text-3xl font-bold text-center">Welcome to Loot Aura</h1>
           <p className="mt-2 text-center text-neutral-600">
             Sign in to save favorites and post your own sales
           </p>

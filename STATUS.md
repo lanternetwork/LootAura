@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 7b8d792 — ci: allow lockfile generator to run on milestone/* pushes and manual dispatch (by Yard Sale Tracker on 2025-10-05 10:42:55 -0400)
+- **Latest commit:** 0a18cf1 — chore(build): quiet webpack infra warnings to keep deploy logs clean (by Yard Sale Tracker on 2025-10-05 10:48:12 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18260251730
+- **CI status:** running, last run: run 18260297135
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T14:44:09.335Z
+Updated automatically by Cursor on 2025-10-05T14:48:43.729Z

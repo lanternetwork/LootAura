@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import CopyButton from './CopyButton'
 import HealthChecks from './HealthChecks'
 import SchemaSection from './SchemaSection'
+import SchemaApply from './SchemaApply'
 import MapPreview from './MapPreview'
 import ZipLookupTool from './ZipLookupTool'
 import SalesTester from './SalesTester'
@@ -150,6 +151,9 @@ export default async function AdminToolsPage() {
         </Section>
 
         <Section title="Database & Schema" description="Schema details, RLS status, and geometry/index verifications.">
+          <div className="mb-4">
+            <SchemaApply />
+          </div>
           <SchemaSection />
         </Section>
 

@@ -56,6 +56,8 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
   const [degraded, setDegraded] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [mapSales, setMapSales] = useState<Sale[]>([])
+  const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
 
   const fetchSales = useCallback(async (append = false) => {
     if (append) {
@@ -119,8 +121,43 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
         }
         setDateWindow(data.dateWindow || null)
         setDegraded(data.degraded || false)
-        setHasMore(newSales.length === 24) // If we got less than 24, no more data
-        console.log(`[SALES] ${append ? 'Appended' : 'Set'} ${newSales.length} sales, hasMore: ${newSales.length === 24}`)
+        const pageHasMore = newSales.length === 24
+        setHasMore(pageHasMore)
+        console.log(`[SALES] ${append ? 'Appended' : 'Set'} ${newSales.length} sales, hasMore: ${pageHasMore}`)
+
+        // Prefetch next page in background for instant next click
+        if (!append && pageHasMore) {
+          const nextParams: GetSalesParams = {
+            ...params,
+            offset: newSales.length,
+          }
+          const nextQs = new URLSearchParams(
+            Object.entries(nextParams).reduce((acc, [key, value]) => {
+              if (value !== undefined && value !== null && value !== '') {
+                if (Array.isArray(value)) {
+                  acc[key] = value.join(',')
+                } else {
+                  acc[key] = String(value)
+                }
+              }
+              return acc
+            }, {} as Record<string, string>)
+          ).toString()
+
+          // Fire and forget prefetch
+          fetch(`/api/sales?${nextQs}`)
+            .then(res => res.json())
+            .then(pref => {
+              if (pref?.ok && Array.isArray(pref.data)) {
+                setNextPageCache(pref.data)
+                // Track if there is more beyond the next cached page
+                if (pref.data.length < 24) {
+                  setHasMore(false)
+                }
+              }
+            })
+            .catch(() => {})
+        }
       } else {
         console.error('Sales API error:', data.error)
         if (!append) {
@@ -142,13 +179,104 @@ export default function SalesClient({ initialSales, initialSearchParams, user }:
     }
   }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, sales.length])
 
+  // Fetch larger set for map pins so all in-radius sales are shown
+  const fetchMapSales = useCallback(async () => {
+    if (!filters.lat || !filters.lng) return
+    try {
+      const params: GetSalesParams = {
+        lat: filters.lat,
+        lng: filters.lng,
+        distanceKm: (filters.distance || 25) * 1.60934,
+        city: filters.city,
+        categories: filters.categories.length > 0 ? filters.categories : undefined,
+        dateRange: filters.dateRange !== 'any' ? filters.dateRange : undefined,
+        limit: 500, // large cap for map pins
+        offset: 0,
+      }
+      const qs = new URLSearchParams(
+        Object.entries(params).reduce((acc, [key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            if (Array.isArray(value)) {
+              acc[key] = value.join(',')
+            } else {
+              acc[key] = String(value)
+            }
+          }
+          return acc
+        }, {} as Record<string, string>)
+      ).toString()
+
+      const res = await fetch(`/api/sales?${qs}`)
+      const data = await res.json()
+      if (data?.ok && Array.isArray(data.data)) {
+        setMapSales(data.data)
+      } else {
+        setMapSales([])
+      }
+    } catch {
+      setMapSales([])
+    }
+  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange])
+
   const loadMore = useCallback(async () => {
+    // Use prefetched next page if available for instant UI
+    if (nextPageCache && nextPageCache.length > 0) {
+      setSales(prev => [...prev, ...nextPageCache])
+      // Determine if there might be more based on cached size
+      const cachedHasMore = nextPageCache.length === 24
+      setHasMore(cachedHasMore)
+      setNextPageCache(null)
+
+      // Prefetch the following page in background
+      const nextOffset = sales.length + (cachedHasMore ? 24 : 0)
+      if (cachedHasMore) {
+        const params: GetSalesParams = {
+          lat: filters.lat!,
+          lng: filters.lng!,
+          distanceKm: (filters.distance || 25) * 1.60934,
+          city: filters.city,
+          categories: filters.categories.length > 0 ? filters.categories : undefined,
+          dateRange: filters.dateRange !== 'any' ? filters.dateRange : undefined,
+          limit: 24,
+          offset: nextOffset,
+        }
+        const qs = new URLSearchParams(
+          Object.entries(params).reduce((acc, [key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+              if (Array.isArray(value)) {
+                acc[key] = value.join(',')
+              } else {
+                acc[key] = String(value)
+              }
+            }
+            return acc
+          }, {} as Record<string, string>)
+        ).toString()
+        fetch(`/api/sales?${qs}`)
+          .then(res => res.json())
+          .then(pref => {
+            if (pref?.ok && Array.isArray(pref.data)) {
+              setNextPageCache(pref.data)
+              if (pref.data.length < 24) setHasMore(false)
+            }
+          })
+          .catch(() => {})
+      }
+      return
+    }
+
     await fetchSales(true)
-  }, [fetchSales])
+  }, [nextPageCache, fetchSales, filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, sales.length])
 
   useEffect(() => {
     fetchSales()
+    fetchMapSales()
   }, [fetchSales])
+
+  // Refetch map pins when filters location/range change
+  useEffect(() => {
+    fetchMapSales()
+  }, [fetchMapSales])
 
   // Don't automatically request location - let user choose
 

@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { useSales } from '@/lib/hooks/useSales'
+import { useSales, useSaleMarkers } from '@/lib/hooks/useSales'
 import { Filters } from '@/state/filters'
 
 // Dynamic imports to avoid build issues
@@ -22,12 +22,13 @@ export default function Explore() {
 
   // Use React Query hook for data fetching
   const { data: sales = [], isLoading, error } = useSales(filters)
+  const { data: markers = [] } = useSaleMarkers(filters)
 
   const mapPoints = useMemo(() => 
-    sales
-      .filter(s => s.lat && s.lng)
-      .map(s => ({ id: s.id, title: s.title, lat: s.lat!, lng: s.lng! }))
-  , [sales])
+    markers
+      .filter(p => typeof p.lat === 'number' && typeof p.lng === 'number')
+      .map(p => ({ id: p.id, title: p.title, lat: p.lat, lng: p.lng }))
+  , [markers])
 
   return (
     <main className="max-w-6xl mx-auto p-4">

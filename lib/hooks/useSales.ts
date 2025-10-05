@@ -19,8 +19,8 @@ export function useSales(filters?: {
   return useQuery({
     queryKey: ['sales', filters],
     queryFn: async () => {
-      // Use the optimized search function for better performance
-      const { data, error } = await sb.rpc('search_sales', {
+      // Prefer Option A RPC if available
+      const { data, error } = await sb.rpc('search_sales_within_distance', {
         search_query: filters?.q || null,
         max_distance_km: filters?.maxKm || null,
         user_lat: filters?.lat || null,
@@ -35,10 +35,60 @@ export function useSales(filters?: {
       })
 
       if (error) {
-        throw new Error(error.message)
+        // Fallback to older search RPC if needed
+        const fallback = await sb.rpc('search_sales', {
+          search_query: filters?.q || null,
+          max_distance_km: filters?.maxKm || null,
+          user_lat: filters?.lat || null,
+          user_lng: filters?.lng || null,
+          date_from: filters?.dateFrom || null,
+          date_to: filters?.dateTo || null,
+          price_min: filters?.min || null,
+          price_max: filters?.max || null,
+          tags_filter: filters?.tags || null,
+          limit_count: 100,
+          offset_count: 0
+        })
+
+        if (fallback.error) {
+          throw new Error(fallback.error.message)
+        }
+
+        return fallback.data as Sale[]
       }
 
       return data as Sale[]
+    },
+  })
+}
+
+export function useSaleMarkers(filters?: {
+  q?: string
+  maxKm?: number
+  lat?: number
+  lng?: number
+  dateFrom?: string
+  dateTo?: string
+  tags?: string[]
+}) {
+  return useQuery({
+    queryKey: ['sale-markers', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (filters?.lat != null) params.set('lat', String(filters.lat))
+      if (filters?.lng != null) params.set('lng', String(filters.lng))
+      if (filters?.maxKm != null) params.set('maxKm', String(filters.maxKm))
+      if (filters?.q) params.set('q', filters.q)
+      if (filters?.dateFrom) params.set('dateFrom', filters.dateFrom)
+      if (filters?.dateTo) params.set('dateTo', filters.dateTo)
+      if (filters?.tags?.length) params.set('tags', filters.tags.join(','))
+
+      const res = await fetch(`/api/sales/markers?${params.toString()}`, { cache: 'no-store' })
+      if (!res.ok) {
+        const t = await res.text()
+        throw new Error(t || 'Failed to load markers')
+      }
+      return (await res.json()) as { id: string; title: string; lat: number; lng: number }[]
     },
   })
 }

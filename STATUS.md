@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 9c53dd7 — fix(location): use neutral US center fallback instead of Louisville for production (by Yard Sale Tracker on 2025-10-05 21:08:36 -0400)
+- **Latest commit:** 4529b6f — fix(types): remove invalid timeout property from fetch options (by Yard Sale Tracker on 2025-10-05 21:13:26 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18267119636
+- **CI status:** running, last run: run 18267196145
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T01:09:12.583Z
+Updated automatically by Cursor on 2025-10-06T01:14:05.010Z

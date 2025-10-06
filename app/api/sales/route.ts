@@ -123,15 +123,10 @@ export async function GET(request: NextRequest) {
         .lte('lat', maxLat)
         .gte('lng', minLng)
         .lte('lng', maxLng)
-        .in('status', ['published', 'active'])
       
-      // Add date filters (inclusive overlap). If end date missing in DB, treat as same-day.
-      if (startDateParam) {
-        query = query.or(`date_end.gte.${startDateParam},and(date_end.is.null,date_start.gte.${startDateParam})`)
-      }
-      if (endDateParam) {
-        query = query.lte('date_start', endDateParam)
-      }
+      // TEMP: Disable date filtering until column names are confirmed (date_start/starts_at)
+      // if (startDateParam) { ... }
+      // if (endDateParam) { ... }
       
       // Add category filters - fallback to text search if tags array not present
       if (categories.length > 0) {
@@ -152,7 +147,6 @@ export async function GET(request: NextRequest) {
       }
       
       const { data: salesData, error: salesError } = await query
-        .order('date_start', { ascending: true })
         .order('id', { ascending: true })
         .limit(limit)
         .range(offset, offset + limit - 1)
@@ -211,8 +205,9 @@ export async function GET(request: NextRequest) {
         results = salesWithDistance.map((row: any) => ({
           id: row.id,
           title: row.title,
-          starts_at: row.starts_at,
-          ends_at: row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null,
+          // Map to common fields
+          starts_at: row.starts_at || (row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null),
+          ends_at: row.ends_at || (row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null),
           lat: row.lat,
           lng: row.lng,
           city: row.city,

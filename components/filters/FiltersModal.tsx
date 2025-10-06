@@ -91,19 +91,21 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
     const endDate = searchParams.get('endDate') || undefined
     const categories = searchParams.get('cat') ? searchParams.get('cat')!.split(',') : []
 
-    setFilters({
-      distance: Math.max(1, Math.min(100, distance)),
-      dateRange: { 
-        type: dateType as DateRange['type'], 
-        startDate, 
-        endDate 
-      },
-      categories
-    })
+    if (!externalFilters) {
+      setInternalFilters({
+        distance: Math.max(1, Math.min(100, distance)),
+        dateRange: { 
+          type: dateType as DateRange['type'], 
+          startDate, 
+          endDate 
+        },
+        categories
+      })
+    }
   }, [searchParams])
 
   const updateFilters = (newFilters: Partial<FilterState>) => {
-    setFilters(prevFilters => {
+    setInternalFilters(prevFilters => {
       const updatedFilters = { ...prevFilters, ...newFilters }
       
       // Update URL with new filters

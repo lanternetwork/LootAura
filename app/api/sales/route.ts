@@ -133,6 +133,12 @@ export async function GET(request: NextRequest) {
         query = query.lte('date_start', endDateParam)
       }
       
+      // Add category filters (expects 'tags' array column)
+      if (categories.length > 0) {
+        // Postgres array contains
+        query = query.contains('tags', categories)
+      }
+
       // Add text search
       if (q) {
         query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,address.ilike.%${q}%`)
@@ -191,37 +197,9 @@ export async function GET(request: NextRequest) {
       
       console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`)
       
-      // If no results from bounding box, try a broader search
+      // If no results, just return empty (never broaden unfiltered)
       if (salesWithDistance.length === 0) {
-        console.log(`[SALES] No results from bounding box, trying broader search...`)
-        const { data: allSales, error: allError } = await supabase
-          .from('sales_v2')
-          .select('*')
-          .in('status', ['published', 'active'])
-          .limit(50)
-        
-        console.log(`[SALES] Broader search result:`, { count: allSales?.length || 0, error: allError })
-        
-        if (allSales && allSales.length > 0) {
-          // Use the broader results
-          const broaderResults = allSales.map((row: any) => ({
-            id: row.id,
-            title: row.title,
-            starts_at: row.starts_at,
-            ends_at: row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null,
-            lat: row.lat,
-            lng: row.lng,
-            city: row.city,
-            state: row.state,
-            zip: row.zip_code,
-            categories: [],
-            cover_image_url: null,
-            distance_m: 0 // No distance calculation for broader search
-          }))
-          
-          results = broaderResults
-          console.log(`[SALES] Using broader search results: ${results.length} sales`)
-        }
+        results = []
       } else {
         results = salesWithDistance.map((row: any) => ({
           id: row.id,
@@ -233,7 +211,7 @@ export async function GET(request: NextRequest) {
           city: row.city,
           state: row.state,
           zip: row.zip_code,
-          categories: [], // TODO: Add categories support
+          categories: row.tags || [],
           cover_image_url: null,
           distance_m: row.distance_m
         }))

@@ -349,7 +349,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   useEffect(() => {
     fetchSales()
     fetchMapSales()
-  }, [fetchSales])
+  }, [fetchSales, fetchMapSales])
 
   // Refetch map pins when filters location/range change
   useEffect(() => {

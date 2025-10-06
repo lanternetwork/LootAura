@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 2404252 — fix(types): remove all next_weekend checks from date mapping (by Yard Sale Tracker on 2025-10-06 11:23:12 -0400)
+- **Latest commit:** b7570dd — fix(filters): align client params with API (startDate/endDate); markers accept start/end keys (by Yard Sale Tracker on 2025-10-06 11:27:04 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18285884814
+- **CI status:** running, last run: run 18285998781
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T15:23:43.347Z
+Updated automatically by Cursor on 2025-10-06T15:27:37.592Z

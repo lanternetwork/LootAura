@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** f07784f — fix(filters): relax date overlap and fallback category matching to avoid empty results (by Yard Sale Tracker on 2025-10-06 11:46:39 -0400)
+- **Latest commit:** 9d5df8a — fix(sales-api): relax filters (no status/date), robust starts/ends mapping; keep bbox + distance (by Yard Sale Tracker on 2025-10-06 11:48:37 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18286557712
+- **CI status:** running, last run: run 18286608516
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T15:47:14.603Z
+Updated automatically by Cursor on 2025-10-06T15:49:21.237Z

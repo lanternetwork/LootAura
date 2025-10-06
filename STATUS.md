@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 89eff6f — feat(api/sales): add degraded fallback to return closest sales when none within radius (by Yard Sale Tracker on 2025-10-06 13:32:42 -0400)
+- **Latest commit:** f6a8275 — fix(api/sales/markers): remove RPC path; query view with bbox; coerce lat/lng; limit results (by Yard Sale Tracker on 2025-10-06 15:49:01 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18289301766
+- **CI status:** running, last run: run 18292636431
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T17:33:29.168Z
+Updated automatically by Cursor on 2025-10-06T19:49:45.201Z

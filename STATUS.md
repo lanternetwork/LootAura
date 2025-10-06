@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** ec69e13 — fix(sales): initialize filters with server-side location to prevent 'location unavailable' message (by Yard Sale Tracker on 2025-10-05 20:29:20 -0400)
+- **Latest commit:** c721caf — debug(sales): add fallback query and better logging to diagnose empty results (by Yard Sale Tracker on 2025-10-05 20:32:20 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18266563314
+- **CI status:** running, last run: run 18266612020
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T00:30:21.456Z
+Updated automatically by Cursor on 2025-10-06T00:32:57.486Z

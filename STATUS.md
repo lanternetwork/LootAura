@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** d376346 — fix(middleware): exclude manifest.json, sw.js, robots, sitemap and assets to stop 401 on PWA files (by Yard Sale Tracker on 2025-10-06 13:30:11 -0400)
+- **Latest commit:** 89eff6f — feat(api/sales): add degraded fallback to return closest sales when none within radius (by Yard Sale Tracker on 2025-10-06 13:32:42 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18289233903
+- **CI status:** running, last run: run 18289301766
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T17:30:59.279Z
+Updated automatically by Cursor on 2025-10-06T17:33:29.168Z

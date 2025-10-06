@@ -146,9 +146,9 @@ export async function GET(request: NextRequest) {
         query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,address.ilike.%${q}%`)
       }
       
+      // Use range for pagination; avoid combining limit and range together
       const { data: salesData, error: salesError } = await query
         .order('id', { ascending: true })
-        .limit(limit)
         .range(offset, offset + limit - 1)
       
       console.log(`[SALES] Direct query response:`, { 
@@ -162,7 +162,9 @@ export async function GET(request: NextRequest) {
       }
       
       // Calculate distances and filter by actual distance
+      // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
+        .filter((sale: any) => typeof sale.lat === 'number' && typeof sale.lng === 'number')
         .map((sale: any) => {
           // Haversine distance calculation
           const R = 6371000 // Earth's radius in meters

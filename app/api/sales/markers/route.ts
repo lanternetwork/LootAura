@@ -18,57 +18,7 @@ export async function GET(request: NextRequest) {
   try {
     const sb = createSupabaseServerClient()
 
-    // Prefer RPC if available (Option A). Try search_sales_within_distance, then search_sales.
-    try {
-      const { data, error } = await sb.rpc('search_sales_within_distance', {
-        search_query: q || null,
-        max_distance_km: maxKm || null,
-        user_lat: lat || null,
-        user_lng: lng || null,
-        date_from: dateFrom || null,
-        date_to: dateTo || null,
-        price_min: null,
-        price_max: null,
-        tags_filter: tags || null,
-        limit_count: limit,
-        offset_count: 0,
-      })
-
-      if (!error && Array.isArray(data)) {
-        const markers = (data as any[])
-          .filter((s: any) => typeof s.lat === 'number' && typeof s.lng === 'number')
-          .map((s: any) => ({ id: s.id, title: s.title, lat: s.lat, lng: s.lng }))
-        return NextResponse.json(markers)
-      }
-    } catch (_) {
-      // Fall through to alternate strategies
-    }
-
-    try {
-      const { data, error } = await sb.rpc('search_sales', {
-        search_query: q || null,
-        max_distance_km: maxKm || null,
-        user_lat: lat || null,
-        user_lng: lng || null,
-        date_from: dateFrom || null,
-        date_to: dateTo || null,
-        price_min: null,
-        price_max: null,
-        tags_filter: tags || null,
-        limit_count: limit,
-        offset_count: 0,
-      })
-      if (!error && Array.isArray(data)) {
-        const markers = (data as any[])
-          .filter((s: any) => typeof s.lat === 'number' && typeof s.lng === 'number')
-          .map((s: any) => ({ id: s.id, title: s.title, lat: s.lat, lng: s.lng }))
-        return NextResponse.json(markers)
-      }
-    } catch (_) {
-      // Fall through to bbox fallback
-    }
-
-    // BBox fallback on public view if RPCs are missing.
+    // Direct view query (robust fallback)
     // Rough degree conversions
     const kmPerDegLat = 111.0
     const latDelta = (maxKm || 25) / kmPerDegLat
@@ -79,19 +29,11 @@ export async function GET(request: NextRequest) {
     const minLng = lng !== undefined ? lng - lngDelta : undefined
     const maxLng = lng !== undefined ? lng + lngDelta : undefined
 
-    let query = sb.from('sales_v2').select('id,title,lat,lng').limit(limit)
+    let query = sb.from('sales_v2').select('id,title,lat,lng')
 
+    // Keep only safe filters to avoid schema mismatches
     if (q) {
       query = query.ilike('title', `%${q}%`)
-    }
-    if (dateFrom) {
-      query = query.gte('date_start', dateFrom)
-    }
-    if (dateTo) {
-      query = query.lte('date_end', dateTo)
-    }
-    if (Array.isArray(tags) && tags.length > 0) {
-      query = query.contains('tags', tags)
     }
     if (
       minLat !== undefined && maxLat !== undefined &&
@@ -104,12 +46,19 @@ export async function GET(request: NextRequest) {
         .lte('lng', maxLng)
     }
 
+    query = query.limit(limit)
+
     const { data, error } = await query
     if (error) throw error
 
     const markers = (data as any[])
-      .filter((s: any) => typeof s.lat === 'number' && typeof s.lng === 'number')
-      .map((s: any) => ({ id: s.id, title: s.title, lat: s.lat, lng: s.lng }))
+      .map((s: any) => {
+        const latNum = typeof s.lat === 'number' ? s.lat : parseFloat(String(s.lat))
+        const lngNum = typeof s.lng === 'number' ? s.lng : parseFloat(String(s.lng))
+        if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
+        return { id: s.id, title: s.title, lat: latNum, lng: lngNum }
+      })
+      .filter(Boolean)
 
     return NextResponse.json(markers)
   } catch (error: any) {

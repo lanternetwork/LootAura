@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 8eaffa7 — chore(sales): remove browser geolocation prompt and button from sales page (by Yard Sale Tracker on 2025-10-06 12:00:32 -0400)
+- **Latest commit:** 4a3cbe7 — fix(sales): guard server-location seeding to run once only when no location is set (by Yard Sale Tracker on 2025-10-06 12:31:31 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18286914655
+- **CI status:** running, last run: run 18287753018
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T16:01:35.483Z
+Updated automatically by Cursor on 2025-10-06T16:32:18.633Z

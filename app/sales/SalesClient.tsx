@@ -509,7 +509,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               onFiltersChange={(newFilters) => {
                 updateFilters({
                   distance: newFilters.distance,
-                  dateRange: newFilters.dateRange,
+                  dateRange: newFilters.dateRange as 'today' | 'weekend' | 'any',
                   categories: newFilters.categories
                 })
               }}

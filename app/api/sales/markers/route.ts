@@ -19,28 +19,24 @@ export async function GET(request: NextRequest) {
     console.log('[MARKERS] Starting markers API request')
     const sb = createSupabaseServerClient()
 
-    // Direct view query (robust fallback)
-    // Rough degree conversions
-    const kmPerDegLat = 111.0
-    const latDelta = (maxKm || 25) / kmPerDegLat
-    const lngDelta = lat ? (maxKm || 25) / (kmPerDegLat * Math.cos((lat * Math.PI) / 180)) : (maxKm || 25) / 85
+    // Use the same logic as the main sales API to avoid 500 errors
+    // Calculate bounding box for approximate distance filtering
+    const latRange = maxKm / 111.0 // 1 degree ≈ 111km
+    const lngRange = lat ? maxKm / (111.0 * Math.cos(lat * Math.PI / 180)) : maxKm / 85
+    
+    const minLat = lat !== undefined ? lat - latRange : undefined
+    const maxLat = lat !== undefined ? lat + latRange : undefined
+    const minLng = lng !== undefined ? lng - lngRange : undefined
+    const maxLng = lng !== undefined ? lng + lngRange : undefined
 
-    const minLat = lat !== undefined ? lat - latDelta : undefined
-    const maxLat = lat !== undefined ? lat + latDelta : undefined
-    const minLng = lng !== undefined ? lng - lngDelta : undefined
-    const maxLng = lng !== undefined ? lng + lngDelta : undefined
+    console.log('[MARKERS] params:', { lat, lng, maxKm, q, dateFrom, dateTo, tags, limit })
+    console.log('[MARKERS] bbox:', { minLat, maxLat, minLng, maxLng })
 
+    // Simple query without complex filters to avoid 500 errors
     let query = sb.from('sales_v2').select('id,title,lat,lng,starts_at,date_start,time_start,date_end,time_end,ends_at')
-
-    // Keep only safe filters to avoid schema mismatches
-    if (q) {
-      query = query.ilike('title', `%${q}%`)
-    }
-    // We'll filter by date window after fetching to avoid OR composition issues
-    if (
-      minLat !== undefined && maxLat !== undefined &&
-      minLng !== undefined && maxLng !== undefined
-    ) {
+    
+    // Only add bbox filter if we have valid coordinates
+    if (minLat !== undefined && maxLat !== undefined && minLng !== undefined && maxLng !== undefined) {
       query = query
         .gte('lat', minLat)
         .lte('lat', maxLat)
@@ -48,20 +44,24 @@ export async function GET(request: NextRequest) {
         .lte('lng', maxLng)
     }
 
+    // Add text search if provided
+    if (q) {
+      query = query.ilike('title', `%${q}%`)
+    }
+
     query = query.limit(limit)
 
-    console.log('[MARKERS] params:', { lat, lng, maxKm, q, dateFrom, dateTo, tags, limit })
-    console.log('[MARKERS] bbox:', { minLat, maxLat, minLng, maxLng })
     const { data, error } = await query
     if (error) {
       console.error('[MARKERS] Query error:', error)
-      throw error
+      return NextResponse.json({ error: 'Database query failed' }, { status: 500 })
     }
 
     const windowStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null
     const windowEnd = dateTo ? new Date(`${dateTo}T23:59:59`) : null
     console.log('[MARKERS] fetched:', Array.isArray(data) ? data.length : 0, 'raw data sample:', data?.slice(0, 2))
 
+    // Filter by date window and convert to markers
     const markers = (data as any[])
       .filter((s: any) => {
         if (!windowStart && !windowEnd) return true

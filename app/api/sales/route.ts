@@ -240,6 +240,14 @@ export async function GET(request: NextRequest) {
         time_start: s.time_start
       })))
       
+      // Debug: Log date filtering details
+      console.log('[SALES] Date filtering debug:', {
+        windowStart: windowStart?.toISOString(),
+        windowEnd: windowEnd?.toISOString(),
+        totalSales: (salesData || []).length,
+        salesWithValidCoords: (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number').length
+      })
+      
       if (salesWithDistance.length === 0) {
         // Degraded fallback: return closest sales regardless of radius to avoid empty UI
         degraded = true

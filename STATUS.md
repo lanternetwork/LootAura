@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** ff5f172 — fix(api): move date filtering to post-fetch window overlap for sales and markers; avoids PostgREST OR issues (by Yard Sale Tracker on 2025-10-06 15:58:26 -0400)
+- **Latest commit:** 77fd716 — feat(filters): restore next_weekend option; map to next Saturday/Sunday in client; support in hook types (by Yard Sale Tracker on 2025-10-06 16:01:38 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18292826619
+- **CI status:** running, last run: run 18292902460
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T19:59:13.803Z
+Updated automatically by Cursor on 2025-10-06T20:02:41.819Z

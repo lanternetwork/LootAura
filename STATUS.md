@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** cd556e2 — debug(sales): add map center debugging and fallback to initialCenter (by Yard Sale Tracker on 2025-10-05 20:35:21 -0400)
+- **Latest commit:** b759e81 — debug(map): add center change logging and force re-render with key prop (by Yard Sale Tracker on 2025-10-05 20:38:13 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18266662949
+- **CI status:** running, last run: run 18266706070
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T00:35:55.408Z
+Updated automatically by Cursor on 2025-10-06T00:38:49.368Z

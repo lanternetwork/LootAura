@@ -5,10 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
 import { GetSalesParams, formatDistance } from '@/lib/data/sales'
 import SalesMap from '@/components/location/SalesMap'
-import UseLocationButton from '@/components/location/UseLocationButton'
 import ZipInput from '@/components/location/ZipInput'
-import ClientGeolocation from '@/components/location/ClientGeolocation'
-import { useLocation } from '@/lib/location/useLocation'
 import SaleCard from '@/components/SaleCard'
 import FiltersModal from '@/components/filters/FiltersModal'
 import FilterTrigger from '@/components/filters/FilterTrigger'
@@ -47,7 +44,6 @@ interface SalesClientProps {
 export default function SalesClient({ initialSales, initialSearchParams, initialCenter, user }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { location, getLocation, loading: locationLoading, error: locationError } = useLocation()
   const { filters, updateFilters, hasActiveFilters } = useFilters(
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
   )
@@ -222,32 +218,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     }
   }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, sales.length])
 
-  // Client-side geolocation handlers
-  const handleClientLocationFound = useCallback((lat: number, lng: number, accuracy?: number) => {
-    console.log('[SALES_CLIENT] Client geolocation found:', { lat, lng, accuracy })
-    setLocationAccuracy('client')
-    
-    // Update filters with more accurate location
-    updateFilters({ lat, lng })
-    
-    // Save to cookie for future visits
-    const locationData = JSON.stringify({
-      lat,
-      lng,
-      accuracy,
-      timestamp: Date.now(),
-      source: 'client'
-    })
-    document.cookie = `la_loc=${locationData}; max-age=${60 * 60 * 24}; path=/; samesite=lax`
-    
-    // Refetch sales with new location
-    fetchSales(false)
-  }, [filters, fetchSales, updateFilters])
-
-  const handleClientLocationError = useCallback((error: string) => {
-    console.log('[SALES_CLIENT] Client geolocation error:', error)
-    // Keep using server location
-  }, [])
+  // Client-side geolocation removed; handlers not used
 
   // Fetch larger set for map pins so all in-radius sales are shown (use markers endpoint)
   const fetchMapSales = useCallback(async () => {
@@ -384,9 +355,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     }
   }, []) // Only run on mount
 
-  const handleLocationClick = () => {
-    getLocation()
-  }
+  // Geolocation prompt removed by design; no client location requests
 
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string) => {
     setZipError(null)
@@ -585,11 +554,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
       {/* Mobile Filters Modal removed per UX request to avoid duplicate filters */}
       
-      {/* Client-side geolocation for better accuracy */}
-      <ClientGeolocation 
-        onLocationFound={handleClientLocationFound}
-        onLocationError={handleClientLocationError}
-      />
+      {/* Client-side geolocation removed to avoid browser prompts */}
     </div>
   )
 }

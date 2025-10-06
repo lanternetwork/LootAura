@@ -30,7 +30,7 @@ export default function SaleCard({ sale }: { sale: Sale }) {
       )}
       <Link 
         className="text-amber-600 font-medium hover:text-amber-700" 
-        href={`/sale/${sale.id}`}
+        href={`/sales/${sale.id}`}
       >
         View Details →
       </Link>

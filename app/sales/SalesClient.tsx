@@ -227,6 +227,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const fetchMapSales = useCallback(async () => {
     if (!filters.lat || !filters.lng) return
     try {
+      console.log('[MAP] fetchMapSales called with filters:', filters)
       // Map dateRange preset to concrete ISO dates for markers too
       let dateFrom: string | undefined
       let dateTo: string | undefined
@@ -258,14 +259,19 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       if (dateTo) params.set('dateTo', dateTo)
       params.set('limit', '1000')
 
+      console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`)
       const res = await fetch(`/api/sales/markers?${params.toString()}`)
       const data = await res.json()
+      console.log('[MAP] Markers response:', data)
       if (Array.isArray(data)) {
+        console.log('[MAP] Setting mapSales to:', data.length, 'markers')
         setMapSales(data as any)
       } else {
+        console.log('[MAP] Setting mapSales to empty array')
         setMapSales([])
       }
-    } catch {
+    } catch (error) {
+      console.error('[MAP] Error fetching markers:', error)
       setMapSales([])
     }
   }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange])
@@ -321,6 +327,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [nextPageCache, fetchSales, filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange])
 
   useEffect(() => {
+    console.log('[SALES] Filters changed, fetching sales and map data')
     fetchSales()
     fetchMapSales()
   }, [fetchSales, fetchMapSales])

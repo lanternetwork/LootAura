@@ -220,6 +220,17 @@ export async function GET(request: NextRequest) {
       
       console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`, { windowStart, windowEnd })
       
+      // Debug: Log sample sales and their dates
+      if (salesWithDistance.length > 0) {
+        console.log('[SALES] Sample filtered sales:', salesWithDistance.slice(0, 3).map(s => ({
+          id: s.id,
+          title: s.title,
+          starts_at: s.starts_at,
+          date_start: s.date_start,
+          time_start: s.time_start
+        })))
+      }
+      
       if (salesWithDistance.length === 0) {
         // Degraded fallback: return closest sales regardless of radius to avoid empty UI
         degraded = true

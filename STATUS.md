@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** bcdc111 — fix(types): use updateFilters instead of setFilters in client geolocation handler (by Yard Sale Tracker on 2025-10-05 21:15:18 -0400)
+- **Latest commit:** 3e43117 — fix(types): move client geolocation handlers after fetchSales function definition (by Yard Sale Tracker on 2025-10-05 21:16:41 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18267225905
+- **CI status:** running, last run: run 18267247169
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T01:16:06.854Z
+Updated automatically by Cursor on 2025-10-06T01:17:11.278Z

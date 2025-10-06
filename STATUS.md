@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 43dc70c — debug(admin): add console logging and better pin visibility for map preview (by Yard Sale Tracker on 2025-10-05 19:24:41 -0400)
+- **Latest commit:** bc16563 — chore: force redeploy - just do it again (by Yard Sale Tracker on 2025-10-05 20:13:10 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18265801496
+- **CI status:** running, last run: run 18266310870
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,5 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-05T23:25:13.211Z
-Force redeploy: just do it again.
+Updated automatically by Cursor on 2025-10-06T00:13:46.782Z

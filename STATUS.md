@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** f6a8275 — fix(api/sales/markers): remove RPC path; query view with bbox; coerce lat/lng; limit results (by Yard Sale Tracker on 2025-10-06 15:49:01 -0400)
+- **Latest commit:** 5ebb27b — feat(api): apply date overlap filtering for sales and markers so date ranges affect results (by Yard Sale Tracker on 2025-10-06 15:54:29 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18292636431
+- **CI status:** running, last run: run 18292749178
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T19:49:45.201Z
+Updated automatically by Cursor on 2025-10-06T19:55:13.124Z

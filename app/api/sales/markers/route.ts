@@ -32,18 +32,30 @@ export async function GET(request: NextRequest) {
     console.log('[MARKERS] params:', { lat, lng, maxKm, q, dateFrom, dateTo, tags, limit })
     console.log('[MARKERS] bbox:', { minLat, maxLat, minLng, maxLng })
 
-    // Ultra-simple query to avoid any database issues
+    // Use the same robust query logic as the main sales API
     let query = sb.from('sales_v2').select('id,title,lat,lng,starts_at,date_start,time_start,date_end,time_end,ends_at')
     
-    // Only add basic filters to avoid 500 errors
-    query = query.limit(Math.min(limit, 100)) // Cap at 100 to avoid timeouts
+    // Add bounding box filter if we have valid coordinates
+    if (minLat !== undefined && maxLat !== undefined && minLng !== undefined && maxLng !== undefined) {
+      query = query
+        .gte('lat', minLat)
+        .lte('lat', maxLat)
+        .gte('lng', minLng)
+        .lte('lng', maxLng)
+    }
+
+    // Add text search if provided
+    if (q) {
+      query = query.ilike('title', `%${q}%`)
+    }
+
+    query = query.limit(limit)
 
     const { data, error } = await query
     if (error) {
       console.error('[MARKERS] Query error:', error)
-      // Fallback: return empty array instead of 500 error
-      console.log('[MARKERS] Returning empty array due to query error')
-      return NextResponse.json([])
+      console.error('[MARKERS] Error details:', error.message, error.details, error.hint)
+      return NextResponse.json({ error: 'Database query failed', details: error.message }, { status: 500 })
     }
 
     const windowStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null

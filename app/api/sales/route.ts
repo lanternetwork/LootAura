@@ -248,6 +248,31 @@ export async function GET(request: NextRequest) {
         salesWithValidCoords: (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number').length
       })
       
+      // Debug: Check if date filtering is actually being applied
+      if (windowStart && windowEnd) {
+        const salesBeforeDateFilter = (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number')
+        const salesAfterDateFilter = salesBeforeDateFilter.filter((sale: any) => {
+          const saleStart = sale.starts_at
+            ? new Date(sale.starts_at)
+            : (sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null)
+          const saleEnd = sale.ends_at
+            ? new Date(sale.ends_at)
+            : (sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null)
+          if (!saleStart && !saleEnd) return true
+          const s = saleStart || saleEnd
+          const e = saleEnd || saleStart
+          if (!s || !e) return true
+          const startOk = !windowEnd || s <= windowEnd
+          const endOk = !windowStart || e >= windowStart
+          return startOk && endOk
+        })
+        console.log('[SALES] Date filter impact:', {
+          beforeDateFilter: salesBeforeDateFilter.length,
+          afterDateFilter: salesAfterDateFilter.length,
+          filteredOut: salesBeforeDateFilter.length - salesAfterDateFilter.length
+        })
+      }
+      
       if (salesWithDistance.length === 0) {
         // Degraded fallback: return closest sales regardless of radius to avoid empty UI
         degraded = true

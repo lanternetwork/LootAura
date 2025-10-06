@@ -327,13 +327,19 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     fetchMapSales()
   }, [fetchMapSales])
 
-  // Initialize filters from server-provided center first
+  // Initialize filters from server-provided center once, only if no location set yet
   useEffect(() => {
-    if (initialCenter?.lat && initialCenter?.lng && !isNeutralFallback) {
+    if (
+      initialCenter?.lat && initialCenter?.lng &&
+      !isNeutralFallback &&
+      !filters.lat && !filters.lng
+    ) {
       console.log(`[SALES] Initializing filters with server location: ${initialCenter.lat}, ${initialCenter.lng}`)
       updateFilters({ lat: initialCenter.lat, lng: initialCenter.lng })
     }
-  }, [initialCenter?.lat, initialCenter?.lng, isNeutralFallback, updateFilters])
+    // Do not include updateFilters in deps to avoid loop; this runs only when initial inputs change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCenter?.lat, initialCenter?.lng, isNeutralFallback, filters.lat, filters.lng])
 
   // Initialize location from cookie on mount
   useEffect(() => {

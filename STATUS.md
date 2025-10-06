@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 50ab9f6 — debug(sales): add server-side location resolution logging (by Yard Sale Tracker on 2025-10-05 20:41:45 -0400)
+- **Latest commit:** 198a4ef — debug(location): add comprehensive IP geolocation debugging and direct Vercel header access (by Yard Sale Tracker on 2025-10-05 20:43:30 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18266754015
+- **CI status:** running, last run: run 18266964605
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T00:42:21.796Z
+Updated automatically by Cursor on 2025-10-06T00:58:50.712Z

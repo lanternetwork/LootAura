@@ -120,9 +120,15 @@ export async function GET(request: NextRequest) {
         .from('sales_v2')
         .select('*')
       
-      // TEMP: Disable date filtering until column names are confirmed (date_start/starts_at)
-      // if (startDateParam) { ... }
-      // if (endDateParam) { ... }
+      // Apply date overlap filtering when provided
+      if (startDateParam) {
+        // Keep rows that end on/after start
+        query = query.or(`date_end.gte.${startDateParam},ends_at.gte.${startDateParam}T00:00:00`)
+      }
+      if (endDateParam) {
+        // Keep rows that start on/before end
+        query = query.or(`date_start.lte.${endDateParam},starts_at.lte.${endDateParam}T23:59:59`)
+      }
       
       // Add category filters - fallback to text search if tags array not present
       if (categories.length > 0) {

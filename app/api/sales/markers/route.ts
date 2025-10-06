@@ -35,6 +35,12 @@ export async function GET(request: NextRequest) {
     if (q) {
       query = query.ilike('title', `%${q}%`)
     }
+    if (dateFrom) {
+      query = query.or(`date_end.gte.${dateFrom},ends_at.gte.${dateFrom}T00:00:00`)
+    }
+    if (dateTo) {
+      query = query.or(`date_start.lte.${dateTo},starts_at.lte.${dateTo}T23:59:59`)
+    }
     if (
       minLat !== undefined && maxLat !== undefined &&
       minLng !== undefined && maxLng !== undefined

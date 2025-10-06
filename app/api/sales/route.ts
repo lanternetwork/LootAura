@@ -125,18 +125,25 @@ export async function GET(request: NextRequest) {
         .lte('lng', maxLng)
         .in('status', ['published', 'active'])
       
-      // Add date filters
+      // Add date filters (inclusive overlap). If end date missing in DB, treat as same-day.
       if (startDateParam) {
-        query = query.gte('date_start', startDateParam)
+        query = query.or(`date_end.gte.${startDateParam},and(date_end.is.null,date_start.gte.${startDateParam})`)
       }
       if (endDateParam) {
         query = query.lte('date_start', endDateParam)
       }
       
-      // Add category filters (expects 'tags' array column)
+      // Add category filters - fallback to text search if tags array not present
       if (categories.length > 0) {
-        // Postgres array contains
-        query = query.contains('tags', categories)
+        const ors: string[] = []
+        for (const c of categories) {
+          const safe = c.replace(/[%_]/g, '')
+          ors.push(`title.ilike.%${safe}%`)
+          ors.push(`description.ilike.%${safe}%`)
+        }
+        if (ors.length > 0) {
+          query = query.or(ors.join(','))
+        }
       }
 
       // Add text search

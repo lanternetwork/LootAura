@@ -98,13 +98,38 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       return
     }
 
+    // Map dateRange preset to concrete ISO dates
+    let dateFrom: string | undefined
+    let dateTo: string | undefined
+    const today = new Date()
+    const toISO = (d: Date) => d.toISOString().slice(0, 10)
+    if (filters.dateRange === 'today') {
+      const start = new Date(today)
+      const end = new Date(today)
+      dateFrom = toISO(start)
+      dateTo = toISO(end)
+    } else if (filters.dateRange === 'weekend' || filters.dateRange === 'next_weekend') {
+      // find upcoming Saturday/Sunday for weekend, or next weekend
+      const base = new Date(today)
+      const day = base.getDay() // 0 Sun, 6 Sat
+      const offsetToSat = ((6 - day + 7) % 7) + (filters.dateRange === 'next_weekend' ? 7 : 0)
+      const sat = new Date(base)
+      sat.setDate(base.getDate() + offsetToSat)
+      const sun = new Date(sat)
+      sun.setDate(sat.getDate() + 1)
+      dateFrom = toISO(sat)
+      dateTo = toISO(sun)
+    }
+
     const params: GetSalesParams = {
       lat: filters.lat,
       lng: filters.lng,
       distanceKm: (filters.distance || 25) * 1.60934, // Convert miles to km
       city: filters.city,
       categories: filters.categories.length > 0 ? filters.categories : undefined,
-      dateRange: filters.dateRange !== 'any' ? filters.dateRange : undefined,
+      // do not send dateRange token; send concrete dates instead
+      ...(dateFrom ? { dateFrom } : {}),
+      ...(dateTo ? { dateTo } : {}),
       limit: 24,
       offset: append ? sales.length : 0,
     }
@@ -228,15 +253,35 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const fetchMapSales = useCallback(async () => {
     if (!filters.lat || !filters.lng) return
     try {
+      // Map dateRange preset to concrete ISO dates for markers too
+      let dateFrom: string | undefined
+      let dateTo: string | undefined
+      const today = new Date()
+      const toISO = (d: Date) => d.toISOString().slice(0, 10)
+      if (filters.dateRange === 'today') {
+        const start = new Date(today)
+        const end = new Date(today)
+        dateFrom = toISO(start)
+        dateTo = toISO(end)
+      } else if (filters.dateRange === 'weekend' || filters.dateRange === 'next_weekend') {
+        const base = new Date(today)
+        const day = base.getDay()
+        const offsetToSat = ((6 - day + 7) % 7) + (filters.dateRange === 'next_weekend' ? 7 : 0)
+        const sat = new Date(base)
+        sat.setDate(base.getDate() + offsetToSat)
+        const sun = new Date(sat)
+        sun.setDate(sat.getDate() + 1)
+        dateFrom = toISO(sat)
+        dateTo = toISO(sun)
+      }
+
       const params = new URLSearchParams()
       params.set('lat', String(filters.lat))
       params.set('lng', String(filters.lng))
       params.set('maxKm', String((filters.distance || 25) * 1.60934))
       if (filters.categories.length > 0) params.set('tags', filters.categories.join(','))
-      if (filters.dateRange !== 'any') {
-        // backend interprets dateRange string; keep as is if supported or map to start/end if needed later
-        params.set('date', String(filters.dateRange))
-      }
+      if (dateFrom) params.set('dateFrom', dateFrom)
+      if (dateTo) params.set('dateTo', dateTo)
       params.set('limit', '1000')
 
       const res = await fetch(`/api/sales/markers?${params.toString()}`)

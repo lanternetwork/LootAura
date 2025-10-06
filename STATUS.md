@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** e868617 — fix(api/sales): revert to '*' select to avoid RPC function aliases; widen fetch window more (by Yard Sale Tracker on 2025-10-06 13:19:51 -0400)
+- **Latest commit:** 0be16d0 — fix(api/sales): coerce lat/lng to numbers before distance filtering to avoid dropping string coords (by Yard Sale Tracker on 2025-10-06 13:27:27 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18288961625
+- **CI status:** running, last run: run 18289162916
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T17:20:43.174Z
+Updated automatically by Cursor on 2025-10-06T17:28:18.387Z

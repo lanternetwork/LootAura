@@ -7,6 +7,7 @@ import { GetSalesParams, formatDistance } from '@/lib/data/sales'
 import SalesMap from '@/components/location/SalesMap'
 import UseLocationButton from '@/components/location/UseLocationButton'
 import ZipInput from '@/components/location/ZipInput'
+import ClientGeolocation from '@/components/location/ClientGeolocation'
 import { useLocation } from '@/lib/location/useLocation'
 import SaleCard from '@/components/SaleCard'
 import FiltersModal from '@/components/filters/FiltersModal'
@@ -69,9 +70,38 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapSales, setMapSales] = useState<Sale[]>([])
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
+  const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
 
   // Detect neutral fallback center (do not auto-fetch in this case)
   const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
+
+  // Client-side geolocation handlers
+  const handleClientLocationFound = useCallback((lat: number, lng: number, accuracy?: number) => {
+    console.log('[SALES_CLIENT] Client geolocation found:', { lat, lng, accuracy })
+    setLocationAccuracy('client')
+    
+    // Update filters with more accurate location
+    const newFilters = { ...filters, lat, lng }
+    setFilters(newFilters)
+    
+    // Save to cookie for future visits
+    const locationData = JSON.stringify({
+      lat,
+      lng,
+      accuracy,
+      timestamp: Date.now(),
+      source: 'client'
+    })
+    document.cookie = `la_loc=${locationData}; max-age=${60 * 60 * 24}; path=/; samesite=lax`
+    
+    // Refetch sales with new location
+    fetchSales(false)
+  }, [filters, fetchSales])
+
+  const handleClientLocationError = useCallback((error: string) => {
+    console.log('[SALES_CLIENT] Client geolocation error:', error)
+    // Keep using server location
+  }, [])
 
   const fetchSales = useCallback(async (append = false) => {
     if (append) {
@@ -507,6 +537,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       </div>
 
       {/* Mobile Filters Modal removed per UX request to avoid duplicate filters */}
+      
+      {/* Client-side geolocation for better accuracy */}
+      <ClientGeolocation 
+        onLocationFound={handleClientLocationFound}
+        onLocationError={handleClientLocationError}
+      />
     </div>
   )
 }

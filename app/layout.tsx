@@ -28,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0b3d2e" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
         <script

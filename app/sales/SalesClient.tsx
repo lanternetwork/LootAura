@@ -224,44 +224,32 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Keep using server location
   }, [])
 
-  // Fetch larger set for map pins so all in-radius sales are shown
+  // Fetch larger set for map pins so all in-radius sales are shown (use markers endpoint)
   const fetchMapSales = useCallback(async () => {
     if (!filters.lat || !filters.lng) return
     try {
-      const params: GetSalesParams = {
-        lat: filters.lat,
-        lng: filters.lng,
-        distanceKm: (filters.distance || 25) * 1.60934,
-        city: filters.city,
-        categories: filters.categories.length > 0 ? filters.categories : undefined,
-        dateRange: filters.dateRange !== 'any' ? filters.dateRange : undefined,
-        limit: 500, // large cap for map pins
-        offset: 0,
+      const params = new URLSearchParams()
+      params.set('lat', String(filters.lat))
+      params.set('lng', String(filters.lng))
+      params.set('maxKm', String((filters.distance || 25) * 1.60934))
+      if (filters.categories.length > 0) params.set('tags', filters.categories.join(','))
+      if (filters.dateRange !== 'any') {
+        // backend interprets dateRange string; keep as is if supported or map to start/end if needed later
+        params.set('date', String(filters.dateRange))
       }
-      const qs = new URLSearchParams(
-        Object.entries(params).reduce((acc, [key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            if (Array.isArray(value)) {
-              acc[key] = value.join(',')
-            } else {
-              acc[key] = String(value)
-            }
-          }
-          return acc
-        }, {} as Record<string, string>)
-      ).toString()
+      params.set('limit', '1000')
 
-      const res = await fetch(`/api/sales?${qs}`)
+      const res = await fetch(`/api/sales/markers?${params.toString()}`)
       const data = await res.json()
-      if (data?.ok && Array.isArray(data.data)) {
-        setMapSales(data.data)
+      if (Array.isArray(data)) {
+        setMapSales(data as any)
       } else {
         setMapSales([])
       }
     } catch {
       setMapSales([])
     }
-  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange])
+  }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange])
 
   const loadMore = useCallback(async () => {
     // Use prefetched next page if available for instant UI

@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** c894e98 — fix(map): use /api/sales/markers for full in-radius pins and filter sync (by Yard Sale Tracker on 2025-10-06 10:46:52 -0400)
+- **Latest commit:** 587334f — fix(filters): map date presets to dateFrom/dateTo; sync markers params; immediate refetch on filter change (by Yard Sale Tracker on 2025-10-06 11:11:15 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18285406166
+- **CI status:** running, last run: run 18285526405
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T15:07:58.703Z
+Updated automatically by Cursor on 2025-10-06T15:11:53.095Z

@@ -80,12 +80,10 @@ export default function MapPreview() {
                 longitude={lng}
               >
                 <div 
-                  className="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg cursor-pointer hover:bg-red-600 flex items-center justify-center text-white text-xs font-bold" 
+                  className="w-2 h-2 bg-red-500 rounded-full border border-white shadow-sm cursor-pointer hover:bg-red-600" 
                   title={`${sale.title} (${sale.city}, ${sale.state})`}
                   style={{ zIndex: 1000 }}
-                >
-                  •
-                </div>
+                />
               </Marker>
             )
           })}

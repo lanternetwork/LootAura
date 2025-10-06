@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   const limit = url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : 1000
 
   try {
+    console.log('[MARKERS] Starting markers API request')
     const sb = createSupabaseServerClient()
 
     // Direct view query (robust fallback)
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     const minLng = lng !== undefined ? lng - lngDelta : undefined
     const maxLng = lng !== undefined ? lng + lngDelta : undefined
 
-    let query = sb.from('sales_v2').select('id,title,lat,lng')
+    let query = sb.from('sales_v2').select('id,title,lat,lng,starts_at,date_start,time_start,date_end,time_end,ends_at')
 
     // Keep only safe filters to avoid schema mismatches
     if (q) {
@@ -50,12 +51,16 @@ export async function GET(request: NextRequest) {
     query = query.limit(limit)
 
     console.log('[MARKERS] params:', { lat, lng, maxKm, q, dateFrom, dateTo, tags, limit })
+    console.log('[MARKERS] bbox:', { minLat, maxLat, minLng, maxLng })
     const { data, error } = await query
-    if (error) throw error
+    if (error) {
+      console.error('[MARKERS] Query error:', error)
+      throw error
+    }
 
     const windowStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null
     const windowEnd = dateTo ? new Date(`${dateTo}T23:59:59`) : null
-    console.log('[MARKERS] fetched:', Array.isArray(data) ? data.length : 0)
+    console.log('[MARKERS] fetched:', Array.isArray(data) ? data.length : 0, 'raw data sample:', data?.slice(0, 2))
 
     const markers = (data as any[])
       .filter((s: any) => {
@@ -79,6 +84,7 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
 
     console.log('[MARKERS] returning markers:', markers.length)
+    console.log('[MARKERS] sample markers:', markers.slice(0, 3))
     return NextResponse.json(markers)
   } catch (error: any) {
     console.error('Markers API error:', error)

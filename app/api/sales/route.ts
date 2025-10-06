@@ -161,7 +161,13 @@ export async function GET(request: NextRequest) {
       // Calculate distances and filter by actual distance
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
-        .filter((sale: any) => typeof sale.lat === 'number' && typeof sale.lng === 'number')
+        .map((sale: any) => {
+          const latNum = typeof sale.lat === 'number' ? sale.lat : parseFloat(String(sale.lat))
+          const lngNum = typeof sale.lng === 'number' ? sale.lng : parseFloat(String(sale.lng))
+          if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
+          return { ...sale, lat: latNum, lng: lngNum }
+        })
+        .filter((sale: any) => sale && typeof sale.lat === 'number' && typeof sale.lng === 'number')
         .map((sale: any) => {
           // Haversine distance calculation
           const R = 6371000 // Earth's radius in meters

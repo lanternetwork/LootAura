@@ -75,33 +75,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Detect neutral fallback center (do not auto-fetch in this case)
   const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
 
-  // Client-side geolocation handlers
-  const handleClientLocationFound = useCallback((lat: number, lng: number, accuracy?: number) => {
-    console.log('[SALES_CLIENT] Client geolocation found:', { lat, lng, accuracy })
-    setLocationAccuracy('client')
-    
-    // Update filters with more accurate location
-    updateFilters({ lat, lng })
-    
-    // Save to cookie for future visits
-    const locationData = JSON.stringify({
-      lat,
-      lng,
-      accuracy,
-      timestamp: Date.now(),
-      source: 'client'
-    })
-    document.cookie = `la_loc=${locationData}; max-age=${60 * 60 * 24}; path=/; samesite=lax`
-    
-    // Refetch sales with new location
-    fetchSales(false)
-  }, [filters, fetchSales])
-
-  const handleClientLocationError = useCallback((error: string) => {
-    console.log('[SALES_CLIENT] Client geolocation error:', error)
-    // Keep using server location
-  }, [])
-
   const fetchSales = useCallback(async (append = false) => {
     if (append) {
       setLoadingMore(true)
@@ -223,6 +196,33 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       }
     }
   }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, sales.length])
+
+  // Client-side geolocation handlers
+  const handleClientLocationFound = useCallback((lat: number, lng: number, accuracy?: number) => {
+    console.log('[SALES_CLIENT] Client geolocation found:', { lat, lng, accuracy })
+    setLocationAccuracy('client')
+    
+    // Update filters with more accurate location
+    updateFilters({ lat, lng })
+    
+    // Save to cookie for future visits
+    const locationData = JSON.stringify({
+      lat,
+      lng,
+      accuracy,
+      timestamp: Date.now(),
+      source: 'client'
+    })
+    document.cookie = `la_loc=${locationData}; max-age=${60 * 60 * 24}; path=/; samesite=lax`
+    
+    // Refetch sales with new location
+    fetchSales(false)
+  }, [filters, fetchSales, updateFilters])
+
+  const handleClientLocationError = useCallback((error: string) => {
+    console.log('[SALES_CLIENT] Client geolocation error:', error)
+    // Keep using server location
+  }, [])
 
   // Fetch larger set for map pins so all in-radius sales are shown
   const fetchMapSales = useCallback(async () => {

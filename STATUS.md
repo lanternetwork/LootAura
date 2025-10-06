@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 7d0e3f1 — fix(types): handle null values in Vercel header parsing (by Yard Sale Tracker on 2025-10-05 21:01:06 -0400)
+- **Latest commit:** edfe54b — feat(location): improve accuracy with multiple IP services and client geolocation fallback (by Yard Sale Tracker on 2025-10-05 21:07:23 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18267002650
+- **CI status:** running, last run: run 18267101124
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T01:01:41.143Z
+Updated automatically by Cursor on 2025-10-06T01:07:50.489Z

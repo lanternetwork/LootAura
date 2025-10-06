@@ -231,6 +231,15 @@ export async function GET(request: NextRequest) {
         })))
       }
       
+      // Debug: Log raw data before filtering
+      console.log('[SALES] Raw data before filtering:', (salesData || []).slice(0, 3).map(s => ({
+        id: s.id,
+        title: s.title,
+        starts_at: s.starts_at,
+        date_start: s.date_start,
+        time_start: s.time_start
+      })))
+      
       if (salesWithDistance.length === 0) {
         // Degraded fallback: return closest sales regardless of radius to avoid empty UI
         degraded = true

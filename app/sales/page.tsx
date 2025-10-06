@@ -88,20 +88,38 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     } catch {}
   }
 
-  // 3) IP geolocation
-  if (!initialCenter && baseUrl) {
+  // 3) IP geolocation - try direct approach first, then API
+  if (!initialCenter) {
     try {
-      console.log(`[SALES_PAGE] Trying IP geolocation: ${baseUrl}/api/geolocation/ip`)
-      const ipRes = await fetch(`${baseUrl}/api/geolocation/ip`, { cache: 'no-store' })
-      if (ipRes.ok) {
-        const g = await ipRes.json()
-        console.log(`[SALES_PAGE] IP geolocation response:`, g)
-        if (g?.lat && g?.lng) {
-          initialCenter = { lat: Number(g.lat), lng: Number(g.lng), label: { city: g.city, state: g.state } }
-          console.log(`[SALES_PAGE] Using IP location:`, initialCenter)
+      // Try Vercel headers directly first
+      const vercelLat = headersList.get('x-vercel-ip-latitude')
+      const vercelLng = headersList.get('x-vercel-ip-longitude')
+      const vercelCity = headersList.get('x-vercel-ip-city')
+      const vercelState = headersList.get('x-vercel-ip-region')
+      
+      console.log(`[SALES_PAGE] Vercel headers:`, { vercelLat, vercelLng, vercelCity, vercelState })
+      
+      if (vercelLat && vercelLng) {
+        initialCenter = { 
+          lat: Number(vercelLat), 
+          lng: Number(vercelLng), 
+          label: { city: vercelCity, state: vercelState } 
         }
-      } else {
-        console.log(`[SALES_PAGE] IP geolocation failed:`, ipRes.status)
+        console.log(`[SALES_PAGE] Using Vercel location:`, initialCenter)
+      } else if (baseUrl) {
+        // Fallback to API
+        console.log(`[SALES_PAGE] Trying IP geolocation API: ${baseUrl}/api/geolocation/ip`)
+        const ipRes = await fetch(`${baseUrl}/api/geolocation/ip`, { cache: 'no-store' })
+        if (ipRes.ok) {
+          const g = await ipRes.json()
+          console.log(`[SALES_PAGE] IP geolocation response:`, g)
+          if (g?.lat && g?.lng) {
+            initialCenter = { lat: Number(g.lat), lng: Number(g.lng), label: { city: g.city, state: g.state } }
+            console.log(`[SALES_PAGE] Using IP location:`, initialCenter)
+          }
+        } else {
+          console.log(`[SALES_PAGE] IP geolocation failed:`, ipRes.status)
+        }
       }
     } catch (e) {
       console.log(`[SALES_PAGE] IP geolocation error:`, e)

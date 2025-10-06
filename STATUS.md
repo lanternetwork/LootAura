@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 3e43117 — fix(types): move client geolocation handlers after fetchSales function definition (by Yard Sale Tracker on 2025-10-05 21:16:41 -0400)
+- **Latest commit:** e91a422 — fix(ui): address multiple UX issues - simple map pins, dropdown distance, connected filters, fixed map layout (by Yard Sale Tracker on 2025-10-05 21:22:25 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18267247169
+- **CI status:** running, last run: run 18267433089
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T01:17:11.278Z
+Updated automatically by Cursor on 2025-10-06T01:29:12.048Z

@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
       
       let query = supabase
         .from('sales_v2')
-        .select('id,title,description,address,city,state,zip_code,lat,lng,tags,starts_at,ends_at,date_start,time_start,date_end,time_end, lat_calc:st_y(geom), lng_calc:st_x(geom)')
+        .select('*')
       
       // TEMP: Disable date filtering until column names are confirmed (date_start/starts_at)
       // if (startDateParam) { ... }
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
       }
       
       // Fetch a wider slice to allow client-side distance filtering, since some rows only have geom
-      const fetchWindow = Math.min(300, Math.max(limit * 10, 100))
+      const fetchWindow = Math.min(1000, Math.max(limit * 10, 200))
       const { data: salesData, error: salesError } = await query
         .order('id', { ascending: true })
         .range(0, fetchWindow - 1)
@@ -161,11 +161,6 @@ export async function GET(request: NextRequest) {
       // Calculate distances and filter by actual distance
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
-        .map((sale: any) => {
-          const latValue = typeof sale.lat === 'number' ? sale.lat : (typeof sale.lat_calc === 'number' ? sale.lat_calc : null)
-          const lngValue = typeof sale.lng === 'number' ? sale.lng : (typeof sale.lng_calc === 'number' ? sale.lng_calc : null)
-          return { ...sale, lat: latValue, lng: lngValue }
-        })
         .filter((sale: any) => typeof sale.lat === 'number' && typeof sale.lng === 'number')
         .map((sale: any) => {
           // Haversine distance calculation

@@ -203,9 +203,42 @@ export async function GET(request: NextRequest) {
       
       console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`)
       
-      // If no results, just return empty (never broaden unfiltered)
       if (salesWithDistance.length === 0) {
-        results = []
+        // Degraded fallback: return closest sales regardless of radius to avoid empty UI
+        degraded = true
+        const closest = (salesData || [])
+          .map((row: any) => {
+            const latNum = typeof row.lat === 'number' ? row.lat : parseFloat(String(row.lat))
+            const lngNum = typeof row.lng === 'number' ? row.lng : parseFloat(String(row.lng))
+            if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
+            const R = 6371000
+            const dLat = (latNum - latitude) * Math.PI / 180
+            const dLng = (lngNum - longitude) * Math.PI / 180
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(latitude * Math.PI / 180) * Math.cos(latNum * Math.PI / 180) *
+                     Math.sin(dLng/2) * Math.sin(dLng/2)
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+            const distanceM = R * c
+            return { ...row, lat: latNum, lng: lngNum, distance_m: Math.round(distanceM) }
+          })
+          .filter(Boolean)
+          .sort((a: any, b: any) => a.distance_m - b.distance_m)
+          .slice(0, limit)
+
+        results = closest.map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          starts_at: row.starts_at || (row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null),
+          ends_at: row.ends_at || (row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null),
+          lat: row.lat,
+          lng: row.lng,
+          city: row.city,
+          state: row.state,
+          zip: row.zip_code,
+          categories: row.tags || [],
+          cover_image_url: null,
+          distance_m: row.distance_m
+        }))
       } else {
         results = salesWithDistance.map((row: any) => ({
           id: row.id,

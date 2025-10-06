@@ -7,7 +7,7 @@ export interface FilterState {
   lat?: number
   lng?: number
   distance: number
-  dateRange: 'today' | 'weekend' | 'any'
+  dateRange: 'today' | 'weekend' | 'next_weekend' | 'any'
   categories: string[]
   city?: string
 }
@@ -42,7 +42,7 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     const lat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : undefined
     const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : undefined
     const distance = searchParams.get('dist') ? parseInt(searchParams.get('dist')!) : 25
-    const dateParam = searchParams.get('date') as 'today' | 'weekend' | 'any' | 'range' | null
+    const dateParam = searchParams.get('date') as 'today' | 'weekend' | 'next_weekend' | 'any' | 'range' | null
     const dateRange = !dateParam || dateParam === 'range' ? 'any' : dateParam
     const categories = searchParams.get('cat') ? searchParams.get('cat')!.split(',') : []
     const city = searchParams.get('city') || undefined

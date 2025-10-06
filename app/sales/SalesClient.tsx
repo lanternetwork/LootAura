@@ -104,11 +104,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       const end = new Date(today)
       dateFrom = toISO(start)
       dateTo = toISO(end)
-    } else if (filters.dateRange === 'weekend') {
+    } else if (filters.dateRange === 'weekend' || filters.dateRange === 'next_weekend') {
       // find upcoming Saturday/Sunday for weekend, or next weekend
       const base = new Date(today)
       const day = base.getDay() // 0 Sun, 6 Sat
-      const offsetToSat = ((6 - day + 7) % 7)
+      const offsetToSat = ((6 - day + 7) % 7) + (filters.dateRange === 'next_weekend' ? 7 : 0)
       const sat = new Date(base)
       sat.setDate(base.getDate() + offsetToSat)
       const sun = new Date(sat)

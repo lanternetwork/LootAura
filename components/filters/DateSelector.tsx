@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 export interface DateRange {
-  type: 'any' | 'today' | 'weekend' | 'range'
+  type: 'any' | 'today' | 'weekend' | 'next_weekend' | 'range'
   startDate?: string
   endDate?: string
 }
@@ -50,6 +50,7 @@ export default function DateSelector({ value, onChange, className = '' }: DateSe
             { value: 'any', label: 'Any Date' },
             { value: 'today', label: 'Today' },
             { value: 'weekend', label: 'This Weekend' },
+            { value: 'next_weekend', label: 'Next Weekend' },
             { value: 'range', label: 'Custom Range' }
           ].map((option) => (
             <label key={option.value} className={`flex items-center p-2 rounded cursor-pointer transition-colors ${

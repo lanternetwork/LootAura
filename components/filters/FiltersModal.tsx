@@ -353,6 +353,7 @@ function FiltersContent({
               {filters.dateRange.type !== 'any' && (
                 <li>• Date: {filters.dateRange.type === 'today' ? 'Today' : 
                             filters.dateRange.type === 'weekend' ? 'This Weekend' :
+                            filters.dateRange.type === 'next_weekend' ? 'Next Weekend' :
                             'Custom Range'}</li>
               )}
               {filters.categories.length > 0 && (

@@ -97,13 +97,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Final fallback to Louisville, KY
-    console.log('[IP_GEOLOCATION] Using Louisville fallback')
+    // Final fallback to neutral US center
+    console.log('[IP_GEOLOCATION] Using neutral US fallback')
     return NextResponse.json({
-      lat: 38.2527,
-      lng: -85.7585,
-      city: 'Louisville',
-      state: 'KY',
+      lat: 39.8283,
+      lng: -98.5795,
+      city: 'Center',
+      state: 'US',
       country: 'US',
       source: 'fallback'
     })
@@ -114,10 +114,10 @@ export async function GET(request: NextRequest) {
     // Return fallback location on error
     console.log('[IP_GEOLOCATION] Using error fallback')
     return NextResponse.json({
-      lat: 38.2527,
-      lng: -85.7585,
-      city: 'Louisville',
-      state: 'KY',
+      lat: 39.8283,
+      lng: -98.5795,
+      city: 'Center',
+      state: 'US',
       country: 'US',
       source: 'fallback'
     })

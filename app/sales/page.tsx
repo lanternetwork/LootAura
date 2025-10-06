@@ -128,7 +128,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
 
   // 4) Neutral fallback if still missing
   if (!initialCenter) {
-    console.log(`[SALES_PAGE] Using neutral fallback location`)
+    console.log(`[SALES_PAGE] Using neutral US center fallback`)
     initialCenter = { lat: 39.8283, lng: -98.5795 }
   } else {
     // Set/refresh la_loc cookie for 24h when we have a real center

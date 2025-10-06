@@ -509,7 +509,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   sales={mapSales}
                   center={filters.lat && filters.lng ? { lat: filters.lat, lng: filters.lng } : 
                          initialCenter ? { lat: initialCenter.lat, lng: initialCenter.lng } : 
-                         { lat: 38.2527, lng: -85.7585 }}
+                         { lat: 39.8283, lng: -98.5795 }}
                   zoom={filters.lat && filters.lng ? 12 : 10}
                 />
                 {/* Debug info */}

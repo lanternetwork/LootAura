@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** b7570dd — fix(filters): align client params with API (startDate/endDate); markers accept start/end keys (by Yard Sale Tracker on 2025-10-06 11:27:04 -0400)
+- **Latest commit:** c0a4cf0 — fix(filters): server honors explicit startDate/endDate; compute presets only when absent (by Yard Sale Tracker on 2025-10-06 11:29:01 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18285998781
+- **CI status:** running, last run: run 18286055610
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T15:27:37.592Z
+Updated automatically by Cursor on 2025-10-06T15:29:40.115Z

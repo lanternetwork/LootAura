@@ -218,7 +218,7 @@ export async function GET(request: NextRequest) {
                 })
                 .slice(offset, offset + limit)
       
-      console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`)
+      console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`, { windowStart, windowEnd })
       
       if (salesWithDistance.length === 0) {
         // Degraded fallback: return closest sales regardless of radius to avoid empty UI

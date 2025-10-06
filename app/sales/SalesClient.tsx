@@ -72,6 +72,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
 
   const fetchSales = useCallback(async (append = false) => {
+    console.log('[SALES] fetchSales start', { append, filters })
     if (append) {
       setLoadingMore(true)
     } else {
@@ -129,6 +130,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       limit: 24,
       offset: append ? sales.length : 0,
     }
+    console.log('[SALES] fetch params:', params)
 
     const queryString = new URLSearchParams(
       Object.entries(params).reduce((acc, [key, value]) => {
@@ -168,6 +170,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             ...params,
             offset: newSales.length,
           }
+          console.log('[SALES] prefetch next page params:', nextParams)
           const nextQs = new URLSearchParams(
             Object.entries(nextParams).reduce((acc, [key, value]) => {
               if (value !== undefined && value !== null && value !== '') {

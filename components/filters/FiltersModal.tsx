@@ -151,6 +151,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
   }
 
   const handleDistanceChange = (distance: number) => {
+    console.log('[FiltersModal] Distance change:', distance)
     if (externalFilters && onFiltersChange) {
       onFiltersChange({ ...externalFilters, distance })
     } else {
@@ -159,7 +160,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
   }
 
   const handleDateRangeChange = (dateRange: DateRange) => {
-    console.log('[FiltersModal] handleDateRangeChange called with:', dateRange)
+    console.log('[FiltersModal] Date change:', dateRange)
     if (externalFilters && onFiltersChange) {
       onFiltersChange({ ...externalFilters, dateRange: dateRange.type })
     } else {
@@ -168,6 +169,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
   }
 
   const handleCategoryToggle = (category: string) => {
+    console.log('[FiltersModal] Toggle category:', category)
     const newCategories = filters.categories.includes(category)
       ? filters.categories.filter(c => c !== category)
       : [...filters.categories, category]
@@ -180,6 +182,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
   }
 
   const handleClearFilters = () => {
+    console.log('[FiltersModal] Clear all filters')
     updateFilters({
       distance: 25,
       dateRange: { type: 'any' },

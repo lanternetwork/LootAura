@@ -39,6 +39,7 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
 
   // Initialize filters from URL params
   useEffect(() => {
+    console.log('[FILTERS] init from URL params:', Object.fromEntries(searchParams.entries()))
     const lat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : undefined
     const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : undefined
     const distance = searchParams.get('dist') ? parseInt(searchParams.get('dist')!) : 25
@@ -64,6 +65,7 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
 
   const updateFilters = useCallback((newFilters: Partial<FilterState>) => {
     const updatedFilters = { ...filters, ...newFilters }
+    console.log('[FILTERS] updateFilters called with:', newFilters, '=> next:', updatedFilters)
     setFilters(updatedFilters)
     
     // Update URL with new filters
@@ -108,6 +110,7 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     
     // Update URL
     const newUrl = `${window.location.pathname}?${params.toString()}`
+    console.log('[FILTERS] push URL:', newUrl)
     router.push(newUrl)
   }, [filters, searchParams, router])
 

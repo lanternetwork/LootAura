@@ -32,6 +32,9 @@ export default function SalesMap({
     longitude: center.lng,
     zoom: zoom
   })
+  useEffect(() => {
+    console.log('[MAP] init viewState:', viewState, 'center:', center, 'sales:', sales.length)
+  }, [])
 
   // Update view state when center changes
   useEffect(() => {
@@ -42,6 +45,10 @@ export default function SalesMap({
       longitude: center.lng
     }))
   }, [center.lat, center.lng])
+
+  useEffect(() => {
+    console.log('[MAP] sales updated, count:', sales.length, sales.map(s => ({ id: s.id, lat: s.lat, lng: s.lng })))
+  }, [sales])
 
   const handleMarkerClick = (sale: Sale) => {
     setSelectedSale(sale)

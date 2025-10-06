@@ -49,11 +49,13 @@ export async function GET(request: NextRequest) {
 
     query = query.limit(limit)
 
+    console.log('[MARKERS] params:', { lat, lng, maxKm, q, dateFrom, dateTo, tags, limit })
     const { data, error } = await query
     if (error) throw error
 
     const windowStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null
     const windowEnd = dateTo ? new Date(`${dateTo}T23:59:59`) : null
+    console.log('[MARKERS] fetched:', Array.isArray(data) ? data.length : 0)
 
     const markers = (data as any[])
       .filter((s: any) => {
@@ -76,6 +78,7 @@ export async function GET(request: NextRequest) {
       })
       .filter(Boolean)
 
+    console.log('[MARKERS] returning markers:', markers.length)
     return NextResponse.json(markers)
   } catch (error: any) {
     console.error('Markers API error:', error)

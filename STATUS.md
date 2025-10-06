@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** bc16563 — chore: force redeploy - just do it again (by Yard Sale Tracker on 2025-10-05 20:13:10 -0400)
+- **Latest commit:** 16a6d05 — fix(admin): add coordinate validation and larger, more visible pins with bullet (by Yard Sale Tracker on 2025-10-05 20:15:04 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18266310870
+- **CI status:** running, last run: run 18266341452
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T00:13:46.782Z
+Updated automatically by Cursor on 2025-10-06T00:15:43.580Z

@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 6080d0e — fix(mapbox): add mapbox-gl.css to fix missing CSS declarations (by Yard Sale Tracker on 2025-10-05 20:18:11 -0400)
+- **Latest commit:** e6b817f — style(admin): make map pins tiny (2x2px) while still visible (by Yard Sale Tracker on 2025-10-05 20:22:13 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18266389412
+- **CI status:** running, last run: run 18266452227
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T00:19:00.227Z
+Updated automatically by Cursor on 2025-10-06T00:22:49.711Z

@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** c057225 — fix(filters): remove next_weekend; stabilize FiltersModal/useFilters to stop re-init loops (by Yard Sale Tracker on 2025-10-06 11:56:06 -0400)
+- **Latest commit:** 8eaffa7 — chore(sales): remove browser geolocation prompt and button from sales page (by Yard Sale Tracker on 2025-10-06 12:00:32 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18286802374
+- **CI status:** running, last run: run 18286914655
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T15:56:51.535Z
+Updated automatically by Cursor on 2025-10-06T16:01:35.483Z

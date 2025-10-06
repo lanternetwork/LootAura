@@ -145,7 +145,11 @@ export async function GET(request: NextRequest) {
         .limit(limit)
         .range(offset, offset + limit - 1)
       
-      console.log(`[SALES] Direct query response:`, { data: salesData, error: salesError })
+      console.log(`[SALES] Direct query response:`, { 
+        dataCount: salesData?.length || 0, 
+        error: salesError,
+        sampleData: salesData?.slice(0, 2)
+      })
       
       if (salesError) {
         throw new Error(`Direct query failed: ${salesError.message}`)
@@ -188,20 +192,53 @@ export async function GET(request: NextRequest) {
       
       console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`)
       
-      results = salesWithDistance.map((row: any) => ({
-        id: row.id,
-        title: row.title,
-        starts_at: row.starts_at,
-        ends_at: row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null,
-        lat: row.lat,
-        lng: row.lng,
-        city: row.city,
-        state: row.state,
-        zip: row.zip_code,
-        categories: [], // TODO: Add categories support
-        cover_image_url: null,
-        distance_m: row.distance_m
-      }))
+      // If no results from bounding box, try a broader search
+      if (salesWithDistance.length === 0) {
+        console.log(`[SALES] No results from bounding box, trying broader search...`)
+        const { data: allSales, error: allError } = await supabase
+          .from('sales_v2')
+          .select('*')
+          .in('status', ['published', 'active'])
+          .limit(50)
+        
+        console.log(`[SALES] Broader search result:`, { count: allSales?.length || 0, error: allError })
+        
+        if (allSales && allSales.length > 0) {
+          // Use the broader results
+          const broaderResults = allSales.map((row: any) => ({
+            id: row.id,
+            title: row.title,
+            starts_at: row.starts_at,
+            ends_at: row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null,
+            lat: row.lat,
+            lng: row.lng,
+            city: row.city,
+            state: row.state,
+            zip: row.zip_code,
+            categories: [],
+            cover_image_url: null,
+            distance_m: 0 // No distance calculation for broader search
+          }))
+          
+          results = broaderResults
+          console.log(`[SALES] Using broader search results: ${results.length} sales`)
+        }
+      } else {
+        results = salesWithDistance.map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          starts_at: row.starts_at,
+          ends_at: row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null,
+          lat: row.lat,
+          lng: row.lng,
+          city: row.city,
+          state: row.state,
+          zip: row.zip_code,
+          categories: [], // TODO: Add categories support
+          cover_image_url: null,
+          distance_m: row.distance_m
+        }))
+      }
         
       console.log(`[SALES] Direct query success: ${results.length} results`)
       

@@ -45,7 +45,6 @@ export async function GET(request: NextRequest) {
       try {
         console.log(`[IP_GEOLOCATION] Trying ${service.name}...`)
         const response = await fetch(service.url, { 
-          timeout: 5000,
           headers: { 'User-Agent': 'LootAura/1.0' }
         })
         

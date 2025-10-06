@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 42c6cc2 — fix(types): align dateRange union usage; remove next_weekend branch for now (by Yard Sale Tracker on 2025-10-06 11:20:01 -0400)
+- **Latest commit:** 2404252 — fix(types): remove all next_weekend checks from date mapping (by Yard Sale Tracker on 2025-10-06 11:23:12 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18285790353
+- **CI status:** running, last run: run 18285884814
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T15:20:35.170Z
+Updated automatically by Cursor on 2025-10-06T15:23:43.347Z

@@ -81,8 +81,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     setLocationAccuracy('client')
     
     // Update filters with more accurate location
-    const newFilters = { ...filters, lat, lng }
-    setFilters(newFilters)
+    updateFilters({ lat, lng })
     
     // Save to cookie for future visits
     const locationData = JSON.stringify({

@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** c4507aa — feat(api/sales): fallback to geom for coords; widen fetch window; paginate after distance filter (by Yard Sale Tracker on 2025-10-06 13:17:10 -0400)
+- **Latest commit:** e868617 — fix(api/sales): revert to '*' select to avoid RPC function aliases; widen fetch window more (by Yard Sale Tracker on 2025-10-06 13:19:51 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18288891651
+- **CI status:** running, last run: run 18288961625
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T17:17:58.329Z
+Updated automatically by Cursor on 2025-10-06T17:20:43.174Z

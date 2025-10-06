@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 198a4ef — debug(location): add comprehensive IP geolocation debugging and direct Vercel header access (by Yard Sale Tracker on 2025-10-05 20:43:30 -0400)
+- **Latest commit:** 7d0e3f1 — fix(types): handle null values in Vercel header parsing (by Yard Sale Tracker on 2025-10-05 21:01:06 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18266964605
+- **CI status:** running, last run: run 18267002650
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T00:58:50.712Z
+Updated automatically by Cursor on 2025-10-06T01:01:41.143Z

@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** daa3218 — fix(filters): enforce category contains and no unfiltered broadening; ensure pins refetch on filter deps; verify header home link (by Yard Sale Tracker on 2025-10-06 11:41:46 -0400)
+- **Latest commit:** f07784f — fix(filters): relax date overlap and fallback category matching to avoid empty results (by Yard Sale Tracker on 2025-10-06 11:46:39 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18286422273
+- **CI status:** running, last run: run 18286557712
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T15:42:18.658Z
+Updated automatically by Cursor on 2025-10-06T15:47:14.603Z

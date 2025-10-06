@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 4a3cbe7 — fix(sales): guard server-location seeding to run once only when no location is set (by Yard Sale Tracker on 2025-10-06 12:31:31 -0400)
+- **Latest commit:** 5c57834 — fix(api/sales): correct pagination (range only) and skip rows with null coords; keep distance filter strict (by Yard Sale Tracker on 2025-10-06 12:49:09 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18287753018
+- **CI status:** running, last run: run 18288185656
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T16:32:18.633Z
+Updated automatically by Cursor on 2025-10-06T16:49:57.851Z

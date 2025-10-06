@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** e91a422 — fix(ui): address multiple UX issues - simple map pins, dropdown distance, connected filters, fixed map layout (by Yard Sale Tracker on 2025-10-05 21:22:25 -0400)
+- **Latest commit:** a9d5304 — fix(types): cast dateRange to correct union type for useFilters hook (by Yard Sale Tracker on 2025-10-05 21:30:43 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18267433089
+- **CI status:** running, last run: run 18268259272
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T01:29:12.048Z
+Updated automatically by Cursor on 2025-10-06T02:27:07.942Z

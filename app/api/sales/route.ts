@@ -118,11 +118,7 @@ export async function GET(request: NextRequest) {
       
       let query = supabase
         .from('sales_v2')
-        .select('*')
-        .gte('lat', minLat)
-        .lte('lat', maxLat)
-        .gte('lng', minLng)
-        .lte('lng', maxLng)
+        .select('id,title,description,address,city,state,zip_code,lat,lng,tags,starts_at,ends_at,date_start,time_start,date_end,time_end, lat_calc:st_y(geom), lng_calc:st_x(geom)')
       
       // TEMP: Disable date filtering until column names are confirmed (date_start/starts_at)
       // if (startDateParam) { ... }
@@ -146,10 +142,11 @@ export async function GET(request: NextRequest) {
         query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,address.ilike.%${q}%`)
       }
       
-      // Use range for pagination; avoid combining limit and range together
+      // Fetch a wider slice to allow client-side distance filtering, since some rows only have geom
+      const fetchWindow = Math.min(300, Math.max(limit * 10, 100))
       const { data: salesData, error: salesError } = await query
         .order('id', { ascending: true })
-        .range(offset, offset + limit - 1)
+        .range(0, fetchWindow - 1)
       
       console.log(`[SALES] Direct query response:`, { 
         dataCount: salesData?.length || 0, 
@@ -164,6 +161,11 @@ export async function GET(request: NextRequest) {
       // Calculate distances and filter by actual distance
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
+        .map((sale: any) => {
+          const latValue = typeof sale.lat === 'number' ? sale.lat : (typeof sale.lat_calc === 'number' ? sale.lat_calc : null)
+          const lngValue = typeof sale.lng === 'number' ? sale.lng : (typeof sale.lng_calc === 'number' ? sale.lng_calc : null)
+          return { ...sale, lat: latValue, lng: lngValue }
+        })
         .filter((sale: any) => typeof sale.lat === 'number' && typeof sale.lng === 'number')
         .map((sale: any) => {
           // Haversine distance calculation
@@ -196,7 +198,7 @@ export async function GET(request: NextRequest) {
                   // Tertiary sort: id (stable)
                   return a.id.localeCompare(b.id)
                 })
-                .slice(0, limit)
+                .slice(offset, offset + limit)
       
       console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`)
       

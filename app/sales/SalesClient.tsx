@@ -477,15 +477,17 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               <div className="h-[400px] rounded-lg overflow-hidden">
                 <SalesMap
                   sales={mapSales}
-                  center={filters.lat && filters.lng ? { lat: filters.lat, lng: filters.lng } : { lat: 38.2527, lng: -85.7585 }}
+                  center={filters.lat && filters.lng ? { lat: filters.lat, lng: filters.lng } : 
+                         initialCenter ? { lat: initialCenter.lat, lng: initialCenter.lng } : 
+                         { lat: 38.2527, lng: -85.7585 }}
                   zoom={filters.lat && filters.lng ? 12 : 10}
                 />
                 {/* Debug info */}
-                {filters.lat && filters.lng && (
-                  <div className="mt-2 text-xs text-gray-500">
-                    Center: {filters.lat.toFixed(4)}, {filters.lng.toFixed(4)} | Pins: {mapSales.length}
-                  </div>
-                )}
+                <div className="mt-2 text-xs text-gray-500">
+                  Center: {filters.lat ? filters.lat.toFixed(4) : 'none'}, {filters.lng ? filters.lng.toFixed(4) : 'none'} | Pins: {mapSales.length}
+                  <br />
+                  Initial Center: {initialCenter?.lat?.toFixed(4) || 'none'}, {initialCenter?.lng?.toFixed(4) || 'none'}
+                </div>
               </div>
               
               {/* Location Info */}

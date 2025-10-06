@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 9d5df8a — fix(sales-api): relax filters (no status/date), robust starts/ends mapping; keep bbox + distance (by Yard Sale Tracker on 2025-10-06 11:48:37 -0400)
+- **Latest commit:** c057225 — fix(filters): remove next_weekend; stabilize FiltersModal/useFilters to stop re-init loops (by Yard Sale Tracker on 2025-10-06 11:56:06 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18286608516
+- **CI status:** running, last run: run 18286802374
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T15:49:21.237Z
+Updated automatically by Cursor on 2025-10-06T15:56:51.535Z

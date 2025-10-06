@@ -35,6 +35,7 @@ export default function SalesMap({
 
   // Update view state when center changes
   useEffect(() => {
+    console.log('[MAP] Center changed:', center)
     setViewState(prev => ({
       ...prev,
       latitude: center.lat,
@@ -79,6 +80,7 @@ export default function SalesMap({
   return (
     <div className="h-96 w-full rounded-lg overflow-hidden">
       <Map
+        key={`${center.lat}-${center.lng}`}
         mapboxAccessToken={token}
         initialViewState={viewState}
         onMove={(evt: any) => setViewState(evt.viewState)}

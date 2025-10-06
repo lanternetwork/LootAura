@@ -65,35 +65,34 @@ export async function GET(request: NextRequest) {
     let startDateParam: string | null = null
     let endDateParam: string | null = null
     
-    if (dateRange !== 'any') {
-      if (startDate && endDate) {
-        startDateParam = startDate
-        endDateParam = endDate
-      } else {
-        // Handle predefined date ranges
-        const now = new Date()
-        switch (dateRange) {
-          case 'today':
-            startDateParam = now.toISOString().split('T')[0]
-            endDateParam = now.toISOString().split('T')[0]
-            break
-          case 'weekend':
-            const saturday = new Date(now)
-            saturday.setDate(now.getDate() + (6 - now.getDay()))
-            const sunday = new Date(saturday)
-            sunday.setDate(saturday.getDate() + 1)
-            startDateParam = saturday.toISOString().split('T')[0]
-            endDateParam = sunday.toISOString().split('T')[0]
-            break
-          case 'next_weekend':
-            const nextSaturday = new Date(now)
-            nextSaturday.setDate(now.getDate() + (6 - now.getDay()) + 7)
-            const nextSunday = new Date(nextSaturday)
-            nextSunday.setDate(nextSaturday.getDate() + 1)
-            startDateParam = nextSaturday.toISOString().split('T')[0]
-            endDateParam = nextSunday.toISOString().split('T')[0]
-            break
-        }
+    // If explicit start/end provided, honor them regardless of dateRange token
+    if (startDate) startDateParam = startDate
+    if (endDate) endDateParam = endDate
+    
+    // If no explicit dates, compute from dateRange presets
+    if (!startDateParam && !endDateParam && dateRange !== 'any') {
+      const now = new Date()
+      switch (dateRange) {
+        case 'today':
+          startDateParam = now.toISOString().split('T')[0]
+          endDateParam = now.toISOString().split('T')[0]
+          break
+        case 'weekend':
+          const saturday = new Date(now)
+          saturday.setDate(now.getDate() + (6 - now.getDay()))
+          const sunday = new Date(saturday)
+          sunday.setDate(saturday.getDate() + 1)
+          startDateParam = saturday.toISOString().split('T')[0]
+          endDateParam = sunday.toISOString().split('T')[0]
+          break
+        case 'next_weekend':
+          const nextSaturday = new Date(now)
+          nextSaturday.setDate(now.getDate() + (6 - now.getDay()) + 7)
+          const nextSunday = new Date(nextSaturday)
+          nextSunday.setDate(nextSaturday.getDate() + 1)
+          startDateParam = nextSaturday.toISOString().split('T')[0]
+          endDateParam = nextSunday.toISOString().split('T')[0]
+          break
       }
     }
     

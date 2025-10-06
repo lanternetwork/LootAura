@@ -50,3 +50,4 @@
 
 ---
 Updated automatically by Cursor on 2025-10-05T23:25:13.211Z
+Force redeploy: just do it again.

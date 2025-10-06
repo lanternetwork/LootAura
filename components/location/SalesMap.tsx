@@ -97,12 +97,11 @@ export default function SalesMap({
             <div className={`cursor-pointer ${
               selectedSaleId === sale.id ? 'scale-125' : 'scale-100'
             } transition-transform duration-200`}>
-              <div className={`w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-xs font-bold ${
+              <div className={`w-3 h-3 rounded-full border border-white shadow-sm ${
                 sale.is_featured 
-                  ? 'bg-red-500 text-white' 
-                  : 'bg-blue-500 text-white'
+                  ? 'bg-red-500' 
+                  : 'bg-gray-600'
               }`}>
-                $
               </div>
             </div>
           </Marker>

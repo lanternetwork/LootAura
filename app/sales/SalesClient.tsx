@@ -498,7 +498,22 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         <div className="hidden lg:block lg:w-1/3">
           <div className="sticky top-4 space-y-6">
             {/* Filters */}
-            <FiltersModal isOpen={true} onClose={() => {}} />
+            <FiltersModal 
+              isOpen={true} 
+              onClose={() => {}} 
+              filters={{
+                distance: filters.distance,
+                dateRange: filters.dateRange,
+                categories: filters.categories
+              }}
+              onFiltersChange={(newFilters) => {
+                updateFilters({
+                  distance: newFilters.distance,
+                  dateRange: newFilters.dateRange,
+                  categories: newFilters.categories
+                })
+              }}
+            />
             
             {/* Map */}
             <div className="bg-white rounded-lg shadow-sm border p-4">
@@ -511,12 +526,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                          { lat: 39.8283, lng: -98.5795 }}
                   zoom={filters.lat && filters.lng ? 12 : 10}
                 />
-                {/* Debug info */}
-                <div className="mt-2 text-xs text-gray-500">
-                  Center: {filters.lat ? filters.lat.toFixed(4) : 'none'}, {filters.lng ? filters.lng.toFixed(4) : 'none'} | Pins: {mapSales.length}
-                  <br />
-                  Initial Center: {initialCenter?.lat?.toFixed(4) || 'none'}, {initialCenter?.lng?.toFixed(4) || 'none'}
-                </div>
+              </div>
+              {/* Debug info */}
+              <div className="mt-2 text-xs text-gray-500">
+                Center: {filters.lat ? filters.lat.toFixed(4) : 'none'}, {filters.lng ? filters.lng.toFixed(4) : 'none'} | Pins: {mapSales.length}
+                <br />
+                Initial Center: {initialCenter?.lat?.toFixed(4) || 'none'}, {initialCenter?.lng?.toFixed(4) || 'none'}
               </div>
               
               {/* Location Info */}

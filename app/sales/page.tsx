@@ -103,7 +103,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         initialCenter = { 
           lat: Number(vercelLat), 
           lng: Number(vercelLng), 
-          label: { city: vercelCity, state: vercelState } 
+          label: { city: vercelCity || undefined, state: vercelState || undefined } 
         }
         console.log(`[SALES_PAGE] Using Vercel location:`, initialCenter)
       } else if (baseUrl) {

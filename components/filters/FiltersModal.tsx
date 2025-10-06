@@ -79,7 +79,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
   
   const filters = externalFilters ? {
     distance: externalFilters.distance,
-    dateRange: { type: externalFilters.dateRange as any, startDate: '', endDate: '' },
+    dateRange: { type: (externalFilters.dateRange as DateRange['type']) === 'range' ? 'any' : (externalFilters.dateRange as DateRange['type']), startDate: '', endDate: '' },
     categories: externalFilters.categories
   } : internalFilters
 
@@ -94,15 +94,17 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
     if (!externalFilters) {
       setInternalFilters({
         distance: Math.max(1, Math.min(100, distance)),
-        dateRange: { 
-          type: dateType as DateRange['type'], 
-          startDate, 
-          endDate 
+        dateRange: {
+          type: (dateType as DateRange['type']) === 'range' ? 'any' : (dateType as DateRange['type']),
+          startDate,
+          endDate
         },
         categories
       })
     }
-  }, [searchParams])
+  // Only run on mount to avoid loops; URL is updated by our own handlers
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateFilters = (newFilters: Partial<FilterState>) => {
     setInternalFilters(prevFilters => {
@@ -351,7 +353,6 @@ function FiltersContent({
               {filters.dateRange.type !== 'any' && (
                 <li>• Date: {filters.dateRange.type === 'today' ? 'Today' : 
                             filters.dateRange.type === 'weekend' ? 'This Weekend' :
-                            filters.dateRange.type === 'next_weekend' ? 'Next Weekend' :
                             'Custom Range'}</li>
               )}
               {filters.categories.length > 0 && (

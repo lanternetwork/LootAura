@@ -42,7 +42,8 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     const lat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : undefined
     const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : undefined
     const distance = searchParams.get('dist') ? parseInt(searchParams.get('dist')!) : 25
-    const dateRange = (searchParams.get('date') as 'today' | 'weekend' | 'any') || 'any'
+    const dateParam = searchParams.get('date') as 'today' | 'weekend' | 'any' | 'range' | null
+    const dateRange = !dateParam || dateParam === 'range' ? 'any' : dateParam
     const categories = searchParams.get('cat') ? searchParams.get('cat')!.split(',') : []
     const city = searchParams.get('city') || undefined
 
@@ -57,7 +58,9 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
       categories,
       city
     }))
-  }, [searchParams])
+  // Only run on mount to seed from URL; further changes are driven by updateFilters
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateFilters = useCallback((newFilters: Partial<FilterState>) => {
     const updatedFilters = { ...filters, ...newFilters }

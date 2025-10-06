@@ -26,10 +26,16 @@ const DEFAULT_FILTERS: FilterState = {
   categories: []
 }
 
-export function useFilters(): UseFiltersReturn {
+export function useFilters(initialLocation?: { lat: number; lng: number }): UseFiltersReturn {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
+  const [filters, setFilters] = useState<FilterState>(() => {
+    // Initialize with initialLocation if provided
+    if (initialLocation) {
+      return { ...DEFAULT_FILTERS, lat: initialLocation.lat, lng: initialLocation.lng }
+    }
+    return DEFAULT_FILTERS
+  })
 
   // Initialize filters from URL params
   useEffect(() => {
@@ -40,14 +46,17 @@ export function useFilters(): UseFiltersReturn {
     const categories = searchParams.get('cat') ? searchParams.get('cat')!.split(',') : []
     const city = searchParams.get('city') || undefined
 
-    setFilters({
-      lat,
-      lng,
+    // Only update if URL has location params, otherwise keep initial location
+    const hasLocationParams = searchParams.get('lat') || searchParams.get('lng')
+    
+    setFilters(prev => ({
+      lat: hasLocationParams ? lat : prev.lat,
+      lng: hasLocationParams ? lng : prev.lng,
       distance: Math.max(1, Math.min(100, distance)),
       dateRange,
       categories,
       city
-    })
+    }))
   }, [searchParams])
 
   const updateFilters = useCallback((newFilters: Partial<FilterState>) => {

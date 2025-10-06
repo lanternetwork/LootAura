@@ -47,7 +47,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const router = useRouter()
   const searchParams = useSearchParams()
   const { location, getLocation, loading: locationLoading, error: locationError } = useLocation()
-  const { filters, updateFilters, hasActiveFilters } = useFilters()
+  const { filters, updateFilters, hasActiveFilters } = useFilters(
+    initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
+  )
+
+  // Debug logging
+  console.log('[SALES] SalesClient render:', {
+    initialCenter,
+    filters,
+    searchParams: Object.fromEntries(searchParams.entries())
+  })
 
   const [sales, setSales] = useState<Sale[]>(initialSales)
   const [loading, setLoading] = useState(false)
@@ -288,6 +297,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Initialize filters from server-provided center first
   useEffect(() => {
     if (initialCenter?.lat && initialCenter?.lng && !isNeutralFallback) {
+      console.log(`[SALES] Initializing filters with server location: ${initialCenter.lat}, ${initialCenter.lng}`)
       updateFilters({ lat: initialCenter.lat, lng: initialCenter.lng })
     }
   }, [initialCenter?.lat, initialCenter?.lng, isNeutralFallback, updateFilters])

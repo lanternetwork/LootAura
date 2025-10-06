@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 5ebb27b — feat(api): apply date overlap filtering for sales and markers so date ranges affect results (by Yard Sale Tracker on 2025-10-06 15:54:29 -0400)
+- **Latest commit:** ff5f172 — fix(api): move date filtering to post-fetch window overlap for sales and markers; avoids PostgREST OR issues (by Yard Sale Tracker on 2025-10-06 15:58:26 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18292749178
+- **CI status:** running, last run: run 18292826619
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T19:55:13.124Z
+Updated automatically by Cursor on 2025-10-06T19:59:13.803Z

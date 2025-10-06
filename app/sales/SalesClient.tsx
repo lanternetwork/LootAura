@@ -127,9 +127,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       distanceKm: (filters.distance || 25) * 1.60934, // Convert miles to km
       city: filters.city,
       categories: filters.categories.length > 0 ? filters.categories : undefined,
-      // do not send dateRange token; send concrete dates instead
-      ...(dateFrom ? { dateFrom } : {}),
-      ...(dateTo ? { dateTo } : {}),
+      // API expects startDate/endDate keys
+      ...(dateFrom ? { startDate: dateFrom } as any : {}),
+      ...(dateTo ? { endDate: dateTo } as any : {}),
       limit: 24,
       offset: append ? sales.length : 0,
     }

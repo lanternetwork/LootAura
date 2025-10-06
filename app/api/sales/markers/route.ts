@@ -9,8 +9,8 @@ export async function GET(request: NextRequest) {
   const lng = url.searchParams.get('lng') ? Number(url.searchParams.get('lng')) : undefined
   const maxKm = url.searchParams.get('maxKm') ? Number(url.searchParams.get('maxKm')) : 25
   const q = url.searchParams.get('q') || undefined
-  const dateFrom = url.searchParams.get('dateFrom') || undefined
-  const dateTo = url.searchParams.get('dateTo') || undefined
+  const dateFrom = url.searchParams.get('startDate') || url.searchParams.get('dateFrom') || undefined
+  const dateTo = url.searchParams.get('endDate') || url.searchParams.get('dateTo') || undefined
   const tags = url.searchParams.get('tags')?.split(',').filter(Boolean) || undefined
   // Protective cap to avoid rendering too many markers
   const limit = url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : 1000

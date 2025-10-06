@@ -66,6 +66,13 @@ export default function MapPreview() {
             const lat = Number(sale.lat)
             const lng = Number(sale.lng)
             console.log(`Sale ${sale.id}: lat=${lat}, lng=${lng}, title=${sale.title}`)
+            
+            // Validate coordinates
+            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+              console.warn(`Invalid coordinates for sale ${sale.id}: lat=${lat}, lng=${lng}`)
+              return null
+            }
+            
             return (
               <Marker
                 key={sale.id}
@@ -73,10 +80,12 @@ export default function MapPreview() {
                 longitude={lng}
               >
                 <div 
-                  className="w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-lg cursor-pointer hover:bg-red-600" 
+                  className="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg cursor-pointer hover:bg-red-600 flex items-center justify-center text-white text-xs font-bold" 
                   title={`${sale.title} (${sale.city}, ${sale.state})`}
                   style={{ zIndex: 1000 }}
-                />
+                >
+                  •
+                </div>
               </Marker>
             )
           })}

@@ -35,12 +35,7 @@ export async function GET(request: NextRequest) {
     if (q) {
       query = query.ilike('title', `%${q}%`)
     }
-    if (dateFrom) {
-      query = query.or(`date_end.gte.${dateFrom},ends_at.gte.${dateFrom}T00:00:00`)
-    }
-    if (dateTo) {
-      query = query.or(`date_start.lte.${dateTo},starts_at.lte.${dateTo}T23:59:59`)
-    }
+    // We'll filter by date window after fetching to avoid OR composition issues
     if (
       minLat !== undefined && maxLat !== undefined &&
       minLng !== undefined && maxLng !== undefined
@@ -57,7 +52,22 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
     if (error) throw error
 
+    const windowStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null
+    const windowEnd = dateTo ? new Date(`${dateTo}T23:59:59`) : null
+
     const markers = (data as any[])
+      .filter((s: any) => {
+        if (!windowStart && !windowEnd) return true
+        const saleStart = s.starts_at ? new Date(s.starts_at) : (s.date_start ? new Date(`${s.date_start}T${s.time_start || '00:00:00'}`) : null)
+        const saleEnd = s.ends_at ? new Date(s.ends_at) : (s.date_end ? new Date(`${s.date_end}T${s.time_end || '23:59:59'}`) : null)
+        if (!saleStart && !saleEnd) return true
+        const st = saleStart || saleEnd
+        const en = saleEnd || saleStart
+        if (!st || !en) return true
+        const startOk = !windowEnd || st <= windowEnd
+        const endOk = !windowStart || en >= windowStart
+        return startOk && endOk
+      })
       .map((s: any) => {
         const latNum = typeof s.lat === 'number' ? s.lat : parseFloat(String(s.lat))
         const lngNum = typeof s.lng === 'number' ? s.lng : parseFloat(String(s.lng))

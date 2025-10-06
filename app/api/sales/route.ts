@@ -120,15 +120,7 @@ export async function GET(request: NextRequest) {
         .from('sales_v2')
         .select('*')
       
-      // Apply date overlap filtering when provided
-      if (startDateParam) {
-        // Keep rows that end on/after start
-        query = query.or(`date_end.gte.${startDateParam},ends_at.gte.${startDateParam}T00:00:00`)
-      }
-      if (endDateParam) {
-        // Keep rows that start on/before end
-        query = query.or(`date_start.lte.${endDateParam},starts_at.lte.${endDateParam}T23:59:59`)
-      }
+      // NOTE: We filter by date window after fetching to avoid PostgREST OR-composition issues
       
       // Add category filters - fallback to text search if tags array not present
       if (categories.length > 0) {
@@ -164,7 +156,9 @@ export async function GET(request: NextRequest) {
         throw new Error(`Direct query failed: ${salesError.message}`)
       }
       
-      // Calculate distances and filter by actual distance
+      // Calculate distances and filter by actual distance and date window (if provided)
+      const windowStart = startDateParam ? new Date(`${startDateParam}T00:00:00`) : null
+      const windowEnd = endDateParam ? new Date(`${endDateParam}T23:59:59`) : null
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
         .map((sale: any) => {
@@ -174,6 +168,23 @@ export async function GET(request: NextRequest) {
           return { ...sale, lat: latNum, lng: lngNum }
         })
         .filter((sale: any) => sale && typeof sale.lat === 'number' && typeof sale.lng === 'number')
+        .filter((sale: any) => {
+          if (!windowStart && !windowEnd) return true
+          // Build sale start/end
+          const saleStart = sale.starts_at
+            ? new Date(sale.starts_at)
+            : (sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null)
+          const saleEnd = sale.ends_at
+            ? new Date(sale.ends_at)
+            : (sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null)
+          if (!saleStart && !saleEnd) return true
+          const s = saleStart || saleEnd
+          const e = saleEnd || saleStart
+          if (!s || !e) return true
+          const startOk = !windowEnd || s <= windowEnd
+          const endOk = !windowStart || e >= windowStart
+          return startOk && endOk
+        })
         .map((sale: any) => {
           // Haversine distance calculation
           const R = 6371000 // Earth's radius in meters

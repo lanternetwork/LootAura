@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 67d8fc2 — fix(types): use correct state setter in FiltersModal for internal filters (by Yard Sale Tracker on 2025-10-05 22:28:16 -0400)
+- **Latest commit:** c894e98 — fix(map): use /api/sales/markers for full in-radius pins and filter sync (by Yard Sale Tracker on 2025-10-06 10:46:52 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18283312301
+- **CI status:** running, last run: run 18285406166
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T13:57:14.650Z
+Updated automatically by Cursor on 2025-10-06T15:07:58.703Z

@@ -49,6 +49,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   // 1) la_loc cookie
   try {
     const c = cookieStore.get('la_loc')?.value
+    console.log(`[SALES_PAGE] la_loc cookie:`, c)
     if (c) {
       const parsed = JSON.parse(c)
       if (parsed?.lat && parsed?.lng) {
@@ -57,9 +58,12 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
           lng: Number(parsed.lng),
           label: { zip: parsed.zip, city: parsed.city, state: parsed.state }
         }
+        console.log(`[SALES_PAGE] Using cookie location:`, initialCenter)
       }
     }
-  } catch {}
+  } catch (e) {
+    console.log(`[SALES_PAGE] Cookie parse error:`, e)
+  }
 
   // 2) user profile.home_zip → lookup zip
   if (!initialCenter && user) {
@@ -87,18 +91,26 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   // 3) IP geolocation
   if (!initialCenter && baseUrl) {
     try {
+      console.log(`[SALES_PAGE] Trying IP geolocation: ${baseUrl}/api/geolocation/ip`)
       const ipRes = await fetch(`${baseUrl}/api/geolocation/ip`, { cache: 'no-store' })
       if (ipRes.ok) {
         const g = await ipRes.json()
+        console.log(`[SALES_PAGE] IP geolocation response:`, g)
         if (g?.lat && g?.lng) {
           initialCenter = { lat: Number(g.lat), lng: Number(g.lng), label: { city: g.city, state: g.state } }
+          console.log(`[SALES_PAGE] Using IP location:`, initialCenter)
         }
+      } else {
+        console.log(`[SALES_PAGE] IP geolocation failed:`, ipRes.status)
       }
-    } catch {}
+    } catch (e) {
+      console.log(`[SALES_PAGE] IP geolocation error:`, e)
+    }
   }
 
   // 4) Neutral fallback if still missing
   if (!initialCenter) {
+    console.log(`[SALES_PAGE] Using neutral fallback location`)
     initialCenter = { lat: 39.8283, lng: -98.5795 }
   } else {
     // Set/refresh la_loc cookie for 24h when we have a real center
@@ -159,3 +171,4 @@ function SalesSkeleton() {
     </div>
   )
 }
+

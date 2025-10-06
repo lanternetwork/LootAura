@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** e6b817f — style(admin): make map pins tiny (2x2px) while still visible (by Yard Sale Tracker on 2025-10-05 20:22:13 -0400)
+- **Latest commit:** ec69e13 — fix(sales): initialize filters with server-side location to prevent 'location unavailable' message (by Yard Sale Tracker on 2025-10-05 20:29:20 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18266452227
+- **CI status:** running, last run: run 18266563314
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-06T00:22:49.711Z
+Updated automatically by Cursor on 2025-10-06T00:30:21.456Z

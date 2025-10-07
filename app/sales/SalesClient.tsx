@@ -174,6 +174,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         const pageHasMore = newSales.length === 24
         setHasMore(pageHasMore)
         console.log(`[SALES] ${append ? 'Appended' : 'Set'} ${newSales.length} sales, hasMore: ${pageHasMore}`)
+        console.debug('[SALES] got', sales.length)
 
         // Prefetch next page in background for instant next click
         if (!append && pageHasMore) {
@@ -285,9 +286,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       if (Array.isArray(data)) {
         console.log('[MAP] Setting mapMarkers to:', data.length, 'markers')
         setMapMarkers(data)
+        console.debug('[MARKERS] got', data.length)
       } else {
         console.log('[MAP] Setting mapMarkers to empty array')
         setMapMarkers([])
+        console.debug('[MARKERS] got', 0)
       }
     } catch (error) {
       console.error('[MAP] Error fetching markers:', error)

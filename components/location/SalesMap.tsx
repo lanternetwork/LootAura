@@ -193,7 +193,11 @@ export default function SalesMap({
   }
 
   return (
-    <div className="h-96 w-full rounded-lg overflow-hidden">
+    <div className="h-96 w-full rounded-lg overflow-hidden relative">
+      {/* TEMP overlay for pin count verification */}
+      <div className="absolute top-2 left-2 z-10 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
+        {markers?.length ?? 0} pins
+      </div>
       <Map
         mapboxAccessToken={token}
         initialViewState={viewState}
@@ -204,13 +208,17 @@ export default function SalesMap({
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
       >
-        {markers.map((marker) => (
-          <Marker
-            key={marker.id}
-            latitude={marker.lat}
-            longitude={marker.lng}
-            onClick={() => handleMarkerClick(marker)}
-          >
+        {markers.map((marker) => {
+          const lat = +marker.lat
+          const lng = +marker.lng
+          if (Number.isNaN(lat) || Number.isNaN(lng)) return null
+          return (
+            <Marker
+              key={marker.id}
+              latitude={lat}
+              longitude={lng}
+              onClick={() => handleMarkerClick(marker)}
+            >
             <div className={`cursor-pointer ${
               selectedSaleId === marker.id ? 'scale-125' : 'scale-100'
             } transition-transform duration-200`}>
@@ -220,7 +228,8 @@ export default function SalesMap({
               </div>
             </div>
           </Marker>
-        ))}
+          )
+        })}
 
         {selectedSale && (
           <Popup

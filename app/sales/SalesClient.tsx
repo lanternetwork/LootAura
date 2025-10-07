@@ -70,6 +70,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
+  const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
 
   // Detect neutral fallback center (do not auto-fetch in this case)
   const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
@@ -458,6 +459,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     setZipError(null)
     console.log(`[ZIP] Setting new location: ${lat}, ${lng} (${city}, ${state})`)
     
+    // Update filters with new location
     updateFilters({
       lat,
       lng,
@@ -473,12 +475,18 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       localStorage.setItem('lootaura_last_location', JSON.stringify({ ...prevObj, lat, lng, city }))
     } catch {}
 
-    // Do not navigate; refetch in place to preserve scroll
-    // Force a manual fetch to ensure it happens immediately
-    console.log(`[ZIP] Manually triggering fetchSales after ZIP lookup`)
+    // Smoothly recenter map to new location
+    setMapCenterOverride({ lat, lng, zoom: 12 })
+    
+    // Clear the override after animation completes
     setTimeout(() => {
-      fetchSales()
-    }, 100)
+      setMapCenterOverride(null)
+    }, 600)
+
+    // Refetch with new center and existing filters
+    console.log(`[ZIP] Refetching sales and map data with new center`)
+    fetchSales()
+    fetchMapSales()
   }
 
   const handleZipError = (error: string) => {
@@ -656,6 +664,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                          initialCenter ? { lat: initialCenter.lat, lng: initialCenter.lng } : 
                          { lat: 39.8283, lng: -98.5795 }}
                   zoom={filters.lat && filters.lng ? 12 : 10}
+                  centerOverride={mapCenterOverride}
                   onSearchArea={({ center }) => {
                     // Recenter filters to map center and refetch (no router navigation)
                     updateFilters({ lat: center.lat, lng: center.lng })

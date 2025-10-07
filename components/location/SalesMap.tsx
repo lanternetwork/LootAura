@@ -16,6 +16,7 @@ interface SalesMapProps {
   selectedSaleId?: string
   onSearchArea?: (args: { bounds: { north: number; south: number; east: number; west: number }, center: { lat: number; lng: number }, zoom: number }) => void
   onViewChange?: (args: { center: { lat: number; lng: number }, zoom: number }) => void
+  centerOverride?: { lat: number; lng: number; zoom?: number } | null
 }
 
 export default function SalesMap({ 
@@ -25,7 +26,8 @@ export default function SalesMap({
   onSaleClick,
   selectedSaleId,
   onSearchArea,
-  onViewChange
+  onViewChange,
+  centerOverride
 }: SalesMapProps) {
   useEffect(() => {
     incMapLoad()
@@ -55,6 +57,24 @@ export default function SalesMap({
       }
     } catch {}
   }, [center.lat, center.lng])
+
+  // Handle centerOverride for ZIP input smooth recentering
+  useEffect(() => {
+    if (centerOverride) {
+      console.log('[MAP] CenterOverride:', centerOverride)
+      try {
+        const map = mapRef.current?.getMap?.()
+        if (map) {
+          const targetZoom = centerOverride.zoom || Math.max(map.getZoom(), 11)
+          map.easeTo({ 
+            center: [centerOverride.lng, centerOverride.lat], 
+            zoom: targetZoom, 
+            duration: 500 
+          })
+        }
+      } catch {}
+    }
+  }, [centerOverride])
 
   useEffect(() => {
     console.log('[MAP] sales updated, count:', sales.length, sales.map(s => ({ id: s.id, lat: s.lat, lng: s.lng })))

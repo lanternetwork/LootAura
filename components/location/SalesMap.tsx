@@ -94,12 +94,24 @@ export default function SalesMap({
     }
   }
 
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  const scheduleAutoSearch = () => {
+    if (!onSearchArea) return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      handleSearchArea()
+    }, 500)
+  }
+
   const handleMoveEnd = () => {
     setMoved(true)
+    scheduleAutoSearch()
   }
 
   const handleZoomEnd = () => {
     setMoved(true)
+    scheduleAutoSearch()
   }
 
   const getBounds = () => {
@@ -220,25 +232,7 @@ export default function SalesMap({
           </Popup>
         )}
       </Map>
-      {/* Top-right overlay Search Area button (enabled after pan/zoom) */}
-      <div className="absolute top-2 right-2 z-10">
-        <button
-          onClick={handleSearchArea}
-          className={`px-3 py-1.5 rounded-md text-sm font-medium border shadow bg-white/95 backdrop-blur transition-opacity ${moved ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        >
-          Search this area
-        </button>
-      </div>
-      {moved && (
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-4 z-10">
-          <button
-            onClick={handleSearchArea}
-            className="px-4 py-2 rounded-md bg-white/95 backdrop-blur border shadow text-sm font-medium hover:bg-white"
-          >
-            Search this area
-          </button>
-        </div>
-      )}
+      {/* Auto-search enabled; manual button removed to avoid duplicates */}
     </div>
   )
 }

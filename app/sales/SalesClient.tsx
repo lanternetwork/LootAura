@@ -461,20 +461,31 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     setZipError(null)
     console.log(`[ZIP] Setting new location: ${lat}, ${lng} (${city}, ${state})`)
     
-    // Update filters with new location
+    // Update filters with new location (skip URL update to prevent route change)
     updateFilters({
       lat,
       lng,
       city: city || undefined
-    })
+    }, true) // Skip URL update
     
-    // Persist la_loc cookie for 24h so server can use it on next visit
+    // Persist to session/local storage
     try {
       const cookiePayload = JSON.stringify({ lat, lng, city, state, zip })
       document.cookie = `la_loc=${cookiePayload}; Max-Age=${60 * 60 * 24}; Path=/; SameSite=Lax`
       const savedPrev = localStorage.getItem('lootaura_last_location')
       const prevObj = savedPrev ? JSON.parse(savedPrev) : {}
       localStorage.setItem('lootaura_last_location', JSON.stringify({ ...prevObj, lat, lng, city }))
+      
+      // Also persist to sessionStorage for immediate restore
+      const sessionData = {
+        lat,
+        lng,
+        city,
+        distance: filters.distance,
+        dateRange: filters.dateRange,
+        categories: filters.categories
+      }
+      sessionStorage.setItem('la_session_filters', JSON.stringify(sessionData))
     } catch {}
 
     // Smoothly recenter map to new location
@@ -485,10 +496,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       setMapCenterOverride(null)
     }, 600)
 
-    // Refetch with new center and existing filters
+    // Immediately refetch with new center and existing filters
     console.log(`[ZIP] Refetching sales and map data with new center`)
     fetchSales()
-    fetchMapSales()
+    fetchMapSales({ lat, lng })
   }
 
   const handleZipError = (error: string) => {

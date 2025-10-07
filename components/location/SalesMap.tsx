@@ -67,7 +67,8 @@ export default function SalesMap({
       try {
         const map = mapRef.current?.getMap?.()
         if (map) {
-          const targetZoom = centerOverride.zoom || Math.max(map.getZoom(), 11)
+          const currentZoom = map.getZoom()
+          const targetZoom = centerOverride.zoom || Math.max(currentZoom, 12)
           map.easeTo({ 
             center: [centerOverride.lng, centerOverride.lat], 
             zoom: targetZoom, 

@@ -94,6 +94,14 @@ export default function SalesMap({
     }
   }
 
+  const handleMoveEnd = () => {
+    setMoved(true)
+  }
+
+  const handleZoomEnd = () => {
+    setMoved(true)
+  }
+
   const getBounds = () => {
     try {
       const map = mapRef.current?.getMap?.()
@@ -106,9 +114,17 @@ export default function SalesMap({
   }
 
   const handleSearchArea = () => {
+    const map = mapRef.current?.getMap?.()
+    let centerNow = { lat: viewState.latitude, lng: viewState.longitude }
+    try {
+      if (map) {
+        const c = map.getCenter()
+        centerNow = { lat: c.lat, lng: c.lng }
+      }
+    } catch {}
     const bounds = getBounds()
-    if (bounds && onSearchArea) {
-      onSearchArea({ bounds, center: { lat: viewState.latitude, lng: viewState.longitude }, zoom: viewState.zoom })
+    if (onSearchArea) {
+      onSearchArea({ bounds: bounds || { north: 0, south: 0, east: 0, west: 0 }, center: centerNow, zoom: viewState.zoom })
     }
     setMoved(false)
   }
@@ -120,6 +136,8 @@ export default function SalesMap({
         mapboxAccessToken={token}
         initialViewState={viewState}
         onMove={handleMove}
+        onMoveEnd={handleMoveEnd as any}
+        onZoomEnd={handleZoomEnd as any}
         ref={mapRef}
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
@@ -202,6 +220,15 @@ export default function SalesMap({
           </Popup>
         )}
       </Map>
+      {/* Top-right overlay Search Area button (enabled after pan/zoom) */}
+      <div className="absolute top-2 right-2 z-10">
+        <button
+          onClick={handleSearchArea}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium border shadow bg-white/95 backdrop-blur transition-opacity ${moved ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        >
+          Search this area
+        </button>
+      </div>
       {moved && (
         <div className="absolute left-1/2 -translate-x-1/2 bottom-4 z-10">
           <button

@@ -286,8 +286,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.debug('[MARKERS] markers', data?.data ? data.data.length : 0)
       if (data?.ok && Array.isArray(data.data)) {
         // Deduplicate markers by id to prevent duplicates
-        const uniqueMarkers = data.data.filter((marker, index, self) => 
-          index === self.findIndex(m => m.id === marker.id)
+        const uniqueMarkers = data.data.filter((marker: any, index: number, self: any[]) => 
+          index === self.findIndex((m: any) => m.id === marker.id)
         )
         console.log('[MAP] Setting mapMarkers to:', uniqueMarkers.length, 'markers (deduplicated from', data.data.length, ')')
         setMapMarkers(uniqueMarkers)

@@ -153,7 +153,15 @@ export async function GET(request: NextRequest) {
       })
       
       if (salesError) {
-        throw new Error(`Direct query failed: ${salesError.message}`)
+        console.error('Sales query error:', salesError)
+        return NextResponse.json({
+          ok: false,
+          error: 'Database query failed',
+          code: (salesError as any)?.code,
+          details: (salesError as any)?.message || (salesError as any)?.details,
+          hint: (salesError as any)?.hint,
+          relation: 'public.sales_v2'
+        }, { status: 500 })
       }
       
       // Calculate distances and filter by actual distance and date window (UTC date-only)

@@ -76,17 +76,19 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Detect neutral fallback center (do not auto-fetch in this case)
   const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
 
-  const fetchSales = useCallback(async (append = false) => {
-    console.log('[SALES] fetchSales start', { append, filters })
+  const fetchSales = useCallback(async (append = false, centerOverride?: { lat: number; lng: number }) => {
+    const useLat = centerOverride?.lat ?? filters.lat
+    const useLng = centerOverride?.lng ?? filters.lng
+    console.log('[SALES] fetchSales start', { append, filters, centerOverride })
     if (append) {
       setLoadingMore(true)
     } else {
       setLoading(true)
     }
-    console.log(`[SALES] fetchSales called with location: ${filters.lat}, ${filters.lng}, append: ${append}`)
+    console.log(`[SALES] fetchSales called with location: ${useLat}, ${useLng}, append: ${append}`)
     
     // If no location, don't try to fetch sales yet
-    if (!filters.lat || !filters.lng) {
+    if (!useLat || !useLng) {
       console.log('[SALES] No location provided, waiting for location')
       setSales([])
       setDateWindow(null)
@@ -124,8 +126,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     }
 
     const params: GetSalesParams = {
-      lat: filters.lat,
-      lng: filters.lng,
+      lat: useLat,
+      lng: useLng,
       // Convert miles to km only at request time
       distanceKm: (filters.distance || 25) * 1.60934,
       city: filters.city,
@@ -137,6 +139,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       offset: append ? sales.length : 0,
     }
     console.log('[SALES] fetch params:', params)
+    console.debug('[SALES] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
 
     const queryString = new URLSearchParams(
       Object.entries(params).reduce((acc, [key, value]) => {
@@ -274,6 +277,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`)
       console.debug('[MARKERS] fetch', `/api/sales/markers?${params.toString()}`)
+      console.debug('[MARKERS] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
       const res = await fetch(`/api/sales/markers?${params.toString()}`)
       const data = await res.json()
       console.log('[MAP] Markers response:', data)
@@ -502,7 +506,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
     // Immediately refetch with new center and existing filters
     console.log(`[ZIP] Refetching sales and map data with new center`)
-    fetchSales()
+    fetchSales(false, { lat, lng })
     fetchMapSales({ lat, lng })
   }
 
@@ -686,7 +690,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onSearchArea={({ center }) => {
                     // Recenter filters to map center and refetch (no router navigation)
                     updateFilters({ lat: center.lat, lng: center.lng }, true) // Skip URL update
-                    fetchSales()
+                    fetchSales(false, center)
                     fetchMapSales(center)
                   }}
                   onViewChange={({ center, zoom }) => {

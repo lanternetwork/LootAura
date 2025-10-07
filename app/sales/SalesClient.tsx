@@ -65,8 +65,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapSales, setMapSales] = useState<Sale[]>([])
+  const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
   const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
+  const [bannerShown, setBannerShown] = useState<boolean>(false)
 
   // Detect neutral fallback center (do not auto-fetch in this case)
   const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
@@ -441,6 +443,31 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     setZipError(error)
   }
 
+  // Smooth map pin fade-in without moving center
+  useEffect(() => {
+    setMapFadeIn(false)
+    const id = setTimeout(() => setMapFadeIn(true), 150)
+    return () => clearTimeout(id)
+  }, [mapSales])
+
+  // One-time soft banner when results first load
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (bannerShown) return
+    if (sales.length > 0) {
+      const seen = sessionStorage.getItem('la_seen_results_banner')
+      if (!seen) {
+        setBannerShown(true)
+        sessionStorage.setItem('la_seen_results_banner', '1')
+      }
+    }
+  }, [sales, bannerShown])
+
+  const handleIncreaseDistanceAndRetry = () => {
+    const nextMiles = Math.min(100, (filters.distance || 25) + 10)
+    updateFilters({ distance: nextMiles })
+  }
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex flex-col lg:flex-row gap-6">
@@ -518,15 +545,29 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
                 {!(loading || !fetchedOnce) && (
                   sales.length === 0 ? (
-                    <div className="text-center py-12">
-                      <p className="text-gray-500 text-lg">No sales found matching your criteria.</p>
-                      <p className="text-gray-400 mt-2">Try adjusting your filters or location.</p>
+                    <div className="text-center py-16">
+                      <h3 className="text-xl font-semibold text-gray-800">No sales found nearby</h3>
+                      <p className="text-gray-500 mt-2">Try expanding your search radius or changing the date range.</p>
+                      <button
+                        onClick={handleIncreaseDistanceAndRetry}
+                        className="mt-4 inline-flex items-center px-4 py-2 rounded-md bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                      >
+                        Increase distance by 10 miles
+                      </button>
                     </div>
                   ) : (
                     <>
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="sales-grid">
-                        {sales.map((sale) => (
-                          <SaleCard key={sale.id} sale={sale} />
+                        {(loading ? Array.from({ length: 6 }) : sales).map((item: any, idx: number) => (
+                          loading ? (
+                            <div key={idx} className="animate-pulse bg-white rounded-lg border p-4">
+                              <div className="h-40 bg-gray-200 rounded mb-4" />
+                              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                              <div className="h-4 bg-gray-200 rounded w-1/2" />
+                            </div>
+                          ) : (
+                            <SaleCard key={item.id} sale={item} />
+                          )
                         ))}
                       </div>
                       <LoadMoreButton
@@ -566,7 +607,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             {/* Map */}
             <div className="bg-white rounded-lg shadow-sm border p-4">
               <h2 className="text-xl font-semibold mb-4">Map View</h2>
-              <div className="h-[400px] rounded-lg overflow-hidden">
+              <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'}`}>
                 <SalesMap
                   sales={mapSales}
                   center={filters.lat && filters.lng ? { lat: filters.lat, lng: filters.lng } : 
@@ -582,15 +623,22 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                 Initial Center: {initialCenter?.lat?.toFixed(4) || 'none'}, {initialCenter?.lng?.toFixed(4) || 'none'}
               </div>
               
-              {/* Location Info */}
+              {/* Location Info & one-time soft banner */}
               {filters.lat && filters.lng && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    <strong>Searching within {filters.distance} miles</strong> of your location
-                  </p>
-                  <p className="text-xs text-blue-600 mt-1">
-                    Found {sales.length} sales
-                  </p>
+                <div className="mt-4 space-y-2">
+                  {bannerShown && (
+                    <div className="p-3 bg-amber-50 border border-amber-100 text-amber-900 rounded-md text-sm">
+                      Showing sales near {filters.city || 'your location'}
+                    </div>
+                  )}
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Searching within {filters.distance} miles</strong> of your location
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Found {sales.length} sales
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

@@ -4,12 +4,6 @@ import type { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 
 export async function middleware(req: NextRequest) {
-  // Bypass middleware for PWA artifacts explicitly
-  const p = req.nextUrl.pathname
-  if (p === '/manifest.json' || p === '/sw.js') {
-    return NextResponse.next()
-  }
-
   const res = NextResponse.next()
   const cookieStore = cookies()
   
@@ -32,14 +26,8 @@ export async function middleware(req: NextRequest) {
   // Get the current user
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Protected routes that require authentication
-  const protectedRoutes = ['/sell', '/favorites', '/account']
-  const isProtectedRoute = protectedRoutes.some(route => 
-    req.nextUrl.pathname.startsWith(route)
-  )
-
-  // If accessing a protected route without authentication
-  if (isProtectedRoute && !user) {
+  // All routes matched by this middleware require authentication
+  if (!user) {
     const loginUrl = new URL('/login', req.url)
     loginUrl.searchParams.set('redirectTo', req.nextUrl.pathname)
     return NextResponse.redirect(loginUrl)
@@ -83,14 +71,12 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     * - PWA files (manifest.json, sw.js)
+     * Only match specific routes that need authentication
+     * This ensures PWA files and static assets are never processed by middleware
      */
-    // Exclude static assets and PWA files from middleware to avoid 401s on manifest/sw
-    '/((?!_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|robots\\.txt|sitemap\\.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|webmanifest)$).*)',
+    '/sell/:path*',
+    '/favorites/:path*', 
+    '/account/:path*',
+    '/admin/:path*'
   ],
 }

@@ -129,7 +129,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       lat: useLat,
       lng: useLng,
       // Convert miles to km only at request time
-      distanceKm: (filters.distance || 25) * 1.60934,
+      distanceKm: filters.distance * 1.60934,
       city: filters.city,
       categories: filters.categories.length > 0 ? filters.categories : undefined,
       // API expects startDate/endDate keys
@@ -269,7 +269,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       params.set('lat', String(useLat))
       params.set('lng', String(useLng))
       // One source of truth: miles in state; convert to km for requests
-      const distanceKm = String((filters.distance || 25) * 1.60934)
+      const distanceKm = String(filters.distance * 1.60934)
       params.set('distanceKm', distanceKm)
       if (filters.categories.length > 0) params.set('tags', filters.categories.join(','))
       if (dateFrom) params.set('dateFrom', dateFrom)
@@ -313,7 +313,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         const params: GetSalesParams = {
           lat: filters.lat!,
           lng: filters.lng!,
-          distanceKm: (filters.distance || 25) * 1.60934,
+          distanceKm: filters.distance * 1.60934,
           city: filters.city,
           categories: filters.categories.length > 0 ? filters.categories : undefined,
           dateRange: filters.dateRange !== 'any' ? filters.dateRange : undefined,
@@ -538,7 +538,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [sales, bannerShown])
 
   const handleIncreaseDistanceAndRetry = () => {
-    const nextMiles = Math.min(100, (filters.distance || 25) + 10)
+    const nextMiles = Math.min(100, filters.distance + 10)
     updateFilters({ distance: nextMiles }, true) // Skip URL update
   }
 

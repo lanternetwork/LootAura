@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing or invalid lat/lng' }, { status: 400 })
     }
     // Normalize distance (km)
-    const distanceKm = Number.isFinite(parseFloat(String(distanceParam))) ? Math.max(0, parseFloat(String(distanceParam))) : 25
+    const distanceKm = Number.isFinite(parseFloat(String(distanceParam))) ? Math.max(0, parseFloat(String(distanceParam))) : 40
     const limit = Number.isFinite(parseFloat(String(limitParam))) ? Math.min(parseInt(String(limitParam), 10), 1000) : 1000
     const categories = catsParam ? catsParam.split(',').map(s => s.trim()).filter(Boolean) : []
 
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
         const distanceKm = R * c
         return { ...sale, distanceKm }
       })
-      .filter((sale: any) => sale.distanceKm <= (distanceKm || 25))
+      .filter((sale: any) => sale.distanceKm <= distanceKm)
 
     const markers = filtered
       .slice(0, Math.min(limit, 1000))

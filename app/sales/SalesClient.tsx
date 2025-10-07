@@ -153,9 +153,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
     try {
       console.log(`[SALES] Fetching from: /api/sales?${queryString}`)
+      console.debug('[SALES] fetch', `/api/sales?${queryString}`)
       const res = await fetch(`/api/sales?${queryString}`)
       const data = await res.json()
       console.log(`[SALES] API response:`, data)
+      console.debug('[SALES] results', data.data?.length || 0)
       
       if (data.ok) {
         const newSales = data.data || []
@@ -271,9 +273,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       params.set('limit', '1000')
 
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`)
+      console.debug('[MARKERS] fetch', `/api/sales/markers?${params.toString()}`)
       const res = await fetch(`/api/sales/markers?${params.toString()}`)
       const data = await res.json()
       console.log('[MAP] Markers response:', data)
+      console.debug('[MARKERS] markers', Array.isArray(data) ? data.length : 0)
       if (Array.isArray(data)) {
         console.log('[MAP] Setting mapMarkers to:', data.length, 'markers')
         setMapMarkers(data)

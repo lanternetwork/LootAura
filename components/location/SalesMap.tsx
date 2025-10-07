@@ -152,7 +152,7 @@ export default function SalesMap({
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       handleSearchArea()
-    }, 800) // trailing debounce 800ms
+    }, 700) // trailing debounce 700ms
   }
 
   const handleMoveEnd = () => {

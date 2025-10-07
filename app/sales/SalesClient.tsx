@@ -351,25 +351,55 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCenter?.lat, initialCenter?.lng, isNeutralFallback, filters.lat, filters.lng])
 
-  // Initialize location from cookie on mount
+  // Initialize location on first mount: localStorage → cookie → /api/location → fallback
   useEffect(() => {
-    const cookieData = getCookie('la_loc')
-    if (cookieData && !filters.lat && !filters.lng) {
+    if (filters.lat && filters.lng) return
+    const tryInit = async () => {
       try {
-        const locationData = JSON.parse(cookieData)
-        if (locationData.lat && locationData.lng) {
-          console.log(`[SALES] Loading location from cookie: ${locationData.zip} (${locationData.city}, ${locationData.state})`)
-          updateFilters({
-            lat: locationData.lat,
-            lng: locationData.lng,
-            city: locationData.city
-          })
+        // 1) localStorage
+        if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('lootaura_last_location')
+          if (saved) {
+            const parsed = JSON.parse(saved)
+            if (parsed?.lat && parsed?.lng) {
+              console.log('[SALES] Restoring location from localStorage')
+              updateFilters({ lat: parsed.lat, lng: parsed.lng, city: parsed.city })
+              return
+            }
+          }
         }
-      } catch (error) {
-        console.error('Failed to parse location cookie:', error)
-      }
+        // 2) cookie
+        const cookieData = getCookie('la_loc')
+        if (cookieData) {
+          try {
+            const locationData = JSON.parse(cookieData)
+            if (locationData.lat && locationData.lng) {
+              console.log('[SALES] Loading location from cookie')
+              updateFilters({ lat: locationData.lat, lng: locationData.lng, city: locationData.city })
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('lootaura_last_location', JSON.stringify({ lat: locationData.lat, lng: locationData.lng, city: locationData.city }))
+              }
+              return
+            }
+          } catch {}
+        }
+        // 3) server endpoint
+        const res = await fetch('/api/location', { cache: 'no-store' })
+        if (res.ok) {
+          const loc = await res.json()
+          if (loc?.lat && loc?.lng) {
+            console.log('[SALES] Seeding location from /api/location', { source: loc.source })
+            updateFilters({ lat: loc.lat, lng: loc.lng, city: loc.city })
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('lootaura_last_location', JSON.stringify({ lat: loc.lat, lng: loc.lng, city: loc.city }))
+            }
+          }
+        }
+      } catch {}
     }
-  }, []) // Only run on mount
+    tryInit()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Geolocation prompt removed by design; no client location requests
 

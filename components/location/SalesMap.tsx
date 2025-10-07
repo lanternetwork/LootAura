@@ -14,6 +14,7 @@ interface SalesMapProps {
   zoom?: number
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string
+  onSearchArea?: (args: { bounds: { north: number; south: number; east: number; west: number }, center: { lat: number; lng: number }, zoom: number }) => void
 }
 
 export default function SalesMap({ 
@@ -21,29 +22,28 @@ export default function SalesMap({
   center = { lat: 38.2527, lng: -85.7585 }, 
   zoom = 10,
   onSaleClick,
-  selectedSaleId
+  selectedSaleId,
+  onSearchArea
 }: SalesMapProps) {
   useEffect(() => {
     incMapLoad()
   }, [])
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
+  const mapRef = useRef<any>(null)
   const [viewState, setViewState] = useState({
     latitude: center.lat,
     longitude: center.lng,
     zoom: zoom
   })
+  const [moved, setMoved] = useState(false)
   useEffect(() => {
     console.log('[MAP] init viewState:', viewState, 'center:', center, 'sales:', sales.length)
   }, [])
 
-  // Update view state when center changes
+  // Update view state when center changes (animate transitions)
   useEffect(() => {
     console.log('[MAP] Center changed:', center)
-    setViewState(prev => ({
-      ...prev,
-      latitude: center.lat,
-      longitude: center.lng
-    }))
+    setViewState(prev => ({ ...prev, latitude: center.lat, longitude: center.lng }))
   }, [center.lat, center.lng])
 
   useEffect(() => {
@@ -84,13 +84,38 @@ export default function SalesMap({
     )
   }
 
+  const handleMove = (evt: any) => {
+    setViewState(evt.viewState)
+    setMoved(true)
+  }
+
+  const getBounds = () => {
+    try {
+      const map = mapRef.current?.getMap?.()
+      if (!map) return undefined
+      const b = map.getBounds()
+      return { north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() }
+    } catch {
+      return undefined
+    }
+  }
+
+  const handleSearchArea = () => {
+    const bounds = getBounds()
+    if (bounds && onSearchArea) {
+      onSearchArea({ bounds, center: { lat: viewState.latitude, lng: viewState.longitude }, zoom: viewState.zoom })
+    }
+    setMoved(false)
+  }
+
   return (
     <div className="h-96 w-full rounded-lg overflow-hidden">
       <Map
         key={`${center.lat}-${center.lng}`}
         mapboxAccessToken={token}
         initialViewState={viewState}
-        onMove={(evt: any) => setViewState(evt.viewState)}
+        onMove={handleMove}
+        ref={mapRef}
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
       >
@@ -172,6 +197,16 @@ export default function SalesMap({
           </Popup>
         )}
       </Map>
+      {moved && (
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-4 z-10">
+          <button
+            onClick={handleSearchArea}
+            className="px-4 py-2 rounded-md bg-white/95 backdrop-blur border shadow text-sm font-medium hover:bg-white"
+          >
+            Search this area
+          </button>
+        </div>
+      )}
     </div>
   )
 }

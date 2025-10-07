@@ -614,6 +614,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                          initialCenter ? { lat: initialCenter.lat, lng: initialCenter.lng } : 
                          { lat: 39.8283, lng: -98.5795 }}
                   zoom={filters.lat && filters.lng ? 12 : 10}
+                  onSearchArea={({ center }) => {
+                    // Recenter filters to map center and refetch
+                    updateFilters({ lat: center.lat, lng: center.lng })
+                  }}
                 />
               </div>
               {/* Debug info */}
@@ -641,6 +645,26 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   </div>
                 </div>
               )}
+              {/* Active filter chips */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {filters.dateRange !== 'any' && (
+                  <button
+                    onClick={() => updateFilters({ dateRange: 'any' as any })}
+                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
+                  >
+                    {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'weekend' ? 'This Weekend' : 'Next Weekend'} ×
+                  </button>
+                )}
+                {filters.categories.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => updateFilters({ categories: filters.categories.filter(x => x !== c) })}
+                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
+                  >
+                    {c} ×
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

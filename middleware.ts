@@ -4,6 +4,12 @@ import type { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 
 export async function middleware(req: NextRequest) {
+  // Bypass middleware for PWA artifacts explicitly
+  const p = req.nextUrl.pathname
+  if (p === '/manifest.json' || p === '/sw.js') {
+    return NextResponse.next()
+  }
+
   const res = NextResponse.next()
   const cookieStore = cookies()
   

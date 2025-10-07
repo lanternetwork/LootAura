@@ -188,11 +188,19 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
 
   const handleClearFilters = () => {
     console.log('[FiltersModal] Clear all filters')
-    updateFilters({
-      distance: 25,
-      dateRange: { type: 'any' },
-      categories: []
-    }, false) // Allow URL update for clear action
+    if (externalFilters && onFiltersChange) {
+      onFiltersChange({
+        distance: 25,
+        dateRange: 'any',
+        categories: []
+      })
+    } else {
+      updateFilters({
+        distance: 25,
+        dateRange: { type: 'any' },
+        categories: []
+      }, false) // Allow URL update for clear action
+    }
   }
 
   const hasActiveFilters = filters.distance !== 25 || filters.dateRange.type !== 'any' || filters.categories.length > 0

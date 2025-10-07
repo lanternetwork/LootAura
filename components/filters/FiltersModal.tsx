@@ -155,7 +155,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
     if (externalFilters && onFiltersChange) {
       onFiltersChange({ ...externalFilters, distance })
     } else {
-      updateFilters({ distance })
+      updateFilters({ distance }, true) // Skip URL update for single source of truth
     }
   }
 

@@ -63,10 +63,16 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const updateFilters = useCallback((newFilters: Partial<FilterState>) => {
+  const updateFilters = useCallback((newFilters: Partial<FilterState>, skipUrlUpdate = false) => {
     const updatedFilters = { ...filters, ...newFilters }
     console.log('[FILTERS] updateFilters called with:', newFilters, '=> next:', updatedFilters)
     setFilters(updatedFilters)
+    
+    // Skip URL updates for auto-refetch scenarios to prevent scroll-to-top
+    if (skipUrlUpdate) {
+      console.log('[FILTERS] Skipping URL update for auto-refetch')
+      return
+    }
     
     // Update URL with new filters
     const params = new URLSearchParams(searchParams.toString())

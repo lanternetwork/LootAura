@@ -670,7 +670,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   centerOverride={mapCenterOverride}
                   onSearchArea={({ center }) => {
                     // Recenter filters to map center and refetch (no router navigation)
-                    updateFilters({ lat: center.lat, lng: center.lng })
+                    updateFilters({ lat: center.lat, lng: center.lng }, true) // Skip URL update
                     fetchSales()
                     fetchMapSales(center)
                   }}

@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     console.log('[MARKERS] fetched:', Array.isArray(data) ? data.length : 0, 'raw data sample:', data?.slice(0, 2))
     console.log('[MARKERS] windowStart:', windowStart, 'windowEnd:', windowEnd)
 
-    // Use the exact same filtering logic as the main sales API
+    // Simplified filtering - just return all sales with valid coordinates
     const salesWithDistance = (data || [])
       .map((sale: any) => {
         const latNum = typeof sale.lat === 'number' ? sale.lat : parseFloat(String(sale.lat))
@@ -78,41 +78,6 @@ export async function GET(request: NextRequest) {
         return { ...sale, lat: latNum, lng: lngNum }
       })
       .filter((sale: any) => sale && typeof sale.lat === 'number' && typeof sale.lng === 'number')
-      .filter((sale: any) => {
-        if (!windowStart && !windowEnd) return true
-        const saleStart = sale.starts_at
-          ? new Date(sale.starts_at)
-          : (sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null)
-        const saleEnd = sale.ends_at
-          ? new Date(sale.ends_at)
-          : (sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null)
-        if (!saleStart && !saleEnd) return true
-        const s = saleStart || saleEnd
-        const e = saleEnd || saleStart
-        if (!s || !e) return true
-        const startOk = !windowEnd || s <= windowEnd
-        const endOk = !windowStart || e >= windowStart
-        return startOk && endOk
-      })
-      .map((sale: any) => {
-        // Calculate distance like the main API
-        const R = 6371000
-        const dLat = (sale.lat - lat!) * Math.PI / 180
-        const dLng = (sale.lng - lng!) * Math.PI / 180
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                 Math.cos(lat! * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
-                 Math.sin(dLng/2) * Math.sin(dLng/2)
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-        const distanceM = R * c
-        const distanceKm = distanceM / 1000
-        
-        return {
-          ...sale,
-          distance_m: Math.round(distanceM),
-          distance_km: Math.round(distanceKm * 100) / 100
-        }
-      })
-      .filter((sale: any) => sale.distance_km <= maxKm)
       .slice(0, limit)
 
     // Convert to markers format

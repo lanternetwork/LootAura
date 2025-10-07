@@ -555,6 +555,31 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               )}
             </div>
             
+            {/* Active filter chips - moved above map/list */}
+            {(filters.dateRange !== 'any' || filters.categories.length > 0) && (
+              <div className="mb-4 overflow-x-auto">
+                <div className="flex gap-2 whitespace-nowrap">
+                  {filters.dateRange !== 'any' && (
+                    <button
+                      onClick={() => updateFilters({ dateRange: 'any' as any })}
+                      className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
+                    >
+                      {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'weekend' ? 'This Weekend' : 'Next Weekend'} ×
+                    </button>
+                  )}
+                  {filters.categories.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => updateFilters({ categories: filters.categories.filter(x => x !== c) })}
+                      className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
+                    >
+                      {c} ×
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   {/* ZIP Input */}
                   <div className="flex-1 sm:flex-none">
@@ -726,26 +751,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   </div>
                 </div>
               )}
-              {/* Active filter chips */}
-              <div className="mt-3 flex flex-wrap gap-2">
-                {filters.dateRange !== 'any' && (
-                  <button
-                    onClick={() => updateFilters({ dateRange: 'any' as any })}
-                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
-                  >
-                    {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'weekend' ? 'This Weekend' : 'Next Weekend'} ×
-                  </button>
-                )}
-                {filters.categories.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => updateFilters({ categories: filters.categories.filter(x => x !== c) })}
-                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
-                  >
-                    {c} ×
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         </div>

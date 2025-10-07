@@ -124,7 +124,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     const params: GetSalesParams = {
       lat: filters.lat,
       lng: filters.lng,
-      distanceKm: (filters.distance || 25) * 1.60934, // Convert miles to km
+      // Convert miles to km only at request time
+      distanceKm: (filters.distance || 25) * 1.60934,
       city: filters.city,
       categories: filters.categories.length > 0 ? filters.categories : undefined,
       // API expects startDate/endDate keys
@@ -256,7 +257,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       const params = new URLSearchParams()
       params.set('lat', String(filters.lat))
       params.set('lng', String(filters.lng))
-      params.set('maxKm', String((filters.distance || 25) * 1.60934))
+      // One source of truth: miles in state; convert to km for requests
+      const distanceKm = String((filters.distance || 25) * 1.60934)
+      // Keep param consistent and map for compatibility
+      params.set('distanceKm', distanceKm)
+      params.set('maxKm', distanceKm)
       if (filters.categories.length > 0) params.set('tags', filters.categories.join(','))
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)

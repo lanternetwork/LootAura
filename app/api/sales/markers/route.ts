@@ -5,16 +5,18 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 // Response shape expected by SalesMap: plain array
 // [{ id: string, title: string, lat: number, lng: number }]
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now()
+  
   try {
     const url = new URL(request.url)
     const q = url.searchParams
     const latParam = q.get('lat')
     const lngParam = q.get('lng')
-    const distanceParam = q.get('distanceKm') || q.get('maxKm')
-    const startDate = q.get('startDate') || q.get('dateFrom') || undefined
-    const endDate = q.get('endDate') || q.get('dateTo') || undefined
+    const distanceParam = q.get('distanceKm')
+    const startDate = q.get('startDate') || undefined
+    const endDate = q.get('endDate') || undefined
     const limitParam = q.get('limit')
-    const catsParam = q.get('tags') || q.get('categories') || ''
+    const catsParam = q.get('categories') || ''
 
     // Validate lat/lng
     const originLat = latParam !== null ? parseFloat(latParam) : NaN
@@ -93,10 +95,25 @@ export async function GET(request: NextRequest) {
       .slice(0, Math.min(limit, 1000))
       .map((sale: any) => ({ id: sale.id, title: sale.title, lat: sale.lat, lng: sale.lng }))
 
-    return NextResponse.json(markers)
+    // Return structured response matching /api/sales format
+    return NextResponse.json({
+      ok: true,
+      data: markers,
+      center: { lat: originLat, lng: originLng },
+      distanceKm,
+      count: markers.length,
+      durationMs: Date.now() - startedAt
+    })
   } catch (error: any) {
     console.error('Markers API error:', error)
-    return NextResponse.json({ error: 'Failed to load markers' }, { status: 500 })
+    return NextResponse.json({
+      ok: false,
+      error: 'Database query failed',
+      code: (error as any)?.code,
+      details: (error as any)?.message || (error as any)?.details,
+      hint: (error as any)?.hint,
+      relation: 'public.sales_v2'
+    }, { status: 500 })
   }
 }
 

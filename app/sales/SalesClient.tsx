@@ -282,11 +282,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       const res = await fetch(`/api/sales/markers?${params.toString()}`)
       const data = await res.json()
       console.log('[MAP] Markers response:', data)
-      console.debug('[MARKERS] markers', Array.isArray(data) ? data.length : 0)
-      if (Array.isArray(data)) {
-        console.log('[MAP] Setting mapMarkers to:', data.length, 'markers')
-        setMapMarkers(data)
-        console.debug('[MARKERS] got', data.length)
+      console.debug('[MARKERS] markers', data?.data ? data.data.length : 0)
+      if (data?.ok && Array.isArray(data.data)) {
+        console.log('[MAP] Setting mapMarkers to:', data.data.length, 'markers')
+        setMapMarkers(data.data)
+        console.debug('[MARKERS] got', data.data.length)
       } else {
         console.log('[MAP] Setting mapMarkers to empty array')
         setMapMarkers([])

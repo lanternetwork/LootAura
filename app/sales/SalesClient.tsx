@@ -69,6 +69,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
   const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)
+  const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
 
   // Detect neutral fallback center (do not auto-fetch in this case)
   const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
@@ -366,6 +367,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             if (parsed?.lat && parsed?.lng) {
               console.log('[SALES] Restoring location from localStorage')
               updateFilters({ lat: parsed.lat, lng: parsed.lng, city: parsed.city, distance: parsed.distance, categories: parsed.categories || [] })
+              setLastLocSource('localStorage')
               return
             }
           }
@@ -383,6 +385,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               const prevObj = savedPrev ? JSON.parse(savedPrev) : {}
               localStorage.setItem('lootaura_last_location', JSON.stringify({ ...prevObj, lat: locationData.lat, lng: locationData.lng, city: locationData.city }))
             }
+              setLastLocSource('cookie')
               return
             }
           } catch {}
@@ -399,6 +402,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               const prevObj = savedPrev ? JSON.parse(savedPrev) : {}
               localStorage.setItem('lootaura_last_location', JSON.stringify({ ...prevObj, lat: loc.lat, lng: loc.lng, city: loc.city }))
             }
+            setLastLocSource(loc.source || 'headers')
           }
         }
       } catch {}
@@ -686,6 +690,17 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       {/* Mobile Filters Modal removed per UX request to avoid duplicate filters */}
       
       {/* Client-side geolocation removed to avoid browser prompts */}
+
+      {/* Developer-only geolocation debug panel */}
+      {typeof window !== 'undefined' && searchParams.get('debug') === 'geo' && process.env.NODE_ENV !== 'production' && (
+        <div className="fixed bottom-4 left-4 z-50 bg-white/95 backdrop-blur border rounded-md shadow px-3 py-2 text-xs text-gray-700 space-y-1">
+          <div><strong>Lat/Lng:</strong> {filters.lat?.toFixed(4) || '—'}, {filters.lng?.toFixed(4) || '—'}</div>
+          <div><strong>City:</strong> {filters.city || '—'}</div>
+          <div><strong>Source:</strong> {lastLocSource || '—'}</div>
+          <div><strong>Schema:</strong> public.sales_v2</div>
+          <div><strong>Degraded:</strong> {degraded ? 'true' : 'false'}</div>
+        </div>
+      )}
     </div>
   )
 }

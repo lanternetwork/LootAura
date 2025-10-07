@@ -159,6 +159,7 @@ export async function GET(request: NextRequest) {
       // Calculate distances and filter by actual distance and date window (if provided)
       const windowStart = startDateParam ? new Date(`${startDateParam}T00:00:00`) : null
       const windowEnd = endDateParam ? new Date(`${endDateParam}T23:59:59`) : null
+      console.log('[SALES] Date filtering:', { startDateParam, endDateParam, windowStart, windowEnd })
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
         .map((sale: any) => {
@@ -183,7 +184,18 @@ export async function GET(request: NextRequest) {
           if (!s || !e) return true
           const startOk = !windowEnd || s <= windowEnd
           const endOk = !windowStart || e >= windowStart
-          return startOk && endOk
+          const passes = startOk && endOk
+          if (windowStart && windowEnd) {
+            console.log('[SALES] Date filter check:', { 
+              saleId: sale.id, 
+              saleStart: s?.toISOString(), 
+              saleEnd: e?.toISOString(),
+              windowStart: windowStart.toISOString(),
+              windowEnd: windowEnd.toISOString(),
+              passes 
+            })
+          }
+          return passes
         })
         .map((sale: any) => {
           // Haversine distance calculation

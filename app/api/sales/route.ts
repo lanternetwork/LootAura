@@ -156,9 +156,10 @@ export async function GET(request: NextRequest) {
         throw new Error(`Direct query failed: ${salesError.message}`)
       }
       
-      // Calculate distances and filter by actual distance and date window (if provided)
-      const windowStart = startDateParam ? new Date(`${startDateParam}T00:00:00`) : null
-      const windowEnd = endDateParam ? new Date(`${endDateParam}T23:59:59`) : null
+      // Calculate distances and filter by actual distance and date window (UTC date-only)
+      const toUtcDateOnly = (d: string) => new Date(d.length === 10 ? `${d}T00:00:00Z` : d)
+      const windowStart = startDateParam ? toUtcDateOnly(startDateParam) : null
+      const windowEnd = endDateParam ? new Date((toUtcDateOnly(endDateParam)).getTime() + 86399999) : null
       console.log('[SALES] Date filtering:', { startDateParam, endDateParam, windowStart, windowEnd })
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])

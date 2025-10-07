@@ -65,6 +65,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapSales, setMapSales] = useState<Sale[]>([])
+  const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
   const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
@@ -228,12 +229,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   // Client-side geolocation removed; handlers not used
 
-  // Fetch larger set for map pins so all in-radius sales are shown (use markers endpoint)
-  const fetchMapSales = useCallback(async () => {
-    if (!filters.lat || !filters.lng) return
+  // Fetch markers for map pins using dedicated markers endpoint
+  const fetchMapSales = useCallback(async (centerOverride?: { lat: number; lng: number }) => {
+    const useLat = centerOverride?.lat ?? filters.lat
+    const useLng = centerOverride?.lng ?? filters.lng
+    if (!useLat || !useLng) return
+    
     try {
-      console.log('[MAP] fetchMapSales called with filters:', filters)
-      // Map dateRange preset to concrete ISO dates for markers too
+      console.log('[MAP] fetchMapSales called with filters:', filters, 'centerOverride:', centerOverride)
+      // Map dateRange preset to concrete ISO dates for markers
       let dateFrom: string | undefined
       let dateTo: string | undefined
       const today = new Date()
@@ -256,13 +260,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       }
 
       const params = new URLSearchParams()
-      params.set('lat', String(filters.lat))
-      params.set('lng', String(filters.lng))
+      params.set('lat', String(useLat))
+      params.set('lng', String(useLng))
       // One source of truth: miles in state; convert to km for requests
       const distanceKm = String((filters.distance || 25) * 1.60934)
-      // Keep param consistent and map for compatibility
       params.set('distanceKm', distanceKm)
-      params.set('maxKm', distanceKm)
       if (filters.categories.length > 0) params.set('tags', filters.categories.join(','))
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
@@ -273,15 +275,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       const data = await res.json()
       console.log('[MAP] Markers response:', data)
       if (Array.isArray(data)) {
-        console.log('[MAP] Setting mapSales to:', data.length, 'markers')
-        setMapSales(data as any)
+        console.log('[MAP] Setting mapMarkers to:', data.length, 'markers')
+        setMapMarkers(data)
       } else {
-        console.log('[MAP] Setting mapSales to empty array')
-        setMapSales([])
+        console.log('[MAP] Setting mapMarkers to empty array')
+        setMapMarkers([])
       }
     } catch (error) {
       console.error('[MAP] Error fetching markers:', error)
-      setMapSales([])
+      setMapMarkers([])
     }
   }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange])
 
@@ -660,6 +662,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'}`}>
                 <SalesMap
                   sales={mapSales}
+                  markers={mapMarkers}
                   center={filters.lat && filters.lng ? { lat: filters.lat, lng: filters.lng } : 
                          initialCenter ? { lat: initialCenter.lat, lng: initialCenter.lng } : 
                          { lat: 39.8283, lng: -98.5795 }}
@@ -669,7 +672,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     // Recenter filters to map center and refetch (no router navigation)
                     updateFilters({ lat: center.lat, lng: center.lng })
                     fetchSales()
-                    fetchMapSales()
+                    fetchMapSales(center)
                   }}
                   onViewChange={({ center, zoom }) => {
                     try {
@@ -681,7 +684,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               </div>
               {/* Debug info */}
               <div className="mt-2 text-xs text-gray-500">
-                Center: {filters.lat ? filters.lat.toFixed(4) : 'none'}, {filters.lng ? filters.lng.toFixed(4) : 'none'} | Pins: {mapSales.length}
+                Center: {filters.lat ? filters.lat.toFixed(4) : 'none'}, {filters.lng ? filters.lng.toFixed(4) : 'none'} | Pins: {mapMarkers.length}
                 <br />
                 Initial Center: {initialCenter?.lat?.toFixed(4) || 'none'}, {initialCenter?.lng?.toFixed(4) || 'none'}
               </div>

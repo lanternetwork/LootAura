@@ -10,6 +10,7 @@ import { incMapLoad } from '@/lib/usageLogs'
 
 interface SalesMapProps {
   sales: Sale[]
+  markers?: {id: string; title: string; lat: number; lng: number}[]
   center?: { lat: number; lng: number }
   zoom?: number
   onSaleClick?: (sale: Sale) => void
@@ -21,6 +22,7 @@ interface SalesMapProps {
 
 export default function SalesMap({ 
   sales, 
+  markers = [],
   center = { lat: 38.2527, lng: -85.7585 }, 
   zoom = 10,
   onSaleClick,
@@ -80,10 +82,26 @@ export default function SalesMap({
     console.log('[MAP] sales updated, count:', sales.length, sales.map(s => ({ id: s.id, lat: s.lat, lng: s.lng })))
   }, [sales])
 
-  const handleMarkerClick = (sale: Sale) => {
-    setSelectedSale(sale)
-    if (onSaleClick) {
-      onSaleClick(sale)
+  useEffect(() => {
+    console.log('[MAP] markers updated, count:', markers.length, markers.map(m => ({ id: m.id, lat: m.lat, lng: m.lng })))
+  }, [markers])
+
+  const handleMarkerClick = (marker: {id: string; title: string; lat: number; lng: number}) => {
+    // Find matching sale in the sales list if available
+    const matchingSale = sales.find(s => s.id === marker.id)
+    if (matchingSale) {
+      setSelectedSale(matchingSale)
+      if (onSaleClick) {
+        onSaleClick(matchingSale)
+      }
+    } else {
+      // If sale not loaded, just pan to the marker
+      try {
+        const map = mapRef.current?.getMap?.()
+        if (map) {
+          map.easeTo({ center: [marker.lng, marker.lat], zoom: Math.max(map.getZoom(), 14), duration: 500 })
+        }
+      } catch {}
     }
   }
 
@@ -186,20 +204,18 @@ export default function SalesMap({
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
       >
-        {sales.map((sale) => (
+        {markers.map((marker) => (
           <Marker
-            key={sale.id}
-            latitude={sale.lat || 0}
-            longitude={sale.lng || 0}
-            onClick={() => handleMarkerClick(sale)}
+            key={marker.id}
+            latitude={marker.lat}
+            longitude={marker.lng}
+            onClick={() => handleMarkerClick(marker)}
           >
             <div className={`cursor-pointer ${
-              selectedSaleId === sale.id ? 'scale-125' : 'scale-100'
+              selectedSaleId === marker.id ? 'scale-125' : 'scale-100'
             } transition-transform duration-200`}>
               <div className={`w-3 h-3 rounded-full border border-white shadow-sm ${
-                sale.is_featured 
-                  ? 'bg-red-500' 
-                  : 'bg-gray-600'
+                'bg-blue-500'
               }`}>
               </div>
             </div>

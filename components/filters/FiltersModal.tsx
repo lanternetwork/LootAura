@@ -106,9 +106,14 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const updateFilters = (newFilters: Partial<FilterState>) => {
+  const updateFilters = (newFilters: Partial<FilterState>, skipUrlUpdate = false) => {
     setInternalFilters(prevFilters => {
       const updatedFilters = { ...prevFilters, ...newFilters }
+      
+      // Skip URL updates for auto-refetch scenarios to prevent scroll-to-top
+      if (skipUrlUpdate) {
+        return updatedFilters
+      }
       
       // Update URL with new filters
       const params = new URLSearchParams(searchParams.toString())

@@ -66,6 +66,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapSales, setMapSales] = useState<Sale[]>([])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
+  const [mapError, setMapError] = useState<string | null>(null)
   const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
   const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
@@ -284,9 +285,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[MAP] Markers response:', data)
       console.debug('[MARKERS] markers', data?.data ? data.data.length : 0)
       if (data?.ok && Array.isArray(data.data)) {
-        console.log('[MAP] Setting mapMarkers to:', data.data.length, 'markers')
-        setMapMarkers(data.data)
-        console.debug('[MARKERS] got', data.data.length)
+        // Deduplicate markers by id to prevent duplicates
+        const uniqueMarkers = data.data.filter((marker, index, self) => 
+          index === self.findIndex(m => m.id === marker.id)
+        )
+        console.log('[MAP] Setting mapMarkers to:', uniqueMarkers.length, 'markers (deduplicated from', data.data.length, ')')
+        setMapMarkers(uniqueMarkers)
+        setMapError(null) // Clear any previous errors
+        console.debug('[MARKERS] got', uniqueMarkers.length)
       } else {
         console.log('[MAP] Setting mapMarkers to empty array')
         setMapMarkers([])
@@ -295,6 +301,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     } catch (error) {
       console.error('[MAP] Error fetching markers:', error)
       setMapMarkers([])
+      setMapError('Failed to load map markers')
+      // Clear error after 3 seconds
+      setTimeout(() => setMapError(null), 3000)
     }
   }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange])
 
@@ -704,7 +713,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             {/* Map */}
             <div className="bg-white rounded-lg shadow-sm border p-4">
               <h2 className="text-xl font-semibold mb-4">Map View</h2>
-              <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'}`}>
+              <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'} relative`}>
+                {/* Error toast */}
+                {mapError && (
+                  <div className="absolute top-2 right-2 z-10 bg-red-500 text-white px-3 py-2 rounded-md text-sm shadow-lg">
+                    {mapError}
+                  </div>
+                )}
                 <SalesMap
                   sales={mapSales}
                   markers={mapMarkers}

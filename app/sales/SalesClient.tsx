@@ -536,7 +536,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   const handleIncreaseDistanceAndRetry = () => {
     const nextMiles = Math.min(100, (filters.distance || 25) + 10)
-    updateFilters({ distance: nextMiles })
+    updateFilters({ distance: nextMiles }, true) // Skip URL update
   }
 
   return (

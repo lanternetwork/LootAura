@@ -49,13 +49,19 @@ export async function GET(request: NextRequest) {
 
     // Use the same fetch window as the main API
     const fetchWindow = Math.min(1000, Math.max(limit * 10, 200))
-    query = query.limit(fetchWindow)
+    query = query
+      .order('id', { ascending: true })
+      .range(0, fetchWindow - 1)
 
     const { data, error } = await query
+    console.log(`[MARKERS] Direct query response:`, { 
+      dataCount: data?.length || 0, 
+      error: error,
+      sampleData: data?.slice(0, 2)
+    })
+    
     if (error) {
-      console.error('[MARKERS] Query error:', error)
-      console.error('[MARKERS] Error details:', error.message, error.details, error.hint)
-      return NextResponse.json({ error: 'Database query failed', details: error.message }, { status: 500 })
+      throw new Error(`Direct query failed: ${error.message}`)
     }
 
     const windowStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null

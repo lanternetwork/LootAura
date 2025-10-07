@@ -288,28 +288,57 @@ export async function GET(request: NextRequest) {
       }
       
       if (salesWithDistance.length === 0) {
-        // Degraded fallback: return closest sales regardless of radius to avoid empty UI
+        // Degraded fallback: still honor filters (coords, date window, categories, distance) before returning
         degraded = true
-        const closest = (salesData || [])
+        const fallbackFiltered = (salesData || [])
+          // validate coordinates
           .map((row: any) => {
             const latNum = typeof row.lat === 'number' ? row.lat : parseFloat(String(row.lat))
             const lngNum = typeof row.lng === 'number' ? row.lng : parseFloat(String(row.lng))
             if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
+            return { ...row, lat: latNum, lng: lngNum }
+          })
+          .filter(Boolean)
+          // date window overlap (exclude undated when window set)
+          .filter((row: any) => {
+            if (!windowStart && !windowEnd) return true
+            const saleStart = row.starts_at
+              ? new Date(row.starts_at)
+              : (row.date_start ? new Date(`${row.date_start}T${row.time_start || '00:00:00'}`) : null)
+            const saleEnd = row.ends_at
+              ? new Date(row.ends_at)
+              : (row.date_end ? new Date(`${row.date_end}T${row.time_end || '23:59:59'}`) : null)
+            if (!saleStart && !saleEnd) return false
+            const s = saleStart || saleEnd
+            const e = saleEnd || saleStart
+            if (!s || !e) return false
+            const startOk = !windowEnd || s <= windowEnd
+            const endOk = !windowStart || e >= windowStart
+            return startOk && endOk
+          })
+          // categories fallback (title/description contains each category term)
+          .filter((row: any) => {
+            if (!Array.isArray(categories) || categories.length === 0) return true
+            const text = `${row.title || ''} ${row.description || ''}`.toLowerCase()
+            return categories.every((c: string) => text.includes(String(c || '').toLowerCase()))
+          })
+          // compute distance (meters) and filter by distanceKm
+          .map((row: any) => {
             const R = 6371000
-            const dLat = (latNum - latitude) * Math.PI / 180
-            const dLng = (lngNum - longitude) * Math.PI / 180
+            const dLat = (row.lat - latitude) * Math.PI / 180
+            const dLng = (row.lng - longitude) * Math.PI / 180
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                     Math.cos(latitude * Math.PI / 180) * Math.cos(latNum * Math.PI / 180) *
+                     Math.cos(latitude * Math.PI / 180) * Math.cos(row.lat * Math.PI / 180) *
                      Math.sin(dLng/2) * Math.sin(dLng/2)
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
             const distanceM = R * c
-            return { ...row, lat: latNum, lng: lngNum, distance_m: Math.round(distanceM) }
+            return { ...row, distance_m: Math.round(distanceM) }
           })
-          .filter(Boolean)
+          .filter((row: any) => row.distance_m <= (distanceKm * 1000))
           .sort((a: any, b: any) => a.distance_m - b.distance_m)
           .slice(0, limit)
 
-        results = closest.map((row: any) => ({
+        results = fallbackFiltered.map((row: any) => ({
           id: row.id,
           title: row.title,
           starts_at: row.starts_at || (row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null),

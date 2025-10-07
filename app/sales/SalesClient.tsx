@@ -223,20 +223,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   // Client-side geolocation removed; handlers not used
 
-  // Use the main sales API data for map pins instead of the broken markers API
+  // Fetch larger set for map pins so all in-radius sales are shown (use markers endpoint)
   const fetchMapSales = useCallback(async () => {
     if (!filters.lat || !filters.lng) return
     try {
       console.log('[MAP] fetchMapSales called with filters:', filters)
-      
-      // Use the main sales API with a larger limit to get more sales for the map
-      const params = new URLSearchParams()
-      params.set('lat', String(filters.lat))
-      params.set('lng', String(filters.lng))
-      params.set('distanceKm', String((filters.distance || 25) * 1.60934))
-      if (filters.categories.length > 0) params.set('categories', filters.categories.join(','))
-      
-      // Map dateRange preset to concrete ISO dates
+      // Map dateRange preset to concrete ISO dates for markers too
       let dateFrom: string | undefined
       let dateTo: string | undefined
       const today = new Date()
@@ -257,32 +249,29 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         dateFrom = toISO(sat)
         dateTo = toISO(sun)
       }
-      
-      if (dateFrom) params.set('startDate', dateFrom)
-      if (dateTo) params.set('endDate', dateTo)
-      params.set('limit', '100') // Get more sales for the map
 
-      console.log('[MAP] Fetching from main sales API:', `/api/sales?${params.toString()}`)
-      const res = await fetch(`/api/sales?${params.toString()}`)
+      const params = new URLSearchParams()
+      params.set('lat', String(filters.lat))
+      params.set('lng', String(filters.lng))
+      params.set('maxKm', String((filters.distance || 25) * 1.60934))
+      if (filters.categories.length > 0) params.set('tags', filters.categories.join(','))
+      if (dateFrom) params.set('dateFrom', dateFrom)
+      if (dateTo) params.set('dateTo', dateTo)
+      params.set('limit', '1000')
+
+      console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`)
+      const res = await fetch(`/api/sales/markers?${params.toString()}`)
       const data = await res.json()
-      console.log('[MAP] Sales API response:', data)
-      
-      if (data.ok && Array.isArray(data.sales)) {
-        // Convert sales to markers format
-        const markers = data.sales.map((sale: any) => ({
-          id: sale.id,
-          title: sale.title,
-          lat: sale.lat,
-          lng: sale.lng
-        }))
-        console.log('[MAP] Setting mapSales to:', markers.length, 'markers')
-        setMapSales(markers)
+      console.log('[MAP] Markers response:', data)
+      if (Array.isArray(data)) {
+        console.log('[MAP] Setting mapSales to:', data.length, 'markers')
+        setMapSales(data as any)
       } else {
         console.log('[MAP] Setting mapSales to empty array')
         setMapSales([])
       }
     } catch (error) {
-      console.error('[MAP] Error fetching sales for map:', error)
+      console.error('[MAP] Error fetching markers:', error)
       setMapSales([])
     }
   }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange])

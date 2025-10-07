@@ -1,95 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-// Returns lightweight markers for all sales within a radius and filters.
-// Response shape: [{ id, title, lat, lng }]
+// Simple markers API - just return sales as map pins
 export async function GET(request: NextRequest) {
-  const url = new URL(request.url)
-  const lat = url.searchParams.get('lat') ? Number(url.searchParams.get('lat')) : undefined
-  const lng = url.searchParams.get('lng') ? Number(url.searchParams.get('lng')) : undefined
-  const maxKm = url.searchParams.get('maxKm') ? Number(url.searchParams.get('maxKm')) : 25
-  const q = url.searchParams.get('q') || undefined
-  const dateFrom = url.searchParams.get('startDate') || url.searchParams.get('dateFrom') || undefined
-  const dateTo = url.searchParams.get('endDate') || url.searchParams.get('dateTo') || undefined
-  const tags = url.searchParams.get('tags')?.split(',').filter(Boolean) || undefined
-  const limit = url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : 1000
-
   try {
-    console.log('[MARKERS] Starting markers API request')
     const sb = createSupabaseServerClient()
-
-    // Use the exact same query as the main sales API that works
-    const latRange = maxKm / 111.0
-    const lngRange = lat ? maxKm / (111.0 * Math.cos(lat * Math.PI / 180)) : maxKm / 85
     
-    const minLat = lat !== undefined ? lat - latRange : undefined
-    const maxLat = lat !== undefined ? lat + latRange : undefined
-    const minLng = lng !== undefined ? lng - lngRange : undefined
-    const maxLng = lng !== undefined ? lng + lngRange : undefined
+    // Simple query - get all sales with coordinates
+    const { data, error } = await sb
+      .from('sales_v2')
+      .select('id, title, lat, lng')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .limit(100)
 
-    console.log('[MARKERS] params:', { lat, lng, maxKm, q, dateFrom, dateTo, tags, limit })
-    console.log('[MARKERS] bbox:', { minLat, maxLat, minLng, maxLng })
-
-    // Use the exact same query structure as the working main sales API
-    let query = sb.from('sales_v2').select('*')
-    
-    // Add bounding box filter exactly like the main API
-    if (minLat !== undefined && maxLat !== undefined && minLng !== undefined && maxLng !== undefined) {
-      query = query
-        .gte('lat', minLat)
-        .lte('lat', maxLat)
-        .gte('lng', minLng)
-        .lte('lng', maxLng)
-    }
-
-    // Add text search if provided
-    if (q) {
-      query = query.ilike('title', `%${q}%`)
-    }
-
-    // Use the same fetch window as the main API
-    const fetchWindow = Math.min(1000, Math.max(limit * 10, 200))
-    query = query
-      .order('id', { ascending: true })
-      .range(0, fetchWindow - 1)
-
-    const { data, error } = await query
-    console.log(`[MARKERS] Direct query response:`, { 
-      dataCount: data?.length || 0, 
-      error: error,
-      sampleData: data?.slice(0, 2)
-    })
-    
     if (error) {
-      throw new Error(`Direct query failed: ${error.message}`)
+      console.error('Markers query error:', error)
+      return NextResponse.json({ error: 'Database query failed' }, { status: 500 })
     }
-
-    const windowStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null
-    const windowEnd = dateTo ? new Date(`${dateTo}T23:59:59`) : null
-    console.log('[MARKERS] fetched:', Array.isArray(data) ? data.length : 0, 'raw data sample:', data?.slice(0, 2))
-    console.log('[MARKERS] windowStart:', windowStart, 'windowEnd:', windowEnd)
-
-    // Simplified filtering - just return all sales with valid coordinates
-    const salesWithDistance = (data || [])
-      .map((sale: any) => {
-        const latNum = typeof sale.lat === 'number' ? sale.lat : parseFloat(String(sale.lat))
-        const lngNum = typeof sale.lng === 'number' ? sale.lng : parseFloat(String(sale.lng))
-        if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
-        return { ...sale, lat: latNum, lng: lngNum }
-      })
-      .filter((sale: any) => sale && typeof sale.lat === 'number' && typeof sale.lng === 'number')
-      .slice(0, limit)
 
     // Convert to markers format
-    const markers = salesWithDistance.map((sale: any) => ({
-      id: sale.id,
-      title: sale.title,
-      lat: sale.lat,
-      lng: sale.lng
-    }))
+    const markers = (data || [])
+      .filter((sale: any) => {
+        const lat = Number(sale.lat)
+        const lng = Number(sale.lng)
+        return !isNaN(lat) && !isNaN(lng)
+      })
+      .map((sale: any) => ({
+        id: sale.id,
+        title: sale.title,
+        lat: Number(sale.lat),
+        lng: Number(sale.lng)
+      }))
 
-    console.log('[MARKERS] salesWithDistance:', salesWithDistance.length, 'markers:', markers.length)
-    console.log('[MARKERS] sample markers:', markers.slice(0, 3))
     return NextResponse.json(markers)
   } catch (error: any) {
     console.error('Markers API error:', error)

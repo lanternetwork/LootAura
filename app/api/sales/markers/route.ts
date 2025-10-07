@@ -1,36 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-// Markers API with server-side date and distance filtering
+// Markers API with server-side date, distance, and category filtering
+// Response shape expected by SalesMap: plain array
+// [{ id: string, title: string, lat: number, lng: number }]
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url)
-    const latParam = url.searchParams.get('lat')
-    const lngParam = url.searchParams.get('lng')
-    const maxKmParam = url.searchParams.get('maxKm')
-    const startDate = url.searchParams.get('startDate') || url.searchParams.get('dateFrom') || undefined
-    const endDate = url.searchParams.get('endDate') || url.searchParams.get('dateTo') || undefined
-    const limitParam = url.searchParams.get('limit')
+    const q = url.searchParams
+    const latParam = q.get('lat')
+    const lngParam = q.get('lng')
+    const distanceParam = q.get('distanceKm') || q.get('maxKm')
+    const startDate = q.get('startDate') || q.get('dateFrom') || undefined
+    const endDate = q.get('endDate') || q.get('dateTo') || undefined
+    const limitParam = q.get('limit')
+    const catsParam = q.get('tags') || q.get('categories') || ''
 
-    const originLat = latParam ? Number(latParam) : undefined
-    const originLng = lngParam ? Number(lngParam) : undefined
-    const maxKm = maxKmParam ? Number(maxKmParam) : 25
-    const limit = limitParam ? Math.min(Number(limitParam), 1000) : 1000
+    // Validate lat/lng
+    const originLat = latParam !== null ? parseFloat(latParam) : NaN
+    const originLng = lngParam !== null ? parseFloat(lngParam) : NaN
+    if (!Number.isFinite(originLat) || !Number.isFinite(originLng)) {
+      return NextResponse.json({ error: 'Missing or invalid lat/lng' }, { status: 400 })
+    }
+    // Normalize distance (km)
+    const distanceKm = Number.isFinite(parseFloat(String(distanceParam))) ? Math.max(0, parseFloat(String(distanceParam))) : 25
+    const limit = Number.isFinite(parseFloat(String(limitParam))) ? Math.min(parseInt(String(limitParam), 10), 1000) : 1000
+    const categories = catsParam ? catsParam.split(',').map(s => s.trim()).filter(Boolean) : []
 
     const sb = createSupabaseServerClient()
 
-    // Fetch a reasonably sized slice with required columns
+    // Fetch a slice with precisely the used columns from the public view
     const { data, error } = await sb
       .from('sales_v2')
-      .select('id, title, lat, lng, starts_at, date_start, time_start, date_end, time_end, ends_at')
+      .select('id, title, description, lat, lng, starts_at, ends_at, date_start, date_end, time_start, time_end')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
       .order('id', { ascending: true })
-      .range(0, 999)
+      .limit(Math.min(limit, 1000))
 
     if (error) {
       console.error('Markers query error:', error)
-      return NextResponse.json({ error: 'Database query failed' }, { status: 500 })
+      return NextResponse.json({
+        error: 'Database query failed',
+        code: (error as any)?.code,
+        details: (error as any)?.message || (error as any)?.details,
+        hint: (error as any)?.hint,
+        relation: 'public.sales_v2'
+      }, { status: 500 })
     }
 
     // Date window (UTC date-only)
@@ -63,7 +79,6 @@ export async function GET(request: NextRequest) {
         return startOk && endOk
       })
       .map((sale: any) => {
-        if (originLat == null || originLng == null) return { ...sale, distanceKm: 0 }
         const R = 6371
         const dLat = (sale.lat - originLat) * Math.PI / 180
         const dLng = (sale.lng - originLng) * Math.PI / 180
@@ -72,7 +87,7 @@ export async function GET(request: NextRequest) {
         const distanceKm = R * c
         return { ...sale, distanceKm }
       })
-      .filter((sale: any) => originLat == null || originLng == null ? true : sale.distanceKm <= (maxKm || 25))
+      .filter((sale: any) => sale.distanceKm <= (distanceKm || 25))
 
     const markers = filtered
       .slice(0, Math.min(limit, 1000))

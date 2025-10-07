@@ -14,7 +14,7 @@ export interface FilterState {
 
 export interface UseFiltersReturn {
   filters: FilterState
-  updateFilters: (newFilters: Partial<FilterState>) => void
+  updateFilters: (newFilters: Partial<FilterState>, skipUrlUpdate?: boolean) => void
   clearFilters: () => void
   hasActiveFilters: boolean
   getQueryString: () => string

@@ -359,12 +359,32 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCenter?.lat, initialCenter?.lng, isNeutralFallback, filters.lat, filters.lng])
 
-  // Initialize location on first mount: localStorage → cookie → /api/location → fallback
+  // Initialize location/filters on first mount: URL (handled by hook) → sessionStorage → localStorage → cookie → /api/location
   useEffect(() => {
     if (filters.lat && filters.lng) return
     const tryInit = async () => {
       try {
-        // 1) localStorage
+        // 1) sessionStorage (last session)
+        if (typeof window !== 'undefined') {
+          const savedSession = sessionStorage.getItem('la_session_filters')
+          if (savedSession) {
+            const parsed = JSON.parse(savedSession)
+            if (parsed?.lat && parsed?.lng) {
+              console.log('[SALES] Restoring filters from sessionStorage')
+              updateFilters({
+                lat: parsed.lat,
+                lng: parsed.lng,
+                city: parsed.city,
+                distance: parsed.distance,
+                dateRange: parsed.dateRange,
+                categories: parsed.categories || []
+              })
+              setLastLocSource('sessionStorage')
+              return
+            }
+          }
+        }
+        // 2) localStorage (last visit)
         if (typeof window !== 'undefined') {
           const saved = localStorage.getItem('lootaura_last_location')
           if (saved) {
@@ -415,6 +435,22 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     tryInit()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Persist current filters to sessionStorage for restore-on-refresh
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      const toStore = {
+        lat: filters.lat,
+        lng: filters.lng,
+        city: filters.city,
+        distance: filters.distance,
+        dateRange: filters.dateRange,
+        categories: filters.categories
+      }
+      sessionStorage.setItem('la_session_filters', JSON.stringify(toStore))
+    } catch {}
+  }, [filters.lat, filters.lng, filters.city, filters.distance, filters.dateRange, filters.categories])
 
   // Geolocation prompt removed by design; no client location requests
 
@@ -662,7 +698,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                       <strong>Searching within {filters.distance} miles</strong> of your location
                     </p>
                     <p className="text-xs text-blue-600 mt-1">
-                      Found {sales.length} sales
+                      Showing {sales.length} results
                     </p>
                   </div>
                 </div>

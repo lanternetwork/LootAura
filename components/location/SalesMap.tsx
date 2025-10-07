@@ -46,6 +46,14 @@ export default function SalesMap({
   useEffect(() => {
     console.log('[MAP] Center changed:', center)
     setViewState(prev => ({ ...prev, latitude: center.lat, longitude: center.lng }))
+    // Smoothly ease to the new center without remounting or routing
+    try {
+      const map = mapRef.current?.getMap?.()
+      if (map) {
+        const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : (zoom || 11)
+        map.easeTo({ center: [center.lng, center.lat], zoom: Math.max(currentZoom, 11), duration: 600 })
+      }
+    } catch {}
   }, [center.lat, center.lng])
 
   useEffect(() => {
@@ -98,10 +106,14 @@ export default function SalesMap({
 
   const scheduleAutoSearch = () => {
     if (!onSearchArea) return
+    const map = mapRef.current?.getMap?.()
+    try {
+      if (map && (map.isMoving?.() || map.isDragging?.())) return
+    } catch {}
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       handleSearchArea()
-    }, 500)
+    }, 800) // trailing debounce 800ms
   }
 
   const handleMoveEnd = () => {

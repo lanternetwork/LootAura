@@ -473,18 +473,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       localStorage.setItem('lootaura_last_location', JSON.stringify({ ...prevObj, lat, lng, city }))
     } catch {}
 
-    // Update URL with new location and ZIP
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('lat', lat.toString())
-    params.set('lng', lng.toString())
-    if (city) params.set('city', city)
-    if (state) params.set('state', state)
-    if (zip) params.set('zip', zip)
-    
-    const newUrl = `${window.location.pathname}?${params.toString()}`
-    router.push(newUrl)
-    
-    // Force a manual fetch to ensure it happens
+    // Do not navigate; refetch in place to preserve scroll
+    // Force a manual fetch to ensure it happens immediately
     console.log(`[ZIP] Manually triggering fetchSales after ZIP lookup`)
     setTimeout(() => {
       fetchSales()
@@ -667,8 +657,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                          { lat: 39.8283, lng: -98.5795 }}
                   zoom={filters.lat && filters.lng ? 12 : 10}
                   onSearchArea={({ center }) => {
-                    // Recenter filters to map center and refetch
+                    // Recenter filters to map center and refetch (no router navigation)
                     updateFilters({ lat: center.lat, lng: center.lng })
+                    fetchSales()
+                    fetchMapSales()
                   }}
                   onViewChange={({ center, zoom }) => {
                     try {

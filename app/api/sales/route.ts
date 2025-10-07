@@ -178,10 +178,11 @@ export async function GET(request: NextRequest) {
           const saleEnd = sale.ends_at
             ? new Date(sale.ends_at)
             : (sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null)
-          if (!saleStart && !saleEnd) return true
+          // If a date window is set, exclude rows with no date information to avoid always passing
+          if ((windowStart || windowEnd) && !saleStart && !saleEnd) return false
           const s = saleStart || saleEnd
           const e = saleEnd || saleStart
-          if (!s || !e) return true
+          if (!s || !e) return false
           const startOk = !windowEnd || s <= windowEnd
           const endOk = !windowStart || e >= windowStart
           const passes = startOk && endOk

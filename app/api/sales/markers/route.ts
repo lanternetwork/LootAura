@@ -67,8 +67,9 @@ export async function GET(request: NextRequest) {
     const windowStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null
     const windowEnd = dateTo ? new Date(`${dateTo}T23:59:59`) : null
     console.log('[MARKERS] fetched:', Array.isArray(data) ? data.length : 0, 'raw data sample:', data?.slice(0, 2))
+    console.log('[MARKERS] windowStart:', windowStart, 'windowEnd:', windowEnd)
 
-    // Apply the same filtering logic as the main sales API
+    // Use the exact same filtering logic as the main sales API
     const salesWithDistance = (data || [])
       .map((sale: any) => {
         const latNum = typeof sale.lat === 'number' ? sale.lat : parseFloat(String(sale.lat))
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
       lng: sale.lng
     }))
 
-    console.log('[MARKERS] returning markers:', markers.length)
+    console.log('[MARKERS] salesWithDistance:', salesWithDistance.length, 'markers:', markers.length)
     console.log('[MARKERS] sample markers:', markers.slice(0, 3))
     return NextResponse.json(markers)
   } catch (error: any) {

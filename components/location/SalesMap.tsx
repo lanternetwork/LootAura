@@ -15,6 +15,7 @@ interface SalesMapProps {
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string
   onSearchArea?: (args: { bounds: { north: number; south: number; east: number; west: number }, center: { lat: number; lng: number }, zoom: number }) => void
+  onViewChange?: (args: { center: { lat: number; lng: number }, zoom: number }) => void
 }
 
 export default function SalesMap({ 
@@ -23,7 +24,8 @@ export default function SalesMap({
   zoom = 10,
   onSaleClick,
   selectedSaleId,
-  onSearchArea
+  onSearchArea,
+  onViewChange
 }: SalesMapProps) {
   useEffect(() => {
     incMapLoad()
@@ -87,6 +89,9 @@ export default function SalesMap({
   const handleMove = (evt: any) => {
     setViewState(evt.viewState)
     setMoved(true)
+    if (onViewChange) {
+      onViewChange({ center: { lat: evt.viewState.latitude, lng: evt.viewState.longitude }, zoom: evt.viewState.zoom })
+    }
   }
 
   const getBounds = () => {

@@ -365,7 +365,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             const parsed = JSON.parse(saved)
             if (parsed?.lat && parsed?.lng) {
               console.log('[SALES] Restoring location from localStorage')
-              updateFilters({ lat: parsed.lat, lng: parsed.lng, city: parsed.city })
+              updateFilters({ lat: parsed.lat, lng: parsed.lng, city: parsed.city, distance: parsed.distance, categories: parsed.categories || [] })
               return
             }
           }
@@ -378,9 +378,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             if (locationData.lat && locationData.lng) {
               console.log('[SALES] Loading location from cookie')
               updateFilters({ lat: locationData.lat, lng: locationData.lng, city: locationData.city })
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('lootaura_last_location', JSON.stringify({ lat: locationData.lat, lng: locationData.lng, city: locationData.city }))
-              }
+            if (typeof window !== 'undefined') {
+              const savedPrev = localStorage.getItem('lootaura_last_location')
+              const prevObj = savedPrev ? JSON.parse(savedPrev) : {}
+              localStorage.setItem('lootaura_last_location', JSON.stringify({ ...prevObj, lat: locationData.lat, lng: locationData.lng, city: locationData.city }))
+            }
               return
             }
           } catch {}
@@ -393,7 +395,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             console.log('[SALES] Seeding location from /api/location', { source: loc.source })
             updateFilters({ lat: loc.lat, lng: loc.lng, city: loc.city })
             if (typeof window !== 'undefined') {
-              localStorage.setItem('lootaura_last_location', JSON.stringify({ lat: loc.lat, lng: loc.lng, city: loc.city }))
+              const savedPrev = localStorage.getItem('lootaura_last_location')
+              const prevObj = savedPrev ? JSON.parse(savedPrev) : {}
+              localStorage.setItem('lootaura_last_location', JSON.stringify({ ...prevObj, lat: loc.lat, lng: loc.lng, city: loc.city }))
             }
           }
         }
@@ -419,6 +423,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     try {
       const cookiePayload = JSON.stringify({ lat, lng, city, state, zip })
       document.cookie = `la_loc=${cookiePayload}; Max-Age=${60 * 60 * 24}; Path=/; SameSite=Lax`
+      const savedPrev = localStorage.getItem('lootaura_last_location')
+      const prevObj = savedPrev ? JSON.parse(savedPrev) : {}
+      localStorage.setItem('lootaura_last_location', JSON.stringify({ ...prevObj, lat, lng, city }))
     } catch {}
 
     // Update URL with new location and ZIP
@@ -617,6 +624,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onSearchArea={({ center }) => {
                     // Recenter filters to map center and refetch
                     updateFilters({ lat: center.lat, lng: center.lng })
+                  }}
+                  onViewChange={({ center, zoom }) => {
+                    try {
+                      const saved = JSON.parse(localStorage.getItem('lootaura_last_location') || '{}')
+                      localStorage.setItem('lootaura_last_location', JSON.stringify({ ...saved, lat: center.lat, lng: center.lng }))
+                    } catch {}
                   }}
                 />
               </div>

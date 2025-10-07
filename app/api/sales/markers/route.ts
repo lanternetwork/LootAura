@@ -30,11 +30,26 @@ export async function GET(request: NextRequest) {
     console.log('[MARKERS] params:', { lat, lng, maxKm, q, dateFrom, dateTo, tags, limit })
     console.log('[MARKERS] bbox:', { minLat, maxLat, minLng, maxLng })
 
-    // Use a simpler query to avoid 500 errors
-    let query = sb.from('sales_v2').select('id,title,lat,lng,starts_at,date_start,time_start,date_end,time_end,ends_at')
+    // Use the exact same query structure as the working main sales API
+    let query = sb.from('sales_v2').select('*')
     
-    // Only add basic filters to avoid complex query issues
-    query = query.limit(Math.min(limit, 500)) // Cap to avoid timeouts
+    // Add bounding box filter exactly like the main API
+    if (minLat !== undefined && maxLat !== undefined && minLng !== undefined && maxLng !== undefined) {
+      query = query
+        .gte('lat', minLat)
+        .lte('lat', maxLat)
+        .gte('lng', minLng)
+        .lte('lng', maxLng)
+    }
+
+    // Add text search if provided
+    if (q) {
+      query = query.ilike('title', `%${q}%`)
+    }
+
+    // Use the same fetch window as the main API
+    const fetchWindow = Math.min(1000, Math.max(limit * 10, 200))
+    query = query.limit(fetchWindow)
 
     const { data, error } = await query
     if (error) {
@@ -47,16 +62,16 @@ export async function GET(request: NextRequest) {
     const windowEnd = dateTo ? new Date(`${dateTo}T23:59:59`) : null
     console.log('[MARKERS] fetched:', Array.isArray(data) ? data.length : 0, 'raw data sample:', data?.slice(0, 2))
 
-    // Simple filtering to avoid complex calculations that might cause 500 errors
-    const markers = (data || [])
-      .filter((sale: any) => {
-        // Basic coordinate validation
+    // Apply the same filtering logic as the main sales API
+    const salesWithDistance = (data || [])
+      .map((sale: any) => {
         const latNum = typeof sale.lat === 'number' ? sale.lat : parseFloat(String(sale.lat))
         const lngNum = typeof sale.lng === 'number' ? sale.lng : parseFloat(String(sale.lng))
-        return !Number.isNaN(latNum) && !Number.isNaN(lngNum)
+        if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
+        return { ...sale, lat: latNum, lng: lngNum }
       })
+      .filter((sale: any) => sale && typeof sale.lat === 'number' && typeof sale.lng === 'number')
       .filter((sale: any) => {
-        // Simple date filtering
         if (!windowStart && !windowEnd) return true
         const saleStart = sale.starts_at
           ? new Date(sale.starts_at)
@@ -72,17 +87,34 @@ export async function GET(request: NextRequest) {
         const endOk = !windowStart || e >= windowStart
         return startOk && endOk
       })
-      .slice(0, Math.min(limit, 100)) // Limit to avoid performance issues
       .map((sale: any) => {
-        const latNum = typeof sale.lat === 'number' ? sale.lat : parseFloat(String(sale.lat))
-        const lngNum = typeof sale.lng === 'number' ? sale.lng : parseFloat(String(sale.lng))
+        // Calculate distance like the main API
+        const R = 6371000
+        const dLat = (sale.lat - lat!) * Math.PI / 180
+        const dLng = (sale.lng - lng!) * Math.PI / 180
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                 Math.cos(lat! * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
+                 Math.sin(dLng/2) * Math.sin(dLng/2)
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+        const distanceM = R * c
+        const distanceKm = distanceM / 1000
+        
         return {
-          id: sale.id,
-          title: sale.title,
-          lat: latNum,
-          lng: lngNum
+          ...sale,
+          distance_m: Math.round(distanceM),
+          distance_km: Math.round(distanceKm * 100) / 100
         }
       })
+      .filter((sale: any) => sale.distance_km <= maxKm)
+      .slice(0, limit)
+
+    // Convert to markers format
+    const markers = salesWithDistance.map((sale: any) => ({
+      id: sale.id,
+      title: sale.title,
+      lat: sale.lat,
+      lng: sale.lng
+    }))
 
     console.log('[MARKERS] returning markers:', markers.length)
     console.log('[MARKERS] sample markers:', markers.slice(0, 3))

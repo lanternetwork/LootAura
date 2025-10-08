@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 9fbc6cd — feat(fetch): make sales/markers fetches mode-aware (map vs zip/distance); add debounced single-flight trigger and logging; no UI changes (by Yard Sale Tracker on 2025-10-08 10:42:17 -0400)
+- **Latest commit:** 4baa78a — feat(viewport): plumb bounds from map; add viewport crop with debounced visible list and cap; logs for [VIEWPORT]/[LIST]; no UI regressions (by Yard Sale Tracker on 2025-10-08 11:14:39 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18348501283
+- **CI status:** running, last run: run 18349445676
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T14:43:27.518Z
+Updated automatically by Cursor on 2025-10-08T15:15:42.016Z

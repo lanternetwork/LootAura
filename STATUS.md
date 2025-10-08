@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** aca92d5 — fix(types): add null checks for s.lat/s.lng in cropSalesToViewport to resolve TypeScript error (by Yard Sale Tracker on 2025-10-08 12:29:41 -0400)
+- **Latest commit:** 8e318f7 — feat(distance): implement distance change with programmatic fitBounds; add bbox helper, guard logic, and map fitBounds support; no control theft (by Yard Sale Tracker on 2025-10-08 13:20:54 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18351500173
+- **CI status:** running, last run: run 18352751872
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T16:30:33.231Z
+Updated automatically by Cursor on 2025-10-08T17:21:50.212Z

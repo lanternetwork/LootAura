@@ -62,6 +62,11 @@ export async function GET(request: NextRequest) {
         // Client-side distance filtering using Haversine formula
         const filteredSales = (salesData || [])
           .map((sale: any) => {
+            // Skip if parsed coordinates are null
+            if (parsed.lat === null || parsed.lng === null) {
+              return { ...sale, distanceM: 0 }
+            }
+            
             // Haversine distance calculation
             const R = 6371000 // Earth's radius in meters
             const dLat = (sale.lat - parsed.lat) * Math.PI / 180

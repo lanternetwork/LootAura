@@ -18,6 +18,8 @@ interface SalesMapProps {
   onSearchArea?: (args: { bounds: { north: number; south: number; east: number; west: number }, center: { lat: number; lng: number }, zoom: number }) => void
   onViewChange?: (args: { center: { lat: number; lng: number }, zoom: number, userInteraction: boolean }) => void
   centerOverride?: { lat: number; lng: number; zoom?: number } | null
+  fitBounds?: { north: number; south: number; east: number; west: number } | null
+  onFitBoundsComplete?: () => void
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number } | undefined) => void
 }
 
@@ -31,6 +33,8 @@ export default function SalesMap({
   onSearchArea,
   onViewChange,
   centerOverride,
+  fitBounds,
+  onFitBoundsComplete,
   onBoundsChange
 }: SalesMapProps) {
   useEffect(() => {
@@ -86,6 +90,36 @@ export default function SalesMap({
       } catch {}
     }
   }, [centerOverride])
+
+  // Handle fitBounds for distance changes
+  useEffect(() => {
+    if (fitBounds) {
+      console.log('[MAP] fitBounds triggered:', fitBounds)
+      try {
+        const map = mapRef.current?.getMap?.()
+        if (map) {
+          const bounds = [
+            [fitBounds.west, fitBounds.south],
+            [fitBounds.east, fitBounds.north]
+          ]
+          map.fitBounds(bounds, { 
+            padding: 24, 
+            duration: 500 
+          })
+          // Call completion callback after animation
+          setTimeout(() => {
+            if (onFitBoundsComplete) {
+              onFitBoundsComplete()
+            }
+            if (onBoundsChange) {
+              const b = getBounds()
+              onBoundsChange(b)
+            }
+          }, 550)
+        }
+      } catch {}
+    }
+  }, [fitBounds, onFitBoundsComplete, onBoundsChange])
 
   useEffect(() => {
     console.log('[MAP] sales updated, count:', sales.length, sales.map(s => ({ id: s.id, lat: s.lat, lng: s.lng })))

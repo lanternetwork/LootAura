@@ -105,6 +105,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
+  const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
 
   const onBoundsChange = useCallback((b?: { north: number; south: number; east: number; west: number }) => {
     if (!b) return
@@ -139,6 +140,20 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     const radius = baseRadiusKmAtZ4 / Math.pow(2, Math.max(0, delta))
     // Clamp to reasonable search window
     return Math.min(300, Math.max(2, radius))
+  }, [])
+
+  // Compute bounding box for a center point and radius in miles
+  const computeBboxForRadius = useCallback((center: { lat: number; lng: number }, radiusMiles: number) => {
+    const radiusKm = radiusMiles * 1.60934
+    const latDeg = radiusKm / 111 // Approximate km per degree latitude
+    const lngDeg = radiusKm / (111 * Math.cos(center.lat * Math.PI / 180)) // Adjust for longitude
+    
+    return {
+      north: center.lat + latDeg,
+      south: center.lat - latDeg,
+      east: center.lng + lngDeg,
+      west: center.lng - lngDeg
+    }
   }, [])
 
   // Detect neutral fallback center (do not auto-fetch in this case)
@@ -603,6 +618,25 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   // Geolocation prompt removed by design; no client location requests
 
+  const handleDistanceChange = useCallback((newDistance: number) => {
+    console.log('[CONTROL] mode=distance (distance slider)')
+    updateControlMode('distance', 'Distance slider changed')
+    setProgrammaticMoveGuard(true, 'Distance fit (programmatic)')
+    
+    // Use current center from filters or mapView
+    const currentCenter = filters.lat && filters.lng 
+      ? { lat: filters.lat, lng: filters.lng }
+      : mapView.center || { lat: 38.2527, lng: -85.7585 }
+    
+    const bbox = computeBboxForRadius(currentCenter, newDistance)
+    setFitBounds(bbox)
+    console.log('[MAP] fitBounds(distance)', bbox.north, bbox.south, bbox.east, bbox.west)
+    
+    // Update URL with new distance and current center
+    updateFilters({ distance: newDistance }, false) // Update URL
+    console.log('[URL] distance change -> lat,lng, dist=miles', currentCenter.lat, currentCenter.lng, newDistance)
+  }, [filters.lat, filters.lng, mapView.center, updateControlMode, setProgrammaticMoveGuard, computeBboxForRadius, updateFilters])
+
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string) => {
     setZipError(null)
     console.log(`[ZIP] Setting new location: ${lat}, ${lng} (${city}, ${state})`)
@@ -835,7 +869,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               }}
               onFiltersChange={(newFilters) => {
                 if (newFilters.distance !== filters.distance) {
-                  updateControlMode('distance', 'Distance slider changed')
+                  handleDistanceChange(newFilters.distance)
                 }
                 updateFilters({
                   distance: newFilters.distance,
@@ -863,6 +897,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                          { lat: 39.8283, lng: -98.5795 }}
                   zoom={filters.lat && filters.lng ? 12 : 10}
                   centerOverride={mapCenterOverride}
+                  fitBounds={fitBounds}
+                  onFitBoundsComplete={() => {
+                    console.log('[CONTROL] onFitBoundsComplete (guard stays true)')
+                    setFitBounds(null)
+                    // Guard stays true until next user interaction
+                  }}
                   onBoundsChange={onBoundsChange}
                   onSearchArea={({ center }) => {
                     // Recenter filters to map center and refetch (no router navigation)

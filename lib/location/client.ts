@@ -215,6 +215,7 @@ export function kmToMiles(km: number): number {
 
 /**
  * Convert miles to kilometers
+ * @deprecated Use utils/geo.ts instead
  */
 export function milesToKm(miles: number): number {
   return miles * 1.60934

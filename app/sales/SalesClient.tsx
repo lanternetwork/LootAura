@@ -13,6 +13,7 @@ import DateWindowLabel from '@/components/filters/DateWindowLabel'
 import DegradedBanner from '@/components/DegradedBanner'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
+import { milesToKm } from '@/utils/geo'
 import LoadMoreButton from '@/components/LoadMoreButton'
 
 // Intent Arbiter types
@@ -163,7 +164,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   // Compute bounding box for a center point and radius in miles
   const computeBboxForRadius = useCallback((center: { lat: number; lng: number }, radiusMiles: number) => {
-    const radiusKm = radiusMiles * 1.60934
+    const radiusKm = milesToKm(radiusMiles)
     const latDeg = radiusKm / 111 // Approximate km per degree latitude
     const lngDeg = radiusKm / (111 * Math.cos(center.lat * Math.PI / 180)) // Adjust for longitude
     
@@ -233,7 +234,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       distanceKmForRequest = approximateRadiusKmFromZoom(mapView.zoom)
     } else {
       // ZIP/Distance/Initial: use filters center + filters distance
-      distanceKmForRequest = filters.distance * 1.60934
+      distanceKmForRequest = milesToKm(filters.distance)
     }
 
     console.log('[SALES] fetchSales start', { append, mode, useLat, useLng, distanceKmForRequest, filters, centerOverride })
@@ -286,7 +287,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       lat: useLat,
       lng: useLng,
       // distanceKm depends on control mode
-      distanceKm: (distanceKmForRequest ?? (filters.distance * 1.60934)),
+      distanceKm: (distanceKmForRequest ?? milesToKm(filters.distance)),
       city: filters.city,
       categories: filters.categories.length > 0 ? filters.categories : undefined,
       // API expects startDate/endDate keys
@@ -440,7 +441,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       useLng = mapView.center.lng
       distanceKmForRequest = approximateRadiusKmFromZoom(mapView.zoom)
     } else {
-      distanceKmForRequest = filters.distance * 1.60934
+      distanceKmForRequest = milesToKm(filters.distance)
     }
     if (!useLat || !useLng) return
     
@@ -472,7 +473,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       params.set('lat', String(useLat))
       params.set('lng', String(useLng))
       // distanceKm depends on control mode
-      const distanceKm = String(distanceKmForRequest ?? (filters.distance * 1.60934))
+      const distanceKm = String(distanceKmForRequest ?? milesToKm(filters.distance))
       params.set('distanceKm', distanceKm)
       if (filters.categories.length > 0) params.set('tags', filters.categories.join(','))
       if (dateFrom) params.set('dateFrom', dateFrom)
@@ -541,7 +542,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         const params: GetSalesParams = {
           lat: filters.lat!,
           lng: filters.lng!,
-          distanceKm: filters.distance * 1.60934,
+          distanceKm: milesToKm(filters.distance),
           city: filters.city,
           categories: filters.categories.length > 0 ? filters.categories : undefined,
           dateRange: filters.dateRange !== 'any' ? filters.dateRange : undefined,

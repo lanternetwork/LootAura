@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
       .eq('status', 'published')
       .limit(50)
     
+    let filteredSales: any[] = []
+    
     if (salesError) {
       console.log('[TEST-RPC] Sales query error:', salesError)
     } else {
@@ -36,7 +38,7 @@ export async function GET(request: NextRequest) {
       const testLng = -85.708
       const testDistanceKm = 40
       
-      const filteredSales = (salesData || [])
+      filteredSales = (salesData || [])
         .map((sale: any) => {
           // Haversine distance calculation
           const R = 6371000 // Earth's radius in meters
@@ -73,7 +75,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       functions: functions,
-      latlng_filtering: { data: filteredSales || [], count: (filteredSales || []).length },
+      latlng_filtering: { data: filteredSales, count: filteredSales.length },
       direct: { data: directData, error: directError }
     })
     

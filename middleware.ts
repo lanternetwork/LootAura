@@ -4,6 +4,11 @@ import type { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 
 export async function middleware(req: NextRequest) {
+  // Skip auth for PWA files and static assets
+  if (req.nextUrl.pathname.match(/^\/(manifest\.json|icon(\.png)?|apple-touch-icon\.png|favicon\.ico|images\/|sw\.js)/)) {
+    return NextResponse.next()
+  }
+  
   const res = NextResponse.next()
   const cookieStore = cookies()
   

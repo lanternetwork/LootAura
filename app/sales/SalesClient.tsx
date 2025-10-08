@@ -639,16 +639,26 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string) => {
     setZipError(null)
-    console.log(`[ZIP] Setting new location: ${lat}, ${lng} (${city}, ${state})`)
+    console.log(`[ZIP] submit -> ${zip} -> lat=${lat}, lng=${lng}`)
+    console.log('[CONTROL] mode=zip (zip submit)')
     updateControlMode('zip', 'ZIP lookup asserted control')
-    setProgrammaticMoveGuard(true, 'ZIP recenter (easeTo)')
+    console.log('[CONTROL] programmaticMoveGuard=true (zip fit)')
+    setProgrammaticMoveGuard(true, 'ZIP fit (programmatic)')
     
-    // Update filters with new location (skip URL update to prevent route change)
+    // Update filters with new location and update URL with mode=zip
     updateFilters({
       lat,
       lng,
       city: city || undefined
-    }, true) // Skip URL update
+    }, false) // Update URL with new lat/lng
+    console.log('[URL] zip -> lat=${lat},lng=${lng},dist=${filters.distance},mode=zip')
+    
+    // Compute bbox from center + current distance and trigger fitBounds
+    const currentCenter = { lat, lng }
+    const bbox = computeBboxForRadius(currentCenter, filters.distance)
+    setFitBounds(bbox)
+    console.log('[ZIP] computed bbox for dist=${filters.distance} -> n=${bbox.north},s=${bbox.south},e=${bbox.east},w=${bbox.west}')
+    console.log('[MAP] fitBounds(zip) north=${bbox.north}, south=${bbox.south}, east=${bbox.east}, west=${bbox.west}')
     
     // Persist to session/local storage
     try {
@@ -670,19 +680,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       sessionStorage.setItem('la_session_filters', JSON.stringify(sessionData))
     } catch {}
 
-    // Smoothly recenter map to new location
-    setMapCenterOverride({ lat, lng, zoom: 12 })
-    
-    // Clear the override after animation completes
-    setTimeout(() => {
-      setMapCenterOverride(null)
-      setProgrammaticMoveGuard(false, 'ZIP recenter complete')
-    }, 600)
-
-    // Immediately refetch with new center and existing filters
-    console.log(`[ZIP] Refetching sales and map data with new center`)
-    fetchSales(false, { lat, lng })
-    fetchMapSales({ lat, lng })
+    // Remove old map centering logic - now using fitBounds instead
+    // The fitBounds will be handled by the map component and onFitBoundsComplete
   }
 
   const handleZipError = (error: string) => {
@@ -902,6 +901,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     console.log('[CONTROL] onFitBoundsComplete (guard stays true)')
                     setFitBounds(null)
                     // Guard stays true until next user interaction
+                    // For ZIP mode, we need to trigger fetches after the fit completes
+                    if (arbiter.mode === 'zip') {
+                      console.log('[ZIP] fitBounds complete, triggering fetches')
+                      fetchSales(false, { lat: filters.lat!, lng: filters.lng! })
+                      fetchMapSales({ lat: filters.lat!, lng: filters.lng! })
+                    }
                   }}
                   onBoundsChange={onBoundsChange}
                   onSearchArea={({ center }) => {
@@ -913,7 +918,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onViewChange={({ center, zoom, userInteraction }) => {
                     setMapView({ center, zoom })
                     if (userInteraction && !arbiter.programmaticMoveGuard) {
+                      console.log('[CONTROL] user pan detected -> switching to map mode')
                       updateControlMode('map', 'User panned/zoomed')
+                    }
+                    if (userInteraction && arbiter.programmaticMoveGuard) {
+                      console.log('[CONTROL] user pan -> mode: zip → map; guard=false')
+                      setProgrammaticMoveGuard(false, 'User interaction after ZIP')
+                      updateControlMode('map', 'User panned/zoomed after ZIP')
                     }
                     if (!userInteraction && arbiter.programmaticMoveGuard) {
                       console.log('[ARB] map move ignored due to guard (programmatic)')

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
 import { GetSalesParams, formatDistance } from '@/lib/data/sales'
@@ -102,14 +102,40 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [bannerShown, setBannerShown] = useState<boolean>(false)
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
   const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
+  const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
+
+  // Approximate radius (km) from Mapbox zoom level at mid-latitudes
+  const approximateRadiusKmFromZoom = useCallback((zoom?: number | null): number | null => {
+    if (zoom === undefined || zoom === null) return null
+    // Simple heuristic: radius halves each +1 zoom; base ~2000km at z=4
+    const baseRadiusKmAtZ4 = 2000
+    const delta = zoom - 4
+    const radius = baseRadiusKmAtZ4 / Math.pow(2, Math.max(0, delta))
+    // Clamp to reasonable search window
+    return Math.min(300, Math.max(2, radius))
+  }, [])
 
   // Detect neutral fallback center (do not auto-fetch in this case)
   const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
 
   const fetchSales = useCallback(async (append = false, centerOverride?: { lat: number; lng: number }) => {
-    const useLat = centerOverride?.lat ?? filters.lat
-    const useLng = centerOverride?.lng ?? filters.lng
-    console.log('[SALES] fetchSales start', { append, filters, centerOverride })
+    // Determine parameters based on arbiter mode (fallback to existing behavior)
+    const mode = arbiter?.mode || 'initial'
+    let useLat = centerOverride?.lat ?? filters.lat
+    let useLng = centerOverride?.lng ?? filters.lng
+    let distanceKmForRequest: number | null = null
+
+    if (mode === 'map' && mapView.center && mapView.zoom) {
+      // Map mode: derive center from mapView and approximate radius from zoom
+      useLat = mapView.center.lat
+      useLng = mapView.center.lng
+      distanceKmForRequest = approximateRadiusKmFromZoom(mapView.zoom)
+    } else {
+      // ZIP/Distance/Initial: use filters center + filters distance
+      distanceKmForRequest = filters.distance * 1.60934
+    }
+
+    console.log('[SALES] fetchSales start', { append, mode, useLat, useLng, distanceKmForRequest, filters, centerOverride })
     if (append) {
       setLoadingMore(true)
     } else {
@@ -158,8 +184,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     const params: GetSalesParams = {
       lat: useLat,
       lng: useLng,
-      // Convert miles to km only at request time
-      distanceKm: filters.distance * 1.60934,
+      // distanceKm depends on control mode
+      distanceKm: (distanceKmForRequest ?? (filters.distance * 1.60934)),
       city: filters.city,
       categories: filters.categories.length > 0 ? filters.categories : undefined,
       // API expects startDate/endDate keys
@@ -168,7 +194,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       limit: 24,
       offset: append ? sales.length : 0,
     }
-    console.log('[SALES] fetch params:', params)
+    console.log('[SALES] fetch params:', { ...params, mode })
     console.debug('[SALES] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
 
     const queryString = new URLSearchParams(
@@ -267,8 +293,18 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   // Fetch markers for map pins using dedicated markers endpoint
   const fetchMapSales = useCallback(async (centerOverride?: { lat: number; lng: number }) => {
-    const useLat = centerOverride?.lat ?? filters.lat
-    const useLng = centerOverride?.lng ?? filters.lng
+    const mode = arbiter?.mode || 'initial'
+    let useLat = centerOverride?.lat ?? filters.lat
+    let useLng = centerOverride?.lng ?? filters.lng
+    let distanceKmForRequest: number | null = null
+
+    if (mode === 'map' && mapView.center && mapView.zoom) {
+      useLat = mapView.center.lat
+      useLng = mapView.center.lng
+      distanceKmForRequest = approximateRadiusKmFromZoom(mapView.zoom)
+    } else {
+      distanceKmForRequest = filters.distance * 1.60934
+    }
     if (!useLat || !useLng) return
     
     try {
@@ -298,15 +334,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       const params = new URLSearchParams()
       params.set('lat', String(useLat))
       params.set('lng', String(useLng))
-      // One source of truth: miles in state; convert to km for requests
-      const distanceKm = String(filters.distance * 1.60934)
+      // distanceKm depends on control mode
+      const distanceKm = String(distanceKmForRequest ?? (filters.distance * 1.60934))
       params.set('distanceKm', distanceKm)
       if (filters.categories.length > 0) params.set('tags', filters.categories.join(','))
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
       params.set('limit', '1000')
 
-      console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`)
+      console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`, { mode })
       console.debug('[MARKERS] fetch', `/api/sales/markers?${params.toString()}`)
       console.debug('[MARKERS] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
       const res = await fetch(`/api/sales/markers?${params.toString()}`)
@@ -386,11 +422,29 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     await fetchSales(true)
   }, [nextPageCache, fetchSales, filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange])
 
-  useEffect(() => {
-    console.log('[SALES] Filters changed, fetching sales and map data')
-    fetchSales()
-    fetchMapSales()
+  // Debounced, single-flight fetchers
+  const salesAbortRef = useRef<AbortController | null>(null)
+  const markersAbortRef = useRef<AbortController | null>(null)
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  const triggerFetches = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      // Abort any in-flight
+      try { salesAbortRef.current?.abort() } catch {}
+      try { markersAbortRef.current?.abort() } catch {}
+      salesAbortRef.current = new AbortController()
+      markersAbortRef.current = new AbortController()
+      // Under the hood our fetch functions don't accept signals yet; keep structure lightweight for now
+      fetchSales()
+      fetchMapSales()
+    }, 250)
   }, [fetchSales, fetchMapSales])
+
+  useEffect(() => {
+    console.log('[SALES] Inputs changed → debounced fetch', { mode: arbiter.mode, mapView })
+    triggerFetches()
+  }, [triggerFetches, arbiter.mode, mapView.center?.lat, mapView.center?.lng, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.categories.join(','), filters.dateRange])
 
   // Refetch map pins when filters location/range change
   useEffect(() => {
@@ -770,6 +824,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     fetchMapSales(center)
                   }}
                   onViewChange={({ center, zoom, userInteraction }) => {
+                    setMapView({ center, zoom })
                     if (userInteraction && !arbiter.programmaticMoveGuard) {
                       updateControlMode('map', 'User panned/zoomed')
                     }

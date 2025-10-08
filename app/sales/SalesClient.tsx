@@ -646,9 +646,22 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   useEffect(() => {
     const key = buildMarkersKey()
+    
+    // Early return if programmatic move guard is active and not in map mode
+    if (arbiter.programmaticMoveGuard && arbiter.mode !== 'map') {
+      console.log('[SKIP] programmatic move guard active, not in map mode')
+      return
+    }
+    
+    // Early return if key hasn't changed
+    if (key === lastMarkersKeyRef.current) {
+      console.log('[SKIP] same markers key')
+      return
+    }
+    
     console.log('[SALES] Inputs changed → key:', key)
     triggerFetches()
-  }, [triggerFetches, buildMarkersKey])
+  }, [triggerFetches, buildMarkersKey, arbiter.programmaticMoveGuard, arbiter.mode])
 
   // Keep visibleSales in sync with current sales and viewport
   useEffect(() => {

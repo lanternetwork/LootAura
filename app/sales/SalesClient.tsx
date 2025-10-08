@@ -236,7 +236,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       // Map mode: derive center from mapView and approximate radius from zoom
       useLat = mapView.center.lat
       useLng = mapView.center.lng
-      distanceKmForRequest = approximateRadiusKmFromZoom(mapView.zoom)
+      const radiusKm = approximateRadiusKmFromZoom(mapView.zoom)
+      distanceKmForRequest = radiusKm
+      console.log('[DIST] MAP mode radius miles→km', { 
+        miles: radiusKm ? radiusKm / 1.60934 : null, 
+        km: radiusKm 
+      })
     } else {
       // ZIP/Distance/Initial: use filters center + filters distance
       distanceKmForRequest = milesToKm(filters.distance)
@@ -444,7 +449,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     if (mode === 'map' && mapView.center && mapView.zoom) {
       useLat = mapView.center.lat
       useLng = mapView.center.lng
-      distanceKmForRequest = approximateRadiusKmFromZoom(mapView.zoom)
+      const radiusKm = approximateRadiusKmFromZoom(mapView.zoom)
+      distanceKmForRequest = radiusKm
+      console.log('[DIST] MAP mode radius miles→km', { 
+        miles: radiusKm ? radiusKm / 1.60934 : null, 
+        km: radiusKm 
+      })
     } else {
       distanceKmForRequest = milesToKm(filters.distance)
     }

@@ -813,7 +813,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
     // Remove old map centering logic - now using fitBounds instead
     // The fitBounds will be handled by the map component and onFitBoundsComplete
-  }, [updateControlMode, setProgrammaticMoveGuard, updateFilters, computeBboxForRadius, resetPagination, debounced, fetchSales, fetchMapSales])
+  }
 
   const handleZipError = (error: string) => {
     setZipError(error)

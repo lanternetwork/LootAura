@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 5b527ca — feat(debounce): implement robust abort controllers and debouncing; eliminate triple flashes; guarantee single-flight requests; add pagination reset on mode/bbox changes (by Yard Sale Tracker on 2025-10-08 13:43:56 -0400)
+- **Latest commit:** cc29f10 — fix(syntax): remove invalid filters.distance from dependency array causing build error (by Yard Sale Tracker on 2025-10-08 13:48:08 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18353310527
+- **CI status:** running, last run: run 18353403917
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T17:44:43.982Z
+Updated automatically by Cursor on 2025-10-08T17:48:57.167Z

@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 99d1e04 — feat(arbiter): introduce intent arbiter state + logging; tag map moves with userInteraction; no behavior change (by Yard Sale Tracker on 2025-10-08 10:35:15 -0400)
+- **Latest commit:** 9fbc6cd — feat(fetch): make sales/markers fetches mode-aware (map vs zip/distance); add debounced single-flight trigger and logging; no UI changes (by Yard Sale Tracker on 2025-10-08 10:42:17 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18348296015
+- **CI status:** running, last run: run 18348501283
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T14:36:39.343Z
+Updated automatically by Cursor on 2025-10-08T14:43:27.518Z

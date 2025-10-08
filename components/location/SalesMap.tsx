@@ -42,6 +42,8 @@ export default function SalesMap({
   }, [])
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
   const mapRef = useRef<any>(null)
+  const fitTokenRef = useRef<string | null>(null)
+  const suppressEmitsRef = useRef(false)
   const [viewState, setViewState] = useState({
     latitude: center.lat,
     longitude: center.lng,
@@ -95,6 +97,12 @@ export default function SalesMap({
   useEffect(() => {
     if (fitBounds) {
       console.log('[MAP] fitBounds triggered:', fitBounds)
+      
+      // Generate token and suppress emits
+      const token = `${Date.now()}-${Math.random()}`
+      fitTokenRef.current = token
+      suppressEmitsRef.current = true
+      
       try {
         const map = mapRef.current?.getMap?.()
         if (map) {
@@ -103,11 +111,15 @@ export default function SalesMap({
             [fitBounds.east, fitBounds.north]
           ]
           map.fitBounds(bounds, { 
-            padding: 24, 
-            duration: 500 
+            padding: 20, 
+            duration: 600 
           })
-          // Call completion callback after animation
-          setTimeout(() => {
+          
+          // Attach one-time idle listener
+          const handleIdle = () => {
+            if (fitTokenRef.current !== token) return // stale
+            fitTokenRef.current = null
+            suppressEmitsRef.current = false
             if (onFitBoundsComplete) {
               onFitBoundsComplete()
             }
@@ -115,9 +127,16 @@ export default function SalesMap({
               const b = getBounds()
               onBoundsChange(b)
             }
-          }, 550)
+            map.off('idle', handleIdle)
+          }
+          map.on('idle', handleIdle)
         }
-      } catch {}
+      } catch (error) {
+        console.error('[MAP] fitBounds error:', error)
+        // Reset on error
+        fitTokenRef.current = null
+        suppressEmitsRef.current = false
+      }
     }
   }, [fitBounds, onFitBoundsComplete, onBoundsChange])
 
@@ -178,6 +197,12 @@ export default function SalesMap({
   const handleMove = (evt: any) => {
     setViewState(evt.viewState)
     setMoved(true)
+    
+    if (suppressEmitsRef.current) {
+      console.log('[MAP] suppress emits (programmatic fit in flight)')
+      return
+    }
+    
     if (onViewChange) {
       const userInteraction = !!(evt && (evt as any).originalEvent)
       onViewChange({ center: { lat: evt.viewState.latitude, lng: evt.viewState.longitude }, zoom: evt.viewState.zoom, userInteraction })
@@ -205,6 +230,12 @@ export default function SalesMap({
   const handleMoveEnd = () => {
     setMoved(true)
     scheduleAutoSearch()
+    
+    if (suppressEmitsRef.current) {
+      console.log('[MAP] suppress emits (programmatic fit in flight)')
+      return
+    }
+    
     if (onBoundsChange) {
       const b = getBounds()
       onBoundsChange(b)
@@ -214,6 +245,12 @@ export default function SalesMap({
   const handleZoomEnd = () => {
     setMoved(true)
     scheduleAutoSearch()
+    
+    if (suppressEmitsRef.current) {
+      console.log('[MAP] suppress emits (programmatic fit in flight)')
+      return
+    }
+    
     if (onBoundsChange) {
       const b = getBounds()
       onBoundsChange(b)

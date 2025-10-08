@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 2e51c35 — fix(syntax): add missing closing brace for handleZipLocationFound function (by Yard Sale Tracker on 2025-10-08 13:52:58 -0400)
+- **Latest commit:** 1b01e76 — fix(types): move abortPrevious function before fetchSales to resolve dependency order error (by Yard Sale Tracker on 2025-10-08 15:04:44 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18354066212
+- **CI status:** running, last run: run 18355248611
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T18:16:50.463Z
+Updated automatically by Cursor on 2025-10-08T19:05:38.386Z

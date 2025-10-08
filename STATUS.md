@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 5671580 — Merge branch 'milestone/db-option-a-restore' of https://github.com/lanternetwork/LootAura into milestone/db-option-a-restore (by Yard Sale Tracker on 2025-10-07 22:07:59 -0400)
+- **Latest commit:** 3a60516 — Merge branch 'milestone/db-option-a-restore' of https://github.com/lanternetwork/LootAura into milestone/db-option-a-restore (by Yard Sale Tracker on 2025-10-07 22:11:10 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18331549172
+- **CI status:** running, last run: run 18347811134
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T02:08:41.382Z
+Updated automatically by Cursor on 2025-10-08T14:20:30.648Z

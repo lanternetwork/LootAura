@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
               distance_km: distanceM / 1000
             }
           })
-          .filter((sale: any) => sale.distance_km <= parsed.distanceKm)
+          .filter((sale: any) => parsed.distanceKm === null || sale.distance_km <= parsed.distanceKm)
         
         afterDistanceCount = filteredSales.length
       } catch (error) {

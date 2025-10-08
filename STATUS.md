@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 4baa78a — feat(viewport): plumb bounds from map; add viewport crop with debounced visible list and cap; logs for [VIEWPORT]/[LIST]; no UI regressions (by Yard Sale Tracker on 2025-10-08 11:14:39 -0400)
+- **Latest commit:** aca92d5 — fix(types): add null checks for s.lat/s.lng in cropSalesToViewport to resolve TypeScript error (by Yard Sale Tracker on 2025-10-08 12:29:41 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18349445676
+- **CI status:** running, last run: run 18351500173
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T15:15:42.016Z
+Updated automatically by Cursor on 2025-10-08T16:30:33.231Z

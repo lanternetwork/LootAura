@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 1b01e76 — fix(types): move abortPrevious function before fetchSales to resolve dependency order error (by Yard Sale Tracker on 2025-10-08 15:04:44 -0400)
+- **Latest commit:** 4ef44a9 — fix(types): move abort controller state declarations before abortPrevious function to resolve dependency order (by Yard Sale Tracker on 2025-10-08 15:11:15 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18355248611
+- **CI status:** running, last run: run 18360465458
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T19:05:38.386Z
+Updated automatically by Cursor on 2025-10-08T23:11:59.144Z

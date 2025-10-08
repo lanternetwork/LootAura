@@ -114,6 +114,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const requestSeqRef = useRef<number>(0)
   const markerSeqRef = useRef<number>(0)
   const lastMarkersKeyRef = useRef<string>('')
+  const pendingFitReasonRef = useRef<'zip' | 'distance' | null>(null)
 
   // Utility functions for value equality checks
   const isEqualCenter = useCallback((a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null, tol = 1e-6) => {
@@ -796,6 +797,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     console.log('[CONTROL] mode=distance (distance slider)')
     updateControlMode('distance', 'Distance slider changed')
     setProgrammaticMoveGuard(true, 'Distance fit (programmatic)')
+    pendingFitReasonRef.current = 'distance'
     
     // Reset pagination for distance changes
     resetPagination()
@@ -827,6 +829,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     updateControlMode('zip', 'ZIP lookup asserted control')
     console.log('[CONTROL] programmaticMoveGuard=true (zip fit)')
     setProgrammaticMoveGuard(true, 'ZIP fit (programmatic)')
+    pendingFitReasonRef.current = 'zip'
     
     // Reset pagination for ZIP changes
     resetPagination()
@@ -1092,13 +1095,23 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onFitBoundsComplete={() => {
                     console.log('[CONTROL] onFitBoundsComplete (guard stays true)')
                     setFitBounds(null)
-                    // Guard stays true until next user interaction
-                    // For ZIP mode, we need to trigger fetches after the fit completes
-                    if (arbiter.mode === 'zip') {
-                      console.log('[ZIP] fitBounds complete, triggering fetches')
-                      fetchSales(false, { lat: filters.lat!, lng: filters.lng! })
-                      fetchMapSales({ lat: filters.lat!, lng: filters.lng! })
+                    
+                    // Check if this is a pending fit we need to handle
+                    if (pendingFitReasonRef.current === null) {
+                      console.log('[CONTROL] fit completion already handled')
+                      return
                     }
+                    
+                    const reason = pendingFitReasonRef.current
+                    pendingFitReasonRef.current = null
+                    
+                    console.log(`[CONTROL] fit completion for ${reason}`)
+                    // Guard stays true until next user interaction
+                    // Trigger fetches once after fit completes
+                    debouncedTrigger(() => {
+                      fetchSales()
+                      fetchMapSales()
+                    })
                   }}
                   onBoundsChange={onBoundsChange}
                   onSearchArea={({ center }) => {

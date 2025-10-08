@@ -106,11 +106,25 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
   const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
-  const [salesAbortController, setSalesAbortController] = useState<AbortController | null>(null)
-  const [markersAbortController, setMarkersAbortController] = useState<AbortController | null>(null)
-  const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null)
+  // Use refs instead of state to avoid re-renders
+  const salesAbortRef = useRef<AbortController | null>(null)
+  const markersAbortRef = useRef<AbortController | null>(null)
+  const debounceRef = useRef<number | null>(null)
   const requestSeqRef = useRef<number>(0)
   const markerSeqRef = useRef<number>(0)
+  const lastMarkersKeyRef = useRef<string>('')
+
+  // Utility functions for value equality checks
+  const isEqualCenter = useCallback((a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null, tol = 1e-6) => {
+    if (!a || !b) return a === b
+    return Math.abs(a.lat - b.lat) < tol && Math.abs(a.lng - b.lng) < tol
+  }, [])
+
+  const isEqualBounds = useCallback((a: { north: number; south: number; east: number; west: number } | null, b: { north: number; south: number; east: number; west: number } | null, tol = 1e-6) => {
+    if (!a || !b) return a === b
+    return Math.abs(a.north - b.north) < tol && Math.abs(a.south - b.south) < tol && 
+           Math.abs(a.east - b.east) < tol && Math.abs(a.west - b.west) < tol
+  }, [])
 
   const onBoundsChange = useCallback((b?: { north: number; south: number; east: number; west: number }) => {
     if (!b) return
@@ -166,17 +180,34 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   // Abort previous requests for a specific endpoint
   const abortPrevious = useCallback((endpoint: 'sales' | 'markers') => {
-    if (endpoint === 'sales' && salesAbortController) {
+    if (endpoint === 'sales' && salesAbortRef.current) {
       console.log('[NET] abort sales')
-      salesAbortController.abort()
-      setSalesAbortController(null)
+      salesAbortRef.current.abort()
+      salesAbortRef.current = null
     }
-    if (endpoint === 'markers' && markersAbortController) {
+    if (endpoint === 'markers' && markersAbortRef.current) {
       console.log('[NET] abort markers')
-      markersAbortController.abort()
-      setMarkersAbortController(null)
+      markersAbortRef.current.abort()
+      markersAbortRef.current = null
     }
-  }, [salesAbortController, markersAbortController])
+  }, [])
+
+  // Build stable request key for markers
+  const buildMarkersKey = useCallback(() => {
+    const mode = arbiter?.mode || 'initial'
+    let key = `mode:${mode}`
+    
+    if (mode === 'map' && mapView.center && mapView.zoom) {
+      const center = mapView.center
+      const radius = approximateRadiusKmFromZoom(mapView.zoom)
+      key += `|center:${center.lat.toFixed(6)},${center.lng.toFixed(6)}|radius:${radius?.toFixed(2) || 'null'}`
+    } else {
+      key += `|lat:${filters.lat?.toFixed(6) || 'null'}|lng:${filters.lng?.toFixed(6) || 'null'}|dist:${filters.distance}`
+    }
+    
+    key += `|date:${filters.dateRange}|cats:${filters.categories.sort().join(',')}`
+    return key
+  }, [arbiter.mode, mapView.center, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.dateRange, filters.categories, approximateRadiusKmFromZoom])
 
   const fetchSales = useCallback(async (append = false, centerOverride?: { lat: number; lng: number }) => {
     // Abort previous sales request
@@ -184,7 +215,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     
     // Create fresh controller and increment sequence
     const controller = new AbortController()
-    setSalesAbortController(controller)
+    salesAbortRef.current = controller
     const seq = ++requestSeqRef.current
     
     console.log('[NET] start sales', { seq })
@@ -364,8 +395,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       setFetchedOnce(true)
     } finally {
       // Clear controller if this is still the active one
-      if (salesAbortController === controller) {
-        setSalesAbortController(null)
+      if (salesAbortRef.current === controller) {
+        salesAbortRef.current = null
       }
       if (append) {
         setLoadingMore(false)
@@ -373,18 +404,28 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         setLoading(false)
       }
     }
-  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, salesAbortController])
+  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious])
 
   // Client-side geolocation removed; handlers not used
 
   // Fetch markers for map pins using dedicated markers endpoint
   const fetchMapSales = useCallback(async (centerOverride?: { lat: number; lng: number }) => {
+    // Check if we need to fetch based on key change
+    const key = buildMarkersKey()
+    if (key === lastMarkersKeyRef.current) {
+      console.log('[SKIP] same markers key')
+      return
+    }
+    
+    console.log('[KEY] markers', key)
+    lastMarkersKeyRef.current = key
+    
     // Abort previous markers request
     abortPrevious('markers')
     
     // Create fresh controller and increment sequence
     const controller = new AbortController()
-    setMarkersAbortController(controller)
+    markersAbortRef.current = controller
     const seq = ++markerSeqRef.current
     
     console.log('[NET] start markers', { seq })
@@ -479,11 +520,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       setTimeout(() => setMapError(null), 3000)
     } finally {
       // Clear controller if this is still the active one
-      if (markersAbortController === controller) {
-        setMarkersAbortController(null)
+      if (markersAbortRef.current === controller) {
+        markersAbortRef.current = null
       }
     }
-  }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, markersAbortController])
+  }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, buildMarkersKey])
 
   const loadMore = useCallback(async () => {
     // Use prefetched next page if available for instant UI
@@ -538,18 +579,17 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Debounced, single-flight fetchers with abort controllers
 
 
-  // Debounced function wrapper
-  const debounced = useCallback((fn: () => void, delay = 250) => {
-    if (debounceTimeout) {
-      clearTimeout(debounceTimeout)
+  // Debounced function wrapper using refs
+  const debouncedTrigger = useCallback((fn: () => void, delay = 250) => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
     }
-    const timeout = setTimeout(() => {
+    debounceRef.current = window.setTimeout(() => {
       console.log('[NET] debounce fire')
       fn()
-      setDebounceTimeout(null)
+      debounceRef.current = null
     }, delay)
-    setDebounceTimeout(timeout)
-  }, [debounceTimeout])
+  }, [])
 
   // Reset pagination when mode/bbox changes
   const resetPagination = useCallback(() => {
@@ -560,21 +600,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [])
 
   const triggerFetches = useCallback(() => {
-    debounced(() => {
-      // Abort any in-flight requests
-      abortPrevious('sales')
-      abortPrevious('markers')
-      
-      // Create fresh controllers
-      const salesController = new AbortController()
-      const markersController = new AbortController()
-      setSalesAbortController(salesController)
-      setMarkersAbortController(markersController)
-      
+    debouncedTrigger(() => {
       fetchSales()
       fetchMapSales()
     })
-  }, [debounced, abortPrevious, fetchSales, fetchMapSales])
+  }, [debouncedTrigger, fetchSales, fetchMapSales])
 
   // Debounced visible list recompute
   const listDebounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -592,26 +622,27 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   useEffect(() => {
     return () => {
       // Abort any in-flight requests
-      if (salesAbortController) {
-        salesAbortController.abort()
+      if (salesAbortRef.current) {
+        salesAbortRef.current.abort()
       }
-      if (markersAbortController) {
-        markersAbortController.abort()
+      if (markersAbortRef.current) {
+        markersAbortRef.current.abort()
       }
       // Clear any pending debounce timeouts
-      if (debounceTimeout) {
-        clearTimeout(debounceTimeout)
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
       }
       if (listDebounceRef.current) {
         clearTimeout(listDebounceRef.current)
       }
     }
-  }, [salesAbortController, markersAbortController, debounceTimeout])
+  }, [])
 
   useEffect(() => {
-    console.log('[SALES] Inputs changed → debounced fetch', { mode: arbiter.mode, mapView })
+    const key = buildMarkersKey()
+    console.log('[SALES] Inputs changed → key:', key)
     triggerFetches()
-  }, [triggerFetches, arbiter.mode, mapView.center?.lat, mapView.center?.lng, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.categories.join(','), filters.dateRange])
+  }, [triggerFetches, buildMarkersKey])
 
   // Keep visibleSales in sync with current sales and viewport
   useEffect(() => {
@@ -754,11 +785,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     console.log('[URL] distance change -> lat,lng, dist=miles', currentCenter.lat, currentCenter.lng, newDistance)
     
     // Trigger debounced fetches
-    debounced(() => {
+    debouncedTrigger(() => {
       fetchSales()
       fetchMapSales()
     })
-  }, [filters.lat, filters.lng, mapView.center, updateControlMode, setProgrammaticMoveGuard, computeBboxForRadius, updateFilters, resetPagination, debounced, fetchSales, fetchMapSales])
+  }, [filters.lat, filters.lng, mapView.center, updateControlMode, setProgrammaticMoveGuard, computeBboxForRadius, updateFilters, resetPagination, debouncedTrigger, fetchSales, fetchMapSales])
 
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string) => {
     setZipError(null)
@@ -787,7 +818,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     console.log('[MAP] fitBounds(zip) north=${bbox.north}, south=${bbox.south}, east=${bbox.east}, west=${bbox.west}')
     
     // Trigger debounced fetches
-    debounced(() => {
+    debouncedTrigger(() => {
       fetchSales()
       fetchMapSales()
     })

@@ -116,6 +116,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const lastMarkersKeyRef = useRef<string>('')
   const pendingFitReasonRef = useRef<'zip' | 'distance' | null>(null)
 
+  // Epsilon for center sync gating
+  const EPS_CENTER = 1e-6
+  const nearEq = (a: number, b: number) => Math.abs(a - b) < EPS_CENTER
+
   // Utility functions for value equality checks
   const isEqualCenter = useCallback((a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null, tol = 1e-6) => {
     if (!a || !b) return a === b
@@ -1115,8 +1119,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   }}
                   onBoundsChange={onBoundsChange}
                   onSearchArea={({ center }) => {
-                    // Recenter filters to map center and refetch (no router navigation)
-                    updateFilters({ lat: center.lat, lng: center.lng }, true) // Skip URL update
+                    // Only update filters if we're in map mode and center changed significantly
+                    if (arbiter.mode === 'map' && !arbiter.programmaticMoveGuard) {
+                      const currentLat = filters.lat || 0
+                      const currentLng = filters.lng || 0
+                      if (!nearEq(currentLat, center.lat) || !nearEq(currentLng, center.lng)) {
+                        console.log('[FILTERS] center sync gated by mode + epsilon')
+                        updateFilters({ lat: center.lat, lng: center.lng }, true) // Skip URL update
+                      }
+                    }
                     fetchSales(false, center)
                     fetchMapSales(center)
                   }}

@@ -17,7 +17,8 @@
     "format": "prettier -w .",
     "check:storage": "tsx scripts/storage-check.ts",
     "check:node": "node scripts/check-node-version.js",
-    "update:status": "tsx scripts/update-status.ts"
+    "update:status": "tsx scripts/update-status.ts",
+    "smoke:sales": "tsx scripts/smoke-sales.ts"
   },
   "dependencies": {
     "next": "14.2.4",

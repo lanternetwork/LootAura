@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** f512e82 — fix(triggers): add early returns for programmatic move guard and unchanged markers key to stabilize fetches (by Yard Sale Tracker on 2025-10-08 19:46:46 -0400)
+- **Latest commit:** 2103869 — [NET] solidify keys; skip duplicates (by Yard Sale Tracker on 2025-10-08 19:58:47 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18361056458
+- **CI status:** running, last run: run 18361223203
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T23:47:41.193Z
+Updated automatically by Cursor on 2025-10-08T23:59:40.109Z

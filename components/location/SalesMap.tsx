@@ -18,6 +18,7 @@ interface SalesMapProps {
   onSearchArea?: (args: { bounds: { north: number; south: number; east: number; west: number }, center: { lat: number; lng: number }, zoom: number }) => void
   onViewChange?: (args: { center: { lat: number; lng: number }, zoom: number, userInteraction: boolean }) => void
   centerOverride?: { lat: number; lng: number; zoom?: number } | null
+  onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number } | undefined) => void
 }
 
 export default function SalesMap({ 
@@ -29,7 +30,8 @@ export default function SalesMap({
   selectedSaleId,
   onSearchArea,
   onViewChange,
-  centerOverride
+  centerOverride,
+  onBoundsChange
 }: SalesMapProps) {
   useEffect(() => {
     incMapLoad()
@@ -74,6 +76,12 @@ export default function SalesMap({
             zoom: targetZoom, 
             duration: 500 
           })
+          setTimeout(() => {
+            if (onBoundsChange) {
+              const b = getBounds()
+              onBoundsChange(b)
+            }
+          }, 550)
         }
       } catch {}
     }
@@ -140,6 +148,10 @@ export default function SalesMap({
       const userInteraction = !!(evt && (evt as any).originalEvent)
       onViewChange({ center: { lat: evt.viewState.latitude, lng: evt.viewState.longitude }, zoom: evt.viewState.zoom, userInteraction })
     }
+    if (onBoundsChange) {
+      const b = getBounds()
+      onBoundsChange(b)
+    }
   }
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -159,11 +171,19 @@ export default function SalesMap({
   const handleMoveEnd = () => {
     setMoved(true)
     scheduleAutoSearch()
+    if (onBoundsChange) {
+      const b = getBounds()
+      onBoundsChange(b)
+    }
   }
 
   const handleZoomEnd = () => {
     setMoved(true)
     scheduleAutoSearch()
+    if (onBoundsChange) {
+      const b = getBounds()
+      onBoundsChange(b)
+    }
   }
 
   const getBounds = () => {

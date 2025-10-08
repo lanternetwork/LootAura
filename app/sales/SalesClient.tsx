@@ -103,6 +103,31 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
   const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
   const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
+  const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
+  const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
+
+  const onBoundsChange = useCallback((b?: { north: number; south: number; east: number; west: number }) => {
+    if (!b) return
+    setViewportBounds(b)
+    console.log('[VIEWPORT] bounds:', b.north, b.south, b.east, b.west)
+  }, [])
+
+  const cropSalesToViewport = useCallback((all: Sale[], b?: { north: number; south: number; east: number; west: number } | null) => {
+    if (!b) return all
+    const { north, south, east, west } = b
+    const crossesAntimeridian = east < west
+    const inView = all.filter(s => {
+      const latOk = s.lat <= north && s.lat >= south
+      if (!latOk) return false
+      if (!crossesAntimeridian) {
+        return s.lng >= west && s.lng <= east
+      }
+      // If bounds cross the antimeridian, longitudes are either >= west or <= east
+      return s.lng >= west || s.lng <= east
+    })
+    console.log('[VIEWPORT] cropped', all.length, '→', inView.length)
+    return inView
+  }, [])
 
   // Approximate radius (km) from Mapbox zoom level at mid-latitudes
   const approximateRadiusKmFromZoom = useCallback((zoom?: number | null): number | null => {
@@ -441,10 +466,27 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     }, 250)
   }, [fetchSales, fetchMapSales])
 
+  // Debounced visible list recompute
+  const listDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const recomputeVisibleSales = useCallback((all: Sale[], b: typeof viewportBounds) => {
+    if (listDebounceRef.current) clearTimeout(listDebounceRef.current)
+    listDebounceRef.current = setTimeout(() => {
+      const inView = cropSalesToViewport(all, b)
+      const rendered = inView.slice(0, 24)
+      setVisibleSales(rendered)
+      console.log('[LIST] update (cap=24) inView=', inView.length, 'rendered=', rendered.length)
+    }, 180)
+  }, [cropSalesToViewport])
+
   useEffect(() => {
     console.log('[SALES] Inputs changed → debounced fetch', { mode: arbiter.mode, mapView })
     triggerFetches()
   }, [triggerFetches, arbiter.mode, mapView.center?.lat, mapView.center?.lng, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.categories.join(','), filters.dateRange])
+
+  // Keep visibleSales in sync with current sales and viewport
+  useEffect(() => {
+    recomputeVisibleSales(sales, viewportBounds)
+  }, [recomputeVisibleSales, sales, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west])
 
   // Refetch map pins when filters location/range change
   useEffect(() => {
@@ -749,8 +791,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     </div>
                   ) : (
                     <>
+                      {visibleSales.length > 24 && (
+                        <div className="text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
+                      )}
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="sales-grid">
-                        {(loading ? Array.from({ length: 6 }) : sales).map((item: any, idx: number) => (
+                        {(loading ? Array.from({ length: 6 }) : visibleSales).map((item: any, idx: number) => (
                           loading ? (
                             <div key={idx} className="animate-pulse bg-white rounded-lg border p-4">
                               <div className="h-40 bg-gray-200 rounded mb-4" />
@@ -817,6 +862,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                          { lat: 39.8283, lng: -98.5795 }}
                   zoom={filters.lat && filters.lng ? 12 : 10}
                   centerOverride={mapCenterOverride}
+                  onBoundsChange={onBoundsChange}
                   onSearchArea={({ center }) => {
                     // Recenter filters to map center and refetch (no router navigation)
                     updateFilters({ lat: center.lat, lng: center.lng }, true) // Skip URL update

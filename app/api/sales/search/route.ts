@@ -47,44 +47,42 @@ export async function GET(request: NextRequest) {
     let error: any = null
 
     if (lat && lng) {
-      // Use PostGIS spatial search
-      const { data: postgisData, error: postgisError } = await supabase
-        .rpc('search_sales_within_distance_v2', {
-          p_lat: lat,
-          p_lng: lng,
-          p_distance_km: distance,
-          p_start_date: null,
-          p_end_date: null,
-          p_categories: categories || null,
-          p_query: city || null,
-          p_limit: limit,
-          p_offset: 0
-        })
+      // Use lat/lng-based distance filtering instead of geometry columns
+      const { data: salesData, error: salesError } = await supabase
+        .from('sales_v2')
+        .select('*')
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(Math.min(limit * 3, 500)) // Fetch more to allow for distance filtering
 
-      if (postgisError) {
-        console.log(`[SALES_SEARCH] PostGIS failed: ${postgisError.message}, falling back to bbox`)
-        
-        // Fallback to bbox search
-        const { data: bboxData, error: bboxError } = await supabase
-          .rpc('search_sales_bbox_v2', {
-            p_lat: lat,
-            p_lng: lng,
-            p_distance_km: distance,
-            p_start_date: null,
-            p_end_date: null,
-            p_categories: categories || null,
-            p_query: city || null,
-            p_limit: limit,
-            p_offset: 0
-          })
-
-        if (bboxError) {
-          error = bboxError
-        } else {
-          sales = bboxData || []
-        }
+      if (salesError) {
+        error = salesError
       } else {
-        sales = postgisData || []
+        // Client-side distance filtering using Haversine formula
+        const distanceMeters = distance * 1000
+        sales = (salesData || [])
+          .map((sale: any) => {
+            // Haversine distance calculation
+            const R = 6371000 // Earth's radius in meters
+            const dLat = (sale.lat - lat) * Math.PI / 180
+            const dLng = (sale.lng - lng) * Math.PI / 180
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(lat * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
+                     Math.sin(dLng/2) * Math.sin(dLng/2)
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+            const distanceM = R * c
+            
+            return {
+              ...sale,
+              distance_m: Math.round(distanceM),
+              distance_km: Math.round(distanceM / 1000 * 100) / 100
+            }
+          })
+          .filter((sale: any) => sale.distance_km <= distance)
+          .sort((a: any, b: any) => a.distance_m - b.distance_m)
+          .slice(0, limit)
       }
     } else {
       // No location provided, use basic query on sales_v2

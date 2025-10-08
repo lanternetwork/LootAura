@@ -43,26 +43,43 @@ export async function GET(request: NextRequest) {
     let afterTextCount = totalCount
     let degraded = false
     
-    // Distance filtering
+    // Distance filtering using lat/lng coordinates
     if (parsed.lat && parsed.lng && parsed.distanceKm) {
       try {
-        // Try PostGIS first
-        const { data: postgisData } = await supabase.rpc('search_sales_by_distance', {
-          search_lat: parsed.lat,
-          search_lng: parsed.lng,
-          max_distance_km: parsed.distanceKm,
-          date_filter: null,
-          category_filter: null,
-          text_filter: null,
-          result_limit: 1000,
-          result_offset: 0
-        })
+        // Use lat/lng-based distance filtering instead of PostGIS
+        const { data: salesData, error: salesError } = await supabase
+          .from('sales_v2')
+          .select('id, lat, lng')
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .eq('status', 'published')
+          .limit(1000)
         
-        if (postgisData) {
-          afterDistanceCount = postgisData.length
-        } else {
-          throw new Error('PostGIS unavailable')
+        if (salesError) {
+          throw new Error(`Sales query failed: ${salesError.message}`)
         }
+        
+        // Client-side distance filtering using Haversine formula
+        const filteredSales = (salesData || [])
+          .map((sale: any) => {
+            // Haversine distance calculation
+            const R = 6371000 // Earth's radius in meters
+            const dLat = (sale.lat - parsed.lat) * Math.PI / 180
+            const dLng = (sale.lng - parsed.lng) * Math.PI / 180
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(parsed.lat * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
+                     Math.sin(dLng/2) * Math.sin(dLng/2)
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+            const distanceM = R * c
+            
+            return {
+              ...sale,
+              distance_km: distanceM / 1000
+            }
+          })
+          .filter((sale: any) => sale.distance_km <= parsed.distanceKm)
+        
+        afterDistanceCount = filteredSales.length
       } catch (error) {
         // Fallback to bounding box
         degraded = true

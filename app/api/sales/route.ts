@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
         query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,address.ilike.%${q}%`)
       }
       
-      // Fetch a wider slice to allow client-side distance filtering, since some rows only have geom
+      // Fetch a wider slice to allow client-side distance filtering
       const fetchWindow = Math.min(1000, Math.max(limit * 10, 200))
       const { data: salesData, error: salesError } = await query
         .order('id', { ascending: true })

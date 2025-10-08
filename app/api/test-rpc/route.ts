@@ -18,39 +18,48 @@ export async function GET(request: NextRequest) {
     
     console.log('[TEST-RPC] Available functions:', functions)
     
-    // Test 2: Try the PostGIS function
-    console.log('[TEST-RPC] Testing search_sales_within_distance_v2...')
-    const { data: postgisData, error: postgisError } = await supabase
-      .rpc('search_sales_within_distance_v2', {
-        p_lat: 38.235,
-        p_lng: -85.708,
-        p_distance_km: 40,
-        p_start_date: null,
-        p_end_date: null,
-        p_categories: null,
-        p_query: null,
-        p_limit: 5,
-        p_offset: 0
-      })
+    // Test 2: Try lat/lng-based distance filtering
+    console.log('[TEST-RPC] Testing lat/lng-based distance filtering...')
+    const { data: salesData, error: salesError } = await supabase
+      .from('sales_v2')
+      .select('id, title, city, lat, lng')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .eq('status', 'published')
+      .limit(50)
     
-    console.log('[TEST-RPC] PostGIS result:', { data: postgisData, error: postgisError })
-    
-    // Test 3: Try the bbox function
-    console.log('[TEST-RPC] Testing search_sales_bbox_v2...')
-    const { data: bboxData, error: bboxError } = await supabase
-      .rpc('search_sales_bbox_v2', {
-        p_lat: 38.235,
-        p_lng: -85.708,
-        p_distance_km: 40,
-        p_start_date: null,
-        p_end_date: null,
-        p_categories: null,
-        p_query: null,
-        p_limit: 5,
-        p_offset: 0
-      })
-    
-    console.log('[TEST-RPC] Bbox result:', { data: bboxData, error: bboxError })
+    if (salesError) {
+      console.log('[TEST-RPC] Sales query error:', salesError)
+    } else {
+      // Client-side distance filtering
+      const testLat = 38.235
+      const testLng = -85.708
+      const testDistanceKm = 40
+      
+      const filteredSales = (salesData || [])
+        .map((sale: any) => {
+          // Haversine distance calculation
+          const R = 6371000 // Earth's radius in meters
+          const dLat = (sale.lat - testLat) * Math.PI / 180
+          const dLng = (sale.lng - testLng) * Math.PI / 180
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                   Math.cos(testLat * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
+                   Math.sin(dLng/2) * Math.sin(dLng/2)
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+          const distanceM = R * c
+          
+          return {
+            ...sale,
+            distance_m: Math.round(distanceM),
+            distance_km: Math.round(distanceM / 1000 * 100) / 100
+          }
+        })
+        .filter((sale: any) => sale.distance_km <= testDistanceKm)
+        .sort((a: any, b: any) => a.distance_m - b.distance_m)
+        .slice(0, 5)
+      
+      console.log('[TEST-RPC] Lat/lng filtering result:', { data: filteredSales, count: filteredSales.length })
+    }
     
     // Test 4: Try direct query to sales_v2 view
     console.log('[TEST-RPC] Testing direct sales_v2 query...')
@@ -64,8 +73,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: true,
       functions: functions,
-      postgis: { data: postgisData, error: postgisError },
-      bbox: { data: bboxData, error: bboxError },
+      latlng_filtering: { data: filteredSales || [], count: (filteredSales || []).length },
       direct: { data: directData, error: directError }
     })
     

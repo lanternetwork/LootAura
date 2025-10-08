@@ -16,7 +16,7 @@ interface SalesMapProps {
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string
   onSearchArea?: (args: { bounds: { north: number; south: number; east: number; west: number }, center: { lat: number; lng: number }, zoom: number }) => void
-  onViewChange?: (args: { center: { lat: number; lng: number }, zoom: number }) => void
+  onViewChange?: (args: { center: { lat: number; lng: number }, zoom: number, userInteraction: boolean }) => void
   centerOverride?: { lat: number; lng: number; zoom?: number } | null
 }
 
@@ -137,7 +137,8 @@ export default function SalesMap({
     setViewState(evt.viewState)
     setMoved(true)
     if (onViewChange) {
-      onViewChange({ center: { lat: evt.viewState.latitude, lng: evt.viewState.longitude }, zoom: evt.viewState.zoom })
+      const userInteraction = !!(evt && (evt as any).originalEvent)
+      onViewChange({ center: { lat: evt.viewState.latitude, lng: evt.viewState.longitude }, zoom: evt.viewState.zoom, userInteraction })
     }
   }
 

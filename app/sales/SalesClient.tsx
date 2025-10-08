@@ -15,6 +15,14 @@ import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import LoadMoreButton from '@/components/LoadMoreButton'
 
+// Intent Arbiter types
+type ControlMode = 'initial' | 'map' | 'zip' | 'distance'
+interface ControlArbiter {
+  mode: ControlMode
+  programmaticMoveGuard: boolean
+  lastChangedAt: number
+}
+
 // Cookie utility functions
 function getCookie(name: string): string | null {
   if (typeof document === 'undefined') return null
@@ -47,6 +55,27 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const { filters, updateFilters, hasActiveFilters } = useFilters(
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
   )
+
+  // Source of Truth Arbiter — observe-only for now
+  const [arbiter, setArbiter] = useState<ControlArbiter>({ mode: 'initial', programmaticMoveGuard: false, lastChangedAt: Date.now() })
+
+  const updateControlMode = useCallback((mode: ControlMode, reason: string) => {
+    setArbiter(prev => {
+      if (prev.mode === mode) return prev
+      const next = { ...prev, mode, lastChangedAt: Date.now() }
+      console.log(`[ARB] mode=${mode} reason=${reason} ts=${next.lastChangedAt}`)
+      return next
+    })
+  }, [])
+
+  const setProgrammaticMoveGuard = useCallback((on: boolean, reason: string) => {
+    setArbiter(prev => {
+      if (prev.programmaticMoveGuard === on) return prev
+      const next = { ...prev, programmaticMoveGuard: on, lastChangedAt: Date.now() }
+      console.log(`[ARB] guard=${on ? 'on' : 'off'} reason=${reason} ts=${next.lastChangedAt}`)
+      return next
+    })
+  }, [])
 
   // Debug logging
   console.log('[SALES] SalesClient render:', {
@@ -480,6 +509,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string) => {
     setZipError(null)
     console.log(`[ZIP] Setting new location: ${lat}, ${lng} (${city}, ${state})`)
+    updateControlMode('zip', 'ZIP lookup asserted control')
+    setProgrammaticMoveGuard(true, 'ZIP recenter (easeTo)')
     
     // Update filters with new location (skip URL update to prevent route change)
     updateFilters({
@@ -514,6 +545,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Clear the override after animation completes
     setTimeout(() => {
       setMapCenterOverride(null)
+      setProgrammaticMoveGuard(false, 'ZIP recenter complete')
     }, 600)
 
     // Immediately refetch with new center and existing filters
@@ -702,6 +734,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                 categories: filters.categories
               }}
               onFiltersChange={(newFilters) => {
+                if (newFilters.distance !== filters.distance) {
+                  updateControlMode('distance', 'Distance slider changed')
+                }
                 updateFilters({
                   distance: newFilters.distance,
                   dateRange: newFilters.dateRange as 'today' | 'weekend' | 'any',
@@ -734,7 +769,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     fetchSales(false, center)
                     fetchMapSales(center)
                   }}
-                  onViewChange={({ center, zoom }) => {
+                  onViewChange={({ center, zoom, userInteraction }) => {
+                    if (userInteraction && !arbiter.programmaticMoveGuard) {
+                      updateControlMode('map', 'User panned/zoomed')
+                    }
+                    if (!userInteraction && arbiter.programmaticMoveGuard) {
+                      console.log('[ARB] map move ignored due to guard (programmatic)')
+                    }
                     try {
                       const saved = JSON.parse(localStorage.getItem('lootaura_last_location') || '{}')
                       localStorage.setItem('lootaura_last_location', JSON.stringify({ ...saved, lat: center.lat, lng: center.lng }))

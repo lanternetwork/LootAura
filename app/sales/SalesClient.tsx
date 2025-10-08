@@ -106,6 +106,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
   const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
+  const [salesAbortController, setSalesAbortController] = useState<AbortController | null>(null)
+  const [markersAbortController, setMarkersAbortController] = useState<AbortController | null>(null)
+  const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null)
+  const requestSeqRef = useRef<number>(0)
+  const markerSeqRef = useRef<number>(0)
 
   const onBoundsChange = useCallback((b?: { north: number; south: number; east: number; west: number }) => {
     if (!b) return
@@ -531,11 +536,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [nextPageCache, fetchSales, filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange])
 
   // Debounced, single-flight fetchers with abort controllers
-  const [salesAbortController, setSalesAbortController] = useState<AbortController | null>(null)
-  const [markersAbortController, setMarkersAbortController] = useState<AbortController | null>(null)
-  const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null)
-  const requestSeqRef = useRef<number>(0)
-  const markerSeqRef = useRef<number>(0)
 
 
   // Debounced function wrapper

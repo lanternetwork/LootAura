@@ -159,6 +159,20 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Detect neutral fallback center (do not auto-fetch in this case)
   const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
 
+  // Abort previous requests for a specific endpoint
+  const abortPrevious = useCallback((endpoint: 'sales' | 'markers') => {
+    if (endpoint === 'sales' && salesAbortController) {
+      console.log('[NET] abort sales')
+      salesAbortController.abort()
+      setSalesAbortController(null)
+    }
+    if (endpoint === 'markers' && markersAbortController) {
+      console.log('[NET] abort markers')
+      markersAbortController.abort()
+      setMarkersAbortController(null)
+    }
+  }, [salesAbortController, markersAbortController])
+
   const fetchSales = useCallback(async (append = false, centerOverride?: { lat: number; lng: number }) => {
     // Abort previous sales request
     abortPrevious('sales')
@@ -523,19 +537,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const requestSeqRef = useRef<number>(0)
   const markerSeqRef = useRef<number>(0)
 
-  // Abort previous requests for a specific endpoint
-  const abortPrevious = useCallback((endpoint: 'sales' | 'markers') => {
-    if (endpoint === 'sales' && salesAbortController) {
-      console.log('[NET] abort sales')
-      salesAbortController.abort()
-      setSalesAbortController(null)
-    }
-    if (endpoint === 'markers' && markersAbortController) {
-      console.log('[NET] abort markers')
-      markersAbortController.abort()
-      setMarkersAbortController(null)
-    }
-  }, [salesAbortController, markersAbortController])
 
   // Debounced function wrapper
   const debounced = useCallback((fn: () => void, delay = 250) => {

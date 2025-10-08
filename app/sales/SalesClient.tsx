@@ -117,6 +117,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     const { north, south, east, west } = b
     const crossesAntimeridian = east < west
     const inView = all.filter(s => {
+      if (s.lat === null || s.lat === undefined || s.lng === null || s.lng === undefined) return false
       const latOk = s.lat <= north && s.lat >= south
       if (!latOk) return false
       if (!crossesAntimeridian) {

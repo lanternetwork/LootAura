@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** eed05e0 — fix(markers): replace stateful controllers with refs, add stable request key gating, debounce without state churn, prevent fetch loops (by Yard Sale Tracker on 2025-10-08 19:26:54 -0400)
+- **Latest commit:** f512e82 — fix(triggers): add early returns for programmatic move guard and unchanged markers key to stabilize fetches (by Yard Sale Tracker on 2025-10-08 19:46:46 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18360741519
+- **CI status:** running, last run: run 18361056458
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T23:27:50.933Z
+Updated automatically by Cursor on 2025-10-08T23:47:41.193Z

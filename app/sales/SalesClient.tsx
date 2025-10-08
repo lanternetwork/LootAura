@@ -1081,18 +1081,25 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   }}
                   onViewChange={({ center, zoom, userInteraction }) => {
                     setMapView({ center, zoom })
-                    if (userInteraction && !arbiter.programmaticMoveGuard) {
-                      console.log('[CONTROL] user pan detected -> switching to map mode')
-                      updateControlMode('map', 'User panned/zoomed')
-                    }
-                    if (userInteraction && arbiter.programmaticMoveGuard) {
-                      console.log('[CONTROL] user pan -> mode: zip → map; guard=false')
-                      setProgrammaticMoveGuard(false, 'User interaction after ZIP')
-                      updateControlMode('map', 'User panned/zoomed after ZIP')
-                    }
-                    if (!userInteraction && arbiter.programmaticMoveGuard) {
+                    
+                    // If programmatic move guard is active, ignore all changes except user interactions
+                    if (arbiter.programmaticMoveGuard && !userInteraction) {
                       console.log('[ARB] map move ignored due to guard (programmatic)')
+                      return
                     }
+                    
+                    // Only handle user interactions
+                    if (userInteraction) {
+                      if (arbiter.programmaticMoveGuard) {
+                        console.log('[CONTROL] user pan -> mode: zip → map; guard=false')
+                        setProgrammaticMoveGuard(false, 'User interaction after ZIP')
+                        updateControlMode('map', 'User panned/zoomed after ZIP')
+                      } else {
+                        console.log('[CONTROL] user pan detected -> switching to map mode')
+                        updateControlMode('map', 'User panned/zoomed')
+                      }
+                    }
+                    
                     try {
                       const saved = JSON.parse(localStorage.getItem('lootaura_last_location') || '{}')
                       localStorage.setItem('lootaura_last_location', JSON.stringify({ ...saved, lat: center.lat, lng: center.lng }))

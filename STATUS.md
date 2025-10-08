@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 8e318f7 — feat(distance): implement distance change with programmatic fitBounds; add bbox helper, guard logic, and map fitBounds support; no control theft (by Yard Sale Tracker on 2025-10-08 13:20:54 -0400)
+- **Latest commit:** 6958b48 — feat(zip): implement ZIP as strong intent with fitBounds; guard stays true until user pan; add mode switching logic and fetch triggers (by Yard Sale Tracker on 2025-10-08 13:37:47 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18352751872
+- **CI status:** running, last run: run 18353164871
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T17:21:50.212Z
+Updated automatically by Cursor on 2025-10-08T17:38:41.759Z

@@ -137,15 +137,20 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     if (!b) return all
     const { north, south, east, west } = b
     const crossesAntimeridian = east < west
+    const EPS = 0.0005 // Small epsilon for inclusive cropping
+    
     const inView = all.filter(s => {
       if (s.lat === null || s.lat === undefined || s.lng === null || s.lng === undefined) return false
-      const latOk = s.lat <= north && s.lat >= south
+      
+      // Use epsilon for inclusive bounds checking
+      const latOk = s.lat <= north + EPS && s.lat >= south - EPS
       if (!latOk) return false
+      
       if (!crossesAntimeridian) {
-        return s.lng >= west && s.lng <= east
+        return s.lng >= west - EPS && s.lng <= east + EPS
       }
-      // If bounds cross the antimeridian, longitudes are either >= west or <= east
-      return s.lng >= west || s.lng <= east
+      // If bounds cross the antimeridian, longitudes are either >= west OR <= east
+      return s.lng >= west - EPS || s.lng <= east + EPS
     })
     console.log('[VIEWPORT] cropped', all.length, '→', inView.length)
     return inView

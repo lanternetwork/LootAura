@@ -160,6 +160,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const isNeutralFallback = !!initialCenter && initialCenter.lat === 39.8283 && initialCenter.lng === -98.5795
 
   const fetchSales = useCallback(async (append = false, centerOverride?: { lat: number; lng: number }) => {
+    // Abort previous sales request
+    abortPrevious('sales')
+    
+    // Create fresh controller and increment sequence
+    const controller = new AbortController()
+    setSalesAbortController(controller)
+    const seq = ++requestSeqRef.current
+    
+    console.log('[NET] start sales', { seq })
+    
     // Determine parameters based on arbiter mode (fallback to existing behavior)
     const mode = arbiter?.mode || 'initial'
     let useLat = centerOverride?.lat ?? filters.lat
@@ -254,8 +264,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     try {
       console.log(`[SALES] Fetching from: /api/sales?${queryString}`)
       console.debug('[SALES] fetch', `/api/sales?${queryString}`)
-      const res = await fetch(`/api/sales?${queryString}`)
+      const res = await fetch(`/api/sales?${queryString}`, { signal: controller.signal })
       const data = await res.json()
+      
+      // Check if this request was aborted
+      if (requestSeqRef.current !== seq) {
+        console.log('[NET] aborted sales', { seq })
+        return
+      }
+      
+      console.log('[NET] ok sales', { seq })
       console.log(`[SALES] API response:`, data)
       console.debug('[SALES] results', data.data?.length || 0)
       
@@ -317,23 +335,41 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         setHasMore(false)
       }
       setFetchedOnce(true)
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('[NET] aborted sales', { seq })
+        return
+      }
       console.error('Error fetching sales:', error)
       setSales([])
       setFetchedOnce(true)
     } finally {
+      // Clear controller if this is still the active one
+      if (salesAbortController === controller) {
+        setSalesAbortController(null)
+      }
       if (append) {
         setLoadingMore(false)
       } else {
         setLoading(false)
       }
     }
-  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange])
+  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, salesAbortController])
 
   // Client-side geolocation removed; handlers not used
 
   // Fetch markers for map pins using dedicated markers endpoint
   const fetchMapSales = useCallback(async (centerOverride?: { lat: number; lng: number }) => {
+    // Abort previous markers request
+    abortPrevious('markers')
+    
+    // Create fresh controller and increment sequence
+    const controller = new AbortController()
+    setMarkersAbortController(controller)
+    const seq = ++markerSeqRef.current
+    
+    console.log('[NET] start markers', { seq })
+    
     const mode = arbiter?.mode || 'initial'
     let useLat = centerOverride?.lat ?? filters.lat
     let useLng = centerOverride?.lng ?? filters.lng
@@ -386,8 +422,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`, { mode })
       console.debug('[MARKERS] fetch', `/api/sales/markers?${params.toString()}`)
       console.debug('[MARKERS] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
-      const res = await fetch(`/api/sales/markers?${params.toString()}`)
+      const res = await fetch(`/api/sales/markers?${params.toString()}`, { signal: controller.signal })
       const data = await res.json()
+      
+      // Check if this request was aborted
+      if (markerSeqRef.current !== seq) {
+        console.log('[NET] aborted markers', { seq })
+        return
+      }
+      
+      console.log('[NET] ok markers', { seq })
       console.log('[MAP] Markers response:', data)
       console.debug('[MARKERS] markers', data?.data ? data.data.length : 0)
       if (data?.ok && Array.isArray(data.data)) {
@@ -404,14 +448,23 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         setMapMarkers([])
         console.debug('[MARKERS] got', 0)
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('[NET] aborted markers', { seq })
+        return
+      }
       console.error('[MAP] Error fetching markers:', error)
       setMapMarkers([])
       setMapError('Failed to load map markers')
       // Clear error after 3 seconds
       setTimeout(() => setMapError(null), 3000)
+    } finally {
+      // Clear controller if this is still the active one
+      if (markersAbortController === controller) {
+        setMarkersAbortController(null)
+      }
     }
-  }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange])
+  }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, markersAbortController])
 
   const loadMore = useCallback(async () => {
     // Use prefetched next page if available for instant UI
@@ -463,24 +516,64 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     await fetchSales(true)
   }, [nextPageCache, fetchSales, filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange])
 
-  // Debounced, single-flight fetchers
-  const salesAbortRef = useRef<AbortController | null>(null)
-  const markersAbortRef = useRef<AbortController | null>(null)
-  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+  // Debounced, single-flight fetchers with abort controllers
+  const [salesAbortController, setSalesAbortController] = useState<AbortController | null>(null)
+  const [markersAbortController, setMarkersAbortController] = useState<AbortController | null>(null)
+  const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null)
+  const requestSeqRef = useRef<number>(0)
+  const markerSeqRef = useRef<number>(0)
+
+  // Abort previous requests for a specific endpoint
+  const abortPrevious = useCallback((endpoint: 'sales' | 'markers') => {
+    if (endpoint === 'sales' && salesAbortController) {
+      console.log('[NET] abort sales')
+      salesAbortController.abort()
+      setSalesAbortController(null)
+    }
+    if (endpoint === 'markers' && markersAbortController) {
+      console.log('[NET] abort markers')
+      markersAbortController.abort()
+      setMarkersAbortController(null)
+    }
+  }, [salesAbortController, markersAbortController])
+
+  // Debounced function wrapper
+  const debounced = useCallback((fn: () => void, delay = 250) => {
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout)
+    }
+    const timeout = setTimeout(() => {
+      console.log('[NET] debounce fire')
+      fn()
+      setDebounceTimeout(null)
+    }, delay)
+    setDebounceTimeout(timeout)
+  }, [debounceTimeout])
+
+  // Reset pagination when mode/bbox changes
+  const resetPagination = useCallback(() => {
+    setSales([])
+    setNextPageCache(null)
+    setHasMore(true)
+    console.log('[NET] reset pagination')
+  }, [])
 
   const triggerFetches = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      // Abort any in-flight
-      try { salesAbortRef.current?.abort() } catch {}
-      try { markersAbortRef.current?.abort() } catch {}
-      salesAbortRef.current = new AbortController()
-      markersAbortRef.current = new AbortController()
-      // Under the hood our fetch functions don't accept signals yet; keep structure lightweight for now
+    debounced(() => {
+      // Abort any in-flight requests
+      abortPrevious('sales')
+      abortPrevious('markers')
+      
+      // Create fresh controllers
+      const salesController = new AbortController()
+      const markersController = new AbortController()
+      setSalesAbortController(salesController)
+      setMarkersAbortController(markersController)
+      
       fetchSales()
       fetchMapSales()
-    }, 250)
-  }, [fetchSales, fetchMapSales])
+    })
+  }, [debounced, abortPrevious, fetchSales, fetchMapSales])
 
   // Debounced visible list recompute
   const listDebounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -493,6 +586,26 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[LIST] update (cap=24) inView=', inView.length, 'rendered=', rendered.length)
     }, 180)
   }, [cropSalesToViewport])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Abort any in-flight requests
+      if (salesAbortController) {
+        salesAbortController.abort()
+      }
+      if (markersAbortController) {
+        markersAbortController.abort()
+      }
+      // Clear any pending debounce timeouts
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout)
+      }
+      if (listDebounceRef.current) {
+        clearTimeout(listDebounceRef.current)
+      }
+    }
+  }, [salesAbortController, markersAbortController, debounceTimeout])
 
   useEffect(() => {
     console.log('[SALES] Inputs changed → debounced fetch', { mode: arbiter.mode, mapView })
@@ -623,6 +736,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     updateControlMode('distance', 'Distance slider changed')
     setProgrammaticMoveGuard(true, 'Distance fit (programmatic)')
     
+    // Reset pagination for distance changes
+    resetPagination()
+    
     // Use current center from filters or mapView
     const currentCenter = filters.lat && filters.lng 
       ? { lat: filters.lat, lng: filters.lng }
@@ -635,7 +751,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Update URL with new distance and current center
     updateFilters({ distance: newDistance }, false) // Update URL
     console.log('[URL] distance change -> lat,lng, dist=miles', currentCenter.lat, currentCenter.lng, newDistance)
-  }, [filters.lat, filters.lng, mapView.center, updateControlMode, setProgrammaticMoveGuard, computeBboxForRadius, updateFilters])
+    
+    // Trigger debounced fetches
+    debounced(() => {
+      fetchSales()
+      fetchMapSales()
+    })
+  }, [filters.lat, filters.lng, mapView.center, updateControlMode, setProgrammaticMoveGuard, computeBboxForRadius, updateFilters, resetPagination, debounced, fetchSales, fetchMapSales])
 
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string) => {
     setZipError(null)
@@ -644,6 +766,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     updateControlMode('zip', 'ZIP lookup asserted control')
     console.log('[CONTROL] programmaticMoveGuard=true (zip fit)')
     setProgrammaticMoveGuard(true, 'ZIP fit (programmatic)')
+    
+    // Reset pagination for ZIP changes
+    resetPagination()
     
     // Update filters with new location and update URL with mode=zip
     updateFilters({
@@ -659,6 +784,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     setFitBounds(bbox)
     console.log('[ZIP] computed bbox for dist=${filters.distance} -> n=${bbox.north},s=${bbox.south},e=${bbox.east},w=${bbox.west}')
     console.log('[MAP] fitBounds(zip) north=${bbox.north}, south=${bbox.south}, east=${bbox.east}, west=${bbox.west}')
+    
+    // Trigger debounced fetches
+    debounced(() => {
+      fetchSales()
+      fetchMapSales()
+    })
     
     // Persist to session/local storage
     try {
@@ -682,7 +813,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
     // Remove old map centering logic - now using fitBounds instead
     // The fitBounds will be handled by the map component and onFitBoundsComplete
-  }
+  }, [updateControlMode, setProgrammaticMoveGuard, updateFilters, computeBboxForRadius, resetPagination, debounced, fetchSales, fetchMapSales, filters.distance])
 
   const handleZipError = (error: string) => {
     setZipError(error)

@@ -6,6 +6,11 @@ import { cookies } from 'next/headers'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
+  // 0. Explicit bypass for manifest.json and other critical assets
+  if (pathname === '/manifest.json' || pathname === '/favicon.ico' || pathname === '/sw.js') {
+    return NextResponse.next();
+  }
+  
   // 1. Bypass all static assets immediately - comprehensive list
   const isStaticAsset = 
     pathname.startsWith('/_next/') ||
@@ -136,7 +141,7 @@ export const config = {
     '/favorites/:path*', 
     '/account/:path*',
     '/admin/:path*',
-    // Match write APIs
+    // Match write APIs (but not GET requests)
     '/api/sales'
   ],
 }

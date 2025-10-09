@@ -55,6 +55,7 @@ export default function SalesMap({
   const [moved, setMoved] = useState(false)
   const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [visiblePinCount, setVisiblePinCount] = useState(0)
+  const autoFitAttemptedRef = useRef(false)
   
   useEffect(() => {
     console.log('[MAP] initialized with', sales.length, 'sales')
@@ -65,21 +66,28 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (!map) return
       
-      // Query all rendered features in the viewport
-      const features = map.queryRenderedFeatures()
+      // Get current viewport bounds
+      const bounds = map.getBounds()
+      const viewportBounds = {
+        north: bounds.getNorth(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        west: bounds.getWest()
+      }
       
-      // Filter for unclustered marker features only
-      const markerFeatures = features.filter((feature: any) => 
-        feature.source === 'markers' || 
-        feature.layer?.id?.includes('marker') ||
-        feature.properties?.id // Assuming markers have an id property
-      )
+      // Filter markers that are within the current viewport
+      const visibleMarkers = markers.filter(marker => {
+        const lat = +marker.lat
+        const lng = +marker.lng
+        if (Number.isNaN(lat) || Number.isNaN(lng)) return false
+        
+        return lat >= viewportBounds.south && 
+               lat <= viewportBounds.north && 
+               lng >= viewportBounds.west && 
+               lng <= viewportBounds.east
+      })
       
-      // Extract IDs from visible markers
-      const visibleIds = markerFeatures
-        .map((feature: any) => feature.properties?.id)
-        .filter((id: any) => id) // Remove undefined/null IDs
-        .filter((id: string, index: number, arr: string[]) => arr.indexOf(id) === index) // Deduplicate
+      const visibleIds = visibleMarkers.map(marker => marker.id)
       
       setVisiblePinIds(visibleIds)
       setVisiblePinCount(visibleIds.length)
@@ -95,7 +103,7 @@ export default function SalesMap({
       setVisiblePinIds([])
       setVisiblePinCount(0)
     }
-  }, [onVisiblePinsChange])
+  }, [markers, onVisiblePinsChange])
 
   // Recompute visible pins when markers change
   useEffect(() => {
@@ -106,9 +114,11 @@ export default function SalesMap({
       const handleIdle = () => {
         recomputeVisiblePins('markers-updated')
         
-        // Auto-fit if no pins are visible but markers exist
-        if (markers.length > 0 && visiblePinCount === 0) {
+        // Auto-fit if no pins are visible but markers exist (only once per session)
+        if (markers.length > 0 && visiblePinCount === 0 && !autoFitAttemptedRef.current) {
           console.log('[AUTO-FIT] No visible pins but markers exist, fitting to bounds')
+          autoFitAttemptedRef.current = true
+          
           const bounds = markers.reduce((acc, marker) => {
             const lat = +marker.lat
             const lng = +marker.lng

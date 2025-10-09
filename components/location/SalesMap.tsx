@@ -21,7 +21,9 @@ interface SalesMapProps {
   centerOverride?: { lat: number; lng: number; zoom?: number } | null
   fitBounds?: { north: number; south: number; east: number; west: number } | null
   onFitBoundsComplete?: () => void
-  onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number } | undefined) => void
+  onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number; ts: number } | undefined) => void
+  visiblePinsCount?: number
+  totalPinsCount?: number
 }
 
 export default function SalesMap({ 
@@ -36,7 +38,9 @@ export default function SalesMap({
   centerOverride,
   fitBounds,
   onFitBoundsComplete,
-  onBoundsChange
+  onBoundsChange,
+  visiblePinsCount = 0,
+  totalPinsCount = 0
 }: SalesMapProps) {
   useEffect(() => {
     incMapLoad()
@@ -296,7 +300,8 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (!map) return undefined
       const b = map.getBounds()
-      return { north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() }
+      const ts = Date.now()
+      return { north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest(), ts }
     } catch {
       return undefined
     }
@@ -320,9 +325,9 @@ export default function SalesMap({
 
   return (
     <div className="h-96 w-full rounded-lg overflow-hidden relative">
-      {/* TEMP overlay for pin count verification */}
+      {/* Visible pins count based on viewport bounds */}
       <div className="absolute top-2 left-2 z-10 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
-        {markers?.length ?? 0} pins
+        {visiblePinsCount} pins{totalPinsCount > visiblePinsCount ? ` (of ${totalPinsCount})` : ''}
       </div>
       <Map
         mapboxAccessToken={token}

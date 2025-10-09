@@ -6,24 +6,35 @@ import { cookies } from 'next/headers'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
-  // 1. Bypass all static assets immediately
+  // 1. Bypass all static assets immediately - comprehensive list
   const isStaticAsset = 
     pathname.startsWith('/_next/') ||
+    pathname.startsWith('/assets/') ||
+    pathname.startsWith('/static/') ||
+    pathname.startsWith('/public/') ||
     pathname.match(/\.[a-z0-9]+$/i) || // files with extensions
     pathname === '/manifest.json' ||
     pathname === '/favicon.ico' ||
-    pathname.startsWith('/icon') ||
     pathname === '/apple-touch-icon.png' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||
+    pathname === '/sw.js' ||
+    pathname.startsWith('/icon') ||
     pathname.startsWith('/images/') ||
-    pathname === '/sw.js';
+    pathname.startsWith('/icons/');
   
   if (isStaticAsset) {
     return NextResponse.next();
   }
   
-  // 2. Bypass auth pages to prevent redirect loops
+  // 2. Bypass requests with manifest content type or .json extension
+  const accept = req.headers.get('accept') || '';
+  const isManifestRequest = accept.includes('application/manifest+json') || pathname.endsWith('.json');
+  if (isManifestRequest) {
+    return NextResponse.next();
+  }
+  
+  // 3. Bypass auth pages to prevent redirect loops
   const isAuthPage = 
     pathname === '/login' ||
     pathname === '/signin' ||
@@ -34,7 +45,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
   
-  // 3. Only protect specific routes and write APIs
+  // 4. Only protect specific routes and write APIs
   const isProtectedRoute = 
     pathname.startsWith('/favorites/') ||
     pathname.startsWith('/account/') ||
@@ -50,7 +61,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
   
-  // 4. Only check auth for HTML navigations or write APIs
+  // 5. Only check auth for HTML navigations or write APIs
   const accept = req.headers.get('accept') || '';
   const isHtml = accept.includes('text/html');
   if (!isHtml && !isWriteAPI) {

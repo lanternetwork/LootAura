@@ -104,7 +104,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
   const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
   const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
-  const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
+  const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
   const lastBoundsTsRef = useRef<number | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
   const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
@@ -133,11 +133,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
            Math.abs(a.east - b.east) < tol && Math.abs(a.west - b.west) < tol
   }, [])
 
-  const onBoundsChange = useCallback((b?: { north: number; south: number; east: number; west: number }) => {
+  const onBoundsChange = useCallback((b?: { north: number; south: number; east: number; west: number; ts: number }) => {
     if (!b) return
-    const ts = Date.now()
-    console.log('[VIEWPORT][EMIT] bounds', { west: b.west, south: b.south, east: b.east, north: b.north, ts })
-    lastBoundsTsRef.current = ts
+    console.log('[VIEWPORT][EMIT] bounds', { west: b.west, south: b.south, east: b.east, north: b.north, ts: b.ts })
+    lastBoundsTsRef.current = b.ts
     
     // Use requestAnimationFrame for smooth viewport updates
     requestAnimationFrame(() => {
@@ -145,26 +144,43 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     })
   }, [])
 
-  const cropSalesToViewport = useCallback((all: Sale[], b?: { north: number; south: number; east: number; west: number } | null) => {
+  const cropSalesToViewport = useCallback((all: Sale[], b?: { north: number; south: number; east: number; west: number; ts: number } | null) => {
     if (!b) return all
+    
+    // Gate crop: only run if bounds are fresh (within 500ms)
+    const now = Date.now()
+    if (now - b.ts > 500) {
+      console.log('[VIEWPORT] crop skipped - stale bounds', { age: now - b.ts })
+      return all
+    }
+    
     const { north, south, east, west } = b
     const crossesAntimeridian = east < west
     const EPS = 0.0005 // Small epsilon for inclusive cropping
     
+    // Add small padding to prevent edge flickering
+    const padding = 0.05 // ~5% padding
+    const latRange = north - south
+    const lngRange = crossesAntimeridian ? (180 - west) + (east + 180) : east - west
+    const paddedNorth = north + (latRange * padding)
+    const paddedSouth = south - (latRange * padding)
+    const paddedEast = east + (lngRange * padding)
+    const paddedWest = west - (lngRange * padding)
+    
     const inView = all.filter(s => {
       if (s.lat === null || s.lat === undefined || s.lng === null || s.lng === undefined) return false
       
-      // Use epsilon for inclusive bounds checking
-      const latOk = s.lat <= north + EPS && s.lat >= south - EPS
+      // Use padded bounds for inclusive cropping
+      const latOk = s.lat <= paddedNorth + EPS && s.lat >= paddedSouth - EPS
       if (!latOk) return false
       
       if (!crossesAntimeridian) {
-        return s.lng >= west - EPS && s.lng <= east + EPS
+        return s.lng >= paddedWest - EPS && s.lng <= paddedEast + EPS
       }
       // If bounds cross the antimeridian, longitudes are either >= west OR <= east
-      return s.lng >= west - EPS || s.lng <= east + EPS
+      return s.lng >= paddedWest - EPS || s.lng <= paddedEast + EPS
     })
-    console.log('[VIEWPORT] cropped', all.length, '→', inView.length)
+    console.log('[VIEWPORT] cropped', all.length, '→', inView.length, `(fresh bounds, age: ${now - b.ts}ms)`)
     return inView
   }, [])
 
@@ -645,7 +661,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     if (listDebounceRef.current) clearTimeout(listDebounceRef.current)
     listDebounceRef.current = setTimeout(() => {
       const now = Date.now()
-      const bObj = b ? { west: b.west, south: b.south, east: b.east, north: b.north } : null
+      const bObj = b ? { west: b.west, south: b.south, east: b.east, north: b.north, ts: b.ts } : null
       const s0 = all?.[0] ? { lat: all[0].lat, lng: all[0].lng } : null
       const s1 = all?.[1] ? { lat: all[1].lat, lng: all[1].lng } : null
       const pointInBounds = (lat?: number, lng?: number) => {
@@ -659,15 +675,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
           : lng >= west - EPS && lng <= east + EPS
         return inLat && inLng
       }
-      console.log('[CROP][TEMP]', {
-        bounds: bObj,
-        lastBoundsTs: lastBoundsTsRef.current,
-        now,
-        s0,
-        s0In: s0 ? pointInBounds(s0.lat as any, s0.lng as any) : null,
-        s1,
-        s1In: s1 ? pointInBounds(s1.lat as any, s1.lng as any) : null
-      })
 
       const inView = cropSalesToViewport(all, b)
       const rendered = inView.slice(0, 24)
@@ -717,7 +724,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   // Keep visibleSales in sync with current sales and viewport
   useEffect(() => {
-    recomputeVisibleSales(sales, viewportBounds)
+    // Defer crop until we have real bounds; avoid cropping against null/old bounds
+    if (!viewportBounds) return
+    const now = Date.now()
+    const last = lastBoundsTsRef.current || 0
+    // If bounds just updated very recently, run crop now; otherwise schedule microtask
+    const delay = now - last <= 32 ? 0 : 0
+    queueMicrotask?.(() => recomputeVisibleSales(sales, viewportBounds))
   }, [recomputeVisibleSales, sales, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west])
 
   // Refetch map pins when filters location/range change
@@ -1141,6 +1154,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   zoom={filters.lat && filters.lng ? 12 : 10}
                   centerOverride={mapCenterOverride}
                   fitBounds={fitBounds}
+                  visiblePinsCount={visibleSales.length}
+                  totalPinsCount={mapMarkers.length}
                   onFitBoundsComplete={() => {
                     console.log('[CONTROL] onFitBoundsComplete (guard stays true)')
                     setFitBounds(null)

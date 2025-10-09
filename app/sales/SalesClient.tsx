@@ -266,7 +266,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // If no location, don't try to fetch sales yet
     if (!useLat || !useLng) {
       console.log('[SALES] No location provided, waiting for location')
-      setSales([])
+      // Don't clear sales immediately to prevent flickering
+      // setSales([])
       setDateWindow(null)
       setDegraded(false)
       setHasMore(true)
@@ -397,7 +398,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       } else {
         console.error('Sales API error:', data.error)
         if (!append) {
-          setSales([])
+          // Don't clear sales immediately to prevent flickering
+          // setSales([])
           setDateWindow(null)
           setDegraded(false)
         }
@@ -410,7 +412,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         return
       }
       console.error('Error fetching sales:', error)
-      setSales([])
+      // Don't clear sales immediately to prevent flickering
+      // setSales([])
       setFetchedOnce(true)
     } finally {
       // Clear controller if this is still the active one
@@ -618,7 +621,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   // Reset pagination when mode/bbox changes
   const resetPagination = useCallback(() => {
-    setSales([])
+    // Don't clear sales immediately to prevent flickering
+    // setSales([])
     setNextPageCache(null)
     setHasMore(true)
     console.log('[NET] reset pagination')

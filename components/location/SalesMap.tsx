@@ -63,7 +63,8 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (map) {
         const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : (zoom || 11)
-        map.easeTo({ center: [center.lng, center.lat], zoom: Math.max(currentZoom, 11), duration: 600 })
+        // Do not force a minimum zoom during programmatic recenters; respect current zoom
+        map.easeTo({ center: [center.lng, center.lat], zoom: currentZoom, duration: 600 })
       }
     } catch {}
   }, [center.lat, center.lng])

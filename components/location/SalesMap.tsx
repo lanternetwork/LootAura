@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Map, { Marker, Popup } from 'react-map-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
+import mapboxgl from 'mapbox-gl'
 import { Sale } from '@/lib/types'
 import { formatLocation } from '@/lib/location/client'
 import { getMapboxToken } from '@/lib/maps/token'
@@ -38,6 +39,8 @@ export default function SalesMap({
   onBoundsChange
 }: SalesMapProps) {
   useEffect(() => {
+    // Disable Mapbox telemetry to prevent events.mapbox.com requests
+    mapboxgl.setTelemetry && mapboxgl.setTelemetry(false);
     incMapLoad()
   }, [])
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)

@@ -43,6 +43,11 @@ interface FiltersModalProps {
     dateRange: string
     categories: string[]
   }) => void
+  arbiter?: {
+    mode: 'initial' | 'map' | 'zip' | 'distance'
+    programmaticMoveGuard: boolean
+    lastChangedAt: number
+  }
 }
 
 interface FilterState {
@@ -66,7 +71,7 @@ const CATEGORY_OPTIONS = [
   { value: 'misc', label: 'Miscellaneous', icon: '📦' }
 ]
 
-export default function FiltersModal({ isOpen, onClose, className = '', filters: externalFilters, onFiltersChange }: FiltersModalProps) {
+export default function FiltersModal({ isOpen, onClose, className = '', filters: externalFilters, onFiltersChange, arbiter }: FiltersModalProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -238,6 +243,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
             onCategoryToggle={handleCategoryToggle}
             onClearFilters={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
+            arbiter={arbiter}
           />
         </div>
       </div>
@@ -264,6 +270,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
             onCategoryToggle={handleCategoryToggle}
             onClearFilters={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
+            arbiter={arbiter}
           />
         </div>
       </div>
@@ -278,6 +285,11 @@ interface FiltersContentProps {
   onCategoryToggle: (category: string) => void
   onClearFilters: () => void
   hasActiveFilters: boolean
+  arbiter?: {
+    mode: 'initial' | 'map' | 'zip' | 'distance'
+    programmaticMoveGuard: boolean
+    lastChangedAt: number
+  }
 }
 
 function FiltersContent({
@@ -286,7 +298,8 @@ function FiltersContent({
   onDateRangeChange,
   onCategoryToggle,
   onClearFilters,
-  hasActiveFilters
+  hasActiveFilters,
+  arbiter
 }: FiltersContentProps) {
   return (
     <div className="space-y-6">
@@ -295,19 +308,29 @@ function FiltersContent({
         <div className="flex items-center mb-3">
           <MapMarkerIcon />
           <span className="text-gray-500 mr-2"></span>
-          <label className="text-sm font-medium text-gray-700">
-            Distance
+          <label className={`text-sm font-medium ${arbiter?.mode === 'map' ? 'text-gray-400' : 'text-gray-700'}`}>
+            {arbiter?.mode === 'map' ? 'Distance (Select)' : 'Distance'}
           </label>
         </div>
         <select
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
+            arbiter?.mode === 'map' 
+              ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' 
+              : 'border-gray-300'
+          }`}
           value={filters.distance}
           onChange={(e) => onDistanceChange(parseInt(e.target.value))}
+          disabled={arbiter?.mode === 'map'}
         >
           {[5, 10, 15, 20, 25, 30, 40, 50, 75, 100].map(miles => (
             <option key={miles} value={miles}>{miles} miles</option>
           ))}
         </select>
+        {arbiter?.mode === 'map' && (
+          <p className="text-xs text-gray-500 mt-1">
+            Search area is the current map view
+          </p>
+        )}
       </div>
 
       {/* Date Range Filter */}

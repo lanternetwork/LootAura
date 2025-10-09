@@ -1075,6 +1075,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   categories: newFilters.categories
                 })
               }}
+              arbiter={arbiter}
             />
             
             {/* Map */}

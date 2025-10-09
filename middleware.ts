@@ -6,38 +6,47 @@ import { cookies } from 'next/headers'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
-  // Debug logging for manifest.json
-  if (pathname === '/manifest.json') {
-    console.log('[MIDDLEWARE] manifest.json request detected');
+  // 1. Bypass all requests with file extensions (e.g., .js, .css, .png, .json, .ico)
+  const hasFileExtension = pathname.match(/\.[a-z0-9]+$/i);
+  if (hasFileExtension) {
+    return NextResponse.next();
   }
   
-  // Immediate bypass for public/static files and auth pages
-  const isAsset = pathname.match(/\.[a-z0-9]+$/i);
-  const isPwa =
+  // 2. Bypass PWA/static assets explicitly
+  const isPwaAsset = 
     pathname === '/manifest.json' ||
     pathname === '/favicon.ico' ||
     pathname === '/apple-touch-icon.png' ||
     pathname.startsWith('/icon') ||
     pathname.startsWith('/images') ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/static') ||
+    pathname.startsWith('/public') ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||
     pathname === '/sw.js';
   
+  if (isPwaAsset) {
+    return NextResponse.next();
+  }
+  
+  // 3. Bypass auth pages to prevent redirect loops
   const isAuthPage = 
     pathname === '/login' ||
     pathname === '/signin' ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/auth/');
   
-  if (isAsset || isPwa || isAuthPage || pathname.startsWith('/_next') || pathname.startsWith('/static') || pathname.startsWith('/public')) {
-    console.log('[MIDDLEWARE] Bypassing auth for:', pathname);
+  if (isAuthPage) {
     return NextResponse.next();
   }
   
-  // Only intercept HTML navigations
+  // 4. Only protect HTML navigations (not API calls, images, etc.)
   const accept = req.headers.get('accept') || '';
   const isHtml = accept.includes('text/html');
-  if (!isHtml) return NextResponse.next();
+  if (!isHtml) {
+    return NextResponse.next();
+  }
   
   const res = NextResponse.next()
   const cookieStore = cookies()

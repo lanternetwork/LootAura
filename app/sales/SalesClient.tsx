@@ -1129,7 +1129,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     // Guard stays true until next user interaction
                     // Trigger fetches once after fit completes with current coordinates
                     debouncedTrigger(() => {
-                      fetchSales(false, { lat: filters.lat, lng: filters.lng })
+                      if (filters.lat && filters.lng) {
+                        fetchSales(false, { lat: filters.lat, lng: filters.lng })
+                      } else {
+                        fetchSales()
+                      }
                       fetchMapSales()
                     })
                   }}

@@ -196,7 +196,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
     if (externalFilters && onFiltersChange) {
       onFiltersChange({
         distance: 25,
-        dateRange: 'any',
+        dateRange: { type: 'any' },
         categories: []
       })
     } else {

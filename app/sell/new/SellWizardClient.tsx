@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
 import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
 import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
-import { createClient } from '@/lib/supabase/client'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 interface WizardStep {
   id: string
@@ -38,7 +38,7 @@ const WIZARD_STEPS: WizardStep[] = [
 
 export default function SellWizardClient({ initialData, isEdit = false, saleId }: { initialData?: Partial<SaleInput>; isEdit?: boolean; saleId?: string }) {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = createSupabaseBrowserClient()
   const [currentStep, setCurrentStep] = useState(0)
   const [user, setUser] = useState<any>(null)
   const [formData, setFormData] = useState<Partial<SaleInput>>({

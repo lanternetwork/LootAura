@@ -5,6 +5,8 @@ import WebVitals from '@/components/WebVitals'
 import { Header } from './Header'
 import { PWAComponents } from './PWAComponents'
 import { createHomepageStructuredData, createOrganizationStructuredData } from '@/lib/metadata'
+// Disable Mapbox telemetry at app startup
+import '@/lib/maps/telemetry'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

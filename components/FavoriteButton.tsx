@@ -1,6 +1,7 @@
 'use client'
-import { useFavorites, useToggleFavorite } from '@/lib/hooks/useAuth'
+import { useFavorites, useToggleFavorite, useAuth } from '@/lib/hooks/useAuth'
 import { AiFillHeart, AiOutlineHeart } from 'react-icons/ai'
+import { useRouter } from 'next/navigation'
 
 export default function FavoriteButton({ 
   saleId, 
@@ -9,12 +10,20 @@ export default function FavoriteButton({
   saleId: string
   initial?: boolean 
 }) {
+  const router = useRouter()
+  const { data: user } = useAuth()
   const { data: favorites = [] } = useFavorites()
   const toggleFavorite = useToggleFavorite()
   
   const isFavorited = favorites.some((fav: any) => fav.id === saleId)
 
   const handleToggle = () => {
+    // If user is not authenticated, redirect to login
+    if (!user) {
+      router.push('/auth/signin?redirectTo=' + encodeURIComponent(window.location.pathname))
+      return
+    }
+    
     toggleFavorite.mutate({ saleId, isFavorited })
   }
 

@@ -25,7 +25,7 @@ export function Header() {
               Favorites
             </Link>
             <Link 
-              href="/auth/signin?redirectTo=/sell/new" 
+              href="/sell/new" 
               className="text-neutral-700 hover:text-amber-600 font-medium"
             >
               Post Your Sale

@@ -146,6 +146,7 @@ export default function SellWizardClient({ initialData, isEdit = false, saleId }
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">List Your Sale</h1>
         <p className="text-gray-600">Create a listing to reach more buyers in your area</p>
+        <p className="text-sm text-gray-500 mt-2">You'll sign in when you submit your listing</p>
       </div>
 
       {/* Progress Steps */}

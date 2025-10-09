@@ -21,7 +21,7 @@ export default function Home() {
                 Browse Sales
               </a>
               <a
-                href="/auth/signin?redirectTo=/sell/new"
+                href="/sell/new"
                 className="inline-flex items-center justify-center rounded-lg border border-amber-500 px-6 py-3 text-amber-700 bg-white font-semibold hover:bg-amber-50 transition"
               >
                 Post Your Sale
@@ -41,7 +41,7 @@ export default function Home() {
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <h2 className="text-xl font-semibold text-gray-900">Post Your Sale</h2>
             <p className="mt-2 text-gray-600">Create a listing with images and attract local buyers. It only takes a minute.</p>
-            <a href="/auth/signin?redirectTo=/sell/new" className="mt-4 inline-block text-amber-700 font-medium hover:underline">Create a listing →</a>
+            <a href="/sell/new" className="mt-4 inline-block text-amber-700 font-medium hover:underline">Create a listing →</a>
           </div>
         </div>
       </section>

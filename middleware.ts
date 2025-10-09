@@ -6,6 +6,11 @@ import { cookies } from 'next/headers'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
+  // Debug logging for manifest.json
+  if (pathname === '/manifest.json') {
+    console.log('[MIDDLEWARE] manifest.json request detected');
+  }
+  
   // Immediate bypass for public/static files and auth pages
   const isAsset = pathname.match(/\.[a-z0-9]+$/i);
   const isPwa =
@@ -25,6 +30,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/api/auth/');
   
   if (isAsset || isPwa || isAuthPage || pathname.startsWith('/_next') || pathname.startsWith('/static') || pathname.startsWith('/public')) {
+    console.log('[MIDDLEWARE] Bypassing auth for:', pathname);
     return NextResponse.next();
   }
   
@@ -99,7 +105,11 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // match everything that doesn't look like a file or auth page
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|apple-touch-icon.png|icon|images|robots.txt|sitemap.xml|sw.js|login|signin|auth/|api/auth/).*)'
+    // Only match specific routes that need authentication
+    '/sell/:path*',
+    '/favorites/:path*', 
+    '/account/:path*',
+    '/admin/:path*',
+    '/sales/:path*'
   ],
 }

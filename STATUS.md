@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 2103869 — [NET] solidify keys; skip duplicates (by Yard Sale Tracker on 2025-10-08 19:58:47 -0400)
+- **Latest commit:** fab9c3a — [MAP] Disable Mapbox telemetry to prevent events.mapbox.com requests (by Yard Sale Tracker on 2025-10-08 20:36:22 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18361223203
+- **CI status:** running, last run: run 18361885463
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-08T23:59:40.109Z
+Updated automatically by Cursor on 2025-10-09T00:37:18.421Z

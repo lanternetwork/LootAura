@@ -419,6 +419,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
+    
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    
     const body = await request.json()
     
     const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags, contact } = body
@@ -439,7 +446,7 @@ export async function POST(request: NextRequest) {
         date_end,
         time_end,
         status: 'published',
-        owner_id: (await supabase.auth.getUser()).data.user?.id
+        owner_id: user.id
       })
       .select()
       .single()
@@ -449,7 +456,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
     }
     
-    return NextResponse.json({ ok: true, data })
+    return NextResponse.json({ ok: true, sale: data })
   } catch (error: any) {
     console.error('Sales POST error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

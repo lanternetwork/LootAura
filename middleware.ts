@@ -6,31 +6,24 @@ import { cookies } from 'next/headers'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
-  // 1. Bypass all requests with file extensions (e.g., .js, .css, .png, .json, .ico)
-  const hasFileExtension = pathname.match(/\.[a-z0-9]+$/i);
-  if (hasFileExtension) {
-    return NextResponse.next();
-  }
-  
-  // 2. Bypass PWA/static assets explicitly
-  const isPwaAsset = 
+  // 1. Bypass all static assets immediately
+  const isStaticAsset = 
+    pathname.startsWith('/_next/') ||
+    pathname.match(/\.[a-z0-9]+$/i) || // files with extensions
     pathname === '/manifest.json' ||
     pathname === '/favicon.ico' ||
-    pathname === '/apple-touch-icon.png' ||
     pathname.startsWith('/icon') ||
-    pathname.startsWith('/images') ||
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/static') ||
-    pathname.startsWith('/public') ||
+    pathname === '/apple-touch-icon.png' ||
     pathname === '/robots.txt' ||
     pathname === '/sitemap.xml' ||
+    pathname.startsWith('/images/') ||
     pathname === '/sw.js';
   
-  if (isPwaAsset) {
+  if (isStaticAsset) {
     return NextResponse.next();
   }
   
-  // 3. Bypass auth pages to prevent redirect loops
+  // 2. Bypass auth pages to prevent redirect loops
   const isAuthPage = 
     pathname === '/login' ||
     pathname === '/signin' ||
@@ -41,10 +34,26 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
   
-  // 4. Only protect HTML navigations (not API calls, images, etc.)
+  // 3. Only protect specific routes and write APIs
+  const isProtectedRoute = 
+    pathname.startsWith('/favorites/') ||
+    pathname.startsWith('/account/') ||
+    pathname.startsWith('/admin/');
+  
+  const isWriteAPI = 
+    req.method === 'POST' && pathname.startsWith('/api/sales') ||
+    req.method === 'PUT' && pathname.startsWith('/api/sales') ||
+    req.method === 'DELETE' && pathname.startsWith('/api/sales');
+  
+  // Only run auth checks for protected routes or write APIs
+  if (!isProtectedRoute && !isWriteAPI) {
+    return NextResponse.next();
+  }
+  
+  // 4. Only check auth for HTML navigations or write APIs
   const accept = req.headers.get('accept') || '';
   const isHtml = accept.includes('text/html');
-  if (!isHtml) {
+  if (!isHtml && !isWriteAPI) {
     return NextResponse.next();
   }
   const res = NextResponse.next()
@@ -114,10 +123,10 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     // Only match specific routes that need authentication
-    '/sell/:path*',
     '/favorites/:path*', 
     '/account/:path*',
     '/admin/:path*',
-    '/sales/:path*'
+    // Match write APIs
+    '/api/sales'
   ],
 }

@@ -13,7 +13,7 @@ export function Header() {
           
           <div className="flex gap-6 items-center">
             <Link 
-              href="/auth/signin?redirectTo=/sales" 
+              href="/sales" 
               className="text-neutral-700 hover:text-amber-600 font-medium"
             >
               Browse Sales

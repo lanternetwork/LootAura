@@ -105,6 +105,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
   const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
+  const lastBoundsTsRef = useRef<number | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
   const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
   // Use refs instead of state to avoid re-renders
@@ -134,6 +135,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   const onBoundsChange = useCallback((b?: { north: number; south: number; east: number; west: number }) => {
     if (!b) return
+    const ts = Date.now()
+    console.log('[VIEWPORT][EMIT] bounds', { west: b.west, south: b.south, east: b.east, north: b.north, ts })
+    lastBoundsTsRef.current = ts
     
     // Use requestAnimationFrame for smooth viewport updates
     requestAnimationFrame(() => {
@@ -640,6 +644,31 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const recomputeVisibleSales = useCallback((all: Sale[], b: typeof viewportBounds) => {
     if (listDebounceRef.current) clearTimeout(listDebounceRef.current)
     listDebounceRef.current = setTimeout(() => {
+      const now = Date.now()
+      const bObj = b ? { west: b.west, south: b.south, east: b.east, north: b.north } : null
+      const s0 = all?.[0] ? { lat: all[0].lat, lng: all[0].lng } : null
+      const s1 = all?.[1] ? { lat: all[1].lat, lng: all[1].lng } : null
+      const pointInBounds = (lat?: number, lng?: number) => {
+        if (!b || lat == null || lng == null) return false
+        const { north, south, east, west } = b
+        const crosses = east < west
+        const EPS = 0.0005
+        const inLat = lat <= north + EPS && lat >= south - EPS
+        const inLng = crosses
+          ? lng >= west - EPS || lng <= east + EPS
+          : lng >= west - EPS && lng <= east + EPS
+        return inLat && inLng
+      }
+      console.log('[CROP][TEMP]', {
+        bounds: bObj,
+        lastBoundsTs: lastBoundsTsRef.current,
+        now,
+        s0,
+        s0In: s0 ? pointInBounds(s0.lat as any, s0.lng as any) : null,
+        s1,
+        s1In: s1 ? pointInBounds(s1.lat as any, s1.lng as any) : null
+      })
+
       const inView = cropSalesToViewport(all, b)
       const rendered = inView.slice(0, 24)
       setVisibleSales(rendered)

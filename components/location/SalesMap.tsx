@@ -69,6 +69,26 @@ export default function SalesMap({
     } catch {}
   }, [center.lat, center.lng])
 
+  // Emit bounds once when map is ready (onLoad)
+  useEffect(() => {
+    try {
+      const map = mapRef.current?.getMap?.()
+      if (!map) return
+      const handleLoad = () => {
+        const b = getBounds()
+        if (b) {
+          console.log('[MAP][EMIT] onLoad bounds', { west: b.west, south: b.south, east: b.east, north: b.north })
+          if (onBoundsChange) onBoundsChange(b)
+        }
+      }
+      if (map.loaded?.()) {
+        handleLoad()
+      } else {
+        map.once?.('load', handleLoad)
+      }
+    } catch {}
+  }, [onBoundsChange])
+
   // Handle centerOverride for ZIP input smooth recentering
   useEffect(() => {
     if (centerOverride) {
@@ -240,6 +260,7 @@ export default function SalesMap({
     // Emit bounds change on move end (debounced)
     if (onBoundsChange) {
       const b = getBounds()
+      if (b) console.log('[MAP][EMIT] onMoveEnd bounds', { west: b.west, south: b.south, east: b.east, north: b.north })
       onBoundsChange(b)
     }
   }
@@ -265,6 +286,7 @@ export default function SalesMap({
     // Emit bounds change on zoom end (debounced)
     if (onBoundsChange) {
       const b = getBounds()
+      if (b) console.log('[MAP][EMIT] onZoomEnd bounds', { west: b.west, south: b.south, east: b.east, north: b.north })
       onBoundsChange(b)
     }
   }

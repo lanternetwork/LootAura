@@ -134,8 +134,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   const onBoundsChange = useCallback((b?: { north: number; south: number; east: number; west: number }) => {
     if (!b) return
-    setViewportBounds(b)
-    console.log('[VIEWPORT] bounds:', b.north, b.south, b.east, b.west)
+    
+    // Use requestAnimationFrame for smooth viewport updates
+    requestAnimationFrame(() => {
+      setViewportBounds(b)
+    })
   }, [])
 
   const cropSalesToViewport = useCallback((all: Sale[], b?: { north: number; south: number; east: number; west: number } | null) => {

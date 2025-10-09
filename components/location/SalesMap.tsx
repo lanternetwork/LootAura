@@ -52,12 +52,11 @@ export default function SalesMap({
   })
   const [moved, setMoved] = useState(false)
   useEffect(() => {
-    console.log('[MAP] init viewState:', viewState, 'center:', center, 'sales:', sales.length)
+    console.log('[MAP] initialized with', sales.length, 'sales')
   }, [])
 
   // Update view state when center changes (animate transitions)
   useEffect(() => {
-    console.log('[MAP] Center changed:', center)
     setViewState(prev => ({ ...prev, latitude: center.lat, longitude: center.lng }))
     // Smoothly ease to the new center without remounting or routing
     try {
@@ -72,7 +71,6 @@ export default function SalesMap({
   // Handle centerOverride for ZIP input smooth recentering
   useEffect(() => {
     if (centerOverride) {
-      console.log('[MAP] CenterOverride:', centerOverride)
       try {
         const map = mapRef.current?.getMap?.()
         if (map) {
@@ -97,7 +95,6 @@ export default function SalesMap({
   // Handle fitBounds for distance changes
   useEffect(() => {
     if (fitBounds) {
-      console.log('[MAP] fitBounds triggered:', fitBounds)
       
       // Generate token and suppress emits
       const token = `${Date.now()}-${Math.random()}`
@@ -142,11 +139,11 @@ export default function SalesMap({
   }, [fitBounds, onFitBoundsComplete, onBoundsChange])
 
   useEffect(() => {
-    console.log('[MAP] sales updated, count:', sales.length, sales.map(s => ({ id: s.id, lat: s.lat, lng: s.lng })))
+    console.log('[MAP] sales updated:', sales.length)
   }, [sales])
 
   useEffect(() => {
-    console.log('[MAP] markers updated, count:', markers.length, markers.map(m => ({ id: m.id, lat: m.lat, lng: m.lng })))
+    console.log('[MAP] markers updated:', markers.length)
   }, [markers])
 
   const handleMarkerClick = (marker: {id: string; title: string; lat: number; lng: number}) => {
@@ -200,18 +197,11 @@ export default function SalesMap({
     setMoved(true)
     
     if (suppressEmitsRef.current) {
-      console.log('[MAP] suppress emits (programmatic fit in flight)')
       return
     }
     
-    if (onViewChange) {
-      const userInteraction = !!(evt && (evt as any).originalEvent)
-      onViewChange({ center: { lat: evt.viewState.latitude, lng: evt.viewState.longitude }, zoom: evt.viewState.zoom, userInteraction })
-    }
-    if (onBoundsChange) {
-      const b = getBounds()
-      onBoundsChange(b)
-    }
+    // Only emit view change on move end, not during continuous movement
+    // This prevents excessive refetches during pan/zoom
   }
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -228,30 +218,50 @@ export default function SalesMap({
     }, 700) // trailing debounce 700ms
   }
 
-  const handleMoveEnd = () => {
+  const handleMoveEnd = (evt: any) => {
     setMoved(true)
     scheduleAutoSearch()
     
     if (suppressEmitsRef.current) {
-      console.log('[MAP] suppress emits (programmatic fit in flight)')
       return
     }
     
+    // Emit view change on move end (debounced)
+    if (onViewChange) {
+      const userInteraction = !!(evt && (evt as any).originalEvent)
+      onViewChange({ 
+        center: { lat: evt.viewState.latitude, lng: evt.viewState.longitude }, 
+        zoom: evt.viewState.zoom, 
+        userInteraction 
+      })
+    }
+    
+    // Emit bounds change on move end (debounced)
     if (onBoundsChange) {
       const b = getBounds()
       onBoundsChange(b)
     }
   }
 
-  const handleZoomEnd = () => {
+  const handleZoomEnd = (evt: any) => {
     setMoved(true)
     scheduleAutoSearch()
     
     if (suppressEmitsRef.current) {
-      console.log('[MAP] suppress emits (programmatic fit in flight)')
       return
     }
     
+    // Emit view change on zoom end (debounced)
+    if (onViewChange) {
+      const userInteraction = !!(evt && (evt as any).originalEvent)
+      onViewChange({ 
+        center: { lat: evt.viewState.latitude, lng: evt.viewState.longitude }, 
+        zoom: evt.viewState.zoom, 
+        userInteraction 
+      })
+    }
+    
+    // Emit bounds change on zoom end (debounced)
     if (onBoundsChange) {
       const b = getBounds()
       onBoundsChange(b)

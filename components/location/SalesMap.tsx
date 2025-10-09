@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Map, { Marker, Popup } from 'react-map-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import mapboxgl from 'mapbox-gl'
@@ -22,6 +22,7 @@ interface SalesMapProps {
   fitBounds?: { north: number; south: number; east: number; west: number } | null
   onFitBoundsComplete?: () => void
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number; ts: number } | undefined) => void
+  onVisiblePinsChange?: (visibleIds: string[], count: number) => void
 }
 
 export default function SalesMap({ 
@@ -36,7 +37,8 @@ export default function SalesMap({
   centerOverride,
   fitBounds,
   onFitBoundsComplete,
-  onBoundsChange
+  onBoundsChange,
+  onVisiblePinsChange
 }: SalesMapProps) {
   useEffect(() => {
     incMapLoad()
@@ -51,9 +53,50 @@ export default function SalesMap({
     zoom: zoom
   })
   const [moved, setMoved] = useState(false)
+  const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
+  const [visiblePinCount, setVisiblePinCount] = useState(0)
+  
   useEffect(() => {
     console.log('[MAP] initialized with', sales.length, 'sales')
   }, [])
+
+  // Recompute visible pins when markers change
+  useEffect(() => {
+    console.log('[MARKERS] set:', markers.length)
+    // Wait for map to be idle before recomputing
+    const map = mapRef.current?.getMap?.()
+    if (map) {
+      const handleIdle = () => {
+        recomputeVisiblePins('markers-updated')
+        
+        // Auto-fit if no pins are visible but markers exist
+        if (markers.length > 0 && visiblePinCount === 0) {
+          console.log('[AUTO-FIT] No visible pins but markers exist, fitting to bounds')
+          const bounds = markers.reduce((acc, marker) => {
+            const lat = +marker.lat
+            const lng = +marker.lng
+            if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+              acc.north = Math.max(acc.north, lat)
+              acc.south = Math.min(acc.south, lat)
+              acc.east = Math.max(acc.east, lng)
+              acc.west = Math.min(acc.west, lng)
+            }
+            return acc
+          }, { north: -90, south: 90, east: -180, west: 180 })
+          
+          if (bounds.north > bounds.south && bounds.east > bounds.west) {
+            map.fitBounds([
+              [bounds.west, bounds.south],
+              [bounds.east, bounds.north]
+            ], { padding: 50, maxZoom: 15 })
+          }
+        }
+        
+        map.off('idle', handleIdle)
+      }
+      map.on('idle', handleIdle)
+    }
+  }, [markers, recomputeVisiblePins, visiblePinCount])
 
   // Update view state when center changes (animate transitions)
   useEffect(() => {
@@ -263,6 +306,9 @@ export default function SalesMap({
       if (b) console.log('[MAP][EMIT] onMoveEnd bounds', { west: b.west, south: b.south, east: b.east, north: b.north })
       onBoundsChange(b)
     }
+    
+    // Recompute visible pins after move ends
+    recomputeVisiblePins('move-end')
   }
 
   const handleZoomEnd = (evt: any) => {
@@ -289,6 +335,9 @@ export default function SalesMap({
       if (b) console.log('[MAP][EMIT] onZoomEnd bounds', { west: b.west, south: b.south, east: b.east, north: b.north })
       onBoundsChange(b)
     }
+    
+    // Recompute visible pins after zoom ends
+    recomputeVisiblePins('zoom-end')
   }
 
   const getBounds = () => {
@@ -303,26 +352,45 @@ export default function SalesMap({
     }
   }
 
-  const queryVisiblePins = () => {
+  const recomputeVisiblePins = useCallback((reason: string) => {
     try {
       const map = mapRef.current?.getMap?.()
-      if (!map) return 0
+      if (!map) return
       
       // Query all rendered features in the viewport
       const features = map.queryRenderedFeatures()
       
-      // Filter for marker features (assuming they have a specific source or layer)
-      // This is a simplified approach - in a real implementation you'd want to be more specific
+      // Filter for unclustered marker features only
       const markerFeatures = features.filter((feature: any) => 
         feature.source === 'markers' || 
         feature.layer?.id?.includes('marker') ||
         feature.properties?.id // Assuming markers have an id property
       )
       
-      return markerFeatures.length
-    } catch {
-      return 0
+      // Extract IDs from visible markers
+      const visibleIds = markerFeatures
+        .map((feature: any) => feature.properties?.id)
+        .filter((id: any) => id) // Remove undefined/null IDs
+        .filter((id: string, index: number, arr: string[]) => arr.indexOf(id) === index) // Deduplicate
+      
+      setVisiblePinIds(visibleIds)
+      setVisiblePinCount(visibleIds.length)
+      
+      // Notify parent component of visible pins change
+      if (onVisiblePinsChange) {
+        onVisiblePinsChange(visibleIds, visibleIds.length)
+      }
+      
+      console.log('[VISIBLE] count:', visibleIds.length, 'reason:', reason)
+    } catch (error) {
+      console.error('[VISIBLE] error:', error)
+      setVisiblePinIds([])
+      setVisiblePinCount(0)
     }
+  }, [])
+
+  const queryVisiblePins = () => {
+    return visiblePinCount
   }
 
   const handleSearchArea = () => {
@@ -345,7 +413,7 @@ export default function SalesMap({
     <div className="h-96 w-full rounded-lg overflow-hidden relative">
       {/* Visible pins count based on queryRenderedFeatures */}
       <div className="absolute top-2 left-2 z-10 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
-        {queryVisiblePins()} pins
+        {visiblePinCount} pins
       </div>
       <Map
         mapboxAccessToken={token}

@@ -1200,6 +1200,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     })
                   }}
                   onBoundsChange={onBoundsChange}
+                  onVisiblePinsChange={(visibleIds, count) => {
+                    console.log('[LIST] visible:', count)
+                    // Filter sales to only show those with visible IDs
+                    const visibleSales = sales.filter(sale => visibleIds.includes(sale.id))
+                    setRenderedSales(visibleSales)
+                  }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly
                     if (arbiter.mode === 'map' && !arbiter.programmaticMoveGuard) {

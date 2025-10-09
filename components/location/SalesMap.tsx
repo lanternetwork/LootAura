@@ -313,7 +313,7 @@ export default function SalesMap({
       
       // Filter for marker features (assuming they have a specific source or layer)
       // This is a simplified approach - in a real implementation you'd want to be more specific
-      const markerFeatures = features.filter(feature => 
+      const markerFeatures = features.filter((feature: any) => 
         feature.source === 'markers' || 
         feature.layer?.id?.includes('marker') ||
         feature.properties?.id // Assuming markers have an id property

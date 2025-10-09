@@ -1066,7 +1066,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               onClose={() => {}} 
               filters={{
                 distance: filters.distance,
-                dateRange: filters.dateRange,
+                dateRange: { type: filters.dateRange as any },
                 categories: filters.categories
               }}
               onFiltersChange={(newFilters) => {
@@ -1075,7 +1075,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                 }
                 updateFilters({
                   distance: newFilters.distance,
-                  dateRange: newFilters.dateRange as 'today' | 'weekend' | 'any',
+                  dateRange: newFilters.dateRange.type as any,
                   categories: newFilters.categories
                 })
               }}

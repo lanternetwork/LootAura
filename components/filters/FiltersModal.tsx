@@ -35,12 +35,12 @@ interface FiltersModalProps {
   className?: string
   filters?: {
     distance: number
-    dateRange: string
+    dateRange: DateRange
     categories: string[]
   }
   onFiltersChange?: (filters: {
     distance: number
-    dateRange: string
+    dateRange: DateRange
     categories: string[]
   }) => void
   arbiter?: {
@@ -172,7 +172,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
   const handleDateRangeChange = (dateRange: DateRange) => {
     console.log('[FiltersModal] Date change:', dateRange)
     if (externalFilters && onFiltersChange) {
-      onFiltersChange({ ...externalFilters, dateRange: dateRange.type })
+      onFiltersChange({ ...externalFilters, dateRange: dateRange })
     } else {
       updateFilters({ dateRange })
     }

@@ -86,7 +86,7 @@ export default function YardSaleMap({ points }: { points: Marker[] }) {
           <div class="p-2">
             <h3 class="font-semibold text-lg">${point.title}</h3>
             <a 
-              href="/sale/${point.id}" 
+              href="/sales/${point.id}" 
               class="text-amber-600 hover:text-amber-700 font-medium"
             >
               View Details →

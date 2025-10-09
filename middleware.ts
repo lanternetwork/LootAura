@@ -62,7 +62,6 @@ export async function middleware(req: NextRequest) {
   }
   
   // 5. Only check auth for HTML navigations or write APIs
-  const accept = req.headers.get('accept') || '';
   const isHtml = accept.includes('text/html');
   if (!isHtml && !isWriteAPI) {
     return NextResponse.next();

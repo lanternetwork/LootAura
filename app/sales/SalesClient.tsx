@@ -861,9 +861,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     console.log('[ZIP] computed bbox for dist=${filters.distance} -> n=${bbox.north},s=${bbox.south},e=${bbox.east},w=${bbox.west}')
     console.log('[MAP] fitBounds(zip) north=${bbox.north}, south=${bbox.south}, east=${bbox.east}, west=${bbox.west}')
     
-    // Trigger debounced fetches
+    // Trigger debounced fetches with the new coordinates
     debouncedTrigger(() => {
-      fetchSales()
+      fetchSales(false, { lat, lng })
       fetchMapSales()
     })
     
@@ -1127,9 +1127,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     
                     console.log(`[CONTROL] fit completion for ${reason}`)
                     // Guard stays true until next user interaction
-                    // Trigger fetches once after fit completes
+                    // Trigger fetches once after fit completes with current coordinates
                     debouncedTrigger(() => {
-                      fetchSales()
+                      fetchSales(false, { lat: filters.lat, lng: filters.lng })
                       fetchMapSales()
                     })
                   }}

@@ -2,12 +2,13 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/hooks/useAuth'
+import { useAuth, useProfile } from '@/lib/hooks/useAuth'
 import AccountClient from './AccountClient'
 
 export default function AccountPage() {
   const router = useRouter()
   const { data: user, isLoading: authLoading } = useAuth()
+  const { data: profile, isLoading: profileLoading } = useProfile()
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -15,7 +16,7 @@ export default function AccountPage() {
     }
   }, [authLoading, user, router])
 
-  if (authLoading) {
+  if (authLoading || profileLoading) {
     return (
       <main className="max-w-6xl mx-auto p-4">
         <div className="text-center py-16">
@@ -41,7 +42,7 @@ export default function AccountPage() {
   return (
     <main className="max-w-6xl mx-auto p-4">
       <h1 className="text-2xl font-semibold mb-4">Your Account</h1>
-      <AccountClient />
+      <AccountClient user={user} profile={profile} />
     </main>
   )
 }

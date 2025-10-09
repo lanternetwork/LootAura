@@ -4,10 +4,28 @@ import type { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 
 export async function middleware(req: NextRequest) {
-  // Skip auth for PWA files and static assets
-  if (req.nextUrl.pathname.match(/^\/(manifest\.json|icon(\.png)?|apple-touch-icon\.png|favicon\.ico|images\/|sw\.js)/)) {
-    return NextResponse.next()
+  const { pathname } = req.nextUrl;
+  
+  // Immediate bypass for public/static files
+  const isAsset = pathname.match(/\.[a-z0-9]+$/i);
+  const isPwa =
+    pathname === '/manifest.json' ||
+    pathname === '/favicon.ico' ||
+    pathname === '/apple-touch-icon.png' ||
+    pathname.startsWith('/icon') ||
+    pathname.startsWith('/images') ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml' ||
+    pathname === '/sw.js';
+  
+  if (isAsset || isPwa || pathname.startsWith('/_next') || pathname.startsWith('/static') || pathname.startsWith('/public')) {
+    return NextResponse.next();
   }
+  
+  // Only intercept HTML navigations
+  const accept = req.headers.get('accept') || '';
+  const isHtml = accept.includes('text/html');
+  if (!isHtml) return NextResponse.next();
   
   const res = NextResponse.next()
   const cookieStore = cookies()
@@ -75,13 +93,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Only match specific routes that need authentication
-     * This ensures PWA files and static assets are never processed by middleware
-     */
-    '/sell/:path*',
-    '/favorites/:path*', 
-    '/account/:path*',
-    '/admin/:path*'
+    // match everything that doesn't look like a file
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|apple-touch-icon.png|icon|images|robots.txt|sitemap.xml|sw.js).*)'
   ],
 }

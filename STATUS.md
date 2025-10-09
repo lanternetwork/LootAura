@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** d23edd0 — [MIDDLEWARE] Use explicit matcher instead of regex to fix manifest.json 401; add debugging (by Yard Sale Tracker on 2025-10-08 21:07:03 -0400)
+- **Latest commit:** 7de7ba2 — [PWA][Auth] Bypass public assets; protect only HTML navigations (by Yard Sale Tracker on 2025-10-08 21:08:21 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18362367052
+- **CI status:** running, last run: run 18362401896
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-09T01:07:59.172Z
+Updated automatically by Cursor on 2025-10-09T01:10:00.388Z

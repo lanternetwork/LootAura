@@ -87,7 +87,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
           </li>
           <li>/</li>
           <li>
-            <Link href="/sales" className="hover:text-gray-700">
+            <Link href="/auth/signin?redirectTo=/sales" className="hover:text-gray-700">
               Sales
             </Link>
           </li>

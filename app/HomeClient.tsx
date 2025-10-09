@@ -111,7 +111,7 @@ export default function HomeClient({ initialSales, user }: HomeClientProps) {
             Nearby Sales ({sales.length})
           </h2>
           <Link
-            href="/sales"
+            href="/auth/signin?redirectTo=/sales"
             className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors min-h-[44px]"
           >
             View All Sales

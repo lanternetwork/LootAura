@@ -47,7 +47,7 @@ export default function Favorites() {
                 Start browsing sales and save the ones you're interested in.
               </p>
               <a 
-                href="/explore" 
+                href="/auth/signin?redirectTo=/sales" 
                 className="inline-block text-amber-600 hover:text-amber-700 font-medium"
               >
                 Browse Sales →

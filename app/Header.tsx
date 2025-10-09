@@ -13,7 +13,7 @@ export function Header() {
           
           <div className="flex gap-6 items-center">
             <Link 
-              href="/sales" 
+              href="/auth/signin?redirectTo=/sales" 
               className="text-neutral-700 hover:text-amber-600 font-medium"
             >
               Browse Sales
@@ -25,7 +25,7 @@ export function Header() {
               Favorites
             </Link>
             <Link 
-              href="/sell/new" 
+              href="/auth/signin?redirectTo=/sell/new" 
               className="text-neutral-700 hover:text-amber-600 font-medium"
             >
               Post Your Sale

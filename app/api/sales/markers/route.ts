@@ -13,10 +13,10 @@ export async function GET(request: NextRequest) {
     const latParam = q.get('lat')
     const lngParam = q.get('lng')
     const distanceParam = q.get('distanceKm')
-    const startDate = q.get('startDate') || undefined
-    const endDate = q.get('endDate') || undefined
+    const startDate = q.get('dateFrom') || q.get('startDate') || undefined
+    const endDate = q.get('dateTo') || q.get('endDate') || undefined
     const limitParam = q.get('limit')
-    const catsParam = q.get('categories') || ''
+    const catsParam = q.get('categories') || q.get('tags') || ''
 
     // Validate lat/lng
     const originLat = latParam !== null ? parseFloat(latParam) : NaN

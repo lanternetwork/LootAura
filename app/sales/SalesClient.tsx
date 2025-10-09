@@ -305,9 +305,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       distanceKm: (distanceKmForRequest ?? milesToKm(filters.distance)),
       city: filters.city,
       categories: filters.categories.length > 0 ? filters.categories : undefined,
-      // API expects startDate/endDate keys
-      ...(dateFrom ? { startDate: dateFrom } as any : {}),
-      ...(dateTo ? { endDate: dateTo } as any : {}),
+      // Use standardized dateFrom/dateTo parameters
+      ...(dateFrom ? { dateFrom: dateFrom } as any : {}),
+      ...(dateTo ? { dateTo: dateTo } as any : {}),
       limit: 24,
       offset: append ? sales.length : 0,
     }
@@ -495,7 +495,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       // distanceKm depends on control mode
       const distanceKm = String(distanceKmForRequest ?? milesToKm(filters.distance))
       params.set('distanceKm', distanceKm)
-      if (filters.categories.length > 0) params.set('tags', filters.categories.join(','))
+      if (filters.categories.length > 0) params.set('categories', filters.categories.join(','))
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
       params.set('limit', '1000')

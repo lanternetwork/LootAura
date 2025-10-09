@@ -1079,7 +1079,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             
             {/* Map */}
             <div className="bg-white rounded-lg shadow-sm border p-4">
-              <h2 className="text-xl font-semibold mb-4">Map View</h2>
+              <h2 className="text-xl font-semibold mb-4">
+                Map View
+                {visibleSales.length > 0 && (
+                  <span className="ml-2 text-sm font-normal text-gray-600">
+                    ({visibleSales.length} in view)
+                  </span>
+                )}
+              </h2>
               <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'} relative`}>
                 {/* Error toast */}
                 {mapError && (
@@ -1158,12 +1165,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     } catch {}
                   }}
                 />
-              </div>
-              {/* Debug info */}
-              <div className="mt-2 text-xs text-gray-500">
-                Center: {filters.lat ? filters.lat.toFixed(4) : 'none'}, {filters.lng ? filters.lng.toFixed(4) : 'none'} | Pins: {mapMarkers.length}
-                <br />
-                Initial Center: {initialCenter?.lat?.toFixed(4) || 'none'}, {initialCenter?.lng?.toFixed(4) || 'none'}
               </div>
               
               {/* Location Info & one-time soft banner */}

@@ -6,7 +6,7 @@ import { cookies } from 'next/headers'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
-  // Immediate bypass for public/static files
+  // Immediate bypass for public/static files and auth pages
   const isAsset = pathname.match(/\.[a-z0-9]+$/i);
   const isPwa =
     pathname === '/manifest.json' ||
@@ -18,7 +18,13 @@ export async function middleware(req: NextRequest) {
     pathname === '/sitemap.xml' ||
     pathname === '/sw.js';
   
-  if (isAsset || isPwa || pathname.startsWith('/_next') || pathname.startsWith('/static') || pathname.startsWith('/public')) {
+  const isAuthPage = 
+    pathname === '/login' ||
+    pathname === '/signin' ||
+    pathname.startsWith('/auth/') ||
+    pathname.startsWith('/api/auth/');
+  
+  if (isAsset || isPwa || isAuthPage || pathname.startsWith('/_next') || pathname.startsWith('/static') || pathname.startsWith('/public')) {
     return NextResponse.next();
   }
   
@@ -93,7 +99,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // match everything that doesn't look like a file
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|apple-touch-icon.png|icon|images|robots.txt|sitemap.xml|sw.js).*)'
+    // match everything that doesn't look like a file or auth page
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|apple-touch-icon.png|icon|images|robots.txt|sitemap.xml|sw.js|login|signin|auth/|api/auth/).*)'
   ],
 }

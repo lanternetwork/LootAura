@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
 import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
 import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
+import { createClient } from '@/lib/supabase/client'
 
 interface WizardStep {
   id: string
@@ -37,7 +38,9 @@ const WIZARD_STEPS: WizardStep[] = [
 
 export default function SellWizardClient({ initialData, isEdit = false, saleId }: { initialData?: Partial<SaleInput>; isEdit?: boolean; saleId?: string }) {
   const router = useRouter()
+  const supabase = createClient()
   const [currentStep, setCurrentStep] = useState(0)
+  const [user, setUser] = useState<any>(null)
   const [formData, setFormData] = useState<Partial<SaleInput>>({
     title: initialData?.title || '',
     description: initialData?.description || '',
@@ -57,6 +60,44 @@ export default function SellWizardClient({ initialData, isEdit = false, saleId }
   const [items, setItems] = useState<Array<{ name: string; price?: number; description?: string; image_url?: string }>>([])
   const [loading, setLoading] = useState(false)
 
+  // Check authentication status
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    checkUser()
+  }, [supabase.auth])
+
+  // Save draft to localStorage whenever form data changes
+  useEffect(() => {
+    const draftData = {
+      formData,
+      photos,
+      items,
+      currentStep
+    }
+    localStorage.setItem('sale_draft', JSON.stringify(draftData))
+  }, [formData, photos, items, currentStep])
+
+  // Load draft from localStorage on mount
+  useEffect(() => {
+    if (!initialData) {
+      const savedDraft = localStorage.getItem('sale_draft')
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft)
+          setFormData(draft.formData || {})
+          setPhotos(draft.photos || [])
+          setItems(draft.items || [])
+          setCurrentStep(draft.currentStep || 0)
+        } catch (error) {
+          console.error('Error loading draft:', error)
+        }
+      }
+    }
+  }, [initialData])
+
   const handleInputChange = (field: keyof SaleInput, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
@@ -74,6 +115,23 @@ export default function SellWizardClient({ initialData, isEdit = false, saleId }
   }
 
   const handleSubmit = async () => {
+    // Check if user is authenticated
+    if (!user) {
+      // Save current draft and redirect to auth
+      const draftData = {
+        formData,
+        photos,
+        items,
+        currentStep
+      }
+      localStorage.setItem('sale_draft', JSON.stringify(draftData))
+      
+      // Redirect to auth with return URL
+      const returnUrl = encodeURIComponent(window.location.pathname)
+      router.push(`/auth/signin?redirectTo=${returnUrl}`)
+      return
+    }
+
     setLoading(true)
     try {
       // Prepare sale data with cover image
@@ -92,6 +150,8 @@ export default function SellWizardClient({ initialData, isEdit = false, saleId }
 
       if (response.ok) {
         const { sale } = await response.json()
+        // Clear draft after successful submission
+        localStorage.removeItem('sale_draft')
         router.push(`/sales/${sale.id}`)
       } else {
         console.error('Failed to create sale')
@@ -146,7 +206,7 @@ export default function SellWizardClient({ initialData, isEdit = false, saleId }
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">List Your Sale</h1>
         <p className="text-gray-600">Create a listing to reach more buyers in your area</p>
-        <p className="text-sm text-gray-500 mt-2">You'll sign in when you submit your listing</p>
+        <p className="text-sm text-gray-500 mt-2">You can fill this out without an account. We'll ask you to sign in when you submit.</p>
       </div>
 
       {/* Progress Steps */}

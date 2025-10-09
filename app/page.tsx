@@ -15,13 +15,13 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
               <a
-                href="/sales"
+                href="/auth/signin?redirectTo=/sales"
                 className="inline-flex items-center justify-center rounded-lg bg-amber-500 px-6 py-3 text-white font-semibold hover:bg-amber-600 transition"
               >
                 Browse Sales
               </a>
               <a
-                href="/sell/new"
+                href="/auth/signin?redirectTo=/sell/new"
                 className="inline-flex items-center justify-center rounded-lg border border-amber-500 px-6 py-3 text-amber-700 bg-white font-semibold hover:bg-amber-50 transition"
               >
                 Post Your Sale
@@ -36,12 +36,12 @@ export default function Home() {
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <h2 className="text-xl font-semibold text-gray-900">Find Sales Near You</h2>
             <p className="mt-2 text-gray-600">Explore listings with photos, details, and maps. Filter by distance and category.</p>
-            <a href="/sales" className="mt-4 inline-block text-amber-700 font-medium hover:underline">Start browsing →</a>
+            <a href="/auth/signin?redirectTo=/sales" className="mt-4 inline-block text-amber-700 font-medium hover:underline">Start browsing →</a>
           </div>
           <div className="bg-white rounded-xl shadow-sm border p-6">
             <h2 className="text-xl font-semibold text-gray-900">Post Your Sale</h2>
             <p className="mt-2 text-gray-600">Create a listing with images and attract local buyers. It only takes a minute.</p>
-            <a href="/sell/new" className="mt-4 inline-block text-amber-700 font-medium hover:underline">Create a listing →</a>
+            <a href="/auth/signin?redirectTo=/sell/new" className="mt-4 inline-block text-amber-700 font-medium hover:underline">Create a listing →</a>
           </div>
         </div>
       </section>

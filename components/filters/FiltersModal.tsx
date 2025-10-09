@@ -84,7 +84,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
   
   const filters = externalFilters ? {
     distance: externalFilters.distance,
-    dateRange: { type: (externalFilters.dateRange as DateRange['type']) === 'range' ? 'any' : (externalFilters.dateRange as DateRange['type']), startDate: '', endDate: '' },
+    dateRange: externalFilters.dateRange,
     categories: externalFilters.categories
   } : internalFilters
 

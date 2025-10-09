@@ -22,8 +22,6 @@ interface SalesMapProps {
   fitBounds?: { north: number; south: number; east: number; west: number } | null
   onFitBoundsComplete?: () => void
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number; ts: number } | undefined) => void
-  visiblePinsCount?: number
-  totalPinsCount?: number
 }
 
 export default function SalesMap({ 
@@ -38,9 +36,7 @@ export default function SalesMap({
   centerOverride,
   fitBounds,
   onFitBoundsComplete,
-  onBoundsChange,
-  visiblePinsCount = 0,
-  totalPinsCount = 0
+  onBoundsChange
 }: SalesMapProps) {
   useEffect(() => {
     incMapLoad()
@@ -307,6 +303,28 @@ export default function SalesMap({
     }
   }
 
+  const queryVisiblePins = () => {
+    try {
+      const map = mapRef.current?.getMap?.()
+      if (!map) return 0
+      
+      // Query all rendered features in the viewport
+      const features = map.queryRenderedFeatures()
+      
+      // Filter for marker features (assuming they have a specific source or layer)
+      // This is a simplified approach - in a real implementation you'd want to be more specific
+      const markerFeatures = features.filter(feature => 
+        feature.source === 'markers' || 
+        feature.layer?.id?.includes('marker') ||
+        feature.properties?.id // Assuming markers have an id property
+      )
+      
+      return markerFeatures.length
+    } catch {
+      return 0
+    }
+  }
+
   const handleSearchArea = () => {
     const map = mapRef.current?.getMap?.()
     let centerNow = { lat: viewState.latitude, lng: viewState.longitude }
@@ -325,9 +343,9 @@ export default function SalesMap({
 
   return (
     <div className="h-96 w-full rounded-lg overflow-hidden relative">
-      {/* Visible pins count based on viewport bounds */}
+      {/* Visible pins count based on queryRenderedFeatures */}
       <div className="absolute top-2 left-2 z-10 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
-        {visiblePinsCount} pins{totalPinsCount > visiblePinsCount ? ` (of ${totalPinsCount})` : ''}
+        {queryVisiblePins()} pins
       </div>
       <Map
         mapboxAccessToken={token}

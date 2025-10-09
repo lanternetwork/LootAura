@@ -108,6 +108,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const lastBoundsTsRef = useRef<number | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
   const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
+  const [isUpdating, setIsUpdating] = useState<boolean>(false)
+  const [staleSales, setStaleSales] = useState<Sale[]>(initialSales) // Keep previous data during fetch
+  const [renderedSales, setRenderedSales] = useState<Sale[]>(initialSales) // Sales visible on map
   // Use refs instead of state to avoid re-renders
   const salesAbortRef = useRef<AbortController | null>(null)
   const markersAbortRef = useRef<AbortController | null>(null)
@@ -142,6 +145,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     requestAnimationFrame(() => {
       setViewportBounds(b)
     })
+  }, [])
+
+  const getVisibleSalesFromRenderedFeatures = useCallback((all: Sale[]) => {
+    // This function will be called from the map component with queryRenderedFeatures results
+    // For now, return all sales - this will be updated when we implement the map integration
+    return all
   }, [])
 
   const cropSalesToViewport = useCallback((all: Sale[], b?: { north: number; south: number; east: number; west: number; ts: number } | null) => {
@@ -280,6 +289,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       setLoadingMore(true)
     } else {
       setLoading(true)
+      setIsUpdating(true)
+      // Keep stale data during fetch
+      setStaleSales(sales)
     }
     console.log(`[SALES] fetchSales called with location: ${useLat}, ${useLng}, append: ${append}`)
     
@@ -373,6 +385,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
           setSales(prev => [...prev, ...newSales])
         } else {
           setSales(newSales)
+          setIsUpdating(false)
         }
         setDateWindow(data.dateWindow || null)
         setDegraded(data.degraded || false)
@@ -420,6 +433,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         if (!append) {
           // Don't clear sales immediately to prevent flickering
           // setSales([])
+          setIsUpdating(false)
           setDateWindow(null)
           setDegraded(false)
         }
@@ -434,6 +448,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.error('Error fetching sales:', error)
       // Don't clear sales immediately to prevent flickering
       // setSales([])
+      setIsUpdating(false)
       setFetchedOnce(true)
     } finally {
       // Clear controller if this is still the active one
@@ -1077,8 +1092,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                       {visibleSales.length > 24 && (
                         <div className="text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
                       )}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="sales-grid">
-                        {(loading ? Array.from({ length: 6 }) : visibleSales).map((item: any, idx: number) => (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200" data-testid="sales-grid">
+                        {(loading ? Array.from({ length: 6 }) : (isUpdating ? staleSales : renderedSales)).map((item: any, idx: number) => (
                           loading ? (
                             <div key={idx} className="animate-pulse bg-white rounded-lg border p-4">
                               <div className="h-40 bg-gray-200 rounded mb-4" />
@@ -1132,9 +1147,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             <div className="bg-white rounded-lg shadow-sm border p-4">
               <h2 className="text-xl font-semibold mb-4">
                 Map View
-                {visibleSales.length > 0 && (
+                {renderedSales.length > 0 && (
                   <span className="ml-2 text-sm font-normal text-gray-600">
-                    ({visibleSales.length} in view)
+                    ({renderedSales.length} in view)
+                  </span>
+                )}
+                {isUpdating && (
+                  <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                    Updating...
                   </span>
                 )}
               </h2>
@@ -1154,8 +1174,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   zoom={filters.lat && filters.lng ? 12 : 10}
                   centerOverride={mapCenterOverride}
                   fitBounds={fitBounds}
-                  visiblePinsCount={visibleSales.length}
-                  totalPinsCount={mapMarkers.length}
                   onFitBoundsComplete={() => {
                     console.log('[CONTROL] onFitBoundsComplete (guard stays true)')
                     setFitBounds(null)

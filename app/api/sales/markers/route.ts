@@ -15,6 +15,8 @@ export async function GET(request: NextRequest) {
     const distanceParam = q.get('distanceKm')
     const startDate = q.get('dateFrom') || q.get('startDate') || undefined
     const endDate = q.get('dateTo') || q.get('endDate') || undefined
+    
+    console.log('[MARKERS API] Date params received: dateFrom=%s, dateTo=%s', startDate, endDate)
     const limitParam = q.get('limit')
     const catsParam = q.get('categories') || q.get('tags') || ''
 

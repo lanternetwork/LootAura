@@ -298,6 +298,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       dateTo = toISO(sun)
     }
 
+    console.log('[DATE] from=%s to=%s', dateFrom, dateTo)
+    
     const params: GetSalesParams = {
       lat: useLat,
       lng: useLng,
@@ -499,6 +501,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
       params.set('limit', '1000')
+      
+      console.log('[DATE] markers from=%s to=%s', dateFrom, dateTo)
 
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`, { mode })
       console.debug('[MARKERS] fetch', `/api/sales/markers?${params.toString()}`)

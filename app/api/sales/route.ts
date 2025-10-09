@@ -45,6 +45,8 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('dateFrom') || searchParams.get('startDate') || undefined
     const endDate = searchParams.get('dateTo') || searchParams.get('endDate') || undefined
     
+    console.log('[SALES API] Date params received: dateFrom=%s, dateTo=%s', startDate, endDate)
+    
     const categoriesParam = searchParams.get('categories')
     const categories = categoriesParam 
       ? categoriesParam.split(',').map(c => c.trim()).filter(c => c.length > 0).slice(0, 10)

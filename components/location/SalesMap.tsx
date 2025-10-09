@@ -40,7 +40,14 @@ export default function SalesMap({
 }: SalesMapProps) {
   useEffect(() => {
     // Disable Mapbox telemetry to prevent events.mapbox.com requests
-    mapboxgl.setTelemetry && mapboxgl.setTelemetry(false);
+    if (typeof window !== 'undefined') {
+      // Disable telemetry by setting the environment variable before mapbox loads
+      (window as any).__MAPBOX_TELEMETRY__ = false;
+      // Also try the newer method if available
+      if (mapboxgl && typeof (mapboxgl as any).setTelemetry === 'function') {
+        (mapboxgl as any).setTelemetry(false);
+      }
+    }
     incMapLoad()
   }, [])
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)

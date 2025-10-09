@@ -308,19 +308,14 @@ function FiltersContent({
         <div className="flex items-center mb-3">
           <MapMarkerIcon />
           <span className="text-gray-500 mr-2"></span>
-          <label className={`text-sm font-medium ${arbiter?.mode === 'map' ? 'text-gray-400' : 'text-gray-700'}`}>
+          <label className={`text-sm font-medium ${arbiter?.mode === 'map' ? 'text-gray-600' : 'text-gray-700'}`}>
             {arbiter?.mode === 'map' ? 'Distance (Select)' : 'Distance'}
           </label>
         </div>
         <select
-          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent ${
-            arbiter?.mode === 'map' 
-              ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' 
-              : 'border-gray-300'
-          }`}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
           value={filters.distance}
           onChange={(e) => onDistanceChange(parseInt(e.target.value))}
-          disabled={arbiter?.mode === 'map'}
         >
           {[5, 10, 15, 20, 25, 30, 40, 50, 75, 100].map(miles => (
             <option key={miles} value={miles}>{miles} miles</option>
@@ -328,7 +323,7 @@ function FiltersContent({
         </select>
         {arbiter?.mode === 'map' && (
           <p className="text-xs text-gray-500 mt-1">
-            Search area is the current map view
+            Currently using map view
           </p>
         )}
       </div>

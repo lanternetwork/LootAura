@@ -60,6 +60,43 @@ export default function SalesMap({
     console.log('[MAP] initialized with', sales.length, 'sales')
   }, [])
 
+  const recomputeVisiblePins = useCallback((reason: string) => {
+    try {
+      const map = mapRef.current?.getMap?.()
+      if (!map) return
+      
+      // Query all rendered features in the viewport
+      const features = map.queryRenderedFeatures()
+      
+      // Filter for unclustered marker features only
+      const markerFeatures = features.filter((feature: any) => 
+        feature.source === 'markers' || 
+        feature.layer?.id?.includes('marker') ||
+        feature.properties?.id // Assuming markers have an id property
+      )
+      
+      // Extract IDs from visible markers
+      const visibleIds = markerFeatures
+        .map((feature: any) => feature.properties?.id)
+        .filter((id: any) => id) // Remove undefined/null IDs
+        .filter((id: string, index: number, arr: string[]) => arr.indexOf(id) === index) // Deduplicate
+      
+      setVisiblePinIds(visibleIds)
+      setVisiblePinCount(visibleIds.length)
+      
+      // Notify parent component of visible pins change
+      if (onVisiblePinsChange) {
+        onVisiblePinsChange(visibleIds, visibleIds.length)
+      }
+      
+      console.log('[VISIBLE] count:', visibleIds.length, 'reason:', reason)
+    } catch (error) {
+      console.error('[VISIBLE] error:', error)
+      setVisiblePinIds([])
+      setVisiblePinCount(0)
+    }
+  }, [onVisiblePinsChange])
+
   // Recompute visible pins when markers change
   useEffect(() => {
     console.log('[MARKERS] set:', markers.length)
@@ -352,42 +389,6 @@ export default function SalesMap({
     }
   }
 
-  const recomputeVisiblePins = useCallback((reason: string) => {
-    try {
-      const map = mapRef.current?.getMap?.()
-      if (!map) return
-      
-      // Query all rendered features in the viewport
-      const features = map.queryRenderedFeatures()
-      
-      // Filter for unclustered marker features only
-      const markerFeatures = features.filter((feature: any) => 
-        feature.source === 'markers' || 
-        feature.layer?.id?.includes('marker') ||
-        feature.properties?.id // Assuming markers have an id property
-      )
-      
-      // Extract IDs from visible markers
-      const visibleIds = markerFeatures
-        .map((feature: any) => feature.properties?.id)
-        .filter((id: any) => id) // Remove undefined/null IDs
-        .filter((id: string, index: number, arr: string[]) => arr.indexOf(id) === index) // Deduplicate
-      
-      setVisiblePinIds(visibleIds)
-      setVisiblePinCount(visibleIds.length)
-      
-      // Notify parent component of visible pins change
-      if (onVisiblePinsChange) {
-        onVisiblePinsChange(visibleIds, visibleIds.length)
-      }
-      
-      console.log('[VISIBLE] count:', visibleIds.length, 'reason:', reason)
-    } catch (error) {
-      console.error('[VISIBLE] error:', error)
-      setVisiblePinIds([])
-      setVisiblePinCount(0)
-    }
-  }, [])
 
   const queryVisiblePins = () => {
     return visiblePinCount

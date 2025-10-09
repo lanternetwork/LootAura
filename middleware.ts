@@ -6,9 +6,13 @@ import { cookies } from 'next/headers'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
+  // Temporary debug log to verify which requests are being intercepted
+  console.info('[MW] path=%s accept=%s', pathname, req.headers.get('accept'));
+  
   // 1. Bypass all requests with file extensions (e.g., .js, .css, .png, .json, .ico)
   const hasFileExtension = pathname.match(/\.[a-z0-9]+$/i);
   if (hasFileExtension) {
+    console.info('[MW] BYPASS: file extension', pathname);
     return NextResponse.next();
   }
   
@@ -27,6 +31,7 @@ export async function middleware(req: NextRequest) {
     pathname === '/sw.js';
   
   if (isPwaAsset) {
+    console.info('[MW] BYPASS: PWA asset', pathname);
     return NextResponse.next();
   }
   
@@ -38,6 +43,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/api/auth/');
   
   if (isAuthPage) {
+    console.info('[MW] BYPASS: auth page', pathname);
     return NextResponse.next();
   }
   
@@ -45,9 +51,11 @@ export async function middleware(req: NextRequest) {
   const accept = req.headers.get('accept') || '';
   const isHtml = accept.includes('text/html');
   if (!isHtml) {
+    console.info('[MW] BYPASS: non-HTML', pathname, accept);
     return NextResponse.next();
   }
   
+  console.info('[MW] PROCESSING: protected route', pathname);
   const res = NextResponse.next()
   const cookieStore = cookies()
   

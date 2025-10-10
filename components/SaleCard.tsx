@@ -10,8 +10,8 @@ export default function SaleCard({ sale, authority }: { sale: Sale; authority?: 
   if (!sale && !isMap) return null
 
   return (
-    <div 
-      className="rounded-xl border p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow" 
+    <article 
+      className="sale-row rounded-xl border p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow" 
       data-testid="sale-card" 
       data-debug={`auth:${authority}`} 
       data-sale-id={String(sale?.id || '')}
@@ -50,6 +50,6 @@ export default function SaleCard({ sale, authority }: { sale: Sale; authority?: 
           View Details →
         </Link>
       )}
-    </div>
+    </article>
   )
 }

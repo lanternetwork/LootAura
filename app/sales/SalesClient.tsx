@@ -1461,10 +1461,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               </div>
             ) : (
               <>
+                {/* Show spinner only for non-MAP authority or when no visible pins in MAP mode */}
                 <div
                   role="status"
                   aria-live="polite"
-                  className={`${(loading || !fetchedOnce) ? 'flex' : 'hidden'} justify-center items-center py-12`}
+                  className={`${(loading || !fetchedOnce) && (arbiter.authority !== 'MAP' || visiblePinIdsState.length === 0) ? 'flex' : 'hidden'} justify-center items-center py-12`}
                 >
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
                   <span className="ml-2">Loading sales...</span>
@@ -1485,38 +1486,63 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     </div>
                   )}
                   
-                  {/* Show loading skeletons when loading */}
-                  {(loading || !fetchedOnce) ? (
-                    Array.from({ length: 6 }).map((_, idx) => (
-                      <div key={idx} className="animate-pulse bg-white rounded-lg border p-4">
-                        <div className="h-40 bg-gray-200 rounded mb-4" />
-                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                        <div className="h-4 bg-gray-200 rounded w-1/2" />
+                  {/* In MAP authority: always render from visible pins, never show loading skeletons */}
+                  {arbiter.authority === 'MAP' ? (
+                    visiblePinIdsState.length === 0 ? (
+                      // No visible pins - show empty state
+                      <div className="col-span-full text-center py-16">
+                        <h3 className="text-xl font-semibold text-gray-800">Pan or zoom to see sales here</h3>
+                        <p className="text-gray-500 mt-2">Move the map to find sales in your area.</p>
                       </div>
-                    ))
-                  ) : sales.length === 0 ? (
-                    // Show empty state message
-                    <div className="col-span-full text-center py-16">
-                      <h3 className="text-xl font-semibold text-gray-800">No sales found nearby</h3>
-                      <p className="text-gray-500 mt-2">Try expanding your search radius or changing the date range.</p>
-                      <button
-                        onClick={handleIncreaseDistanceAndRetry}
-                        className="mt-4 inline-flex items-center px-4 py-2 rounded-md bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
-                      >
-                        Increase distance by 10 miles
-                      </button>
-                    </div>
+                    ) : (
+                      // Show visible pins - render from markers immediately, hydrate from sales cache
+                      <>
+                        {visibleSales.length > 24 && (
+                          <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
+                        )}
+                        {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => (
+                          (console.log('[DOM] list item rendered id=', item.id),
+                            <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                          )
+                        ))}
+                      </>
+                    )
                   ) : (
-                    // Show actual sales
+                    // Non-MAP authority: show loading skeletons when loading
                     <>
-                      {visibleSales.length > 24 && (
-                        <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
+                      {(loading || !fetchedOnce) ? (
+                        Array.from({ length: 6 }).map((_, idx) => (
+                          <div key={idx} className="animate-pulse bg-white rounded-lg border p-4">
+                            <div className="h-40 bg-gray-200 rounded mb-4" />
+                            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                            <div className="h-4 bg-gray-200 rounded w-1/2" />
+                          </div>
+                        ))
+                      ) : sales.length === 0 ? (
+                        // Show empty state message
+                        <div className="col-span-full text-center py-16">
+                          <h3 className="text-xl font-semibold text-gray-800">No sales found nearby</h3>
+                          <p className="text-gray-500 mt-2">Try expanding your search radius or changing the date range.</p>
+                          <button
+                            onClick={handleIncreaseDistanceAndRetry}
+                            className="mt-4 inline-flex items-center px-4 py-2 rounded-md bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                          >
+                            Increase distance by 10 miles
+                          </button>
+                        </div>
+                      ) : (
+                        // Show actual sales
+                        <>
+                          {visibleSales.length > 24 && (
+                            <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
+                          )}
+                          {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => (
+                            (console.log('[DOM] list item rendered id=', item.id),
+                              <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                            )
+                          ))}
+                        </>
                       )}
-                      {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => (
-                        (console.log('[DOM] list item rendered id=', item.id),
-                          <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
-                        )
-                      ))}
                     </>
                   )}
                 </div>

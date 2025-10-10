@@ -1044,6 +1044,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       return
     }
     
+    // In MAP-AUTHORITATIVE mode, never call fitBounds automatically
+    if (arbiter.authority === 'MAP-AUTHORITATIVE') {
+      console.log('[MAP] ignoring auto-fit - MAP-AUTHORITATIVE mode prevents automatic movement')
+      return
+    }
+    
+    // Switch to FILTERS-AUTHORITATIVE mode for distance changes
+    setAuthority('FILTERS-AUTHORITATIVE', 'Distance filter changed')
+    
     setFitBounds(bbox)
     console.log('[MAP] fitBounds(distance)', bbox.north, bbox.south, bbox.east, bbox.west)
     
@@ -1085,6 +1094,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Check if map movement is guarded
     if (arbiter.guardMapMove) {
       console.log('[MAP] ignoring auto-fit (guarded) - ZIP search blocked')
+      return
+    }
+    
+    // In MAP-AUTHORITATIVE mode, never call fitBounds automatically
+    if (arbiter.authority === 'MAP-AUTHORITATIVE') {
+      console.log('[MAP] ignoring auto-fit - MAP-AUTHORITATIVE mode prevents automatic movement')
       return
     }
     
@@ -1415,6 +1430,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                       } else {
                         console.log('[CONTROL] user pan detected -> switching to map mode')
                         updateControlMode('map', 'User panned/zoomed')
+                        setAuthority('MAP-AUTHORITATIVE', 'User panned/zoomed')
                       }
                     }
                     

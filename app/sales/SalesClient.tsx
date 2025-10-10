@@ -1363,6 +1363,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   zoom={filters.lat && filters.lng ? 12 : 10}
                   centerOverride={mapCenterOverride}
                   fitBounds={fitBounds}
+                  arbiterMode={arbiter.mode}
+                  arbiterAuthority={arbiter.authority}
                   onFitBoundsComplete={() => {
                     console.log('[CONTROL] onFitBoundsComplete (guard stays true)')
                     setFitBounds(null)

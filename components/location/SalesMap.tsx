@@ -25,6 +25,8 @@ interface SalesMapProps {
   onVisiblePinsChange?: (visibleIds: string[], count: number) => void
   onMoveEnd?: () => void
   onZoomEnd?: () => void
+  arbiterMode?: 'initial' | 'map' | 'zip' | 'distance'
+  arbiterAuthority?: 'MAP-AUTHORITATIVE' | 'FILTERS-AUTHORITATIVE'
 }
 
 export default function SalesMap({ 
@@ -42,7 +44,9 @@ export default function SalesMap({
   onBoundsChange,
   onVisiblePinsChange,
   onMoveEnd,
-  onZoomEnd
+  onZoomEnd,
+  arbiterMode,
+  arbiterAuthority
 }: SalesMapProps) {
   useEffect(() => {
     incMapLoad()
@@ -120,6 +124,18 @@ export default function SalesMap({
         
         // Auto-fit if no pins are visible but markers exist (only once per session)
         if (markers.length > 0 && visiblePinCount === 0 && !autoFitAttemptedRef.current) {
+          // Block AUTO-FIT in MAP-AUTHORITATIVE mode
+          if (arbiterAuthority === 'MAP-AUTHORITATIVE') {
+            console.log('[BLOCK] AUTO-FIT suppressed (mode=map)')
+            return
+          }
+          
+          // Block AUTO-FIT in FILTERS-AUTHORITATIVE mode (not distance change)
+          if (arbiterAuthority === 'FILTERS-AUTHORITATIVE' && arbiterMode !== 'distance') {
+            console.log('[BLOCK] AUTO-FIT suppressed (filters authoritative, not distance)')
+            return
+          }
+          
           console.log('[AUTO-FIT] No visible pins but markers exist, fitting to bounds')
           autoFitAttemptedRef.current = true
           
@@ -156,12 +172,18 @@ export default function SalesMap({
     try {
       const map = mapRef.current?.getMap?.()
       if (map) {
+        // Block programmatic movement in MAP-AUTHORITATIVE mode
+        if (arbiterAuthority === 'MAP-AUTHORITATIVE') {
+          console.log('[BLOCK] programmatic move suppressed (map authoritative)')
+          return
+        }
+        
         const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : (zoom || 11)
         // Do not force a minimum zoom during programmatic recenters; respect current zoom
         map.easeTo({ center: [center.lng, center.lat], zoom: currentZoom, duration: 600 })
       }
     } catch {}
-  }, [center.lat, center.lng])
+  }, [center.lat, center.lng, arbiterAuthority])
 
   // Emit bounds once when map is ready (onLoad)
   useEffect(() => {
@@ -189,6 +211,12 @@ export default function SalesMap({
       try {
         const map = mapRef.current?.getMap?.()
         if (map) {
+          // Block programmatic movement in MAP-AUTHORITATIVE mode
+          if (arbiterAuthority === 'MAP-AUTHORITATIVE') {
+            console.log('[BLOCK] centerOverride suppressed (mode=map)')
+            return
+          }
+          
           const currentZoom = map.getZoom()
           const targetZoom = centerOverride.zoom || Math.max(currentZoom, 12)
           map.easeTo({ 
@@ -205,11 +233,16 @@ export default function SalesMap({
         }
       } catch {}
     }
-  }, [centerOverride])
+  }, [centerOverride, arbiterAuthority])
 
   // Handle fitBounds for distance changes
   useEffect(() => {
     if (fitBounds) {
+      // Block programmatic movement in MAP-AUTHORITATIVE mode
+      if (arbiterAuthority === 'MAP-AUTHORITATIVE') {
+        console.log('[BLOCK] programmatic move suppressed (map authoritative)')
+        return
+      }
       
       // Generate token and suppress emits
       const token = `${Date.now()}-${Math.random()}`

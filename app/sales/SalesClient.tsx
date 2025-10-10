@@ -1485,7 +1485,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                               <div className="h-4 bg-gray-200 rounded w-1/2" />
                             </div>
                           ) : (
-                            (console.log('[DOM] list item rendered id=', item.id), <SaleCard key={item.id} sale={item} />)
+                            (console.log('[DOM] list item rendered id=', item.id), <SaleCard key={item.id} sale={item} authority={arbiter.authority} />)
                           )
                         ))}
                       </div>

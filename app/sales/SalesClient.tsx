@@ -290,25 +290,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     return `${round(bounds.north)},${round(bounds.south)},${round(bounds.east)},${round(bounds.west)}`
   }, [])
 
-  // Keep visibleSales in sync with current sales and viewport
-  useEffect(() => {
-    // Defer crop until we have real bounds; avoid cropping against null/old bounds
-    if (!viewportBounds) return
-    const now = Date.now()
-    const last = lastBoundsTsRef.current || 0
-    
-    // Only crop if bounds are fresh (within 500ms) or this is the first crop
-    if (now - last > 500 && last > 0) {
-      console.log('[VIEWPORT] crop skipped - stale bounds', { age: now - last })
-      return
-    }
-    
-    const inView = cropSalesToViewport(sales, viewportBounds)
-    const rendered = inView.slice(0, 24)
-    setVisibleSales(inView)
-    setRenderedSales(rendered)
-    console.log('[LIST] update (cap=24) inView=', inView.length, 'rendered=', rendered.length)
-  }, [sales, viewportBounds, cropSalesToViewport])
 
   // Debounced bounds emission (leading + trailing)
   const emitBoundsDebounced = useCallback((bounds: { north: number; south: number; east: number; west: number; ts: number }) => {
@@ -547,6 +528,26 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     console.log('[VIEWPORT] cropped', all.length, '→', inView.length, `(fresh bounds, age: ${now - b.ts}ms)`)
     return inView
   }, [])
+
+  // Keep visibleSales in sync with current sales and viewport
+  useEffect(() => {
+    // Defer crop until we have real bounds; avoid cropping against null/old bounds
+    if (!viewportBounds) return
+    const now = Date.now()
+    const last = lastBoundsTsRef.current || 0
+    
+    // Only crop if bounds are fresh (within 500ms) or this is the first crop
+    if (now - last > 500 && last > 0) {
+      console.log('[VIEWPORT] crop skipped - stale bounds', { age: now - last })
+      return
+    }
+    
+    const inView = cropSalesToViewport(sales, viewportBounds)
+    const rendered = inView.slice(0, 24)
+    setVisibleSales(inView)
+    setRenderedSales(rendered)
+    console.log('[LIST] update (cap=24) inView=', inView.length, 'rendered=', rendered.length)
+  }, [sales, viewportBounds, cropSalesToViewport])
 
   // Approximate radius (km) from Mapbox zoom level at mid-latitudes
   const approximateRadiusKmFromZoom = useCallback((zoom?: number | null): number | null => {

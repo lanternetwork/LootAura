@@ -312,6 +312,22 @@ curl https://lootaura.com/api/health
    - Check image optimization
    - Verify caching configuration
 
+5. **Map/List Sync (MAP Authority) – Debug Playbook**
+   - Verify middleware allows public assets (`/_next/*`, `/manifest.json`) and GET sales endpoints.
+   - In MAP authority, wide sales fetches are suppressed; list derives from map-visible pin IDs.
+   - DOM checks (open Elements):
+     - Ensure `[data-debug="sales-list"]` container exists and is above the map (z-index).
+     - Confirm a badge inside the list shows `MAP LIST: K` for visible pins.
+     - Each rendered item has a wrapper with `[data-sale-id]`; expect K nodes.
+   - Logs to expect on pan:
+     - `[LIST] visible pins seq=… count=K ids=[…]`
+     - `[LIST][MAP] seq=… ids.count=K haveInDict=K missing=[]`
+     - `[LIST] update (map) … rendered=K`
+     - `[DOM] list item rendered id=…` (K lines) and `[DOM] item mounts id=…` (K lines)
+     - `[DOM] nodes in panel = K expected = K` (heights > 0)
+   - If nodes == K but invisible: check container height/overflow/z-index; temporarily set `min-height:240` and a background tint.
+   - If nodes < K: ensure items are wrapped in real DOM elements (no Fragments), and `data-sale-id` is on those elements.
+
 4. **Security Issues**
    - Check CSP policies
    - Verify rate limiting

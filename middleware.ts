@@ -25,6 +25,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/public/') ||
     pathname.match(/\.[a-z0-9]+$/i) || // files with extensions
     pathname === '/manifest.json' ||
+    pathname === '/manifest.webmanifest' ||
     pathname === '/favicon.ico' ||
     pathname === '/apple-touch-icon.png' ||
     pathname === '/robots.txt' ||
@@ -84,17 +85,15 @@ export async function middleware(req: NextRequest) {
     (req.method === 'PATCH' && pathname.startsWith('/api/sales')) ||
     (req.method === 'DELETE' && pathname.startsWith('/api/sales'));
   
-  // Only run auth checks for protected routes or write APIs
+  // If it's not a protected route or write API, allow public access
   if (!isProtectedRoute && !isWriteAPI) {
     console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     return NextResponse.next();
   }
   
-  // 5. Only check auth for HTML navigations or write APIs
-  const isHtml = accept.includes('text/html');
-  if (!isHtml && !isWriteAPI) {
-    return NextResponse.next();
-  }
+  // Only run auth checks for protected routes or write APIs
+  console.log(`[MIDDLEWARE] checking authentication for → ${pathname}`);
+  
   const res = NextResponse.next()
   const cookieStore = cookies()
   
@@ -119,7 +118,7 @@ export async function middleware(req: NextRequest) {
 
   // All routes matched by this middleware require authentication
   if (!user) {
-    const loginUrl = new URL('/login', req.url)
+    const loginUrl = new URL('/auth/signin', req.url)
     loginUrl.searchParams.set('redirectTo', req.nextUrl.pathname)
     return NextResponse.redirect(loginUrl)
   }
@@ -161,11 +160,9 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Only match specific routes that need authentication
-    '/favorites/:path*', 
-    '/account/:path*',
-    '/admin/:path*',
-    // Match write APIs (but not GET requests)
-    '/api/sales'
+    // Match all app routes except static assets
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|robots.txt|sitemap.xml|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/).*)',
+    // Match API routes
+    '/api/:path*'
   ],
 }

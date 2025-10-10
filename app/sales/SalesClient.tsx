@@ -1148,9 +1148,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       return
     }
     
-    // In MAP-AUTHORITATIVE mode, never call fitBounds automatically
-    if (arbiter.authority === 'MAP-AUTHORITATIVE') {
-      console.log('[MAP] ignoring auto-fit - MAP-AUTHORITATIVE mode prevents automatic movement')
+    // In MAP authority mode, never call fitBounds automatically
+    if (arbiter.authority === 'MAP') {
+      console.log('[MAP] ignoring auto-fit - MAP authority mode prevents automatic movement')
       return
     }
     

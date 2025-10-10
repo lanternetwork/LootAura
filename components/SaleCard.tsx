@@ -10,7 +10,7 @@ export default function SaleCard({ sale, authority }: { sale: Sale; authority?: 
   if (!sale && !isMap) return null
 
   return (
-    <div className="rounded-xl border p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow" data-testid="sale-card" data-debug={`auth:${authority}`}>
+    <div className="rounded-xl border p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow" data-testid="sale-card" data-debug={`auth:${authority}`} data-sale-id={String(sale?.id || '')}>
       <div className="flex justify-between">
         <h3 className="text-xl font-semibold line-clamp-1">{sale?.title || (isMap ? `Sale ${sale?.id}` : '')}</h3>
         {sale?.id && <FavoriteButton saleId={sale.id} initial={false} />}

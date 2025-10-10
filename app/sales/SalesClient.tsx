@@ -162,6 +162,52 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     }
   }, [arbiter.authority, filters])
 
+
+  // Debug logging
+  console.log('[SALES] SalesClient render:', {
+    initialCenter,
+    filters,
+    searchParams: Object.fromEntries(searchParams.entries())
+  })
+
+  const [sales, setSales] = useState<Sale[]>(initialSales)
+  const [loading, setLoading] = useState(false)
+  const [fetchedOnce, setFetchedOnce] = useState(false)
+  const [showFiltersModal, setShowFiltersModal] = useState(false)
+  const [zipError, setZipError] = useState<string | null>(null)
+  const [dateWindow, setDateWindow] = useState<any>(null)
+  const [degraded, setDegraded] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [mapSales, setMapSales] = useState<Sale[]>([])
+  const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
+  const [mapError, setMapError] = useState<string | null>(null)
+  const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
+  
+  // Request tokening system
+  const [requestToken, setRequestToken] = useState<string>('')
+  const [abortController, setAbortController] = useState<AbortController | null>(null)
+  const [visiblePins, setVisiblePins] = useState<string[]>([])
+  const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
+  const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
+  const [bannerShown, setBannerShown] = useState<boolean>(false)
+  const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
+  const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
+  const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
+  const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
+  const lastBoundsTsRef = useRef<number | null>(null)
+  const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
+  const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
+  const [isUpdating, setIsUpdating] = useState<boolean>(false)
+  const [staleSales, setStaleSales] = useState<Sale[]>(initialSales) // Keep previous data during fetch
+  const [renderedSales, setRenderedSales] = useState<Sale[]>(initialSales) // Sales visible on map
+  // Use refs instead of state to avoid re-renders
+  const salesAbortRef = useRef<AbortController | null>(null)
+  const markersAbortRef = useRef<AbortController | null>(null)
+  const debounceRef = useRef<number | null>(null)
+  const requestSeqRef = useRef<number>(0)
+  const markerSeqRef = useRef<number>(0)
+
   // Unified fetch function with request tokening
   const fetchWithToken = useCallback(async (endpoint: 'sales' | 'markers', queryShape: QueryShape) => {
     // Cancel previous request
@@ -220,51 +266,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       }
     }
   }, [abortController, requestToken])
-
-  // Debug logging
-  console.log('[SALES] SalesClient render:', {
-    initialCenter,
-    filters,
-    searchParams: Object.fromEntries(searchParams.entries())
-  })
-
-  const [sales, setSales] = useState<Sale[]>(initialSales)
-  const [loading, setLoading] = useState(false)
-  const [fetchedOnce, setFetchedOnce] = useState(false)
-  const [showFiltersModal, setShowFiltersModal] = useState(false)
-  const [zipError, setZipError] = useState<string | null>(null)
-  const [dateWindow, setDateWindow] = useState<any>(null)
-  const [degraded, setDegraded] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [mapSales, setMapSales] = useState<Sale[]>([])
-  const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
-  const [mapError, setMapError] = useState<string | null>(null)
-  const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
-  
-  // Request tokening system
-  const [requestToken, setRequestToken] = useState<string>('')
-  const [abortController, setAbortController] = useState<AbortController | null>(null)
-  const [visiblePins, setVisiblePins] = useState<string[]>([])
-  const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
-  const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
-  const [bannerShown, setBannerShown] = useState<boolean>(false)
-  const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
-  const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
-  const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
-  const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
-  const lastBoundsTsRef = useRef<number | null>(null)
-  const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
-  const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
-  const [isUpdating, setIsUpdating] = useState<boolean>(false)
-  const [staleSales, setStaleSales] = useState<Sale[]>(initialSales) // Keep previous data during fetch
-  const [renderedSales, setRenderedSales] = useState<Sale[]>(initialSales) // Sales visible on map
-  // Use refs instead of state to avoid re-renders
-  const salesAbortRef = useRef<AbortController | null>(null)
-  const markersAbortRef = useRef<AbortController | null>(null)
-  const debounceRef = useRef<number | null>(null)
-  const requestSeqRef = useRef<number>(0)
-  const markerSeqRef = useRef<number>(0)
   const lastMarkersKeyRef = useRef<string>('')
   const pendingFitReasonRef = useRef<'zip' | 'distance' | null>(null)
 

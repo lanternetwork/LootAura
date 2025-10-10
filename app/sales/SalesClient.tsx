@@ -283,6 +283,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const pendingBoundsRef = useRef<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
   const pendingStableTimerRef = useRef<NodeJS.Timeout | null>(null)
   const latestBoundsKeyRef = useRef<string>('')
+  // Deterministic viewport sequencing
+  const viewportSeqRef = useRef<number>(0)
 
   // Helper to create bounds coalesce key
   const createBoundsKey = useCallback((bounds: { north: number; south: number; east: number; west: number }) => {
@@ -333,7 +335,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       lastViewportEmitTsRef.current = now
       latestBoundsTsRef.current = bounds.ts
       latestBoundsKeyRef.current = boundsKey
-      console.log(`[VIEWPORT] accepted bounds emit ts=${now} key=${boundsKey}`)
+      // Increment viewport seq and log
+      viewportSeqRef.current += 1
+      console.log(`[VIEWPORT] seq=${viewportSeqRef.current} key=${boundsKey} accepted at ts=${now}`)
       setViewportBounds(bounds)
     }
     
@@ -344,7 +348,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         lastViewportEmitTsRef.current = Date.now()
         latestBoundsTsRef.current = bounds.ts
         latestBoundsKeyRef.current = boundsKey
-        console.log(`[VIEWPORT] accepted bounds emit ts=${Date.now()} key=${boundsKey}`)
+        viewportSeqRef.current += 1
+        console.log(`[VIEWPORT] seq=${viewportSeqRef.current} key=${boundsKey} accepted (trailing) ts=${Date.now()}`)
         setViewportBounds(bounds)
       }
       boundsDebounceTimeoutRef.current = null
@@ -490,13 +495,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const cropSalesToViewport = useCallback((all: Sale[], b?: { north: number; south: number; east: number; west: number; ts: number } | null) => {
     if (!b) return all
     
-    // Gate crop: only run if bounds are fresh (within 500ms)
-    const now = Date.now()
-    if (now - b.ts > 500) {
-      console.log('[VIEWPORT] crop skipped - stale bounds', { age: now - b.ts })
-      return all
-    }
-    
     const { north, south, east, west } = b
     const crossesAntimeridian = east < west
     const EPS = 0.0005 // Small epsilon for inclusive cropping
@@ -523,29 +521,41 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       // If bounds cross the antimeridian, longitudes are either >= west OR <= east
       return s.lng >= paddedWest - EPS || s.lng <= paddedEast + EPS
     })
-    console.log('[VIEWPORT] cropped', all.length, '→', inView.length, `(fresh bounds, age: ${now - b.ts}ms)`)
+    console.log('[VIEWPORT] cropped', all.length, '→', inView.length, `(seq=${viewportSeqRef.current} key=${latestBoundsKeyRef.current})`)
     return inView
   }, [])
 
-  // Keep visibleSales in sync with current sales and viewport
+  // Visible list policy
+  // - In MAP authority, derive from markers + active viewport (faithful to pins)
+  // - Otherwise, fall back to cropping sales by viewport
   useEffect(() => {
-    // Defer crop until we have real bounds; avoid cropping against null/old bounds
     if (!viewportBounds) return
-    const now = Date.now()
-    const last = lastBoundsTsRef.current || 0
-    
-    // Only crop if bounds are fresh (within 500ms) or this is the first crop
-    if (now - last > 500 && last > 0) {
-      console.log('[VIEWPORT] crop skipped - stale bounds', { age: now - last })
-      return
+    const seq = viewportSeqRef.current
+    if (arbiter.authority === 'MAP') {
+      // Derive visible ids from markers inside active viewport
+      const { north, south, east, west } = viewportBounds
+      const crosses = east < west
+      const inViewMarkers = mapMarkers.filter(m => {
+        if (m.lat == null || m.lng == null) return false
+        const latOk = m.lat >= south && m.lat <= north
+        if (!latOk) return false
+        if (!crosses) return m.lng >= west && m.lng <= east
+        return m.lng >= west || m.lng <= east
+      })
+      const visibleIds = new Set(inViewMarkers.map(m => m.id))
+      const inViewSales = sales.filter(s => visibleIds.has(s.id))
+      const rendered = inViewSales.slice(0, 24)
+      setVisibleSales(inViewSales)
+      setRenderedSales(rendered)
+      console.log(`[LIST] update (map) seq=${seq} markers=${inViewMarkers.length} inView=${inViewSales.length} rendered=${rendered.length}`)
+    } else {
+      const inView = cropSalesToViewport(sales, viewportBounds)
+      const rendered = inView.slice(0, 24)
+      setVisibleSales(inView)
+      setRenderedSales(rendered)
+      console.log(`[LIST] update (filters) seq=${seq} inView=${inView.length} rendered=${rendered.length}`)
     }
-    
-    const inView = cropSalesToViewport(sales, viewportBounds)
-    const rendered = inView.slice(0, 24)
-    setVisibleSales(inView)
-    setRenderedSales(rendered)
-    console.log('[LIST] update (cap=24) inView=', inView.length, 'rendered=', rendered.length)
-  }, [sales, viewportBounds, cropSalesToViewport])
+  }, [arbiter.authority, mapMarkers, sales, viewportBounds, cropSalesToViewport])
 
   // Approximate radius (km) from Mapbox zoom level at mid-latitudes
   const approximateRadiusKmFromZoom = useCallback((zoom?: number | null): number | null => {
@@ -615,7 +625,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     salesAbortRef.current = controller
     const seq = ++requestSeqRef.current
     
-    console.log('[NET] start sales', { seq })
+    console.log('[NET] start sales', { seq, mode: arbiter.authority, viewportSeq: viewportSeqRef.current })
     
     // Determine parameters based on arbiter mode (fallback to existing behavior)
     const mode = arbiter?.mode || 'initial'
@@ -725,16 +735,21 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       
       // Check if this request was aborted
       if (requestSeqRef.current !== seq) {
-        console.log('[NET] aborted sales', { seq })
+        console.log('[DROP] stale response sales (seq mismatch)', { seq, current: requestSeqRef.current })
         return
       }
       
-      console.log('[NET] ok sales', { seq })
+      console.log('[NET] ok sales', { seq, mode: arbiter.authority, viewportSeq: viewportSeqRef.current })
       console.log(`[SALES] API response:`, data)
       console.debug('[SALES] results', data.data?.length || 0)
       
       if (data.ok) {
         const newSales = data.data || []
+        // If in MAP authority, do not let wide/broad results overwrite map-scoped list
+        if (arbiter.authority === 'MAP') {
+          console.log('[DROP] stale/wide response (MAP authority active)')
+          return
+        }
         if (append) {
           setSales(prev => [...prev, ...newSales])
         } else {
@@ -749,7 +764,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         console.debug('[SALES] got', sales.length)
 
         // Prefetch next page in background for instant next click
-        if (!append && pageHasMore) {
+        if (!append && pageHasMore && arbiter.authority !== 'MAP') {
           const nextParams: GetSalesParams = {
             ...params,
             offset: newSales.length,

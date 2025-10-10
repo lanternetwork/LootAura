@@ -1491,7 +1491,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
                         data-testid="sales-grid"
                         data-debug="sales-list"
-                        key={arbiter.authority==='MAP' ? `map-${viewportSeqRef.current}` : 'filters'}
+                        // Avoid re-keying container in MAP to prevent unmounts before effects run
+                        key={arbiter.authority==='MAP' ? 'map-stable' : 'filters'}
                         style={arbiter.authority==='MAP' ? { position: 'relative', zIndex: 3, minHeight: 240, background: 'rgba(0, 128, 0, 0.06)' } : undefined}
                       >
                         {arbiter.authority==='MAP' && (

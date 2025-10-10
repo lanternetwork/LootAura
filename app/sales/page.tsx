@@ -149,7 +149,8 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Suspense fallback={<SalesSkeleton />}>
+      {/* Bypass Suspense masking in MAP authority: keep a visible sentinel */}
+      <Suspense fallback={<div data-debug="sales-list-fallback" className="p-2 text-xs bg-yellow-100 text-yellow-800">Loading sales…</div>}>
         <SalesClient 
           initialSales={initialSales}
           initialSearchParams={searchParams}

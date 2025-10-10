@@ -153,25 +153,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[ARB] switch to map blocked (guard active)')
       return
     }
-    
-    // Check mode authority lock to prevent thrashing
-    const now = Date.now()
-    if (now < mapAuthorityUntilRef.current) {
-      console.log('[ARB] switch to map blocked (authority locked)')
-      return
-    }
-    
-    // Debounce the switch to map mode (100-200ms)
-    if (mapModeDebounceRef.current) {
-      clearTimeout(mapModeDebounceRef.current)
-    }
-    
-    mapModeDebounceRef.current = setTimeout(() => {
-      updateControlMode('map', reason)
-      setAuthority('MAP', reason)
-      console.log('[ARB] authority=MAP reason=' + reason + ' (guard off)')
-      mapModeDebounceRef.current = null
-    }, 150)
+    // Immediate authority flip; no debounce, no lock
+    updateControlMode('map', reason)
+    setAuthority('MAP', reason)
+    console.log('[ARB] authority=MAP (immediate) reason=' + reason)
   }, [arbiter.programmaticMoveGuard, updateControlMode, setAuthority])
 
   const setGuardMapMove = useCallback((on: boolean, reason: string) => {
@@ -1018,11 +1003,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       clearTimeout(debounceRef.current)
     }
     debounceRef.current = window.setTimeout(() => {
-      console.log('[NET] debounce fire')
-      fn()
+      // Gate wide fetches while in MAP authority
+      if (arbiter.authority === 'MAP') {
+        console.log('[SKIP] debounce fire suppressed (MAP authority; require viewport-scoped request)')
+      } else {
+        console.log('[NET] debounce fire')
+        fn()
+      }
       debounceRef.current = null
     }, delay)
-  }, [])
+  }, [arbiter.authority])
 
   // Reset pagination when mode/bbox changes
   const resetPagination = useCallback(() => {
@@ -1035,10 +1025,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   const triggerFetches = useCallback(() => {
     debouncedTrigger(() => {
-      fetchSales()
-      fetchMapSales()
+      // In MAP authority, do not fire wide sales; only markers fetch
+      if (arbiter.authority === 'MAP') {
+        console.log('[SKIP] suppress wide sales fetch (MAP authority)')
+        fetchMapSales()
+      } else {
+        fetchSales()
+        fetchMapSales()
+      }
     })
-  }, [debouncedTrigger, fetchSales, fetchMapSales])
+  }, [debouncedTrigger, fetchSales, fetchMapSales, arbiter.authority])
 
   // Debounced visible list recompute
 
@@ -1572,8 +1568,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onBoundsChange={onBoundsChange}
                   onMapReady={onMapReady}
                   onVisiblePinsChange={(visibleIds, count) => {
-                    console.log('[LIST] visible:', count)
-                    // Visibility is now handled by the viewport bounds system
+                    const seq = viewportSeqRef.current
+                    console.log(`[LIST] visible pins seq=${seq} count=${count} ids=[${visibleIds.join(',')}]`)
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly

@@ -254,6 +254,94 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const markersReqIdRef = useRef<number>(0)
   const currentSalesRequestRef = useRef<{reqId: number, stateKey: string} | null>(null)
   const currentMarkersRequestRef = useRef<{reqId: number, stateKey: string} | null>(null)
+  
+  // In-flight tracking and versioning
+  const [inFlightSales, setInFlightSales] = useState<boolean>(false)
+  const [inFlightMarkers, setInFlightMarkers] = useState<boolean>(false)
+  const markersVersionRef = useRef<number>(0)
+  const latestBoundsTsRef = useRef<number>(0)
+  const visibilityComputeKeyRef = useRef<string>('')
+  const lastVisibleIdsRef = useRef<string[]>([])
+  const visibilityComputeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Coalesced visibility computation with rAF throttling
+  const scheduleVisibilityCompute = useCallback((reason: string) => {
+    const markersVersion = markersVersionRef.current
+    const boundsTs = latestBoundsTsRef.current
+    const computeKey = `${markersVersion}-${boundsTs}`
+    
+    // Skip if same key already enqueued
+    if (visibilityComputeKeyRef.current === computeKey) {
+      return
+    }
+    
+    // Clear any pending computation
+    if (visibilityComputeTimeoutRef.current) {
+      clearTimeout(visibilityComputeTimeoutRef.current)
+    }
+    
+    visibilityComputeKeyRef.current = computeKey
+    
+    // Schedule on next animation frame
+    visibilityComputeTimeoutRef.current = setTimeout(() => {
+      requestAnimationFrame(() => {
+        // Check if still current
+        if (visibilityComputeKeyRef.current !== computeKey) {
+          return // Stale computation, abort
+        }
+        
+        // Compute visibility with current markers and bounds
+        const currentMarkers = mapMarkers
+        const currentBounds = viewportBounds
+        
+        if (!currentBounds || currentMarkers.length === 0) {
+          return
+        }
+        
+        // Filter markers within bounds
+        const visibleMarkers = currentMarkers.filter(marker => {
+          if (!marker.lat || !marker.lng) return false
+          const { north, south, east, west } = currentBounds
+          const crossesAntimeridian = east < west
+          
+          if (!crossesAntimeridian) {
+            return marker.lat >= south && marker.lat <= north && 
+                   marker.lng >= west && marker.lng <= east
+          } else {
+            return marker.lat >= south && marker.lat <= north && 
+                   (marker.lng >= west || marker.lng <= east)
+          }
+        })
+        
+        const visibleIds = visibleMarkers.map(m => m.id).sort()
+        
+        // Check if visible set actually changed
+        const lastIds = lastVisibleIdsRef.current
+        const idsEqual = visibleIds.length === lastIds.length && 
+                        visibleIds.every((id, i) => id === lastIds[i])
+        
+        if (!idsEqual) {
+          // Guard against setting visible=0 while request in flight and pins>0
+          if (visibleIds.length === 0 && (inFlightSales || inFlightMarkers) && currentMarkers.length > 0) {
+            console.log('[GUARD] suppressing visible=0 while request in flight and pins>0')
+            return
+          }
+          
+          lastVisibleIdsRef.current = visibleIds
+          
+          // Filter sales to only show those with visible IDs
+          const visibleSales = sales.filter(sale => visibleIds.includes(sale.id))
+          setRenderedSales(visibleSales)
+          
+          console.log(`[VISIBLE] count: ${visibleIds.length}, reason: ${reason}`)
+          console.log(`[OVERLAY] visible=${visibleSales.length} (source=viewport)`)
+          console.log(`[SYNC] list=${visibleSales.length}, overlay=${visibleSales.length}, pins=${visibleIds.length}`)
+        }
+        
+        visibilityComputeTimeoutRef.current = null
+      })
+    }, 0)
+  }, [mapMarkers, viewportBounds, sales])
 
   // Unified fetch function with request identity and stale-response guard
   const fetchWithToken = useCallback(async (endpoint: 'sales' | 'markers', queryShape: QueryShape) => {
@@ -279,6 +367,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     const newToken = `${endpoint}-${queryShape.shapeHash}-${Date.now()}`
     setRequestToken(newToken)
     setIsUpdating(true)
+    
+    // Set in-flight flags (don't clear arrays)
+    if (endpoint === 'sales') {
+      setInFlightSales(true)
+    } else {
+      setInFlightMarkers(true)
+    }
 
     // Create new abort controller
     const newController = new AbortController()
@@ -305,14 +400,28 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         console.log(`[NET] ok ${endpoint} {seq: ${reqId}}`)
         
         if (endpoint === 'sales') {
+          // Atomic commit: set sales then schedule visibility computation
           setSales(data.data || [])
+          setInFlightSales(false)
+          // Schedule visibility computation on next animation frame
+          requestAnimationFrame(() => {
+            // Visibility will be recomputed by the markers change handler
+          })
         } else {
-          // Keep existing markers visible while loading new ones
+          // Increment markers version for identity tracking
+          markersVersionRef.current++
           setMapMarkers(data.data || [])
-          console.log(`[MARKERS] set: ${(data.data || []).length}`)
+          setInFlightMarkers(false)
+          console.log(`[MARKERS] set: ${(data.data || []).length} version: ${markersVersionRef.current}`)
         }
       } else {
         console.error(`[NET] error ${endpoint}:`, data.error)
+        // Clear in-flight flags on error
+        if (endpoint === 'sales') {
+          setInFlightSales(false)
+        } else {
+          setInFlightMarkers(false)
+        }
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -325,6 +434,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       if (requestToken === newToken) {
         setIsUpdating(false)
         setAbortController(null)
+        // Clear in-flight flags
+        if (endpoint === 'sales') {
+          setInFlightSales(false)
+        } else {
+          setInFlightMarkers(false)
+        }
       }
     }
   }, [abortController, requestToken, arbiter.mode, createStateKey])
@@ -350,13 +465,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const onBoundsChange = useCallback((b?: { north: number; south: number; east: number; west: number; ts: number }) => {
     if (!b) return
     console.log('[VIEWPORT][EMIT] bounds', { west: b.west, south: b.south, east: b.east, north: b.north, ts: b.ts })
+    latestBoundsTsRef.current = b.ts
     lastBoundsTsRef.current = b.ts
     
     // Use requestAnimationFrame for smooth viewport updates
     requestAnimationFrame(() => {
       setViewportBounds(b)
+      // Schedule visibility computation after bounds update
+      scheduleVisibilityCompute('bounds-updated')
     })
-  }, [])
+  }, [scheduleVisibilityCompute])
 
   const getVisibleSalesFromRenderedFeatures = useCallback((all: Sale[]) => {
     // This function will be called from the map component with queryRenderedFeatures results
@@ -868,10 +986,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Reset pagination when mode/bbox changes
   const resetPagination = useCallback(() => {
     // Don't clear sales immediately to prevent flickering
-    // setSales([])
+    // Keep previous sales visible during fetch
     setNextPageCache(null)
     setHasMore(true)
-    console.log('[NET] reset pagination')
+    console.log('[NET] reset pagination (keeping previous sales)')
   }, [])
 
   const triggerFetches = useCallback(() => {
@@ -1444,15 +1562,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onBoundsChange={onBoundsChange}
                   onVisiblePinsChange={(visibleIds, count) => {
                     console.log('[LIST] visible:', count)
-                    // Defer visibility computation until markers commit
-                    requestAnimationFrame(() => {
-                      // Filter sales to only show those with visible IDs
-                      const visibleSales = sales.filter(sale => visibleIds.includes(sale.id))
-                      setRenderedSales(visibleSales)
-                      console.log('[VISIBLE] count: ' + count + ', reason: markers-updated')
-                      console.log('[OVERLAY] visible=' + visibleSales.length + ' (source=viewport)')
-                      console.log('[SYNC] list=' + visibleSales.length + ', overlay=' + visibleSales.length + ', pins=' + count)
-                    })
+                    // Use coalesced visibility computation
+                    scheduleVisibilityCompute('markers-updated')
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly

@@ -335,7 +335,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       latestBoundsKeyRef.current = boundsKey
       console.log(`[VIEWPORT] accepted bounds emit ts=${now} key=${boundsKey}`)
       setViewportBounds(bounds)
-      scheduleVisibilityCompute('bounds-idle')
     }
     
     // Trailing: emit after 100ms if no newer bounds arrive
@@ -347,11 +346,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         latestBoundsKeyRef.current = boundsKey
         console.log(`[VIEWPORT] accepted bounds emit ts=${Date.now()} key=${boundsKey}`)
         setViewportBounds(bounds)
-        scheduleVisibilityCompute('bounds-idle')
       }
       boundsDebounceTimeoutRef.current = null
     }, 100)
-  }, [viewportBounds, createBoundsKey, scheduleVisibilityCompute])
+  }, [viewportBounds, createBoundsKey])
 
   // Unified fetch function with request identity and stale-response guard
   const fetchWithToken = useCallback(async (endpoint: 'sales' | 'markers', queryShape: QueryShape) => {

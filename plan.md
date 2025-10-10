@@ -167,6 +167,13 @@ npm run format
 - **Responsive Design**: Mobile-first approach
 - **Accessibility**: WCAG AA compliance
 
+#### Map Authority (MAP) Behavior — Implemented
+- In MAP authority, the list derives directly from the map’s visible pin IDs (no second geo-filter), so the list count always matches visible pins.
+- Wide `/api/sales?...limit=24` requests are suppressed while in MAP authority; only viewport-scoped markers (and optional by-IDs hydration) are allowed.
+- Viewport updates carry a deterministic sequence (viewportSeq) and key; late/wide responses are dropped with `[DROP]` logs.
+- The MAP list exposes DOM hooks for verification: `data-debug="sales-list"` on the container and `data-sale-id` per item.
+- Suspense fallback no longer masks the list: a visible sentinel is used so the container is never empty during MAP.
+
 ## 🧪 Testing Coverage
 
 ### Unit Tests
@@ -181,6 +188,10 @@ npm run format
 - Search and filtering
 - Mobile responsiveness
 - Error states
+ 
+#### MAP Authority E2E — Added
+- Pan/zoom to a tight cluster: expect `[LIST] visible pins … count=K` → `[LIST][MAP] … haveInDict=K missing=[]` → `rendered=K` and K DOM nodes with `[data-sale-id]`.
+- Assert no wide `/api/sales?...limit=24` calls while authority==='MAP'.
 
 ## 🔄 Next Steps Roadmap (Active)
 
@@ -359,6 +370,11 @@ npm run format
 3. **Environment Test**: `npm run test tests/unit/env.test.ts`
 4. **Type Check**: `npm run typecheck`
 5. **Build Test**: `npm run build`
+
+### Middleware/Public Routes — Updated
+- Static & PWA assets (e.g., `/_next/*`, `/manifest.json`, `/favicon.ico`, `/sw.js`) are always public.
+- Read APIs are public: `GET /api/sales`, `GET /api/sales/markers`, `GET /api/geocoding/*`, `GET /api/location`.
+- Write APIs remain protected; `/favorites` and `/account` require authentication.
 
 ### Environment Variables Required
 ```bash

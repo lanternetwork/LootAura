@@ -22,7 +22,7 @@ type AuthorityMode = 'MAP-AUTHORITATIVE' | 'FILTERS-AUTHORITATIVE'
 
 interface ControlArbiter {
   mode: ControlMode
-  authority: AuthorityMode
+  authority: 'FILTERS' | 'MAP'  // Simplified authority tracking
   programmaticMoveGuard: boolean
   guardMapMove: boolean  // Strict guard to prevent automatic map movement
   lastChangedAt: number
@@ -110,7 +110,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Source of Truth Arbiter — observe-only for now
   const [arbiter, setArbiter] = useState<ControlArbiter>({ 
     mode: 'initial', 
-    authority: 'MAP-AUTHORITATIVE',
+    authority: 'MAP',
     programmaticMoveGuard: false,
     guardMapMove: false,  // Start with guard disabled
     lastChangedAt: Date.now(),
@@ -144,6 +144,26 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     })
   }, [])
 
+  // Helper to switch to map mode only if user gesture (not programmatic)
+  const switchToMapIfUserGesture = useCallback((reason: string) => {
+    if (arbiter.programmaticMoveGuard) {
+      console.log('[ARB] switch to map blocked (guard active)')
+      return
+    }
+    
+    // Debounce the switch to map mode (100-200ms)
+    if (mapModeDebounceRef.current) {
+      clearTimeout(mapModeDebounceRef.current)
+    }
+    
+    mapModeDebounceRef.current = setTimeout(() => {
+      updateControlMode('map', reason)
+      setAuthority('MAP', reason)
+      console.log('[ARB] authority=MAP reason=' + reason + ' (guard off)')
+      mapModeDebounceRef.current = null
+    }, 150)
+  }, [arbiter.programmaticMoveGuard, updateControlMode, setAuthority])
+
   const setGuardMapMove = useCallback((on: boolean, reason: string) => {
     setArbiter(prev => {
       if (prev.guardMapMove === on) return prev
@@ -153,25 +173,32 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     })
   }, [])
 
+  // Helper to create state key for request identity
+  const createStateKey = useCallback((mode: string, center: {lat: number, lng: number}, radiusKm: number, dateRange: string, categories: string[]) => {
+    const catKey = categories.sort().join(',')
+    const dateKey = dateRange === 'any' ? 'any' : dateRange
+    return `${mode}|${center.lat.toFixed(6)},${center.lng.toFixed(6)}|${radiusKm.toFixed(2)}|${dateKey}|${catKey}`
+  }, [])
+
   // Get effective query shape based on current authority
   const getEffectiveQueryShape = useCallback((): QueryShape => {
     const dateRange = filters.dateRange === 'any' ? 'any' : filters.dateRange
     const categories = filters.categories || []
     
-    if (arbiter.authority === 'MAP-AUTHORITATIVE') {
-      // Use current map center and computed radius
-      const center = { lat: filters.lat || 0, lng: filters.lng || 0 }
-      const radiusKm = computeRadiusFromZoom(12) // Default zoom 12
+    if (arbiter.authority === 'MAP') {
+      // Use current map center and viewport-derived radius
+      const center = mapView.center || { lat: filters.lat || 0, lng: filters.lng || 0 }
+      const radiusKm = mapView.zoom ? computeRadiusFromZoom(mapView.zoom) : milesToKm(filters.distance || 25)
       const shapeHash = createShapeHash(center.lat, center.lng, radiusKm, dateRange, categories)
       return { lat: center.lat, lng: center.lng, radiusKm, dateRange, categories, shapeHash }
     } else {
-      // Use filter values
+      // Use filter values (slider-driven)
       const center = { lat: filters.lat || 0, lng: filters.lng || 0 }
       const radiusKm = milesToKm(filters.distance || 25)
       const shapeHash = createShapeHash(center.lat, center.lng, radiusKm, dateRange, categories)
       return { lat: center.lat, lng: center.lng, radiusKm, dateRange, categories, shapeHash }
     }
-  }, [arbiter.authority, filters])
+  }, [arbiter.authority, filters, mapView])
 
 
   // Debug logging
@@ -218,9 +245,28 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const debounceRef = useRef<number | null>(null)
   const requestSeqRef = useRef<number>(0)
   const markerSeqRef = useRef<number>(0)
+  const mapModeDebounceRef = useRef<number | null>(null)
+  
+  // Request identity and stale-response guard
+  const salesReqIdRef = useRef<number>(0)
+  const markersReqIdRef = useRef<number>(0)
+  const currentSalesRequestRef = useRef<{reqId: number, stateKey: string} | null>(null)
+  const currentMarkersRequestRef = useRef<{reqId: number, stateKey: string} | null>(null)
 
-  // Unified fetch function with request tokening
+  // Unified fetch function with request identity and stale-response guard
   const fetchWithToken = useCallback(async (endpoint: 'sales' | 'markers', queryShape: QueryShape) => {
+    // Generate request identity
+    const reqId = endpoint === 'sales' ? ++salesReqIdRef.current : ++markersReqIdRef.current
+    const stateKey = createStateKey(arbiter.mode, {lat: queryShape.lat, lng: queryShape.lng}, queryShape.radiusKm, queryShape.dateRange, queryShape.categories)
+    
+    // Store current request
+    const currentRequest = {reqId, stateKey}
+    if (endpoint === 'sales') {
+      currentSalesRequestRef.current = currentRequest
+    } else {
+      currentMarkersRequestRef.current = currentRequest
+    }
+
     // Cancel previous request
     if (abortController) {
       abortController.abort()
@@ -241,31 +287,34 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         ? `/api/sales?lat=${queryShape.lat}&lng=${queryShape.lng}&distanceKm=${queryShape.radiusKm}&dateRange=${queryShape.dateRange}&categories=${queryShape.categories.join(',')}`
         : `/api/sales/markers?lat=${queryShape.lat}&lng=${queryShape.lng}&distanceKm=${queryShape.radiusKm}&dateRange=${queryShape.dateRange}&categories=${queryShape.categories.join(',')}`
 
-      console.log(`[NET] start ${endpoint} {seq: ${newToken}}`)
+      console.log(`[NET] start ${endpoint} {seq: ${reqId}} key=${stateKey}`)
       
       const response = await fetch(url, { signal: newController.signal })
       const data = await response.json()
 
       // Check if this request is still current
-      if (requestToken !== newToken) {
-        console.log(`[NET] ignore stale response for ${endpoint}`)
+      const currentRequestRef = endpoint === 'sales' ? currentSalesRequestRef : currentMarkersRequestRef
+      if (!currentRequestRef.current || currentRequestRef.current.reqId !== reqId) {
+        console.log(`[NET] ok ${endpoint} {seq: ${reqId}} but dropped (stale key=${stateKey}, current=${currentRequestRef.current?.stateKey || 'none'})`)
         return
       }
 
       if (data.ok) {
-        console.log(`[NET] ok ${endpoint} {seq: ${newToken}}`)
+        console.log(`[NET] ok ${endpoint} {seq: ${reqId}}`)
         
         if (endpoint === 'sales') {
           setSales(data.data || [])
         } else {
+          // Keep existing markers visible while loading new ones
           setMapMarkers(data.data || [])
+          console.log(`[MARKERS] set: ${(data.data || []).length}`)
         }
       } else {
         console.error(`[NET] error ${endpoint}:`, data.error)
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.log(`[NET] aborted ${endpoint} {seq: ${newToken}}`)
+        console.log(`[NET] aborted ${endpoint} {seq: ${reqId}}`)
         return
       }
       console.error(`[NET] error ${endpoint}:`, error)
@@ -276,7 +325,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         setAbortController(null)
       }
     }
-  }, [abortController, requestToken])
+  }, [abortController, requestToken, arbiter.mode, createStateKey])
   const lastMarkersKeyRef = useRef<string>('')
   const pendingFitReasonRef = useRef<'zip' | 'distance' | null>(null)
 
@@ -1043,8 +1092,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     
     const bbox = computeBboxForRadius(currentCenter, newDistance)
     
-    // Switch to FILTERS-AUTHORITATIVE mode for distance changes
-    setAuthority('FILTERS-AUTHORITATIVE', 'Distance filter changed')
+    // Switch to FILTERS authority for distance changes
+    setAuthority('FILTERS', 'Distance filter changed')
     
     // Allow a single-use zoom operation for distance changes
     // This bypasses the guard by clearing it temporarily
@@ -1393,11 +1442,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onBoundsChange={onBoundsChange}
                   onVisiblePinsChange={(visibleIds, count) => {
                     console.log('[LIST] visible:', count)
-                    // Filter sales to only show those with visible IDs
-                    const visibleSales = sales.filter(sale => visibleIds.includes(sale.id))
-                    setRenderedSales(visibleSales)
-                    console.log('[OVERLAY] visible=' + visibleSales.length + ' (source=viewport)')
-                    console.log('[SYNC] list=' + visibleSales.length + ', overlay=' + visibleSales.length + ', pins=' + count)
+                    // Defer visibility computation until markers commit
+                    requestAnimationFrame(() => {
+                      // Filter sales to only show those with visible IDs
+                      const visibleSales = sales.filter(sale => visibleIds.includes(sale.id))
+                      setRenderedSales(visibleSales)
+                      console.log('[VISIBLE] count: ' + count + ', reason: markers-updated')
+                      console.log('[OVERLAY] visible=' + visibleSales.length + ' (source=viewport)')
+                      console.log('[SYNC] list=' + visibleSales.length + ', overlay=' + visibleSales.length + ', pins=' + count)
+                    })
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly
@@ -1433,8 +1486,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                         updateControlMode('map', 'User panned/zoomed after ZIP')
                       } else {
                         console.log('[CONTROL] user pan detected -> switching to map mode')
-                        updateControlMode('map', 'User panned/zoomed')
-                        setAuthority('MAP-AUTHORITATIVE', 'User panned/zoomed')
+                        switchToMapIfUserGesture('User panned/zoomed')
                       }
                     }
                     

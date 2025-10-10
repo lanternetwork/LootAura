@@ -26,7 +26,7 @@ interface SalesMapProps {
   onMoveEnd?: () => void
   onZoomEnd?: () => void
   arbiterMode?: 'initial' | 'map' | 'zip' | 'distance'
-  arbiterAuthority?: 'MAP-AUTHORITATIVE' | 'FILTERS-AUTHORITATIVE'
+  arbiterAuthority?: 'FILTERS' | 'MAP'
 }
 
 export default function SalesMap({ 
@@ -124,14 +124,14 @@ export default function SalesMap({
         
         // Auto-fit if no pins are visible but markers exist (only once per session)
         if (markers.length > 0 && visiblePinCount === 0 && !autoFitAttemptedRef.current) {
-          // Block AUTO-FIT in MAP-AUTHORITATIVE mode
-          if (arbiterAuthority === 'MAP-AUTHORITATIVE') {
+          // Block AUTO-FIT in MAP authority mode
+          if (arbiterAuthority === 'MAP') {
             console.log('[BLOCK] AUTO-FIT suppressed (mode=map)')
             return
           }
           
-          // Block AUTO-FIT in FILTERS-AUTHORITATIVE mode (not distance change)
-          if (arbiterAuthority === 'FILTERS-AUTHORITATIVE' && arbiterMode !== 'distance') {
+          // Block AUTO-FIT in FILTERS authority mode (not distance change)
+          if (arbiterAuthority === 'FILTERS' && arbiterMode !== 'distance') {
             console.log('[BLOCK] AUTO-FIT suppressed (filters authoritative, not distance)')
             return
           }
@@ -172,8 +172,8 @@ export default function SalesMap({
     try {
       const map = mapRef.current?.getMap?.()
       if (map) {
-        // Block programmatic movement in MAP-AUTHORITATIVE mode
-        if (arbiterAuthority === 'MAP-AUTHORITATIVE') {
+        // Block programmatic movement in MAP authority mode
+        if (arbiterAuthority === 'MAP') {
           console.log('[BLOCK] programmatic move suppressed (map authoritative)')
           return
         }
@@ -211,8 +211,8 @@ export default function SalesMap({
       try {
         const map = mapRef.current?.getMap?.()
         if (map) {
-          // Block programmatic movement in MAP-AUTHORITATIVE mode
-          if (arbiterAuthority === 'MAP-AUTHORITATIVE') {
+          // Block programmatic movement in MAP authority mode
+          if (arbiterAuthority === 'MAP') {
             console.log('[BLOCK] centerOverride suppressed (mode=map)')
             return
           }
@@ -238,8 +238,8 @@ export default function SalesMap({
   // Handle fitBounds for distance changes
   useEffect(() => {
     if (fitBounds) {
-      // Block programmatic movement in MAP-AUTHORITATIVE mode
-      if (arbiterAuthority === 'MAP-AUTHORITATIVE') {
+      // Block programmatic movement in MAP authority mode
+      if (arbiterAuthority === 'MAP') {
         console.log('[BLOCK] programmatic move suppressed (map authoritative)')
         return
       }

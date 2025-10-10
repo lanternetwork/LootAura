@@ -116,6 +116,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     lastChangedAt: Date.now(),
     lastTransitionReason: 'initial'
   })
+  
+  // Mode authority locking to prevent thrashing
+  const mapAuthorityUntilRef = useRef<number>(0)
 
   const updateControlMode = useCallback((mode: ControlMode, reason: string) => {
     setArbiter(prev => {
@@ -148,6 +151,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const switchToMapIfUserGesture = useCallback((reason: string) => {
     if (arbiter.programmaticMoveGuard) {
       console.log('[ARB] switch to map blocked (guard active)')
+      return
+    }
+    
+    // Check mode authority lock to prevent thrashing
+    const now = Date.now()
+    if (now < mapAuthorityUntilRef.current) {
+      console.log('[ARB] switch to map blocked (authority locked)')
       return
     }
     
@@ -271,6 +281,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const boundsCoalesceKeyRef = useRef<string>('')
   const boundsDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingBoundsRef = useRef<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
+  const pendingStableTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const latestBoundsKeyRef = useRef<string>('')
 
   // Helper to create bounds coalesce key
   const createBoundsKey = useCallback((bounds: { north: number; south: number; east: number; west: number }) => {
@@ -293,7 +305,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     const now = Date.now()
     if (firstStableViewportTsRef.current === 0) {
       if (!mapReady || mapMarkers.length === 0 || sales.length === 0 || now - lastViewportEmitTsRef.current < 150) {
-        console.log('[STABILITY] waiting for stable viewport (mapReady, markers, sales, 150ms)')
+        const remain = 150 - (now - lastViewportEmitTsRef.current)
+        console.log(`[STABILITY] wait ${Math.max(0, remain)}ms (boundsKey: ${latestBoundsKeyRef.current})`)
+        
+        // Re-arm timer instead of dropping compute
+        if (pendingStableTimerRef.current) {
+          clearTimeout(pendingStableTimerRef.current)
+        }
+        pendingStableTimerRef.current = setTimeout(() => {
+          scheduleVisibilityCompute('stable-debounce')
+        }, Math.max(0, remain))
         return
       }
       firstStableViewportTsRef.current = now
@@ -313,11 +334,20 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         return // Stale computation, abort
       }
       
-      // Read latest bounds at execution time
+      // Read latest bounds at execution time (single source of truth)
       const currentBounds = viewportBounds
       const currentMarkers = mapMarkers
+      const currentBoundsKey = latestBoundsKeyRef.current
       
       if (!currentBounds || currentMarkers.length === 0) {
+        return
+      }
+      
+      // Check for stale bounds and requeue immediately
+      const computeBoundsKey = createBoundsKey(currentBounds)
+      if (computeBoundsKey !== currentBoundsKey) {
+        console.log('[VIEWPORT] crop skipped - stale bounds')
+        scheduleVisibilityCompute('stale-reschedule')
         return
       }
       
@@ -338,13 +368,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       
       const visibleIds = visibleMarkers.map(m => m.id).sort()
       
-      // Check if visible set actually changed
+      // Check if visible set actually changed (Rule B)
       const lastIds = lastVisibleIdsRef.current
       const idsEqual = visibleIds.length === lastIds.length && 
                       visibleIds.every((id, i) => id === lastIds[i])
       
       if (!idsEqual) {
-        // Zero-result guard with retry logic
+        // Zero-result guard with retry logic (Rule A)
         if (visibleIds.length === 0 && (inFlightSales || inFlightMarkers) && currentMarkers.length > 0) {
           console.log('[GUARD] zero result while in-flight, retrying...')
           // Reschedule after next idle+rAF cycle (max 2 retries)
@@ -364,7 +394,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         const visibleSales = sales.filter(sale => visibleIds.includes(sale.id))
         setRenderedSales(visibleSales)
         
-        console.log(`[VISIBLE] count: ${visibleIds.length} key=(mVer:${markersVersion} ts:${boundsTs})`)
+        console.log(`[VISIBLE] count: ${visibleIds.length} key=(mVer:${markersVersion} bKey:${currentBoundsKey})`)
       }
       
       visibilityComputeTimeoutRef.current = null
@@ -418,8 +448,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     
     // Leading: emit immediately if first or after long gap
     if (lastViewportEmitTsRef.current === 0 || now - lastViewportEmitTsRef.current > 150) {
+      // Only update viewport clock on accepted viewport emits
       lastViewportEmitTsRef.current = now
       latestBoundsTsRef.current = bounds.ts
+      latestBoundsKeyRef.current = boundsKey
+      console.log(`[VIEWPORT] accepted bounds emit ts=${now} key=${boundsKey}`)
       setViewportBounds(bounds)
       scheduleVisibilityCompute('bounds-idle')
     }
@@ -427,8 +460,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Trailing: emit after 100ms if no newer bounds arrive
     boundsDebounceTimeoutRef.current = setTimeout(() => {
       if (pendingBoundsRef.current === bounds) {
+        // Only update viewport clock on accepted viewport emits
         lastViewportEmitTsRef.current = Date.now()
         latestBoundsTsRef.current = bounds.ts
+        latestBoundsKeyRef.current = boundsKey
+        console.log(`[VIEWPORT] accepted bounds emit ts=${Date.now()} key=${boundsKey}`)
         setViewportBounds(bounds)
         scheduleVisibilityCompute('bounds-idle')
       }
@@ -1653,7 +1689,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onMapReady={onMapReady}
                   onVisiblePinsChange={(visibleIds, count) => {
                     console.log('[LIST] visible:', count)
-                    // Use coalesced visibility computation
+                    // Markers updates must only enqueue compute - never set visible=0 directly
                     scheduleVisibilityCompute('markers-updated')
                   }}
                   onSearchArea={({ center }) => {
@@ -1683,6 +1719,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                       // Set guard immediately on user interaction
                       setGuardMapMove(true, 'User panned/zoomed')
                       console.log('[MAP] userMove=true (guard active)')
+                      
+                      // Lock mode='map' for 600ms minimum to prevent thrashing
+                      mapAuthorityUntilRef.current = Date.now() + 600
                       
                       if (arbiter.programmaticMoveGuard) {
                         console.log('[CONTROL] user pan -> mode: zip → map; guard=false')

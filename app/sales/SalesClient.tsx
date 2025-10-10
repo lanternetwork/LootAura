@@ -559,8 +559,18 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // DOM-count assertion for MAP list
   useEffect(() => {
     if (arbiter.authority !== 'MAP') return
+    
+    // Check for sales list container with both possible selectors
+    const listContainer = document.querySelector('[data-debug="sales-list"]') || document.querySelector('[data-panel="list"]')
+    if (!listContainer) {
+      console.error('[DOM] no [data-debug="sales-list"] or [data-panel="list"] found - sales list container missing')
+      return
+    }
+    
     const els = document.querySelectorAll('[data-sale-id]')
     console.log('[DOM] nodes in panel =', els.length, ' expected =', visiblePinIdsState.length)
+    console.log('[DOM] list container found:', !!listContainer, 'visible pins:', visiblePinIdsState.length)
+    
     els.forEach((el) => {
       const rect = (el as HTMLElement).getBoundingClientRect()
       console.log('[DOM] node rect h=', rect.height)
@@ -1476,6 +1486,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
                   data-testid="sales-grid"
                   data-debug="sales-list"
+                  data-panel="list"
                   // Avoid re-keying container in MAP to prevent unmounts before effects run
                   key={arbiter.authority==='MAP' ? 'map-stable' : 'filters'}
                   style={arbiter.authority==='MAP' ? { position: 'relative', zIndex: 3, minHeight: 240, background: 'rgba(0, 128, 0, 0.06)' } : undefined}

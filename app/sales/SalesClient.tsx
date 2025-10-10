@@ -1470,9 +1470,33 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   <span className="ml-2">Loading sales...</span>
                 </div>
 
-                {!(loading || !fetchedOnce) && (
-                  sales.length === 0 ? (
-                    <div className="text-center py-16">
+                {/* Always render the sales list container - never hide it */}
+                <div
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
+                  data-testid="sales-grid"
+                  data-debug="sales-list"
+                  // Avoid re-keying container in MAP to prevent unmounts before effects run
+                  key={arbiter.authority==='MAP' ? 'map-stable' : 'filters'}
+                  style={arbiter.authority==='MAP' ? { position: 'relative', zIndex: 3, minHeight: 240, background: 'rgba(0, 128, 0, 0.06)' } : undefined}
+                >
+                  {arbiter.authority==='MAP' && (
+                    <div style={{ position:'absolute', top:8, left:8, padding:'4px 6px', fontSize:12, background:'rgba(255,255,0,.6)', zIndex:1000 }}>
+                      MAP LIST: {(visiblePinIdsState?.length ?? 0)}
+                    </div>
+                  )}
+                  
+                  {/* Show loading skeletons when loading */}
+                  {(loading || !fetchedOnce) ? (
+                    Array.from({ length: 6 }).map((_, idx) => (
+                      <div key={idx} className="animate-pulse bg-white rounded-lg border p-4">
+                        <div className="h-40 bg-gray-200 rounded mb-4" />
+                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                        <div className="h-4 bg-gray-200 rounded w-1/2" />
+                      </div>
+                    ))
+                  ) : sales.length === 0 ? (
+                    // Show empty state message
+                    <div className="col-span-full text-center py-16">
                       <h3 className="text-xl font-semibold text-gray-800">No sales found nearby</h3>
                       <p className="text-gray-500 mt-2">Try expanding your search radius or changing the date range.</p>
                       <button
@@ -1483,46 +1507,27 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                       </button>
                     </div>
                   ) : (
+                    // Show actual sales
                     <>
                       {visibleSales.length > 24 && (
-                        <div className="text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
+                        <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
                       )}
-                      <div
-                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
-                        data-testid="sales-grid"
-                        data-debug="sales-list"
-                        // Avoid re-keying container in MAP to prevent unmounts before effects run
-                        key={arbiter.authority==='MAP' ? 'map-stable' : 'filters'}
-                        style={arbiter.authority==='MAP' ? { position: 'relative', zIndex: 3, minHeight: 240, background: 'rgba(0, 128, 0, 0.06)' } : undefined}
-                      >
-                        {arbiter.authority==='MAP' && (
-                          <div style={{ position:'absolute', top:8, left:8, padding:'4px 6px', fontSize:12, background:'rgba(255,255,0,.6)', zIndex:1000 }}>
-                            MAP LIST: {(visiblePinIdsState?.length ?? 0)}
-                          </div>
-                        )}
-                        {(loading ? Array.from({ length: 6 }) : (isUpdating ? staleSales : renderedSales)).map((item: any, idx: number) => (
-                          loading ? (
-                            <div key={idx} className="animate-pulse bg-white rounded-lg border p-4">
-                              <div className="h-40 bg-gray-200 rounded mb-4" />
-                              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                              <div className="h-4 bg-gray-200 rounded w-1/2" />
-                            </div>
-                          ) : (
-                            (console.log('[DOM] list item rendered id=', item.id),
-                              <div key={item.id} data-sale-id={String(item.id)}>
-                                <SaleCard sale={item} authority={arbiter.authority} />
-                              </div>
-                            )
-                          )
-                        ))}
-                      </div>
-                      <LoadMoreButton
-                        onLoadMore={loadMore}
-                        hasMore={hasMore}
-                        loading={loadingMore}
-                      />
+                      {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => (
+                        (console.log('[DOM] list item rendered id=', item.id),
+                          <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                        )
+                      ))}
                     </>
-                  )
+                  )}
+                </div>
+                
+                {/* Load more button - only show when not loading and has more */}
+                {!(loading || !fetchedOnce) && sales.length > 0 && (
+                  <LoadMoreButton
+                    onLoadMore={loadMore}
+                    hasMore={hasMore}
+                    loading={loadingMore}
+                  />
                 )}
               </>
             )}

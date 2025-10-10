@@ -25,6 +25,7 @@ interface SalesMapProps {
   onVisiblePinsChange?: (visibleIds: string[], count: number) => void
   onMoveEnd?: () => void
   onZoomEnd?: () => void
+  onMapReady?: () => void
   arbiterMode?: 'initial' | 'map' | 'zip' | 'distance'
   arbiterAuthority?: 'FILTERS' | 'MAP'
 }
@@ -45,12 +46,20 @@ export default function SalesMap({
   onVisiblePinsChange,
   onMoveEnd,
   onZoomEnd,
+  onMapReady,
   arbiterMode,
   arbiterAuthority
 }: SalesMapProps) {
   useEffect(() => {
     incMapLoad()
   }, [])
+
+  // Call onMapReady when map loads (not onLoad bounds emission)
+  const handleMapLoad = useCallback(() => {
+    if (onMapReady) {
+      onMapReady()
+    }
+  }, [onMapReady])
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
   const mapRef = useRef<any>(null)
   const fitTokenRef = useRef<string | null>(null)
@@ -185,17 +194,14 @@ export default function SalesMap({
     } catch {}
   }, [center.lat, center.lng, arbiterAuthority])
 
-  // Emit bounds once when map is ready (onLoad)
+  // Call onMapReady when map loads (no bounds emission on onLoad)
   useEffect(() => {
     try {
       const map = mapRef.current?.getMap?.()
       if (!map) return
       const handleLoad = () => {
-        const b = getBounds()
-        if (b) {
-          console.log('[MAP][EMIT] onLoad bounds', { west: b.west, south: b.south, east: b.east, north: b.north })
-          if (onBoundsChange) onBoundsChange(b)
-        }
+        handleMapLoad()
+        // Don't emit bounds on onLoad - only on idle
       }
       if (map.loaded?.()) {
         handleLoad()
@@ -203,7 +209,7 @@ export default function SalesMap({
         map.once?.('load', handleLoad)
       }
     } catch {}
-  }, [onBoundsChange])
+  }, [handleMapLoad])
 
   // Handle centerOverride for ZIP input smooth recentering
   useEffect(() => {

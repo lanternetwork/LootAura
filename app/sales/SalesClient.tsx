@@ -245,7 +245,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const debounceRef = useRef<number | null>(null)
   const requestSeqRef = useRef<number>(0)
   const markerSeqRef = useRef<number>(0)
-  const mapModeDebounceRef = useRef<number | null>(null)
+  const mapModeDebounceRef = useRef<NodeJS.Timeout | null>(null)
   
   // Request identity and stale-response guard
   const salesReqIdRef = useRef<number>(0)

@@ -173,6 +173,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     })
   }, [])
 
+  // Map view state (needed before getEffectiveQueryShape)
+  const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
+
   // Helper to create state key for request identity
   const createStateKey = useCallback((mode: string, center: {lat: number, lng: number}, radiusKm: number, dateRange: string, categories: string[]) => {
     const catKey = categories.sort().join(',')
@@ -231,7 +234,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [bannerShown, setBannerShown] = useState<boolean>(false)
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
   const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
-  const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
   const lastBoundsTsRef = useRef<number | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)

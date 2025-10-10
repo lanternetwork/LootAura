@@ -278,62 +278,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     return `${round(bounds.north)},${round(bounds.south)},${round(bounds.east)},${round(bounds.west)}`
   }, [])
 
-  // Debounced bounds emission (leading + trailing)
-  const emitBoundsDebounced = useCallback((bounds: { north: number; south: number; east: number; west: number; ts: number }) => {
-    const boundsKey = createBoundsKey(bounds)
-    const now = Date.now()
-    
-    // Skip if same key within 150ms
-    if (boundsKey === boundsCoalesceKeyRef.current && now - lastViewportEmitTsRef.current < 150) {
-      return
-    }
-    
-    // Check area change < 1% and center delta < epsilon
-    const currentBounds = viewportBounds
-    if (currentBounds) {
-      const areaChange = Math.abs((bounds.north - bounds.south) * (bounds.east - bounds.west) - 
-                                 (currentBounds.north - currentBounds.south) * (currentBounds.east - currentBounds.west)) / 
-                        ((currentBounds.north - currentBounds.south) * (currentBounds.east - currentBounds.west))
-      const centerLat = (bounds.north + bounds.south) / 2
-      const centerLng = (bounds.east + bounds.west) / 2
-      const currentCenterLat = (currentBounds.north + currentBounds.south) / 2
-      const currentCenterLng = (currentBounds.east + currentBounds.west) / 2
-      const centerDelta = Math.sqrt(Math.pow(centerLat - currentCenterLat, 2) + Math.pow(centerLng - currentCenterLng, 2))
-      
-      if (areaChange < 0.01 && centerDelta < 0.0001) { // ~10 meters
-        return
-      }
-    }
-    
-    // Clear any pending debounce
-    if (boundsDebounceTimeoutRef.current) {
-      clearTimeout(boundsDebounceTimeoutRef.current)
-    }
-    
-    // Store pending bounds
-    pendingBoundsRef.current = bounds
-    boundsCoalesceKeyRef.current = boundsKey
-    
-    // Leading: emit immediately if first or after long gap
-    if (lastViewportEmitTsRef.current === 0 || now - lastViewportEmitTsRef.current > 150) {
-      lastViewportEmitTsRef.current = now
-      latestBoundsTsRef.current = bounds.ts
-      setViewportBounds(bounds)
-      scheduleVisibilityCompute('bounds-idle')
-    }
-    
-    // Trailing: emit after 100ms if no newer bounds arrive
-    boundsDebounceTimeoutRef.current = setTimeout(() => {
-      if (pendingBoundsRef.current === bounds) {
-        lastViewportEmitTsRef.current = Date.now()
-        latestBoundsTsRef.current = bounds.ts
-        setViewportBounds(bounds)
-        scheduleVisibilityCompute('bounds-idle')
-      }
-      boundsDebounceTimeoutRef.current = null
-    }, 100)
-  }, [viewportBounds, createBoundsKey, scheduleVisibilityCompute])
-
   // Coalesced visibility computation with stability barrier and idle/rAF chain
   const scheduleVisibilityCompute = useCallback((reason: string) => {
     const markersVersion = markersVersionRef.current
@@ -435,6 +379,62 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       })
     }, 0)
   }, [mapReady, mapMarkers, viewportBounds, sales, inFlightSales, inFlightMarkers])
+
+  // Debounced bounds emission (leading + trailing)
+  const emitBoundsDebounced = useCallback((bounds: { north: number; south: number; east: number; west: number; ts: number }) => {
+    const boundsKey = createBoundsKey(bounds)
+    const now = Date.now()
+    
+    // Skip if same key within 150ms
+    if (boundsKey === boundsCoalesceKeyRef.current && now - lastViewportEmitTsRef.current < 150) {
+      return
+    }
+    
+    // Check area change < 1% and center delta < epsilon
+    const currentBounds = viewportBounds
+    if (currentBounds) {
+      const areaChange = Math.abs((bounds.north - bounds.south) * (bounds.east - bounds.west) - 
+                                 (currentBounds.north - currentBounds.south) * (currentBounds.east - currentBounds.west)) / 
+                        ((currentBounds.north - currentBounds.south) * (currentBounds.east - currentBounds.west))
+      const centerLat = (bounds.north + bounds.south) / 2
+      const centerLng = (bounds.east + bounds.west) / 2
+      const currentCenterLat = (currentBounds.north + currentBounds.south) / 2
+      const currentCenterLng = (currentBounds.east + currentBounds.west) / 2
+      const centerDelta = Math.sqrt(Math.pow(centerLat - currentCenterLat, 2) + Math.pow(centerLng - currentCenterLng, 2))
+      
+      if (areaChange < 0.01 && centerDelta < 0.0001) { // ~10 meters
+        return
+      }
+    }
+    
+    // Clear any pending debounce
+    if (boundsDebounceTimeoutRef.current) {
+      clearTimeout(boundsDebounceTimeoutRef.current)
+    }
+    
+    // Store pending bounds
+    pendingBoundsRef.current = bounds
+    boundsCoalesceKeyRef.current = boundsKey
+    
+    // Leading: emit immediately if first or after long gap
+    if (lastViewportEmitTsRef.current === 0 || now - lastViewportEmitTsRef.current > 150) {
+      lastViewportEmitTsRef.current = now
+      latestBoundsTsRef.current = bounds.ts
+      setViewportBounds(bounds)
+      scheduleVisibilityCompute('bounds-idle')
+    }
+    
+    // Trailing: emit after 100ms if no newer bounds arrive
+    boundsDebounceTimeoutRef.current = setTimeout(() => {
+      if (pendingBoundsRef.current === bounds) {
+        lastViewportEmitTsRef.current = Date.now()
+        latestBoundsTsRef.current = bounds.ts
+        setViewportBounds(bounds)
+        scheduleVisibilityCompute('bounds-idle')
+      }
+      boundsDebounceTimeoutRef.current = null
+    }, 100)
+  }, [viewportBounds, createBoundsKey, scheduleVisibilityCompute])
 
   // Unified fetch function with request identity and stale-response guard
   const fetchWithToken = useCallback(async (endpoint: 'sales' | 'markers', queryShape: QueryShape) => {

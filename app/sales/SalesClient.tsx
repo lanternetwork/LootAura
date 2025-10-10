@@ -1476,7 +1476,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                       {visibleSales.length > 24 && (
                         <div className="text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
                       )}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200" data-testid="sales-grid">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200" data-testid="sales-grid" data-debug={`mode:${arbiter.mode}|auth:${arbiter.authority}|items:${(isUpdating ? staleSales : renderedSales).length}`} key={arbiter.authority==='MAP' ? `map-${viewportSeqRef.current}` : 'filters'}>
                         {(loading ? Array.from({ length: 6 }) : (isUpdating ? staleSales : renderedSales)).map((item: any, idx: number) => (
                           loading ? (
                             <div key={idx} className="animate-pulse bg-white rounded-lg border p-4">
@@ -1485,7 +1485,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                               <div className="h-4 bg-gray-200 rounded w-1/2" />
                             </div>
                           ) : (
-                            <SaleCard key={item.id} sale={item} />
+                            (console.log('[DOM] list item rendered id=', item.id), <SaleCard key={item.id} sale={item} />)
                           )
                         ))}
                       </div>

@@ -223,7 +223,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Request tokening system
   const [requestToken, setRequestToken] = useState<string>('')
   const [abortController, setAbortController] = useState<AbortController | null>(null)
-  const [visiblePins, setVisiblePins] = useState<string[]>([])
+  const [visiblePinIdsState, setVisiblePinIdsState] = useState<string[]>([])
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
   const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)
@@ -511,36 +511,50 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [])
 
   // Visible list policy
-  // - In MAP authority, derive from markers + active viewport (faithful to pins)
+  // - In MAP authority, derive from the exact visible ids provided by the map (no duplicate geo-filter)
   // - Otherwise, fall back to cropping sales by viewport
   useEffect(() => {
-    if (!viewportBounds) return
     const seq = viewportSeqRef.current
     if (arbiter.authority === 'MAP') {
-      // Derive visible ids from markers inside active viewport
-      const { north, south, east, west } = viewportBounds
-      const crosses = east < west
-      const inViewMarkers = mapMarkers.filter(m => {
-        if (m.lat == null || m.lng == null) return false
-        const latOk = m.lat >= south && m.lat <= north
-        if (!latOk) return false
-        if (!crosses) return m.lng >= west && m.lng <= east
-        return m.lng >= west || m.lng <= east
+      const ids = visiblePinIdsState
+      const haveInDict = ids.filter(id => !!mapMarkers.find(m => String(m.id) === String(id))).length
+      const missing = ids.filter(id => !mapMarkers.find(m => String(m.id) === String(id))).slice(0, 3)
+      console.log(`[LIST][MAP] seq=${seq} ids.count=${ids.length} sample=${ids.slice(0,3)} haveInDict=${haveInDict} missing=${missing}`)
+
+      // Build minimal items from markers immediately; hydrate from sales cache if present
+      const minimal = ids.map(id => {
+        const m = mapMarkers.find(mm => String(mm.id) === String(id))
+        return {
+          id: String(id),
+          title: m?.title || 'Sale',
+          address: '',
+          city: '',
+          state: '',
+          zip_code: '',
+          lat: m?.lat,
+          lng: m?.lng,
+          date_start: null,
+          time_start: null,
+          date_end: null,
+          time_end: null,
+          photos: [],
+        } as unknown as Sale
       })
-      const visibleIds = new Set(inViewMarkers.map(m => m.id))
-      const inViewSales = sales.filter(s => visibleIds.has(s.id))
-      const rendered = inViewSales.slice(0, 24)
-      setVisibleSales(inViewSales)
+      const byId: Record<string, Sale> = {}
+      for (const s of sales) byId[String(s.id)] = s
+      const hydrated = minimal.map(s => byId[String(s.id)] ?? s)
+      const rendered = hydrated.slice(0, 24)
+      setVisibleSales(hydrated)
       setRenderedSales(rendered)
-      console.log(`[LIST] update (map) seq=${seq} markers=${inViewMarkers.length} inView=${inViewSales.length} rendered=${rendered.length}`)
-    } else {
+      console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=${hydrated.length} rendered=${rendered.length}`)
+    } else if (viewportBounds) {
       const inView = cropSalesToViewport(sales, viewportBounds)
       const rendered = inView.slice(0, 24)
       setVisibleSales(inView)
       setRenderedSales(rendered)
       console.log(`[LIST] update (filters) seq=${seq} inView=${inView.length} rendered=${rendered.length}`)
     }
-  }, [arbiter.authority, mapMarkers, sales, viewportBounds, cropSalesToViewport])
+  }, [arbiter.authority, visiblePinIdsState, mapMarkers, sales, viewportBounds, cropSalesToViewport])
 
   // Approximate radius (km) from Mapbox zoom level at mid-latitudes
   const approximateRadiusKmFromZoom = useCallback((zoom?: number | null): number | null => {
@@ -913,11 +927,17 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[MAP] Markers response:', data)
       console.debug('[MARKERS] markers', data?.data ? data.data.length : 0)
       if (data?.ok && Array.isArray(data.data)) {
-        // Deduplicate markers by id to prevent duplicates
-        const uniqueMarkers = data.data.filter((marker: any, index: number, self: any[]) => 
+        // Normalize id to a stable value (prefer saleId if present), then deduplicate
+        const normalized = data.data.map((m: any) => {
+          const stableId = m.id ?? m.saleId
+          return { id: String(stableId), saleId: String(stableId), title: m.title, lat: m.lat, lng: m.lng }
+        })
+        const uniqueMarkers = normalized.filter((marker: any, index: number, self: any[]) => 
           index === self.findIndex((m: any) => m.id === marker.id)
         )
         console.log('[MAP] Setting mapMarkers to:', uniqueMarkers.length, 'markers (deduplicated from', data.data.length, ')')
+        const sample = uniqueMarkers.slice(0, 5).map((m: any) => m.id === m.saleId)
+        console.log('[ASSERT] id parity ok? examples:', sample)
         setMapMarkers(uniqueMarkers)
         setMapError(null) // Clear any previous errors
         console.debug('[MARKERS] got', uniqueMarkers.length)
@@ -1570,6 +1590,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onVisiblePinsChange={(visibleIds, count) => {
                     const seq = viewportSeqRef.current
                     console.log(`[LIST] visible pins seq=${seq} count=${count} ids=[${visibleIds.join(',')}]`)
+                    setVisiblePinIdsState(visibleIds.map(String))
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly

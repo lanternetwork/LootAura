@@ -23,6 +23,8 @@ interface SalesMapProps {
   onFitBoundsComplete?: () => void
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number; ts: number } | undefined) => void
   onVisiblePinsChange?: (visibleIds: string[], count: number) => void
+  onMoveEnd?: () => void
+  onZoomEnd?: () => void
 }
 
 export default function SalesMap({ 
@@ -38,7 +40,9 @@ export default function SalesMap({
   fitBounds,
   onFitBoundsComplete,
   onBoundsChange,
-  onVisiblePinsChange
+  onVisiblePinsChange,
+  onMoveEnd,
+  onZoomEnd
 }: SalesMapProps) {
   useEffect(() => {
     incMapLoad()
@@ -356,6 +360,11 @@ export default function SalesMap({
     
     // Recompute visible pins after move ends
     recomputeVisiblePins('move-end')
+    
+    // Call onMoveEnd prop if provided
+    if (onMoveEnd) {
+      onMoveEnd()
+    }
   }
 
   const handleZoomEnd = (evt: any) => {
@@ -385,6 +394,11 @@ export default function SalesMap({
     
     // Recompute visible pins after zoom ends
     recomputeVisiblePins('zoom-end')
+    
+    // Call onZoomEnd prop if provided
+    if (onZoomEnd) {
+      onZoomEnd()
+    }
   }
 
   const getBounds = () => {

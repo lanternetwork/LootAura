@@ -556,6 +556,17 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     }
   }, [arbiter.authority, visiblePinIdsState, mapMarkers, sales, viewportBounds, cropSalesToViewport])
 
+  // DOM-count assertion for MAP list
+  useEffect(() => {
+    if (arbiter.authority !== 'MAP') return
+    const els = document.querySelectorAll('[data-sale-id]')
+    console.log('[DOM] nodes in panel =', els.length, ' expected =', visiblePinIdsState.length)
+    els.forEach((el) => {
+      const rect = (el as HTMLElement).getBoundingClientRect()
+      console.log('[DOM] node rect h=', rect.height)
+    })
+  }, [arbiter.authority, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west, visiblePinIdsState.length])
+
   // Approximate radius (km) from Mapbox zoom level at mid-latitudes
   const approximateRadiusKmFromZoom = useCallback((zoom?: number | null): number | null => {
     if (zoom === undefined || zoom === null) return null
@@ -1476,7 +1487,18 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                       {visibleSales.length > 24 && (
                         <div className="text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
                       )}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200" data-testid="sales-grid" data-debug={`mode:${arbiter.mode}|auth:${arbiter.authority}|items:${(isUpdating ? staleSales : renderedSales).length}`} key={arbiter.authority==='MAP' ? `map-${viewportSeqRef.current}` : 'filters'}>
+                      <div
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
+                        data-testid="sales-grid"
+                        data-debug="sales-list"
+                        key={arbiter.authority==='MAP' ? `map-${viewportSeqRef.current}` : 'filters'}
+                        style={arbiter.authority==='MAP' ? { position: 'relative', zIndex: 3, minHeight: 240, background: 'rgba(0, 128, 0, 0.06)' } : undefined}
+                      >
+                        {arbiter.authority==='MAP' && (
+                          <div style={{ position:'absolute', top:8, left:8, padding:'4px 6px', fontSize:12, background:'rgba(255,255,0,.6)', zIndex:1000 }}>
+                            MAP LIST: {(visiblePinIdsState?.length ?? 0)}
+                          </div>
+                        )}
                         {(loading ? Array.from({ length: 6 }) : (isUpdating ? staleSales : renderedSales)).map((item: any, idx: number) => (
                           loading ? (
                             <div key={idx} className="animate-pulse bg-white rounded-lg border p-4">
@@ -1485,7 +1507,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                               <div className="h-4 bg-gray-200 rounded w-1/2" />
                             </div>
                           ) : (
-                            (console.log('[DOM] list item rendered id=', item.id), <SaleCard key={item.id} sale={item} authority={arbiter.authority} />)
+                            (console.log('[DOM] list item rendered id=', item.id),
+                              <div key={item.id} data-sale-id={String(item.id)}>
+                                <SaleCard sale={item} authority={arbiter.authority} />
+                              </div>
+                            )
                           )
                         ))}
                       </div>
@@ -1542,7 +1568,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   </span>
                 )}
               </h2>
-              <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'} relative`}>
+              <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'} relative`} style={{ zIndex: 1 }}>
                 {/* Error toast */}
                 {mapError && (
                   <div className="absolute top-2 right-2 z-10 bg-red-500 text-white px-3 py-2 rounded-md text-sm shadow-lg">

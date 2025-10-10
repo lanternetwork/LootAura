@@ -18,7 +18,7 @@ import LoadMoreButton from '@/components/LoadMoreButton'
 
 // Intent Arbiter types
 type ControlMode = 'initial' | 'map' | 'zip' | 'distance'
-type AuthorityMode = 'MAP-AUTHORITATIVE' | 'FILTERS-AUTHORITATIVE'
+type AuthorityMode = 'FILTERS' | 'MAP'
 
 interface ControlArbiter {
   mode: ControlMode

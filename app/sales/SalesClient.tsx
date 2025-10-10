@@ -24,6 +24,7 @@ interface ControlArbiter {
   mode: ControlMode
   authority: AuthorityMode
   programmaticMoveGuard: boolean
+  guardMapMove: boolean  // Strict guard to prevent automatic map movement
   lastChangedAt: number
   lastTransitionReason: string
 }
@@ -110,7 +111,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [arbiter, setArbiter] = useState<ControlArbiter>({ 
     mode: 'initial', 
     authority: 'MAP-AUTHORITATIVE',
-    programmaticMoveGuard: false, 
+    programmaticMoveGuard: false,
+    guardMapMove: false,  // Start with guard disabled
     lastChangedAt: Date.now(),
     lastTransitionReason: 'initial'
   })
@@ -138,6 +140,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       if (prev.programmaticMoveGuard === on) return prev
       const next = { ...prev, programmaticMoveGuard: on, lastChangedAt: Date.now() }
       console.log(`[ARB] guard=${on ? 'on' : 'off'} reason=${reason} ts=${next.lastChangedAt}`)
+      return next
+    })
+  }, [])
+
+  const setGuardMapMove = useCallback((on: boolean, reason: string) => {
+    setArbiter(prev => {
+      if (prev.guardMapMove === on) return prev
+      const next = { ...prev, guardMapMove: on, lastChangedAt: Date.now() }
+      console.log(`[ARB] mapGuard=${on ? 'on' : 'off'} reason=${reason} ts=${next.lastChangedAt}`)
       return next
     })
   }, [])
@@ -1026,6 +1037,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       : mapView.center || { lat: 38.2527, lng: -85.7585 }
     
     const bbox = computeBboxForRadius(currentCenter, newDistance)
+    
+    // Check if map movement is guarded
+    if (arbiter.guardMapMove) {
+      console.log('[MAP] ignoring auto-fit (guarded) - distance change blocked')
+      return
+    }
+    
     setFitBounds(bbox)
     console.log('[MAP] fitBounds(distance)', bbox.north, bbox.south, bbox.east, bbox.west)
     
@@ -1063,6 +1081,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Compute bbox from center + current distance and trigger fitBounds
     const currentCenter = { lat, lng }
     const bbox = computeBboxForRadius(currentCenter, filters.distance)
+    
+    // Check if map movement is guarded
+    if (arbiter.guardMapMove) {
+      console.log('[MAP] ignoring auto-fit (guarded) - ZIP search blocked')
+      return
+    }
+    
     setFitBounds(bbox)
     console.log('[ZIP] computed bbox for dist=${filters.distance} -> n=${bbox.north},s=${bbox.south},e=${bbox.east},w=${bbox.west}')
     console.log('[MAP] fitBounds(zip) north=${bbox.north}, south=${bbox.south}, east=${bbox.east}, west=${bbox.west}')
@@ -1379,6 +1404,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     
                     // Only handle user interactions
                     if (userInteraction) {
+                      // Set guard immediately on user interaction
+                      setGuardMapMove(true, 'User panned/zoomed')
+                      console.log('[MAP] userMove=true (guard active)')
+                      
                       if (arbiter.programmaticMoveGuard) {
                         console.log('[CONTROL] user pan -> mode: zip → map; guard=false')
                         setProgrammaticMoveGuard(false, 'User interaction after ZIP')
@@ -1393,6 +1422,20 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                       const saved = JSON.parse(localStorage.getItem('lootaura_last_location') || '{}')
                       localStorage.setItem('lootaura_last_location', JSON.stringify({ ...saved, lat: center.lat, lng: center.lng }))
                     } catch {}
+                  }}
+                  onMoveEnd={() => {
+                    // Clear guard after user interaction completes
+                    if (arbiter.guardMapMove) {
+                      setGuardMapMove(false, 'Move completed')
+                      console.log('[MAP] move completed - guard cleared')
+                    }
+                  }}
+                  onZoomEnd={() => {
+                    // Clear guard after user interaction completes
+                    if (arbiter.guardMapMove) {
+                      setGuardMapMove(false, 'Zoom completed')
+                      console.log('[MAP] zoom completed - guard cleared')
+                    }
                   }}
                 />
               </div>

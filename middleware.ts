@@ -6,12 +6,18 @@ import { cookies } from 'next/headers'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
-  // 0. Explicit bypass for manifest.json and other critical assets
-  if (pathname === '/manifest.json' || pathname === '/favicon.ico' || pathname === '/sw.js') {
+  // 1. Public pages that don't require authentication
+  const isPublicPage = 
+    pathname === '/' ||
+    pathname === '/sales' ||
+    pathname === '/sell/new';
+  
+  if (isPublicPage) {
+    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     return NextResponse.next();
   }
   
-  // 1. Bypass all static assets immediately - comprehensive list
+  // 2. Public static assets and PWA files
   const isStaticAsset = 
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/assets/') ||
@@ -29,17 +35,31 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/icons/');
   
   if (isStaticAsset) {
+    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     return NextResponse.next();
   }
   
-  // 2. Bypass requests with manifest content type or .json extension
+  // 3. Public API endpoints (GET only for sales, all methods for others)
+  const isPublicAPI = 
+    (pathname === '/api/sales' && req.method === 'GET') ||
+    (pathname === '/api/sales/markers' && req.method === 'GET') ||
+    pathname.startsWith('/api/geocoding/') ||
+    pathname === '/api/location';
+  
+  if (isPublicAPI) {
+    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    return NextResponse.next();
+  }
+  
+  // 4. Bypass requests with manifest content type or .json extension
   const accept = req.headers.get('accept') || '';
   const isManifestRequest = accept.includes('application/manifest+json') || pathname.endsWith('.json');
   if (isManifestRequest) {
+    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     return NextResponse.next();
   }
   
-  // 3. Bypass auth pages to prevent redirect loops
+  // 5. Bypass auth pages to prevent redirect loops
   const isAuthPage = 
     pathname === '/login' ||
     pathname === '/signin' ||
@@ -47,22 +67,26 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/api/auth/');
   
   if (isAuthPage) {
+    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     return NextResponse.next();
   }
   
-  // 4. Only protect specific routes and write APIs
+  // 6. Protected routes that require authentication
   const isProtectedRoute = 
     pathname.startsWith('/favorites/') ||
     pathname.startsWith('/account/') ||
     pathname.startsWith('/admin/');
   
+  // 7. Write APIs that require authentication
   const isWriteAPI = 
-    req.method === 'POST' && pathname.startsWith('/api/sales') ||
-    req.method === 'PUT' && pathname.startsWith('/api/sales') ||
-    req.method === 'DELETE' && pathname.startsWith('/api/sales');
+    (req.method === 'POST' && pathname.startsWith('/api/sales')) ||
+    (req.method === 'PUT' && pathname.startsWith('/api/sales')) ||
+    (req.method === 'PATCH' && pathname.startsWith('/api/sales')) ||
+    (req.method === 'DELETE' && pathname.startsWith('/api/sales'));
   
   // Only run auth checks for protected routes or write APIs
   if (!isProtectedRoute && !isWriteAPI) {
+    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     return NextResponse.next();
   }
   

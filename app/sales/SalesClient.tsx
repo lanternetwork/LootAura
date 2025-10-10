@@ -290,125 +290,25 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     return `${round(bounds.north)},${round(bounds.south)},${round(bounds.east)},${round(bounds.west)}`
   }, [])
 
-  // Coalesced visibility computation with stability barrier and idle/rAF chain
-  const scheduleVisibilityCompute = useCallback((reason: string) => {
-    const markersVersion = markersVersionRef.current
-    const boundsTs = latestBoundsTsRef.current
-    const computeKey = `${markersVersion}-${boundsTs}`
+  // Keep visibleSales in sync with current sales and viewport
+  useEffect(() => {
+    // Defer crop until we have real bounds; avoid cropping against null/old bounds
+    if (!viewportBounds) return
+    const now = Date.now()
+    const last = lastBoundsTsRef.current || 0
     
-    // Skip if same key already enqueued
-    if (visibilityComputeKeyRef.current === computeKey) {
+    // Only crop if bounds are fresh (within 500ms) or this is the first crop
+    if (now - last > 500 && last > 0) {
+      console.log('[VIEWPORT] crop skipped - stale bounds', { age: now - last })
       return
     }
     
-    // Stability barrier for first compute
-    const now = Date.now()
-    if (firstStableViewportTsRef.current === 0) {
-      if (!mapReady || mapMarkers.length === 0 || sales.length === 0 || now - lastViewportEmitTsRef.current < 150) {
-        const remain = 150 - (now - lastViewportEmitTsRef.current)
-        console.log(`[STABILITY] wait ${Math.max(0, remain)}ms (boundsKey: ${latestBoundsKeyRef.current})`)
-        
-        // Re-arm timer instead of dropping compute
-        if (pendingStableTimerRef.current) {
-          clearTimeout(pendingStableTimerRef.current)
-        }
-        pendingStableTimerRef.current = setTimeout(() => {
-          scheduleVisibilityCompute('stable-debounce')
-        }, Math.max(0, remain))
-        return
-      }
-      firstStableViewportTsRef.current = now
-    }
-    
-    // Clear any pending computation
-    if (visibilityComputeTimeoutRef.current) {
-      clearTimeout(visibilityComputeTimeoutRef.current)
-    }
-    
-    visibilityComputeKeyRef.current = computeKey
-    
-    // Idle/rAF chain: wait for map idle, then double rAF
-    const runCompute = () => {
-      // Check if still current
-      if (visibilityComputeKeyRef.current !== computeKey) {
-        return // Stale computation, abort
-      }
-      
-      // Read latest bounds at execution time (single source of truth)
-      const currentBounds = viewportBounds
-      const currentMarkers = mapMarkers
-      const currentBoundsKey = latestBoundsKeyRef.current
-      
-      if (!currentBounds || currentMarkers.length === 0) {
-        return
-      }
-      
-      // Check for stale bounds and requeue immediately
-      const computeBoundsKey = createBoundsKey(currentBounds)
-      if (computeBoundsKey !== currentBoundsKey) {
-        console.log('[VIEWPORT] crop skipped - stale bounds')
-        scheduleVisibilityCompute('stale-reschedule')
-        return
-      }
-      
-      // Filter markers within bounds
-      const visibleMarkers = currentMarkers.filter(marker => {
-        if (!marker.lat || !marker.lng) return false
-        const { north, south, east, west } = currentBounds
-        const crossesAntimeridian = east < west
-        
-        if (!crossesAntimeridian) {
-          return marker.lat >= south && marker.lat <= north && 
-                 marker.lng >= west && marker.lng <= east
-        } else {
-          return marker.lat >= south && marker.lat <= north && 
-                 (marker.lng >= west || marker.lng <= east)
-        }
-      })
-      
-      const visibleIds = visibleMarkers.map(m => m.id).sort()
-      
-      // Check if visible set actually changed (Rule B)
-      const lastIds = lastVisibleIdsRef.current
-      const idsEqual = visibleIds.length === lastIds.length && 
-                      visibleIds.every((id, i) => id === lastIds[i])
-      
-      if (!idsEqual) {
-        // Zero-result guard with retry logic (Rule A)
-        if (visibleIds.length === 0 && (inFlightSales || inFlightMarkers) && currentMarkers.length > 0) {
-          console.log('[GUARD] zero result while in-flight, retrying...')
-          // Reschedule after next idle+rAF cycle (max 2 retries)
-          setTimeout(() => {
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                scheduleVisibilityCompute('retry-zero-guard')
-              })
-            })
-          }, 100)
-          return
-        }
-        
-        lastVisibleIdsRef.current = visibleIds
-        
-        // Filter sales to only show those with visible IDs
-        const visibleSales = sales.filter(sale => visibleIds.includes(sale.id))
-        setRenderedSales(visibleSales)
-        
-        console.log(`[VISIBLE] count: ${visibleIds.length} key=(mVer:${markersVersion} bKey:${currentBoundsKey})`)
-      }
-      
-      visibilityComputeTimeoutRef.current = null
-    }
-    
-    // Schedule with double rAF for tile/layer commitment
-    visibilityComputeTimeoutRef.current = setTimeout(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          runCompute()
-        })
-      })
-    }, 0)
-  }, [mapReady, mapMarkers, viewportBounds, sales, inFlightSales, inFlightMarkers])
+    const inView = cropSalesToViewport(sales, viewportBounds)
+    const rendered = inView.slice(0, 24)
+    setVisibleSales(inView)
+    setRenderedSales(rendered)
+    console.log('[LIST] update (cap=24) inView=', inView.length, 'rendered=', rendered.length)
+  }, [sales, viewportBounds, cropSalesToViewport])
 
   // Debounced bounds emission (leading + trailing)
   const emitBoundsDebounced = useCallback((bounds: { north: number; south: number; east: number; west: number; ts: number }) => {
@@ -1126,32 +1026,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [debouncedTrigger, fetchSales, fetchMapSales])
 
   // Debounced visible list recompute
-  const listDebounceRef = useRef<NodeJS.Timeout | null>(null)
-  const recomputeVisibleSales = useCallback((all: Sale[], b: typeof viewportBounds) => {
-    if (listDebounceRef.current) clearTimeout(listDebounceRef.current)
-    listDebounceRef.current = setTimeout(() => {
-      const now = Date.now()
-      const bObj = b ? { west: b.west, south: b.south, east: b.east, north: b.north, ts: b.ts } : null
-      const s0 = all?.[0] ? { lat: all[0].lat, lng: all[0].lng } : null
-      const s1 = all?.[1] ? { lat: all[1].lat, lng: all[1].lng } : null
-      const pointInBounds = (lat?: number, lng?: number) => {
-        if (!b || lat == null || lng == null) return false
-        const { north, south, east, west } = b
-        const crosses = east < west
-        const EPS = 0.0005
-        const inLat = lat <= north + EPS && lat >= south - EPS
-        const inLng = crosses
-          ? lng >= west - EPS || lng <= east + EPS
-          : lng >= west - EPS && lng <= east + EPS
-        return inLat && inLng
-      }
-
-      const inView = cropSalesToViewport(all, b)
-      const rendered = inView.slice(0, 24)
-      setVisibleSales(rendered)
-      console.log('[LIST] update (cap=24) inView=', inView.length, 'rendered=', rendered.length)
-    }, 180)
-  }, [cropSalesToViewport])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1198,10 +1072,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     if (!viewportBounds) return
     const now = Date.now()
     const last = lastBoundsTsRef.current || 0
-    // If bounds just updated very recently, run crop now; otherwise schedule microtask
-    const delay = now - last <= 32 ? 0 : 0
-    queueMicrotask?.(() => recomputeVisibleSales(sales, viewportBounds))
-  }, [recomputeVisibleSales, sales, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west])
+    // Visibility is now handled by the main useEffect
+  }, [sales, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west])
 
   // Refetch map pins when filters location/range change
   useEffect(() => {
@@ -1689,8 +1561,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onMapReady={onMapReady}
                   onVisiblePinsChange={(visibleIds, count) => {
                     console.log('[LIST] visible:', count)
-                    // Markers updates must only enqueue compute - never set visible=0 directly
-                    scheduleVisibilityCompute('markers-updated')
+                    // Visibility is now handled by the viewport bounds system
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly

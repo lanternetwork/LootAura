@@ -1031,34 +1031,34 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Reset pagination for distance changes
     resetPagination()
     
-    // Use current center from filters or mapView
-    const currentCenter = filters.lat && filters.lng 
-      ? { lat: filters.lat, lng: filters.lng }
-      : mapView.center || { lat: 38.2527, lng: -85.7585 }
+    // CRITICAL: Use current viewport center (after user pan), not initial filters center
+    const currentCenter = mapView.center && mapView.center.lat && mapView.center.lng
+      ? { lat: mapView.center.lat, lng: mapView.center.lng }
+      : (filters.lat && filters.lng 
+        ? { lat: filters.lat, lng: filters.lng }
+        : { lat: 38.2527, lng: -85.7585 })
+    
+    console.log('[DIST] center used for fetch: lat=' + currentCenter.lat + ', lng=' + currentCenter.lng + ' (from viewport)')
+    console.log('[DIST] radius miles→km {miles:' + newDistance + ', km:' + milesToKm(newDistance) + '}')
     
     const bbox = computeBboxForRadius(currentCenter, newDistance)
-    
-    // Check if map movement is guarded
-    if (arbiter.guardMapMove) {
-      console.log('[MAP] ignoring auto-fit (guarded) - distance change blocked')
-      return
-    }
-    
-    // In MAP-AUTHORITATIVE mode, never call fitBounds automatically
-    if (arbiter.authority === 'MAP-AUTHORITATIVE') {
-      console.log('[MAP] ignoring auto-fit - MAP-AUTHORITATIVE mode prevents automatic movement')
-      return
-    }
     
     // Switch to FILTERS-AUTHORITATIVE mode for distance changes
     setAuthority('FILTERS-AUTHORITATIVE', 'Distance filter changed')
     
+    // Allow a single-use zoom operation for distance changes
+    // This bypasses the guard by clearing it temporarily
+    setGuardMapMove(false, 'Distance change - allow zoom')
+    
     setFitBounds(bbox)
-    console.log('[MAP] fitBounds(distance)', bbox.north, bbox.south, bbox.east, bbox.west)
+    console.log('[DIST-ZOOM] applied for radius=' + newDistance + ', center fixed at (' + currentCenter.lat + ',' + currentCenter.lng + ')')
     
     // Update URL with new distance and current center
-    updateFilters({ distance: newDistance }, false) // Update URL
-    console.log('[URL] distance change -> lat,lng, dist=miles', currentCenter.lat, currentCenter.lng, newDistance)
+    updateFilters({ 
+      distance: newDistance,
+      lat: currentCenter.lat,
+      lng: currentCenter.lng
+    }, false)
     
     // Trigger debounced fetches
     debouncedTrigger(() => {
@@ -1396,6 +1396,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     // Filter sales to only show those with visible IDs
                     const visibleSales = sales.filter(sale => visibleIds.includes(sale.id))
                     setRenderedSales(visibleSales)
+                    console.log('[OVERLAY] visible=' + visibleSales.length + ' (source=viewport)')
+                    console.log('[SYNC] list=' + visibleSales.length + ', overlay=' + visibleSales.length + ', pins=' + count)
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly
@@ -1471,7 +1473,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                       <strong>Searching within {filters.distance} miles</strong> of your location
                     </p>
                     <p className="text-xs text-blue-600 mt-1">
-                      Showing {sales.length} results
+                      Showing {renderedSales.length} sales
                     </p>
                   </div>
                 </div>

@@ -764,7 +764,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         console.debug('[SALES] got', sales.length)
 
         // Prefetch next page in background for instant next click
-        if (!append && pageHasMore && arbiter.authority !== 'MAP') {
+        // Note: safe here because MAP authority already returned above
+        if (!append && pageHasMore) {
           const nextParams: GetSalesParams = {
             ...params,
             offset: newSales.length,

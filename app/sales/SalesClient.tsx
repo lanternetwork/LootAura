@@ -246,8 +246,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [requestToken, setRequestToken] = useState<string>('')
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [visiblePins, setVisiblePins] = useState<string[]>([])
-  const [visibleSales, setVisibleSales] = useState<Sale[]>([])
-  const [isUpdating, setIsUpdating] = useState(false)
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
   const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)

@@ -2,6 +2,16 @@
 
 All notable changes to YardSaleFinder will be documented in this file.
 
+## [Docs Refresh: Mapbox Migration] - 2025-10-10
+
+### Changed
+- Migrate documentation from Google Maps/Places/Geocoding to Mapbox GL JS & Geocoding API
+- Update environment variables to use `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` (+ optional `MAPBOX_GEOCODING_ENDPOINT`)
+- Revise deployment and launch docs for Mapbox setup and validation
+- Add MAP authority behavior notes (arbiter, visible pins → list derivation)
+- Clarify public routes: `/sales`, `/api/sales`, `/api/sales/markers`, `/manifest.json`
+- Enhance troubleshooting with Mapbox-specific guidance and MAP list-sync checks
+
 ## [Production Steps Kickoff] - 2025-01-18
 
 ### Added

@@ -5,7 +5,7 @@ A modern web application for discovering and managing yard sales, garage sales, 
 
 ## Features
 
-- **Interactive Map View**: Find sales near you with an interactive map
+- **Interactive Map View**: Find sales near you with an interactive Mapbox map
 - **List View**: Browse sales in a clean, organized list
 - **User Authentication**: Sign up and manage your account
 - **Favorites**: Save sales you're interested in
@@ -49,7 +49,7 @@ LootAura includes a comprehensive US ZIP code database for instant, free geocodi
 ### Geocoding API
 - **Endpoint**: `/api/geocoding/zip?zip=XXXXX`
 - **Local First**: Queries `lootaura_v2.zipcodes` table for instant results
-- **Fallback**: Nominatim geocoding (throttled to 1 request/second)
+- **Fallback**: Nominatim geocoding (throttled) or Mapbox Geocoding API (token-based)
 - **Write-back**: Optional storage of Nominatim results (set `ENABLE_ZIP_WRITEBACK=true`)
 
 ### Benefits
@@ -67,7 +67,7 @@ This project uses configurable Supabase schemas via environment variables. The s
 - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
 - `NEXT_PUBLIC_SUPABASE_SCHEMA` - The schema to use (defaults to 'public')
-- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` - Google Maps API key for geocoding
+- `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` - Mapbox public access token (maps/geocoding)
 - `SUPABASE_SERVICE_ROLE` - Supabase service role key
 
 ### Optional Environment Variables
@@ -99,7 +99,7 @@ The application automatically uses the configured schema for all Supabase operat
 - **Styling**: Tailwind CSS
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: Supabase Auth
-- **Maps**: Google Maps API, Mapbox
+- **Maps**: Mapbox GL JS
 - **Deployment**: Vercel
 #  Forced redeployment 09/30/2025 21:09:32
 

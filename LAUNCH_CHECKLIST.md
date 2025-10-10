@@ -22,7 +22,7 @@
 
 ### Security
 - [ ] **Environment Variables**: All required vars configured
-- [ ] **API Keys**: Google Maps API key has proper restrictions
+- [ ] **API Keys**: Mapbox access token configured (public token for client; secret only if server geocoding)
 - [ ] **RLS Policies**: Owner-based access control active
 - [ ] **Rate Limiting**: Configured and tested
 - [ ] **CSP Headers**: Content Security Policy active
@@ -86,8 +86,8 @@
 ### Technical Checks
 - [ ] **Health Endpoint**: `GET /api/health` returns success
 - [ ] **Database**: All queries execute successfully
-- [ ] **Maps**: Google Maps loads and displays markers
-- [ ] **Geocoding**: Address to coordinates conversion works
+- [ ] **Maps**: Mapbox GL JS renders tiles and displays markers
+- [ ] **Geocoding**: Mapbox Geocoding API (or local ZIP) returns coordinates; apply backoff on errors
 - [ ] **Images**: Photo upload and display works
 - [ ] **PWA**: Install prompt appears on mobile
 - [ ] **Offline**: Basic offline functionality works

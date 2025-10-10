@@ -4,7 +4,7 @@
 
 - **Hosting**: Vercel (Next.js hosting)
 - **Database**: Supabase (PostgreSQL + Auth + Storage)
-- **Maps**: Google Maps (JavaScript API + Places API + Geocoding API)
+- **Maps**: Mapbox (GL JS + Geocoding API)
 - **Monitoring**: Sentry (error tracking)
 - **Analytics**: Web Vitals + Custom events
 - **Rate Limiting**: Upstash Redis (production)
@@ -33,8 +33,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 # Supabase (Server-only - never expose)
 SUPABASE_SERVICE_ROLE=your_service_role_key
 
-# Google Maps (Public - safe to expose)
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_key
+# Mapbox (Public - safe to expose)
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your_mapbox_public_token
+# Optional server-side geocoding endpoint
+MAPBOX_GEOCODING_ENDPOINT=https://api.mapbox.com/geocoding/v5/mapbox.places
 
 # Optional: Nominatim fallback (Server-only)
 NOMINATIM_APP_EMAIL=your-email@domain.com
@@ -80,17 +82,15 @@ Run these migrations in order:
 - **reviews**: Public read, authenticated write with owner_id
 - **push_subscriptions**: User-specific read/write
 
-### Google Maps Configuration
+### Mapbox Configuration
 
 #### APIs to Enable
-- **Maps JavaScript API**: For map display
-- **Places API**: For address autocomplete
-- **Geocoding API**: For address to coordinates conversion
+- **Mapbox GL JS**: For map display (vector tiles, clusters, markers)
+- **Geocoding API**: For address and reverse geocoding
 
 #### API Key Restrictions
-- **HTTP referrers**: `https://lootaura.com/*`
-- **IP addresses**: Vercel server IPs (if needed)
-- **API restrictions**: Maps JavaScript API, Places API, Geocoding API
+- **Token scopes**: Public token for client; secret token only if server geocoding with higher privileges
+- **Allowed origins**: Restrict token to your production domains when possible
 
 ## Deploy Steps
 
@@ -125,7 +125,8 @@ Run these migrations in order:
    NEXT_PUBLIC_SUPABASE_URL = https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY = your_anon_key
    SUPABASE_SERVICE_ROLE = your_service_role_key
-   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = your_google_maps_key
+   NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN = your_mapbox_public_token
+   MAPBOX_GEOCODING_ENDPOINT = https://api.mapbox.com/geocoding/v5/mapbox.places
    NOMINATIM_APP_EMAIL = your-email@domain.com
    NEXT_PUBLIC_SITE_URL = https://lootaura.com
    ```
@@ -226,18 +227,18 @@ curl https://lootaura.com/api/health
 ### Monthly Cost Estimates
 - **Vercel**: $0 (Hobby plan) to $20 (Pro plan)
 - **Supabase**: $25 (Pro plan) to $200 (high usage)
-- **Google Maps**: $10-50 (depending on usage)
+- **Mapbox**: pricing varies by tile/geocoding usage; monitor token usage
 - **Upstash Redis**: $0-10 (depending on usage)
 - **Sentry**: $0-26 (depending on plan)
 
 ### Quota Monitoring
 - **Vercel**: 100GB bandwidth, 100GB-hours function execution
 - **Supabase**: 8GB database, 100GB storage, 500k requests
-- **Google Maps**: 28k loads, 1k requests per month (free tier)
+- **Mapbox**: usage-based billing; review plan limits in your Mapbox account
 - **Upstash**: 10k requests per day (free tier)
 
 ### Cost Optimization
-- **Geocoding**: Write-time only (100x cost reduction)
+- **Geocoding**: Write-time only (100x cost reduction); prefer local ZIP database when possible
 - **Maps**: Dynamic import (50% cost reduction)
 - **Images**: Next.js optimization (70% cost reduction)
 - **Database**: Efficient queries with indexes (60% cost reduction)
@@ -246,10 +247,10 @@ curl https://lootaura.com/api/health
 ## Security Configuration
 
 ### Content Security Policy
-- **Script sources**: `'self'`, Google Maps APIs
+- **Script sources**: `'self'`, Mapbox domains
 - **Image sources**: `'self'`, `data:`, `https:`, `blob:`
 - **Connect sources**: `'self'`, Supabase domains
-- **Frame sources**: `'self'`, Google Maps
+- **Frame sources**: `'self'`, Mapbox
 
 ### Security Headers
 - **X-Frame-Options**: DENY
@@ -304,7 +305,7 @@ curl https://lootaura.com/api/health
 
 2. **Runtime Errors**
    - Check Supabase connection
-   - Verify Google Maps API key
+   - Verify Mapbox access token
    - Check RLS policies
 
 3. **Performance Issues**
@@ -336,7 +337,7 @@ curl https://lootaura.com/api/health
 ### Support Contacts
 - **Vercel**: [Vercel Support](https://vercel.com/support)
 - **Supabase**: [Supabase Support](https://supabase.com/support)
-- **Google Maps**: [Google Cloud Support](https://cloud.google.com/support)
+- **Mapbox**: [Mapbox Support](https://docs.mapbox.com/help/)
 
 ## Success Criteria
 

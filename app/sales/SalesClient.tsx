@@ -18,10 +18,59 @@ import LoadMoreButton from '@/components/LoadMoreButton'
 
 // Intent Arbiter types
 type ControlMode = 'initial' | 'map' | 'zip' | 'distance'
+type AuthorityMode = 'MAP-AUTHORITATIVE' | 'FILTERS-AUTHORITATIVE'
+
 interface ControlArbiter {
   mode: ControlMode
+  authority: AuthorityMode
   programmaticMoveGuard: boolean
   lastChangedAt: number
+  lastTransitionReason: string
+}
+
+interface QueryShape {
+  lat: number
+  lng: number
+  radiusKm: number
+  dateRange: string
+  categories: string[]
+  shapeHash: string
+}
+
+interface MapViewState {
+  center: { lat: number; lng: number }
+  bounds: { west: number; south: number; east: number; north: number }
+  zoom: number
+  radiusKm: number
+}
+
+// Arbiter helper functions
+function createShapeHash(lat: number, lng: number, radiusKm: number, dateRange: string, categories: string[]): string {
+  const catKey = categories.sort().join(',')
+  const dateKey = dateRange === 'any' ? 'any' : dateRange
+  return `${lat.toFixed(6)}|${lng.toFixed(6)}|${radiusKm.toFixed(2)}|${dateKey}|${catKey}`
+}
+
+function computeRadiusFromZoom(zoom: number): number {
+  // Approximate radius in km based on zoom level
+  const baseRadius = 40 // Default 40km (25 miles)
+  const zoomFactor = Math.pow(2, 12 - zoom) // Zoom 12 = 40km
+  return Math.max(1, Math.min(160, baseRadius * zoomFactor))
+}
+
+function computeRadiusFromBounds(bounds: { west: number; south: number; east: number; north: number }): number {
+  // Approximate radius from bounds using center and corner distance
+  const centerLat = (bounds.north + bounds.south) / 2
+  const centerLng = (bounds.east + bounds.west) / 2
+  const cornerLat = bounds.north
+  const cornerLng = bounds.east
+  
+  // Simple distance calculation (not haversine, but good enough for radius approximation)
+  const latDiff = cornerLat - centerLat
+  const lngDiff = cornerLng - centerLng
+  const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff) * 111 // Rough km conversion
+  
+  return Math.max(1, Math.min(160, distance))
 }
 
 // Cookie utility functions
@@ -58,13 +107,28 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   )
 
   // Source of Truth Arbiter — observe-only for now
-  const [arbiter, setArbiter] = useState<ControlArbiter>({ mode: 'initial', programmaticMoveGuard: false, lastChangedAt: Date.now() })
+  const [arbiter, setArbiter] = useState<ControlArbiter>({ 
+    mode: 'initial', 
+    authority: 'MAP-AUTHORITATIVE',
+    programmaticMoveGuard: false, 
+    lastChangedAt: Date.now(),
+    lastTransitionReason: 'initial'
+  })
 
   const updateControlMode = useCallback((mode: ControlMode, reason: string) => {
     setArbiter(prev => {
       if (prev.mode === mode) return prev
-      const next = { ...prev, mode, lastChangedAt: Date.now() }
+      const next = { ...prev, mode, lastChangedAt: Date.now(), lastTransitionReason: reason }
       console.log(`[ARB] mode=${mode} reason=${reason} ts=${next.lastChangedAt}`)
+      return next
+    })
+  }, [])
+
+  const setAuthority = useCallback((authority: AuthorityMode, reason: string) => {
+    setArbiter(prev => {
+      if (prev.authority === authority) return prev
+      const next = { ...prev, authority, lastChangedAt: Date.now(), lastTransitionReason: reason }
+      console.log(`[ARB] authority=${authority} reason=${reason} ts=${next.lastChangedAt}`)
       return next
     })
   }, [])
@@ -77,6 +141,85 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       return next
     })
   }, [])
+
+  // Get effective query shape based on current authority
+  const getEffectiveQueryShape = useCallback((): QueryShape => {
+    const dateRange = filters.dateRange === 'any' ? 'any' : filters.dateRange
+    const categories = filters.categories || []
+    
+    if (arbiter.authority === 'MAP-AUTHORITATIVE') {
+      // Use current map center and computed radius
+      const center = { lat: filters.lat || 0, lng: filters.lng || 0 }
+      const radiusKm = computeRadiusFromZoom(12) // Default zoom 12
+      const shapeHash = createShapeHash(center.lat, center.lng, radiusKm, dateRange, categories)
+      return { lat: center.lat, lng: center.lng, radiusKm, dateRange, categories, shapeHash }
+    } else {
+      // Use filter values
+      const center = { lat: filters.lat || 0, lng: filters.lng || 0 }
+      const radiusKm = milesToKm(filters.distance || 25)
+      const shapeHash = createShapeHash(center.lat, center.lng, radiusKm, dateRange, categories)
+      return { lat: center.lat, lng: center.lng, radiusKm, dateRange, categories, shapeHash }
+    }
+  }, [arbiter.authority, filters])
+
+  // Unified fetch function with request tokening
+  const fetchWithToken = useCallback(async (endpoint: 'sales' | 'markers', queryShape: QueryShape) => {
+    // Cancel previous request
+    if (abortController) {
+      abortController.abort()
+      console.log(`[NET] abort previous request for ${endpoint}`)
+    }
+
+    // Create new request token
+    const newToken = `${endpoint}-${queryShape.shapeHash}-${Date.now()}`
+    setRequestToken(newToken)
+    setIsUpdating(true)
+
+    // Create new abort controller
+    const newController = new AbortController()
+    setAbortController(newController)
+
+    try {
+      const url = endpoint === 'sales' 
+        ? `/api/sales?lat=${queryShape.lat}&lng=${queryShape.lng}&distanceKm=${queryShape.radiusKm}&dateRange=${queryShape.dateRange}&categories=${queryShape.categories.join(',')}`
+        : `/api/sales/markers?lat=${queryShape.lat}&lng=${queryShape.lng}&distanceKm=${queryShape.radiusKm}&dateRange=${queryShape.dateRange}&categories=${queryShape.categories.join(',')}`
+
+      console.log(`[NET] start ${endpoint} {seq: ${newToken}}`)
+      
+      const response = await fetch(url, { signal: newController.signal })
+      const data = await response.json()
+
+      // Check if this request is still current
+      if (requestToken !== newToken) {
+        console.log(`[NET] ignore stale response for ${endpoint}`)
+        return
+      }
+
+      if (data.ok) {
+        console.log(`[NET] ok ${endpoint} {seq: ${newToken}}`)
+        
+        if (endpoint === 'sales') {
+          setSales(data.data || [])
+        } else {
+          setMapMarkers(data.data || [])
+        }
+      } else {
+        console.error(`[NET] error ${endpoint}:`, data.error)
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log(`[NET] aborted ${endpoint} {seq: ${newToken}}`)
+        return
+      }
+      console.error(`[NET] error ${endpoint}:`, error)
+    } finally {
+      // Only clear updating state if this is still the current request
+      if (requestToken === newToken) {
+        setIsUpdating(false)
+        setAbortController(null)
+      }
+    }
+  }, [abortController, requestToken])
 
   // Debug logging
   console.log('[SALES] SalesClient render:', {
@@ -98,6 +241,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
   const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
+  
+  // Request tokening system
+  const [requestToken, setRequestToken] = useState<string>('')
+  const [abortController, setAbortController] = useState<AbortController | null>(null)
+  const [visiblePins, setVisiblePins] = useState<string[]>([])
+  const [visibleSales, setVisibleSales] = useState<Sale[]>([])
+  const [isUpdating, setIsUpdating] = useState(false)
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
   const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)

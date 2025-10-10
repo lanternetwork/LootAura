@@ -1040,9 +1040,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)
       }
-      if (listDebounceRef.current) {
-        clearTimeout(listDebounceRef.current)
-      }
     }
   }, [])
 

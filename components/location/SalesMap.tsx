@@ -417,6 +417,12 @@ export default function SalesMap({
     }
   }
 
+  // Prevent page scroll when interacting with map
+  const handleMapInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
   const handleZoomEnd = (evt: any) => {
     setMoved(true)
     scheduleAutoSearch()
@@ -485,7 +491,18 @@ export default function SalesMap({
   }
 
   return (
-    <div className="h-96 w-full rounded-lg overflow-hidden relative">
+    <div 
+      className="h-96 w-full rounded-lg overflow-hidden relative"
+      style={{ 
+        touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        MozUserSelect: 'none',
+        msUserSelect: 'none'
+      }}
+      onMouseDown={handleMapInteraction}
+      onTouchStart={handleMapInteraction}
+    >
       {/* Visible pins count based on queryRenderedFeatures */}
       <div className="absolute top-2 left-2 z-10 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
         {visiblePinCount} pins
@@ -499,6 +516,14 @@ export default function SalesMap({
         ref={mapRef}
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
+        preventDefault={true}
+        scrollZoom={true}
+        dragPan={true}
+        dragRotate={false}
+        doubleClickZoom={true}
+        touchZoom={true}
+        touchPitch={true}
+        keyboard={true}
       >
         {markers.map((marker) => {
           const lat = +marker.lat

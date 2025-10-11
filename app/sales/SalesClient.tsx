@@ -1146,21 +1146,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     fetchMapSales()
   }, [fetchMapSales])
 
-  // Clear visible pins and trigger viewport update when date filters change in MAP authority
-  useEffect(() => {
-    if (arbiter.authority === 'MAP' && filters.dateRange) {
-      // When date filters change, clear visible pins and trigger viewport update
-      // This ensures the map recalculates which pins should be visible with new filtered markers
-      setVisiblePinIdsState([])
-      
-      // Trigger a viewport update to recalculate visible pins with new filtered markers
-      // This forces the map to re-evaluate which pins are visible in the current viewport
-      if (viewportSeqRef.current !== undefined) {
-        viewportSeqRef.current += 1
-        console.log(`[LIST][MAP] triggering viewport update for date filter change - seq=${viewportSeqRef.current}`)
-      }
-    }
-  }, [arbiter.authority, filters.dateRange])
+  // Note: When date filters change, the map will automatically recalculate visible pins
+  // when the new filtered markers are loaded. No manual intervention needed.
 
   // Initialize filters from server-provided center once, only if no location set yet
   useEffect(() => {

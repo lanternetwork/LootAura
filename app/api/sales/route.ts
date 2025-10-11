@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getDateWindow, saleOverlapsWindow, formatDateWindow } from '@/lib/date/dateWindows'
+import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now()
+  
   try {
     const supabase = createSupabaseServerClient()
     const { searchParams } = new URL(request.url)
@@ -36,13 +38,14 @@ export async function GET(request: NextRequest) {
     
     // 2. Parse & validate other parameters
     const distanceKm = Math.max(1, Math.min(
-      searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm')!) : 40.2336,
+      searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm')!) : 40,
       160
     ))
     
     const dateRange = searchParams.get('dateRange') || 'any'
-    const startDate = searchParams.get('startDate') || undefined
-    const endDate = searchParams.get('endDate') || undefined
+    const startDate = searchParams.get('from') || searchParams.get('dateFrom') || searchParams.get('startDate') || undefined
+    const endDate = searchParams.get('to') || searchParams.get('dateTo') || searchParams.get('endDate') || undefined
+    
     
     const categoriesParam = searchParams.get('categories')
     const categories = categoriesParam 
@@ -57,149 +60,360 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
     
-    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50, 100)
+    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 24, 48)
     const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0, 0)
     
-    // Log parameters
-    console.log(`[SALES] lat=${latitude},lng=${longitude},km=${distanceKm},dateRange=${dateRange},cats=${categories.join(',')},q=${q} -> returned=count degraded?=bool`)
-    
-    // 3. Compute date window if needed
-    const dateWindow = dateRange !== 'any' ? getDateWindow(dateRange, startDate, endDate) : null
-    if (dateRange !== 'any' && !dateWindow) {
+    // Validate date range parameters
+    const dateValidation = validateDateRange(startDate, endDate)
+    if (!dateValidation.valid) {
       return NextResponse.json({ 
         ok: false, 
-        error: 'Invalid date range parameters' 
+        error: dateValidation.error 
       }, { status: 400 })
     }
+
+    // Convert date range to start/end dates
+    let startDateParam: string | null = null
+    let endDateParam: string | null = null
+    
+    // If explicit start/end provided, honor them regardless of dateRange token
+    if (startDate) startDateParam = startDate
+    if (endDate) endDateParam = endDate
+    
+    // If no explicit dates, compute from dateRange presets
+    if (!startDateParam && !endDateParam && dateRange !== 'any') {
+      const now = new Date()
+      switch (dateRange) {
+        case 'today':
+          startDateParam = now.toISOString().split('T')[0]
+          endDateParam = now.toISOString().split('T')[0]
+          break
+        case 'weekend':
+          const saturday = new Date(now)
+          saturday.setDate(now.getDate() + (6 - now.getDay()))
+          const sunday = new Date(saturday)
+          sunday.setDate(saturday.getDate() + 1)
+          startDateParam = saturday.toISOString().split('T')[0]
+          endDateParam = sunday.toISOString().split('T')[0]
+          break
+        case 'next_weekend':
+          const nextSaturday = new Date(now)
+          nextSaturday.setDate(now.getDate() + (6 - now.getDay()) + 7)
+          const nextSunday = new Date(nextSaturday)
+          nextSunday.setDate(nextSaturday.getDate() + 1)
+          startDateParam = nextSaturday.toISOString().split('T')[0]
+          endDateParam = nextSunday.toISOString().split('T')[0]
+          break
+      }
+    }
+    
+    console.log(`[SALES] Query params: lat=${latitude}, lng=${longitude}, km=${distanceKm}, start=${startDateParam}, end=${endDateParam}, categories=[${categories.join(',')}], q=${q}, limit=${limit}, offset=${offset}`)
     
     let results: any[] = []
     let degraded = false
     
-    // 4. Try PostGIS distance calculation first
+    // 3. Use direct query to sales_v2 view (RPC functions have permission issues)
     try {
-      console.log(`[SALES] Attempting PostGIS distance calculation for lat=${latitude}, lng=${longitude}, km=${distanceKm}`)
+      console.log(`[SALES] Querying sales_v2 view directly...`)
       
-      const { data: postgisData, error: postgisError } = await supabase
-        .rpc('search_sales_by_distance', {
-          search_lat: latitude,
-          search_lng: longitude,
-          max_distance_km: distanceKm,
-          date_filter: dateRange !== 'any' ? dateRange : null,
-          category_filter: categories.length > 0 ? categories : null,
-          text_filter: q || null,
-          result_limit: limit,
-          result_offset: offset
-        })
+      // Calculate bounding box for approximate distance filtering
+      const latRange = distanceKm / 111.0 // 1 degree ≈ 111km
+      const lngRange = distanceKm / (111.0 * Math.cos(latitude * Math.PI / 180))
       
-      if (postgisError) {
-        throw new Error(`PostGIS RPC failed: ${postgisError.message}`)
+      const minLat = latitude - latRange
+      const maxLat = latitude + latRange
+      const minLng = longitude - lngRange
+      const maxLng = longitude + lngRange
+      
+      console.log(`[SALES] Bounding box: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
+      
+      let query = supabase
+        .from('sales_v2')
+        .select('*')
+      
+      // NOTE: We filter by date window after fetching to avoid PostgREST OR-composition issues
+      
+      // Add category filters - fallback to text search if tags array not present
+      if (categories.length > 0) {
+        const ors: string[] = []
+        for (const c of categories) {
+          const safe = c.replace(/[%_]/g, '')
+          ors.push(`title.ilike.%${safe}%`)
+          ors.push(`description.ilike.%${safe}%`)
+        }
+        if (ors.length > 0) {
+          query = query.or(ors.join(','))
+        }
+      }
+
+      // Add text search
+      if (q) {
+        query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,address.ilike.%${q}%`)
       }
       
-      console.log(`[SALES] PostGIS returned ${postgisData?.length || 0} results`)
+      // Fetch a wider slice to allow client-side distance filtering
+      const fetchWindow = Math.min(1000, Math.max(limit * 10, 200))
+      const { data: salesData, error: salesError } = await query
+        .order('id', { ascending: true })
+        .range(0, fetchWindow - 1)
       
-      // Apply date filtering in application layer for PostGIS results
-      results = (postgisData || [])
-        .filter((row: any) => {
-          if (!dateWindow) return true
-          return saleOverlapsWindow(row.start_at, row.end_at, dateWindow)
+      console.log(`[SALES] Direct query response:`, { 
+        dataCount: salesData?.length || 0, 
+        error: salesError,
+        sampleData: salesData?.slice(0, 2)
+      })
+      
+      if (salesError) {
+        console.error('Sales query error:', salesError)
+        return NextResponse.json({
+          ok: false,
+          error: 'Database query failed',
+          code: (salesError as any)?.code,
+          details: (salesError as any)?.message || (salesError as any)?.details,
+          hint: (salesError as any)?.hint,
+          relation: 'public.sales_v2'
+        }, { status: 500 })
+      }
+      
+      // Calculate distances and filter by actual distance and date window (UTC date-only)
+      const toUtcDateOnly = (d: string) => new Date(d.length === 10 ? `${d}T00:00:00Z` : d)
+      const windowStart = startDateParam ? toUtcDateOnly(startDateParam) : null
+      const windowEnd = endDateParam ? new Date((toUtcDateOnly(endDateParam)).getTime() + 86399999) : null
+      console.log('[SALES] Date filtering:', { startDateParam, endDateParam, windowStart, windowEnd })
+      // If coordinates are null or missing, skip those rows
+      const salesWithDistance = (salesData || [])
+        .map((sale: any) => {
+          const latNum = typeof sale.lat === 'number' ? sale.lat : parseFloat(String(sale.lat))
+          const lngNum = typeof sale.lng === 'number' ? sale.lng : parseFloat(String(sale.lng))
+          if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
+          return { ...sale, lat: latNum, lng: lngNum }
         })
-        .map((row: any) => ({
+        .filter((sale: any) => sale && typeof sale.lat === 'number' && typeof sale.lng === 'number')
+        .filter((sale: any) => {
+          if (!windowStart && !windowEnd) return true
+          // Build sale start/end
+          const saleStart = sale.starts_at
+            ? new Date(sale.starts_at)
+            : (sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null)
+          const saleEnd = sale.ends_at
+            ? new Date(sale.ends_at)
+            : (sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null)
+          // If a date window is set, exclude rows with no date information to avoid always passing
+          if ((windowStart || windowEnd) && !saleStart && !saleEnd) return false
+          const s = saleStart || saleEnd
+          const e = saleEnd || saleStart
+          if (!s || !e) return false
+          const startOk = !windowEnd || s <= windowEnd
+          const endOk = !windowStart || e >= windowStart
+          const passes = startOk && endOk
+          if (windowStart && windowEnd) {
+            console.log('[SALES] Date filter check:', { 
+              saleId: sale.id, 
+              saleStart: s?.toISOString(), 
+              saleEnd: e?.toISOString(),
+              windowStart: windowStart.toISOString(),
+              windowEnd: windowEnd.toISOString(),
+              passes 
+            })
+          }
+          return passes
+        })
+        .map((sale: any) => {
+          // Haversine distance calculation
+          const R = 6371000 // Earth's radius in meters
+          const dLat = (sale.lat - latitude) * Math.PI / 180
+          const dLng = (sale.lng - longitude) * Math.PI / 180
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                   Math.cos(latitude * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
+                   Math.sin(dLng/2) * Math.sin(dLng/2)
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+          const distanceM = R * c
+          const distanceKm = distanceM / 1000
+          
+          return {
+            ...sale,
+            distance_m: Math.round(distanceM),
+            distance_km: Math.round(distanceKm * 100) / 100
+          }
+        })
+                .filter((sale: any) => sale.distance_km <= distanceKm)
+                .sort((a: any, b: any) => {
+                  // Primary sort: distance
+                  if (a.distance_m !== b.distance_m) {
+                    return a.distance_m - b.distance_m
+                  }
+                  // Secondary sort: starts_at
+                  if (a.starts_at !== b.starts_at) {
+                    return new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()
+                  }
+                  // Tertiary sort: id (stable)
+                  return a.id.localeCompare(b.id)
+                })
+                .slice(offset, offset + limit)
+      
+      console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`, { windowStart, windowEnd })
+      
+      // Debug: Log sample sales and their dates
+      if (salesWithDistance.length > 0) {
+        console.log('[SALES] Sample filtered sales:', salesWithDistance.slice(0, 3).map(s => ({
+          id: s.id,
+          title: s.title,
+          starts_at: s.starts_at,
+          date_start: s.date_start,
+          time_start: s.time_start
+        })))
+      }
+      
+      // Debug: Log raw data before filtering
+      console.log('[SALES] Raw data before filtering:', (salesData || []).slice(0, 3).map(s => ({
+        id: s.id,
+        title: s.title,
+        starts_at: s.starts_at,
+        date_start: s.date_start,
+        time_start: s.time_start
+      })))
+      
+      // Debug: Log date filtering details
+      console.log('[SALES] Date filtering debug:', {
+        windowStart: windowStart?.toISOString(),
+        windowEnd: windowEnd?.toISOString(),
+        totalSales: (salesData || []).length,
+        salesWithValidCoords: (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number').length
+      })
+      
+      // Debug: Check if date filtering is actually being applied
+      if (windowStart && windowEnd) {
+        const salesBeforeDateFilter = (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number')
+        const salesAfterDateFilter = salesBeforeDateFilter.filter((sale: any) => {
+          const saleStart = sale.starts_at
+            ? new Date(sale.starts_at)
+            : (sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null)
+          const saleEnd = sale.ends_at
+            ? new Date(sale.ends_at)
+            : (sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null)
+          if (!saleStart && !saleEnd) return true
+          const s = saleStart || saleEnd
+          const e = saleEnd || saleStart
+          if (!s || !e) return true
+          const startOk = !windowEnd || s <= windowEnd
+          const endOk = !windowStart || e >= windowStart
+          return startOk && endOk
+        })
+        console.log('[SALES] Date filter impact:', {
+          beforeDateFilter: salesBeforeDateFilter.length,
+          afterDateFilter: salesAfterDateFilter.length,
+          filteredOut: salesBeforeDateFilter.length - salesAfterDateFilter.length
+        })
+      }
+      
+      if (salesWithDistance.length === 0) {
+        // Degraded fallback: still honor filters (coords, date window, categories, distance) before returning
+        degraded = true
+        const fallbackFiltered = (salesData || [])
+          // validate coordinates
+          .map((row: any) => {
+            const latNum = typeof row.lat === 'number' ? row.lat : parseFloat(String(row.lat))
+            const lngNum = typeof row.lng === 'number' ? row.lng : parseFloat(String(row.lng))
+            if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
+            return { ...row, lat: latNum, lng: lngNum }
+          })
+          .filter(Boolean)
+          // date window overlap (exclude undated when window set)
+          .filter((row: any) => {
+            if (!windowStart && !windowEnd) return true
+            const saleStart = row.starts_at
+              ? new Date(row.starts_at)
+              : (row.date_start ? new Date(`${row.date_start}T${row.time_start || '00:00:00'}`) : null)
+            const saleEnd = row.ends_at
+              ? new Date(row.ends_at)
+              : (row.date_end ? new Date(`${row.date_end}T${row.time_end || '23:59:59'}`) : null)
+            if (!saleStart && !saleEnd) return false
+            const s = saleStart || saleEnd
+            const e = saleEnd || saleStart
+            if (!s || !e) return false
+            const startOk = !windowEnd || s <= windowEnd
+            const endOk = !windowStart || e >= windowStart
+            return startOk && endOk
+          })
+          // categories fallback (title/description contains each category term)
+          .filter((row: any) => {
+            if (!Array.isArray(categories) || categories.length === 0) return true
+            const text = `${row.title || ''} ${row.description || ''}`.toLowerCase()
+            return categories.every((c: string) => text.includes(String(c || '').toLowerCase()))
+          })
+          // compute distance (meters) and filter by distanceKm
+          .map((row: any) => {
+            const R = 6371000
+            const dLat = (row.lat - latitude) * Math.PI / 180
+            const dLng = (row.lng - longitude) * Math.PI / 180
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(latitude * Math.PI / 180) * Math.cos(row.lat * Math.PI / 180) *
+                     Math.sin(dLng/2) * Math.sin(dLng/2)
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+            const distanceM = R * c
+            return { ...row, distance_m: Math.round(distanceM) }
+          })
+          .filter((row: any) => row.distance_m <= (distanceKm * 1000))
+          .sort((a: any, b: any) => a.distance_m - b.distance_m)
+          .slice(0, limit)
+
+        results = fallbackFiltered.map((row: any) => ({
           id: row.id,
           title: row.title,
-          starts_at: row.start_at,
-          ends_at: row.end_at,
-          latitude: row.lat,
-          longitude: row.lng,
+          starts_at: row.starts_at || (row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null),
+          ends_at: row.ends_at || (row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null),
+          lat: row.lat,
+          lng: row.lng,
           city: row.city,
           state: row.state,
-          zip: row.zip,
+          zip: row.zip_code,
           categories: row.tags || [],
           cover_image_url: null,
           distance_m: row.distance_m
         }))
-        
-      console.log(`[SALES] PostGIS success: ${results.length} results`)
-      
-    } catch (postgisError: any) {
-      console.log(`[SALES] PostGIS failed: ${postgisError.message}, falling back to bounding box`)
-      degraded = true
-      
-      // Fallback to bounding box approximation
-      const latRange = distanceKm / 111 // 1 degree ≈ 111 km
-      const lngRange = distanceKm / (111 * Math.cos(latitude * Math.PI / 180)) // Adjust for latitude
-      
-      console.log(`[SALES] Bounding box: lat=${latitude}±${latRange}, lng=${longitude}±${lngRange}`)
-      
-      let query = supabase
-        .from('yard_sales')
-        .select('*')
-        .eq('status', 'active')
-        .gte('lat', latitude - latRange)
-        .lte('lat', latitude + latRange)
-        .gte('lng', longitude - lngRange)
-        .lte('lng', longitude + lngRange)
-        .order('start_at', { ascending: true })
-        .limit(limit)
-        .range(offset, offset + limit - 1)
-      
-      // Apply category filter
-      if (categories.length > 0) {
-        query = query.overlaps('tags', categories)
-      }
-      
-      // Apply text filter
-      if (q) {
-        query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,city.ilike.%${q}%`)
-      }
-      
-      const { data: bboxData, error: bboxError } = await query
-      
-      if (bboxError) {
-        console.log(`[SALES][ERROR][BOUNDING_BOX] ${bboxError.message}`)
-        return NextResponse.json({ 
-          ok: false, 
-          error: 'Database query failed' 
-        }, { status: 500 })
-      }
-      
-      // Apply date filtering in application layer for bounding box results
-      results = (bboxData || [])
-        .filter((row: any) => {
-          if (!dateWindow) return true
-          return saleOverlapsWindow(row.start_at, row.end_at, dateWindow)
-        })
-        .map((row: any) => ({
+      } else {
+        results = salesWithDistance.map((row: any) => ({
           id: row.id,
           title: row.title,
-          starts_at: row.start_at,
-          ends_at: row.end_at,
-          latitude: row.lat,
-          longitude: row.lng,
+          // Map to common fields
+          starts_at: row.starts_at || (row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null),
+          ends_at: row.ends_at || (row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null),
+          lat: row.lat,
+          lng: row.lng,
           city: row.city,
           state: row.state,
-          zip: row.zip,
+          zip: row.zip_code,
           categories: row.tags || [],
-          cover_image_url: null
+          cover_image_url: null,
+          distance_m: row.distance_m
         }))
+      }
+        
+      console.log(`[SALES] Direct query success: ${results.length} results`)
+      
+    } catch (queryError: any) {
+      console.log(`[SALES] Direct query failed: ${queryError.message}`)
+      return NextResponse.json({ 
+        ok: false, 
+        error: 'Database query failed' 
+      }, { status: 500 })
     }
     
-    // 5. Return normalized response
-    const response = {
+    // 4. Return normalized response
+    const response: any = {
       ok: true,
       data: results,
       center: { lat: latitude, lng: longitude },
       distanceKm,
       count: results.length,
-      ...(degraded && { degraded: true }),
-      ...(dateWindow && { dateWindow: {
-        label: dateWindow.label,
-        start: dateWindow.start.toISOString(),
-        end: dateWindow.end.toISOString(),
-        display: formatDateWindow(dateWindow)
-      }})
+      durationMs: Date.now() - startedAt
     }
     
-    console.log(`[SALES] lat=${latitude},lng=${longitude},km=${distanceKm},dateRange=${dateRange},cats=${categories.join(',')},q=${q} -> returned=${results.length} degraded=${degraded}`)
+    if (degraded) {
+      response.degraded = true
+    }
+    
+    console.log(`[SALES] Final result: ${results.length} sales, degraded=${degraded}, duration=${Date.now() - startedAt}ms`)
     
     return NextResponse.json(response)
     
@@ -215,27 +429,34 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
+    
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    
     const body = await request.json()
     
-    const { title, description, address, city, state, zip, lat, lng, start_at, end_at, tags, contact } = body
+    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags, contact } = body
     
     const { data, error } = await supabase
-      .from('yard_sales')
+      .from('sales_v2')
       .insert({
         title,
         description,
         address,
         city,
         state,
-        zip,
+        zip_code,
         lat,
         lng,
-        start_at,
-        end_at,
-        tags: tags || [],
-        contact,
-        status: 'active',
-        source: 'manual'
+        date_start,
+        time_start,
+        date_end,
+        time_end,
+        status: 'published',
+        owner_id: user.id
       })
       .select()
       .single()
@@ -245,7 +466,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
     }
     
-    return NextResponse.json({ ok: true, data })
+    return NextResponse.json({ ok: true, sale: data })
   } catch (error: any) {
     console.error('Sales POST error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

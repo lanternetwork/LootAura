@@ -12,13 +12,13 @@ This document outlines the cost optimization strategies implemented in YardSaleF
   - No reverse geocoding on search or display
 - **Cost Impact**: ~$0.005 per sale creation vs $0.005 per search (100x reduction)
 
-### 2. Google Maps Optimization ✅
-- **Strategy**: Dynamic import only on map pages
+### 2. Map Rendering Optimization ✅
+- **Strategy**: Dynamic import only on map pages; prefer client-side filtering first
 - **Implementation**:
   - Maps library loaded only when needed
   - Lazy loading with `next/dynamic`
   - Client-side filtering before server requests
-- **Cost Impact**: ~50% reduction in Maps API calls
+- **Cost Impact**: ~50% reduction in map API calls
 
 ### 3. Image Optimization ✅
 - **Strategy**: Next.js Image optimization + Supabase storage
@@ -57,11 +57,10 @@ This document outlines the cost optimization strategies implemented in YardSaleF
   - Auth: $0.00325 per MAU
 - **Estimated Monthly Cost**: $25-50 (depending on usage)
 
-### Google Maps API
-- **Maps JavaScript API**: $7 per 1,000 loads
-- **Places API**: $17 per 1,000 requests
-- **Geocoding API**: $5 per 1,000 requests
-- **Estimated Monthly Cost**: $10-30 (with optimizations)
+### Mapbox API
+- **GL JS / Tiles**: usage-based (optimize tile loads, cache where possible)
+- **Geocoding API**: usage-based (geocode on WRITE; prefer local ZIP lookups)
+- **Estimated Monthly Cost**: low-to-moderate depending on usage
 
 ### Vercel (Hosting)
 - **Hobby Plan**: Free (100GB bandwidth, 100GB-hours function execution)
@@ -86,7 +85,7 @@ This document outlines the cost optimization strategies implemented in YardSaleF
 
 ### Conservative Estimate (1,000 users)
 - Supabase Pro: $25
-- Google Maps: $10
+- Mapbox: low
 - Vercel: $0 (Hobby)
 - Redis: $0 (Free tier)
 - Sentry: $0 (Free tier)
@@ -94,7 +93,7 @@ This document outlines the cost optimization strategies implemented in YardSaleF
 
 ### Moderate Estimate (10,000 users)
 - Supabase Pro: $40
-- Google Maps: $20
+- Mapbox: moderate
 - Vercel: $20
 - Redis: $2
 - Sentry: $26
@@ -102,7 +101,7 @@ This document outlines the cost optimization strategies implemented in YardSaleF
 
 ### High Traffic Estimate (100,000 users)
 - Supabase Pro: $200
-- Google Maps: $50
+- Mapbox: higher usage
 - Vercel: $50
 - Redis: $10
 - Sentry: $26
@@ -112,7 +111,7 @@ This document outlines the cost optimization strategies implemented in YardSaleF
 
 ### Key Metrics to Track
 1. **Database Requests**: Monitor query volume and optimization
-2. **Maps API Usage**: Track loads and requests per user
+2. **Mapbox Usage**: Track tile loads and geocoding requests
 3. **Storage Usage**: Monitor image and data storage growth
 4. **Bandwidth**: Track CDN and API usage
 5. **Function Execution**: Monitor serverless function costs
@@ -205,6 +204,7 @@ const urlsToCache = [
 - Set up billing alerts at $50, $100, $200 thresholds
 - Monitor daily usage patterns
 - Track cost per user metrics
+- Monitor Mapbox token usage against plan thresholds
 
 ### Performance Monitoring
 - Monitor Core Web Vitals
@@ -221,9 +221,9 @@ const urlsToCache = [
 With the implemented optimizations, YardSaleFinder is designed to be cost-effective at scale. The estimated monthly costs range from $35 for 1,000 users to $336 for 100,000 users, making it viable for both small communities and large-scale deployments.
 
 Key cost drivers:
-1. **Database usage** (40% of costs)
-2. **Google Maps API** (25% of costs)
-3. **Hosting and CDN** (20% of costs)
-4. **Monitoring and tools** (15% of costs)
+1. **Database usage** (largest share)
+2. **Mapbox tiles/geocoding** (usage-based)
+3. **Hosting and CDN**
+4. **Monitoring and tools**
 
 The optimizations implemented provide significant cost savings while maintaining excellent user experience and performance.

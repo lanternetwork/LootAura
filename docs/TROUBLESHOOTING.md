@@ -14,13 +14,14 @@ This document covers common issues and their solutions in LootAura.
 - Verify the `search_sales_by_distance` RPC function exists
 
 ### No Sales Appear
-**Cause**: Missing location or API errors.
+**Cause**: Missing location, API errors, or MAP authority list not deriving from visible pins.
 
 **Solutions**:
 1. Ensure you have a valid location (ZIP code or GPS)
 2. Check browser console for API errors
-3. Verify the sales API is returning data
-4. Try different location/ZIP codes
+3. If in MAP authority: confirm visible pin IDs are emitted and list derives from those IDs
+4. Verify the sales API is returning data
+5. Try different location/ZIP codes
 
 ### Category Filters Not Working
 **Cause**: Categories missing from database or API issues.
@@ -52,13 +53,14 @@ This document covers common issues and their solutions in LootAura.
 4. Check for rate limiting on geocoding services
 
 ### Map Not Updating
-**Cause**: Map component not receiving new location data.
+**Cause**: Map component not receiving new location data or Mapbox token/config issues.
 
 **Solutions**:
 1. Check if location state is updating
 2. Verify map center coordinates are changing
-3. Check browser console for map errors
-4. Try refreshing the page
+3. Check browser console for map errors (Mapbox GL JS)
+4. Confirm `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` is set and valid
+5. Try refreshing the page
 
 ## Performance Issues
 
@@ -130,6 +132,10 @@ This document covers common issues and their solutions in LootAura.
 
 ### Common Log Messages
 - `[SALES]` - Sales API operations
+- `[MAP]` - Map updates and markers fetch
+- `[VISIBLE]` - Visible pins count
+- `[LIST]` - List updates and rendered counts
+- `[DROP]` - Dropped network responses (stale/wide)
 - `[ZIPSEED]` - ZIP code database operations
 - `[SALES][ERROR]` - Sales API errors
 - `[SALES][ERROR][BOUNDING_BOX]` - Fallback mode errors

@@ -42,36 +42,63 @@ export async function GET(request: NextRequest) {
 
     console.log(`[SALES_SEARCH] params lat=${lat}, lng=${lng}, distKm=${distance}, city=${city}, cats=${categories?.join(',')}, limit=${limit}`)
 
-    // Build query using yard_sales table
-    let query = supabase
-      .from('yard_sales')
-      .select('*')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(limit)
+    // Use the new RPC function for spatial search
+    let sales: any[] = []
+    let error: any = null
 
-    // Apply location filter
-    if (lat && lng && distance) {
-      const latRange = distance / 111 // 1 degree ≈ 111 km
-      const lngRange = distance / (111 * Math.cos(lat * Math.PI / 180)) // Adjust for latitude
-      query = query
-        .gte('lat', lat - latRange)
-        .lte('lat', lat + latRange)
-        .gte('lng', lng - lngRange)
-        .lte('lng', lng + lngRange)
+    if (lat && lng) {
+      // Use lat/lng-based distance filtering instead of geometry columns
+      const { data: salesData, error: salesError } = await supabase
+        .from('sales_v2')
+        .select('*')
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(Math.min(limit * 3, 500)) // Fetch more to allow for distance filtering
+
+      if (salesError) {
+        error = salesError
+      } else {
+        // Client-side distance filtering using Haversine formula
+        const distanceMeters = distance * 1000
+        sales = (salesData || [])
+          .map((sale: any) => {
+            // Haversine distance calculation
+            const R = 6371000 // Earth's radius in meters
+            const dLat = (sale.lat - lat) * Math.PI / 180
+            const dLng = (sale.lng - lng) * Math.PI / 180
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(lat * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
+                     Math.sin(dLng/2) * Math.sin(dLng/2)
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+            const distanceM = R * c
+            
+            return {
+              ...sale,
+              distance_m: Math.round(distanceM),
+              distance_km: Math.round(distanceM / 1000 * 100) / 100
+            }
+          })
+          .filter((sale: any) => sale.distance_km <= distance)
+          .sort((a: any, b: any) => a.distance_m - b.distance_m)
+          .slice(0, limit)
+      }
+    } else {
+      // No location provided, use basic query on sales_v2
+      const { data: basicData, error: basicError } = await supabase
+        .from('sales_v2')
+        .select('*')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      if (basicError) {
+        error = basicError
+      } else {
+        sales = basicData || []
+      }
     }
-
-    // Apply city filter
-    if (city) {
-      query = query.ilike('city', `%${city}%`)
-    }
-
-    // Apply category filter
-    if (categories && categories.length > 0) {
-      query = query.overlaps('tags', categories)
-    }
-
-    const { data: sales, error } = await query
 
     if (error) {
       console.error('Sales search error:', error)

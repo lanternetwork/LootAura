@@ -57,7 +57,7 @@ YardSaleFinder is **95% production-ready** with all core features implemented, c
 **Tests to add/extend**: 
 - Database connection tests already exist in `app/api/health/route.ts`
 
-#### A3. Google Maps API Configuration
+#### A3. Mapbox Configuration
 **Why it matters**: Maps functionality is core to the application and requires proper API configuration.
 
 **Files/areas to touch**:
@@ -66,12 +66,10 @@ YardSaleFinder is **95% production-ready** with all core features implemented, c
 - `components/YardSaleMap.tsx` (verify dynamic import)
 
 **Acceptance criteria**:
-- [ ] Google Maps JavaScript API enabled
-- [ ] Places API enabled
-- [ ] Geocoding API enabled
-- [ ] API key has proper referrer restrictions
-- [ ] Maps load correctly in production
-- [ ] Places autocomplete works in Add Sale form
+- [ ] Mapbox GL JS configured and maps render in production
+- [ ] Mapbox Geocoding API functioning (if used)
+- [ ] Public token set in env; secret token only if server geocoding
+- [ ] Tiles and markers load correctly
 
 **Effort**: S (2-3 hours)
 **Risk**: Low
@@ -253,7 +251,7 @@ YardSaleFinder is **95% production-ready** with all core features implemented, c
 
 ### Low Risk Items
 - **Vercel Deployment**: Standard Next.js deployment
-- **Google Maps Configuration**: Well-documented process
+- **Mapbox Configuration**: Token setup and GL JS integration
 - **Performance Monitoring**: Existing integrations
 
 ## Success Metrics

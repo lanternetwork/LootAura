@@ -64,6 +64,13 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // Block Mapbox telemetry requests
+  if (url.hostname === 'events.mapbox.com') {
+    console.log('Blocking Mapbox telemetry request:', url.href)
+    event.respondWith(new Response(null, { status: 204 }))
+    return
+  }
+
   // Skip external requests (except our API)
   if (url.origin !== location.origin && !url.pathname.startsWith('/api/')) {
     return

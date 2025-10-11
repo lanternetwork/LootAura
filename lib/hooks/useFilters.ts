@@ -7,14 +7,14 @@ export interface FilterState {
   lat?: number
   lng?: number
   distance: number
-  dateRange: 'today' | 'weekend' | 'any'
+  dateRange: 'today' | 'weekend' | 'next_weekend' | 'any'
   categories: string[]
   city?: string
 }
 
 export interface UseFiltersReturn {
   filters: FilterState
-  updateFilters: (newFilters: Partial<FilterState>) => void
+  updateFilters: (newFilters: Partial<FilterState>, skipUrlUpdate?: boolean) => void
   clearFilters: () => void
   hasActiveFilters: boolean
   getQueryString: () => string
@@ -26,33 +26,53 @@ const DEFAULT_FILTERS: FilterState = {
   categories: []
 }
 
-export function useFilters(): UseFiltersReturn {
+export function useFilters(initialLocation?: { lat: number; lng: number }): UseFiltersReturn {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
+  const [filters, setFilters] = useState<FilterState>(() => {
+    // Initialize with initialLocation if provided
+    if (initialLocation) {
+      return { ...DEFAULT_FILTERS, lat: initialLocation.lat, lng: initialLocation.lng }
+    }
+    return DEFAULT_FILTERS
+  })
 
   // Initialize filters from URL params
   useEffect(() => {
+    console.log('[FILTERS] init from URL params:', Object.fromEntries(searchParams.entries()))
     const lat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : undefined
     const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : undefined
     const distance = searchParams.get('dist') ? parseInt(searchParams.get('dist')!) : 25
-    const dateRange = (searchParams.get('date') as 'today' | 'weekend' | 'any') || 'any'
+    const dateParam = searchParams.get('date') as 'today' | 'weekend' | 'next_weekend' | 'any' | 'range' | null
+    const dateRange = !dateParam || dateParam === 'range' ? 'any' : dateParam
     const categories = searchParams.get('cat') ? searchParams.get('cat')!.split(',') : []
     const city = searchParams.get('city') || undefined
 
-    setFilters({
-      lat,
-      lng,
+    // Only update if URL has location params, otherwise keep initial location
+    const hasLocationParams = searchParams.get('lat') || searchParams.get('lng')
+    
+    setFilters(prev => ({
+      lat: hasLocationParams ? lat : prev.lat,
+      lng: hasLocationParams ? lng : prev.lng,
       distance: Math.max(1, Math.min(100, distance)),
       dateRange,
       categories,
       city
-    })
-  }, [searchParams])
+    }))
+  // Only run on mount to seed from URL; further changes are driven by updateFilters
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const updateFilters = useCallback((newFilters: Partial<FilterState>) => {
+  const updateFilters = useCallback((newFilters: Partial<FilterState>, skipUrlUpdate = false) => {
     const updatedFilters = { ...filters, ...newFilters }
+    console.log('[FILTERS] updateFilters called with:', newFilters, '=> next:', updatedFilters)
     setFilters(updatedFilters)
+    
+    // Skip URL updates for auto-refetch scenarios to prevent scroll-to-top
+    if (skipUrlUpdate) {
+      console.log('[FILTERS] Skipping URL update for auto-refetch')
+      return
+    }
     
     // Update URL with new filters
     const params = new URLSearchParams(searchParams.toString())
@@ -96,6 +116,7 @@ export function useFilters(): UseFiltersReturn {
     
     // Update URL
     const newUrl = `${window.location.pathname}?${params.toString()}`
+    console.log('[FILTERS] push URL:', newUrl)
     router.push(newUrl)
   }, [filters, searchParams, router])
 

@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { useSales } from '@/lib/hooks/useSales'
+import { useSales, useSaleMarkers } from '@/lib/hooks/useSales'
 import { Filters } from '@/state/filters'
 
 // Dynamic imports to avoid build issues
@@ -20,14 +20,18 @@ export default function Explore() {
   
   const tab = searchParams.get('tab') as 'list' | 'map' | 'add' | 'find' || 'list'
 
-  // Use React Query hook for data fetching
-  const { data: sales = [], isLoading, error } = useSales(filters)
+  // Use React Query hook for data fetching; derive loading from query flags to avoid flicker
+  const salesQuery = useSales(filters)
+  const sales = salesQuery.data || []
+  const isLoading = salesQuery.isPending || (!salesQuery.isFetched && sales.length === 0)
+  const error = salesQuery.error as any
+  const { data: markers = [] } = useSaleMarkers(filters)
 
   const mapPoints = useMemo(() => 
-    sales
-      .filter(s => s.lat && s.lng)
-      .map(s => ({ id: s.id, title: s.title, lat: s.lat!, lng: s.lng! }))
-  , [sales])
+    markers
+      .filter(p => typeof p.lat === 'number' && typeof p.lng === 'number')
+      .map(p => ({ id: p.id, title: p.title, lat: p.lat, lng: p.lng }))
+  , [markers])
 
   return (
     <main className="max-w-6xl mx-auto p-4">
@@ -45,10 +49,10 @@ export default function Explore() {
           <div className="mb-4 text-sm text-neutral-600">
             {isLoading ? 'Loading...' : `${sales.length} sales found`}
           </div>
-          <VirtualizedSalesList 
-            sales={sales} 
-            isLoading={isLoading} 
-            error={error} 
+          <VirtualizedSalesList
+            sales={sales}
+            isLoading={isLoading}
+            error={error as Error | null}
           />
         </div>
       )}

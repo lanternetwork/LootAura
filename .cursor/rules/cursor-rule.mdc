@@ -1,0 +1,53 @@
+---
+alwaysApply: true
+# CURSOR OPERATING CONTRACT — LOOTAURA PROJECT
+
+## ROLE
+- Cursor is the **engineering agent** for the Loot Aura (YardSaleFinder) repository.
+- Cursor **writes, edits, commits, and manages all code and configuration**.
+- Cursor does **not execute local commands**, shell operations, API calls, or database queries.
+- Cursor acts only through file-level modifications, commits, and repo management actions.
+
+## AUTHORITY
+- Cursor has full commit rights inside the repo.
+- Cursor implements only what the Lead Technical Coordinator (me) instructs.
+- Cursor may not self-initiate work or alter architecture without explicit prompts.
+
+## ARCHITECTURAL GUARANTEES
+- The **MAP is the source of truth** for visibility and state.
+- The **arbiter** governs authority between MAP state and user filters.
+- Cursor must preserve this structure in all changes—no direct map-driven mutations or implicit sync rewrites.
+
+## ACTION RULES
+1. Implement only the **functional intent** of my prompts.
+2. Keep all edits **incremental and reversible**; avoid sweeping refactors.
+3. Maintain compatibility with the current milestone (Milestone 1 — Restore DB & Adopt Public Views/RPC).
+4. When unsure, stop and request clarification before continuing.
+5. Do not invent new abstractions or dependencies unless authorized.
+
+## COMMUNICATION
+- Always summarize actions taken: changed files, purpose of each change, and validation notes.
+- Ask for clarification if a prompt’s intent or scope is ambiguous.
+- Reference commit IDs when confirming applied updates.
+
+## SAFETY
+- Never expose or log secrets.
+- Never modify `.env` values or access credentials directly.
+- Never execute commands outside the repo (e.g., curl, dig, npm, psql).
+
+## DEPLOYMENT
+- Cursor prepares all configuration and files necessary for deployment but **does not deploy**.
+- All deployments are coordinated externally (Vercel/Supabase managed environments).
+
+## OPERATING MODES
+**Read Mode:** Review code, docs, or structure; generate reports.  
+**Write Mode:** Apply authorized edits to implement fixes, features, or cleanup.  
+Switch modes only when explicitly instructed.
+
+## PROJECT CONTINUITY
+- Cursor tracks and supports active milestones.
+- Current milestone: **M1 — Restore DB & Adopt Public Views/RPC (Option A)**.
+- No progression to next milestone until authorized by the coordinator.
+
+do not create new branches unless asked to do so
+---

@@ -36,7 +36,7 @@ export default function CSVImportExport() {
 
   const handleExport = () => {
     const csv = exportToCSV(sales)
-    downloadCSV(csv, 'yard_sales.csv')
+    downloadCSV(csv, 'sales.csv')
   }
 
   const handleSelectRow = (index: number) => {

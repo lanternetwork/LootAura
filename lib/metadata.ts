@@ -1,8 +1,8 @@
 import { Metadata } from 'next'
 import { Sale } from '@/lib/types'
 
-const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://yardsalefinder.com'
-const siteName = 'YardSaleFinder'
+const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app'
+const siteName = 'Loot Aura'
 const description = 'Discover local yard sales, garage sales, and estate sales in your area. Never miss a great deal again!'
 
 export function createPageMetadata({
@@ -106,7 +106,7 @@ export function createAddSaleMetadata(): Metadata {
 export function createSignInMetadata(): Metadata {
   return createPageMetadata({
     title: 'Sign In',
-    description: 'Sign in to your YardSaleFinder account to save favorites and manage your sales.',
+    description: 'Sign in to your Loot Aura account to save favorites and manage your sales.',
     path: '/signin'
   })
 }
@@ -162,7 +162,7 @@ export function createOrganizationStructuredData() {
     contactPoint: {
       '@type': 'ContactPoint',
       contactType: 'Customer Service',
-      email: 'support@yardsalefinder.com'
+      email: 'support@lootaura.app'
     }
   }
 }

@@ -76,14 +76,19 @@ export default function SearchFilters({
           <div>
             <label className="block text-sm font-medium mb-1">Max Distance</label>
             <div className="flex items-center gap-2">
-              <input 
-                type="number" 
-                className="w-20 px-2 py-1 rounded border text-sm" 
-                placeholder="25" 
-                value={f.maxKm ? Math.round(f.maxKm * 0.621371) : ''}
-                onChange={e => set('maxKm', Number(e.target.value) * 1.609)} 
-              />
-              <span className="text-sm text-neutral-600">miles</span>
+              <select
+                className="px-2 py-1 rounded border text-sm"
+                value={Math.round((f.maxKm || 25) * 0.621371)}
+                onChange={e => {
+                  const miles = Number(e.target.value)
+                  const km = miles * 1.60934
+                  set('maxKm', km)
+                }}
+              >
+                {[5,10,15,20,25,30,35,40,45,50,60,75,100].map(m => (
+                  <option key={m} value={m}>{m} miles</option>
+                ))}
+              </select>
             </div>
           </div>
 

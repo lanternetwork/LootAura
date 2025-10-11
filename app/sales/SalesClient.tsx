@@ -1654,8 +1654,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   style={arbiter.authority==='MAP' ? { 
                     position: 'relative', 
                     zIndex: 3, 
-                    minHeight: 240
-                  } : undefined}
+                    minHeight: 240,
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))'
+                  } : {
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))'
+                  }}
                 >
                   {arbiter.authority==='MAP' && (
                     <div style={{ position:'absolute', top:8, left:8, padding:'4px 6px', fontSize:12, background:'rgba(255,255,0,.6)', zIndex:1000 }}>

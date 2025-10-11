@@ -169,7 +169,7 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
     
     // Fallback to regular query without distance filtering
     let query = supabase
-      .from(T.sales)
+      .from('sales_v2')
       .select('*')
       .eq('status', 'published')
       .order('created_at', { ascending: false })
@@ -212,7 +212,7 @@ export async function getSaleById(id: string): Promise<Sale | null> {
     const supabase = createSupabaseServerClient()
     
     const { data, error } = await supabase
-      .from(T.sales)
+      .from('sales_v2')
       .select('*')
       .eq('id', id)
       .single()
@@ -244,7 +244,7 @@ export async function createSale(input: SaleInput): Promise<Sale> {
     }
 
     const { data, error } = await supabase
-      .from(T.sales)
+      .from('lootaura_v2.sales')
       .insert({
         owner_id: user.id,
         ...validatedInput,
@@ -276,7 +276,7 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
     }
 
     const { data, error } = await supabase
-      .from(T.sales)
+      .from('lootaura_v2.sales')
       .update(validatedInput)
       .eq('id', id)
       .eq('owner_id', user.id) // Ensure user owns the sale
@@ -306,7 +306,7 @@ export async function deleteSale(id: string): Promise<void> {
     }
 
     const { error } = await supabase
-      .from(T.sales)
+      .from('lootaura_v2.sales')
       .delete()
       .eq('id', id)
       .eq('owner_id', user.id) // Ensure user owns the sale

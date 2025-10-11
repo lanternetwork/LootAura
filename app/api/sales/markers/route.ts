@@ -68,7 +68,16 @@ export async function GET(request: NextRequest) {
       endDate,
       dateBounds,
       totalRecords: data?.length || 0,
-      url: request.url
+      url: request.url,
+      sampleSales: data?.slice(0, 3).map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        date_start: s.date_start,
+        date_end: s.date_end,
+        time_start: s.time_start,
+        time_end: s.time_end,
+        starts_at: s.starts_at
+      }))
     })
 
     const filtered = (data || [])
@@ -99,9 +108,12 @@ export async function GET(request: NextRequest) {
         if (!overlaps) {
           console.log('[MARKERS API] Sale filtered out by date:', {
             saleId: sale.id,
+            title: sale.title,
             saleStart: sale.saleStart,
             saleEnd: sale.saleEnd,
-            dateBounds
+            dateBounds,
+            originalDateStart: sale.date_start,
+            originalDateEnd: sale.date_end
           })
         }
         return overlaps

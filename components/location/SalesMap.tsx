@@ -125,7 +125,10 @@ export default function SalesMap({
   // Recompute visible pins when markers change
   useEffect(() => {
     console.log('[MARKERS] set:', markers.length)
-    // Wait for map to be idle before recomputing
+    // Recompute immediately when markers change
+    recomputeVisiblePins('markers-updated')
+    
+    // Also wait for map to be idle for additional updates
     const map = mapRef.current?.getMap?.()
     if (map) {
       const handleIdle = () => {

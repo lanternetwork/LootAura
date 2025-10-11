@@ -1656,12 +1656,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     zIndex: 3, 
                     minHeight: 240,
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gridTemplateColumns: window.innerWidth < 640 ? '1fr' : window.innerWidth < 1024 ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
                     gap: '1.5rem',
                     width: '100%'
                   } : {
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gridTemplateColumns: window.innerWidth < 640 ? '1fr' : window.innerWidth < 1024 ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
                     gap: '1.5rem',
                     width: '100%'
                   }}
@@ -1676,6 +1676,21 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   {process.env.NODE_ENV === 'development' && (
                     <div style={{ position:'absolute', top:8, right:8, padding:'4px 6px', fontSize:12, background:'rgba(0,255,0,.6)', zIndex:1000 }}>
                       GRID: {window.innerWidth < 640 ? '1col' : window.innerWidth < 1024 ? '2col' : '3col'} | W: {window.innerWidth}px
+                      <br />
+                      STYLE: {JSON.stringify(arbiter.authority==='MAP' ? { 
+                        position: 'relative', 
+                        zIndex: 3, 
+                        minHeight: 240,
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                        gap: '1.5rem',
+                        width: '100%'
+                      } : {
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                        gap: '1.5rem',
+                        width: '100%'
+                      })}
                     </div>
                   )}
                   

@@ -1211,16 +1211,19 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
   const triggerFetches = useCallback(() => {
     console.log('[TRIGGER] triggerFetches called - DEPLOYMENT TEST')
-    debouncedTrigger(() => {
-      // In MAP authority, do not fire wide sales; only markers fetch
-      if (arbiter.authority === 'MAP') {
-        console.log('[SKIP] suppress wide sales fetch (MAP authority)')
-        fetchMapSales()
-      } else {
+    
+    // For MAP authority, trigger markers fetch immediately (no debounce)
+    // For other authority, use debounced trigger
+    if (arbiter.authority === 'MAP') {
+      console.log('[NET] start markers {seq: 1} (MAP authority)')
+      fetchMapSales()
+    } else {
+      debouncedTrigger(() => {
+        console.log('[NET] start sales {seq: 1, mode: \'FILTERS\'}')
         fetchSales()
         fetchMapSales()
-      }
-    })
+      })
+    }
   }, [debouncedTrigger, fetchSales, fetchMapSales, arbiter.authority])
 
   // Debounced visible list recompute

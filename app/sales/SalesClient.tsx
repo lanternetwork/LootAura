@@ -1489,7 +1489,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   data-panel="list"
                   // Avoid re-keying container in MAP to prevent unmounts before effects run
                   key={arbiter.authority==='MAP' ? 'map-stable' : 'filters'}
-                  style={arbiter.authority==='MAP' ? { position: 'relative', zIndex: 3, minHeight: 240, background: 'rgba(0, 128, 0, 0.06)' } : undefined}
+                  style={arbiter.authority==='MAP' ? { 
+                    position: 'relative', 
+                    zIndex: 10, 
+                    minHeight: 240, 
+                    background: 'rgba(0, 128, 0, 0.1)',
+                    border: '2px solid red',
+                    padding: '20px'
+                  } : undefined}
                 >
                   {arbiter.authority==='MAP' && (
                     <div style={{ position:'absolute', top:8, left:8, padding:'4px 6px', fontSize:12, background:'rgba(255,255,0,.6)', zIndex:1000 }}>

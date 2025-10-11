@@ -133,10 +133,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     markerIds: string
   } | null>(null)
   
+  // Circuit breaker for visible pins to prevent re-render loops
+  const lastVisiblePinsRef = useRef<string[]>([])
+  
   // Stable date key for effect dependencies
   const dateKey = useMemo(() => {
     const resolved = resolveDatePreset(filters.dateRange)
-    return (resolved?.from || '') + '|' + (resolved?.to || '')
+    const key = (resolved?.from || '') + '|' + (resolved?.to || '')
+    console.log('[DATEKEY] computed:', { preset: filters.dateRange, resolved, key })
+    return key
   }, [filters.dateRange])
   
   // Stable bbox hash for effect dependencies (moved after viewportBounds declaration)
@@ -258,8 +263,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   
   // Stable bbox hash for effect dependencies
   const bboxHash = useMemo(() => {
-    if (!viewportBounds) return 'no-bounds'
-    return `${viewportBounds.north},${viewportBounds.south},${viewportBounds.east},${viewportBounds.west}`
+    if (!viewportBounds) {
+      console.log('[BBOXHASH] no bounds')
+      return 'no-bounds'
+    }
+    const hash = `${viewportBounds.north},${viewportBounds.south},${viewportBounds.east},${viewportBounds.west}`
+    console.log('[BBOXHASH] computed:', hash)
+    return hash
   }, [viewportBounds])
   const lastBoundsTsRef = useRef<number | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
@@ -446,6 +456,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
           const currentState = { bboxHash, dateKey, markerIds }
           const lastState = lastApplyStateRef.current
           
+          console.log('[MARKERS] idempotency check:', { 
+            current: currentState, 
+            last: lastState,
+            bboxMatch: lastState?.bboxHash === currentState.bboxHash,
+            dateMatch: lastState?.dateKey === currentState.dateKey,
+            markersMatch: lastState?.markerIds === currentState.markerIds
+          })
+          
           if (lastState && 
               lastState.bboxHash === currentState.bboxHash &&
               lastState.dateKey === currentState.dateKey &&
@@ -570,6 +588,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     const seq = viewportSeqRef.current
     if (arbiter.authority === 'MAP') {
       const ids = visiblePinIdsState
+      
+      // Circuit breaker: skip if visible pins haven't changed
+      const idsString = ids.join(',')
+      const lastIdsString = lastVisiblePinsRef.current.join(',')
+      if (idsString === lastIdsString) {
+        console.log('[LIST] visible pins unchanged - skipping effect to prevent loop')
+        return
+      }
+      lastVisiblePinsRef.current = [...ids]
+      
       const haveInDict = ids.filter(id => !!mapMarkers.find(m => String(m.id) === String(id))).length
       const missing = ids.filter(id => !mapMarkers.find(m => String(m.id) === String(id))).slice(0, 3)
       console.log(`[LIST][MAP] seq=${seq} ids.count=${ids.length} sample=${ids.slice(0,3)} haveInDict=${haveInDict} missing=${missing}`)
@@ -1162,6 +1190,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [])
 
   const triggerFetches = useCallback(() => {
+    console.log('[TRIGGER] triggerFetches called - DEPLOYMENT TEST')
     debouncedTrigger(() => {
       // In MAP authority, do not fire wide sales; only markers fetch
       if (arbiter.authority === 'MAP') {
@@ -1193,8 +1222,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     }
   }, [])
 
+  // Counter to track how many times this effect runs
+  const effectRunCountRef = useRef(0)
+  
   useEffect(() => {
-    const key = buildMarkersKey()
+    effectRunCountRef.current++
+    console.log(`[EFFECT] Main effect run #${effectRunCountRef.current}`)
+    
+    // Use stable keys instead of buildMarkersKey to prevent identity churn
+    const stableKey = `${bboxHash}|${dateKey}|${arbiter.mode}`
     
     // Early return if programmatic move guard is active and not in map mode
     if (arbiter.programmaticMoveGuard && arbiter.mode !== 'map') {
@@ -1203,14 +1239,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     }
     
     // Early return if key hasn't changed
-    if (key === lastMarkersKeyRef.current) {
-      console.log('[SKIP] same markers key')
+    if (stableKey === lastMarkersKeyRef.current) {
+      console.log('[SKIP] same stable key')
       return
     }
     
-    console.log('[SALES] Inputs changed → key:', key)
+    console.log('[SALES] Stable inputs changed → key:', stableKey)
+    lastMarkersKeyRef.current = stableKey
     triggerFetches()
-  }, [triggerFetches, buildMarkersKey, arbiter.programmaticMoveGuard, arbiter.mode])
+  }, [bboxHash, dateKey, arbiter.mode, triggerFetches, arbiter.programmaticMoveGuard])
 
   // Keep visibleSales in sync with current sales and viewport
   useEffect(() => {
@@ -1221,15 +1258,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Visibility is now handled by the main useEffect
   }, [sales, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west])
 
-  // Single effect for MAP authority markers fetch - keyed by stable bbox|date
-  useEffect(() => {
-    if (arbiter.authority === 'MAP') {
-      console.log('[MAP] bbox|date change - triggering markers fetch', { bboxHash, dateKey })
-      // Bump viewport sequence to ensure stale responses are dropped
-      viewportSeqRef.current++
-      fetchMapSales()
-    }
-  }, [bboxHash, dateKey, arbiter.authority, fetchMapSales])
+  // Note: MAP authority markers fetch is handled by the main effect above via triggerFetches()
 
   // Initialize filters from server-provided center once, only if no location set yet
   useEffect(() => {
@@ -1770,7 +1799,18 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onVisiblePinsChange={(visibleIds, count) => {
                     const seq = viewportSeqRef.current
                     console.log(`[LIST] visible pins seq=${seq} count=${count} ids=[${visibleIds.join(',')}]`)
-                    setVisiblePinIdsState(visibleIds.map(String))
+                    
+                    // Circuit breaker: only update if visible pins actually changed
+                    const newVisibleIds = visibleIds.map(String)
+                    const currentVisibleIds = visiblePinIdsState
+                    
+                    if (newVisibleIds.length === currentVisibleIds.length && 
+                        newVisibleIds.every(id => currentVisibleIds.includes(id))) {
+                      console.log('[LIST] visible pins unchanged - skipping update to prevent loop')
+                      return
+                    }
+                    
+                    setVisiblePinIdsState(newVisibleIds)
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly

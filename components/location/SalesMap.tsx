@@ -106,6 +106,14 @@ export default function SalesMap({
       
       const visibleIds = visibleMarkers.map(marker => marker.id)
       
+      // Circuit breaker: only update if visible pins actually changed
+      const currentVisibleIds = visiblePinIds
+      if (visibleIds.length === currentVisibleIds.length && 
+          visibleIds.every(id => currentVisibleIds.includes(id))) {
+        console.log('[VISIBLE] pins unchanged - skipping update to prevent loop')
+        return
+      }
+      
       setVisiblePinIds(visibleIds)
       setVisiblePinCount(visibleIds.length)
       
@@ -120,7 +128,7 @@ export default function SalesMap({
       setVisiblePinIds([])
       setVisiblePinCount(0)
     }
-  }, [markers, onVisiblePinsChange])
+  }, [markers, onVisiblePinsChange, visiblePinIds])
 
   // Recompute visible pins when markers change
   useEffect(() => {

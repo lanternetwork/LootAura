@@ -521,10 +521,17 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       const missing = ids.filter(id => !mapMarkers.find(m => String(m.id) === String(id))).slice(0, 3)
       console.log(`[LIST][MAP] seq=${seq} ids.count=${ids.length} sample=${ids.slice(0,3)} haveInDict=${haveInDict} missing=${missing}`)
 
-      // If we have no visible pins or they don't match the current markers, clear the visible pins
-      // This happens when date filters change and the old viewport pins are no longer valid
-      if (ids.length === 0 || haveInDict === 0) {
-        console.log(`[LIST][MAP] clearing visible pins - no valid pins for current markers`)
+      // If we have no visible pins, that's fine - just return empty
+      if (ids.length === 0) {
+        setVisibleSales([])
+        setRenderedSales([])
+        console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=0 rendered=0`)
+        return
+      }
+
+      // If visible pins don't match current markers, clear them and let the map recalculate
+      if (haveInDict === 0) {
+        console.log(`[LIST][MAP] clearing visible pins - pins don't match current markers`)
         setVisiblePinIdsState([])
         setVisibleSales([])
         setRenderedSales([])
@@ -1139,21 +1146,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     fetchMapSales()
   }, [fetchMapSales])
 
-  // Clear visible pins when markers change due to filter updates in MAP authority
+  // Clear visible pins when date filters change in MAP authority
   useEffect(() => {
-    if (arbiter.authority === 'MAP' && mapMarkers.length > 0) {
-      // Check if current visible pins are still valid with new markers
-      const validPins = visiblePinIdsState.filter(id => 
-        mapMarkers.find(m => String(m.id) === String(id))
-      )
-      
-      // If we have visible pins but they don't match the new markers, clear them
-      if (visiblePinIdsState.length > 0 && validPins.length === 0) {
-        console.log(`[LIST][MAP] clearing visible pins due to marker change - old pins no longer valid`)
-        setVisiblePinIdsState([])
-      }
+    if (arbiter.authority === 'MAP' && filters.dateRange) {
+      // When date filters change, clear visible pins so the map can recalculate
+      // This prevents showing stale pins from the previous viewport
+      setVisiblePinIdsState([])
     }
-  }, [arbiter.authority, mapMarkers, visiblePinIdsState])
+  }, [arbiter.authority, filters.dateRange])
 
   // Initialize filters from server-provided center once, only if no location set yet
   useEffect(() => {

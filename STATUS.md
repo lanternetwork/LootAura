@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** ba3ac4d — resolve merge conflict in STATUS.md (by Yard Sale Tracker on 2025-10-10 22:18:08 -0400)
+- **Latest commit:** 9c2b8f2 — Merge branch 'milestone/db-option-a-restore' of https://github.com/lanternetwork/LootAura into milestone/db-option-a-restore (by Yard Sale Tracker on 2025-10-10 22:31:45 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18422941805
+- **CI status:** running, last run: run 18423102639
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-11T02:18:48.116Z
+Updated automatically by Cursor on 2025-10-11T02:32:26.144Z

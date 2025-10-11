@@ -76,7 +76,17 @@ export async function GET(request: NextRequest) {
         const lng = Number(sale.lng)
         if (Number.isNaN(lat) || Number.isNaN(lng)) return null
         const saleStart = sale.starts_at ? new Date(sale.starts_at) : null
-        const saleEnd = sale.ends_at ? new Date(sale.ends_at) : null
+        // For end date, we need to compute it from date_end + time_end, or use date_end if time_end is null
+        let saleEnd = null
+        if (sale.date_end) {
+          if (sale.time_end) {
+            // Combine date_end + time_end into a timestamp
+            saleEnd = new Date(`${sale.date_end}T${sale.time_end}`)
+          } else {
+            // Use date_end as end of day
+            saleEnd = new Date(`${sale.date_end}T23:59:59.999`)
+          }
+        }
         return { ...sale, lat, lng, saleStart, saleEnd }
       })
       .filter(Boolean)

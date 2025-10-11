@@ -1024,7 +1024,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     try {
       console.log('[MAP] fetchMapSales called with filters:', filters, 'centerOverride:', centerOverride)
       // Resolve dateRange preset to concrete dates
+      console.log('[MAP] Resolving dateRange:', filters.dateRange)
       const resolvedDates = resolveDatePreset(filters.dateRange)
+      console.log('[MAP] Resolved dates:', resolvedDates)
+      
+      // Test the function directly
+      const testToday = resolveDatePreset('today')
+      console.log('[MAP] Test today resolution:', testToday)
       const dateFrom = resolvedDates?.from
       const dateTo = resolvedDates?.to
       

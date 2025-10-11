@@ -1054,6 +1054,19 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`, { mode })
       console.log('[MAP] Date parameters being sent:', { from: dateFrom, to: dateTo, dateRange: filters.dateRange })
+      
+      // Test with a hardcoded date to verify the pipeline works
+      if (filters.dateRange === 'any') {
+        console.log('[MAP] Testing date pipeline with hardcoded today...')
+        const testParams = new URLSearchParams()
+        testParams.set('lat', String(useLat))
+        testParams.set('lng', String(useLng))
+        testParams.set('distanceKm', distanceKm)
+        testParams.set('from', '2025-10-11')
+        testParams.set('to', '2025-10-11')
+        testParams.set('limit', '1000')
+        console.log('[MAP] Test URL would be:', `/api/sales/markers?${testParams.toString()}`)
+      }
       console.debug('[MARKERS] fetch', `/api/sales/markers?${params.toString()}`)
       console.debug('[MARKERS] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
       

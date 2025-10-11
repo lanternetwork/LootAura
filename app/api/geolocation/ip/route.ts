@@ -13,7 +13,10 @@ export async function GET(request: NextRequest) {
     const vercelCity = headersList.get('x-vercel-ip-city')
     const vercelCountry = headersList.get('x-vercel-ip-country')
 
+    console.log('[IP_GEOLOCATION] Vercel headers:', { vercelLat, vercelLng, vercelCity, vercelCountry })
+
     if (vercelLat && vercelLng) {
+      console.log('[IP_GEOLOCATION] Using Vercel location:', { lat: vercelLat, lng: vercelLng })
       return NextResponse.json({
         lat: parseFloat(vercelLat),
         lng: parseFloat(vercelLng),
@@ -23,50 +26,97 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fallback to external IP geolocation API
+    // Fallback to external IP geolocation APIs (try multiple for better accuracy)
     const clientIP = headersList.get('x-forwarded-for') || 
                      headersList.get('x-real-ip') || 
                      request.ip ||
                      '127.0.0.1'
 
-    const response = await fetch(`https://ipapi.co/${clientIP}/json/`)
+    console.log('[IP_GEOLOCATION] Client IP:', clientIP)
     
-    if (!response.ok) {
-      throw new Error('IP geolocation API failed')
+    // Try multiple geolocation services for better accuracy
+    const services = [
+      { name: 'ipapi.co', url: `https://ipapi.co/${clientIP}/json/` },
+      { name: 'ip-api.com', url: `http://ip-api.com/json/${clientIP}` },
+      { name: 'ipinfo.io', url: `https://ipinfo.io/${clientIP}/json` }
+    ]
+    
+    for (const service of services) {
+      try {
+        console.log(`[IP_GEOLOCATION] Trying ${service.name}...`)
+        const response = await fetch(service.url, { 
+          headers: { 'User-Agent': 'LootAura/1.0' }
+        })
+        
+        if (!response.ok) {
+          console.log(`[IP_GEOLOCATION] ${service.name} failed:`, response.status, response.statusText)
+          continue
+        }
+
+        const data = await response.json()
+        console.log(`[IP_GEOLOCATION] ${service.name} response:`, data)
+        
+        let lat, lng, city, state, country
+        
+        if (service.name === 'ipapi.co') {
+          lat = data.latitude
+          lng = data.longitude
+          city = data.city
+          state = data.region
+          country = data.country_name
+        } else if (service.name === 'ip-api.com') {
+          lat = data.lat
+          lng = data.lon
+          city = data.city
+          state = data.region
+          country = data.country
+        } else if (service.name === 'ipinfo.io') {
+          const loc = data.loc?.split(',')
+          lat = loc?.[0]
+          lng = loc?.[1]
+          city = data.city
+          state = data.region
+          country = data.country
+        }
+        
+        if (lat && lng) {
+          console.log(`[IP_GEOLOCATION] Using ${service.name} location:`, { lat, lng, city, state })
+          return NextResponse.json({
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            city: city,
+            state: state,
+            country: country,
+            source: service.name
+          })
+        }
+      } catch (error) {
+        console.log(`[IP_GEOLOCATION] ${service.name} error:`, error)
+        continue
+      }
     }
 
-    const data = await response.json()
-    
-    if (data.latitude && data.longitude) {
-      return NextResponse.json({
-        lat: parseFloat(data.latitude),
-        lng: parseFloat(data.longitude),
-        city: data.city,
-        state: data.region,
-        country: data.country_name,
-        source: 'ipapi'
-      })
-    }
-
-    // Final fallback to Louisville, KY
+    // Final fallback to neutral US center
+    console.log('[IP_GEOLOCATION] Using neutral US fallback')
     return NextResponse.json({
-      lat: 38.2527,
-      lng: -85.7585,
-      city: 'Louisville',
-      state: 'KY',
+      lat: 39.8283,
+      lng: -98.5795,
+      city: 'Center',
+      state: 'US',
       country: 'US',
       source: 'fallback'
     })
 
   } catch (error) {
-    console.error('IP geolocation error:', error)
+    console.error('[IP_GEOLOCATION] Error:', error)
     
     // Return fallback location on error
+    console.log('[IP_GEOLOCATION] Using error fallback')
     return NextResponse.json({
-      lat: 38.2527,
-      lng: -85.7585,
-      city: 'Louisville',
-      state: 'KY',
+      lat: 39.8283,
+      lng: -98.5795,
+      city: 'Center',
+      state: 'US',
       country: 'US',
       source: 'fallback'
     })

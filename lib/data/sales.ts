@@ -39,7 +39,7 @@ const GetSalesParamsSchema = z.object({
   distanceKm: z.number().default(25),
   lat: z.number().optional(),
   lng: z.number().optional(),
-  dateRange: z.enum(['today', 'weekend', 'any']).optional(),
+  dateRange: z.enum(['today', 'weekend', 'next_weekend', 'any']).optional(),
   categories: z.array(z.string()).optional(),
   limit: z.number().default(50),
   offset: z.number().default(0),
@@ -86,7 +86,7 @@ export function formatDistance(meters: number, unit: 'miles' | 'km' = 'miles'): 
 }
 
 // Helper function to get date range based on dateRange parameter
-function getDateRange(dateRange?: 'today' | 'weekend' | 'any') {
+function getDateRange(dateRange?: 'today' | 'weekend' | 'next_weekend' | 'any') {
   if (!dateRange || dateRange === 'any') return null
   
   const today = new Date()
@@ -100,6 +100,23 @@ function getDateRange(dateRange?: 'today' | 'weekend' | 'any') {
     const dayOfWeek = today.getDay()
     const daysUntilSaturday = (6 - dayOfWeek) % 7
     const daysUntilSunday = (7 - dayOfWeek) % 7
+    
+    const saturday = new Date(today)
+    saturday.setDate(today.getDate() + daysUntilSaturday)
+    
+    const sunday = new Date(today)
+    sunday.setDate(today.getDate() + daysUntilSunday)
+    
+    return {
+      start: saturday.toISOString().split('T')[0],
+      end: sunday.toISOString().split('T')[0]
+    }
+  }
+  
+  if (dateRange === 'next_weekend') {
+    const dayOfWeek = today.getDay()
+    const daysUntilSaturday = ((6 - dayOfWeek) % 7) + 7
+    const daysUntilSunday = ((7 - dayOfWeek) % 7) + 7
     
     const saturday = new Date(today)
     saturday.setDate(today.getDate() + daysUntilSaturday)

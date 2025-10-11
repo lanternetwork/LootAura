@@ -56,6 +56,10 @@ const nextConfig = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname),
     }
+    // Reduce noisy webpack infra warnings about cache string serialization
+    config.infrastructureLogging = {
+      level: 'error',
+    }
     return config
   },
 }

@@ -1645,7 +1645,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
                 {/* Always render the sales list container - never hide it */}
                 <div
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
+                  className="grid gap-6 transition-opacity duration-200"
                   data-testid="sales-grid"
                   data-debug="sales-list"
                   data-panel="list"
@@ -1654,12 +1654,26 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   style={arbiter.authority==='MAP' ? { 
                     position: 'relative', 
                     zIndex: 3, 
-                    minHeight: 240
-                  } : undefined}
+                    minHeight: 240,
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                    gap: '1.5rem'
+                  } : {
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                    gap: '1.5rem'
+                  }}
                 >
                   {arbiter.authority==='MAP' && (
                     <div style={{ position:'absolute', top:8, left:8, padding:'4px 6px', fontSize:12, background:'rgba(255,255,0,.6)', zIndex:1000 }}>
                       MAP LIST: {(visiblePinIdsState?.length ?? 0)}
+                    </div>
+                  )}
+                  
+                  {/* Debug grid info */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div style={{ position:'absolute', top:8, right:8, padding:'4px 6px', fontSize:12, background:'rgba(0,255,0,.6)', zIndex:1000 }}>
+                      GRID: {window.innerWidth < 640 ? '1col' : window.innerWidth < 1024 ? '2col' : '3col'}
                     </div>
                   )}
                   

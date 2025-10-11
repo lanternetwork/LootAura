@@ -529,10 +529,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         return
       }
 
-      // If visible pins don't match current markers, clear them and let the map recalculate
+      // If visible pins don't match current markers, let the map recalculate naturally
+      // Don't clear visible pins here as it prevents the map from recalculating them
       if (haveInDict === 0) {
-        console.log(`[LIST][MAP] clearing visible pins - pins don't match current markers`)
-        setVisiblePinIdsState([])
+        console.log(`[LIST][MAP] visible pins don't match current markers - waiting for map to recalculate`)
         setVisibleSales([])
         setRenderedSales([])
         return

@@ -1518,11 +1518,18 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                         {visibleSales.length > 24 && (
                           <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
                         )}
-                        {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => (
-                          (console.log('[DOM] list item rendered id=', item.id),
-                            <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
-                          )
-                        ))}
+                        {(() => {
+                          const itemsToRender = isUpdating ? staleSales : renderedSales
+                          console.log('[DEBUG] MAP rendering - itemsToRender.length:', itemsToRender.length)
+                          console.log('[DEBUG] MAP rendering - itemsToRender:', itemsToRender.slice(0, 3))
+                          console.log('[DEBUG] MAP rendering - visibleSales.length:', visibleSales.length)
+                          console.log('[DEBUG] MAP rendering - visiblePinIdsState.length:', visiblePinIdsState.length)
+                          return itemsToRender.map((item: any, idx: number) => (
+                            (console.log('[DOM] list item rendered id=', item.id),
+                              <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                            )
+                          ))
+                        })()}
                       </>
                     )
                   ) : (

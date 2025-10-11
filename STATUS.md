@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** d5598b9 — Merge branch 'milestone/db-option-a-restore' of https://github.com/lanternetwork/LootAura into milestone/db-option-a-restore (by Yard Sale Tracker on 2025-10-10 21:02:04 -0400)
+- **Latest commit:** da6ac6c — Merge branch 'milestone/db-option-a-restore' of https://github.com/lanternetwork/LootAura into milestone/db-option-a-restore (by Yard Sale Tracker on 2025-10-10 22:00:01 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18422337788
+- **CI status:** running, last run: run 18422735856
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -54,15 +54,22 @@
 - **URL Roundtrip**: Date parameters encoded/decoded identically; no authority flips on date changes
 - **Acceptance**: DEBUG=1 confirms only markers calls during pan/zoom; date filters show markers with from/to; no wide sales
 
-## 9. Known Issues / TODO
+## 9. Date Range Filter — Loop Fix
+- **Root Cause**: Date preset changes triggered fetches even when resolved dates were unchanged
+- **Solution**: Added resolveDatePreset helper and dateRangesEqual check to prevent unnecessary fetches
+- **Parameter Standardization**: Client sends from/to, server prioritizes from/to over dateFrom/dateTo
+- **Dev Verification**: DEBUG logs show concrete dates in URLs and prevent loops
+- **Result**: Zero markers loop eliminated; date filters work as narrowing constraints
+
+## 10. Known Issues / TODO
 - Apply 032/033 migrations to restore lootaura_v2 schema
 - Apply 034 public views/RPC and verify grants
 - Wire /api/sales fully to Option A RPC, confirm degraded flag
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
-## 10. Next Milestone
+## 11. Next Milestone
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-11T01:26:35.143Z
+Updated automatically by Cursor on 2025-10-11T02:00:34.629Z

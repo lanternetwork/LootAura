@@ -7,6 +7,7 @@ import { GetSalesParams, formatDistance } from '@/lib/data/sales'
 import SalesMap from '@/components/location/SalesMap'
 import ZipInput from '@/components/location/ZipInput'
 import SaleCard from '@/components/SaleCard'
+import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import FiltersModal from '@/components/filters/FiltersModal'
 import FilterTrigger from '@/components/filters/FilterTrigger'
 import DateWindowLabel from '@/components/filters/DateWindowLabel'
@@ -245,6 +246,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [degraded, setDegraded] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [mapUpdating, setMapUpdating] = useState(false)
   const [mapSales, setMapSales] = useState<Sale[]>([])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
@@ -992,6 +994,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     console.log('[KEY] markers', key)
     lastMarkersKeyRef.current = key
     
+    // Set map updating state to prevent flashing
+    setMapUpdating(true)
+    
     // Abort previous markers request
     abortPrevious('markers')
     
@@ -1106,10 +1111,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         console.log('[ASSERT] id parity ok? examples:', sample)
         setMapMarkers(uniqueMarkers)
         setMapError(null) // Clear any previous errors
+        setMapUpdating(false) // Reset map updating state
         console.debug('[MARKERS] got', uniqueMarkers.length)
       } else {
         console.log('[MAP] Setting mapMarkers to empty array')
         setMapMarkers([])
+        setMapUpdating(false) // Reset map updating state
         console.debug('[MARKERS] got', 0)
       }
     } catch (error: any) {
@@ -1120,6 +1127,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.error('[MAP] Error fetching markers:', error)
       setMapMarkers([])
       setMapError('Failed to load map markers')
+      setMapUpdating(false) // Reset map updating state
       // Clear error after 3 seconds
       setTimeout(() => setMapError(null), 3000)
     } finally {
@@ -1655,42 +1663,48 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     </div>
                   )}
                   
+                  {/* Map updating indicator */}
+                  {mapUpdating && (
+                    <div className="absolute top-4 right-4 z-10 bg-blue-500 text-white px-3 py-1 rounded-full text-sm flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Updating map...
+                    </div>
+                  )}
+                  
                   {/* In MAP authority: always render from visible pins, never show loading skeletons */}
                   {arbiter.authority === 'MAP' ? (
-                    visiblePinIdsState.length === 0 ? (
-                      // No visible pins - show empty state
-                      <div className="col-span-full text-center py-16">
-                        <h3 className="text-xl font-semibold text-gray-800">Pan or zoom to see sales here</h3>
-                        <p className="text-gray-500 mt-2">Move the map to find sales in your area.</p>
-                      </div>
-                    ) : (
-                      // Show visible pins - render from markers immediately, hydrate from sales cache
-                      <>
-                        {visibleSales.length > 24 && (
-                          <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
-                        )}
-                        {(() => {
-                          const itemsToRender = isUpdating ? staleSales : renderedSales
-                          
-                          // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
-                          const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
-                          
-                          return finalItemsToRender.map((item: any, idx: number) => (
-                            <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
-                          ))
-                        })()}
-                      </>
-                    )
+                    <div className={`transition-opacity duration-300 ${mapUpdating ? 'opacity-50' : 'opacity-100'}`}>
+                      {visiblePinIdsState.length === 0 ? (
+                        // No visible pins - show empty state
+                        <div className="col-span-full text-center py-16">
+                          <h3 className="text-xl font-semibold text-gray-800">Pan or zoom to see sales here</h3>
+                          <p className="text-gray-500 mt-2">Move the map to find sales in your area.</p>
+                        </div>
+                      ) : (
+                        // Show visible pins - render from markers immediately, hydrate from sales cache
+                        <>
+                          {visibleSales.length > 24 && (
+                            <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
+                          )}
+                          {(() => {
+                            const itemsToRender = isUpdating ? staleSales : renderedSales
+                            
+                            // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
+                            const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
+                            
+                            return finalItemsToRender.map((item: any, idx: number) => (
+                              <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                            ))
+                          })()}
+                        </>
+                      )}
+                    </div>
                   ) : (
                     // Non-MAP authority: show loading skeletons when loading
-                    <>
+                    <div className={`transition-opacity duration-300 ${loading ? 'opacity-75' : 'opacity-100'}`}>
                       {(loading || !fetchedOnce) ? (
                         Array.from({ length: 6 }).map((_, idx) => (
-                          <div key={idx} className="animate-pulse bg-white rounded-lg border p-4">
-                            <div className="h-40 bg-gray-200 rounded mb-4" />
-                            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                            <div className="h-4 bg-gray-200 rounded w-1/2" />
-                          </div>
+                          <SaleCardSkeleton key={idx} />
                         ))
                       ) : sales.length === 0 ? (
                         // Show empty state message
@@ -1717,7 +1731,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                           ))}
                         </>
                       )}
-                    </>
+                    </div>
                   )}
                 </div>
                 

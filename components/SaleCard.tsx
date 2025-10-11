@@ -17,11 +17,7 @@ export default function SaleCard({ sale, authority }: { sale: Sale; authority?: 
       data-sale-id={String(sale?.id || '')}
       data-kind="sale-row"
       style={isMap ? { 
-        border: '3px solid blue', 
-        background: 'rgba(255, 255, 0, 0.1)',
-        minHeight: '200px',
-        position: 'relative',
-        zIndex: 5
+        minHeight: '200px'
       } : undefined}
     >
       <div className="flex justify-between">
@@ -29,12 +25,6 @@ export default function SaleCard({ sale, authority }: { sale: Sale; authority?: 
         {sale?.id && <FavoriteButton saleId={sale.id} initial={false} />}
       </div>
       
-      {/* Debug content for MAP authority */}
-      {isMap && (
-        <div style={{ background: 'rgba(255, 0, 0, 0.1)', padding: '8px', border: '1px solid red', fontSize: '12px' }}>
-          DEBUG: MAP CARD - ID: {sale?.id || 'NO_ID'} - Authority: {authority}
-        </div>
-      )}
       
       {/* Image preview removed: photos are not part of the Sale schema */}
       

@@ -61,6 +61,14 @@ export async function GET(request: NextRequest) {
 
     // Parse date bounds using shared helper
     const dateBounds = parseDateBounds(startDate, endDate)
+    
+    // Debug logging for date filtering
+    console.log('[MARKERS API] Date filtering debug:', {
+      startDate,
+      endDate,
+      dateBounds,
+      totalRecords: data?.length || 0
+    })
 
     const filtered = (data || [])
       .map((sale: any) => {
@@ -75,7 +83,17 @@ export async function GET(request: NextRequest) {
       .filter((sale: any) => {
         // Use shared date overlap logic
         if (!dateBounds) return true
-        return checkDateOverlap(sale.saleStart, sale.saleEnd, dateBounds)
+        
+        const overlaps = checkDateOverlap(sale.saleStart, sale.saleEnd, dateBounds)
+        if (!overlaps) {
+          console.log('[MARKERS API] Sale filtered out by date:', {
+            saleId: sale.id,
+            saleStart: sale.saleStart,
+            saleEnd: sale.saleEnd,
+            dateBounds
+          })
+        }
+        return overlaps
       })
       .map((sale: any) => {
         const R = 6371
@@ -91,6 +109,14 @@ export async function GET(request: NextRequest) {
     const markers = filtered
       .slice(0, Math.min(limit, 1000))
       .map((sale: any) => ({ id: sale.id, title: sale.title, lat: sale.lat, lng: sale.lng }))
+
+    // Debug logging for final results
+    console.log('[MARKERS API] Final results:', {
+      totalRecords: data?.length || 0,
+      afterDateFilter: filtered.length,
+      finalMarkers: markers.length,
+      dateBounds
+    })
 
     // Return structured response matching /api/sales format
     return NextResponse.json({

@@ -1524,7 +1524,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                           console.log('[DEBUG] MAP rendering - itemsToRender:', itemsToRender.slice(0, 3))
                           console.log('[DEBUG] MAP rendering - visibleSales.length:', visibleSales.length)
                           console.log('[DEBUG] MAP rendering - visiblePinIdsState.length:', visiblePinIdsState.length)
-                          return itemsToRender.map((item: any, idx: number) => (
+                          console.log('[DEBUG] MAP rendering - isUpdating:', isUpdating)
+                          console.log('[DEBUG] MAP rendering - staleSales.length:', staleSales.length)
+                          console.log('[DEBUG] MAP rendering - renderedSales.length:', renderedSales.length)
+                          
+                          // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
+                          const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
+                          console.log('[DEBUG] MAP rendering - finalItemsToRender.length:', finalItemsToRender.length)
+                          
+                          return finalItemsToRender.map((item: any, idx: number) => (
                             (console.log('[DOM] list item rendered id=', item.id),
                               <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
                             )

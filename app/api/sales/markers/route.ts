@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
     const latParam = q.get('lat')
     const lngParam = q.get('lng')
     const distanceParam = q.get('distanceKm')
-    const startDate = q.get('dateFrom') || q.get('startDate') || q.get('from') || undefined
-    const endDate = q.get('dateTo') || q.get('endDate') || q.get('to') || undefined
+    const startDate = q.get('from') || q.get('dateFrom') || q.get('startDate') || undefined
+    const endDate = q.get('to') || q.get('dateTo') || q.get('endDate') || undefined
     
     const limitParam = q.get('limit')
     const catsParam = q.get('categories') || q.get('tags') || ''
@@ -67,12 +67,8 @@ export async function GET(request: NextRequest) {
         const lat = Number(sale.lat)
         const lng = Number(sale.lng)
         if (Number.isNaN(lat) || Number.isNaN(lng)) return null
-        const saleStart = sale.starts_at
-          ? new Date(sale.starts_at)
-          : (sale.date_start ? toUtcDateOnly(sale.date_start) : undefined)
-        const saleEnd = sale.ends_at
-          ? new Date(sale.ends_at)
-          : (sale.date_end ? new Date((toUtcDateOnly(sale.date_end)).getTime() + 86399999) : saleStart)
+        const saleStart = sale.starts_at ? new Date(sale.starts_at) : null
+        const saleEnd = sale.ends_at ? new Date(sale.ends_at) : null
         return { ...sale, lat, lng, saleStart, saleEnd }
       })
       .filter(Boolean)

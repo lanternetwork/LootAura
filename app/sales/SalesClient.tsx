@@ -17,6 +17,7 @@ import { milesToKm } from '@/utils/geo'
 import LoadMoreButton from '@/components/LoadMoreButton'
 import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
+import { resolveDatePreset, dateRangesEqual } from '@/lib/shared/resolveDatePreset'
 
 // Intent Arbiter types
 type ControlMode = 'initial' | 'map' | 'zip' | 'distance'
@@ -121,6 +122,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   
   // Mode authority locking to prevent thrashing
   const mapAuthorityUntilRef = useRef<number>(0)
+  
+  // Track last resolved date range to prevent unnecessary fetches
+  const lastResolvedDateRangeRef = useRef<{ from?: string; to?: string } | null>(null)
   
   // Diagnostic overlay state
   const [showDiagnostics, setShowDiagnostics] = useState(false)
@@ -417,6 +421,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
           setMapMarkers(data.data || [])
           setInFlightMarkers(false)
           console.log(`[MARKERS] set: ${(data.data || []).length} version: ${markersVersionRef.current}`)
+          
+          // Dev-only verification logging
+          if (process.env.NEXT_PUBLIC_DEBUG === '1') {
+            console.log(`[MARKERS][apply] count=${(data.data || []).length} vSeq=${viewportSeqRef.current} dropped=false`)
+          }
         }
       } else {
         console.error(`[NET] error ${endpoint}:`, data.error)
@@ -774,6 +783,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       // HARD GUARD: Suppress wide /api/sales under MAP authority
       if (arbiter.authority === 'MAP') {
         console.log('[GUARD] Suppressed wide /api/sales under MAP authority')
+        
+        // Dev-only verification logging
+        if (process.env.NEXT_PUBLIC_DEBUG === '1') {
+          console.log(`[SALES][suppressed] wide fetch blocked under MAP authority vSeq=${viewportSeqRef.current}`)
+        }
+        
         emitSuppressedFetch('/api/sales', Object.fromEntries(
           Object.entries(params).map(([key, value]) => [key, String(value)])
         ), {
@@ -810,7 +825,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       if (data.ok) {
         const newSales = data.data || []
         // If in MAP authority, do not let wide/broad results overwrite map-scoped list
-        if (arbiter.authority === 'MAP') {
+        if ((arbiter.authority as string) === 'MAP') {
           console.log('[DROP] stale/wide response (MAP authority active)')
           return
         }
@@ -942,27 +957,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     
     try {
       console.log('[MAP] fetchMapSales called with filters:', filters, 'centerOverride:', centerOverride)
-      // Map dateRange preset to concrete ISO dates for markers
-      let dateFrom: string | undefined
-      let dateTo: string | undefined
-      const today = new Date()
-      const toISO = (d: Date) => d.toISOString().slice(0, 10)
-      if (filters.dateRange === 'today') {
-        const start = new Date(today)
-        const end = new Date(today)
-        dateFrom = toISO(start)
-        dateTo = toISO(end)
-      } else if (filters.dateRange === 'weekend' || filters.dateRange === 'next_weekend') {
-        const base = new Date(today)
-        const day = base.getDay()
-        const offsetToSat = ((6 - day + 7) % 7) + (filters.dateRange === 'next_weekend' ? 7 : 0)
-        const sat = new Date(base)
-        sat.setDate(base.getDate() + offsetToSat)
-        const sun = new Date(sat)
-        sun.setDate(sat.getDate() + 1)
-        dateFrom = toISO(sat)
-        dateTo = toISO(sun)
-      }
+      // Resolve dateRange preset to concrete dates
+      const resolvedDates = resolveDatePreset(filters.dateRange)
+      const dateFrom = resolvedDates?.from
+      const dateTo = resolvedDates?.to
 
       const params = new URLSearchParams()
       params.set('lat', String(useLat))
@@ -971,14 +969,19 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       const distanceKm = String(distanceKmForRequest ?? milesToKm(filters.distance))
       params.set('distanceKm', distanceKm)
       if (filters.categories.length > 0) params.set('categories', filters.categories.join(','))
-      if (dateFrom) params.set('dateFrom', dateFrom)
-      if (dateTo) params.set('dateTo', dateTo)
+      if (dateFrom) params.set('from', dateFrom)
+      if (dateTo) params.set('to', dateTo)
       params.set('limit', '1000')
       
 
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`, { mode })
       console.debug('[MARKERS] fetch', `/api/sales/markers?${params.toString()}`)
       console.debug('[MARKERS] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
+      
+      // Dev-only verification logging
+      if (process.env.NEXT_PUBLIC_DEBUG === '1') {
+        console.log(`[MARKERS][dispatch] bbox=<${useLat},${useLng}> from=${dateFrom || 'none'} to=${dateTo || 'none'} authority=${arbiter.authority} vSeq=${viewportSeqRef.current}`)
+      }
       
       const res = await diagnosticFetch(`/api/sales/markers?${params.toString()}`, { signal: controller.signal }, {
         authority: arbiter.authority,
@@ -1182,10 +1185,22 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Date filter change handling - MAP authority only triggers markers fetch
   useEffect(() => {
     if (arbiter.authority === 'MAP') {
-      console.log('[DATE] dateRange change under MAP authority - triggering markers fetch only')
-      // Bump viewport sequence to ensure stale responses are dropped
-      viewportSeqRef.current++
-      fetchMapSales()
+      // Resolve current date range to check if it actually changed
+      const currentResolved = resolveDatePreset(filters.dateRange)
+      const lastResolved = lastResolvedDateRangeRef.current
+      
+      // Only trigger if the resolved dates actually changed
+      if (!dateRangesEqual(currentResolved, lastResolved)) {
+        console.log('[DATE] dateRange change under MAP authority - triggering markers fetch only')
+        console.log('[DATE] resolved dates changed:', { from: currentResolved?.from, to: currentResolved?.to })
+        // Bump viewport sequence to ensure stale responses are dropped
+        viewportSeqRef.current++
+        fetchMapSales()
+        // Update the last resolved date range
+        lastResolvedDateRangeRef.current = currentResolved
+      } else {
+        console.log('[DATE] dateRange preset changed but resolved dates unchanged - skipping fetch')
+      }
     }
   }, [filters.dateRange, arbiter.authority, fetchMapSales])
 

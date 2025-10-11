@@ -1047,6 +1047,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       
 
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`, { mode })
+      console.log('[MAP] Date parameters being sent:', { from: dateFrom, to: dateTo, dateRange: filters.dateRange })
       console.debug('[MARKERS] fetch', `/api/sales/markers?${params.toString()}`)
       console.debug('[MARKERS] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
       

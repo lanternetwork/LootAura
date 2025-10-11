@@ -28,6 +28,35 @@ A modern web application for discovering and managing yard sales, garage sales, 
 
 **Important**: See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues, solutions, and diagnostic tools.
 
+## Debugging
+
+### Diagnostic Overlay
+
+When `NEXT_PUBLIC_DEBUG=1` is set, a diagnostic overlay appears in the bottom-right corner showing:
+
+- **Last 10 fetch events** with endpoint, query parameters, authority, and timing
+- **Viewport/Request sequences** to verify proper sequencing behavior
+- **Red badge** indicating suppressed wide fetches under MAP authority
+- **Toggle button** to show/hide the overlay
+
+### Visual Confirmation
+
+The overlay helps verify:
+- **Suppression**: Red "SUPPRESSED" status for wide `/api/sales` calls under MAP authority
+- **Sequencing**: Monotonically increasing viewport/request sequence numbers
+- **Parameter Consistency**: Identical `from`/`to` values in both endpoint calls
+- **Authority Stability**: No authority flips when changing date filters
+
+### Enabling Debug Mode
+
+```bash
+# Set environment variable
+NEXT_PUBLIC_DEBUG=1
+
+# Or in Vercel dashboard
+# Environment Variables → Add → NEXT_PUBLIC_DEBUG = 1
+```
+
 ## ZIP Codes (Full US) — Free Lookups
 
 LootAura includes a comprehensive US ZIP code database for instant, free geocoding lookups:

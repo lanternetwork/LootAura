@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
 
 // Markers API with server-side date, distance, and category filtering
 // Response shape expected by SalesMap: plain array
@@ -52,10 +53,14 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Date window (UTC date-only)
-    const toUtcDateOnly = (isoLike: string) => new Date(isoLike.length === 10 ? `${isoLike}T00:00:00Z` : isoLike)
-    const windowStart = startDate ? toUtcDateOnly(startDate) : undefined
-    const windowEnd = endDate ? new Date((toUtcDateOnly(endDate)).getTime() + 86399999) : undefined
+    // Validate date range parameters
+    const dateValidation = validateDateRange(startDate, endDate)
+    if (!dateValidation.valid) {
+      return NextResponse.json({ error: dateValidation.error }, { status: 400 })
+    }
+
+    // Parse date bounds using shared helper
+    const dateBounds = parseDateBounds(startDate, endDate)
 
     const filtered = (data || [])
       .map((sale: any) => {
@@ -72,14 +77,9 @@ export async function GET(request: NextRequest) {
       })
       .filter(Boolean)
       .filter((sale: any) => {
-        if (!windowStart && !windowEnd) return true
-        if (!sale.saleStart && !sale.saleEnd) return false
-        const s = sale.saleStart || sale.saleEnd
-        const e = sale.saleEnd || sale.saleStart
-        if (!s || !e) return false
-        const startOk = !windowEnd || s <= windowEnd
-        const endOk = !windowStart || e >= windowStart
-        return startOk && endOk
+        // Use shared date overlap logic
+        if (!dateBounds) return true
+        return checkDateOverlap(sale.saleStart, sale.saleEnd, dateBounds)
       })
       .map((sale: any) => {
         const R = 6371

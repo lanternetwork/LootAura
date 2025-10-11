@@ -15,6 +15,8 @@ import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { milesToKm } from '@/utils/geo'
 import LoadMoreButton from '@/components/LoadMoreButton'
+import DiagnosticOverlay from '@/components/DiagnosticOverlay'
+import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
 
 // Intent Arbiter types
 type ControlMode = 'initial' | 'map' | 'zip' | 'distance'
@@ -119,6 +121,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   
   // Mode authority locking to prevent thrashing
   const mapAuthorityUntilRef = useRef<number>(0)
+  
+  // Diagnostic overlay state
+  const [showDiagnostics, setShowDiagnostics] = useState(false)
+  const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === '1'
 
   const updateControlMode = useCallback((mode: ControlMode, reason: string) => {
     setArbiter(prev => {
@@ -765,9 +771,30 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     ).toString()
 
     try {
+      // HARD GUARD: Suppress wide /api/sales under MAP authority
+      if (arbiter.authority === 'MAP') {
+        console.log('[GUARD] Suppressed wide /api/sales under MAP authority')
+        emitSuppressedFetch('/api/sales', Object.fromEntries(
+          Object.entries(params).map(([key, value]) => [key, String(value)])
+        ), {
+          authority: arbiter.authority,
+          viewportSeq: viewportSeqRef.current,
+          requestSeq: seq
+        })
+        return
+      }
+
       console.log(`[SALES] Fetching from: /api/sales?${queryString}`)
       console.debug('[SALES] fetch', `/api/sales?${queryString}`)
-      const res = await fetch(`/api/sales?${queryString}`, { signal: controller.signal })
+      
+      const res = await diagnosticFetch(`/api/sales?${queryString}`, { signal: controller.signal }, {
+        authority: arbiter.authority,
+        viewportSeq: viewportSeqRef.current,
+        requestSeq: seq,
+        params: Object.fromEntries(
+          Object.entries(params).map(([key, value]) => [key, String(value)])
+        )
+      })
       const data = await res.json()
       
       // Check if this request was aborted
@@ -952,7 +979,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`, { mode })
       console.debug('[MARKERS] fetch', `/api/sales/markers?${params.toString()}`)
       console.debug('[MARKERS] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
-      const res = await fetch(`/api/sales/markers?${params.toString()}`, { signal: controller.signal })
+      
+      const res = await diagnosticFetch(`/api/sales/markers?${params.toString()}`, { signal: controller.signal }, {
+        authority: arbiter.authority,
+        viewportSeq: viewportSeqRef.current,
+        requestSeq: seq,
+        params: Object.fromEntries(params.entries())
+      })
       const data = await res.json()
       
       // Check if this request was aborted
@@ -1796,6 +1829,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
           <div><strong>Schema:</strong> public.sales_v2</div>
           <div><strong>Degraded:</strong> {degraded ? 'true' : 'false'}</div>
         </div>
+      )}
+      
+      {/* Diagnostic Overlay - only show in debug mode */}
+      {isDebugMode && (
+        <DiagnosticOverlay
+          isVisible={showDiagnostics}
+          onToggle={() => setShowDiagnostics(!showDiagnostics)}
+        />
       )}
     </div>
   )

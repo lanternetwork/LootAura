@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
@@ -62,6 +63,15 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 24, 48)
     const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0, 0)
     
+    // Validate date range parameters
+    const dateValidation = validateDateRange(startDate, endDate)
+    if (!dateValidation.valid) {
+      return NextResponse.json({ 
+        ok: false, 
+        error: dateValidation.error 
+      }, { status: 400 })
+    }
+
     // Convert date range to start/end dates
     let startDateParam: string | null = null
     let endDateParam: string | null = null

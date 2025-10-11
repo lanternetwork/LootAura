@@ -46,14 +46,22 @@
 - **Overlap Logic**: Sale window [starts_at, ends_at] overlaps [fromUtc, toUtc] inclusively
 - **Limitations**: No wide /api/sales queries under MAP authority; date filtering is server-side only
 
-## 8. Known Issues / TODO
+## 8. Date Range Filter — Verification
+- **Diagnostic Overlay**: Dev-only overlay (DEBUG=1) shows last 10 fetch events with endpoint, params, authority, sequences
+- **Hard Guards**: Client-side early-return prevents wide /api/sales under MAP authority; suppressed fetches logged
+- **Parameter Consistency**: Shared dateBounds helper ensures consistent parsing across both API routes
+- **Unit Tests**: Comprehensive tests for date overlap, validation, and MAP authority query building
+- **URL Roundtrip**: Date parameters encoded/decoded identically; no authority flips on date changes
+- **Acceptance**: DEBUG=1 confirms only markers calls during pan/zoom; date filters show markers with from/to; no wide sales
+
+## 9. Known Issues / TODO
 - Apply 032/033 migrations to restore lootaura_v2 schema
 - Apply 034 public views/RPC and verify grants
 - Wire /api/sales fully to Option A RPC, confirm degraded flag
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
-## 9. Next Milestone
+## 10. Next Milestone
 - Bulk generator + clustering polish
 
 ---

@@ -38,14 +38,22 @@
 - **Environment vars:** NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, etc. (verify set)
 - **Last deploy health:** unknown in this run
 
-## 7. Known Issues / TODO
+## 7. Date Range Filter — Repair
+- **Behavior**: Date filters work as narrowing constraints under MAP authority
+- **Authority Model**: MAP remains source of truth; date changes only trigger markers fetch
+- **Sequencing**: Date changes bump viewportSeqRef to ensure stale responses are dropped
+- **API Support**: Both /api/sales and /api/sales/markers accept from/to parameters
+- **Overlap Logic**: Sale window [starts_at, ends_at] overlaps [fromUtc, toUtc] inclusively
+- **Limitations**: No wide /api/sales queries under MAP authority; date filtering is server-side only
+
+## 8. Known Issues / TODO
 - Apply 032/033 migrations to restore lootaura_v2 schema
 - Apply 034 public views/RPC and verify grants
 - Wire /api/sales fully to Option A RPC, confirm degraded flag
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
-## 8. Next Milestone
+## 9. Next Milestone
 - Bulk generator + clustering polish
 
 ---

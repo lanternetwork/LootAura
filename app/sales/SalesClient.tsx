@@ -1146,8 +1146,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     fetchMapSales()
   }, [fetchMapSales])
 
-  // Note: When date filters change, the map will automatically recalculate visible pins
-  // when the new filtered markers are loaded. No manual intervention needed.
+  // Date filter change handling - MAP authority only triggers markers fetch
+  useEffect(() => {
+    if (arbiter.authority === 'MAP') {
+      console.log('[DATE] dateRange change under MAP authority - triggering markers fetch only')
+      // Bump viewport sequence to ensure stale responses are dropped
+      viewportSeqRef.current++
+      fetchMapSales()
+    }
+  }, [filters.dateRange, arbiter.authority, fetchMapSales])
 
   // Initialize filters from server-provided center once, only if no location set yet
   useEffect(() => {

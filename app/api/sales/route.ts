@@ -42,8 +42,8 @@ export async function GET(request: NextRequest) {
     ))
     
     const dateRange = searchParams.get('dateRange') || 'any'
-    const startDate = searchParams.get('dateFrom') || searchParams.get('startDate') || undefined
-    const endDate = searchParams.get('dateTo') || searchParams.get('endDate') || undefined
+    const startDate = searchParams.get('dateFrom') || searchParams.get('startDate') || searchParams.get('from') || undefined
+    const endDate = searchParams.get('dateTo') || searchParams.get('endDate') || searchParams.get('to') || undefined
     
     
     const categoriesParam = searchParams.get('categories')

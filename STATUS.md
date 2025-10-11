@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 95acee4 — [MAP] Disable Mapbox telemetry (stop events.mapbox.com requests) (by Yard Sale Tracker on 2025-10-08 21:12:29 -0400)
+- **Latest commit:** 5a5bf47 — cleanup: remove debugging styles and logs after successful fix (by Yard Sale Tracker on 2025-10-10 20:22:04 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18362467697
+- **CI status:** running, last run: run 18421499117
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-09T01:14:01.451Z
+Updated automatically by Cursor on 2025-10-11T00:22:46.934Z

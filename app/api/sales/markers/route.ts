@@ -67,7 +67,8 @@ export async function GET(request: NextRequest) {
       startDate,
       endDate,
       dateBounds,
-      totalRecords: data?.length || 0
+      totalRecords: data?.length || 0,
+      url: request.url
     })
 
     const filtered = (data || [])

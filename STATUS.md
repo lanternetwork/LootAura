@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 548736e — debug: add client-side date parameter logging (by Yard Sale Tracker on 2025-10-11 00:55:44 -0400)
+- **Latest commit:** dcf1833 — fix: comprehensive date filtering overhaul (by Yard Sale Tracker on 2025-10-11 01:05:47 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18424698606
+- **CI status:** running, last run: run 18424801697
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-11T04:56:23.413Z
+Updated automatically by Cursor on 2025-10-11T05:06:25.767Z

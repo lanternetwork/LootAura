@@ -85,24 +85,48 @@ export async function GET(request: NextRequest) {
         const lat = Number(sale.lat)
         const lng = Number(sale.lng)
         if (Number.isNaN(lat) || Number.isNaN(lng)) return null
-        const saleStart = sale.starts_at ? new Date(sale.starts_at) : null
-        // For end date, we need to compute it from date_end + time_end, or use date_end if time_end is null
+        
+        // Compute sale start date - use starts_at if available, otherwise compute from date_start + time_start
+        let saleStart = null
+        if (sale.starts_at) {
+          saleStart = new Date(sale.starts_at)
+        } else if (sale.date_start) {
+          if (sale.time_start) {
+            saleStart = new Date(`${sale.date_start}T${sale.time_start}`)
+          } else {
+            saleStart = new Date(`${sale.date_start}T00:00:00`)
+          }
+        }
+        
+        // Compute sale end date - use date_end + time_end, or date_end as end of day
         let saleEnd = null
         if (sale.date_end) {
           if (sale.time_end) {
-            // Combine date_end + time_end into a timestamp
             saleEnd = new Date(`${sale.date_end}T${sale.time_end}`)
           } else {
-            // Use date_end as end of day
             saleEnd = new Date(`${sale.date_end}T23:59:59.999`)
           }
+        } else if (saleStart) {
+          // If no end date, treat as single-day sale
+          saleEnd = new Date(saleStart)
+          saleEnd.setHours(23, 59, 59, 999)
         }
+        
         return { ...sale, lat, lng, saleStart, saleEnd }
       })
       .filter(Boolean)
       .filter((sale: any) => {
-        // Use shared date overlap logic
+        // Skip date filtering if no date bounds provided
         if (!dateBounds) return true
+        
+        // Skip sales with no date information
+        if (!sale.saleStart && !sale.saleEnd) {
+          console.log('[MARKERS API] Sale has no date info, excluding:', {
+            saleId: sale.id,
+            title: sale.title
+          })
+          return false
+        }
         
         const overlaps = checkDateOverlap(sale.saleStart, sale.saleEnd, dateBounds)
         if (!overlaps) {
@@ -113,7 +137,9 @@ export async function GET(request: NextRequest) {
             saleEnd: sale.saleEnd,
             dateBounds,
             originalDateStart: sale.date_start,
-            originalDateEnd: sale.date_end
+            originalDateEnd: sale.date_end,
+            originalTimeStart: sale.time_start,
+            originalTimeEnd: sale.time_end
           })
         }
         return overlaps
@@ -138,7 +164,14 @@ export async function GET(request: NextRequest) {
       totalRecords: data?.length || 0,
       afterDateFilter: filtered.length,
       finalMarkers: markers.length,
-      dateBounds
+      dateBounds,
+      dateFilterApplied: !!dateBounds,
+      sampleFilteredSales: filtered.slice(0, 3).map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        saleStart: s.saleStart?.toISOString(),
+        saleEnd: s.saleEnd?.toISOString()
+      }))
     })
 
     // Return structured response matching /api/sales format

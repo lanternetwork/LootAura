@@ -61,7 +61,22 @@ export function checkDateOverlap(
 
   // Check for overlap: sale range [start, end] overlaps bounds [start, end]
   // Overlap exists if: saleStart <= boundsEnd AND saleEnd >= boundsStart
-  return effectiveSaleStart <= bounds.end && effectiveSaleEnd >= bounds.start
+  const overlaps = effectiveSaleStart <= bounds.end && effectiveSaleEnd >= bounds.start
+  
+  // Debug logging for overlap calculation
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[DATE OVERLAP]', {
+      saleStart: effectiveSaleStart,
+      saleEnd: effectiveSaleEnd,
+      boundsStart: bounds.start,
+      boundsEnd: bounds.end,
+      overlaps,
+      condition1: effectiveSaleStart <= bounds.end,
+      condition2: effectiveSaleEnd >= bounds.start
+    })
+  }
+  
+  return overlaps
 }
 
 /**

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
 import { GetSalesParams, formatDistance } from '@/lib/data/sales'
@@ -126,6 +126,21 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Track last resolved date range to prevent unnecessary fetches
   const lastResolvedDateRangeRef = useRef<{ from?: string; to?: string } | null>(null)
   
+  // Idempotency guard to prevent ping-pong when results are repeatedly "0"
+  const lastApplyStateRef = useRef<{
+    bboxHash: string
+    dateKey: string
+    markerIds: string
+  } | null>(null)
+  
+  // Stable date key for effect dependencies
+  const dateKey = useMemo(() => {
+    const resolved = resolveDatePreset(filters.dateRange)
+    return (resolved?.from || '') + '|' + (resolved?.to || '')
+  }, [filters.dateRange])
+  
+  // Stable bbox hash for effect dependencies (moved after viewportBounds declaration)
+  
   // Diagnostic overlay state
   const [showDiagnostics, setShowDiagnostics] = useState(false)
   const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === '1'
@@ -240,6 +255,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
   const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
+  
+  // Stable bbox hash for effect dependencies
+  const bboxHash = useMemo(() => {
+    if (!viewportBounds) return 'no-bounds'
+    return `${viewportBounds.north},${viewportBounds.south},${viewportBounds.east},${viewportBounds.west}`
+  }, [viewportBounds])
   const lastBoundsTsRef = useRef<number | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
   const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
@@ -418,13 +439,30 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         } else {
           // Increment markers version for identity tracking
           markersVersionRef.current++
-          setMapMarkers(data.data || [])
+          const newMarkers = data.data || []
+          const markerIds = newMarkers.map((m: any) => m.id).sort().join(',')
+          
+          // Idempotency guard: skip if bbox, date, and marker IDs haven't changed
+          const currentState = { bboxHash, dateKey, markerIds }
+          const lastState = lastApplyStateRef.current
+          
+          if (lastState && 
+              lastState.bboxHash === currentState.bboxHash &&
+              lastState.dateKey === currentState.dateKey &&
+              lastState.markerIds === currentState.markerIds) {
+            console.log('[MARKERS] idempotent apply - skipping update (same bbox|date|markers)')
+            setInFlightMarkers(false)
+            return
+          }
+          
+          setMapMarkers(newMarkers)
           setInFlightMarkers(false)
-          console.log(`[MARKERS] set: ${(data.data || []).length} version: ${markersVersionRef.current}`)
+          lastApplyStateRef.current = currentState
+          console.log(`[MARKERS] set: ${newMarkers.length} version: ${markersVersionRef.current}`)
           
           // Dev-only verification logging
           if (process.env.NEXT_PUBLIC_DEBUG === '1') {
-            console.log(`[MARKERS][apply] count=${(data.data || []).length} vSeq=${viewportSeqRef.current} dropped=false`)
+            console.log(`[MARKERS][apply] count=${newMarkers.length} vSeq=${viewportSeqRef.current} dropped=false`)
           }
         }
       } else {
@@ -961,6 +999,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       const resolvedDates = resolveDatePreset(filters.dateRange)
       const dateFrom = resolvedDates?.from
       const dateTo = resolvedDates?.to
+      
+      // Dev-only verification logging
+      if (process.env.NEXT_PUBLIC_DEBUG === '1') {
+        const nowLocalISO = new Date().toISOString().slice(0, 10)
+        console.log(`[PRESET] nowLocalISO=${nowLocalISO} from=${dateFrom || 'none'} to=${dateTo || 'none'} preset=${filters.dateRange}`)
+      }
 
       const params = new URLSearchParams()
       params.set('lat', String(useLat))
@@ -1177,32 +1221,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Visibility is now handled by the main useEffect
   }, [sales, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west])
 
-  // Refetch map pins when filters location/range change
-  useEffect(() => {
-    fetchMapSales()
-  }, [fetchMapSales])
-
-  // Date filter change handling - MAP authority only triggers markers fetch
+  // Single effect for MAP authority markers fetch - keyed by stable bbox|date
   useEffect(() => {
     if (arbiter.authority === 'MAP') {
-      // Resolve current date range to check if it actually changed
-      const currentResolved = resolveDatePreset(filters.dateRange)
-      const lastResolved = lastResolvedDateRangeRef.current
-      
-      // Only trigger if the resolved dates actually changed
-      if (!dateRangesEqual(currentResolved, lastResolved)) {
-        console.log('[DATE] dateRange change under MAP authority - triggering markers fetch only')
-        console.log('[DATE] resolved dates changed:', { from: currentResolved?.from, to: currentResolved?.to })
-        // Bump viewport sequence to ensure stale responses are dropped
-        viewportSeqRef.current++
-        fetchMapSales()
-        // Update the last resolved date range
-        lastResolvedDateRangeRef.current = currentResolved
-      } else {
-        console.log('[DATE] dateRange preset changed but resolved dates unchanged - skipping fetch')
-      }
+      console.log('[MAP] bbox|date change - triggering markers fetch', { bboxHash, dateKey })
+      // Bump viewport sequence to ensure stale responses are dropped
+      viewportSeqRef.current++
+      fetchMapSales()
     }
-  }, [filters.dateRange, arbiter.authority, fetchMapSales])
+  }, [bboxHash, dateKey, arbiter.authority, fetchMapSales])
 
   // Initialize filters from server-provided center once, only if no location set yet
   useEffect(() => {

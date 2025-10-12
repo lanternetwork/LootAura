@@ -1261,6 +1261,45 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Layout diagnostic ref
   const gridContainerRef = useRef<HTMLDivElement>(null)
   
+  // Grid layout diagnostic
+  useEffect(() => {
+    if (gridContainerRef.current && visibleSales.length > 0) {
+      const container = gridContainerRef.current
+      const computedStyle = window.getComputedStyle(container)
+      const parent = container.parentElement
+      const firstCard = container.querySelector('.sale-row')
+      
+      console.log('[GRID DIAGNOSTIC] Container:', {
+        display: computedStyle.display,
+        gridTemplateColumns: computedStyle.gridTemplateColumns,
+        width: computedStyle.width,
+        classList: Array.from(container.classList),
+        containerWidth: container.offsetWidth,
+        windowWidth: window.innerWidth,
+        salesCount: visibleSales.length
+      })
+      
+      if (parent) {
+        const parentStyle = window.getComputedStyle(parent)
+        console.log('[GRID DIAGNOSTIC] Parent:', {
+          display: parentStyle.display,
+          flexDirection: parentStyle.flexDirection,
+          width: parentStyle.width,
+          parentWidth: parent.offsetWidth
+        })
+      }
+      
+      if (firstCard) {
+        const cardStyle = window.getComputedStyle(firstCard)
+        console.log('[GRID DIAGNOSTIC] First Card:', {
+          display: cardStyle.display,
+          width: cardStyle.width,
+          cardWidth: firstCard.offsetWidth
+        })
+      }
+    }
+  }, [visibleSales.length])
+  
   useEffect(() => {
     effectRunCountRef.current++
     console.log(`[EFFECT] Main effect run #${effectRunCountRef.current}`)
@@ -1666,6 +1705,43 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     // Let Tailwind handle grid properties - no inline overrides
                   }}
                   data-grid-container="true"
+                  onLoad={() => {
+                    // Diagnostic logging for grid layout
+                    if (gridContainerRef.current) {
+                      const container = gridContainerRef.current
+                      const computedStyle = window.getComputedStyle(container)
+                      const parent = container.parentElement
+                      const firstCard = container.querySelector('.sale-row')
+                      
+                      console.log('[GRID DIAGNOSTIC] Container:', {
+                        display: computedStyle.display,
+                        gridTemplateColumns: computedStyle.gridTemplateColumns,
+                        width: computedStyle.width,
+                        classList: Array.from(container.classList),
+                        containerWidth: container.offsetWidth,
+                        windowWidth: window.innerWidth
+                      })
+                      
+                      if (parent) {
+                        const parentStyle = window.getComputedStyle(parent)
+                        console.log('[GRID DIAGNOSTIC] Parent:', {
+                          display: parentStyle.display,
+                          flexDirection: parentStyle.flexDirection,
+                          width: parentStyle.width,
+                          parentWidth: parent.offsetWidth
+                        })
+                      }
+                      
+                      if (firstCard) {
+                        const cardStyle = window.getComputedStyle(firstCard)
+                        console.log('[GRID DIAGNOSTIC] First Card:', {
+                          display: cardStyle.display,
+                          width: cardStyle.width,
+                          cardWidth: firstCard.offsetWidth
+                        })
+                      }
+                    }
+                  }}
                 >
                   {arbiter.authority==='MAP' && (
                     <div style={{ position:'absolute', top:8, left:8, padding:'4px 6px', fontSize:12, background:'rgba(255,255,0,.6)', zIndex:1000 }}>

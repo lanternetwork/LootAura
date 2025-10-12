@@ -1289,7 +1289,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         })
       }
       
-      if (firstCard) {
+      if (firstCard && firstCard instanceof HTMLElement) {
         const cardStyle = window.getComputedStyle(firstCard)
         console.log('[GRID DIAGNOSTIC] First Card:', {
           display: cardStyle.display,
@@ -1732,7 +1732,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                         })
                       }
                       
-                      if (firstCard) {
+                      if (firstCard && firstCard instanceof HTMLElement) {
                         const cardStyle = window.getComputedStyle(firstCard)
                         console.log('[GRID DIAGNOSTIC] First Card:', {
                           display: cardStyle.display,

@@ -8,15 +8,15 @@ export function useRealtimeSales(onUpdate: (payload: any) => void) {
   const supabase = createSupabaseBrowserClient()
 
   useEffect(() => {
-    // Subscribe to yard_sales changes
+    // Subscribe to sales_v2 changes
     const channel = supabase
-      .channel('yard_sales_changes')
+      .channel('sales_v2_changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'yard_sales'
+          table: 'sales_v2'
         },
         onUpdate
       )
@@ -39,15 +39,15 @@ export function useRealtimeFavorites(userId: string, onUpdate: (payload: any) =>
   useEffect(() => {
     if (!userId) return
 
-    // Subscribe to favorites changes for this user
+    // Subscribe to favorites_v2 changes for this user
     const channel = supabase
-      .channel('favorites_changes')
+      .channel('favorites_v2_changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'favorites',
+          table: 'favorites_v2',
           filter: `user_id=eq.${userId}`
         },
         onUpdate
@@ -71,15 +71,15 @@ export function useRealtimeReviews(saleId: string, onUpdate: (payload: any) => v
   useEffect(() => {
     if (!saleId) return
 
-    // Subscribe to reviews changes for this sale
+    // Subscribe to reviews_v2 changes for this sale
     const channel = supabase
-      .channel('reviews_changes')
+      .channel('reviews_v2_changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'reviews',
+          table: 'reviews_v2',
           filter: `sale_id=eq.${saleId}`
         },
         onUpdate

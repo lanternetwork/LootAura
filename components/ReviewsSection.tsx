@@ -36,10 +36,23 @@ export default function ReviewsSection({ saleId, averageRating = 0, totalReviews
 
   const fetchReviews = async () => {
     try {
+      // First get the sale to compute the review_key
+      const { data: sale, error: saleError } = await supabase
+        .from('sales_v2')
+        .select('address_key, owner_id')
+        .eq('id', saleId)
+        .single()
+
+      if (saleError) throw saleError
+
+      // Compute review_key from address_key + owner_id
+      const reviewKey = `${sale.address_key}|${sale.owner_id}`
+
+      // Fetch reviews by review_key (dual-link system)
       const { data, error } = await supabase
-        .from('reviews')
+        .from('reviews_v2')
         .select('*')
-        .eq('sale_id', saleId)
+        .eq('review_key', reviewKey)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -55,10 +68,23 @@ export default function ReviewsSection({ saleId, averageRating = 0, totalReviews
     if (!user) return
 
     try {
+      // First get the sale to compute the review_key
+      const { data: sale, error: saleError } = await supabase
+        .from('sales_v2')
+        .select('address_key, owner_id')
+        .eq('id', saleId)
+        .single()
+
+      if (saleError) throw saleError
+
+      // Compute review_key from address_key + owner_id
+      const reviewKey = `${sale.address_key}|${sale.owner_id}`
+
+      // Fetch user's review by review_key and user_id
       const { data, error } = await supabase
-        .from('reviews')
+        .from('reviews_v2')
         .select('*')
-        .eq('sale_id', saleId)
+        .eq('review_key', reviewKey)
         .eq('user_id', user.id)
         .single()
 
@@ -91,15 +117,15 @@ export default function ReviewsSection({ saleId, averageRating = 0, totalReviews
       if (userReview) {
         // Update existing review
         const { error } = await supabase
-          .from('reviews')
+          .from('reviews_v2')
           .update(reviewData)
           .eq('id', userReview.id)
 
         if (error) throw error
       } else {
-        // Create new review
+        // Create new review (server will compute review_key via trigger)
         const { error } = await supabase
-          .from('reviews')
+          .from('reviews_v2')
           .insert([reviewData])
 
         if (error) throw error

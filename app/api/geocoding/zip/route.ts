@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 // Nominatim rate limiting (1 request per second)

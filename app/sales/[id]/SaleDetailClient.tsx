@@ -33,11 +33,6 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
     return `${displayHour}:${minutes} ${ampm}`
   }
 
-  const getPriceDisplay = (price?: number) => {
-    if (price === null || price === undefined) return 'Free'
-    if (price === 0) return 'Free'
-    return `$${price.toLocaleString()}`
-  }
 
   const handleFavoriteToggle = async () => {
     try {
@@ -170,12 +165,6 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Price</h3>
-                  <div className="text-2xl font-bold text-green-600">
-                    {getPriceDisplay(sale.price)}
-                  </div>
-                </div>
               </div>
 
               <div>

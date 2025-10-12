@@ -5,34 +5,11 @@ export async function GET() {
   try {
     const supabase = createSupabaseServerClient()
     
-    // Query information_schema.tables to get table names
+    // Test that we can access the sales table
     const { data, error } = await supabase
-      .rpc('get_table_names')
-
-    // If the RPC doesn't exist, fall back to a direct query
-    if (error && error.message.includes('function get_table_names')) {
-      const { data: tableData, error: tableError } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public')
-
-      if (tableError) {
-        return NextResponse.json({
-          ok: false,
-          error: tableError.message,
-          timestamp: new Date().toISOString()
-        }, { status: 500 })
-      }
-
-      const tables = tableData?.map(row => row.table_name) || []
-      
-      return NextResponse.json({
-        ok: true,
-        tables,
-        count: tables.length,
-        timestamp: new Date().toISOString()
-      })
-    }
+      .from('sales')
+      .select('id')
+      .limit(1)
 
     if (error) {
       return NextResponse.json({
@@ -44,8 +21,7 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      tables: data || [],
-      count: data?.length || 0,
+      message: 'Sales table accessible',
       timestamp: new Date().toISOString()
     })
   } catch (error) {

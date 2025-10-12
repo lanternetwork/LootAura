@@ -1,14 +1,23 @@
 'use client'
-import { useState } from 'react'
-import { useSignIn, useSignUp } from '@/lib/hooks/useAuth'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useAuth, useSignIn } from '@/lib/hooks/useAuth'
 
 export default function SignIn() {
+  const router = useRouter()
+  const params = useSearchParams()
+  const { data: currentUser, isLoading: authLoading } = useAuth()
   const signIn = useSignIn()
-  const signUp = useSignUp()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!authLoading && currentUser) {
+      router.replace('/sales')
+    }
+  }, [authLoading, currentUser, router])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -16,30 +25,20 @@ export default function SignIn() {
 
     try {
       await signIn.mutateAsync({ email, password })
-      window.location.href = '/explore'
+      const redirectTo = params.get('redirectTo') || '/sales'
+      window.location.href = redirectTo
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
     }
   }
 
-  async function handleSignUp() {
-    setError(null)
-
-    try {
-      await signUp.mutateAsync({ email, password })
-      alert('Check your email for a confirmation link!')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
-    }
-  }
-
-  const isLoading = signIn.isPending || signUp.isPending
+  const isLoading = signIn.isPending || authLoading
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-50">
       <div className="max-w-md w-full space-y-8 p-8">
         <div>
-          <h1 className="text-3xl font-bold text-center">Welcome to YardSaleFinder</h1>
+          <h1 className="text-3xl font-bold text-center">Welcome to Loot Aura</h1>
           <p className="mt-2 text-center text-neutral-600">
             Sign in to save favorites and post your own sales
           </p>
@@ -85,14 +84,12 @@ export default function SignIn() {
               {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
 
-            <button 
-              type="button"
-              onClick={handleSignUp}
-              disabled={isLoading}
-              className="w-full rounded border border-amber-500 px-4 py-2 text-amber-600 font-medium hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            <Link 
+              href="/auth/signup"
+              className="block text-center w-full rounded border border-amber-500 px-4 py-2 text-amber-600 font-medium hover:bg-amber-50"
             >
-              {isLoading ? 'Creating account...' : 'Create Account'}
-            </button>
+              Create Account
+            </Link>
           </div>
         </form>
 

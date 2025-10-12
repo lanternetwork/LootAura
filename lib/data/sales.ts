@@ -39,7 +39,7 @@ const GetSalesParamsSchema = z.object({
   distanceKm: z.number().default(25),
   lat: z.number().optional(),
   lng: z.number().optional(),
-  dateRange: z.enum(['today', 'weekend', 'any']).optional(),
+  dateRange: z.enum(['today', 'weekend', 'next_weekend', 'any']).optional(),
   categories: z.array(z.string()).optional(),
   limit: z.number().default(50),
   offset: z.number().default(0),
@@ -86,7 +86,7 @@ export function formatDistance(meters: number, unit: 'miles' | 'km' = 'miles'): 
 }
 
 // Helper function to get date range based on dateRange parameter
-function getDateRange(dateRange?: 'today' | 'weekend' | 'any') {
+function getDateRange(dateRange?: 'today' | 'weekend' | 'next_weekend' | 'any') {
   if (!dateRange || dateRange === 'any') return null
   
   const today = new Date()
@@ -100,6 +100,23 @@ function getDateRange(dateRange?: 'today' | 'weekend' | 'any') {
     const dayOfWeek = today.getDay()
     const daysUntilSaturday = (6 - dayOfWeek) % 7
     const daysUntilSunday = (7 - dayOfWeek) % 7
+    
+    const saturday = new Date(today)
+    saturday.setDate(today.getDate() + daysUntilSaturday)
+    
+    const sunday = new Date(today)
+    sunday.setDate(today.getDate() + daysUntilSunday)
+    
+    return {
+      start: saturday.toISOString().split('T')[0],
+      end: sunday.toISOString().split('T')[0]
+    }
+  }
+  
+  if (dateRange === 'next_weekend') {
+    const dayOfWeek = today.getDay()
+    const daysUntilSaturday = ((6 - dayOfWeek) % 7) + 7
+    const daysUntilSunday = ((7 - dayOfWeek) % 7) + 7
     
     const saturday = new Date(today)
     saturday.setDate(today.getDate() + daysUntilSaturday)
@@ -152,7 +169,7 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
     
     // Fallback to regular query without distance filtering
     let query = supabase
-      .from(T.sales)
+      .from('sales_v2')
       .select('*')
       .eq('status', 'published')
       .order('created_at', { ascending: false })
@@ -195,7 +212,7 @@ export async function getSaleById(id: string): Promise<Sale | null> {
     const supabase = createSupabaseServerClient()
     
     const { data, error } = await supabase
-      .from(T.sales)
+      .from('sales_v2')
       .select('*')
       .eq('id', id)
       .single()
@@ -227,7 +244,7 @@ export async function createSale(input: SaleInput): Promise<Sale> {
     }
 
     const { data, error } = await supabase
-      .from(T.sales)
+      .from('lootaura_v2.sales')
       .insert({
         owner_id: user.id,
         ...validatedInput,
@@ -259,7 +276,7 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
     }
 
     const { data, error } = await supabase
-      .from(T.sales)
+      .from('lootaura_v2.sales')
       .update(validatedInput)
       .eq('id', id)
       .eq('owner_id', user.id) // Ensure user owns the sale
@@ -289,7 +306,7 @@ export async function deleteSale(id: string): Promise<void> {
     }
 
     const { error } = await supabase
-      .from(T.sales)
+      .from('lootaura_v2.sales')
       .delete()
       .eq('id', id)
       .eq('owner_id', user.id) // Ensure user owns the sale

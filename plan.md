@@ -3,7 +3,45 @@
 ## 🎯 Project Summary
 A production-grade mobile-first web app for browsing, mapping, posting, and planning yard/garage/estate sales with robust scraping, offline PWA capabilities, and cost-effective operation.
 
+## 🏗️ Enterprise Grid System
+**Status**: ✅ **COMPLETED** - Map + Filter Sync Milestone
+
+### Root Cause Analysis
+- **Issue**: Sales list rendered as single column due to conflicting CSS and wrapper divs
+- **Solution**: Single grid container with direct children, Tailwind responsive classes
+- **Authority**: MAP remains source of truth, filters narrow results without overriding
+
+### Implementation Details
+- **Grid Container**: Single `div` with `data-testid="sales-grid"`
+- **Column Authority**: Tailwind breakpoints (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`)
+- **Direct Children**: Sale cards are direct children, no wrapper divs
+- **Arbiter Integration**: ViewportSeq/RequestSeq for latest-wins behavior
+- **Debug Gating**: All debug artifacts behind `NEXT_PUBLIC_DEBUG=true`
+
+### Performance & Security
+- **RLS Verified**: Public read access, owner-only mutations
+- **Performance Targets**: ≤3s first paint, ≤300ms query p95
+- **Bundle Growth**: ≤+5KB gzip
+- **No PII Leaks**: Debug logs properly gated
+
+### Test Coverage
+- **Unit Tests**: Grid layout, arbiter sequencing, build-time checks
+- **Integration Tests**: Direct children, loading states, empty states
+- **Snapshot Tests**: Stable classes across authority modes
+- **Lint Rules**: Prevent regressions with ESLint rules
+
 ## 📁 Files Added/Changed
+
+### Grid System & Layout (Enterprise-Grade)
+- ✅ `docs/GRID_SYSTEM.md` - Comprehensive grid system documentation
+- ✅ `tests/unit/gridLayout.test.ts` - Grid layout unit tests
+- ✅ `tests/integration/gridLayout.integration.test.tsx` - Grid integration tests
+- ✅ `tests/snapshots/gridContainer.snapshot.test.tsx` - Grid container snapshots
+- ✅ `tests/build-time/css-tokens.test.ts` - Build-time CSS verification
+- ✅ `tests/unit/arbiter.test.ts` - Arbiter sequencing tests
+- ✅ `.eslintrc.grid-rules.js` - Lint rules for grid layout prevention
+- ✅ `app/globals.css` - Cleaned up conflicting CSS rules
+- ✅ `tailwind.config.ts` - Safelist for grid column classes
 
 ### Core Application Structure
 - ✅ `app/layout.tsx` - Root layout with navigation and PWA components
@@ -167,6 +205,13 @@ npm run format
 - **Responsive Design**: Mobile-first approach
 - **Accessibility**: WCAG AA compliance
 
+#### Map Authority (MAP) Behavior — Implemented
+- In MAP authority, the list derives directly from the map’s visible pin IDs (no second geo-filter), so the list count always matches visible pins.
+- Wide `/api/sales?...limit=24` requests are suppressed while in MAP authority; only viewport-scoped markers (and optional by-IDs hydration) are allowed.
+- Viewport updates carry a deterministic sequence (viewportSeq) and key; late/wide responses are dropped with `[DROP]` logs.
+- The MAP list exposes DOM hooks for verification: `data-debug="sales-list"` on the container and `data-sale-id` per item.
+- Suspense fallback no longer masks the list: a visible sentinel is used so the container is never empty during MAP.
+
 ## 🧪 Testing Coverage
 
 ### Unit Tests
@@ -181,6 +226,10 @@ npm run format
 - Search and filtering
 - Mobile responsiveness
 - Error states
+ 
+#### MAP Authority E2E — Added
+- Pan/zoom to a tight cluster: expect `[LIST] visible pins … count=K` → `[LIST][MAP] … haveInDict=K missing=[]` → `rendered=K` and K DOM nodes with `[data-sale-id]`.
+- Assert no wide `/api/sales?...limit=24` calls while authority==='MAP'.
 
 ## 🔄 Next Steps Roadmap (Active)
 
@@ -359,6 +408,11 @@ npm run format
 3. **Environment Test**: `npm run test tests/unit/env.test.ts`
 4. **Type Check**: `npm run typecheck`
 5. **Build Test**: `npm run build`
+
+### Middleware/Public Routes — Updated
+- Static & PWA assets (e.g., `/_next/*`, `/manifest.json`, `/favicon.ico`, `/sw.js`) are always public.
+- Read APIs are public: `GET /api/sales`, `GET /api/sales/markers`, `GET /api/geocoding/*`, `GET /api/location`.
+- Write APIs remain protected; `/favorites` and `/account` require authentication.
 
 ### Environment Variables Required
 ```bash

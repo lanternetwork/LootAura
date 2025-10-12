@@ -2,3 +2,92 @@
 @tailwind components;
 @tailwind utilities;
 body { min-height: 100vh; }
+
+/* Enterprise-grade responsive grid system */
+.sales-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--grid-columns, 1), 1fr);
+  gap: var(--grid-gap, 1.5rem);
+  width: 100%;
+  min-height: 200px;
+}
+
+.sales-grid-item {
+  display: block;
+  width: 100%;
+  min-height: 200px;
+}
+
+/* Responsive behavior */
+@media (min-width: 640px) {
+  .sales-grid[data-columns="2"] {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .sales-grid[data-columns="3"] {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Skeleton loading styles */
+.sale-skeleton {
+  @apply rounded-xl border p-4 bg-white shadow-sm;
+  min-height: 200px;
+}
+
+.skeleton-header {
+  @apply h-6 bg-gray-200 rounded mb-2;
+}
+
+.skeleton-content {
+  @apply h-4 bg-gray-200 rounded mb-2;
+}
+
+.skeleton-footer {
+  @apply h-4 bg-gray-200 rounded w-3/4;
+}
+
+/* Override any conflicting styles */
+.sale-row {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+/* Debug grid layout - only when NEXT_PUBLIC_DEBUG is enabled */
+[data-grid-debug="true"] {
+  display: grid !important;
+  grid-template-columns: repeat(1, 1fr) !important;
+  gap: 1.5rem !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+@media (min-width: 640px) {
+  [data-grid-debug="true"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-grid-debug="true"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* Legacy support - DISABLED to allow Tailwind responsive classes to work */
+/* [data-grid-container="true"] {
+  display: grid !important;
+  grid-template-columns: repeat(var(--grid-columns, 1), 1fr) !important;
+  gap: 1.5rem !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 200px !important;
+}
+
+.grid-item {
+  display: block !important;
+  width: 100% !important;
+  min-height: 200px !important;
+} */

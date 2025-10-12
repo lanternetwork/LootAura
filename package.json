@@ -16,7 +16,9 @@
     "test:e2e": "playwright test",
     "format": "prettier -w .",
     "check:storage": "tsx scripts/storage-check.ts",
-    "check:node": "node scripts/check-node-version.js"
+    "check:node": "node scripts/check-node-version.js",
+    "update:status": "tsx scripts/update-status.ts",
+    "smoke:sales": "tsx scripts/smoke-sales.ts"
   },
   "dependencies": {
     "next": "14.2.4",
@@ -51,6 +53,7 @@
     "react-toastify": "^10.0.5"
   },
   "devDependencies": {
+    "eslint-config-next": "14.2.4",
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.0",
     "autoprefixer": "^10.4.19",

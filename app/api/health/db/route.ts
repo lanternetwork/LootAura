@@ -6,8 +6,8 @@ export async function GET() {
     const supabase = createSupabaseServerClient()
     
     const { data, error } = await supabase
-      .from('yard_sales')
-      .select('1')
+      .from('sales')
+      .select('id')
       .limit(1)
 
     if (error) {

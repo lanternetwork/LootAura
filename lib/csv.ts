@@ -84,7 +84,7 @@ export function exportToCSV(sales: any[]): string {
   return csvRows.join('\n')
 }
 
-export function downloadCSV(csvContent: string, filename: string = 'yard_sales.csv') {
+export function downloadCSV(csvContent: string, filename: string = 'sales.csv') {
   const blob = new Blob([csvContent], { type: 'text/csv' })
   const url = window.URL.createObjectURL(blob)
   const link = document.createElement('a')

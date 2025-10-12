@@ -33,6 +33,21 @@ interface FiltersModalProps {
   isOpen: boolean
   onClose: () => void
   className?: string
+  filters?: {
+    distance: number
+    dateRange: DateRange
+    categories: string[]
+  }
+  onFiltersChange?: (filters: {
+    distance: number
+    dateRange: DateRange
+    categories: string[]
+  }) => void
+  arbiter?: {
+    mode: 'initial' | 'map' | 'zip' | 'distance'
+    programmaticMoveGuard: boolean
+    lastChangedAt: number
+  }
 }
 
 interface FilterState {
@@ -56,14 +71,22 @@ const CATEGORY_OPTIONS = [
   { value: 'misc', label: 'Miscellaneous', icon: '📦' }
 ]
 
-export default function FiltersModal({ isOpen, onClose, className = '' }: FiltersModalProps) {
+export default function FiltersModal({ isOpen, onClose, className = '', filters: externalFilters, onFiltersChange, arbiter }: FiltersModalProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [filters, setFilters] = useState<FilterState>({
+  
+  // Use external filters if provided, otherwise use internal state
+  const [internalFilters, setInternalFilters] = useState<FilterState>({
     distance: 25,
     dateRange: { type: 'any' },
     categories: []
   })
+  
+  const filters = externalFilters ? {
+    distance: externalFilters.distance,
+    dateRange: externalFilters.dateRange,
+    categories: externalFilters.categories
+  } : internalFilters
 
   // Initialize filters from URL params
   useEffect(() => {
@@ -73,20 +96,29 @@ export default function FiltersModal({ isOpen, onClose, className = '' }: Filter
     const endDate = searchParams.get('endDate') || undefined
     const categories = searchParams.get('cat') ? searchParams.get('cat')!.split(',') : []
 
-    setFilters({
-      distance: Math.max(1, Math.min(100, distance)),
-      dateRange: { 
-        type: dateType as DateRange['type'], 
-        startDate, 
-        endDate 
-      },
-      categories
-    })
-  }, [searchParams])
+    if (!externalFilters) {
+      setInternalFilters({
+        distance: Math.max(1, Math.min(100, distance)),
+        dateRange: {
+          type: (dateType as DateRange['type']) === 'range' ? 'any' : (dateType as DateRange['type']),
+          startDate,
+          endDate
+        },
+        categories
+      })
+    }
+  // Only run on mount to avoid loops; URL is updated by our own handlers
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const updateFilters = (newFilters: Partial<FilterState>) => {
-    setFilters(prevFilters => {
+  const updateFilters = (newFilters: Partial<FilterState>, skipUrlUpdate = false) => {
+    setInternalFilters(prevFilters => {
       const updatedFilters = { ...prevFilters, ...newFilters }
+      
+      // Skip URL updates for auto-refetch scenarios to prevent scroll-to-top
+      if (skipUrlUpdate) {
+        return updatedFilters
+      }
       
       // Update URL with new filters
       const params = new URLSearchParams(searchParams.toString())
@@ -129,28 +161,51 @@ export default function FiltersModal({ isOpen, onClose, className = '' }: Filter
   }
 
   const handleDistanceChange = (distance: number) => {
-    updateFilters({ distance })
+    console.log('[FiltersModal] Distance change:', distance)
+    if (externalFilters && onFiltersChange) {
+      onFiltersChange({ ...externalFilters, distance })
+    } else {
+      updateFilters({ distance }, true) // Skip URL update for single source of truth
+    }
   }
 
   const handleDateRangeChange = (dateRange: DateRange) => {
-    console.log('[FiltersModal] handleDateRangeChange called with:', dateRange)
-    updateFilters({ dateRange })
+    console.log('[FiltersModal] Date change:', dateRange)
+    if (externalFilters && onFiltersChange) {
+      onFiltersChange({ ...externalFilters, dateRange: dateRange })
+    } else {
+      updateFilters({ dateRange })
+    }
   }
 
   const handleCategoryToggle = (category: string) => {
+    console.log('[FiltersModal] Toggle category:', category)
     const newCategories = filters.categories.includes(category)
       ? filters.categories.filter(c => c !== category)
       : [...filters.categories, category]
     
-    updateFilters({ categories: newCategories })
+    if (externalFilters && onFiltersChange) {
+      onFiltersChange({ ...externalFilters, categories: newCategories })
+    } else {
+      updateFilters({ categories: newCategories })
+    }
   }
 
   const handleClearFilters = () => {
-    updateFilters({
-      distance: 25,
-      dateRange: { type: 'any' },
-      categories: []
-    })
+    console.log('[FiltersModal] Clear all filters')
+    if (externalFilters && onFiltersChange) {
+      onFiltersChange({
+        distance: 25,
+        dateRange: { type: 'any' },
+        categories: []
+      })
+    } else {
+      updateFilters({
+        distance: 25,
+        dateRange: { type: 'any' },
+        categories: []
+      }, false) // Allow URL update for clear action
+    }
   }
 
   const hasActiveFilters = filters.distance !== 25 || filters.dateRange.type !== 'any' || filters.categories.length > 0
@@ -188,6 +243,7 @@ export default function FiltersModal({ isOpen, onClose, className = '' }: Filter
             onCategoryToggle={handleCategoryToggle}
             onClearFilters={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
+            arbiter={arbiter}
           />
         </div>
       </div>
@@ -214,6 +270,7 @@ export default function FiltersModal({ isOpen, onClose, className = '' }: Filter
             onCategoryToggle={handleCategoryToggle}
             onClearFilters={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
+            arbiter={arbiter}
           />
         </div>
       </div>
@@ -228,6 +285,11 @@ interface FiltersContentProps {
   onCategoryToggle: (category: string) => void
   onClearFilters: () => void
   hasActiveFilters: boolean
+  arbiter?: {
+    mode: 'initial' | 'map' | 'zip' | 'distance'
+    programmaticMoveGuard: boolean
+    lastChangedAt: number
+  }
 }
 
 function FiltersContent({
@@ -236,7 +298,8 @@ function FiltersContent({
   onDateRangeChange,
   onCategoryToggle,
   onClearFilters,
-  hasActiveFilters
+  hasActiveFilters,
+  arbiter
 }: FiltersContentProps) {
   return (
     <div className="space-y-6">
@@ -245,22 +308,24 @@ function FiltersContent({
         <div className="flex items-center mb-3">
           <MapMarkerIcon />
           <span className="text-gray-500 mr-2"></span>
-          <label className="text-sm font-medium text-gray-700">
-            Distance: {filters.distance} miles
+          <label className={`text-sm font-medium ${arbiter?.mode === 'map' ? 'text-gray-600' : 'text-gray-700'}`}>
+            {arbiter?.mode === 'map' ? 'Distance (Select)' : 'Distance'}
           </label>
         </div>
-        <input
-          type="range"
-          min="1"
-          max="100"
+        <select
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
           value={filters.distance}
           onChange={(e) => onDistanceChange(parseInt(e.target.value))}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-        />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>1 mi</span>
-          <span>100 mi</span>
-        </div>
+        >
+          {[5, 10, 15, 20, 25, 30, 40, 50, 75, 100].map(miles => (
+            <option key={miles} value={miles}>{miles} miles</option>
+          ))}
+        </select>
+        {arbiter?.mode === 'map' && (
+          <p className="text-xs text-gray-500 mt-1">
+            Currently using map view
+          </p>
+        )}
       </div>
 
       {/* Date Range Filter */}

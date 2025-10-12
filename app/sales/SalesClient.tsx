@@ -1656,12 +1656,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     zIndex: 3, 
                     minHeight: 240,
                     display: 'grid !important',
-                    gridTemplateColumns: 'repeat(1, 1fr) !important',
-                    gap: '1.5rem !important'
+                    gridTemplateColumns: 'repeat(3, 1fr) !important',
+                    gap: '1.5rem !important',
+                    width: '100% !important',
+                    maxWidth: 'none !important'
                   } : {
                     display: 'grid !important',
-                    gridTemplateColumns: 'repeat(1, 1fr) !important',
-                    gap: '1.5rem !important'
+                    gridTemplateColumns: 'repeat(3, 1fr) !important',
+                    gap: '1.5rem !important',
+                    width: '100% !important',
+                    maxWidth: 'none !important'
                   }}
                   data-grid-container="true"
                 >

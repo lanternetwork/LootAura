@@ -2,3 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 body { min-height: 100vh; }
+
+/* Force grid layout for sales */
+[data-grid-container="true"] {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 1.5rem !important;
+  width: 100% !important;
+}
+
+.grid-item {
+  display: block !important;
+  width: 100% !important;
+}

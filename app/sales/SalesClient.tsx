@@ -1654,8 +1654,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   style={arbiter.authority==='MAP' ? { 
                     position: 'relative', 
                     zIndex: 3, 
-                    minHeight: 240
-                  } : {}}
+                    minHeight: 240,
+                    display: 'grid !important',
+                    gridTemplateColumns: 'repeat(1, 1fr) !important',
+                    gap: '1.5rem !important'
+                  } : {
+                    display: 'grid !important',
+                    gridTemplateColumns: 'repeat(1, 1fr) !important',
+                    gap: '1.5rem !important'
+                  }}
                 >
                   {arbiter.authority==='MAP' && (
                     <div style={{ position:'absolute', top:8, left:8, padding:'4px 6px', fontSize:12, background:'rgba(255,255,0,.6)', zIndex:1000 }}>
@@ -1666,9 +1673,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   {/* Debug grid info */}
                   {process.env.NODE_ENV === 'development' && (
                     <div style={{ position:'absolute', top:8, right:8, padding:'4px 6px', fontSize:12, background:'rgba(0,255,0,.6)', zIndex:1000 }}>
-                      TAILWIND: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
+                      FORCE GRID: display:grid !important
                       <br />
-                      W: {window.innerWidth}px | Expected: {window.innerWidth < 640 ? '1col' : window.innerWidth < 1024 ? '2col' : '3col'}
+                      W: {window.innerWidth}px | Sales: {visibleSales.length}
+                      <br />
+                      <div style={{fontSize:10}}>
+                        Check browser dev tools for computed styles
+                      </div>
                     </div>
                   )}
                   

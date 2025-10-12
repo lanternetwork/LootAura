@@ -1616,7 +1616,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     <div className="container mx-auto p-4">
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Main Content */}
-        <div className="lg:w-2/3">
+        <div className="lg:w-3/4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
             <div>
               <h1 className="text-3xl font-bold mb-2">Sales Search</h1>
@@ -1716,12 +1716,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   ref={gridContainerRef}
                   className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
                   style={{
-                    // Force grid display to override any conflicting styles
-                    display: 'grid !important',
-                    // Ensure container has proper width
-                    width: '100%',
-                    maxWidth: 'none',
-                    // MAP authority specific styles
+                    // MAP authority specific styles only
                     ...(arbiter.authority === 'MAP' ? {
                       position: 'relative',
                       zIndex: 3,
@@ -1821,9 +1816,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                             const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
                             
                             return finalItemsToRender.map((item: any, idx: number) => (
-                              <div key={item.id} className="grid-item">
-                                <SaleCard sale={item} authority={arbiter.authority} />
-                              </div>
+                              <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
                             ))
                           })()}
                         </>
@@ -1856,9 +1849,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                           )}
                           {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => (
                             (console.log('[DOM] list item rendered id=', item.id),
-                              <div key={item.id} className="grid-item">
-                                <SaleCard sale={item} authority={arbiter.authority} />
-                              </div>
+                              <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
                             )
                           ))}
                         </>

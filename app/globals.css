@@ -55,8 +55,8 @@ body { min-height: 100vh; }
   max-width: none !important;
 }
 
-/* Legacy support - remove after migration */
-[data-grid-container="true"] {
+/* Legacy support - DISABLED to allow Tailwind responsive classes to work */
+/* [data-grid-container="true"] {
   display: grid !important;
   grid-template-columns: repeat(var(--grid-columns, 1), 1fr) !important;
   gap: 1.5rem !important;
@@ -69,4 +69,4 @@ body { min-height: 100vh; }
   display: block !important;
   width: 100% !important;
   min-height: 200px !important;
-}
+} */

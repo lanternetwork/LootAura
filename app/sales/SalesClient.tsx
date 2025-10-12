@@ -1720,21 +1720,19 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     display: 'grid !important',
                     // Ensure container has proper width
                     width: '100%',
-                    maxWidth: 'none'
+                    maxWidth: 'none',
+                    // MAP authority specific styles
+                    ...(arbiter.authority === 'MAP' ? {
+                      position: 'relative',
+                      zIndex: 3,
+                      minHeight: 240
+                    } : {})
                   }}
                   data-testid="sales-grid"
                   data-debug="sales-list"
                   data-panel="list"
                   // Avoid re-keying container in MAP to prevent unmounts before effects run
                   key={arbiter.authority==='MAP' ? 'map-stable' : 'filters'}
-                  style={arbiter.authority==='MAP' ? { 
-                    position: 'relative', 
-                    zIndex: 3, 
-                    minHeight: 240
-                    // Let Tailwind handle grid properties - no inline overrides
-                  } : {
-                    // Let Tailwind handle grid properties - no inline overrides
-                  }}
                   data-grid-container="true"
                   onLoad={() => {
                     // Diagnostic logging for grid layout

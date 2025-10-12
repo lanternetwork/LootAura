@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic'
+
 // Markers API with server-side date, distance, and category filtering
 // Response shape expected by SalesMap: plain array
 // [{ id: string, title: string, lat: number, lng: number }]

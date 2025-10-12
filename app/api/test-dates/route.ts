@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic'
+
 // Test endpoint to verify date filtering logic
 export async function GET(request: NextRequest) {
   try {

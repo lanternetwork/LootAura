@@ -1292,7 +1292,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         colsDetected,
         breakpoint,
         windowWidth: window.innerWidth,
-        salesCount: visibleSales.length
+        salesCount: visibleSales.length,
+        // Additional debugging
+        computedGridTemplateColumns: computedStyle.gridTemplateColumns,
+        computedDisplay: computedStyle.display,
+        computedGap: computedStyle.gap,
+        computedWidth: computedStyle.width,
+        computedMaxWidth: computedStyle.maxWidth,
+        computedMinWidth: computedStyle.minWidth
       })
       
       if (parent) {
@@ -1715,6 +1722,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                 <div
                   ref={gridContainerRef}
                   className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
+                  data-grid-debug="true"
                   style={{
                     // MAP authority specific styles only
                     ...(arbiter.authority === 'MAP' ? {

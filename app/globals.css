@@ -55,6 +55,27 @@ body { min-height: 100vh; }
   max-width: none !important;
 }
 
+/* Force grid layout for sales list - highest specificity */
+[data-grid-debug="true"] {
+  display: grid !important;
+  grid-template-columns: repeat(1, 1fr) !important;
+  gap: 1.5rem !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+@media (min-width: 640px) {
+  [data-grid-debug="true"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-grid-debug="true"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
 /* Legacy support - DISABLED to allow Tailwind responsive classes to work */
 /* [data-grid-container="true"] {
   display: grid !important;

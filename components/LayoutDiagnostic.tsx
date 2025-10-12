@@ -80,12 +80,14 @@ export default function LayoutDiagnostic({ containerRef, isVisible }: LayoutDiag
     
     // Update on mutation
     const observer = new MutationObserver(updateLayoutInfo)
-    observer.observe(container, { 
-      attributes: true, 
-      childList: true, 
-      subtree: true,
-      attributeFilter: ['class', 'style']
-    })
+    if (containerRef.current) {
+      observer.observe(containerRef.current, { 
+        attributes: true, 
+        childList: true, 
+        subtree: true,
+        attributeFilter: ['class', 'style']
+      })
+    }
 
     return () => {
       window.removeEventListener('resize', handleResize)

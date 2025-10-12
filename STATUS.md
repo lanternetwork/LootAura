@@ -45,8 +45,32 @@
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
-## 8. Next Milestone
-- Bulk generator + clustering polish
+## 8. Next Milestone: Auth + Profile (In Progress)
+
+### Scope
+- **Providers**: Email + Google only (no other social providers)
+- **Storage**: `profiles` table with strict RLS policies
+- **Performance**: Auth/profile DB p95 ≤ 50ms, initial sales p95 ≤ 300ms
+- **Security**: Self-read/self-write only; no public reads by default
+
+### Implementation Tasks
+- [ ] Restore Google sign-in button and verify end-to-end flow
+- [ ] Verify Email auth (magic link/OTP) with proper error handling
+- [ ] Implement idempotent profile creation on first login
+- [ ] Add route gating with consistent navbar/session state
+- [ ] Add comprehensive test coverage for auth flows
+- [ ] Implement debug diagnostics (gated by NEXT_PUBLIC_DEBUG)
+- [ ] Document performance monitoring and index proposals
+
+### Acceptance Criteria
+- [ ] Google OAuth flow works end-to-end
+- [ ] Email magic link/OTP works with proper error handling
+- [ ] Profile creation is idempotent (no duplicates)
+- [ ] Route gating works consistently
+- [ ] RLS policies enforce self-only access
+- [ ] Performance targets met (p95 ≤ 50ms auth, ≤ 300ms sales)
+- [ ] All tests pass (unit, integration, E2E)
+- [ ] Debug logs removed before merge
 
 ---
-Updated automatically by Cursor on 2025-10-12T20:48:41.033Z
+Updated automatically by Cursor on 2025-01-27T20:48:41.033Z

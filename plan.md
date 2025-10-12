@@ -822,3 +822,41 @@ Canonical domain set to `https://lootaura.com` across environment configuration 
 ### Notes
 - No secrets committed; Supabase URLs and Google endpoints unchanged
 - Environment validation continues to enforce proper URL format
+
+## 🔐 Auth + Profile Milestone (In Progress)
+
+### Scope
+- **Providers**: Email + Google only (no other social providers)
+- **Storage**: `profiles` table keyed by `auth.users(id)` with strict RLS
+- **Performance**: Auth/profile DB p95 ≤ 50ms, initial sales p95 ≤ 300ms
+- **Security**: Self-read/self-write only; no public reads by default
+
+### Architecture
+- **Auth Client/Server Boundaries**: Supabase Auth for session management
+- **Session Handling**: Server-side session validation with RLS policies
+- **Route Gating**: Protected routes require authentication
+- **Profile Model**: `profiles(user_id PK → auth.users(id), display_name, avatar_url, timestamps)`
+
+### RLS Policy Intent
+- **Read**: Users can only read their own profile row
+- **Write**: Users can only insert/update their own profile row
+- **Public Access**: No public reads by default (privacy-first)
+
+### Performance Budgets
+- **Auth/Profile Operations**: p95 ≤ 50ms database response
+- **Initial Sales Load**: p95 ≤ 300ms database response
+- **Bundle Growth**: ≤ +5KB gzip (no new dependencies without approval)
+
+### Index Strategy
+- **Primary**: `profiles.user_id` (already indexed as PK)
+- **Future**: Defer heavy new indexes for sales until proposal approved
+- **Monitoring**: Document query performance and propose optimizations
+
+### Implementation Tasks
+- [ ] Restore Google sign-in button and verify end-to-end flow
+- [ ] Verify Email auth (magic link/OTP) with proper error handling
+- [ ] Implement idempotent profile creation on first login
+- [ ] Add route gating with consistent navbar/session state
+- [ ] Add comprehensive test coverage for auth flows
+- [ ] Implement debug diagnostics (gated by NEXT_PUBLIC_DEBUG)
+- [ ] Document performance monitoring and index proposals

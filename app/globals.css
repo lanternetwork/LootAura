@@ -6,12 +6,21 @@ body { min-height: 100vh; }
 /* Force grid layout for sales */
 [data-grid-container="true"] {
   display: grid !important;
-  grid-template-columns: repeat(3, 1fr) !important;
+  grid-template-columns: 1fr 1fr 1fr !important;
   gap: 1.5rem !important;
   width: 100% !important;
+  max-width: none !important;
+  min-height: 200px !important;
 }
 
 .grid-item {
   display: block !important;
   width: 100% !important;
+  min-height: 200px !important;
+}
+
+/* Override any conflicting styles */
+.sale-row {
+  width: 100% !important;
+  max-width: none !important;
 }

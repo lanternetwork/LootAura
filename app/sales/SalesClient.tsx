@@ -1656,13 +1656,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     zIndex: 3, 
                     minHeight: 240,
                     display: 'grid !important',
-                    gridTemplateColumns: 'repeat(3, 1fr) !important',
+                    gridTemplateColumns: '1fr 1fr 1fr !important',
                     gap: '1.5rem !important',
                     width: '100% !important',
                     maxWidth: 'none !important'
                   } : {
                     display: 'grid !important',
-                    gridTemplateColumns: 'repeat(3, 1fr) !important',
+                    gridTemplateColumns: '1fr 1fr 1fr !important',
                     gap: '1.5rem !important',
                     width: '100% !important',
                     maxWidth: 'none !important'
@@ -1678,12 +1678,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   {/* Debug grid info */}
                   {process.env.NODE_ENV === 'development' && (
                     <div style={{ position:'absolute', top:8, right:8, padding:'4px 6px', fontSize:12, background:'rgba(0,255,0,.6)', zIndex:1000 }}>
-                      FORCE GRID: display:grid !important
+                      GRID DEBUG: 3 columns forced
                       <br />
                       W: {window.innerWidth}px | Sales: {visibleSales.length}
                       <br />
                       <div style={{fontSize:10}}>
-                        Check browser dev tools for computed styles
+                        Container: {typeof document !== 'undefined' && document.querySelector('[data-grid-container="true"]') ? 'FOUND' : 'NOT FOUND'}
                       </div>
                     </div>
                   )}

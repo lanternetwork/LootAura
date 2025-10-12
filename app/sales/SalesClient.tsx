@@ -323,8 +323,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const pendingBoundsRef = useRef<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
   const pendingStableTimerRef = useRef<NodeJS.Timeout | null>(null)
   const latestBoundsKeyRef = useRef<string>('')
-  // Deterministic viewport sequencing
-  const viewportSeqRef = useRef<number>(0)
 
   // Helper to create bounds coalesce key
   const createBoundsKey = useCallback((bounds: { north: number; south: number; east: number; west: number }) => {

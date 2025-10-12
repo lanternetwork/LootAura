@@ -1,123 +1,195 @@
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import React from 'react'
+import { render, screen, waitFor } from '@testing-library/react'
+import '@testing-library/jest-dom'
 import SalesGrid from '@/components/SalesGrid'
 import { Sale } from '@/lib/types'
 
-// Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
-
-// Mock sales data
-const mockSales: Sale[] = [
-  {
-    id: '1',
-    title: 'Test Sale 1',
-    description: 'Test description',
-    address: '123 Test St',
-    city: 'Test City',
-    state: 'TS',
-    lat: 38.0,
-    lng: -85.0,
-    date_start: '2025-01-01',
-    time_start: '09:00',
-    price: 0
-  },
-  {
-    id: '2', 
-    title: 'Test Sale 2',
-    description: 'Test description 2',
-    address: '456 Test Ave',
-    city: 'Test City',
-    state: 'TS',
-    lat: 38.1,
-    lng: -85.1,
-    date_start: '2025-01-02',
-    time_start: '10:00',
-    price: 0
+// Mock SaleCard and SaleCardSkeleton to simplify tests
+jest.mock('@/components/SaleCard', () => {
+  return function MockSaleCard({ sale }: { sale: Sale }) {
+    return <div data-testid="sale-card">{sale.title}</div>
   }
+})
+
+jest.mock('@/components/SaleCardSkeleton', () => {
+  return function MockSaleCardSkeleton() {
+    return <div data-testid="sale-card-skeleton">Loading...</div>
+  }
+})
+
+const mockSales: Sale[] = [
+  { id: '1', title: 'Sale 1', description: 'Desc 1', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
+  { id: '2', title: 'Sale 2', description: 'Desc 2', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
+  { id: '3', title: 'Sale 3', description: 'Desc 3', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
+  { id: '4', title: 'Sale 4', description: 'Desc 4', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
 ]
 
+const emptyState = <div>No sales found.</div>
+
 describe('SalesGrid', () => {
+  // Mock ResizeObserver
+  let observe: jest.Mock
+  let unobserve: jest.Mock
+  let disconnect: jest.Mock
+
+  beforeAll(() => {
+    observe = jest.fn()
+    unobserve = jest.fn()
+    disconnect = jest.fn()
+    global.ResizeObserver = jest.fn(() => ({
+      observe,
+      unobserve,
+      disconnect,
+    }))
+  })
+
   beforeEach(() => {
-    // Reset window dimensions
-    Object.defineProperty(window, 'innerWidth', {
-      writable: true,
-      configurable: true,
-      value: 1024,
+    observe.mockClear()
+    unobserve.mockClear()
+    disconnect.mockClear()
+    // Reset window width for each test
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 0 })
+  })
+
+  it('renders sales cards when not loading and sales are present', () => {
+    render(
+      <SalesGrid
+        sales={mockSales}
+        loading={false}
+        authority="FILTERS"
+        emptyStateMessage={emptyState}
+      />
+    )
+    expect(screen.getAllByTestId('sale-card')).toHaveLength(mockSales.length)
+    expect(screen.queryByTestId('sale-card-skeleton')).not.toBeInTheDocument()
+    expect(screen.queryByText('No sales found.')).not.toBeInTheDocument()
+  })
+
+  it('renders skeletons when loading and not in MAP authority', () => {
+    render(
+      <SalesGrid
+        sales={[]}
+        loading={true}
+        authority="FILTERS"
+        emptyStateMessage={emptyState}
+        skeletonCount={3}
+      />
+    )
+    expect(screen.getAllByTestId('sale-card-skeleton')).toHaveLength(3)
+    expect(screen.queryByTestId('sale-card')).not.toBeInTheDocument()
+    expect(screen.queryByText('No sales found.')).not.toBeInTheDocument()
+  })
+
+  it('renders empty state message when no sales and not loading', () => {
+    render(
+      <SalesGrid
+        sales={[]}
+        loading={false}
+        authority="FILTERS"
+        emptyStateMessage={emptyState}
+      />
+    )
+    expect(screen.getByText('No sales found.')).toBeInTheDocument()
+    expect(screen.queryByTestId('sale-card')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sale-card-skeleton')).not.toBeInTheDocument()
+  })
+
+  it('does not render skeletons when in MAP authority, even if loading', () => {
+    render(
+      <SalesGrid
+        sales={[]}
+        loading={true}
+        authority="MAP"
+        emptyStateMessage={emptyState}
+        skeletonCount={3}
+      />
+    )
+    expect(screen.queryByTestId('sale-card-skeleton')).not.toBeInTheDocument()
+    expect(screen.getByText('No sales found.')).toBeInTheDocument() // Should show empty state if no sales
+  })
+
+  it('observes resize events and updates columns', async () => {
+    const { rerender } = render(
+      <SalesGrid
+        sales={mockSales}
+        loading={false}
+        authority="FILTERS"
+        emptyStateMessage={emptyState}
+      />
+    )
+
+    const gridElement = screen.getByTestId('sales-grid')
+    expect(observe).toHaveBeenCalledWith(gridElement)
+
+    // Simulate a resize to 700px (should be 2 columns)
+    Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 700 })
+    // Manually trigger the ResizeObserver callback
+    // This is a simplified way; in a real browser, the callback would be async
+    ;(global.ResizeObserver as jest.Mock).mock.calls[0][0]([{ target: gridElement }])
+
+    await waitFor(() => {
+      expect(gridElement).toHaveAttribute('data-columns', '2')
+      expect(gridElement).toHaveAttribute('data-container-width', '700')
+    })
+
+    // Simulate a resize to 1200px (should be 3 columns)
+    Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 1200 })
+    ;(global.ResizeObserver as jest.Mock).mock.calls[0][0]([{ target: gridElement }])
+
+    await waitFor(() => {
+      expect(gridElement).toHaveAttribute('data-columns', '3')
+      expect(gridElement).toHaveAttribute('data-container-width', '1200')
+    })
+
+    // Simulate a resize to 500px (should be 1 column)
+    Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 500 })
+    ;(global.ResizeObserver as jest.Mock).mock.calls[0][0]([{ target: gridElement }])
+
+    await waitFor(() => {
+      expect(gridElement).toHaveAttribute('data-columns', '1')
+      expect(gridElement).toHaveAttribute('data-container-width', '500')
     })
   })
 
-  it('renders sales in grid layout', () => {
-    render(<SalesGrid sales={mockSales} authority="MAP" />)
-    
-    const grid = screen.getByTestId('sales-grid')
-    expect(grid).toBeInTheDocument()
-    expect(grid).toHaveClass('sales-grid')
-  })
-
-  it('applies correct data attributes', () => {
-    render(<SalesGrid sales={mockSales} authority="FILTERS" />)
-    
-    const grid = screen.getByTestId('sales-grid')
-    expect(grid).toHaveAttribute('data-authority', 'FILTERS')
-    expect(grid).toHaveAttribute('data-columns')
-    expect(grid).toHaveAttribute('data-width')
-  })
-
-  it('renders correct number of sales', () => {
-    render(<SalesGrid sales={mockSales} authority="MAP" />)
-    
-    const saleCards = screen.getAllByTestId('sale-card')
-    expect(saleCards).toHaveLength(2)
-  })
-
-  it('shows loading skeletons when loading', () => {
-    render(<SalesGrid sales={[]} authority="MAP" isLoading={true} />)
-    
-    const skeletons = screen.getAllByText('')
-    expect(skeletons.length).toBeGreaterThan(0)
+  it('cleans up ResizeObserver on unmount', () => {
+    const { unmount } = render(
+      <SalesGrid
+        sales={mockSales}
+        loading={false}
+        authority="FILTERS"
+        emptyStateMessage={emptyState}
+      />
+    )
+    expect(observe).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(disconnect).toHaveBeenCalledTimes(1)
   })
 
   it('applies custom className', () => {
-    render(<SalesGrid sales={mockSales} authority="MAP" className="custom-class" />)
-    
-    const grid = screen.getByTestId('sales-grid')
-    expect(grid).toHaveClass('custom-class')
+    render(
+      <SalesGrid
+        sales={mockSales}
+        loading={false}
+        authority="FILTERS"
+        emptyStateMessage={emptyState}
+        className="custom-class"
+      />
+    )
+    const gridElement = screen.getByTestId('sales-grid')
+    expect(gridElement).toHaveClass('sales-grid', 'custom-class')
   })
 
-  it('handles empty sales array', () => {
-    render(<SalesGrid sales={[]} authority="MAP" />)
-    
-    const grid = screen.getByTestId('sales-grid')
-    expect(grid).toBeInTheDocument()
-    expect(screen.queryByTestId('sale-card')).not.toBeInTheDocument()
-  })
-})
-
-describe('SalesGrid Responsive Behavior', () => {
-  it('applies correct grid columns for different screen sizes', () => {
-    // Test small screen
-    Object.defineProperty(window, 'innerWidth', { value: 500 })
-    const { rerender } = render(<SalesGrid sales={mockSales} authority="MAP" />)
-    
-    let grid = screen.getByTestId('sales-grid')
-    expect(grid).toHaveAttribute('data-columns', '1')
-    
-    // Test medium screen
-    Object.defineProperty(window, 'innerWidth', { value: 800 })
-    rerender(<SalesGrid sales={mockSales} authority="MAP" />)
-    
-    grid = screen.getByTestId('sales-grid')
-    expect(grid).toHaveAttribute('data-columns', '2')
-    
-    // Test large screen
-    Object.defineProperty(window, 'innerWidth', { value: 1200 })
-    rerender(<SalesGrid sales={mockSales} authority="MAP" />)
-    
-    grid = screen.getByTestId('sales-grid')
-    expect(grid).toHaveAttribute('data-columns', '3')
+  it('sets correct data attributes', () => {
+    render(
+      <SalesGrid
+        sales={mockSales}
+        loading={false}
+        authority="MAP"
+        emptyStateMessage={emptyState}
+      />
+    )
+    const gridElement = screen.getByTestId('sales-grid')
+    expect(gridElement).toHaveAttribute('data-authority', 'MAP')
+    expect(gridElement).toHaveAttribute('data-hydrated', 'true')
   })
 })

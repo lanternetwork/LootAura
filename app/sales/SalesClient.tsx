@@ -19,6 +19,7 @@ import LoadMoreButton from '@/components/LoadMoreButton'
 import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
 import LayoutDiagnostic from '@/components/LayoutDiagnostic'
+import GridLayoutDiagnostic from '@/components/GridLayoutDiagnostic'
 import { resolveDatePreset, dateRangesEqual } from '@/lib/shared/resolveDatePreset'
 
 // Intent Arbiter types
@@ -1659,18 +1660,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   style={arbiter.authority==='MAP' ? { 
                     position: 'relative', 
                     zIndex: 3, 
-                    minHeight: 240,
-                    display: 'grid !important',
-                    gridTemplateColumns: '1fr 1fr 1fr !important',
-                    gap: '1.5rem !important',
-                    width: '100% !important',
-                    maxWidth: 'none !important'
+                    minHeight: 240
+                    // Let Tailwind handle grid properties - no inline overrides
                   } : {
-                    display: 'grid !important',
-                    gridTemplateColumns: '1fr 1fr 1fr !important',
-                    gap: '1.5rem !important',
-                    width: '100% !important',
-                    maxWidth: 'none !important'
+                    // Let Tailwind handle grid properties - no inline overrides
                   }}
                   data-grid-container="true"
                 >
@@ -1992,13 +1985,21 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         />
       )}
       
-      {/* Layout Diagnostic */}
-      {process.env.NODE_ENV === 'development' && (
-        <LayoutDiagnostic 
-          containerRef={gridContainerRef} 
-          isVisible={visibleSales.length > 0}
-        />
-      )}
+          {/* Layout Diagnostic */}
+          {process.env.NODE_ENV === 'development' && (
+            <LayoutDiagnostic 
+              containerRef={gridContainerRef} 
+              isVisible={visibleSales.length > 0}
+            />
+          )}
+          
+          {/* Advanced Grid Layout Diagnostic */}
+          {process.env.NODE_ENV === 'development' && (
+            <GridLayoutDiagnostic 
+              containerRef={gridContainerRef} 
+              isVisible={visibleSales.length > 0}
+            />
+          )}
     </div>
   )
 }

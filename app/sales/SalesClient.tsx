@@ -1663,6 +1663,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     gridTemplateColumns: 'repeat(1, 1fr) !important',
                     gap: '1.5rem !important'
                   }}
+                  data-grid-container="true"
                 >
                   {arbiter.authority==='MAP' && (
                     <div style={{ position:'absolute', top:8, left:8, padding:'4px 6px', fontSize:12, background:'rgba(255,255,0,.6)', zIndex:1000 }}>
@@ -1713,7 +1714,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                             const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
                             
                             return finalItemsToRender.map((item: any, idx: number) => (
-                              <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                              <div key={item.id} className="grid-item">
+                                <SaleCard sale={item} authority={arbiter.authority} />
+                              </div>
                             ))
                           })()}
                         </>
@@ -1746,7 +1749,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                           )}
                           {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => (
                             (console.log('[DOM] list item rendered id=', item.id),
-                              <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                              <div key={item.id} className="grid-item">
+                                <SaleCard sale={item} authority={arbiter.authority} />
+                              </div>
                             )
                           ))}
                         </>

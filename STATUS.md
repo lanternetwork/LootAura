@@ -1,10 +1,10 @@
 # Loot Aura Repository Status
 
 ## 1. Branch & Commit
-- **Current branch:** milestone/db-option-a-restore
-- **Latest commit:** 444c553 — Merge branch 'milestone/db-option-a-restore' of https://github.com/lanternetwork/LootAura into milestone/db-option-a-restore (by Yard Sale Tracker on 2025-10-12 16:52:39 -0400)
+- **Current branch:** main
+- **Latest commit:** 7a5b049 — Close Milestone: Map + Filter Sync — enforce single grid container, fix layout hierarchy, verify arbiter authority, add tests & CI guards (by lanternetwork on 2025-10-12 17:11:56 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18449353627
+- **CI status:** running, last run: run 18449563326
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-12T20:53:17.855Z
+Updated automatically by Cursor on 2025-10-12T21:12:34.152Z

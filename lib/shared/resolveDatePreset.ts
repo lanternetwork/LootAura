@@ -36,24 +36,29 @@ export function resolveDatePreset(
     case 'weekend': {
       const dayOfWeek = now.getDay()
       // Find this weekend (Saturday-Sunday)
-      let daysToSaturday, daysToSunday
+      let saturday, sunday
       
       if (dayOfWeek === 0) { // Sunday
-        daysToSaturday = 6 // Previous Saturday
-        daysToSunday = 0 // Today
+        // Previous Saturday to today (Sunday)
+        saturday = new Date(now)
+        saturday.setDate(now.getDate() - 1) // Yesterday (Saturday)
+        sunday = new Date(now) // Today (Sunday)
       } else if (dayOfWeek === 6) { // Saturday
-        daysToSaturday = 0 // Today
-        daysToSunday = 1 // Tomorrow
+        // Today (Saturday) to tomorrow (Sunday)
+        saturday = new Date(now) // Today (Saturday)
+        sunday = new Date(now)
+        sunday.setDate(now.getDate() + 1) // Tomorrow (Sunday)
       } else { // Monday-Friday
-        daysToSaturday = 6 - dayOfWeek // This Saturday
-        daysToSunday = 7 - dayOfWeek // This Sunday
+        // This coming Saturday and Sunday
+        const daysToSaturday = 6 - dayOfWeek
+        const daysToSunday = 7 - dayOfWeek
+        
+        saturday = new Date(now)
+        saturday.setDate(now.getDate() + daysToSaturday)
+        
+        sunday = new Date(now)
+        sunday.setDate(now.getDate() + daysToSunday)
       }
-      
-      const saturday = new Date(now)
-      saturday.setDate(now.getDate() + daysToSaturday)
-      
-      const sunday = new Date(now)
-      sunday.setDate(now.getDate() + daysToSunday)
       
       return {
         from: toISO(saturday),

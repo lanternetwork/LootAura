@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createSupabaseClient } from '@/lib/supabase/client'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 interface AuthDiagnosticsProps {
   enabled?: boolean
@@ -28,7 +28,7 @@ export default function AuthDiagnostics({ enabled = false }: AuthDiagnosticsProp
   useEffect(() => {
     if (!enabled || process.env.NEXT_PUBLIC_DEBUG !== 'true') return
 
-    const supabase = createSupabaseClient()
+    const supabase = createSupabaseBrowserClient()
     
     // Check provider availability
     const checkProviders = () => {

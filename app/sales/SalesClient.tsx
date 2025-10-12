@@ -1299,7 +1299,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         computedGap: computedStyle.gap,
         computedWidth: computedStyle.width,
         computedMaxWidth: computedStyle.maxWidth,
-        computedMinWidth: computedStyle.minWidth
+        computedMinWidth: computedStyle.minWidth,
+        // Check for wrapper issues
+        directChildren: container.children.length,
+        firstChild: container.firstElementChild?.tagName,
+        firstChildClasses: container.firstElementChild?.className
       })
       
       if (parent) {
@@ -1721,7 +1725,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                 {/* Always render the sales list container - never hide it */}
                 <div
                   ref={gridContainerRef}
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
+                  className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${
+                    arbiter.authority === 'MAP' 
+                      ? (mapUpdating ? 'opacity-50' : 'opacity-100')
+                      : (loading ? 'opacity-75' : 'opacity-100')
+                  }`}
                   data-grid-debug="true"
                   style={{
                     // MAP authority specific styles only
@@ -1804,7 +1812,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   
                   {/* In MAP authority: always render from visible pins, never show loading skeletons */}
                   {arbiter.authority === 'MAP' ? (
-                    <div className={`transition-opacity duration-300 ${mapUpdating ? 'opacity-50' : 'opacity-100'}`}>
+                    <>
                       {visiblePinIdsState.length === 0 ? (
                         // No visible pins - show empty state
                         <div className="col-span-full text-center py-16">
@@ -1829,10 +1837,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                           })()}
                         </>
                       )}
-                    </div>
+                    </>
                   ) : (
                     // Non-MAP authority: show loading skeletons when loading
-                    <div className={`transition-opacity duration-300 ${loading ? 'opacity-75' : 'opacity-100'}`}>
+                    <>
                       {(loading || !fetchedOnce) ? (
                         Array.from({ length: 6 }).map((_, idx) => (
                           <SaleCardSkeleton key={idx} />
@@ -1862,7 +1870,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                           ))}
                         </>
                       )}
-                    </div>
+                    </>
                   )}
                 </div>
                 

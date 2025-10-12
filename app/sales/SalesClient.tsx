@@ -20,6 +20,7 @@ import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
 import LayoutDiagnostic from '@/components/LayoutDiagnostic'
 import GridLayoutDiagnostic from '@/components/GridLayoutDiagnostic'
+import GridDebugOverlay from '@/components/GridDebugOverlay'
 import { resolveDatePreset, dateRangesEqual } from '@/lib/shared/resolveDatePreset'
 
 // Intent Arbiter types
@@ -1261,41 +1262,64 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Layout diagnostic ref
   const gridContainerRef = useRef<HTMLDivElement>(null)
   
-  // Grid layout diagnostic
+  // Grid layout diagnostic (gated by NEXT_PUBLIC_DEBUG)
   useEffect(() => {
-    if (gridContainerRef.current && visibleSales.length > 0) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && gridContainerRef.current && visibleSales.length > 0) {
       const container = gridContainerRef.current
       const computedStyle = window.getComputedStyle(container)
       const parent = container.parentElement
       const firstCard = container.querySelector('.sale-row')
       
-      console.log('[GRID DIAGNOSTIC] Container:', {
+      // Parse grid template columns to detect column count
+      const gridTemplate = computedStyle.gridTemplateColumns
+      const colsDetected = gridTemplate.includes('repeat') ? 
+        gridTemplate.match(/repeat\((\d+)/)?.[1] || 'unknown' : 
+        gridTemplate.split(' ').length
+      
+      // Determine breakpoint
+      const width = container.offsetWidth
+      const breakpoint = width < 640 ? 'mobile' : width < 1024 ? 'tablet' : 'desktop'
+      
+      console.log('[GRID DEBUG] Container Analysis:', {
         display: computedStyle.display,
-        gridTemplateColumns: computedStyle.gridTemplateColumns,
+        gridTemplateColumns: gridTemplate,
+        gap: computedStyle.gap,
         width: computedStyle.width,
+        clientWidth: container.clientWidth,
+        offsetWidth: container.offsetWidth,
+        className: container.className,
         classList: Array.from(container.classList),
-        containerWidth: container.offsetWidth,
+        colsDetected,
+        breakpoint,
         windowWidth: window.innerWidth,
         salesCount: visibleSales.length
       })
       
       if (parent) {
         const parentStyle = window.getComputedStyle(parent)
-        console.log('[GRID DIAGNOSTIC] Parent:', {
+        console.log('[GRID DEBUG] Parent Container:', {
           display: parentStyle.display,
           flexDirection: parentStyle.flexDirection,
           width: parentStyle.width,
-          parentWidth: parent.offsetWidth
+          parentWidth: parent.offsetWidth,
+          overflow: parentStyle.overflow
         })
       }
       
       if (firstCard && firstCard instanceof HTMLElement) {
         const cardStyle = window.getComputedStyle(firstCard)
-        console.log('[GRID DIAGNOSTIC] First Card:', {
+        console.log('[GRID DEBUG] First Card:', {
           display: cardStyle.display,
           width: cardStyle.width,
-          cardWidth: firstCard.offsetWidth
+          cardWidth: firstCard.offsetWidth,
+          margin: cardStyle.margin
         })
+      }
+      
+      // Check for multiple column-defining classes
+      const columnClasses = container.className.match(/(?:^|\s)(?:grid-cols-\d+|auto-cols-)/g)
+      if (columnClasses && columnClasses.length > 1) {
+        console.warn('[GRID DEBUG] Multiple column classes detected:', columnClasses)
       }
     }
   }, [visibleSales.length])
@@ -1691,6 +1715,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                 <div
                   ref={gridContainerRef}
                   className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
+                  style={{
+                    // Force grid display to override any conflicting styles
+                    display: 'grid !important',
+                    // Ensure container has proper width
+                    width: '100%',
+                    maxWidth: 'none'
+                  }}
                   data-testid="sales-grid"
                   data-debug="sales-list"
                   data-panel="list"
@@ -2069,13 +2100,20 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             />
           )}
           
-          {/* Advanced Grid Layout Diagnostic */}
-          {process.env.NODE_ENV === 'development' && (
-            <GridLayoutDiagnostic 
-              containerRef={gridContainerRef} 
-              isVisible={visibleSales.length > 0}
-            />
-          )}
+                  {/* Advanced Grid Layout Diagnostic */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <GridLayoutDiagnostic 
+                      containerRef={gridContainerRef} 
+                      isVisible={visibleSales.length > 0}
+                    />
+                  )}
+                  
+                  {/* Grid Debug Overlay (gated by NEXT_PUBLIC_DEBUG) */}
+                  <GridDebugOverlay 
+                    containerRef={gridContainerRef}
+                    isVisible={visibleSales.length > 0}
+                    salesCount={visibleSales.length}
+                  />
     </div>
   )
 }

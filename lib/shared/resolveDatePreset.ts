@@ -35,14 +35,25 @@ export function resolveDatePreset(
 
     case 'weekend': {
       const dayOfWeek = now.getDay()
-      const daysUntilSaturday = (6 - dayOfWeek) % 7
-      const daysUntilSunday = (7 - dayOfWeek) % 7
+      // Find this weekend (Saturday-Sunday)
+      let daysToSaturday, daysToSunday
+      
+      if (dayOfWeek === 0) { // Sunday
+        daysToSaturday = 6 // Previous Saturday
+        daysToSunday = 0 // Today
+      } else if (dayOfWeek === 6) { // Saturday
+        daysToSaturday = 0 // Today
+        daysToSunday = 1 // Tomorrow
+      } else { // Monday-Friday
+        daysToSaturday = 6 - dayOfWeek // This Saturday
+        daysToSunday = 7 - dayOfWeek // This Sunday
+      }
       
       const saturday = new Date(now)
-      saturday.setDate(now.getDate() + daysUntilSaturday)
+      saturday.setDate(now.getDate() + daysToSaturday)
       
       const sunday = new Date(now)
-      sunday.setDate(now.getDate() + daysUntilSunday)
+      sunday.setDate(now.getDate() + daysToSunday)
       
       return {
         from: toISO(saturday),
@@ -52,14 +63,22 @@ export function resolveDatePreset(
 
     case 'next_weekend': {
       const dayOfWeek = now.getDay()
-      const daysUntilSaturday = ((6 - dayOfWeek) % 7) + 7
-      const daysUntilSunday = ((7 - dayOfWeek) % 7) + 7
+      // Find the next weekend (Saturday-Sunday) after the current week
+      // If we're already in the weekend, go to next week's weekend
+      let daysToNextSaturday
+      if (dayOfWeek === 0) { // Sunday
+        daysToNextSaturday = 6 // Next Saturday
+      } else if (dayOfWeek === 6) { // Saturday
+        daysToNextSaturday = 7 // Next Saturday
+      } else { // Monday-Friday
+        daysToNextSaturday = 6 - dayOfWeek + 7 // Next Saturday
+      }
       
       const saturday = new Date(now)
-      saturday.setDate(now.getDate() + daysUntilSaturday)
+      saturday.setDate(now.getDate() + daysToNextSaturday)
       
       const sunday = new Date(now)
-      sunday.setDate(now.getDate() + daysUntilSunday)
+      sunday.setDate(now.getDate() + daysToNextSaturday + 1)
       
       return {
         from: toISO(saturday),

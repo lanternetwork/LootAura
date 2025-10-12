@@ -133,16 +133,40 @@ export async function GET(request: NextRequest) {
       
       // NOTE: We filter by date window after fetching to avoid PostgREST OR-composition issues
       
-      // Add category filters - fallback to text search if tags array not present
+      // Add category filters by joining with items table
       if (categories.length > 0) {
-        const ors: string[] = []
-        for (const c of categories) {
-          const safe = c.replace(/[%_]/g, '')
-          ors.push(`title.ilike.%${safe}%`)
-          ors.push(`description.ilike.%${safe}%`)
+        console.log('[SALES] Applying category filter:', categories)
+        // Use a subquery approach to find sales that have items matching the categories
+        const { data: salesWithCategories, error: categoryError } = await supabase
+          .from('items_v2')
+          .select('sale_id')
+          .in('category', categories)
+        
+        if (categoryError) {
+          console.error('[SALES] Category filter error:', categoryError)
+          return NextResponse.json({
+            ok: false,
+            error: 'Category filter failed',
+            code: (categoryError as any)?.code,
+            details: (categoryError as any)?.message
+          }, { status: 500 })
         }
-        if (ors.length > 0) {
-          query = query.or(ors.join(','))
+        
+        const saleIds = salesWithCategories?.map(item => item.sale_id) || []
+        console.log('[SALES] Found sales with matching categories:', saleIds.length)
+        
+        if (saleIds.length > 0) {
+          query = query.in('id', saleIds)
+        } else {
+          // No sales match the categories, return empty result
+          return NextResponse.json({
+            ok: true,
+            data: [],
+            center: { lat: latitude, lng: longitude },
+            distanceKm,
+            count: 0,
+            durationMs: Date.now() - startedAt
+          })
         }
       }
 

@@ -36,12 +36,50 @@ export async function GET(request: NextRequest) {
 
     const sb = createSupabaseServerClient()
 
-    // Fetch a slice with precisely the used columns from the public view
-    const { data, error } = await sb
+    // Build query with category filtering if categories are provided
+    let query = sb
       .from('sales_v2')
       .select('id, title, description, lat, lng, starts_at, ends_at, date_start, date_end, time_start, time_end')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
+
+    // Apply category filtering by joining with items table
+    if (categories.length > 0) {
+      console.log('[MARKERS API] Applying category filter:', categories)
+      // Use a subquery approach to find sales that have items matching the categories
+      const { data: salesWithCategories, error: categoryError } = await sb
+        .from('items_v2')
+        .select('sale_id')
+        .in('category', categories)
+      
+      if (categoryError) {
+        console.error('[MARKERS API] Category filter error:', categoryError)
+        return NextResponse.json({
+          error: 'Category filter failed',
+          code: (categoryError as any)?.code,
+          details: (categoryError as any)?.message
+        }, { status: 500 })
+      }
+      
+      const saleIds = salesWithCategories?.map(item => item.sale_id) || []
+      console.log('[MARKERS API] Found sales with matching categories:', saleIds.length)
+      
+      if (saleIds.length > 0) {
+        query = query.in('id', saleIds)
+      } else {
+        // No sales match the categories, return empty result
+        return NextResponse.json({
+          ok: true,
+          data: [],
+          center: { lat: originLat, lng: originLng },
+          distanceKm,
+          count: 0,
+          durationMs: Date.now() - startedAt
+        })
+      }
+    }
+
+    const { data, error } = await query
       .order('id', { ascending: true })
       .limit(Math.min(limit, 1000))
 

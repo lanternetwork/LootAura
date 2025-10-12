@@ -144,7 +144,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const dateKey = useMemo(() => {
     const resolved = resolveDatePreset(filters.dateRange)
     const key = (resolved?.from || '') + '|' + (resolved?.to || '')
-    console.log('[DATEKEY] computed:', { preset: filters.dateRange, resolved, key })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[DATEKEY] computed:', { preset: filters.dateRange, resolved, key })
+    }
     return key
   }, [filters.dateRange])
   
@@ -269,11 +271,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Stable bbox hash for effect dependencies
   const bboxHash = useMemo(() => {
     if (!viewportBounds) {
-      console.log('[BBOXHASH] no bounds')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[BBOXHASH] no bounds')
+      }
       return 'no-bounds'
     }
     const hash = `${viewportBounds.north},${viewportBounds.south},${viewportBounds.east},${viewportBounds.west}`
-    console.log('[BBOXHASH] computed:', hash)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[BBOXHASH] computed:', hash)
+    }
     return hash
   }, [viewportBounds])
   const lastBoundsTsRef = useRef<number | null>(null)
@@ -286,7 +292,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const salesAbortRef = useRef<AbortController | null>(null)
   const markersAbortRef = useRef<AbortController | null>(null)
   const debounceRef = useRef<number | null>(null)
-  const requestSeqRef = useRef<number>(0)
   const markerSeqRef = useRef<number>(0)
   const mapModeDebounceRef = useRef<NodeJS.Timeout | null>(null)
   
@@ -295,6 +300,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const markersReqIdRef = useRef<number>(0)
   const currentSalesRequestRef = useRef<{reqId: number, stateKey: string} | null>(null)
   const currentMarkersRequestRef = useRef<{reqId: number, stateKey: string} | null>(null)
+  
+  // Arbiter sequencing for latest-wins behavior
+  const viewportSeqRef = useRef<number>(0)
+  const requestSeqRef = useRef<number>(0)
   
   // In-flight tracking and versioning
   const [inFlightSales, setInFlightSales] = useState<boolean>(false)
@@ -1722,7 +1731,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   <span className="ml-2">Loading sales...</span>
                 </div>
 
-                {/* Always render the sales list container - never hide it */}
+                {/* Sales list grid container - single source of truth */}
                 <div
                   ref={gridContainerRef}
                   className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${
@@ -1730,7 +1739,6 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                       ? (mapUpdating ? 'opacity-50' : 'opacity-100')
                       : (loading ? 'opacity-75' : 'opacity-100')
                   }`}
-                  data-grid-debug="true"
                   style={{
                     // MAP authority specific styles only
                     ...(arbiter.authority === 'MAP' ? {
@@ -1740,65 +1748,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     } : {})
                   }}
                   data-testid="sales-grid"
-                  data-debug="sales-list"
-                  data-panel="list"
+                  {...(process.env.NEXT_PUBLIC_DEBUG === 'true' && { 'data-grid-debug': 'true' })}
                   // Avoid re-keying container in MAP to prevent unmounts before effects run
                   key={arbiter.authority==='MAP' ? 'map-stable' : 'filters'}
-                  data-grid-container="true"
-                  onLoad={() => {
-                    // Diagnostic logging for grid layout
-                    if (gridContainerRef.current) {
-                      const container = gridContainerRef.current
-                      const computedStyle = window.getComputedStyle(container)
-                      const parent = container.parentElement
-                      const firstCard = container.querySelector('.sale-row')
-                      
-                      console.log('[GRID DIAGNOSTIC] Container:', {
-                        display: computedStyle.display,
-                        gridTemplateColumns: computedStyle.gridTemplateColumns,
-                        width: computedStyle.width,
-                        classList: Array.from(container.classList),
-                        containerWidth: container.offsetWidth,
-                        windowWidth: window.innerWidth
-                      })
-                      
-                      if (parent) {
-                        const parentStyle = window.getComputedStyle(parent)
-                        console.log('[GRID DIAGNOSTIC] Parent:', {
-                          display: parentStyle.display,
-                          flexDirection: parentStyle.flexDirection,
-                          width: parentStyle.width,
-                          parentWidth: parent.offsetWidth
-                        })
-                      }
-                      
-                      if (firstCard && firstCard instanceof HTMLElement) {
-                        const cardStyle = window.getComputedStyle(firstCard)
-                        console.log('[GRID DIAGNOSTIC] First Card:', {
-                          display: cardStyle.display,
-                          width: cardStyle.width,
-                          cardWidth: firstCard.offsetWidth
-                        })
-                      }
-                    }
-                  }}
                 >
-                  {arbiter.authority==='MAP' && (
-                    <div style={{ position:'absolute', top:8, left:8, padding:'4px 6px', fontSize:12, background:'rgba(255,255,0,.6)', zIndex:1000 }}>
-                      MAP LIST: {(visiblePinIdsState?.length ?? 0)}
-                    </div>
-                  )}
-                  
-                  {/* Debug grid info */}
-                  {process.env.NODE_ENV === 'development' && (
+                  {/* Debug overlay - only in development with NEXT_PUBLIC_DEBUG */}
+                  {process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEBUG === 'true' && (
                     <div style={{ position:'absolute', top:8, right:8, padding:'4px 6px', fontSize:12, background:'rgba(0,255,0,.6)', zIndex:1000 }}>
-                      GRID DEBUG: 3 columns forced
+                      GRID: {visibleSales.length} sales
                       <br />
-                      W: {window.innerWidth}px | Sales: {visibleSales.length}
-                      <br />
-                      <div style={{fontSize:10}}>
-                        Container: {typeof document !== 'undefined' && document.querySelector('[data-grid-container="true"]') ? 'FOUND' : 'NOT FOUND'}
-                      </div>
+                      W: {typeof window !== 'undefined' ? window.innerWidth : 0}px
                     </div>
                   )}
                   

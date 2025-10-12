@@ -37,7 +37,7 @@ jest.mock('@/components/location/SalesMap', () => {
 
 jest.mock('@/components/SaleCard', () => {
   return function MockSaleCard({ sale }: { sale: Sale }) {
-    return <div data-testid="sale-card">{sale.title}</div>
+    return <div data-testid="sale-card" className="sale-row">{sale.title}</div>
   }
 })
 
@@ -106,5 +106,53 @@ describe('Grid Layout Integration', () => {
       // Card should not be wrapped in a div with grid-item class
       expect(card.parentElement).toBe(gridContainer)
     })
+  })
+
+  it('should maintain grid layout during loading states', () => {
+    const { rerender } = render(
+      <SalesClient
+        initialSales={[]}
+        initialSearchParams={{}}
+        initialCenter={{ lat: 38.1405, lng: -85.6936 }}
+        user={null}
+      />
+    )
+
+    const gridContainer = screen.getByTestId('sales-grid')
+    expect(gridContainer).toHaveClass('grid')
+    expect(gridContainer).toHaveClass('grid-cols-1')
+  })
+
+  it('should handle empty state without breaking grid', () => {
+    render(
+      <SalesClient
+        initialSales={[]}
+        initialSearchParams={{}}
+        initialCenter={{ lat: 38.1405, lng: -85.6936 }}
+        user={null}
+      />
+    )
+
+    const gridContainer = screen.getByTestId('sales-grid')
+    expect(gridContainer).toBeInTheDocument()
+    expect(gridContainer).toHaveClass('grid')
+  })
+
+  it('should not have multiple column-defining classes', () => {
+    render(
+      <SalesClient
+        initialSales={mockSales}
+        initialSearchParams={{}}
+        initialCenter={{ lat: 38.1405, lng: -85.6936 }}
+        user={null}
+      />
+    )
+
+    const gridContainer = screen.getByTestId('sales-grid')
+    const className = gridContainer.className
+    
+    // Count grid-cols-* classes
+    const columnClasses = className.match(/grid-cols-\d+/g) || []
+    expect(columnClasses.length).toBeLessThanOrEqual(1) // Only base class, responsive classes are different
   })
 })

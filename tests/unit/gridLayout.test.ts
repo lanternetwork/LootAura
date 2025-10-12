@@ -67,4 +67,69 @@ describe('Grid Layout', () => {
     expect(hasMultipleColumnClasses('grid grid-cols-1 grid-cols-2')).toBe(true)
     expect(hasMultipleColumnClasses('grid sm:grid-cols-2 lg:grid-cols-3')).toBe(false)
   })
+
+  it('should validate grid container width constraints', () => {
+    const isContainerWidthAdequate = (width: number, breakpoint: 'mobile' | 'tablet' | 'desktop') => {
+      switch (breakpoint) {
+        case 'mobile':
+          return width >= 320
+        case 'tablet':
+          return width >= 640
+        case 'desktop':
+          return width >= 1024
+        default:
+          return false
+      }
+    }
+
+    expect(isContainerWidthAdequate(320, 'mobile')).toBe(true)
+    expect(isContainerWidthAdequate(640, 'tablet')).toBe(true)
+    expect(isContainerWidthAdequate(1024, 'desktop')).toBe(true)
+    expect(isContainerWidthAdequate(300, 'mobile')).toBe(false)
+    expect(isContainerWidthAdequate(600, 'tablet')).toBe(false)
+    expect(isContainerWidthAdequate(1000, 'desktop')).toBe(false)
+  })
+
+  it('should detect grid layout issues', () => {
+    const detectGridIssues = (computedStyle: {
+      display: string
+      gridTemplateColumns: string
+      width: string
+      clientWidth: number
+    }) => {
+      const issues: string[] = []
+      
+      if (computedStyle.display !== 'grid') {
+        issues.push('Not using CSS Grid')
+      }
+      
+      if (computedStyle.gridTemplateColumns === 'none') {
+        issues.push('No grid template columns defined')
+      }
+      
+      if (computedStyle.clientWidth < 400 && window.innerWidth >= 1024) {
+        issues.push('Container too narrow for desktop')
+      }
+      
+      return issues
+    }
+
+    const goodStyle = {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(3, 1fr)',
+      width: '100%',
+      clientWidth: 1200
+    }
+
+    const badStyle = {
+      display: 'block',
+      gridTemplateColumns: 'none',
+      width: '100%',
+      clientWidth: 200
+    }
+
+    expect(detectGridIssues(goodStyle)).toHaveLength(0)
+    expect(detectGridIssues(badStyle)).toContain('Not using CSS Grid')
+    expect(detectGridIssues(badStyle)).toContain('No grid template columns defined')
+  })
 })

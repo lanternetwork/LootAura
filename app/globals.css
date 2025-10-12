@@ -55,7 +55,7 @@ body { min-height: 100vh; }
   max-width: none !important;
 }
 
-/* Force grid layout for sales list - highest specificity */
+/* Debug grid layout - only when NEXT_PUBLIC_DEBUG is enabled */
 [data-grid-debug="true"] {
   display: grid !important;
   grid-template-columns: repeat(1, 1fr) !important;

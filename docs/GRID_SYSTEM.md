@@ -1,174 +1,137 @@
-# Enterprise-Grade Responsive Grid System
+# Enterprise Grid System Documentation
 
-This document outlines the design, implementation, and usage of the new responsive grid system for displaying sales listings. The goal is to provide a robust, flexible, and performant solution that addresses previous layout issues, hydration mismatches, and CSS conflicts.
+## Overview
 
----
+The LootAura sales list uses an enterprise-grade responsive grid system that ensures stable, multi-column layouts across all breakpoints while maintaining MAP authority and preventing layout regressions.
 
-## 1. Motivation & Root Cause Analysis
+## Architecture
 
-Previously, the sales list suffered from inconsistent layouts, often rendering as a single column instead of a responsive grid. The root causes were identified as:
+### Single Grid Container
+- **One source of truth**: Single `div` with `data-testid="sales-grid"`
+- **Direct children only**: Sale cards are direct children, no wrapper divs
+- **Responsive classes**: `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6`
 
-- **CSS Conflict Cascade**: A mix of Tailwind utility classes, inline styles, and global CSS rules created a complex cascade where `!important` declarations often overrode desired responsive behavior.
-- **Hydration Mismatch**: Differences in how styles were applied during server-side rendering (SSR) versus client-side hydration led to layout shifts and incorrect rendering.
-- **Layout Hierarchy Problems**: The `SaleCard` component's internal `flex flex-col` styling conflicted when it was a direct child of a grid container, leading to unexpected rendering.
-- **Lack of Centralized Control**: No single source of truth for grid definitions, making debugging and maintenance difficult.
+### Column Authority
+- **Tailwind breakpoints**: Uses literal Tailwind responsive classes
+- **No JS calculations**: Avoids dynamic column computation
+- **Safelist protection**: All grid classes are safelisted in `tailwind.config.ts`
 
----
+### Arbiter Integration
+- **MAP authority**: Grid maintains layout during map interactions
+- **Latest-wins**: ViewportSeq/RequestSeq prevent stale updates
+- **Suppression rules**: Wide fetches blocked under MAP authority
 
-## 2. Solution: `SalesGrid` Component
+## Breakpoints
 
-To address these issues, a new `SalesGrid` React component has been introduced, along with a dedicated CSS system and development guardrails.
+| Breakpoint | Width | Columns | Classes |
+|------------|-------|---------|---------|
+| Mobile | < 640px | 1 | `grid-cols-1` |
+| Tablet | 640px - 1023px | 2 | `sm:grid-cols-2` |
+| Desktop | ≥ 1024px | 3 | `lg:grid-cols-3` |
 
-### `components/SalesGrid.tsx`
+## Implementation
 
-This component acts as the primary container for displaying sales in a responsive grid.
-
-**Key Features:**
-
-- **Responsive Columns**: Dynamically adjusts the number of columns (1, 2, or 3) based on the `SalesGrid` container's actual width, not `window.innerWidth`.
-- **`ResizeObserver`**: Utilizes the `ResizeObserver` API for efficient and performant monitoring of the container's size, triggering re-renders only when necessary. This avoids reliance on `window.innerWidth` which can be problematic with SSR and non-reactive updates.
-- **CSS Custom Properties (CSS Variables)**: Uses `--grid-columns` and `--grid-gap` CSS variables to pass dynamic values to the CSS, allowing for flexible styling without inline style conflicts.
-- **Clear Separation of Concerns**: The `SalesGrid` component manages the grid container logic, while individual `SaleCard` components (wrapped in `SalesGridItem` divs) handle their internal layout.
-- **Loading State Handling**: Renders `SaleCardSkeleton` components when `loading` is true (and not in MAP authority mode), providing a smooth user experience.
-- **Empty State Management**: Displays a customizable `emptyStateMessage` when no sales are present.
-
-**Usage Example:**
-
+### Grid Container
 ```tsx
-import SalesGrid from '@/components/SalesGrid';
-import { Sale } from '@/lib/types';
-
-// In SalesClient.tsx or similar
-<SalesGrid
-  sales={visibleSales}
-  loading={loading}
-  authority={arbiter.authority}
-  emptyStateMessage={
-    <div className="text-center py-16">
-      <h3 className="text-xl font-semibold text-gray-800">No sales found.</h3>
-      <p className="text-gray-500 mt-2">Try adjusting your filters.</p>
-    </div>
-  }
-  skeletonCount={6}
-/>
+<div
+  ref={gridContainerRef}
+  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
+  data-testid="sales-grid"
+  {...(process.env.NEXT_PUBLIC_DEBUG === 'true' && { 'data-grid-debug': 'true' })}
+>
+  {/* Sale cards as direct children */}
+</div>
 ```
 
-### `app/globals.css`
-
-The global CSS file now defines the core styles for the `.sales-grid` and `.sales-grid-item` classes, leveraging CSS custom properties for dynamic values.
-
+### CSS Overrides (Debug Only)
 ```css
-/* Enterprise-grade responsive grid system */
-.sales-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--grid-columns, 1), 1fr); /* Default to 1 column */
-  gap: var(--grid-gap, 1.5rem);
-  width: 100%;
-  min-height: 200px; /* Ensure minimum height for consistency */
-}
-
-.sales-grid-item {
-  display: block; /* Ensure grid items behave as block-level elements */
-  width: 100%;
-  min-height: 200px; /* Ensure minimum height for consistency */
-}
-
-/* Responsive behavior based on container width (handled by JS in SalesGrid) */
-/* These media queries are for illustrative purposes if CSS-only breakpoints were desired,
-   but the SalesGrid component dynamically sets --grid-columns based on its own width.
-   The data-columns attribute is used for debugging and potential future CSS-driven breakpoints. */
-@media (min-width: 640px) {
-  .sales-grid[data-columns="2"] {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  .sales-grid[data-columns="3"] {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-/* Skeleton loading styles (re-applied for consistency) */
-.sale-skeleton {
-  @apply rounded-xl border p-4 bg-white shadow-sm;
-  min-height: 200px;
-}
-.skeleton-header { @apply h-6 bg-gray-200 rounded mb-2; }
-.skeleton-content { @apply h-4 bg-gray-200 rounded mb-2; }
-.skeleton-footer { @apply h-4 bg-gray-200 rounded w-3/4; }
-
-/* Override any conflicting styles for SaleCard's root element */
-.sale-row {
-  width: 100% !important;
-  max-width: none !important;
-}
-
-/* Legacy support - these rules should be removed once SalesClient fully migrates to SalesGrid */
-[data-grid-container="true"] {
+/* Only applied when NEXT_PUBLIC_DEBUG=true */
+[data-grid-debug="true"] {
   display: grid !important;
-  grid-template-columns: repeat(var(--grid-columns, 1), 1fr) !important;
+  grid-template-columns: repeat(1, 1fr) !important;
   gap: 1.5rem !important;
   width: 100% !important;
   max-width: none !important;
-  min-height: 200px !important;
-}
-.grid-item {
-  display: block !important;
-  width: 100% !important;
-  min-height: 200px !important;
 }
 ```
 
----
+## Testing
 
-## 3. Development Guardrails
+### Unit Tests
+- **Class resolution**: `tests/unit/gridLayout.test.ts`
+- **Arbiter sequencing**: `tests/unit/arbiter.test.ts`
+- **Build-time checks**: `tests/build-time/css-tokens.test.ts`
 
-To prevent future regressions and ensure maintainability, the following guardrails have been implemented:
+### Integration Tests
+- **Direct children**: `tests/integration/gridLayout.integration.test.tsx`
+- **Loading states**: Grid maintains structure during transitions
+- **Empty states**: No layout breaks with zero sales
 
-### `tests/components/SalesGrid.test.tsx`
+### Snapshot Tests
+- **Stable classes**: `tests/snapshots/gridContainer.snapshot.test.tsx`
+- **Authority modes**: Consistent across MAP/FILTERS authority
+- **Sale counts**: Stable with different data volumes
 
-A dedicated unit test suite for the `SalesGrid` component ensures:
+## Performance
 
-- Correct rendering of sales cards, skeletons, and empty states.
-- Accurate column calculation based on container width via `ResizeObserver` mocks.
-- Proper cleanup of `ResizeObserver` on component unmount.
+### Targets
+- **First paint**: ≤ 3s for interactive map
+- **Query p95**: ≤ 300ms for visible sales
+- **Bundle growth**: ≤ +5 KB gzip
 
-### `.eslintrc.grid-rules.js`
+### Optimizations
+- **Pure CSS**: No JS-based column calculations
+- **Debounced resize**: 100-150ms for any measurements
+- **Stable keys**: Prevents unnecessary re-renders
 
-Custom ESLint rules have been introduced to enforce best practices and prevent common grid-related conflicts:
+## Security
 
-- **`no-inline-grid-styles`**: Disallows inline `display: grid` or `gridTemplateColumns` styles on the main grid container, promoting the use of `SalesGrid` or `app/globals.css`.
-- **`no-direct-sale-card-grid-children`**: Ensures `SaleCard` components are not direct children of grid containers, preventing conflicts with their internal flex layout. They must be wrapped in a `SalesGridItem` (or the `SalesGrid` component's internal wrapper).
+### RLS Verification
+- **Public read**: `yard_sales` table allows anonymous reads
+- **Owner mutations**: Requires authenticated user
+- **No PII leaks**: Debug logs gated by `NEXT_PUBLIC_DEBUG`
 
-### `components/LayoutDiagnostic.tsx`
+### Debug Gating
+```typescript
+if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+  console.log('[DEBUG] Grid diagnostic info')
+}
+```
 
-A new client-side component for real-time visual debugging of layout properties:
+## Maintenance
 
-- Displays computed `display`, `gridTemplateColumns`, `width`, and `itemCount`.
-- Shows applied `className` and `style` attributes for both the container and the first item.
-- Uses `ResizeObserver` and `MutationObserver` to detect and report layout changes dynamically.
-- Helps identify hydration mismatches or unexpected style overrides at runtime.
+### Lint Rules
+- **No inline styles**: Prevents grid overrides
+- **No wrappers**: Enforces direct children
+- **ESLint config**: `.eslintrc.grid-rules.js`
 
----
+### CI Checks
+- **Grid classes**: Build-time verification
+- **Console warnings**: Fail on new warnings
+- **Coverage**: Maintain test coverage
 
-## 4. Migration & Next Steps
+## Troubleshooting
 
-The next crucial step is to **integrate the new `SalesGrid` component into `SalesClient.tsx`** and remove all legacy grid-related code.
+### Common Issues
+1. **Single column**: Check for conflicting CSS or missing Tailwind classes
+2. **Wrapper divs**: Ensure SaleCard components are direct children
+3. **Debug artifacts**: Remove `data-grid-debug` in production
 
-**Migration Plan for `SalesClient.tsx`:**
+### Debug Mode
+Set `NEXT_PUBLIC_DEBUG=true` to enable:
+- Grid diagnostic overlay
+- Console logging
+- CSS overrides for testing
 
-1. **Import `SalesGrid`**: Add `import SalesGrid from '@/components/SalesGrid';`
-2. **Replace Grid Container**: Replace the existing `div` with `data-testid="sales-grid"` with the `SalesGrid` component.
-3. **Pass Props**:
-   - `sales`: Pass `visibleSales` (or `renderedSales` depending on authority).
-   - `loading`: Pass the `loading` state.
-   - `authority`: Pass `arbiter.authority`.
-   - `emptyStateMessage`: Define appropriate empty state JSX.
-   - `skeletonCount`: (Optional) Define number of skeletons.
-4. **Remove Legacy Styling**: Delete all inline `style` attributes and Tailwind `grid-cols-*` classes from the replaced `div`.
-5. **Remove Legacy Debugging**: Remove the old `GRID DEBUG` overlay.
-6. **Remove `gridContainerRef`**: The `SalesGrid` component manages its own ref.
-7. **Cleanup `app/globals.css`**: Remove the `[data-grid-container="true"]` and `.grid-item` legacy rules once `SalesClient` is fully migrated.
+## Migration Notes
 
-This structured approach ensures a robust, maintainable, and performant grid layout for the sales list, with clear guardrails against future regressions.
+### From Legacy System
+- **Removed**: `[data-grid-container="true"]` CSS rules
+- **Removed**: `.grid-item` wrapper classes
+- **Added**: Comprehensive test coverage
+- **Added**: Lint rules for prevention
+
+### Breaking Changes
+- Sale cards must be direct children of grid container
+- No wrapper divs allowed around grid items
+- Debug artifacts only available with `NEXT_PUBLIC_DEBUG=true`

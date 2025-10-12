@@ -1,84 +1,78 @@
 module.exports = {
   rules: {
-    'no-inline-grid-styles': {
+    // Prevent hard-coded display styles on grid containers
+    'no-inline-styles': {
       meta: {
         type: 'problem',
         docs: {
-          description: 'Disallow inline grid styles that conflict with the SalesGrid component',
-          category: 'Possible Errors',
-          recommended: true,
+          description: 'Prevent inline styles that override grid layout',
+          category: 'Layout'
         },
-        schema: [],
+        fixable: null,
+        schema: []
       },
       create(context) {
         return {
           JSXAttribute(node) {
-            if (node.name.name === 'style' && node.parent.name.name === 'div') {
-              const styleProps = node.value.expression.properties;
-              const hasGridDisplay = styleProps.some(
-                (prop) =>
-                  prop.key.name === 'display' &&
-                  prop.value.value &&
-                  prop.value.value.includes('grid')
-              );
-              const hasGridTemplateColumns = styleProps.some(
-                (prop) => prop.key.name === 'gridTemplateColumns'
-              );
-
-              if (hasGridDisplay || hasGridTemplateColumns) {
-                context.report({
-                  node,
-                  message:
-                    'Avoid inline `display: grid` or `gridTemplateColumns` styles. Use the `SalesGrid` component or `app/globals.css` for grid definitions.',
-                });
+            if (node.name.name === 'style' && node.value.type === 'JSXExpressionContainer') {
+              const styleValue = node.value.expression
+              if (styleValue.type === 'ObjectExpression') {
+                const properties = styleValue.properties
+                const hasGridOverride = properties.some(prop => {
+                  if (prop.key.type === 'Literal' && prop.key.value === 'display') {
+                    return prop.value.type === 'Literal' && prop.value.value !== 'grid'
+                  }
+                  if (prop.key.type === 'Literal' && prop.key.value === 'gridTemplateColumns') {
+                    return true // Any inline gridTemplateColumns is suspicious
+                  }
+                  return false
+                })
+                
+                if (hasGridOverride) {
+                  context.report({
+                    node,
+                    message: 'Avoid inline styles that override grid layout. Use Tailwind classes instead.'
+                  })
+                }
               }
             }
-          },
-          // You can add more checks here, e.g., for conflicting Tailwind classes
-        };
-      },
+          }
+        }
+      }
     },
-    'no-direct-sale-card-grid-children': {
+    
+    // Prevent wrapper divs around grid items
+    'no-grid-wrappers': {
       meta: {
         type: 'problem',
         docs: {
-          description: 'Ensure SaleCard components are not direct children of grid containers to prevent flex conflicts',
-          category: 'Possible Errors',
-          recommended: true,
+          description: 'Prevent wrapper divs around grid items',
+          category: 'Layout'
         },
-        schema: [],
+        fixable: null,
+        schema: []
       },
       create(context) {
         return {
           JSXElement(node) {
-            if (node.openingElement.name.name === 'SaleCard') {
-              const parent = node.parent;
-              if (parent && parent.type === 'JSXElement') {
-                const parentClasses = parent.openingElement.attributes.find(
-                  (attr) => attr.type === 'JSXAttribute' && attr.name.name === 'className'
-                );
-                const parentStyles = parent.openingElement.attributes.find(
-                  (attr) => attr.type === 'JSXAttribute' && attr.name.name === 'style'
-                );
-
-                const isParentGrid =
-                  (parentClasses && parentClasses.value.type === 'Literal' && parentClasses.value.value.includes('grid')) ||
-                  (parentStyles && parentStyles.value.expression.properties.some(
-                    (prop) => prop.key.name === 'display' && prop.value.value && prop.value.value.includes('grid')
-                  ));
-
-                if (isParentGrid) {
+            if (node.openingElement.name.name === 'div') {
+              const className = node.openingElement.attributes.find(
+                attr => attr.name.name === 'className'
+              )
+              
+              if (className && className.value.type === 'Literal') {
+                const classValue = className.value.value
+                if (classValue.includes('grid-item') || classValue.includes('grid-wrapper')) {
                   context.report({
                     node,
-                    message:
-                      'SaleCard should not be a direct child of a grid container. Wrap it in a `SalesGridItem` or similar component to prevent layout conflicts.',
-                  });
+                    message: 'Avoid wrapper divs around grid items. Grid items should be direct children of the grid container.'
+                  })
                 }
               }
             }
-          },
-        };
-      },
-    },
-  },
-};
+          }
+        }
+      }
+    }
+  }
+}

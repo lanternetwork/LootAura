@@ -18,6 +18,7 @@ import { milesToKm } from '@/utils/geo'
 import LoadMoreButton from '@/components/LoadMoreButton'
 import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
+import LayoutDiagnostic from '@/components/LayoutDiagnostic'
 import { resolveDatePreset, dateRangesEqual } from '@/lib/shared/resolveDatePreset'
 
 // Intent Arbiter types
@@ -1256,6 +1257,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // Counter to track how many times this effect runs
   const effectRunCountRef = useRef(0)
   
+  // Layout diagnostic ref
+  const gridContainerRef = useRef<HTMLDivElement>(null)
+  
   useEffect(() => {
     effectRunCountRef.current++
     console.log(`[EFFECT] Main effect run #${effectRunCountRef.current}`)
@@ -1645,6 +1649,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
 
                 {/* Always render the sales list container - never hide it */}
                 <div
+                  ref={gridContainerRef}
                   className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200"
                   data-testid="sales-grid"
                   data-debug="sales-list"
@@ -1984,6 +1989,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         <DiagnosticOverlay
           isVisible={showDiagnostics}
           onToggle={() => setShowDiagnostics(!showDiagnostics)}
+        />
+      )}
+      
+      {/* Layout Diagnostic */}
+      {process.env.NODE_ENV === 'development' && (
+        <LayoutDiagnostic 
+          containerRef={gridContainerRef} 
+          isVisible={visibleSales.length > 0}
         />
       )}
     </div>

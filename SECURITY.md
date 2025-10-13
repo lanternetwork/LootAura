@@ -35,6 +35,18 @@ We currently support the following versions with security updates:
 - **Rotation Policy**: Regular rotation of API keys and tokens
 - **Access Control**: Least privilege access to production secrets
 
+### RLS Posture
+- **Public Read**: Sales data readable by anonymous users for browsing
+- **Owner Write**: Only sale owners can modify their own sales
+- **Profile Access**: Users can only access their own profiles
+- **Filter Security**: Filters are not security controls - they are user preferences
+
+### Log Policy
+- **No PII**: No personally identifiable information in logs
+- **Debug Gating**: All debug logs behind `NEXT_PUBLIC_DEBUG` flag
+- **Structured Logging**: Use structured logging format for consistency
+- **Log Rotation**: Implement log rotation to prevent disk space issues
+
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability, please report it responsibly:

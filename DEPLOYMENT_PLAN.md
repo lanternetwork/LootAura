@@ -205,6 +205,47 @@ Run these migrations in order:
 - **Environment Validation**: Automated checks for required variables
 - **Health Monitoring**: Continuous health checks with alerting
 
+## Migration Order & Verification
+
+### Migration Application Order
+1. **Development**: Apply migrations to local Supabase instance
+2. **Preview**: Apply migrations to preview Supabase instance
+3. **Production**: Apply migrations to production Supabase instance
+
+### Verification Queries
+```sql
+-- Verify schema matches invariants
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'items_v2'
+AND column_name = 'category';
+
+-- Verify indexes exist
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE tablename = 'items_v2' AND indexname LIKE '%category%';
+
+-- Verify RLS policies
+SELECT policyname, permissive, roles, cmd, qual
+FROM pg_policies
+WHERE tablename = 'items_v2';
+```
+
+### Rollback Steps
+1. **Immediate**: Revert to previous deployment via Vercel dashboard
+2. **Database**: Execute rollback migration if available
+3. **Environment**: Revert environment variables if needed
+4. **Verification**: Run verification queries to confirm rollback
+5. **Monitoring**: Monitor system health after rollback
+
+### Migration Checklist
+- [ ] Migration script reviewed and approved
+- [ ] Rollback procedure tested
+- [ ] Backup created before migration
+- [ ] Verification queries prepared
+- [ ] Monitoring in place
+- [ ] Team notified of migration schedule
+
 ## Post-Deploy Validation
 
 ### Manual QA Script (lootaura.com)

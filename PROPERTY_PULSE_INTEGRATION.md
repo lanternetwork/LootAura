@@ -18,6 +18,12 @@ This branch integrates the Property Pulse Next.js template while preserving the 
 - **Documentation**: Integration patterns documented for future templates
 - **Testing**: Comprehensive testing required for all integrations
 
+### Filter Integration Compliance
+- **Parameter Keys**: Must use canonical `categories` parameter (not legacy `cat`)
+- **Shared Predicates**: Must use same database predicates as main application
+- **Suppression Logic**: Must respect MAP authority suppression rules
+- **Debug Integration**: Must use `NEXT_PUBLIC_DEBUG` flag for all debug features
+
 ## Structure
 
 ### Property Pulse Files

@@ -60,7 +60,29 @@
 - **Views**: public.items_v2 with category computation
 - **RLS**: Strict policies active
 
-## 10. Next Milestone
+## 10. Stability Program
+
+### Current Defects
+- **Category Filter Regression**: Fixed with computed category columns and canonical parameter handling
+- **Grid Layout Issues**: Resolved with single grid container and direct children structure
+- **Suppression Logic**: Corrected to prevent over-suppression of list updates
+- **Parameter Consistency**: Standardized on `categories` parameter with legacy `cat` support
+
+### Root Cause Analysis Summary
+- **Database Schema**: Missing category column in `public.items_v2` view
+- **Parameter Drift**: Inconsistent parameter keys between client and server
+- **Suppression Logic**: Incorrect equality checks causing over-suppression
+- **DOM Structure**: Intermediate wrappers breaking grid layout
+
+### Tasks Closed by Documentation Update
+- ✅ **INVARIANTS.md**: Protocol contracts and invariants documented
+- ✅ **TEST_MATRIX.md**: Comprehensive test matrix created
+- ✅ **DEBUG_GUIDE.md**: Unified debug system documented
+- ✅ **MIGRATION_POLICY.md**: Database migration procedures established
+- ✅ **CI Gates**: Test-driven gates implemented
+- ✅ **Owner Acceptance Protocol**: Manual validation procedures defined
+
+## 11. Next Milestone
 - **Stabilization Sprint**: 4-week enterprise development cycle
 - **CI/CD Enhancement**: Advanced testing and deployment gates
 - **Performance Optimization**: Database tuning and query optimization

@@ -257,6 +257,27 @@
 3. **User Notification**: If rollback affects users, notify within 1 hour
 4. **Post-Incident**: Root cause analysis within 48 hours
 
+## Owner Acceptance Protocol
+
+### Manual Validation Steps
+1. **Where**: `/sales` on a production build with `NEXT_PUBLIC_DEBUG=true`
+2. **Actions**:
+   - Select one known-hit category, then a second, then clear
+   - Pan map 3× between each step
+3. **Expected Results**:
+   - Payloads for markers/list show **identical normalized filters** when list is suppressed
+   - Suppression decision prints `{authority, equalFilters, suppressed}`; with categories present, list only suppressed when equalFilters=true
+   - List shows multi-column grid; DOM parity check passes
+4. **Report**: Three console screenshots (single, multi, cleared), plus network panel row counts
+
+### Acceptance Criteria
+- [ ] **CI Green**: All tests passing, no console warnings
+- [ ] **Debug Disabled**: `NEXT_PUBLIC_DEBUG=false` in production
+- [ ] **Docs Updated**: All documentation reflects current state
+- [ ] **Performance**: Response times within targets
+- [ ] **Security**: No vulnerabilities detected
+- [ ] **Monitoring**: All monitoring systems active
+
 ## Emergency Contacts
 
 ### Technical Issues

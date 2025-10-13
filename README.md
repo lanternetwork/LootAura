@@ -12,6 +12,37 @@ A modern web application for discovering and managing yard sales, garage sales, 
 - **Launch**: See [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) for launch validation
 - **Roadmap**: See [ROADMAP.md](ROADMAP.md) for development milestones
 
+## 🏗️ Architecture Invariants
+
+LootAura follows strict architectural invariants to prevent regressions:
+
+- **Map-Centric Authority**: Map is the source of truth for visible sales
+- **Arbiter Logic**: Controls when to suppress list fetches under MAP authority
+- **Parameter Canonicalization**: `categories` parameter with legacy `cat` support
+- **Single Source**: Both markers and list read from `public.items_v2`
+- **DOM Structure**: List container with direct children, no intermediate wrappers
+
+See [docs/INVARIANTS.md](docs/INVARIANTS.md) for complete protocol contracts.
+
+## 🐛 Debug Mode
+
+### Enabling Debug Mode
+```bash
+# Set environment variable
+NEXT_PUBLIC_DEBUG=true
+
+# Or in Vercel dashboard
+# Environment Variables → Add → NEXT_PUBLIC_DEBUG = true
+```
+
+### Debug Features
+- **Filter Normalization**: See how categories are processed
+- **Suppression Logic**: Understand when list fetches are suppressed
+- **DOM Structure**: Verify grid layout and card counting
+- **ID Parity**: Check marker-list consistency
+
+See [docs/DEBUG_GUIDE.md](docs/DEBUG_GUIDE.md) for complete debug guide.
+
 ## Features
 
 - **Interactive Map View**: Find sales near you with an interactive Mapbox map

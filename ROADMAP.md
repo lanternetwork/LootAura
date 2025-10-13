@@ -307,6 +307,20 @@ LootAura is **95% production-ready** with all core features implemented, compreh
 - **API Response Times**: < 1s for all endpoints
 - **Database Performance**: Query optimization and indexing
 
+## Stability & Contracts
+
+### Standing Workstream
+- **Invariants Review**: Required for any epic touching map/filters/list
+- **Test Matrix**: Comprehensive test coverage for all critical behaviors
+- **Debug Discipline**: Unified debug system with single flag
+- **Migration Safety**: Database migration procedures and verification
+
+### Contract Requirements
+- **Protocol Contracts**: Documented in [docs/INVARIANTS.md](docs/INVARIANTS.md)
+- **Test Coverage**: Defined in [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md)
+- **Debug Standards**: Specified in [docs/DEBUG_GUIDE.md](docs/DEBUG_GUIDE.md)
+- **Migration Policy**: Established in [docs/MIGRATION_POLICY.md](docs/MIGRATION_POLICY.md)
+
 ## Next Steps
 
 1. **Week 1**: Complete all "Must-do" items (A1-A5)

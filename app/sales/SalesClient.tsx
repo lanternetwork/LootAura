@@ -1323,6 +1323,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       
       // Debug suppression decision
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] normalizedFilters =', { categories: listFilters.categories })
         console.log('[FILTER DEBUG] suppression_decision =', {
           authority: arbiter.authority,
           equalFilters,

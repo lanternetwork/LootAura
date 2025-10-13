@@ -110,7 +110,7 @@ interface SalesClientProps {
 
 export default function SalesClient({ initialSales, initialSearchParams, initialCenter, user }: SalesClientProps) {
   // Debug flag for console checkpoints
-  const DEBUG = typeof window !== 'undefined' && (window as any).__LA_DEBUG === true
+  const DEBUG = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_DEBUG === 'true'
   
   // Container mount checkpoint
   useEffect(() => {
@@ -124,7 +124,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
           const computedStyle = window.getComputedStyle(listContainer)
           const display = computedStyle.display
           const gtc = computedStyle.gridTemplateColumns
-          console.log(`[DOM][LIST] grid display=${display} gtc=${gtc}`)
+          const parent = listContainer.parentElement
+          const parentDisplay = parent ? window.getComputedStyle(parent).display : 'none'
+          const parentWidth = parent ? window.getComputedStyle(parent).width : '0px'
+          console.log(`[DOM][LIST] grid display=${display} gtc=${gtc} parentDisplay=${parentDisplay} parentWidth=${parentWidth}`)
         }
       }, 100) // Small delay to ensure styles are applied
     }
@@ -135,6 +138,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   
   // List store sequence for UI updates
   const listStoreSeqRef = useRef<number>(0)
+  const prevVisibleIdsHashRef = useRef<string>('')
   const router = useRouter()
   const searchParams = useSearchParams()
   const { filters, updateFilters, hasActiveFilters } = useFilters(
@@ -685,9 +689,17 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       setRenderedSales(rendered)
       
       // List store update with sequence tracking
-      listStoreSeqRef.current += 1
-      if (DEBUG) {
-        console.log(`[LIST] apply visible count=${hydrated.length} seq=${listStoreSeqRef.current}`)
+      const currentIdsHash = hydrated.map(s => s.id).sort().join(',')
+      const idsChanged = prevVisibleIdsHashRef.current !== currentIdsHash
+      
+      if (idsChanged) {
+        listStoreSeqRef.current += 1
+        prevVisibleIdsHashRef.current = currentIdsHash
+      }
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[LIST][DIFF] seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}... prevSeq=${listStoreSeqRef.current - 1} changed=${idsChanged}`)
+        console.log(`[LIST] apply visible count=${hydrated.length} seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}...`)
       }
       
       console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=${hydrated.length} rendered=${rendered.length}`)
@@ -698,9 +710,17 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       setRenderedSales(rendered)
       
       // List store update with sequence tracking
-      listStoreSeqRef.current += 1
-      if (DEBUG) {
-        console.log(`[LIST] apply visible count=${inView.length} seq=${listStoreSeqRef.current}`)
+      const currentIdsHash = inView.map(s => s.id).sort().join(',')
+      const idsChanged = prevVisibleIdsHashRef.current !== currentIdsHash
+      
+      if (idsChanged) {
+        listStoreSeqRef.current += 1
+        prevVisibleIdsHashRef.current = currentIdsHash
+      }
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[LIST][DIFF] seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}... prevSeq=${listStoreSeqRef.current - 1} changed=${idsChanged}`)
+        console.log(`[LIST] apply visible count=${inView.length} seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}...`)
       }
       
       console.log(`[LIST] update (filters) seq=${seq} inView=${inView.length} rendered=${rendered.length}`)
@@ -714,7 +734,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Check for sales list container with both possible selectors
     const listContainer = document.querySelector('[data-debug="sales-list"]') || document.querySelector('[data-panel="list"]')
     if (!listContainer) {
-      if (DEBUG) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[DOM][LIST] MISSING container (BUG)')
       }
       console.error('[DOM] no [data-debug="sales-list"] or [data-panel="list"] found - sales list container missing')
@@ -723,7 +743,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     
     // Use descendant query for structure-proof counting
     const cardsInPanel = listContainer.querySelectorAll('[data-card="sale"]').length
-    if (DEBUG) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[DOM][LIST] cards in panel=${cardsInPanel} expected=${visiblePinIdsState.length}`)
     }
     console.log('[DOM] nodes in panel =', cardsInPanel, ' expected =', visiblePinIdsState.length)
@@ -1175,8 +1195,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       params.set('distanceKm', distanceKm)
       if (filters.categories.length > 0) {
         params.set('categories', filters.categories.join(','))
-        if (DEBUG) {
-          console.log(`[NET][markers] query cats=${filters.categories.join(',')}`)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[NET][markers] cats=${filters.categories.join(',')} url=${url.toString().split('?')[0]}`)
         }
       }
       if (dateFrom) params.set('from', dateFrom)

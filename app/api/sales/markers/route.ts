@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     
     const limitParam = q.get('limit')
     // Accept both canonical 'categories' and legacy 'cat' parameters
-    const catsParam = q.get('categories') || q.get('cat') || ''
+    const catsParam = q.get('categories') || q.get('cat') || q.get('cats') || ''
 
     // Validate lat/lng
     const originLat = latParam !== null ? parseFloat(latParam) : NaN
@@ -37,24 +37,14 @@ export async function GET(request: NextRequest) {
     const limit = Number.isFinite(parseFloat(String(limitParam))) ? Math.min(parseInt(String(limitParam), 10), 1000) : 1000
     // Canonical parameter parsing - normalize to sorted, deduplicated array
     const categories = normalizeCategories(catsParam)
+    const catsCsv = categories.join(',')
     
     // Apply UI→DB mapping
     const dbCategories = toDbSet(categories)
 
     // Debug server-side category processing
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[FILTER DEBUG] Server received categories:', categories)
-      console.log('[FILTER DEBUG] catsParam =', catsParam)
-      console.log('[FILTER DEBUG] normalized categories:', categories)
-      console.log('[FILTER DEBUG] db mapped categories:', dbCategories)
-      console.log('[FILTER DEBUG] categories param source:', q.get('categories') ? 'categories' : q.get('cat') ? 'cat (legacy)' : 'none')
-      console.log('[FILTER DEBUG] relationUsed = public.items_v2')
-      console.log('[FILTER DEBUG] predicateChosen = = ANY')
-    }
-    
-    // Debug markers query categories (server-side)
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log(`[API][markers] cats received=${categories.join(',')} whereClause=category IN (${dbCategories.join(',')})`)
+      console.log(`[API][markers] cats received=${catsParam} norm=${catsCsv}`)
     }
 
     const sb = createSupabaseServerClient()
@@ -86,6 +76,7 @@ export async function GET(request: NextRequest) {
       }
       
       // Use a subquery approach to find sales that have items matching the categories
+      // Since category is a computed text column, use exact matching
       const { data: salesWithCategories, error: categoryError } = await sb
         .from('items_v2')
         .select('sale_id')
@@ -105,8 +96,7 @@ export async function GET(request: NextRequest) {
       
       // Debug server-side category filtering results
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[FILTER DEBUG] Server found saleIds:', saleIds.length, 'for categories:', dbCategories)
-        console.log('[FILTER DEBUG] sqlParamsPreview =', dbCategories)
+        console.log(`[API][markers] where=in count=${saleIds.length}`)
       }
       
       if (saleIds.length > 0) {

@@ -66,6 +66,7 @@ Conflict reconciled on 2025-10-13 — stabilization content retained; recent mai
 - **Migration Verification**: Database schema validation on SQL changes
 - **Build Process**: Next.js build with proper environment variables
 - **Status**: Foundation ready, awaiting Owner secrets configuration
+- **CI Failure Map**: `ci-failure-map` workflow auto-posts the first failing lines per job after `ci` completes, or can be run manually (Actions → ci-failure-map → Run). Use it to target the next fix quickly.
 
 ### CI Status
 - **Single workflow**: Only `ci` workflow is active

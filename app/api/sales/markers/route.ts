@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
     const categories = normalizeCategories(catsParam)
     const catsCsv = categories.join(',')
     
-    // Apply UI→DB mapping
-    const dbCategories = toDbSet(categories)
+    // Use categories directly since they match the computed column values
+    const dbCategories = categories
 
     // Debug server-side category processing
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

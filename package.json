@@ -70,7 +70,7 @@
     "@typescript-eslint/parser": "^7.0.0",
     "eslint-plugin-react": "^7.33.0",
     "eslint-plugin-vitest": "^0.2.0",
-    "@testing-library/eslint-plugin": "^6.0.0",
+    "eslint-plugin-testing-library": "^6.0.0",
     "prettier": "^3.3.3",
     "vitest": "^2.0.5",
     "@vitejs/plugin-react": "^4.3.1",

@@ -2,17 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/auth-profile
-- **Latest commit:** 9253c8d — Docs: add comprehensive category filter implementation summary
+- **Latest commit:** 8752cbd — DB: add working category filter migration and diagnostic scripts (by Yard Sale Tracker on 2025-10-12 21:37:14 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18451805319
-
-## 1.1. Phase 0: Filters Regression Fix
-- **Status:** ✅ **COMPLETED** - Category filter regression resolved
-- **Database Migration:** Applied `035_fix_items_v2_category.sql` to expose category column
-- **Parameter Parsing:** Canonical CSV format with server-side normalization
-- **Authority Logic:** MAP authority suppresses list only when markers include identical filters
-- **Tests:** Comprehensive unit and integration tests added
-- **Debug Logging:** Temporary debug logs added (to be removed before merge)
+- **CI status:** running, last run: run 18452700266
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -57,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-13T00:35:01.758Z
+Updated automatically by Cursor on 2025-10-13T01:39:42.232Z

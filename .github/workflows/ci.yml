@@ -7,13 +7,29 @@ on:
     branches: ['**']
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    outputs:
+      has_pr: ${{ steps.check.outputs.has_pr }}
+    steps:
+      - name: Check if SHA belongs to an open PR
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: prs } = await github.rest.pulls.list({ owner: context.repo.owner, repo: context.repo.repo, state: 'open', head: undefined, per_page: 100 })
+            const has = prs.some(pr => pr.head && pr.head.sha === context.sha)
+            core.setOutput('has_pr', has ? 'true' : 'false')
   env-presence:
     name: env-presence
     runs-on: ubuntu-latest
+    needs: gate
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && needs.gate.outputs.has_pr == 'false') }}
     steps:
       - name: Check required environment variables
         run: |
@@ -31,6 +47,8 @@ jobs:
   lint:
     name: lint
     runs-on: ubuntu-latest
+    needs: gate
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && needs.gate.outputs.has_pr == 'false') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -50,6 +68,8 @@ jobs:
   typecheck:
     name: typecheck
     runs-on: ubuntu-latest
+    needs: gate
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && needs.gate.outputs.has_pr == 'false') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -69,6 +89,8 @@ jobs:
   test-unit:
     name: test-unit
     runs-on: ubuntu-latest
+    needs: gate
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && needs.gate.outputs.has_pr == 'false') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -102,6 +124,8 @@ jobs:
   test-integration:
     name: test-integration
     runs-on: ubuntu-latest
+    needs: gate
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && needs.gate.outputs.has_pr == 'false') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -126,6 +150,8 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
+    needs: gate
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && needs.gate.outputs.has_pr == 'false') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -161,7 +187,8 @@ jobs:
   css-scan:
     name: css-scan
     runs-on: ubuntu-latest
-    needs: build
+    needs: [gate, build]
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && needs.gate.outputs.has_pr == 'false') }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -186,6 +213,8 @@ jobs:
   migration-verify:
     name: migration-verify
     runs-on: ubuntu-latest
+    needs: gate
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && needs.gate.outputs.has_pr == 'false') }}
     if: contains(github.event.head_commit.modified, '**/*.sql') || contains(github.event.head_commit.added, '**/*.sql')
     steps:
       - name: Checkout repository

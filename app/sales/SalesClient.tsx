@@ -645,20 +645,26 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       
       const haveInDict = ids.filter(id => !!mapMarkers.find(m => String(m.id) === String(id))).length
       const missing = ids.filter(id => !mapMarkers.find(m => String(m.id) === String(id))).slice(0, 3)
-      console.log(`[LIST][MAP] seq=${seq} ids.count=${ids.length} sample=${ids.slice(0,3)} haveInDict=${haveInDict} missing=${missing}`)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[LIST][MAP] seq=${seq} ids.count=${ids.length} sample=${ids.slice(0,3)} haveInDict=${haveInDict} missing=${missing}`)
+      }
 
       // If we have no visible pins, that's fine - just return empty
       if (ids.length === 0) {
         setVisibleSales([])
         setRenderedSales([])
-        console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=0 rendered=0`)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=0 rendered=0`)
+        }
         return
       }
 
       // If visible pins don't match current markers, let the map recalculate naturally
       // Don't clear visible pins here as it prevents the map from recalculating them
       if (haveInDict === 0) {
-        console.log(`[LIST][MAP] visible pins don't match current markers - waiting for map to recalculate`)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[LIST][MAP] visible pins don't match current markers - waiting for map to recalculate`)
+        }
         setVisibleSales([])
         setRenderedSales([])
         return
@@ -704,7 +710,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         console.log(`[LIST] apply visible count=${hydrated.length} seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}...`)
       }
       
-      console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=${hydrated.length} rendered=${rendered.length}`)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=${hydrated.length} rendered=${rendered.length}`)
+      }
     } else if (viewportBounds) {
       const inView = cropSalesToViewport(sales, viewportBounds)
       const rendered = inView.slice(0, 24)
@@ -725,7 +733,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         console.log(`[LIST] apply visible count=${inView.length} seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}...`)
       }
       
-      console.log(`[LIST] update (filters) seq=${seq} inView=${inView.length} rendered=${rendered.length}`)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[LIST] update (filters) seq=${seq} inView=${inView.length} rendered=${rendered.length}`)
+      }
     }
   }, [arbiter.authority, visiblePinIdsState, mapMarkers, sales, viewportBounds, cropSalesToViewport])
 
@@ -733,12 +743,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   useEffect(() => {
     if (arbiter.authority !== 'MAP') return
     
-    // Check for sales list container with both possible selectors
-    const listContainer = document.querySelector('[data-debug="sales-list"]') || document.querySelector('[data-panel="list"]')
+    // Check for sales list container - use the actual panel selector
+    const listContainer = document.querySelector('[data-panel="list"]')
     if (!listContainer) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[DOM][LIST] MISSING container (BUG)')
-        console.error('[DOM] no [data-debug="sales-list"] or [data-panel="list"] found - sales list container missing')
+        console.error('[DOM] no [data-panel="list"] found - sales list container missing')
       }
       return
     }
@@ -2052,11 +2062,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                           {visibleSales.length > 24 && (
                             <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
                           )}
-                          {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => (
-                            (console.log('[DOM] list item rendered id=', item.id),
-                              <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
-                            )
-                          ))}
+                          {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => {
+                            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                              console.log('[DOM] list item rendered id=', item.id)
+                            }
+                            return <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                          })}
                         </>
                       )}
                     </>
@@ -2163,7 +2174,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onMapReady={onMapReady}
                   onVisiblePinsChange={(visibleIds, count) => {
                     const seq = viewportSeqRef.current
-                    console.log(`[LIST] visible pins seq=${seq} count=${count} ids=[${visibleIds.join(',')}]`)
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log(`[LIST] visible pins seq=${seq} count=${count} ids=[${visibleIds.join(',')}]`)
+                    }
                     
                     // Circuit breaker: only update if visible pins actually changed
                     const newVisibleIds = visibleIds.map(String)

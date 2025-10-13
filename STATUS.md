@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/auth-profile
-- **Latest commit:** ca83f56 — Merge branch 'milestone/auth-profile' of https://github.com/lanternetwork/LootAura into milestone/auth-profile (by Yard Sale Tracker on 2025-10-12 17:57:33 -0400)
+- **Latest commit:** b9bc568 — Complete category filter fixes with comprehensive documentation (by Yard Sale Tracker on 2025-10-12 20:22:14 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18450014644
+- **CI status:** running, last run: run 18451805319
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -49,4 +49,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-12T21:58:12.862Z
+Updated automatically by Cursor on 2025-10-13T00:35:01.758Z

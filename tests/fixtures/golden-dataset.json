@@ -1,0 +1,87 @@
+{
+  "sales": [
+    {
+      "id": "sale-001",
+      "title": "Vintage Tools Collection",
+      "description": "Old hand tools and workshop equipment",
+      "category": "tools",
+      "price": 25.00,
+      "lat": 38.2527,
+      "lng": -85.7585,
+      "city": "Louisville",
+      "date_start": "2025-10-15",
+      "date_end": "2025-10-15"
+    },
+    {
+      "id": "sale-002", 
+      "title": "Antique Furniture Set",
+      "description": "Victorian era dining room set",
+      "category": "furniture",
+      "price": 500.00,
+      "lat": 38.2527,
+      "lng": -85.7585,
+      "city": "Louisville",
+      "date_start": "2025-10-16",
+      "date_end": "2025-10-16"
+    },
+    {
+      "id": "sale-003",
+      "title": "Children's Toys",
+      "description": "Gently used toys and games",
+      "category": "toys",
+      "price": 15.00,
+      "lat": 38.2527,
+      "lng": -85.7585,
+      "city": "Louisville", 
+      "date_start": "2025-10-17",
+      "date_end": "2025-10-17"
+    },
+    {
+      "id": "sale-004",
+      "title": "Tools and Furniture Mix",
+      "description": "Workshop tools and small furniture pieces",
+      "category": "tools",
+      "price": 75.00,
+      "lat": 38.2527,
+      "lng": -85.7585,
+      "city": "Louisville",
+      "date_start": "2025-10-18",
+      "date_end": "2025-10-18"
+    },
+    {
+      "id": "sale-005",
+      "title": "Electronics and Toys",
+      "description": "Old electronics and children's toys",
+      "category": "toys",
+      "price": 30.00,
+      "lat": 38.2527,
+      "lng": -85.7585,
+      "city": "Louisville",
+      "date_start": "2025-10-19",
+      "date_end": "2025-10-19"
+    }
+  ],
+  "categories": ["tools", "furniture", "toys"],
+  "testScenarios": {
+    "singleCategory": {
+      "input": "tools",
+      "expectedCount": 2,
+      "expectedIds": ["sale-001", "sale-004"]
+    },
+    "multiCategory": {
+      "input": ["tools", "furniture"],
+      "expectedCount": 3,
+      "expectedIds": ["sale-001", "sale-002", "sale-004"]
+    },
+    "overlapCase": {
+      "input": ["tools", "toys"],
+      "expectedCount": 4,
+      "expectedIds": ["sale-001", "sale-003", "sale-004", "sale-005"]
+    },
+    "noResults": {
+      "input": "electronics",
+      "expectedCount": 0,
+      "expectedIds": []
+    }
+  }
+}

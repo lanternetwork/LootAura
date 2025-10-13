@@ -83,15 +83,40 @@
 - ✅ **CI Gates**: Test-driven gates implemented
 - ✅ **Owner Acceptance Protocol**: Manual validation procedures defined
 
-## 11. Next Milestone
+## 11. Environment Drift Verification
+
+### Schema Verification
+```bash
+# Run schema and environment verification
+node scripts/verify-schema-env.js
+
+# Expected output:
+# ✅ All required environment variables present
+# ✅ Database connection successful  
+# ✅ items_v2 view found (type: VIEW)
+# ✅ Found category column (single type, text)
+# ✅ Found btree index for category column
+# ✅ Found RLS policies for items_v2
+# ✅ Data access successful (N rows accessible)
+```
+
+### Environment Configuration
+- **Supabase URL**: Masked for security
+- **Debug Mode**: `NEXT_PUBLIC_DEBUG` flag status
+- **Required Variables**: All present and configured
+- **Database Access**: Connection and query successful
+
+### Migration Status
+- **Current Schema**: `lootaura_v2` with computed category columns
+- **Public Views**: `public.items_v2` with category computation
+- **Indexes**: Appropriate index type for category column
+- **RLS**: Strict policies active and verified
+
+## 12. Next Milestone
 - **Stabilization Sprint**: 4-week enterprise development cycle
 - **CI/CD Enhancement**: Advanced testing and deployment gates
 - **Performance Optimization**: Database tuning and query optimization
 - **Security Hardening**: Advanced threat protection and monitoring
-=======
-## 8. Next Milestone
-- Bulk generator + clustering polish
->>>>>>> f6ce9cd59ee3a648fdeca84b03e6506205fcd415
 
 ---
 Updated automatically by Cursor on 2025-10-13T04:11:34.671Z

@@ -21,6 +21,9 @@ LootAura follows strict architectural invariants to prevent regressions:
 - **Parameter Canonicalization**: `categories` parameter with legacy `cat` support
 - **Single Source**: Both markers and list read from `public.items_v2`
 - **DOM Structure**: List container with direct children, no intermediate wrappers
+- **Suppression Equality**: Under MAP authority, suppress only if markers include identical normalized filter set
+- **Debug Discipline**: Single `NEXT_PUBLIC_DEBUG` flag, no PII in logs
+- **ID Parity**: Marker IDs must be discoverable in list after updates
 
 See [docs/INVARIANTS.md](docs/INVARIANTS.md) for complete protocol contracts.
 

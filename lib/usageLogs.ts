@@ -16,7 +16,7 @@ declare global {
 }
 
 function getFlagEnabled(): boolean {
-  const raw = process.env.NEXT_PUBLIC_ENABLE_USAGE_LOGS ?? process.env.ENABLE_USAGE_LOGS
+  const raw = process.env.NEXT_PUBLIC_DEBUG
   if (!raw) return false
   const v = String(raw).toLowerCase().trim()
   return v === '1' || v === 'true' || v === 'yes' || v === 'on'

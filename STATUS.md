@@ -59,6 +59,8 @@ Conflict reconciled on 2025-10-13 — stabilization content retained; recent mai
 ### CI Stabilization: Red→Green
 - **ESLint Configuration**: Added comprehensive rules for TypeScript, React, testing
 - **Test Harness**: Added global DOM shims, fetch mocking, network isolation
+- **Harness Parse Fixes**: DOMRect.fromRect, JSX-free setup.ts, JSX tests renamed to .tsx
+- **Env-aware Lint**: Browser/Node overrides; legacy folder ignored
 - **Environment Handling**: Public envs only, no service role in CI
 - **CSS Validation**: Tailwind grid token scanner for responsive layouts
 - **Migration Verification**: Database schema validation on SQL changes

@@ -27,6 +27,9 @@ export default [
       'testing-library': testingLibrary,
       'vitest': vitest,
     },
+    env: {
+      browser: true,
+    },
     rules: {
       // TypeScript rules
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
@@ -50,6 +53,33 @@ export default [
       
       // Import rules
       'no-duplicate-imports': 'error',
+    },
+  },
+  // Server-side routes (Node env)
+  {
+    files: ['app/**/route.ts', 'app/**/route.tsx', 'app/api/**/*.ts', 'app/api/**/*.tsx'],
+    env: { node: true },
+    languageOptions: {
+      globals: {
+        URL: 'readonly',
+        Response: 'readonly',
+        fetch: 'readonly',
+        process: 'readonly',
+      },
+    },
+  },
+  // Tests (browser env)
+  {
+    files: ['tests/**/*.{ts,tsx}'],
+    env: { browser: true },
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        performance: 'readonly',
+        fetch: 'readonly',
+      },
     },
   },
   {
@@ -76,6 +106,7 @@ export default [
       '*.config.js',
       '*.config.ts',
       'supabase/functions/**',
+      'app-property-pulse/**',
     ],
   },
 ]

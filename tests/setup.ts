@@ -1,4 +1,5 @@
 import { expect, afterEach, beforeAll, afterAll, vi } from 'vitest'
+import * as React from 'react'
 import { cleanup } from '@testing-library/react'
 import * as matchers from '@testing-library/jest-dom/matchers'
 import { setupServer } from 'msw/node'
@@ -109,17 +110,26 @@ global.matchMedia = vi.fn().mockImplementation((query) => ({
   dispatchEvent: vi.fn(),
 }))
 
-// Mock DOMRect
-global.DOMRect = vi.fn().mockImplementation(() => ({
-  x: 0,
-  y: 0,
-  width: 0,
-  height: 0,
-  top: 0,
-  right: 0,
-  bottom: 0,
-  left: 0,
-}))
+// Mock DOMRect with fromRect
+const DOMRectMock = function (this: any, x = 0, y = 0, width = 0, height = 0) {
+  this.x = x
+  this.y = y
+  this.width = width
+  this.height = height
+  this.top = y
+  this.left = x
+  this.right = x + width
+  this.bottom = y + height
+  this.toJSON = () => ({ x, y, width, height, top: y, left: x, right: x + width, bottom: y + height })
+} as unknown as typeof DOMRect
+;(DOMRectMock as any).fromRect = (other?: DOMRectInit) => new (DOMRectMock as any)(
+  other?.x ?? 0,
+  other?.y ?? 0,
+  other?.width ?? 0,
+  other?.height ?? 0,
+)
+// @ts-expect-error override global
+global.DOMRect = DOMRectMock
 
 // Mock TextEncoder/TextDecoder
 global.TextEncoder = TextEncoder
@@ -130,10 +140,9 @@ global.fetch = vi.fn().mockImplementation(() => {
   throw new Error('fetch() called in test - use MSW or mock explicitly')
 })
 
-// Mock next/image
+// Mock next/image without JSX to keep this file .ts
 vi.mock('next/image', () => ({
   default: ({ src, alt, ...props }: any) => {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} {...props} />
+    return React.createElement('img', { src, alt, ...props })
   },
 }))

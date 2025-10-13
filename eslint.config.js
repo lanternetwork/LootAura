@@ -80,6 +80,10 @@ export default [
         // React
         React: 'readonly',
         console: 'readonly',
+        // Additional missing globals
+        jest: 'readonly',
+        FileList: 'readonly',
+        getDbMapping: 'readonly',
       },
     },
     plugins: {
@@ -91,7 +95,11 @@ export default [
     },
     rules: {
       // TypeScript rules
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['error', { 
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_'
+      }],
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
@@ -110,6 +118,8 @@ export default [
       'prefer-const': 'error',
       'no-var': 'error',
       'no-empty': 'warn', // Allow empty blocks but warn
+      'no-useless-escape': 'error',
+      'no-unexpected-multiline': 'error',
       
       // Import rules
       'no-duplicate-imports': 'error',
@@ -166,13 +176,6 @@ export default [
       'testing-library/no-wait-for-side-effects': 'off', // Allow side effects in waitFor
       'vitest/expect-expect': 'off', // Allow tests without expect
       'vitest/prefer-to-be': 'off', // Allow toBeNull instead of toBeNull
-    },
-  },
-  {
-    files: ['**/*.test.{js,jsx,ts,tsx}'],
-    rules: {
-      ...testingLibrary.configs.react.rules,
-      ...vitest.configs.recommended.rules,
     },
   },
   // Development and script files

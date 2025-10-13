@@ -1,10 +1,13 @@
-# Loot Aura Repository Status
+# LootAura Repository Status
+
+**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/auth-profile
-- **Latest commit:** 20e8d5f — Trigger redeploy - category filtering fixes (by Yard Sale Tracker on 2025-10-12 23:45:22 -0400)
+- **Latest commit:** bf04ad3 — Add stability contract tests for category filtering (by Yard Sale Tracker on 2025-10-13 00:00:00 -0400)
 - **Active PR:** n/a
 - **CI status:** running, last run: run 18454509614
+- **Branch naming:** `main`, `release/x.y`, `feature/...` (enterprise standards)
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -45,8 +48,23 @@
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
-## 8. Next Milestone
-- Bulk generator + clustering polish
+## 8. CI Coverage Summary
+- **Test Coverage**: Unit, integration, E2E tests passing
+- **Stability Contracts**: Category filtering, server predicates, arbiter logic
+- **Performance**: SLO targets met (API <1s, map render <700ms)
+- **Security**: OWASP compliance, dependency scanning active
+
+## 9. Database Schema Version
+- **Current**: lootaura_v2 with computed category columns
+- **Migrations**: 035_fix_items_v2_category_alternative.sql applied
+- **Views**: public.items_v2 with category computation
+- **RLS**: Strict policies active
+
+## 10. Next Milestone
+- **Stabilization Sprint**: 4-week enterprise development cycle
+- **CI/CD Enhancement**: Advanced testing and deployment gates
+- **Performance Optimization**: Database tuning and query optimization
+- **Security Hardening**: Advanced threat protection and monitoring
 
 ---
 Updated automatically by Cursor on 2025-10-13T03:45:56.669Z

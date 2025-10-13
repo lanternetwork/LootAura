@@ -1,6 +1,14 @@
-# YardSaleFinder - Launch Checklist
+# LootAura - Launch Checklist
+
+**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
 
 ## Pre-Launch Checklist
+
+### Enterprise Criteria
+- [ ] **Stability Contracts**: All passing (filters, map suppression, ANY-OF predicate)
+- [ ] **Performance Targets**: API <1s, map render <700ms
+- [ ] **Canary SLO Verification**: 5% traffic test successful
+- [ ] **CI Smoke Test**: Required before production promotion
 
 ### Product Readiness
 - [ ] **Core Features**: All user flows work end-to-end
@@ -235,6 +243,20 @@
 - [ ] **Performance**: Check performance
 - [ ] **Celebrate**: Team celebration!
 
+## Rollback & Communication Protocol
+
+### Rollback Triggers
+- [ ] **Critical Errors**: >5% error rate
+- [ ] **Security Issues**: Any security vulnerabilities detected
+- [ ] **Performance**: Page load >10 seconds
+- [ ] **Data Loss**: Any data corruption or loss
+
+### Communication Protocol
+1. **Immediate Response**: Acknowledge issue within 15 minutes
+2. **Status Updates**: Every 30 minutes until resolved
+3. **User Notification**: If rollback affects users, notify within 1 hour
+4. **Post-Incident**: Root cause analysis within 48 hours
+
 ## Emergency Contacts
 
 ### Technical Issues
@@ -254,4 +276,4 @@
 **Technical Lead**: [To be assigned]
 **Support Team**: [To be assigned]
 
-This checklist ensures a comprehensive and successful launch of YardSaleFinder with minimal risk and maximum user satisfaction.
+This checklist ensures a comprehensive and successful launch of LootAura with minimal risk and maximum user satisfaction.

@@ -1,7 +1,16 @@
-# YardSaleTracker
-Yard Sale Tracker
+# LootAura
 
-A modern web application for discovering and managing yard sales, garage sales, and estate sales in your area.
+**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
+
+A modern web application for discovering and managing yard sales, garage sales, and estate sales in your area. Built with enterprise-grade architecture featuring map-centric source of truth, arbiter logic, Supabase backend, and Mapbox integration.
+
+## 📋 Quick Start
+
+- **Architecture Overview**: See [docs/operating-handbook.md](docs/operating-handbook.md) for comprehensive development standards
+- **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
+- **Deployment**: See [DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md) for production deployment
+- **Launch**: See [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) for launch validation
+- **Roadmap**: See [ROADMAP.md](ROADMAP.md) for development milestones
 
 ## Features
 
@@ -30,9 +39,13 @@ A modern web application for discovering and managing yard sales, garage sales, 
 
 ## Debugging
 
+### Enterprise Debug Policy
+
+**Important**: `NEXT_PUBLIC_DEBUG` is the only runtime debug flag. All debug features are gated behind this environment variable to prevent production leaks.
+
 ### Diagnostic Overlay
 
-When `NEXT_PUBLIC_DEBUG=1` is set, a diagnostic overlay appears in the bottom-right corner showing:
+When `NEXT_PUBLIC_DEBUG=true` is set, a diagnostic overlay appears showing:
 
 - **Last 10 fetch events** with endpoint, query parameters, authority, and timing
 - **Viewport/Request sequences** to verify proper sequencing behavior
@@ -51,10 +64,10 @@ The overlay helps verify:
 
 ```bash
 # Set environment variable
-NEXT_PUBLIC_DEBUG=1
+NEXT_PUBLIC_DEBUG=true
 
 # Or in Vercel dashboard
-# Environment Variables → Add → NEXT_PUBLIC_DEBUG = 1
+# Environment Variables → Add → NEXT_PUBLIC_DEBUG = true
 ```
 
 ## ZIP Codes (Full US) — Free Lookups

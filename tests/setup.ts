@@ -150,7 +150,8 @@ const DOMRectMock = function (this: any, x = 0, y = 0, width = 0, height = 0) {
   other?.width ?? 0,
   other?.height ?? 0,
 )
-// @ts-expect-error override global
+// Allow overriding global for tests
+// @ts-ignore
 global.DOMRect = DOMRectMock
 
 // Mock TextEncoder/TextDecoder

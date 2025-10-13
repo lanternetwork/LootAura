@@ -55,23 +55,22 @@ export default [
       'no-duplicate-imports': 'error',
     },
   },
-  // Server-side routes (Node env)
+  // Server-side routes (Node globals)
   {
     files: ['app/**/route.ts', 'app/**/route.tsx', 'app/api/**/*.ts', 'app/api/**/*.tsx'],
-    env: { node: true },
     languageOptions: {
       globals: {
         URL: 'readonly',
         Response: 'readonly',
         fetch: 'readonly',
         process: 'readonly',
+        console: 'readonly',
       },
     },
   },
-  // Tests (browser env)
+  // Tests (browser globals)
   {
     files: ['tests/**/*.{ts,tsx}'],
-    env: { browser: true },
     languageOptions: {
       globals: {
         window: 'readonly',
@@ -79,6 +78,7 @@ export default [
         navigator: 'readonly',
         performance: 'readonly',
         fetch: 'readonly',
+        console: 'readonly',
       },
     },
   },

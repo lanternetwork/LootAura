@@ -29,11 +29,10 @@ vi.mock('@/lib/hooks/useSales', () => ({
   })
 }))
 
-vi.mock('@/components/location/SalesMap', () => {
-  return function MockSalesMap() {
-    return <div data-testid="sales-map">Mock Map</div>
-  }
-})
+vi.mock('@/components/location/SalesMap', () => ({
+  __esModule: true,
+  default: () => <div data-testid="sales-map">Mock Map</div>,
+}))
 
 vi.mock('@/components/SaleCard', () => {
   return function MockSaleCard({ sale }: { sale: Sale }) {

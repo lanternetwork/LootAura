@@ -16,10 +16,22 @@ jobs:
     name: sync-lockfile
     runs-on: ubuntu-latest
     steps:
+      - name: Determine target ref
+        id: ref
+        run: |
+          if [ -n "${{ github.head_ref }}" ]; then
+            echo "TARGET_REF=${{ github.head_ref }}" >> $GITHUB_ENV
+          else
+            echo "TARGET_REF=${{ inputs.branch }}" >> $GITHUB_ENV
+          fi
+          echo "TARGET_REF=$TARGET_REF"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch }}
+          ref: ${{ env.TARGET_REF }}
+          persist-credentials: true
+          fetch-depth: 0
 
       - name: Setup Node.js 20.x
         uses: actions/setup-node@v4
@@ -31,6 +43,8 @@ jobs:
         run: |
           node --version
           npm --version
+          echo "Current branch: $(git rev-parse --abbrev-ref HEAD)"
+          echo "HEAD SHA: $(git rev-parse HEAD)"
 
       - name: Print key deps for verification
         run: |
@@ -40,6 +54,7 @@ jobs:
           node -e "const p=require('./package.json'); console.log('deps:', Object.keys(p.dependencies||{})); console.log('devDeps:', Object.keys(p.devDependencies||{}))"
           echo "--- testing-library plugin grep ---"
           grep -E '"eslint-plugin-testing-library"|@testing-library/eslint-plugin' -n package.json || true
+          node -e "const p=require('./package.json'); console.log({eslint:p.devDependencies?.eslint, eslintJs:p.devDependencies?.['@eslint/js'], tsESLint:p.devDependencies?.['@typescript-eslint/eslint-plugin'], parser:p.devDependencies?.['@typescript-eslint/parser'], testingLib:p.devDependencies?.['eslint-plugin-testing-library'], vitest:p.devDependencies?.['eslint-plugin-vitest']});"
 
       - name: Hard regenerate lockfile
         run: |
@@ -55,9 +70,9 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add package-lock.json package.json || true
-            git commit -m "ci: hard-regenerate package-lock.json"
-            git push origin HEAD:${{ inputs.branch }}
-            echo "✅ Lockfile changes pushed to ${{ inputs.branch }}"
+            git commit -m "ci: hard-regenerate package-lock.json (eslint stack normalized)"
+            git push origin HEAD:${{ env.TARGET_REF }}
+            echo "✅ Lockfile changes pushed to ${{ env.TARGET_REF }}"
           else
             echo "ℹ️  No changes to lockfile — verify package.json contains eslint-plugin-testing-library and not @testing-library/eslint-plugin"
           fi
@@ -65,4 +80,5 @@ jobs:
       - name: Reminder to re-run CI
         run: |
           echo "Now re-run CI (npm ci) from the PR Checks tab."
+          echo "PUSHED_TO=${{ env.TARGET_REF }}"
 

@@ -1299,7 +1299,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         setMapUpdating(false) // Reset map updating state
         
         // Update markers hash for change detection
-        const newMarkersHash = uniqueMarkers.map(m => m.id).sort().join(',')
+        const newMarkersHash = uniqueMarkers.map((m: any) => m.id).sort().join(',')
         const markersChanged = markersHashRef.current !== newMarkersHash
         markersHashRef.current = newMarkersHash
         

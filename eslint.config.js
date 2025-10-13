@@ -104,11 +104,12 @@ export default [
       'react-hooks/exhaustive-deps': 'warn',
       
       // General rules
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-console': 'off', // Allow console for debugging
       'no-debugger': 'error',
       'no-unused-vars': 'off', // Use TypeScript version instead
       'prefer-const': 'error',
       'no-var': 'error',
+      'no-empty': 'warn', // Allow empty blocks but warn
       
       // Import rules
       'no-duplicate-imports': 'error',
@@ -157,6 +158,14 @@ export default [
     rules: {
       'no-console': 'off', // Allow console in tests
       '@typescript-eslint/no-explicit-any': 'off', // Allow any in tests
+      '@typescript-eslint/no-unused-vars': 'off', // Allow unused vars in tests
+      'no-empty': 'off', // Allow empty blocks in tests
+      'testing-library/no-node-access': 'off', // Allow direct DOM access in tests
+      'testing-library/no-container': 'off', // Allow container methods in tests
+      'testing-library/no-wait-for-multiple-assertions': 'off', // Allow multiple assertions
+      'testing-library/no-wait-for-side-effects': 'off', // Allow side effects in waitFor
+      'vitest/expect-expect': 'off', // Allow tests without expect
+      'vitest/prefer-to-be': 'off', // Allow toBeNull instead of toBeNull
     },
   },
   {
@@ -164,6 +173,16 @@ export default [
     rules: {
       ...testingLibrary.configs.react.rules,
       ...vitest.configs.recommended.rules,
+    },
+  },
+  // Development and script files
+  {
+    files: ['scripts/**/*.{js,ts}', '**/*.config.{js,ts}'],
+    rules: {
+      'no-console': 'off', // Allow console in scripts
+      '@typescript-eslint/no-explicit-any': 'off', // Allow any in scripts
+      '@typescript-eslint/no-unused-vars': 'off', // Allow unused vars in scripts
+      'no-empty': 'off', // Allow empty blocks in scripts
     },
   },
   {

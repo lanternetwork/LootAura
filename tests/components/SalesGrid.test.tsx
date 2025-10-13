@@ -4,7 +4,7 @@ import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 import SalesGrid from '@/components/SalesGrid'
 import { Sale } from '@/lib/types'
-import { createSales } from '../_helpers/factories'
+import { makeSales } from '../_helpers/factories'
 
 // Mock SaleCard and SaleCardSkeleton to simplify tests
 vi.mock('@/components/SaleCard', () => ({
@@ -21,7 +21,7 @@ vi.mock('@/components/SaleCardSkeleton', () => ({
   }
 }))
 
-const mockSales = createSales(4, [
+const mockSales = makeSales(4, [
   { title: 'Sale 1', description: 'Desc 1' },
   { title: 'Sale 2', description: 'Desc 2' },
   { title: 'Sale 3', description: 'Desc 3' },

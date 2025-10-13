@@ -139,10 +139,10 @@ describe('Arbiter Decision Logic', () => {
     markersSatisfyPredicate: boolean
   ): { shouldSkipNetwork: boolean; shouldUpdateUI: boolean } {
     const categoriesChanged = createCategoriesKey(prevFilters.categories || []) !== createCategoriesKey(nextFilters.categories || [])
-    const filtersEqual = filtersEqual(prevFilters, nextFilters)
+    const filtersAreEqual = filtersEqual(prevFilters, nextFilters)
     
     const shouldSkipNetwork = mapAuthority && markersSatisfyPredicate && !categoriesChanged
-    const shouldUpdateUI = categoriesChanged || !filtersEqual
+    const shouldUpdateUI = categoriesChanged || !filtersAreEqual
     
     return { shouldSkipNetwork, shouldUpdateUI }
   }

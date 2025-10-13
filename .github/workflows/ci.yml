@@ -228,8 +228,9 @@ jobs:
         with:
           script: |
             const ctx = github.context
-            const branch = ctx.ref.replace('refs/heads/', '')
-            const prNumber = ctx.event.pull_request?.number || ''
+            const ref = ctx.ref || ctx.payload?.workflow_run?.head_branch || ctx.payload?.pull_request?.head?.ref || ''
+            const branch = ref.replace('refs/heads/', '')
+            const prNumber = ctx.payload?.pull_request?.number || ''
             
             await github.rest.repos.createDispatchEvent({
               owner: ctx.repo.owner,

@@ -19,15 +19,6 @@ export default [
           jsx: true,
         },
       },
-    },
-    plugins: {
-      '@typescript-eslint': typescript,
-      'react': react,
-      'react-hooks': reactHooks,
-      'testing-library': testingLibrary,
-      'vitest': vitest,
-    },
-    languageOptions: {
       globals: {
         window: 'readonly',
         document: 'readonly',
@@ -36,6 +27,13 @@ export default [
         fetch: 'readonly',
         console: 'readonly',
       },
+    },
+    plugins: {
+      '@typescript-eslint': typescript,
+      'react': react,
+      'react-hooks': reactHooks,
+      'testing-library': testingLibrary,
+      'vitest': vitest,
     },
     rules: {
       // TypeScript rules
@@ -114,6 +112,11 @@ export default [
       '*.config.ts',
       'supabase/functions/**',
       'app-property-pulse/**',
+      'components-property-pulse/**',
+      'config-property-pulse/**',
+      'context-property-pulse/**',
+      '**/.eslintrc.*',
+      'public/sw.js',
     ],
   },
 ]

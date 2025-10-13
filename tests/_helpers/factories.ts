@@ -4,7 +4,7 @@ import { Sale } from '@/lib/types'
  * Factory function to create Sale objects for testing
  * Provides sensible defaults and allows overriding specific fields
  */
-export function createSale(overrides: Partial<Sale> = {}): Sale {
+export function makeSale(overrides: Partial<Sale> = {}): Sale {
   const now = new Date().toISOString()
   const id = Math.random().toString(36).substring(2, 15)
   
@@ -37,9 +37,9 @@ export function createSale(overrides: Partial<Sale> = {}): Sale {
 /**
  * Create multiple Sale objects with different properties
  */
-export function createSales(count: number, overrides: Partial<Sale>[] = []): Sale[] {
+export function makeSales(count: number, overrides: Partial<Sale>[] = []): Sale[] {
   return Array.from({ length: count }, (_, i) => 
-    createSale({
+    makeSale({
       id: `sale-${i + 1}`,
       title: `Sale ${i + 1}`,
       description: `Description ${i + 1}`,

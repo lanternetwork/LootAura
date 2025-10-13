@@ -3,7 +3,7 @@ import { render } from '@testing-library/react'
 import { vi } from 'vitest'
 import SalesClient from '@/app/sales/SalesClient'
 import { Sale } from '@/lib/types'
-import { createSales } from '../_helpers/factories'
+import { makeSales } from '../_helpers/factories'
 
 // Mock dependencies
 vi.mock('@/lib/hooks/useFilters', () => ({
@@ -34,7 +34,7 @@ vi.mock('@/components/SaleCard', () => ({
   }
 }))
 
-const mockSales = createSales(3, [
+const mockSales = makeSales(3, [
   { title: 'Sale 1', description: 'Desc 1' },
   { title: 'Sale 2', description: 'Desc 2' },
   { title: 'Sale 3', description: 'Desc 3' }

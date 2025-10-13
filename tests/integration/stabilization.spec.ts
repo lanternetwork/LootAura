@@ -75,7 +75,7 @@ describe('Stabilization Integration Tests', () => {
       expect(shouldSuppress).toBe(true)
     })
 
-    it('should not suppress under FILTER authority', () => {
+    it('should not suppress under FILTERS authority', () => {
       const equalFilters = true
       const authority = 'FILTERS'
       const shouldSuppress = equalFilters && authority === 'MAP'

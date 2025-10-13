@@ -34,6 +34,12 @@ export async function GET(request: NextRequest) {
     const limit = Number.isFinite(parseFloat(String(limitParam))) ? Math.min(parseInt(String(limitParam), 10), 1000) : 1000
     const categories = catsParam ? catsParam.split(',').map(s => s.trim()).filter(Boolean) : []
 
+    // Debug server-side category processing
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[FILTER DEBUG] Server received categories:', categories)
+      console.log('[FILTER DEBUG] catsParam =', catsParam)
+    }
+
     const sb = createSupabaseServerClient()
 
     // Build query with category filtering if categories are provided
@@ -63,6 +69,11 @@ export async function GET(request: NextRequest) {
       
       const saleIds = salesWithCategories?.map(item => item.sale_id) || []
       console.log('[MARKERS API] Found sales with matching categories:', saleIds.length)
+      
+      // Debug server-side category filtering results
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] Server found saleIds:', saleIds.length, 'for categories:', categories)
+      }
       
       if (saleIds.length > 0) {
         query = query.in('id', saleIds)

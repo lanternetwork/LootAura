@@ -841,6 +841,23 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       limit: 24,
       offset: append ? sales.length : 0,
     }
+    
+    // Debug list payload
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const listPayload = {
+        lat: useLat,
+        lng: useLng,
+        distanceKm: distanceKmForRequest ?? milesToKm(filters.distance),
+        city: filters.city,
+        categories: filters.categories.length > 0 ? filters.categories : undefined,
+        dateFrom,
+        dateTo,
+        limit: 24,
+        offset: append ? sales.length : 0
+      }
+      console.log('[FILTER DEBUG] listPayload =', listPayload)
+    }
+    
     console.log('[SALES] fetch params:', { ...params, mode })
     console.debug('[SALES] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
 
@@ -899,6 +916,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[NET] ok sales', { seq, mode: arbiter.authority, viewportSeq: viewportSeqRef.current })
       console.log(`[SALES] API response:`, data)
       console.debug('[SALES] results', data.data?.length || 0)
+      
+      // Debug response count
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] response.count =', data.count || data.data?.length || 0)
+      }
       
       if (data.ok) {
         const newSales = data.data || []
@@ -1038,6 +1060,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     
     try {
       console.log('[MAP] fetchMapSales called with filters:', filters, 'centerOverride:', centerOverride)
+      
+      // Debug category filter flow
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] selectedCategories =', filters.categories)
+        console.log('[FILTER DEBUG] arbiter.authority =', arbiter.authority)
+        console.log('[FILTER DEBUG] suppressed =', arbiter.authority === 'MAP' ? 'false (markers allowed)' : 'true (list suppressed)')
+      }
+      
       // Resolve dateRange preset to concrete dates
       console.log('[MAP] Resolving dateRange:', filters.dateRange)
       const resolvedDates = resolveDatePreset(filters.dateRange)
@@ -1065,6 +1095,20 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       if (dateFrom) params.set('from', dateFrom)
       if (dateTo) params.set('to', dateTo)
       params.set('limit', '1000')
+      
+      // Debug markers payload
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const markersPayload = {
+          lat: useLat,
+          lng: useLng,
+          distanceKm: distanceKm,
+          categories: filters.categories,
+          from: dateFrom,
+          to: dateTo,
+          limit: '1000'
+        }
+        console.log('[FILTER DEBUG] markersPayload =', markersPayload)
+      }
       
 
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`, { mode })
@@ -1107,6 +1151,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[NET] ok markers', { seq })
       console.log('[MAP] Markers response:', data)
       console.debug('[MARKERS] markers', data?.data ? data.data.length : 0)
+      
+      // Debug response count
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] response.count =', data.count || data.data?.length || 0)
+      }
       if (data?.ok && Array.isArray(data.data)) {
         // Normalize id to a stable value (prefer saleId if present), then deduplicate
         const normalized = data.data.map((m: any) => {

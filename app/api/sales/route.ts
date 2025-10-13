@@ -52,6 +52,12 @@ export async function GET(request: NextRequest) {
       ? categoriesParam.split(',').map(c => c.trim()).filter(c => c.length > 0).slice(0, 10)
       : []
     
+    // Debug server-side category processing
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[FILTER DEBUG] Server received categories:', categories)
+      console.log('[FILTER DEBUG] categoriesParam =', categoriesParam)
+    }
+    
     const q = searchParams.get('q')
     if (q && q.length > 64) {
       return NextResponse.json({ 
@@ -154,6 +160,11 @@ export async function GET(request: NextRequest) {
         
         const saleIds = salesWithCategories?.map(item => item.sale_id) || []
         console.log('[SALES] Found sales with matching categories:', saleIds.length)
+        
+        // Debug server-side category filtering results
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FILTER DEBUG] Server found saleIds:', saleIds.length, 'for categories:', categories)
+        }
         
         if (saleIds.length > 0) {
           query = query.in('id', saleIds)

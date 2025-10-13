@@ -32,9 +32,21 @@ jobs:
           node --version
           npm --version
 
-      - name: Regenerate lockfile
+      - name: Print key deps for verification
         run: |
+          echo "--- package.json ---"
+          cat package.json
+          echo "--- deps summary ---"
+          node -e "const p=require('./package.json'); console.log('deps:', Object.keys(p.dependencies||{})); console.log('devDeps:', Object.keys(p.devDependencies||{}))"
+          echo "--- testing-library plugin grep ---"
+          grep -E '"eslint-plugin-testing-library"|@testing-library/eslint-plugin' -n package.json || true
+
+      - name: Hard regenerate lockfile
+        run: |
+          rm -f package-lock.json
+          rm -rf node_modules
           npm install --no-audit --no-fund
+          npm dedupe || true
 
       - name: Commit and push lockfile (if changed)
         shell: bash
@@ -43,10 +55,14 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add package-lock.json package.json || true
-            git commit -m "ci: regenerate package-lock.json via lockfile-sync workflow"
+            git commit -m "ci: hard-regenerate package-lock.json"
             git push origin HEAD:${{ inputs.branch }}
             echo "✅ Lockfile changes pushed to ${{ inputs.branch }}"
           else
-            echo "ℹ️  No changes to lockfile"
+            echo "ℹ️  No changes to lockfile — verify package.json contains eslint-plugin-testing-library and not @testing-library/eslint-plugin"
           fi
+
+      - name: Reminder to re-run CI
+        run: |
+          echo "Now re-run CI (npm ci) from the PR Checks tab."
 

@@ -39,18 +39,22 @@ export function serializeCategories(categories: string[]): string {
 }
 
 /**
+ * Creates a canonical key for category arrays (for change detection)
+ * @param categories - Array of category strings
+ * @returns Sorted, comma-separated string key
+ */
+export function createCategoriesKey(categories: string[]): string {
+  return normalizeCategories(categories).join(',')
+}
+
+/**
  * Checks if two category arrays are equal (for suppression logic)
  * @param a - First category array
  * @param b - Second category array
  * @returns True if arrays contain the same categories
  */
 export function categoriesEqual(a: string[], b: string[]): boolean {
-  const normalizedA = normalizeCategories(a)
-  const normalizedB = normalizeCategories(b)
-  
-  if (normalizedA.length !== normalizedB.length) return false
-  
-  return normalizedA.every((cat, index) => cat === normalizedB[index])
+  return createCategoriesKey(a) === createCategoriesKey(b)
 }
 
 /**
@@ -88,8 +92,8 @@ export function filtersEqual(a: any, b: any): boolean {
   const normalizedA = normalizeFilters(a)
   const normalizedB = normalizeFilters(b)
   
-  // Compare categories
-  if (!categoriesEqual(normalizedA.categories, normalizedB.categories)) return false
+  // Compare categories using key for better change detection
+  if (createCategoriesKey(normalizedA.categories) !== createCategoriesKey(normalizedB.categories)) return false
   
   // Compare other relevant filters
   const relevantKeys = ['city', 'dateRange']

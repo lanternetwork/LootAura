@@ -18,7 +18,7 @@ import { milesToKm } from '@/utils/geo'
 import LoadMoreButton from '@/components/LoadMoreButton'
 import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
-import { normalizeFilters, filtersEqual, normalizeCategoryParams } from '@/lib/shared/categoryNormalizer'
+import { normalizeFilters, filtersEqual, normalizeCategoryParams, createCategoriesKey } from '@/lib/shared/categoryNormalizer'
 import LayoutDiagnostic from '@/components/LayoutDiagnostic'
 import GridLayoutDiagnostic from '@/components/GridLayoutDiagnostic'
 import GridDebugOverlay from '@/components/GridDebugOverlay'
@@ -109,6 +109,21 @@ interface SalesClientProps {
 }
 
 export default function SalesClient({ initialSales, initialSearchParams, initialCenter, user }: SalesClientProps) {
+  // Debug flag for console checkpoints
+  const DEBUG = typeof window !== 'undefined' && (window as any).__LA_DEBUG === true
+  
+  // Container mount checkpoint
+  useEffect(() => {
+    if (DEBUG) {
+      console.log('[DOM][LIST] container mounted')
+    }
+  }, [])
+  
+  // Category change detection ref
+  const prevCategoriesKeyRef = useRef<string>('')
+  
+  // List store sequence for UI updates
+  const listStoreSeqRef = useRef<number>(0)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { filters, updateFilters, hasActiveFilters } = useFilters(
@@ -657,12 +672,26 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       const rendered = hydrated.slice(0, 24)
       setVisibleSales(hydrated)
       setRenderedSales(rendered)
+      
+      // List store update with sequence tracking
+      listStoreSeqRef.current += 1
+      if (DEBUG) {
+        console.log(`[LIST] apply visible count=${hydrated.length} seq=${listStoreSeqRef.current}`)
+      }
+      
       console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=${hydrated.length} rendered=${rendered.length}`)
     } else if (viewportBounds) {
       const inView = cropSalesToViewport(sales, viewportBounds)
       const rendered = inView.slice(0, 24)
       setVisibleSales(inView)
       setRenderedSales(rendered)
+      
+      // List store update with sequence tracking
+      listStoreSeqRef.current += 1
+      if (DEBUG) {
+        console.log(`[LIST] apply visible count=${inView.length} seq=${listStoreSeqRef.current}`)
+      }
+      
       console.log(`[LIST] update (filters) seq=${seq} inView=${inView.length} rendered=${rendered.length}`)
     }
   }, [arbiter.authority, visiblePinIdsState, mapMarkers, sales, viewportBounds, cropSalesToViewport])
@@ -674,6 +703,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     // Check for sales list container with both possible selectors
     const listContainer = document.querySelector('[data-debug="sales-list"]') || document.querySelector('[data-panel="list"]')
     if (!listContainer) {
+      if (DEBUG) {
+        console.log('[DOM][LIST] MISSING container (BUG)')
+      }
       console.error('[DOM] no [data-debug="sales-list"] or [data-panel="list"] found - sales list container missing')
       return
     }
@@ -1325,6 +1357,16 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const triggerFetches = useCallback(() => {
     console.log('[TRIGGER] triggerFetches called - DEPLOYMENT TEST')
     
+    // Category change detection
+    const currentCategoriesKey = createCategoriesKey(filters.categories)
+    const categoriesChanged = prevCategoriesKeyRef.current !== currentCategoriesKey
+    
+    if (DEBUG && categoriesChanged) {
+      console.log(`[FILTERS] cats change prev=${prevCategoriesKeyRef.current} next=${currentCategoriesKey} changed=true`)
+    }
+    
+    prevCategoriesKeyRef.current = currentCategoriesKey
+    
     // For MAP authority, check if we can suppress list fetch
     if (arbiter.authority === 'MAP') {
       // Build the filter sets that would be used for list and markers
@@ -1343,13 +1385,21 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       // Check if filters are identical
       const equalFilters = filtersEqual(listFilters, markersFilters)
       
+      // Split decisions: network vs UI updates
+      const shouldSkipNetwork = equalFilters && !categoriesChanged
+      const shouldUpdateUI = categoriesChanged || !equalFilters
+      
+      if (DEBUG) {
+        console.log(`[ARB] evaluate mapAuth=true shouldSkipNetwork=${shouldSkipNetwork} shouldUpdateUI=${shouldUpdateUI}`)
+      }
+      
       // Debug suppression decision
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[FILTER DEBUG] normalizedFilters =', { categories: listFilters.categories })
         console.log('[FILTER DEBUG] suppression_decision =', {
           authority: arbiter.authority,
           equalFilters,
-          suppressed: equalFilters,
+          suppressed: shouldSkipNetwork,
           listFilters,
           markersFilters
         })
@@ -1358,17 +1408,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[NET] start markers {seq: 1} (MAP authority)')
       fetchMapSales()
       
-      // Failsafe: Only suppress list fetch if filters are identical AND categories will be applied
-      const serverWillApplyCategoryPredicate = filters.categories.length > 0
-      
-      if (equalFilters && serverWillApplyCategoryPredicate) {
-        console.log('[FILTER DEBUG] Suppressing list fetch - markers include identical filters with category predicate')
-      } else if (filters.categories.length > 0) {
-        console.log('[FILTER DEBUG] NOT suppressing list fetch - categories present but filters may differ')
+      // Only suppress network fetch if filters are identical and no category change
+      if (shouldSkipNetwork) {
+        console.log('[FILTER DEBUG] Suppressing list fetch - markers include identical filters')
+      } else {
+        console.log('[FILTER DEBUG] Allowing list fetch - filters differ or categories changed')
         // Don't suppress when categories are present unless we're certain filters are identical
         return // Exit early to allow list fetch
-      } else {
-        console.log('[FILTER DEBUG] Suppressing list fetch - no categories, identical filters')
       }
       
       // Warning: Check if categories are present but list is suppressed under MAP authority
@@ -1887,9 +1933,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     } : {})
                   }}
                   data-testid="sales-grid"
+                  data-panel="list"
                   {...(process.env.NEXT_PUBLIC_DEBUG === 'true' && { 'data-grid-debug': 'true' })}
-                  // Avoid re-keying container in MAP to prevent unmounts before effects run
-                  key={arbiter.authority==='MAP' ? 'map-stable' : 'filters'}
+                  // Always use stable key to prevent unmounting
+                  key="sales-list-stable"
                 >
                   {/* Debug overlay - only in development with NEXT_PUBLIC_DEBUG */}
                   {process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEBUG === 'true' && (

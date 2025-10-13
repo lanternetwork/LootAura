@@ -5,17 +5,20 @@ import { createMockSupabaseClient } from '@/tests/utils/mocks'
 import { useCreateSale, useSales } from '@/lib/hooks/useSales'
 vi.mock('@/app/(app)/explore/page', () => ({
   __esModule: true,
-  default: () => (
-    <div>
-      <h1>Post Your Sale</h1>
-      <label>Sale Title *</label>
-      <label>Address *</label>
-      <button>Post Sale</button>
-      <div>Posting...</div>
-    </div>
-  )
+  default: function Explore() {
+    return (
+      <div>
+        <h1>Post Your Sale</h1>
+        <label>Sale Title *</label>
+        <label>Address *</label>
+        <button>Post Sale</button>
+        <div>Posting...</div>
+      </div>
+    )
+  }
 }))
 import { getAddressFixtures } from '@/tests/utils/mocks'
+import Explore from '@/app/(app)/explore/page'
 
 // Mock the hooks
 vi.mock('@/lib/hooks/useSales', () => ({

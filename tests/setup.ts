@@ -14,7 +14,49 @@ afterEach(() => {
 })
 
 // MSW server for API mocking
-const server = setupServer()
+const server = setupServer(
+  // Mock /api/sales/markers endpoint
+  http.get('/api/sales/markers', ({ request }) => {
+    const url = new URL(request.url)
+    const categories = url.searchParams.get('categories')
+    
+    // Return minimal valid markers response
+    const markers = categories ? [] : [
+      {
+        id: 'test-marker-1',
+        lat: 38.1405,
+        lng: -85.6936,
+        title: 'Test Sale',
+        price: 100
+      }
+    ]
+    
+    return HttpResponse.json(markers)
+  }),
+  
+  // Mock /api/sales endpoint
+  http.get('/api/sales', ({ request }) => {
+    const url = new URL(request.url)
+    const categories = url.searchParams.get('categories')
+    
+    const sales = categories ? [] : [
+      {
+        id: 'test-sale-1',
+        title: 'Test Sale',
+        description: 'Test Description',
+        price: 100,
+        lat: 38.1405,
+        lng: -85.6936,
+        date_start: '2025-01-01',
+        time_start: '09:00',
+        date_end: '2025-01-01',
+        time_end: '17:00'
+      }
+    ]
+    
+    return HttpResponse.json(sales)
+  })
+)
 
 beforeAll(() => server.listen())
 afterEach(() => server.resetHandlers())

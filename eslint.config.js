@@ -113,6 +113,7 @@ export default [
       'supabase/functions/**',
       '**/.eslintrc.*',
       'public/sw.js',
+      'app/(legacy-admin)/**',
     ],
   },
 ]

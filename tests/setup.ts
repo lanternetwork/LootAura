@@ -26,7 +26,8 @@ export { server }
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
 process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key'
-process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
+process.env.NEXT_PUBLIC_DEBUG = 'false'
+// Do not set service role in tests
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -83,3 +84,56 @@ Object.defineProperty(navigator, 'geolocation', {
   },
   writable: true,
 })
+
+// Global DOM shims for JSDOM
+global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}))
+
+global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}))
+
+global.matchMedia = vi.fn().mockImplementation((query) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
+}))
+
+// Mock DOMRect
+global.DOMRect = vi.fn().mockImplementation(() => ({
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+}))
+
+// Mock TextEncoder/TextDecoder
+global.TextEncoder = TextEncoder
+global.TextDecoder = TextDecoder
+
+// Mock fetch globally to prevent network calls
+global.fetch = vi.fn().mockImplementation(() => {
+  throw new Error('fetch() called in test - use MSW or mock explicitly')
+})
+
+// Mock next/image
+vi.mock('next/image', () => ({
+  default: ({ src, alt, ...props }: any) => {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt={alt} {...props} />
+  },
+}))

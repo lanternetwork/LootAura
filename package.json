@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:ui": "vitest",
@@ -18,7 +18,9 @@
     "check:storage": "tsx scripts/storage-check.ts",
     "check:node": "node scripts/check-node-version.js",
     "update:status": "tsx scripts/update-status.ts",
-    "smoke:sales": "tsx scripts/smoke-sales.ts"
+    "smoke:sales": "tsx scripts/smoke-sales.ts",
+    "check:css": "node scripts/check-css-tokens.js",
+    "verify:migration": "node scripts/verify-migration.js"
   },
   "dependencies": {
     "next": "14.2.4",
@@ -63,6 +65,12 @@
     "@types/react": "^18.2.66",
     "@types/node": "^20.12.12",
     "eslint": "^8.57.0",
+    "@eslint/js": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint-plugin-react": "^7.33.0",
+    "eslint-plugin-vitest": "^0.2.0",
+    "@testing-library/eslint-plugin": "^6.0.0",
     "prettier": "^3.3.3",
     "vitest": "^2.0.5",
     "@vitejs/plugin-react": "^4.3.1",

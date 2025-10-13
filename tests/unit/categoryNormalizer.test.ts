@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { 
   normalizeCategories, 
   serializeCategories, 
@@ -6,7 +6,8 @@ import {
   normalizeFilters, 
   filtersEqual,
   normalizeCategoryParams,
-  buildCategoryParams
+  buildCategoryParams,
+  createCategoriesKey
 } from '@/lib/shared/categoryNormalizer'
 
 describe('Category Normalizer', () => {
@@ -29,6 +30,26 @@ describe('Category Normalizer', () => {
     it('should handle null/undefined', () => {
       expect(normalizeCategories(null)).toEqual([])
       expect(normalizeCategories(undefined)).toEqual([])
+    })
+  })
+
+  describe('createCategoriesKey', () => {
+    it('should create consistent keys for same categories', () => {
+      const key1 = createCategoriesKey(['tools', 'furniture'])
+      const key2 = createCategoriesKey(['furniture', 'tools'])
+      expect(key1).toBe(key2)
+      expect(key1).toBe('furniture,tools')
+    })
+
+    it('should create different keys for different categories', () => {
+      const key1 = createCategoriesKey(['tools'])
+      const key2 = createCategoriesKey(['furniture'])
+      expect(key1).not.toBe(key2)
+    })
+
+    it('should handle empty arrays', () => {
+      const key = createCategoriesKey([])
+      expect(key).toBe('')
     })
 
     it('should deduplicate and sort', () => {

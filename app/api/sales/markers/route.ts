@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       
       // Debug server-side category filtering results
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log(`[API][markers] where=in count=${saleIds.length}`)
+        console.log(`[API][markers] cats norm=${catsCsv} where=in count=${saleIds.length}`)
       }
       
       if (saleIds.length > 0) {

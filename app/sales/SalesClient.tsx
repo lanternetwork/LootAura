@@ -139,6 +139,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   // List store sequence for UI updates
   const listStoreSeqRef = useRef<number>(0)
   const prevVisibleIdsHashRef = useRef<string>('')
+  
+  // Markers change signal for list updates
+  const markersHashRef = useRef<string>('')
   const router = useRouter()
   const searchParams = useSearchParams()
   const { filters, updateFilters, hasActiveFilters } = useFilters(
@@ -1198,11 +1201,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       // distanceKm depends on control mode
       const distanceKm = String(distanceKmForRequest ?? milesToKm(filters.distance))
       params.set('distanceKm', distanceKm)
-      if (filters.categories.length > 0) {
-        params.set('categories', filters.categories.join(','))
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log(`[NET][markers] cats=${filters.categories.join(',')}`)
-        }
+      // Always include categories parameter for consistency
+      params.set('categories', filters.categories.join(','))
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[NET][markers] mode=${mode} cats=${filters.categories.join(',')}`)
       }
       if (dateFrom) params.set('from', dateFrom)
       if (dateTo) params.set('to', dateTo)
@@ -1295,11 +1297,31 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         setMapMarkers(uniqueMarkers)
         setMapError(null) // Clear any previous errors
         setMapUpdating(false) // Reset map updating state
+        
+        // Update markers hash for change detection
+        const newMarkersHash = uniqueMarkers.map(m => m.id).sort().join(',')
+        const markersChanged = markersHashRef.current !== newMarkersHash
+        markersHashRef.current = newMarkersHash
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' && markersChanged) {
+          console.log(`[MAP][MARKERS] changed size=${uniqueMarkers.length}`)
+        }
+        
         console.debug('[MARKERS] got', uniqueMarkers.length)
       } else {
         console.log('[MAP] Setting mapMarkers to empty array')
         setMapMarkers([])
         setMapUpdating(false) // Reset map updating state
+        
+        // Update markers hash for change detection
+        const newMarkersHash = ''
+        const markersChanged = markersHashRef.current !== newMarkersHash
+        markersHashRef.current = newMarkersHash
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' && markersChanged) {
+          console.log(`[MAP][MARKERS] changed size=0`)
+        }
+        
         console.debug('[MARKERS] got', 0)
       }
     } catch (error: any) {
@@ -1311,6 +1333,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       setMapMarkers([])
       setMapError('Failed to load map markers')
       setMapUpdating(false) // Reset map updating state
+      
+      // Update markers hash for change detection
+      const newMarkersHash = ''
+      const markersChanged = markersHashRef.current !== newMarkersHash
+      markersHashRef.current = newMarkersHash
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true' && markersChanged) {
+        console.log(`[MAP][MARKERS] changed size=0 (error)`)
+      }
       // Clear error after 3 seconds
       setTimeout(() => setMapError(null), 3000)
     } finally {

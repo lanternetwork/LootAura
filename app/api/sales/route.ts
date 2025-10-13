@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
       console.log('[FILTER DEBUG] Server received categories:', categories)
       console.log('[FILTER DEBUG] categoriesParam =', categoriesParam)
       console.log('[FILTER DEBUG] normalized categories:', categories)
+      console.log('[FILTER DEBUG] categories param source:', searchParams.get('categories') ? 'categories' : searchParams.get('cat') ? 'cat (legacy)' : 'none')
     }
     
     const q = searchParams.get('q')

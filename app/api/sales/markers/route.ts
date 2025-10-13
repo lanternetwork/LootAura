@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
       console.log('[FILTER DEBUG] Server received categories:', categories)
       console.log('[FILTER DEBUG] catsParam =', catsParam)
       console.log('[FILTER DEBUG] normalized categories:', categories)
+      console.log('[FILTER DEBUG] categories param source:', q.get('categories') ? 'categories' : q.get('cat') ? 'cat (legacy)' : 'none')
     }
 
     const sb = createSupabaseServerClient()

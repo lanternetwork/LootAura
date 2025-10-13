@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
+import { toDbSet, buildDbMapping } from '@/lib/shared/categoryContract'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
@@ -53,12 +54,18 @@ export async function GET(request: NextRequest) {
     // Canonical parameter parsing - normalize to sorted, deduplicated array
     const categories = normalizeCategories(categoriesParam)
     
+    // Apply UI→DB mapping
+    const dbCategories = toDbSet(categories)
+    
     // Debug server-side category processing
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[FILTER DEBUG] Server received categories:', categories)
       console.log('[FILTER DEBUG] categoriesParam =', categoriesParam)
       console.log('[FILTER DEBUG] normalized categories:', categories)
+      console.log('[FILTER DEBUG] db mapped categories:', dbCategories)
       console.log('[FILTER DEBUG] categories param source:', searchParams.get('categories') ? 'categories' : searchParams.get('cat') ? 'cat (legacy)' : 'none')
+      console.log('[FILTER DEBUG] relationUsed = public.items_v2')
+      console.log('[FILTER DEBUG] predicateChosen = = ANY')
     }
     
     const q = searchParams.get('q')
@@ -165,7 +172,7 @@ export async function GET(request: NextRequest) {
         const { data: salesWithCategories, error: categoryError } = await supabase
           .from('items_v2')
           .select('sale_id')
-          .in('category', categories)
+          .in('category', dbCategories)
         
         if (categoryError) {
           console.error('[SALES] Category filter error:', categoryError)
@@ -182,7 +189,8 @@ export async function GET(request: NextRequest) {
         
         // Debug server-side category filtering results
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[FILTER DEBUG] Server found saleIds:', saleIds.length, 'for categories:', categories)
+          console.log('[FILTER DEBUG] Server found saleIds:', saleIds.length, 'for categories:', dbCategories)
+          console.log('[FILTER DEBUG] sqlParamsPreview =', dbCategories)
         }
         
         if (saleIds.length > 0) {

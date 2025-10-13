@@ -932,6 +932,28 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       // Debug response count
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[FILTER DEBUG] response.count =', data.count || data.data?.length || 0)
+        
+        // List container and ID parity checks
+        const listContainer = document.querySelector('[data-testid="sales-grid"]')
+        if (!listContainer) {
+          console.error('[LIST DEBUG] ERROR: Sales list container missing!')
+        } else {
+          console.log('[LIST DEBUG] Sales list container found')
+        }
+        
+        // Check ID parity between markers and list
+        const visibleIds = data.data?.slice(0, 5).map((sale: any) => sale.id) || []
+        const listIds = Array.from(document.querySelectorAll('[data-sale-id]')).map(el => el.getAttribute('data-sale-id'))
+        const sampleIdParity = visibleIds.reduce((acc: any, id: string) => {
+          acc[id] = listIds.includes(id)
+          return acc
+        }, {})
+        
+        console.log('[LIST DEBUG] ID parity check:', {
+          markersCount: data.data?.length || 0,
+          sampleIdParity,
+          listCount: listIds.length
+        })
       }
       
       if (data.ok) {
@@ -1336,13 +1358,17 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[NET] start markers {seq: 1} (MAP authority)')
       fetchMapSales()
       
-      // Only suppress list fetch if filters are identical
-      if (equalFilters) {
-        console.log('[FILTER DEBUG] Suppressing list fetch - markers include identical filters')
+      // Failsafe: Only suppress list fetch if filters are identical AND categories will be applied
+      const serverWillApplyCategoryPredicate = filters.categories.length > 0
+      
+      if (equalFilters && serverWillApplyCategoryPredicate) {
+        console.log('[FILTER DEBUG] Suppressing list fetch - markers include identical filters with category predicate')
+      } else if (filters.categories.length > 0) {
+        console.log('[FILTER DEBUG] NOT suppressing list fetch - categories present but filters may differ')
+        // Don't suppress when categories are present unless we're certain filters are identical
+        return // Exit early to allow list fetch
       } else {
-        console.log('[FILTER DEBUG] Allowing list fetch - filters differ between list and markers')
-        // Note: In MAP authority, we typically don't fetch the list, but this ensures
-        // we have the logic in place for when we need to allow it
+        console.log('[FILTER DEBUG] Suppressing list fetch - no categories, identical filters')
       }
       
       // Warning: Check if categories are present but list is suppressed under MAP authority

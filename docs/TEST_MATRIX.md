@@ -40,7 +40,7 @@ This document defines the comprehensive test matrix for validating core behavior
 
 ## Test Implementation Mapping
 
-### Unit Tests
+### Unit Tests (CI Job: `ci / test-unit`)
 
 | Test Name | File | Description |
 |-----------|------|-------------|
@@ -49,7 +49,7 @@ This document defines the comprehensive test matrix for validating core behavior
 | `shouldSuppressList` | `tests/unit/arbiterDecisions.test.ts` | Suppression decision logic |
 | `createCategoriesKey` | `tests/unit/categoryNormalizer.test.ts` | Canonical key generation |
 
-### Integration Tests (JSDOM)
+### Integration Tests (CI Job: `ci / test-integration`)
 
 | Test Name | File | Description |
 |-----------|------|-------------|
@@ -58,6 +58,7 @@ This document defines the comprehensive test matrix for validating core behavior
 | `suppression-equality` | `tests/integration/categoryFilters.test.ts` | Suppression decision validation |
 | `dom-grid-multi-col` | `tests/integration/gridLayout.integration.test.tsx` | Grid layout verification |
 | `id-parity-sample` | `tests/integration/categoryFilters.test.ts` | Marker-list ID consistency |
+| `sales-list-rendering` | `tests/integration/sales-list.spec.ts` | Sales list component integration |
 
 ### Server Tests
 

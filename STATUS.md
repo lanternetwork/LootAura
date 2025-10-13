@@ -53,6 +53,15 @@
 - **Standard job names**: env-presence, lint, typecheck, test-unit, test-integration, build, css-scan, migration-verify
 - **Required checks for Rulesets/Vercel**: ci/env-presence, ci/lint, ci/typecheck, ci/test-unit, ci/test-integration, ci/build
 
+### CI Stabilization: Red→Green
+- **ESLint Configuration**: Added comprehensive rules for TypeScript, React, testing
+- **Test Harness**: Added global DOM shims, fetch mocking, network isolation
+- **Environment Handling**: Public envs only, no service role in CI
+- **CSS Validation**: Tailwind grid token scanner for responsive layouts
+- **Migration Verification**: Database schema validation on SQL changes
+- **Build Process**: Next.js build with proper environment variables
+- **Status**: Foundation ready, awaiting Owner secrets configuration
+
 ### CI Status
 - **Single workflow**: Only `ci` workflow is active
 - **Triggers**: pull_request to main, push to any branch

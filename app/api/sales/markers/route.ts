@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
+import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -32,12 +33,14 @@ export async function GET(request: NextRequest) {
     // Normalize distance (km)
     const distanceKm = Number.isFinite(parseFloat(String(distanceParam))) ? Math.max(0, parseFloat(String(distanceParam))) : 40
     const limit = Number.isFinite(parseFloat(String(limitParam))) ? Math.min(parseInt(String(limitParam), 10), 1000) : 1000
-    const categories = catsParam ? catsParam.split(',').map(s => s.trim()).filter(Boolean) : []
+    // Canonical parameter parsing - normalize to sorted, deduplicated array
+    const categories = normalizeCategories(catsParam)
 
     // Debug server-side category processing
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[FILTER DEBUG] Server received categories:', categories)
       console.log('[FILTER DEBUG] catsParam =', catsParam)
+      console.log('[FILTER DEBUG] normalized categories:', categories)
     }
 
     const sb = createSupabaseServerClient()

@@ -1,0 +1,100 @@
+/**
+ * Category parameter normalization utilities
+ * Ensures consistent parsing and serialization of category filters
+ */
+
+/**
+ * Normalizes category parameters to a consistent format
+ * @param categories - CSV string, array, or null/undefined
+ * @returns Sorted, deduplicated array of category strings
+ */
+export function normalizeCategories(categories: string | string[] | null | undefined): string[] {
+  if (!categories) return []
+  
+  let categoryArray: string[]
+  
+  if (typeof categories === 'string') {
+    // Parse CSV string
+    categoryArray = categories.split(',').map(c => c.trim()).filter(Boolean)
+  } else if (Array.isArray(categories)) {
+    // Already an array
+    categoryArray = categories.filter(c => c && c.trim().length > 0)
+  } else {
+    return []
+  }
+  
+  // Deduplicate and sort for consistent equality checks
+  return [...new Set(categoryArray.map(c => c.trim()))].sort()
+}
+
+/**
+ * Serializes category array to CSV string for URL parameters
+ * @param categories - Array of category strings
+ * @returns CSV string or empty string if no categories
+ */
+export function serializeCategories(categories: string[]): string {
+  if (!categories || categories.length === 0) return ''
+  return categories.join(',')
+}
+
+/**
+ * Checks if two category arrays are equal (for suppression logic)
+ * @param a - First category array
+ * @param b - Second category array
+ * @returns True if arrays contain the same categories
+ */
+export function categoriesEqual(a: string[], b: string[]): boolean {
+  const normalizedA = normalizeCategories(a)
+  const normalizedB = normalizeCategories(b)
+  
+  if (normalizedA.length !== normalizedB.length) return false
+  
+  return normalizedA.every((cat, index) => cat === normalizedB[index])
+}
+
+/**
+ * Normalizes filter objects for equality comparison
+ * @param filters - Filter object with categories and other properties
+ * @returns Normalized filter object
+ */
+export function normalizeFilters(filters: {
+  categories?: string | string[]
+  city?: string
+  dateRange?: string
+  [key: string]: any
+}): {
+  categories: string[]
+  city?: string
+  dateRange?: string
+  [key: string]: any
+} {
+  return {
+    ...filters,
+    categories: normalizeCategories(filters.categories),
+    // Remove empty/undefined values for cleaner comparison
+    ...(filters.city && { city: filters.city }),
+    ...(filters.dateRange && filters.dateRange !== 'any' && { dateRange: filters.dateRange })
+  }
+}
+
+/**
+ * Checks if two filter objects are equal (for suppression logic)
+ * @param a - First filter object
+ * @param b - Second filter object
+ * @returns True if filters are equivalent
+ */
+export function filtersEqual(a: any, b: any): boolean {
+  const normalizedA = normalizeFilters(a)
+  const normalizedB = normalizeFilters(b)
+  
+  // Compare categories
+  if (!categoriesEqual(normalizedA.categories, normalizedB.categories)) return false
+  
+  // Compare other relevant filters
+  const relevantKeys = ['city', 'dateRange']
+  for (const key of relevantKeys) {
+    if (normalizedA[key] !== normalizedB[key]) return false
+  }
+  
+  return true
+}

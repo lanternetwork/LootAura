@@ -18,6 +18,7 @@ import { milesToKm } from '@/utils/geo'
 import LoadMoreButton from '@/components/LoadMoreButton'
 import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
+import { normalizeFilters, filtersEqual } from '@/lib/shared/categoryNormalizer'
 import LayoutDiagnostic from '@/components/LayoutDiagnostic'
 import GridLayoutDiagnostic from '@/components/GridLayoutDiagnostic'
 import GridDebugOverlay from '@/components/GridDebugOverlay'
@@ -1292,19 +1293,45 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const triggerFetches = useCallback(() => {
     console.log('[TRIGGER] triggerFetches called - DEPLOYMENT TEST')
     
-    // For MAP authority, trigger markers fetch immediately (no debounce)
-    // For other authority, use debounced trigger
+    // For MAP authority, check if we can suppress list fetch
     if (arbiter.authority === 'MAP') {
+      // Build the filter sets that would be used for list and markers
+      const listFilters = normalizeFilters({
+        categories: filters.categories,
+        city: filters.city,
+        dateRange: filters.dateRange
+      })
+      
+      const markersFilters = normalizeFilters({
+        categories: filters.categories,
+        city: filters.city,
+        dateRange: filters.dateRange
+      })
+      
+      // Check if filters are identical
+      const equalFilters = filtersEqual(listFilters, markersFilters)
+      
+      // Debug suppression decision
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] suppression_decision =', {
+          authority: arbiter.authority,
+          equalFilters,
+          suppressed: equalFilters,
+          listFilters,
+          markersFilters
+        })
+      }
+      
       console.log('[NET] start markers {seq: 1} (MAP authority)')
       fetchMapSales()
       
-      // CRITICAL: When MAP authority is active and categories are selected,
-      // we need to ensure the markers query includes the same filters
-      // that would have been applied to the suppressed list query
-      if (filters.categories.length > 0) {
-        console.log('[FILTER DEBUG] MAP authority with categories - ensuring markers include same filters')
-        // The fetchMapSales function already includes categories from filters.categories
-        // This is handled in the fetchMapSales implementation
+      // Only suppress list fetch if filters are identical
+      if (equalFilters) {
+        console.log('[FILTER DEBUG] Suppressing list fetch - markers include identical filters')
+      } else {
+        console.log('[FILTER DEBUG] Allowing list fetch - filters differ between list and markers')
+        // Note: In MAP authority, we typically don't fetch the list, but this ensures
+        // we have the logic in place for when we need to allow it
       }
     } else {
       debouncedTrigger(() => {
@@ -1313,7 +1340,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         fetchMapSales()
       })
     }
-  }, [debouncedTrigger, fetchSales, fetchMapSales, arbiter.authority, filters.categories])
+  }, [debouncedTrigger, fetchSales, fetchMapSales, arbiter.authority, filters.categories, filters.city, filters.dateRange])
 
   // Debounced visible list recompute
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
+import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
@@ -48,14 +49,14 @@ export async function GET(request: NextRequest) {
     
     
     const categoriesParam = searchParams.get('categories')
-    const categories = categoriesParam 
-      ? categoriesParam.split(',').map(c => c.trim()).filter(c => c.length > 0).slice(0, 10)
-      : []
+    // Canonical parameter parsing - normalize to sorted, deduplicated array
+    const categories = normalizeCategories(categoriesParam)
     
     // Debug server-side category processing
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[FILTER DEBUG] Server received categories:', categories)
       console.log('[FILTER DEBUG] categoriesParam =', categoriesParam)
+      console.log('[FILTER DEBUG] normalized categories:', categories)
     }
     
     const q = searchParams.get('q')

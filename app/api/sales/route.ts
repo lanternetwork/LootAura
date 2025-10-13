@@ -142,6 +142,22 @@ export async function GET(request: NextRequest) {
       // Add category filters by joining with items table
       if (categories.length > 0) {
         console.log('[SALES] Applying category filter:', categories)
+        
+        // Debug: Check if items_v2 table has category column
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FILTER DEBUG] Checking items_v2 table structure...')
+          const { data: tableInfo, error: tableError } = await supabase
+            .from('items_v2')
+            .select('*')
+            .limit(1)
+          
+          if (tableError) {
+            console.error('[FILTER DEBUG] Error checking items_v2 table:', tableError)
+          } else {
+            console.log('[FILTER DEBUG] items_v2 sample row:', tableInfo?.[0])
+          }
+        }
+        
         // Use a subquery approach to find sales that have items matching the categories
         const { data: salesWithCategories, error: categoryError } = await supabase
           .from('items_v2')

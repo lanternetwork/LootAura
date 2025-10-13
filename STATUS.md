@@ -45,7 +45,21 @@
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
-## 8. Next Milestone
+## 8. CI Hygiene
+
+### Workflow Cleanup
+- **Legacy workflows removed**: bootstrap.yml, ci-main.yml, generate-lockfile.yml, update-status.yml, ingest-craigslist-backup.yml, test.yml, ysf-step-b.yml
+- **Unified workflow only**: `.github/workflows/ci.yml`
+- **Standard job names**: env-presence, lint, typecheck, test-unit, test-integration, build, css-scan, migration-verify
+- **Required checks for Rulesets/Vercel**: ci/env-presence, ci/lint, ci/typecheck, ci/test-unit, ci/test-integration, ci/build
+
+### CI Status
+- **Single workflow**: Only `ci` workflow is active
+- **Triggers**: pull_request to main, push to any branch
+- **Concurrency**: Single-key per-branch to cancel superseded runs
+- **Environment validation**: Fast failure on missing required variables
+
+## 9. Next Milestone
 - Bulk generator + clustering polish
 
 ---

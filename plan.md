@@ -1,7 +1,9 @@
-# YardSaleFinder - Complete Implementation Plan
+# LootAura - Complete Implementation Plan
+
+**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
 
 ## 🎯 Project Summary
-A production-grade mobile-first web app for browsing, mapping, posting, and planning yard/garage/estate sales with robust scraping, offline PWA capabilities, and cost-effective operation.
+A production-grade mobile-first web app for browsing, mapping, posting, and planning yard/garage/estate sales with robust scraping, offline PWA capabilities, and cost-effective operation. Built with enterprise-grade architecture featuring map-centric source of truth, arbiter logic, and comprehensive CI/CD pipeline.
 
 ## 🏗️ Enterprise Grid System
 **Status**: ✅ **COMPLETED** - Map + Filter Sync Milestone
@@ -867,6 +869,12 @@ Canonical domain set to `https://lootaura.com` across environment configuration 
 - **Future**: Defer heavy new indexes for sales until proposal approved
 - **Monitoring**: Document query performance and propose optimizations
 
+### Enterprise Development Process
+- **CI/CD Pipeline**: Automated testing, type checking, and deployment gates
+- **Stability Contracts**: Comprehensive test suite under `tests/stability/`
+- **Environment Configuration**: Strict environment variable validation
+- **Security Compliance**: OWASP Top 10, dependency scanning, CI security audit
+
 ### Implementation Tasks
 - [ ] Restore Google sign-in button and verify end-to-end flow
 - [ ] Verify Email auth (magic link/OTP) with proper error handling
@@ -875,3 +883,44 @@ Canonical domain set to `https://lootaura.com` across environment configuration 
 - [ ] Add comprehensive test coverage for auth flows
 - [ ] Implement debug diagnostics (gated by NEXT_PUBLIC_DEBUG)
 - [ ] Document performance monitoring and index proposals
+
+### CI/CD Integration
+- **Unified Workflow**: Single `.github/workflows/ci.yml` with stable job names
+- **Required Checks**: ci/env-presence, ci/lint, ci/typecheck, ci/test-unit, ci/test-integration, ci/build
+- **Optional Checks**: ci/css-scan, ci/migration-verify
+- **Test Coverage**: Unit, integration, and E2E tests for all auth flows
+- **Security Gates**: RLS policy verification and authentication testing
+- **Performance Gates**: Auth operation timing and bundle size validation
+- **Deployment Gates**: Environment validation and health checks
+
+## Grid Invariants
+- **Container Structure**: List container always present with `data-panel="list"`
+- **Direct Children**: Cards are direct children of grid container
+- **Grid Classes**: Applied to container, not intermediate wrappers
+- **Ancestor Requirements**: Ancestor must have `min-w-0` to prevent overflow
+- **No Wrappers**: No intermediate divs between grid and cards
+
+## Filter Canonicalization
+- **Parameter Key**: `categories` (CSV on URL; array in code)
+- **Legacy Support**: `cat` accepted read-only; never emitted
+- **Normalization**: All arrays sorted + deduplicated before comparison
+- **Consistency**: Same parameter names in markers and list requests
+
+## Suppression Equality
+- **MAP Authority**: Suppress `/api/sales` only if markers include identical normalized filter set
+- **Filter Change**: Any filter change prevents suppression
+- **Empty Handling**: "Empty == empty" must NOT hide user-initiated filter updates
+- **Equality Check**: Deep comparison of normalized filter objects
+
+## DB Predicate Choice
+- **Single Category**: `category = ANY($1::text[])` for TEXT/ENUM columns
+- **Array Category**: `categories && $1::text[]` for TEXT[] columns with GIN index
+- **Schema Match**: Use predicate that matches actual schema
+- **Consistency**: Same predicate for both markers and list endpoints
+
+## Performance Budgets
+- **Auth/Profile Operations**: p95 ≤ 50ms database response
+- **Visible Sales Load**: p95 ≤ 300ms database response
+- **Category Filtering**: p95 ≤ 200ms database response
+- **Map Render**: < 700ms client-side rendering
+- **List Update**: < 300ms DOM updates

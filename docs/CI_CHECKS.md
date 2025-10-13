@@ -4,9 +4,16 @@
 
 This document lists the exact required check names that must be added to GitHub Rulesets and Vercel Deployment Checks.
 
+## Unified CI Workflow
+
+**Single workflow only**: `.github/workflows/ci.yml`
+
+All CI functionality is consolidated into one unified workflow with stable job names.
+
 ## Required Checks
 
 ### Core Checks (Required)
+- `ci / env-presence` - Environment variable validation
 - `ci / lint` - ESLint code quality checks
 - `ci / typecheck` - TypeScript type checking
 - `ci / test-unit` - Unit tests (Vitest)
@@ -26,17 +33,35 @@ This document lists the exact required check names that must be added to GitHub 
    - ✅ **Require status checks to pass**
    - ✅ **Require up to date**
    - ✅ **Include administrators**
-4. Add the required checks listed above
+4. Add the required checks listed above:
+   - `ci / env-presence`
+   - `ci / lint`
+   - `ci / typecheck`
+   - `ci / test-unit`
+   - `ci / test-integration`
+   - `ci / build`
 5. Save the ruleset
 
 ## Vercel Deployment Checks
 
 1. Go to **Vercel Dashboard** → **Project** → **Settings** → **Git**
 2. Enable **"Require GitHub checks to pass before Production deployments"**
-3. Add the same required checks listed above
+3. Add the same required checks listed above:
+   - `ci / env-presence`
+   - `ci / lint`
+   - `ci / typecheck`
+   - `ci / test-unit`
+   - `ci / test-integration`
+   - `ci / build`
 4. Save settings
 
 ## Check Descriptions
+
+### `ci / env-presence`
+- **Purpose**: Environment variable validation
+- **Tool**: Custom environment checker
+- **Failure**: Missing required environment variables
+- **Fix**: Ensure all required environment variables are set in GitHub Secrets
 
 ### `ci / lint`
 - **Purpose**: Code quality and style enforcement

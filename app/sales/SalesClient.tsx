@@ -857,6 +857,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         offset: append ? sales.length : 0
       }
       console.log('[FILTER DEBUG] listPayload =', listPayload)
+      
+      // Assertion: if categories are selected, ensure they're in the payload
+      if (filters.categories.length > 0 && !listPayload.categories) {
+        console.error('[FILTER DEBUG] ERROR: Categories selected but not included in list payload!')
+      }
     }
     
     console.log('[SALES] fetch params:', { ...params, mode })
@@ -1115,6 +1120,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
           limit: '1000'
         }
         console.log('[FILTER DEBUG] markersPayload =', markersPayload)
+        
+        // Assertion: if categories are selected, ensure they're in the markers payload
+        if (filters.categories.length > 0 && (!markersPayload.categories || markersPayload.categories.length === 0)) {
+          console.error('[FILTER DEBUG] ERROR: Categories selected but not included in markers payload!')
+        }
       }
       
 
@@ -1332,6 +1342,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         console.log('[FILTER DEBUG] Allowing list fetch - filters differ between list and markers')
         // Note: In MAP authority, we typically don't fetch the list, but this ensures
         // we have the logic in place for when we need to allow it
+      }
+      
+      // Warning: Check if categories are present but list is suppressed under MAP authority
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true' && filters.categories.length > 0) {
+        console.warn('[FILTER DEBUG] WARNING: Categories present but list fetch suppressed under MAP authority')
+        console.warn('[FILTER DEBUG] Ensure markers query includes same category filters')
       }
     } else {
       debouncedTrigger(() => {

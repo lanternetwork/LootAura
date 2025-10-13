@@ -6,6 +6,21 @@ A production-grade mobile-first web app for browsing, mapping, posting, and plan
 ## 🏗️ Enterprise Grid System
 **Status**: ✅ **COMPLETED** - Map + Filter Sync Milestone
 
+## 🔧 Category Filter Regression Fix
+**Status**: ✅ **COMPLETED** - Phase 0: Filters Regression Fix
+
+### Root Cause Analysis
+- **Issue**: Category filters returning zero results due to missing database column and inconsistent parameter parsing
+- **Solution**: Database migration, canonical parameter parsing, and authority-aware suppression
+- **Authority**: MAP authority suppresses list only when markers include identical filters
+
+### Implementation Details
+- **Database Schema**: Applied migration `035_fix_items_v2_category.sql` to expose category column in `items_v2` view
+- **Parameter Format**: Canonical CSV format (`?categories=tools,furniture`) with server-side normalization
+- **Suppression Logic**: List fetch suppressed only when markers carry identical filter set
+- **Predicate Semantics**: OR semantics using `category = ANY($1)` for single-valued category column
+- **Normalization**: Sorted, deduplicated arrays for consistent equality checks
+
 ### Root Cause Analysis
 - **Issue**: Sales list rendered as single column due to conflicting CSS and wrapper divs
 - **Solution**: Single grid container with direct children, Tailwind responsive classes

@@ -2,9 +2,17 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/auth-profile
-- **Latest commit:** ca83f56 — Merge branch 'milestone/auth-profile' of https://github.com/lanternetwork/LootAura into milestone/auth-profile (by Yard Sale Tracker on 2025-10-12 17:57:33 -0400)
+- **Latest commit:** 62c30f9 — Filters: canonical CSV parsing + normalization
 - **Active PR:** n/a
 - **CI status:** running, last run: run 18450014644
+
+## 1.1. Phase 0: Filters Regression Fix
+- **Status:** ✅ **COMPLETED** - Category filter regression resolved
+- **Database Migration:** Applied `035_fix_items_v2_category.sql` to expose category column
+- **Parameter Parsing:** Canonical CSV format with server-side normalization
+- **Authority Logic:** MAP authority suppresses list only when markers include identical filters
+- **Tests:** Comprehensive unit and integration tests added
+- **Debug Logging:** Temporary debug logs added (to be removed before merge)
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2

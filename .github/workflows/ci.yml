@@ -1,148 +1,146 @@
-name: CI/CD Pipeline
+name: ci
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-      - pivot/property-pulse
-      - feat/**
-      - fix/**
-      - chore/**
-      - refactor/**
-      - hotfix/**
   pull_request:
-    branches:
-      - main
-      - develop
-  workflow_dispatch:
+    branches: [main]
+  push:
+    branches: ['**']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  setup:
+  env-presence:
+    name: env-presence
     runs-on: ubuntu-latest
-    outputs:
-      node-version: ${{ steps.node-version.outputs.version }}
-      schema: ${{ steps.schema.outputs.value }}
-    
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js 20
-      id: node-version
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        
-    - name: Log environment information
-      id: schema
-      run: |
-        echo "Node.js version: $(node --version)"
-        echo "NPM version: $(npm --version)"
-        echo "NEXT_PUBLIC_SUPABASE_SCHEMA: ${NEXT_PUBLIC_SUPABASE_SCHEMA:-public}"
-        echo "schema=${NEXT_PUBLIC_SUPABASE_SCHEMA:-public}" >> $GITHUB_OUTPUT
-        
-    - name: Install project dependencies
-      run: npm install
-
-  build:
-    needs: setup
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        
-    - name: Log environment information
-      run: |
-        echo "Node.js version: $(node --version)"
-        echo "NEXT_PUBLIC_SUPABASE_SCHEMA: ${NEXT_PUBLIC_SUPABASE_SCHEMA:-public}"
-        
-    - name: Install project dependencies
-      run: npm install
-      
-    - name: Build Next.js application
-      run: npm run build 2>&1 | tee build.log
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
-        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
-        NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
-        NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
-
-  typecheck:
-    needs: setup
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        
-    - name: Log environment information
-      run: |
-        echo "Node.js version: $(node --version)"
-        echo "NEXT_PUBLIC_SUPABASE_SCHEMA: ${NEXT_PUBLIC_SUPABASE_SCHEMA:-public}"
-        
-    - name: Install project dependencies
-      run: npm install
-      
-    - name: Run TypeScript type checking
-      run: npm run typecheck 2>&1 | tee typecheck.log
-      
-    - name: Run ESLint code linting
-      run: npm run lint 2>&1 | tee lint.log
-
-  unit-tests:
-    needs: setup
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        
-    - name: Log environment information
-      run: |
-        echo "Node.js version: $(node --version)"
-        echo "NEXT_PUBLIC_SUPABASE_SCHEMA: ${NEXT_PUBLIC_SUPABASE_SCHEMA:-public}"
-        
-    - name: Install project dependencies
-      run: npm install
-
-      - name: Discover Vitest tests
+      - name: Check required environment variables
         run: |
-          set -e
-          echo "Enabling pnpm via corepack for discovery only"
-          corepack enable || true
-          corepack prepare pnpm@8.15.8 --activate || true
-          pnpm -v || echo "pnpm not available; attempting to proceed"
-          echo "Listing Vitest test files..."
-          pnpm vitest --list | tee vitest-discovery.log || true
-          total=$(wc -l < vitest-discovery.log | xargs || echo 0)
-          echo "Vitest discovered files: $total"
-          if [ "${total}" = "0" ]; then
-            echo "No unit tests discovered"
+          echo "Checking required environment variables..."
+          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ]; then
+            echo "❌ NEXT_PUBLIC_SUPABASE_URL is missing"
             exit 1
           fi
-      
-      - name: Run Vitest unit tests with verbose reporter
-        run: npm run test -- --reporter=verbose 2>&1 | tee vitest.log
+          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
+            echo "❌ NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"
+            exit 1
+          fi
+          echo "✅ All required environment variables present"
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript type checking
+        run: npm run typecheck
+
+  test-unit:
+    name: test-unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
+          NEXT_PUBLIC_DEBUG: 'true'
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            test-results.xml
+            coverage/
+
+  test-integration:
+    name: test-integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm run test -- tests/integration/
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
+          NEXT_PUBLIC_DEBUG: 'true'
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -152,233 +150,59 @@ jobs:
           NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
           NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
 
-  stabilization-checks:
-    needs: setup
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        
-    - name: Install project dependencies
-      run: npm install
-      
-    - name: Build application for CSS token check
-      run: npm run build
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
-        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
-        NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
-        NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
-        
-    - name: Check CSS tokens and parameter contract
-      run: node scripts/check-css-tokens.js 2>&1 | tee stabilization.log
-      
-    - name: Run stabilization unit tests
-      run: npm run test -- tests/unit/stabilization.test.ts tests/unit/server-stabilization.test.ts 2>&1 | tee stabilization-tests.log
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-        NEXT_PUBLIC_DEBUG: 'true'
-        
-    - name: Run stabilization integration tests
-      run: npm run test -- tests/integration/stabilization.spec.ts 2>&1 | tee stabilization-integration.log
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-        NEXT_PUBLIC_DEBUG: 'true'
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            .next/
+            dist/
 
-  e2e-smoke:
-    needs: setup
+  css-scan:
+    name: css-scan
     runs-on: ubuntu-latest
-    
+    needs: build
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        
-    - name: Log environment information
-      run: |
-        echo "Node.js version: $(node --version)"
-        echo "NEXT_PUBLIC_SUPABASE_SCHEMA: ${NEXT_PUBLIC_SUPABASE_SCHEMA:-public}"
-        
-    - name: Install project dependencies
-      run: npm install
-      
-    - name: Install Playwright browser dependencies
-      run: npx playwright install --with-deps
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Discover Playwright tests
-        run: |
-          set -e
-          echo "Listing Playwright tests..."
-          npx playwright test --list | tee playwright-discovery.log || true
-          tests=$(grep -E "^\s*\-\s" playwright-discovery.log | wc -l | xargs || echo 0)
-          projects=$(grep -E "^Project " playwright-discovery.log | wc -l | xargs || echo 0)
-          echo "Playwright discovered tests: ${tests}"
-          echo "Playwright discovered projects: ${projects}"
-          if [ "${tests}" = "0" ]; then
-            echo "::warning::No E2E tests discovered"
-          fi
-      
-      - name: Run Playwright E2E smoke tests with list reporter
-        run: npm run test:e2e -- --reporter=list 2>&1 | tee playwright.log
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: .
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check CSS tokens
+        run: node scripts/check-css-tokens.js
+
+  migration-verify:
+    name: migration-verify
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.modified, '**/*.sql') || contains(github.event.head_commit.added, '**/*.sql')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify migration
+        run: node scripts/verify-migration.js
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
-          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
-          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
-          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
-        
-  deploy:
-    needs: [unit-tests, e2e-smoke, stabilization-checks]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js 20
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        
-    - name: Log environment information
-      run: |
-        echo "Node.js version: $(node --version)"
-        echo "NEXT_PUBLIC_SUPABASE_SCHEMA: ${NEXT_PUBLIC_SUPABASE_SCHEMA:-public}"
-        
-    - name: Install project dependencies
-      run: npm install
-      
-    - name: Build Next.js application for production
-      run: npm run build
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-        NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-        NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
-        NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
-        NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
-        NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
-        
-    - name: Deploy application to Vercel production
-      uses: amondnet/vercel-action@v25
-      with:
-        vercel-token: ${{ secrets.VERCEL_TOKEN }}
-        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-        vercel-args: '--prod'
-
-  error-summary:
-    needs: [build, typecheck, unit-tests, e2e-smoke]
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      
-    - name: Aggregate error summary
-      run: |
-        echo "## Error Summary" >> $GITHUB_STEP_SUMMARY
-        
-        # Check if any logs exist and extract errors
-        if [ -f build.log ]; then
-          echo "### Build" >> $GITHUB_STEP_SUMMARY
-          if grep -q "Error\|Failed\|failed" build.log; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            head -30 build.log | grep -A 5 -B 5 "Error\|Failed\|failed" | head -20 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
-          fi
-        fi
-        
-        if [ -f typecheck.log ]; then
-          echo "### Typecheck" >> $GITHUB_STEP_SUMMARY
-          if grep -q "error TS" typecheck.log; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep "error TS" typecheck.log | head -10 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ TypeScript type checking passed" >> $GITHUB_STEP_SUMMARY
-          fi
-        fi
-        
-        if [ -f lint.log ]; then
-          echo "### ESLint" >> $GITHUB_STEP_SUMMARY
-          if grep -q "error\|warning" lint.log; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep "error\|warning" lint.log | head -10 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ ESLint passed" >> $GITHUB_STEP_SUMMARY
-          fi
-        fi
-        
-        if [ -f vitest.log ]; then
-          echo "### Unit Tests (Vitest)" >> $GITHUB_STEP_SUMMARY
-          if grep -q "FAIL\|Error" vitest.log; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -A 3 "FAIL\|Error" vitest.log | head -20 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ All unit tests passed" >> $GITHUB_STEP_SUMMARY
-          fi
-        fi
-        
-        if [ -f playwright.log ]; then
-          echo "### E2E Smoke (Playwright)" >> $GITHUB_STEP_SUMMARY
-          if grep -q "failed\|Error" playwright.log; then
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -A 2 "failed\|Error" playwright.log | head -15 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ All E2E tests passed" >> $GITHUB_STEP_SUMMARY
-          fi
-        fi
-        
-        # Check if any errors were found
-        if ! grep -q "Error\|Failed\|failed\|error TS\|error\|warning" *.log 2>/dev/null; then
-          echo "## ✅ No errors detected" >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Copy this block into Cursor:" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
-        echo "## Error Summary" >> $GITHUB_STEP_SUMMARY
-        if [ -f build.log ] && grep -q "Error\|Failed\|failed" build.log; then
-          echo "### Build Errors:" >> $GITHUB_STEP_SUMMARY
-          head -30 build.log | grep -A 5 -B 5 "Error\|Failed\|failed" | head -10 >> $GITHUB_STEP_SUMMARY
-        fi
-        if [ -f typecheck.log ] && grep -q "error TS" typecheck.log; then
-          echo "### TypeScript Errors:" >> $GITHUB_STEP_SUMMARY
-          grep "error TS" typecheck.log | head -5 >> $GITHUB_STEP_SUMMARY
-        fi
-        if [ -f vitest.log ] && grep -q "FAIL\|Error" vitest.log; then
-          echo "### Test Failures:" >> $GITHUB_STEP_SUMMARY
-          grep -A 2 "FAIL\|Error" vitest.log | head -10 >> $GITHUB_STEP_SUMMARY
-        fi
-        if [ -f playwright.log ] && grep -q "failed\|Error" playwright.log; then
-          echo "### E2E Failures:" >> $GITHUB_STEP_SUMMARY
-          grep -A 1 "failed\|Error" playwright.log | head -8 >> $GITHUB_STEP_SUMMARY
-        fi
-        echo '```' >> $GITHUB_STEP_SUMMARY

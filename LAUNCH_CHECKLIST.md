@@ -278,6 +278,32 @@
 - [ ] **Security**: No vulnerabilities detected
 - [ ] **Monitoring**: All monitoring systems active
 
+## CI Gate Acceptance
+
+### GitHub Rulesets Verification
+- [ ] **Open Test PR**: Create a test PR to main branch
+- [ ] **Verify Merge Block**: Confirm PR is blocked from merging
+- [ ] **Check Requirements**: Verify all required checks are listed:
+  - `ci / lint`
+  - `ci / typecheck`
+  - `ci / test-unit`
+  - `ci / test-integration`
+  - `ci / build`
+- [ ] **Optional Checks**: Confirm optional checks are available:
+  - `ci / css-scan`
+  - `ci / migration-verify`
+
+### Vercel Deployment Verification
+- [ ] **Production Block**: Confirm Vercel Production deployment is blocked until checks pass
+- [ ] **Check Integration**: Verify Vercel shows GitHub check status
+- [ ] **Deployment Flow**: Confirm deployment only proceeds when all checks are green
+
+### CI Workflow Verification
+- [ ] **Single Workflow**: Confirm only one "ci" workflow runs
+- [ ] **Job Names**: Verify job names match exactly (case-sensitive)
+- [ ] **Artifacts**: Check that build artifacts and test results are uploaded
+- [ ] **Environment**: Confirm env-presence check fails fast on missing variables
+
 ## Emergency Contacts
 
 ### Technical Issues

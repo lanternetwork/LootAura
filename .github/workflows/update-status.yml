@@ -1,10 +1,6 @@
 name: Update STATUS
 
 on:
-  push:
-    branches:
-      - main
-      - 'milestone/**'
   workflow_dispatch: {}
 
 jobs:

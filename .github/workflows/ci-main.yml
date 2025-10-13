@@ -1,15 +1,6 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-      - pivot/property-pulse
-  pull_request:
-    branches:
-      - main
-      - develop
   workflow_dispatch:
 
 jobs:

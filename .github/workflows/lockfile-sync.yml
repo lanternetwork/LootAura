@@ -1,0 +1,52 @@
+name: lockfile-sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to sync lockfile on'
+        required: true
+        default: 'milestone/auth-profile'
+
+permissions:
+  contents: write
+
+jobs:
+  sync-lockfile:
+    name: sync-lockfile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Show Node/npm versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Regenerate lockfile
+        run: |
+          npm install --no-audit --no-fund
+
+      - name: Commit and push lockfile (if changed)
+        shell: bash
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json package.json || true
+            git commit -m "ci: regenerate package-lock.json via lockfile-sync workflow"
+            git push origin HEAD:${{ inputs.branch }}
+            echo "✅ Lockfile changes pushed to ${{ inputs.branch }}"
+          else
+            echo "ℹ️  No changes to lockfile"
+          fi
+

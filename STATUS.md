@@ -2,9 +2,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/auth-profile
-- **Latest commit:** 62c30f9 — Filters: canonical CSV parsing + normalization
+- **Latest commit:** 9253c8d — Docs: add comprehensive category filter implementation summary
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18450014644
+- **CI status:** running, last run: run 18451805319
 
 ## 1.1. Phase 0: Filters Regression Fix
 - **Status:** ✅ **COMPLETED** - Category filter regression resolved
@@ -57,4 +57,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-12T21:58:12.862Z
+Updated automatically by Cursor on 2025-10-13T00:35:01.758Z

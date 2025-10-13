@@ -632,11 +632,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     if (arbiter.authority === 'MAP') {
       const ids = visiblePinIdsState
       
-      // Circuit breaker: skip if visible pins haven't changed
-      const idsString = ids.join(',')
-      const lastIdsString = lastVisiblePinsRef.current.join(',')
+      // Circuit breaker: skip if visible pins haven't changed (using hash for better change detection)
+      const idsString = ids.sort().join(',')
+      const lastIdsString = lastVisiblePinsRef.current.sort().join(',')
       if (idsString === lastIdsString) {
-        console.log('[LIST] visible pins unchanged - skipping effect to prevent loop')
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[LIST] visible pins unchanged - skipping effect to prevent loop')
+        }
         return
       }
       lastVisiblePinsRef.current = [...ids]
@@ -736,8 +738,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     if (!listContainer) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[DOM][LIST] MISSING container (BUG)')
+        console.error('[DOM] no [data-debug="sales-list"] or [data-panel="list"] found - sales list container missing')
       }
-      console.error('[DOM] no [data-debug="sales-list"] or [data-panel="list"] found - sales list container missing')
       return
     }
     
@@ -746,14 +748,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[DOM][LIST] cards in panel=${cardsInPanel} expected=${visiblePinIdsState.length}`)
     }
-    console.log('[DOM] nodes in panel =', cardsInPanel, ' expected =', visiblePinIdsState.length)
-    console.log('[DOM] list container found:', !!listContainer, 'visible pins:', visiblePinIdsState.length)
     
-    const els = listContainer.querySelectorAll('[data-card="sale"]')
-    els.forEach((el) => {
-      const rect = (el as HTMLElement).getBoundingClientRect()
-      console.log('[DOM] node rect h=', rect.height)
-    })
   }, [arbiter.authority, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west, visiblePinIdsState.length])
 
   // Approximate radius (km) from Mapbox zoom level at mid-latitudes
@@ -1406,6 +1401,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log(`[FILTERS] cats norm prev=${prevCategoriesKeyRef.current} next=${currentCategoriesKey} changed=true`)
     }
     
+    // Bump sequence on category changes to force UI updates
+    if (categoriesChanged) {
+      listStoreSeqRef.current += 1
+      if (DEBUG) {
+        console.log(`[LIST][CATEGORY] seq bumped to ${listStoreSeqRef.current} due to category change`)
+      }
+    }
+    
     prevCategoriesKeyRef.current = currentCategoriesKey
     
     // For MAP authority, check if we can suppress list fetch
@@ -1960,7 +1963,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                 {/* Sales list grid container - single source of truth */}
                 <div
                   ref={gridContainerRef}
-                  className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${
+                  className={`w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${
                     arbiter.authority === 'MAP' 
                       ? (mapUpdating ? 'opacity-50' : 'opacity-100')
                       : (loading ? 'opacity-75' : 'opacity-100')
@@ -2166,9 +2169,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     const newVisibleIds = visibleIds.map(String)
                     const currentVisibleIds = visiblePinIdsState
                     
-                    if (newVisibleIds.length === currentVisibleIds.length && 
-                        newVisibleIds.every(id => currentVisibleIds.includes(id))) {
-                      console.log('[LIST] visible pins unchanged - skipping update to prevent loop')
+                    // Use hash-based change detection instead of length-only check
+                    const newIdsHash = newVisibleIds.sort().join(',')
+                    const currentIdsHash = currentVisibleIds.sort().join(',')
+                    if (newIdsHash === currentIdsHash) {
+                      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                        console.log('[LIST] visible pins unchanged - skipping update to prevent loop')
+                      }
                       return
                     }
                     

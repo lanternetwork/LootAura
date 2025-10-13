@@ -22,7 +22,8 @@ export async function GET(request: NextRequest) {
     const endDate = q.get('to') || q.get('dateTo') || q.get('endDate') || undefined
     
     const limitParam = q.get('limit')
-    const catsParam = q.get('categories') || q.get('tags') || ''
+    // Accept both canonical 'categories' and legacy 'cat' parameters
+    const catsParam = q.get('categories') || q.get('cat') || ''
 
     // Validate lat/lng
     const originLat = latParam !== null ? parseFloat(latParam) : NaN

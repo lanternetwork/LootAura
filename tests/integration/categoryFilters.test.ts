@@ -35,6 +35,30 @@ describe('Category Filter Integration Tests', () => {
       expect(params.get('categories')).toBe('tools,furniture')
     })
 
+    it('should migrate legacy cat parameter to categories', () => {
+      const params = new URLSearchParams()
+      params.set('cat', 'tools,furniture')
+      
+      // Simulate the migration logic
+      const categoriesParam = params.get('categories')
+      const catParam = params.get('cat')
+      
+      const categories = categoriesParam || catParam
+      expect(categories).toBe('tools,furniture')
+    })
+
+    it('should prefer categories over cat when both exist', () => {
+      const params = new URLSearchParams()
+      params.set('categories', 'tools,furniture')
+      params.set('cat', 'electronics,books')
+      
+      const categoriesParam = params.get('categories')
+      const catParam = params.get('cat')
+      
+      const categories = categoriesParam || catParam
+      expect(categories).toBe('tools,furniture')
+    })
+
     it('should handle empty categories array', () => {
       const categories: string[] = []
       const params = new URLSearchParams()

@@ -1,6 +1,7 @@
 /**
  * Category parameter normalization utilities
  * Ensures consistent parsing and serialization of category filters
+ * Handles both canonical 'categories' and legacy 'cat' parameters
  */
 
 /**
@@ -97,4 +98,60 @@ export function filtersEqual(a: any, b: any): boolean {
   }
   
   return true
+}
+
+/**
+ * Normalizes category parameters from URL search params or filter objects
+ * Handles both canonical 'categories' and legacy 'cat' parameters
+ * @param params - Search params object or filter object
+ * @returns Normalized categories array
+ */
+export function normalizeCategoryParams(params: URLSearchParams | { [key: string]: any }): { categories: string[] } {
+  let categories: string[] = []
+  
+  if (params instanceof URLSearchParams) {
+    // Handle URLSearchParams
+    const categoriesParam = params.get('categories')
+    const catParam = params.get('cat') // Legacy support
+    
+    if (categoriesParam) {
+      categories = normalizeCategories(categoriesParam)
+    } else if (catParam) {
+      // Legacy support: migrate cat to categories
+      categories = normalizeCategories(catParam)
+    }
+  } else {
+    // Handle filter object
+    if (params.categories) {
+      categories = normalizeCategories(params.categories)
+    } else if (params.cat) {
+      // Legacy support: migrate cat to categories
+      categories = normalizeCategories(params.cat)
+    }
+  }
+  
+  return { categories }
+}
+
+/**
+ * Builds URL search params with canonical 'categories' parameter
+ * Never emits legacy 'cat' parameter
+ * @param categories - Array of category strings
+ * @param existingParams - Existing URLSearchParams to merge with
+ * @returns URLSearchParams with canonical categories parameter
+ */
+export function buildCategoryParams(categories: string[], existingParams?: URLSearchParams): URLSearchParams {
+  const params = existingParams ? new URLSearchParams(existingParams) : new URLSearchParams()
+  
+  // Remove legacy 'cat' parameter if it exists
+  params.delete('cat')
+  
+  // Add canonical 'categories' parameter if categories exist
+  if (categories.length > 0) {
+    params.set('categories', serializeCategories(categories))
+  } else {
+    params.delete('categories')
+  }
+  
+  return params
 }

@@ -48,7 +48,8 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('to') || searchParams.get('dateTo') || searchParams.get('endDate') || undefined
     
     
-    const categoriesParam = searchParams.get('categories')
+    // Accept both canonical 'categories' and legacy 'cat' parameters
+    const categoriesParam = searchParams.get('categories') || searchParams.get('cat')
     // Canonical parameter parsing - normalize to sorted, deduplicated array
     const categories = normalizeCategories(categoriesParam)
     

@@ -4,7 +4,9 @@ import {
   serializeCategories, 
   categoriesEqual, 
   normalizeFilters, 
-  filtersEqual 
+  filtersEqual,
+  normalizeCategoryParams,
+  buildCategoryParams
 } from '@/lib/shared/categoryNormalizer'
 
 describe('Category Normalizer', () => {
@@ -178,6 +180,92 @@ describe('Category Normalizer', () => {
       const b = { categories: [] }
       
       expect(filtersEqual(a, b)).toBe(true)
+    })
+  })
+
+  describe('normalizeCategoryParams', () => {
+    it('should parse canonical categories parameter', () => {
+      const params = new URLSearchParams()
+      params.set('categories', 'tools,furniture')
+      
+      const result = normalizeCategoryParams(params)
+      expect(result.categories).toEqual(['furniture', 'tools'])
+    })
+
+    it('should parse legacy cat parameter', () => {
+      const params = new URLSearchParams()
+      params.set('cat', 'tools,furniture')
+      
+      const result = normalizeCategoryParams(params)
+      expect(result.categories).toEqual(['furniture', 'tools'])
+    })
+
+    it('should prefer categories over cat when both exist', () => {
+      const params = new URLSearchParams()
+      params.set('categories', 'tools,furniture')
+      params.set('cat', 'electronics,books')
+      
+      const result = normalizeCategoryParams(params)
+      expect(result.categories).toEqual(['furniture', 'tools'])
+    })
+
+    it('should handle filter object input', () => {
+      const filters = { categories: 'tools,furniture' }
+      
+      const result = normalizeCategoryParams(filters)
+      expect(result.categories).toEqual(['furniture', 'tools'])
+    })
+
+    it('should handle legacy cat in filter object', () => {
+      const filters = { cat: 'tools,furniture' }
+      
+      const result = normalizeCategoryParams(filters)
+      expect(result.categories).toEqual(['furniture', 'tools'])
+    })
+
+    it('should return empty array when no categories', () => {
+      const params = new URLSearchParams()
+      
+      const result = normalizeCategoryParams(params)
+      expect(result.categories).toEqual([])
+    })
+  })
+
+  describe('buildCategoryParams', () => {
+    it('should build canonical categories parameter', () => {
+      const categories = ['tools', 'furniture']
+      const params = buildCategoryParams(categories)
+      
+      expect(params.get('categories')).toBe('tools,furniture')
+      expect(params.get('cat')).toBeNull()
+    })
+
+    it('should remove legacy cat parameter', () => {
+      const existingParams = new URLSearchParams()
+      existingParams.set('cat', 'electronics,books')
+      existingParams.set('lat', '38.1405')
+      
+      const params = buildCategoryParams(['tools'], existingParams)
+      
+      expect(params.get('categories')).toBe('tools')
+      expect(params.get('cat')).toBeNull()
+      expect(params.get('lat')).toBe('38.1405')
+    })
+
+    it('should remove categories when empty array', () => {
+      const existingParams = new URLSearchParams()
+      existingParams.set('categories', 'tools,furniture')
+      
+      const params = buildCategoryParams([], existingParams)
+      
+      expect(params.get('categories')).toBeNull()
+    })
+
+    it('should handle empty input', () => {
+      const params = buildCategoryParams([])
+      
+      expect(params.get('categories')).toBeNull()
+      expect(params.get('cat')).toBeNull()
     })
   })
 })

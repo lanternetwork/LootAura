@@ -3,8 +3,6 @@ export default {
   content: [
     "./app/**/*.{ts,tsx}", 
     "./components/**/*.{ts,tsx}",
-    "./app-property-pulse/**/*.{js,ts,jsx,tsx}",
-    "./components-property-pulse/**/*.{js,ts,jsx,tsx}"
   ],
   safelist: [
     // Grid column classes to ensure they're not purged

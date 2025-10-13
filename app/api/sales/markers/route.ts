@@ -51,6 +51,11 @@ export async function GET(request: NextRequest) {
       console.log('[FILTER DEBUG] relationUsed = public.items_v2')
       console.log('[FILTER DEBUG] predicateChosen = = ANY')
     }
+    
+    // Debug markers query categories (server-side)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[API][markers] cats received=${categories.join(',')} whereClause=category IN (${dbCategories.join(',')})`)
+    }
 
     const sb = createSupabaseServerClient()
 

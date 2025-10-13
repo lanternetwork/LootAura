@@ -116,6 +116,17 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   useEffect(() => {
     if (DEBUG) {
       console.log('[DOM][LIST] container mounted')
+      
+      // One-time computed-style debug for grid layout
+      setTimeout(() => {
+        const listContainer = document.querySelector('[data-panel="list"]')
+        if (listContainer) {
+          const computedStyle = window.getComputedStyle(listContainer)
+          const display = computedStyle.display
+          const gtc = computedStyle.gridTemplateColumns
+          console.log(`[DOM][LIST] grid display=${display} gtc=${gtc}`)
+        }
+      }, 100) // Small delay to ensure styles are applied
     }
   }, [])
   
@@ -710,10 +721,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       return
     }
     
-    const els = document.querySelectorAll('[data-sale-id]')
-    console.log('[DOM] nodes in panel =', els.length, ' expected =', visiblePinIdsState.length)
+    // Use descendant query for structure-proof counting
+    const cardsInPanel = listContainer.querySelectorAll('[data-card="sale"]').length
+    if (DEBUG) {
+      console.log(`[DOM][LIST] cards in panel=${cardsInPanel} expected=${visiblePinIdsState.length}`)
+    }
+    console.log('[DOM] nodes in panel =', cardsInPanel, ' expected =', visiblePinIdsState.length)
     console.log('[DOM] list container found:', !!listContainer, 'visible pins:', visiblePinIdsState.length)
     
+    const els = listContainer.querySelectorAll('[data-card="sale"]')
     els.forEach((el) => {
       const rect = (el as HTMLElement).getBoundingClientRect()
       console.log('[DOM] node rect h=', rect.height)
@@ -1157,7 +1173,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       // distanceKm depends on control mode
       const distanceKm = String(distanceKmForRequest ?? milesToKm(filters.distance))
       params.set('distanceKm', distanceKm)
-      if (filters.categories.length > 0) params.set('categories', filters.categories.join(','))
+      if (filters.categories.length > 0) {
+        params.set('categories', filters.categories.join(','))
+        if (DEBUG) {
+          console.log(`[NET][markers] query cats=${filters.categories.join(',')}`)
+        }
+      }
       if (dateFrom) params.set('from', dateFrom)
       if (dateTo) params.set('to', dateTo)
       params.set('limit', '1000')
@@ -1362,7 +1383,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     const categoriesChanged = prevCategoriesKeyRef.current !== currentCategoriesKey
     
     if (DEBUG && categoriesChanged) {
-      console.log(`[FILTERS] cats change prev=${prevCategoriesKeyRef.current} next=${currentCategoriesKey} changed=true`)
+      console.log(`[FILTERS] cats norm prev=${prevCategoriesKeyRef.current} next=${currentCategoriesKey} changed=true`)
     }
     
     prevCategoriesKeyRef.current = currentCategoriesKey

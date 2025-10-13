@@ -15,6 +15,7 @@ export default function SaleCard({ sale, authority }: { sale: Sale; authority?: 
       data-testid="sale-card" 
       data-debug={`auth:${authority}`} 
       data-sale-id={String(sale?.id || '')}
+      data-card="sale"
       data-kind="sale-row"
       style={isMap ? { 
         minHeight: '200px'

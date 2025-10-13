@@ -1196,7 +1196,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       if (filters.categories.length > 0) {
         params.set('categories', filters.categories.join(','))
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log(`[NET][markers] cats=${filters.categories.join(',')} url=${url.toString().split('?')[0]}`)
+          console.log(`[NET][markers] cats=${filters.categories.join(',')}`)
         }
       }
       if (dateFrom) params.set('from', dateFrom)

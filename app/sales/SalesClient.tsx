@@ -879,6 +879,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       if (arbiter.authority === 'MAP') {
         console.log('[GUARD] Suppressed wide /api/sales under MAP authority')
         
+        // Warning: Check if categories are present but list is suppressed
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' && filters.categories.length > 0) {
+          console.warn('[FILTER DEBUG] WARNING: Categories present but list fetch suppressed under MAP authority')
+          console.warn('[FILTER DEBUG] Ensure markers query includes same category filters')
+        }
+        
         // Dev-only verification logging
         if (process.env.NEXT_PUBLIC_DEBUG === '1') {
           console.log(`[SALES][suppressed] wide fetch blocked under MAP authority vSeq=${viewportSeqRef.current}`)
@@ -1114,6 +1120,13 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`, { mode })
       console.log('[MAP] Date parameters being sent:', { from: dateFrom, to: dateTo, dateRange: filters.dateRange })
       
+      // Debug: Verify categories are included in the markers request
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const categoriesParam = params.get('categories')
+        console.log('[FILTER DEBUG] Markers request categories param:', categoriesParam)
+        console.log('[FILTER DEBUG] Markers request full URL:', `/api/sales/markers?${params.toString()}`)
+      }
+      
       // Test with a hardcoded date to verify the pipeline works
       if (filters.dateRange === 'any') {
         console.log('[MAP] Testing date pipeline with hardcoded today...')
@@ -1284,6 +1297,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     if (arbiter.authority === 'MAP') {
       console.log('[NET] start markers {seq: 1} (MAP authority)')
       fetchMapSales()
+      
+      // CRITICAL: When MAP authority is active and categories are selected,
+      // we need to ensure the markers query includes the same filters
+      // that would have been applied to the suppressed list query
+      if (filters.categories.length > 0) {
+        console.log('[FILTER DEBUG] MAP authority with categories - ensuring markers include same filters')
+        // The fetchMapSales function already includes categories from filters.categories
+        // This is handled in the fetchMapSales implementation
+      }
     } else {
       debouncedTrigger(() => {
         console.log('[NET] start sales {seq: 1, mode: \'FILTERS\'}')
@@ -1291,7 +1313,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         fetchMapSales()
       })
     }
-  }, [debouncedTrigger, fetchSales, fetchMapSales, arbiter.authority])
+  }, [debouncedTrigger, fetchSales, fetchMapSales, arbiter.authority, filters.categories])
 
   // Debounced visible list recompute
 

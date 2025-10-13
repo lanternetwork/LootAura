@@ -1,10 +1,13 @@
 # Loot Aura Repository Status
 
+Conflict reconciled on 2025-10-13 — stabilization content retained; recent main entries preserved.
+
 ## 1. Branch & Commit
 - **Current branch:** milestone/auth-profile
-- **Latest commit:** 2d2f5e2 — resolve: merge conflict in STATUS.md - keep stabilization layer version (by Yard Sale Tracker on 2025-10-13 00:32:35 -0400)
-- **Active PR:** n/a
-- **CI status:** running, last run: run 18455233890
+- **Latest commit (branch):** e55f25a — ci: redeploy trigger (by system)
+- **Recent on main:** 7a5b049 — Close Milestone: Map + Filter Sync — enforce single grid container, fix layout hierarchy, verify arbiter authority, add tests & CI guards (by lanternetwork on 2025-10-12 17:11:56 -0400)
+- **Active PR:** milestone/auth-profile → main
+- **CI status:** pending (will start after conflicts resolved)
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -72,4 +75,4 @@
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-13T04:33:19.379Z
+Updated automatically by Cursor on 2025-10-13T12:00:00.000Z

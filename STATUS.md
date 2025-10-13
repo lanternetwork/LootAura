@@ -4,9 +4,9 @@
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/auth-profile
-- **Latest commit:** b275637 — docs: comprehensive documentation alignment with enterprise standards (by Yard Sale Tracker on 2025-10-13 00:00:00 -0400)
+- **Latest commit:** cd97023 — Docs: add INVARIANTS/TEST_MATRIX/DEBUG_GUIDE/MIGRATION_POLICY (by Yard Sale Tracker on 2025-10-13 00:00:00 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18454698795
+- **CI status:** running, last run: run 18454881746
 - **Branch naming:** `main`, `release/x.y`, `feature/...` (enterprise standards)
 
 ## 2. Database Schema
@@ -48,6 +48,7 @@
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
+<<<<<<< HEAD
 ## 8. CI Coverage Summary
 - **Test Coverage**: Unit, integration, E2E tests passing
 - **Stability Contracts**: Category filtering, server predicates, arbiter logic
@@ -87,6 +88,10 @@
 - **CI/CD Enhancement**: Advanced testing and deployment gates
 - **Performance Optimization**: Database tuning and query optimization
 - **Security Hardening**: Advanced threat protection and monitoring
+=======
+## 8. Next Milestone
+- Bulk generator + clustering polish
+>>>>>>> f6ce9cd59ee3a648fdeca84b03e6506205fcd415
 
 ---
-Updated automatically by Cursor on 2025-10-13T04:00:18.032Z
+Updated automatically by Cursor on 2025-10-13T04:11:34.671Z

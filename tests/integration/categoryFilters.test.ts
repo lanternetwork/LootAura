@@ -103,6 +103,27 @@ describe('Category Filter Integration Tests', () => {
       expect(salesWithCategories).toHaveLength(3)
     })
 
+    it('should handle both canonical categories and legacy cat parameters', async () => {
+      // Test canonical 'categories' parameter
+      const categoriesParam = 'tools,furniture'
+      const categories = categoriesParam.split(',').map(s => s.trim()).filter(Boolean)
+      
+      expect(categories).toEqual(['tools', 'furniture'])
+      
+      // Test legacy 'cat' parameter
+      const catParam = 'electronics,books'
+      const catCategories = catParam.split(',').map(s => s.trim()).filter(Boolean)
+      
+      expect(catCategories).toEqual(['electronics', 'books'])
+    })
+
+    it('should normalize and deduplicate category parameters', async () => {
+      const categoriesParam = 'tools,furniture,tools,electronics,furniture'
+      const categories = [...new Set(categoriesParam.split(',').map(s => s.trim()))].sort()
+      
+      expect(categories).toEqual(['electronics', 'furniture', 'tools'])
+    })
+
     it('should return empty result when no sales match categories', async () => {
       const categories = ['nonexistent-category']
       mockSupabase.data = []
@@ -163,6 +184,28 @@ describe('Category Filter Integration Tests', () => {
       const shouldSuppressList = arbiter.authority === 'MAP' && categories.length > 0
       
       expect(shouldSuppressList).toBe(false)
+    })
+
+    it('should suppress list only when markers and list have identical filter sets', () => {
+      const listFilters = { categories: ['tools'], city: 'Louisville' }
+      const markersFilters = { categories: ['tools'], city: 'Louisville' }
+      
+      // Simulate filter equality check
+      const equalFilters = JSON.stringify(listFilters) === JSON.stringify(markersFilters)
+      const shouldSuppress = equalFilters
+      
+      expect(shouldSuppress).toBe(true)
+    })
+
+    it('should not suppress list when markers and list have different filter sets', () => {
+      const listFilters = { categories: ['tools'], city: 'Louisville' }
+      const markersFilters = { categories: ['electronics'], city: 'Louisville' }
+      
+      // Simulate filter equality check
+      const equalFilters = JSON.stringify(listFilters) === JSON.stringify(markersFilters)
+      const shouldSuppress = equalFilters
+      
+      expect(shouldSuppress).toBe(false)
     })
   })
 

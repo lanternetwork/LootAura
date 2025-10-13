@@ -1,13 +1,10 @@
-# LootAura Repository Status
-
-**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
+# Loot Aura Repository Status
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/auth-profile
-- **Latest commit:** cd97023 — Docs: add INVARIANTS/TEST_MATRIX/DEBUG_GUIDE/MIGRATION_POLICY (by Yard Sale Tracker on 2025-10-13 00:00:00 -0400)
+- **Latest commit:** 0b3be01 — resolve: merge conflict in STATUS.md - keep updated version with stability program (by Yard Sale Tracker on 2025-10-13 00:23:01 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18454881746
-- **Branch naming:** `main`, `release/x.y`, `feature/...` (enterprise standards)
+- **CI status:** running, last run: run 18455082274
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -48,50 +45,8 @@
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
-<<<<<<< HEAD
-## 8. CI Coverage Summary
-- **Test Coverage**: Unit, integration, E2E tests passing
-- **Stability Contracts**: Category filtering, server predicates, arbiter logic
-- **Performance**: SLO targets met (API <1s, map render <700ms)
-- **Security**: OWASP compliance, dependency scanning active
-
-## 9. Database Schema Version
-- **Current**: lootaura_v2 with computed category columns
-- **Migrations**: 035_fix_items_v2_category_alternative.sql applied
-- **Views**: public.items_v2 with category computation
-- **RLS**: Strict policies active
-
-## 10. Stability Program
-
-### Current Defects
-- **Category Filter Regression**: Fixed with computed category columns and canonical parameter handling
-- **Grid Layout Issues**: Resolved with single grid container and direct children structure
-- **Suppression Logic**: Corrected to prevent over-suppression of list updates
-- **Parameter Consistency**: Standardized on `categories` parameter with legacy `cat` support
-
-### Root Cause Analysis Summary
-- **Database Schema**: Missing category column in `public.items_v2` view
-- **Parameter Drift**: Inconsistent parameter keys between client and server
-- **Suppression Logic**: Incorrect equality checks causing over-suppression
-- **DOM Structure**: Intermediate wrappers breaking grid layout
-
-### Tasks Closed by Documentation Update
-- ✅ **INVARIANTS.md**: Protocol contracts and invariants documented
-- ✅ **TEST_MATRIX.md**: Comprehensive test matrix created
-- ✅ **DEBUG_GUIDE.md**: Unified debug system documented
-- ✅ **MIGRATION_POLICY.md**: Database migration procedures established
-- ✅ **CI Gates**: Test-driven gates implemented
-- ✅ **Owner Acceptance Protocol**: Manual validation procedures defined
-
-## 11. Next Milestone
-- **Stabilization Sprint**: 4-week enterprise development cycle
-- **CI/CD Enhancement**: Advanced testing and deployment gates
-- **Performance Optimization**: Database tuning and query optimization
-- **Security Hardening**: Advanced threat protection and monitoring
-=======
 ## 8. Next Milestone
 - Bulk generator + clustering polish
->>>>>>> f6ce9cd59ee3a648fdeca84b03e6506205fcd415
 
 ---
-Updated automatically by Cursor on 2025-10-13T04:11:34.671Z
+Updated automatically by Cursor on 2025-10-13T04:23:35.829Z

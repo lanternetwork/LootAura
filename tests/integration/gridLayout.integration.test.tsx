@@ -34,11 +34,12 @@ vi.mock('@/components/location/SalesMap', () => ({
   default: () => <div data-testid="sales-map">Mock Map</div>,
 }))
 
-vi.mock('@/components/SaleCard', () => {
-  return function MockSaleCard({ sale }: { sale: Sale }) {
+vi.mock('@/components/SaleCard', () => ({
+  __esModule: true,
+  default: function MockSaleCard({ sale }: { sale: Sale }) {
     return <div data-testid="sale-card" className="sale-row">{sale.title}</div>
   }
-})
+}))
 
 const mockSales: Sale[] = [
   { id: '1', title: 'Sale 1', description: 'Desc 1', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },

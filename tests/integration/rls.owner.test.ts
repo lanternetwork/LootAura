@@ -151,9 +151,7 @@ describe('RLS and Owner Permissions', () => {
 
     // Set up the mock chain
     const mockEq = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        update: updateSpy
-      })
+      eq: vi.fn().mockReturnValue(updateSpy)
     })
     
     mockSupabase.from = vi.fn().mockReturnValue({
@@ -231,9 +229,7 @@ describe('RLS and Owner Permissions', () => {
 
     // Set up the mock chain
     const mockEq = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        delete: deleteSpy
-      })
+      eq: vi.fn().mockReturnValue(deleteSpy)
     })
     
     mockSupabase.from = vi.fn().mockReturnValue({

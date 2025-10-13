@@ -27,8 +27,15 @@ export default [
       'testing-library': testingLibrary,
       'vitest': vitest,
     },
-    env: {
-      browser: true,
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        performance: 'readonly',
+        fetch: 'readonly',
+        console: 'readonly',
+      },
     },
     rules: {
       // TypeScript rules

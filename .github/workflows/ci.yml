@@ -159,11 +159,13 @@ jobs:
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: build-artifacts
           path: |
             .next/
             dist/
+          if-no-files-found: warn
 
   css-scan:
     name: css-scan
@@ -225,19 +227,19 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const context = github.context
-            const branch = context.ref.replace('refs/heads/', '')
-            const prNumber = context.event.pull_request?.number || ''
+            const ctx = github.context
+            const branch = ctx.ref.replace('refs/heads/', '')
+            const prNumber = ctx.event.pull_request?.number || ''
             
             await github.rest.repos.createDispatchEvent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner: ctx.repo.owner,
+              repo: ctx.repo.repo,
               event_type: 'ci_completed',
               client_payload: {
                 branch: branch,
                 pr_number: prNumber,
-                run_id: context.runId,
-                conclusion: context.payload.workflow_run?.conclusion || 'completed'
+                run_id: ctx.runId,
+                conclusion: ctx.payload.workflow_run?.conclusion || 'completed'
               }
             })
             

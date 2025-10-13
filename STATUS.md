@@ -1,13 +1,10 @@
-# LootAura Repository Status
-
-**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
+# Loot Aura Repository Status
 
 ## 1. Branch & Commit
 - **Current branch:** milestone/auth-profile
-- **Latest commit:** cd97023 — Docs: add INVARIANTS/TEST_MATRIX/DEBUG_GUIDE/MIGRATION_POLICY (by Yard Sale Tracker on 2025-10-13 00:00:00 -0400)
+- **Latest commit:** 0b3be01 — resolve: merge conflict in STATUS.md - keep updated version with stability program (by Yard Sale Tracker on 2025-10-13 00:23:01 -0400)
 - **Active PR:** n/a
-- **CI status:** running, last run: run 18454881746
-- **Branch naming:** `main`, `release/x.y`, `feature/...` (enterprise standards)
+- **CI status:** running, last run: run 18455082274
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -48,6 +45,7 @@
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 ## 8. CI Coverage Summary
 - **Test Coverage**: Unit, integration, E2E tests passing
@@ -119,4 +117,4 @@ node scripts/verify-schema-env.js
 - **Security Hardening**: Advanced threat protection and monitoring
 
 ---
-Updated automatically by Cursor on 2025-10-13T04:11:34.671Z
+Updated automatically by Cursor on 2025-10-13T04:23:35.829Z

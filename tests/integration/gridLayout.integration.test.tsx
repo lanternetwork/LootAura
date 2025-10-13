@@ -5,7 +5,7 @@ import SalesClient from '@/app/sales/SalesClient'
 import { Sale } from '@/lib/types'
 
 // Mock dependencies
-jest.mock('@/lib/hooks/useFilters', () => ({
+vi.mock('@/lib/hooks/useFilters', () => ({
   __esModule: true,
   default: () => ({
     filters: {
@@ -15,27 +15,27 @@ jest.mock('@/lib/hooks/useFilters', () => ({
       dateRange: 'any',
       categories: []
     },
-    updateFilters: jest.fn()
+    updateFilters: vi.fn()
   })
 }))
 
-jest.mock('@/lib/hooks/useSales', () => ({
+vi.mock('@/lib/hooks/useSales', () => ({
   __esModule: true,
   default: () => ({
     sales: [],
     loading: false,
-    fetchSales: jest.fn(),
-    fetchMapSales: jest.fn()
+    fetchSales: vi.fn(),
+    fetchMapSales: vi.fn()
   })
 }))
 
-jest.mock('@/components/location/SalesMap', () => {
+vi.mock('@/components/location/SalesMap', () => {
   return function MockSalesMap() {
     return <div data-testid="sales-map">Mock Map</div>
   }
 })
 
-jest.mock('@/components/SaleCard', () => {
+vi.mock('@/components/SaleCard', () => {
   return function MockSaleCard({ sale }: { sale: Sale }) {
     return <div data-testid="sale-card" className="sale-row">{sale.title}</div>
   }

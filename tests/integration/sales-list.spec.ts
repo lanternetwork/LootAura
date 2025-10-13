@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
+import { renderWithProviders } from '../utils/renderWithProviders'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SalesList from '@/components/SalesList'
 
@@ -51,11 +52,7 @@ describe('SalesList Integration', () => {
   })
 
   it('should render sales list with proper grid layout', () => {
-    render(
-      <QueryClientProvider client={queryClient}>
-        <SalesList sales={mockSales} />
-      </QueryClientProvider>
-    )
+    renderWithProviders(<SalesList sales={mockSales} />)
 
     // Check that sales are rendered
     expect(screen.getByText('Vintage Chair')).toBeInTheDocument()
@@ -68,11 +65,7 @@ describe('SalesList Integration', () => {
   })
 
   it('should handle empty sales list', () => {
-    render(
-      <QueryClientProvider client={queryClient}>
-        <SalesList sales={[]} />
-      </QueryClientProvider>
-    )
+    renderWithProviders(<SalesList sales={[]} />)
 
     // Should show empty state
     expect(screen.getByText(/no sales found/i)).toBeInTheDocument()
@@ -81,11 +74,7 @@ describe('SalesList Integration', () => {
   it('should filter sales by category', () => {
     const filteredSales = mockSales.filter(sale => sale.category === 'furniture')
     
-    render(
-      <QueryClientProvider client={queryClient}>
-        <SalesList sales={filteredSales} />
-      </QueryClientProvider>
-    )
+    renderWithProviders(<SalesList sales={filteredSales} />)
 
     // Should only show furniture
     expect(screen.getByText('Vintage Chair')).toBeInTheDocument()

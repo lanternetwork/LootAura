@@ -1,42 +1,46 @@
 import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
+import { vi } from 'vitest'
 import SalesGrid from '@/components/SalesGrid'
 import { Sale } from '@/lib/types'
+import { createSales } from '../_helpers/factories'
 
 // Mock SaleCard and SaleCardSkeleton to simplify tests
-jest.mock('@/components/SaleCard', () => {
-  return function MockSaleCard({ sale }: { sale: Sale }) {
+vi.mock('@/components/SaleCard', () => ({
+  __esModule: true,
+  default: function MockSaleCard({ sale }: { sale: Sale }) {
     return <div data-testid="sale-card">{sale.title}</div>
   }
-})
+}))
 
-jest.mock('@/components/SaleCardSkeleton', () => {
-  return function MockSaleCardSkeleton() {
+vi.mock('@/components/SaleCardSkeleton', () => ({
+  __esModule: true,
+  default: function MockSaleCardSkeleton() {
     return <div data-testid="sale-card-skeleton">Loading...</div>
   }
-})
+}))
 
-const mockSales: Sale[] = [
-  { id: '1', title: 'Sale 1', description: 'Desc 1', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-  { id: '2', title: 'Sale 2', description: 'Desc 2', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-  { id: '3', title: 'Sale 3', description: 'Desc 3', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-  { id: '4', title: 'Sale 4', description: 'Desc 4', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-]
+const mockSales = createSales(4, [
+  { title: 'Sale 1', description: 'Desc 1' },
+  { title: 'Sale 2', description: 'Desc 2' },
+  { title: 'Sale 3', description: 'Desc 3' },
+  { title: 'Sale 4', description: 'Desc 4' }
+])
 
 const emptyState = <div>No sales found.</div>
 
 describe('SalesGrid', () => {
   // Mock ResizeObserver
-  let observe: jest.Mock
-  let unobserve: jest.Mock
-  let disconnect: jest.Mock
+  let observe: ReturnType<typeof vi.fn>
+  let unobserve: ReturnType<typeof vi.fn>
+  let disconnect: ReturnType<typeof vi.fn>
 
   beforeAll(() => {
-    observe = jest.fn()
-    unobserve = jest.fn()
-    disconnect = jest.fn()
-    global.ResizeObserver = jest.fn(() => ({
+    observe = vi.fn()
+    unobserve = vi.fn()
+    disconnect = vi.fn()
+    global.ResizeObserver = vi.fn(() => ({
       observe,
       unobserve,
       disconnect,
@@ -125,7 +129,7 @@ describe('SalesGrid', () => {
     Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 700 })
     // Manually trigger the ResizeObserver callback
     // This is a simplified way; in a real browser, the callback would be async
-    ;(global.ResizeObserver as jest.Mock).mock.calls[0][0]([{ target: gridElement }])
+    ;(global.ResizeObserver as ReturnType<typeof vi.fn>).mock.calls[0][0]([{ target: gridElement }])
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '2')
@@ -134,7 +138,7 @@ describe('SalesGrid', () => {
 
     // Simulate a resize to 1200px (should be 3 columns)
     Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 1200 })
-    ;(global.ResizeObserver as jest.Mock).mock.calls[0][0]([{ target: gridElement }])
+    ;(global.ResizeObserver as ReturnType<typeof vi.fn>).mock.calls[0][0]([{ target: gridElement }])
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '3')
@@ -143,7 +147,7 @@ describe('SalesGrid', () => {
 
     // Simulate a resize to 500px (should be 1 column)
     Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 500 })
-    ;(global.ResizeObserver as jest.Mock).mock.calls[0][0]([{ target: gridElement }])
+    ;(global.ResizeObserver as ReturnType<typeof vi.fn>).mock.calls[0][0]([{ target: gridElement }])
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '1')

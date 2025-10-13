@@ -82,12 +82,12 @@ describe('Stabilization Unit Tests', () => {
       expect(shouldSuppressList('MAP', false, false)).toBe(false)
     })
 
-    it('should not suppress under FILTER authority', () => {
-      expect(shouldSuppressList('FILTER', true, false)).toBe(false)
+    it('should not suppress under FILTERS authority', () => {
+      expect(shouldSuppressList('FILTERS', true, false)).toBe(false)
     })
 
-    it('should not suppress under FILTER authority even with equal filters', () => {
-      expect(shouldSuppressList('FILTER', true, false)).toBe(false)
+    it('should not suppress under FILTERS authority even with equal filters', () => {
+      expect(shouldSuppressList('FILTERS', true, false)).toBe(false)
     })
   })
 

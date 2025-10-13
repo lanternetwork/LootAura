@@ -1,12 +1,14 @@
 import React from 'react'
 import { render } from '@testing-library/react'
+import { vi } from 'vitest'
 import SalesClient from '@/app/sales/SalesClient'
 import { Sale } from '@/lib/types'
+import { createSales } from '../_helpers/factories'
 
 // Mock dependencies
-jest.mock('@/lib/hooks/useFilters', () => ({
+vi.mock('@/lib/hooks/useFilters', () => ({
   __esModule: true,
-  default: () => ({
+  useFilters: () => ({
     filters: {
       lat: 38.1405,
       lng: -85.6936,
@@ -14,27 +16,29 @@ jest.mock('@/lib/hooks/useFilters', () => ({
       dateRange: 'any',
       categories: []
     },
-    updateFilters: jest.fn()
+    updateFilters: vi.fn()
   })
 }))
 
-jest.mock('@/components/location/SalesMap', () => {
-  return function MockSalesMap() {
+vi.mock('@/components/location/SalesMap', () => ({
+  __esModule: true,
+  default: function MockSalesMap() {
     return <div data-testid="sales-map">Mock Map</div>
   }
-})
+}))
 
-jest.mock('@/components/SaleCard', () => {
-  return function MockSaleCard({ sale }: { sale: Sale }) {
+vi.mock('@/components/SaleCard', () => ({
+  __esModule: true,
+  default: function MockSaleCard({ sale }: { sale: Sale }) {
     return <div data-testid="sale-card" className="sale-row">{sale.title}</div>
   }
-})
+}))
 
-const mockSales: Sale[] = [
-  { id: '1', title: 'Sale 1', description: 'Desc 1', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-  { id: '2', title: 'Sale 2', description: 'Desc 2', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-  { id: '3', title: 'Sale 3', description: 'Desc 3', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-]
+const mockSales = createSales(3, [
+  { title: 'Sale 1', description: 'Desc 1' },
+  { title: 'Sale 2', description: 'Desc 2' },
+  { title: 'Sale 3', description: 'Desc 3' }
+])
 
 describe('Grid Container Snapshot', () => {
   it('should have stable grid container classes across breakpoints', () => {

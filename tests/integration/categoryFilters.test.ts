@@ -161,7 +161,8 @@ describe('Category Filter Integration Tests', () => {
 
   describe('Authority and Suppression Rules', () => {
     it('should allow list fetch when categories are present and authority is FILTERS', () => {
-      const arbiter = { authority: 'FILTERS' as const }
+      type Authority = 'MAP' | 'FILTERS'
+      const arbiter: { authority: Authority } = { authority: 'FILTERS' }
       const categories = ['tools']
       
       const shouldSuppressList = arbiter.authority === 'MAP' && categories.length === 0

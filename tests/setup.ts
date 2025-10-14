@@ -81,7 +81,11 @@ if (!globalThis.__mswServer) {
   
   beforeAll(() => server.listen())
   afterEach(() => server.resetHandlers())
-  afterAll(() => server.close())
+  afterAll(() => {
+    server.close()
+    // Clean up any process listeners to prevent MaxListenersExceededWarning
+    process.removeAllListeners('unhandledRejection')
+  })
 } else {
   server = globalThis.__mswServer
 }

@@ -3,32 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import AddSaleForm from '@/components/AddSaleForm'
 import { useCreateSale } from '@/lib/hooks/useSales'
 
-// Mock the hooks
-vi.mock('@/lib/hooks/useSales', () => ({
-  useCreateSale: vi.fn()
-}))
-
-// Mock the geocoding function
-vi.mock('@/lib/geocode', () => ({
-  geocodeAddress: vi.fn().mockResolvedValue({
-    lat: 40.7128,
-    lng: -74.0060,
-    city: 'New York',
-    state: 'NY',
-    zip: '10001'
-  })
-}))
-
-// Removed Google Maps mocks (not used)
-
-// Mock the Supabase client
-vi.mock('@/lib/supabase/client', () => ({
-  createSupabaseBrowserClient: () => ({
-    auth: {
-      getUser: () => Promise.resolve({ data: { user: { id: 'test-user' } } })
-    }
-  })
-}))
+// Use global mocks from tests/setup.ts
 
 describe('AddSaleForm', () => {
   beforeEach(() => {

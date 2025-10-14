@@ -3,21 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AddSaleForm from '@/components/AddSaleForm'
 
-// Mock the hooks
-vi.mock('@/lib/hooks/useSales', () => ({
-  useCreateSale: () => ({
-    mutateAsync: vi.fn(),
-    isPending: false,
-    error: null
-  })
-}))
-
-// Google Maps not used; remove related mocks
-
-// Mock geocoding
-vi.mock('@/lib/geocode', () => ({
-  geocodeAddress: vi.fn().mockResolvedValue(null)
-}))
+// Use global mocks from tests/setup.ts
 
 // Mock ImageUploader
 vi.mock('@/components/ImageUploader', () => ({

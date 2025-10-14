@@ -11,13 +11,13 @@ describe('Category Normalization', () => {
     it('should normalize categories to lowercase, trim, dedupe, sort', () => {
       const input = ['Furniture', '  Tools  ', 'furniture', 'Toys']
       const result = normalizeCategories(input)
-      expect(result).toEqual(['furniture', 'toys', 'tools'])
+      expect(result).toEqual(['furniture', 'tools', 'toys'])
     })
 
     it('should handle CSV string input', () => {
       const input = 'furniture,tools,toys'
       const result = normalizeCategories(input)
-      expect(result).toEqual(['furniture', 'toys', 'tools'])
+      expect(result).toEqual(['furniture', 'tools', 'toys'])
     })
 
     it('should handle empty input', () => {

@@ -2,38 +2,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import ReviewsSection from '@/components/ReviewsSection'
 
-// Mock the Supabase client (include rpc as required by component)
-const mockSupabase = {
-  from: vi.fn(() => ({
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        order: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null
-        }))
-      }))
-    }))
-  })),
-  rpc: vi.fn(() => Promise.resolve({
-    data: null,
-    error: null
-  }))
-}
-
-// Mock the async operations to resolve immediately
-const mockFetchReviews = vi.fn().mockResolvedValue({
-  data: [],
-  error: null
-})
-
-const mockFetchUserReview = vi.fn().mockResolvedValue({
-  data: null,
-  error: null
-})
-
-vi.mock('@/lib/supabase/client', () => ({
-  createSupabaseBrowserClient: () => mockSupabase
-}))
+// Use the centralized Supabase mock from tests/setup.ts
+// The mock is already set up globally in setup.ts
 
 // Mock the auth hook
 vi.mock('@/lib/hooks/useAuth', () => ({
@@ -171,18 +141,6 @@ describe('ReviewsSection', () => {
   })
 
   it('shows empty state when no reviews', async () => {
-    // Mock empty reviews response
-    mockSupabase.from.mockReturnValue({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          order: vi.fn(() => Promise.resolve({
-            data: [],
-            error: null
-          }))
-        }))
-      }))
-    })
-
     render(
       <ReviewsSection 
         saleId="test-sale" 
@@ -197,32 +155,6 @@ describe('ReviewsSection', () => {
   })
 
   it('shows existing reviews', async () => {
-    const mockReviews = [
-      {
-        id: '1',
-        rating: 5,
-        comment: 'Great sale!',
-        created_at: '2023-12-01T10:00:00Z'
-      },
-      {
-        id: '2',
-        rating: 4,
-        comment: 'Good prices',
-        created_at: '2023-12-02T10:00:00Z'
-      }
-    ]
-
-    mockSupabase.from.mockReturnValue({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          order: vi.fn(() => Promise.resolve({
-            data: mockReviews,
-            error: null
-          }))
-        }))
-      }))
-    })
-
     render(
       <ReviewsSection 
         saleId="test-sale" 

@@ -197,16 +197,16 @@ export default function AccountClient({ user, profile }: AccountClientProps) {
             <div className="space-y-3">
               <div>
                 <label className="text-sm font-medium text-gray-500">Email</label>
-                <p className="text-gray-900">{user.email}</p>
+                <p className="text-gray-900">{user?.email}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">User ID</label>
-                <p className="text-gray-900 font-mono text-sm">{user.id}</p>
+                <p className="text-gray-900 font-mono text-sm">{user?.id}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Member since</label>
                 <p className="text-gray-900">
-                  {new Date(user.created_at).toLocaleDateString('en-US', {
+                  {new Date(user?.created_at || '').toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric'

@@ -180,7 +180,7 @@ describe('SalesGrid', () => {
       />
     )
     const gridElement = screen.getByTestId('sales-grid')
-    expect(gridElement).toHaveClass('sales-grid', 'custom-class')
+    expect(gridElement).toHaveClass('sales-grid custom-class')
   })
 
   it('sets correct data attributes', () => {

@@ -2,11 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock Supabase client
 const mockSupabase = {
-  from: vi.fn(() => mockSupabase),
-  select: vi.fn(() => mockSupabase),
-  in: vi.fn(() => mockSupabase),
+  from: vi.fn((table: string) => mockSupabase),
+  select: vi.fn((columns: string) => mockSupabase),
+  in: vi.fn((column: string, values: any[]) => mockSupabase),
   data: null,
   error: null,
+  then: vi.fn((resolve) => resolve({ data: mockSupabase.data, error: mockSupabase.error }))
 }
 
 // Mock fetch for API calls
@@ -194,7 +195,7 @@ describe('Category Filter Integration Tests', () => {
     it('should handle null/undefined categories gracefully', () => {
       const categoriesParam = null
       const categories = categoriesParam 
-        ? categoriesParam.split(',').map(c => c.trim()).filter(c => c.length > 0).slice(0, 10)
+        ? (categoriesParam as string).split(',').map((c: string) => c.trim()).filter((c: string) => c.length > 0).slice(0, 10)
         : []
       
       expect(categories).toEqual([])
@@ -203,7 +204,7 @@ describe('Category Filter Integration Tests', () => {
     it('should limit categories to prevent abuse', () => {
       const categoriesParam = 'cat1,cat2,cat3,cat4,cat5,cat6,cat7,cat8,cat9,cat10,cat11'
       const categories = categoriesParam 
-        ? categoriesParam.split(',').map(c => c.trim()).filter(c => c.length > 0).slice(0, 10)
+        ? (categoriesParam as string).split(',').map((c: string) => c.trim()).filter((c: string) => c.length > 0).slice(0, 10)
         : []
       
       expect(categories).toHaveLength(10)
@@ -213,7 +214,7 @@ describe('Category Filter Integration Tests', () => {
     it('should handle whitespace in category names', () => {
       const categoriesParam = ' tools , furniture , electronics '
       const categories = categoriesParam 
-        ? categoriesParam.split(',').map(c => c.trim()).filter(c => c.length > 0).slice(0, 10)
+        ? (categoriesParam as string).split(',').map((c: string) => c.trim()).filter((c: string) => c.length > 0).slice(0, 10)
         : []
       
       expect(categories).toEqual(['tools', 'furniture', 'electronics'])

@@ -254,7 +254,7 @@ export async function GET(request: NextRequest) {
           if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
           return { ...sale, lat: latNum, lng: lngNum }
         })
-        .filter((sale: Sale | null) => sale && typeof sale.lat === 'number' && typeof sale.lng === 'number')
+        .filter((sale: Sale | null): sale is Sale => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
         .filter((sale: Sale) => {
           if (!windowStart && !windowEnd) return true
           // Build sale start/end
@@ -283,10 +283,10 @@ export async function GET(request: NextRequest) {
         .map((sale: Sale) => {
           // Haversine distance calculation
           const R = 6371000 // Earth's radius in meters
-          const dLat = (sale.lat - latitude) * Math.PI / 180
-          const dLng = (sale.lng - longitude) * Math.PI / 180
+          const dLat = ((sale.lat || 0) - latitude) * Math.PI / 180
+          const dLng = ((sale.lng || 0) - longitude) * Math.PI / 180
           const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                   Math.cos(latitude * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
+                   Math.cos(latitude * Math.PI / 180) * Math.cos((sale.lat || 0) * Math.PI / 180) *
                    Math.sin(dLng/2) * Math.sin(dLng/2)
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
           const distanceM = R * c
@@ -298,11 +298,11 @@ export async function GET(request: NextRequest) {
             distance_km: Math.round(distanceKm * 100) / 100
           }
         })
-                .filter((sale: Sale) => sale.distance_km <= distanceKm)
+                .filter((sale: Sale) => (sale.distance_km || 0) <= distanceKm)
                 .sort((a: Sale, b: Sale) => {
                   // Primary sort: distance
-                  if (a.distance_m !== b.distance_m) {
-                    return a.distance_m - b.distance_m
+                  if ((a.distance_m || 0) !== (b.distance_m || 0)) {
+                    return (a.distance_m || 0) - (b.distance_m || 0)
                   }
                   // Secondary sort: date_start
                   const aStart = a.date_start ? new Date(`${a.date_start}T${a.time_start || '00:00:00'}`).getTime() : 0
@@ -413,34 +413,53 @@ export async function GET(request: NextRequest) {
           .sort((a: any, b: any) => a.distance_m - b.distance_m)
           .slice(0, limit)
 
-        results = fallbackFiltered.map((row: any) => ({
+        results = fallbackFiltered.map((row: any): Sale => ({
           id: row.id,
+          owner_id: row.owner_id || '',
           title: row.title,
-          starts_at: row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null,
-          ends_at: row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null,
-          lat: row.lat,
-          lng: row.lng,
+          description: row.description,
+          address: row.address,
           city: row.city,
           state: row.state,
-          zip: row.zip_code,
-          categories: row.tags || [],
-          cover_image_url: null,
+          zip_code: row.zip_code,
+          lat: row.lat,
+          lng: row.lng,
+          date_start: row.date_start || '',
+          time_start: row.time_start || '',
+          date_end: row.date_end,
+          time_end: row.time_end,
+          price: row.price,
+          tags: row.tags || [],
+          status: row.status || 'published',
+          privacy_mode: row.privacy_mode || 'exact',
+          is_featured: row.is_featured || false,
+          created_at: row.created_at || new Date().toISOString(),
+          updated_at: row.updated_at || new Date().toISOString(),
           distance_m: row.distance_m
         }))
       } else {
-        results = salesWithDistance.map((row: any) => ({
+        results = salesWithDistance.map((row: any): Sale => ({
           id: row.id,
+          owner_id: row.owner_id || '',
           title: row.title,
-          // Map to common fields
-          starts_at: row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null,
-          ends_at: row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null,
-          lat: row.lat,
-          lng: row.lng,
+          description: row.description,
+          address: row.address,
           city: row.city,
           state: row.state,
-          zip: row.zip_code,
-          categories: row.tags || [],
-          cover_image_url: null,
+          zip_code: row.zip_code,
+          lat: row.lat,
+          lng: row.lng,
+          date_start: row.date_start || '',
+          time_start: row.time_start || '',
+          date_end: row.date_end,
+          time_end: row.time_end,
+          price: row.price,
+          tags: row.tags || [],
+          status: row.status || 'published',
+          privacy_mode: row.privacy_mode || 'exact',
+          is_featured: row.is_featured || false,
+          created_at: row.created_at || new Date().toISOString(),
+          updated_at: row.updated_at || new Date().toISOString(),
           distance_m: row.distance_m
         }))
       }

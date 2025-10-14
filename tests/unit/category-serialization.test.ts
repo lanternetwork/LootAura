@@ -34,14 +34,14 @@ describe('Category Parameter Serialization', () => {
 
     it('should handle empty string', () => {
       const categoriesParam = ''
-      const categories = categoriesParam ? categoriesParam.split(',').map(s => s.trim()).filter(Boolean) : []
+      const categories = categoriesParam ? (categoriesParam as string).split(',').map((s: string) => s.trim()).filter(Boolean) : []
       
       expect(categories).toEqual([])
     })
 
     it('should handle null/undefined parameter', () => {
       const categoriesParam = null
-      const categories = categoriesParam ? categoriesParam.split(',').map(s => s.trim()).filter(Boolean) : []
+      const categories = categoriesParam ? (categoriesParam as string).split(',').map((s: string) => s.trim()).filter(Boolean) : []
       
       expect(categories).toEqual([])
     })

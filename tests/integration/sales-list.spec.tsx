@@ -73,7 +73,7 @@ describe('SalesList Integration', () => {
   })
 
   it('should filter sales by category', () => {
-    const filteredSales = mockSales.filter(sale => sale.category === 'furniture')
+    const filteredSales = mockSales.filter(sale => sale.tags?.includes('furniture'))
     
     renderWithProviders(<SalesList sales={filteredSales} />)
 

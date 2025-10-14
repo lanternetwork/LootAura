@@ -3,10 +3,12 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { updateProfile, type ProfileUpdateInput } from './_actions'
+import { User } from '@supabase/supabase-js'
+import { Profile } from '@/lib/types'
 
 interface AccountClientProps {
-  user: any
-  profile: any
+  user: User | null
+  profile: Profile | null
 }
 
 export default function AccountClient({ user, profile }: AccountClientProps) {

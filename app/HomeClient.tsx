@@ -3,22 +3,23 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Sale } from '@/lib/types'
+import { User } from '@supabase/supabase-js'
 import SalesMap from '@/components/location/SalesMap'
 import UseLocationButton from '@/components/location/UseLocationButton'
 import { useLocationSearch } from '@/lib/location/useLocation'
 
 interface HomeClientProps {
   initialSales: Sale[]
-  user: any
+  user: User | null
 }
 
-export default function HomeClient({ initialSales, user }: HomeClientProps) {
+export default function HomeClient({ initialSales, user: _user }: HomeClientProps) {
   const [sales, setSales] = useState<Sale[]>(initialSales)
-  const [locationLoading] = useState(false)
-  const [locationError] = useState<string | null>(null)
+  const [_locationLoading] = useState(false)
+  const [_locationError] = useState<string | null>(null)
   const { location, searchWithLocation, setSearchRadius } = useLocationSearch()
 
-  const handleLocationUpdate = async (newLocation: { lat: number; lng: number }) => {
+  const handleLocationUpdate = async (_newLocation: { lat: number; lng: number }) => {
     setSearchRadius(25) // Reset to default distance
     
     try {
@@ -34,7 +35,7 @@ export default function HomeClient({ initialSales, user }: HomeClientProps) {
     }
   }
 
-  const handleLocationClick = () => {}
+  const _handleLocationClick = () => {}
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)

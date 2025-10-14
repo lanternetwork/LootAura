@@ -32,13 +32,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     
     // Parse query parameters
-    const lat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : undefined
-    const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : undefined
+    const lat = searchParams.get('lat') ? parseFloat(searchParams.get('lat') || '0') : undefined
+    const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng') || '0') : undefined
     const distanceKmParam = searchParams.get('distanceKm') ?? searchParams.get('distance')
     const distance = distanceKmParam ? parseFloat(distanceKmParam) : 25
     const city = searchParams.get('city') || undefined
     const categories = searchParams.get('categories')?.split(',') || undefined
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit') || '50') : 50
 
     console.log(`[SALES_SEARCH] params lat=${lat}, lng=${lng}, distKm=${distance}, city=${city}, cats=${categories?.join(',')}, limit=${limit}`)
 

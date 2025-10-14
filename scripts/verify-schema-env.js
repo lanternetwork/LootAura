@@ -42,7 +42,7 @@ async function verifyEnvironment() {
   console.log('✅ All required environment variables present')
   
   // Mask sensitive values for logging
-  const maskedUrl = supabaseUrl.replace(/https:\/\/[^\.]+\.supabase\.co/, 'https://***.supabase.co')
+  const maskedUrl = supabaseUrl.replace(/https:\/\/[^.]+\.supabase\.co/, 'https://***.supabase.co')
   console.log(`   Supabase URL: ${maskedUrl}`)
   console.log(`   Debug mode: ${debugMode}`)
   

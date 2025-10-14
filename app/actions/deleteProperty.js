@@ -34,7 +34,7 @@ async function deleteProperty(propertyId) {
 
   // Delete images from Cloudinary
   if (publicIds.length > 0) {
-    for (let publicId of publicIds) {
+    for (const publicId of publicIds) {
       await cloudinary.uploader.destroy('propertypulse/' + publicId);
     }
   }

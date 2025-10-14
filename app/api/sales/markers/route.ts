@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
-import { toDbSet } from '@/lib/shared/categoryContract'
+import { toDbSet as _toDbSet } from '@/lib/shared/categoryContract'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'

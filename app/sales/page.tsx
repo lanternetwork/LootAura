@@ -145,7 +145,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   }
 
   // Start with empty sales; client fetches immediately using initialCenter
-  let initialSales: any[] = []
+  const initialSales: any[] = []
 
   return (
     <div className="min-h-screen bg-gray-50">

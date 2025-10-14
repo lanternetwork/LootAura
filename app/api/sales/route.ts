@@ -254,7 +254,7 @@ export async function GET(request: NextRequest) {
           if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
           return { ...sale, lat: latNum, lng: lngNum }
         })
-        .filter((sale): sale is Sale => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
+        .filter((sale): sale is NonNullable<Sale> => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
         .filter((sale: Sale) => {
           if (!sale) return false
           if (!windowStart && !windowEnd) return true
@@ -300,8 +300,8 @@ export async function GET(request: NextRequest) {
             distance_km: Math.round(distanceKm * 100) / 100
           }
         })
-                .filter((sale: Sale) => (sale.distance_km || 0) <= distanceKm)
-                .sort((a: Sale, b: Sale) => {
+                .filter((sale) => (sale.distance_km || 0) <= distanceKm)
+                .sort((a, b) => {
                   // Primary sort: distance
                   if ((a.distance_m || 0) !== (b.distance_m || 0)) {
                     return (a.distance_m || 0) - (b.distance_m || 0)
@@ -322,11 +322,11 @@ export async function GET(request: NextRequest) {
       // Debug: Log sample sales and their dates
       if (salesWithDistance.length > 0) {
         console.log('[SALES] Sample filtered sales:', salesWithDistance.slice(0, 3).map(s => ({
-          id: s.id,
-          title: s.title,
-          starts_at: s.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
-          date_start: s.date_start,
-          time_start: s.time_start
+          id: s?.id,
+          title: s?.title,
+          starts_at: s?.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
+          date_start: s?.date_start,
+          time_start: s?.time_start
         })))
       }
       

@@ -5,14 +5,14 @@ const mockSupabase = {
   from: vi.fn((table: string) => mockSupabase),
   select: vi.fn((columns: string) => mockSupabase),
   in: vi.fn((column: string, values: any[]) => mockSupabase),
-  data: null,
-  error: null
+  data: null as any,
+  error: null as any
 }
 
 // Make the mock methods return proper promises
 mockSupabase.from.mockReturnValue(mockSupabase)
 mockSupabase.select.mockReturnValue(mockSupabase)
-mockSupabase.in.mockReturnValue(Promise.resolve({ data: mockSupabase.data, error: mockSupabase.error }))
+mockSupabase.in.mockResolvedValue({ data: mockSupabase.data, error: mockSupabase.error })
 
 // Mock fetch for API calls
 const mockFetch = vi.fn()
@@ -165,7 +165,7 @@ describe('Category Filter Integration Tests', () => {
       const categories = ['tools']
       
       const shouldSuppressList = arbiter.authority === 'MAP'
-      const shouldAllowList = !shouldSuppressList || categories.length === 0
+      const shouldAllowList = !shouldSuppressList || categories.length > 0
       
       expect(shouldSuppressList).toBe(false)
       expect(shouldAllowList).toBe(true)

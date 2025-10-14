@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import * as dateBounds from '@/lib/shared/dateBounds'

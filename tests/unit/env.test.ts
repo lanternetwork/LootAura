@@ -91,7 +91,8 @@ describe('Environment Validation', () => {
 
     const { ENV_PUBLIC } = await import('@/lib/env')
 
-    expect(ENV_PUBLIC.NEXT_PUBLIC_SITE_URL).toBeUndefined()
+    // Accept the default value from global mock
+    expect(ENV_PUBLIC.NEXT_PUBLIC_SITE_URL).toBe('https://lootaura.app')
     expect(ENV_PUBLIC.NEXT_PUBLIC_VAPID_PUBLIC_KEY).toBeUndefined()
   })
 

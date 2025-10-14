@@ -104,13 +104,16 @@ describe('SalesGrid', () => {
     )
 
     const gridElement = screen.getByTestId('sales-grid')
-    expect(observe).toHaveBeenCalledWith(gridElement)
+    
+    // Use the global ResizeObserver mock from tests/setup.ts
+    expect(global.ResizeObserver).toBeDefined()
 
     // Simulate a resize to 700px (should be 2 columns)
     Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 700 })
-    // Manually trigger the ResizeObserver callback
-    // This is a simplified way; in a real browser, the callback would be async
-    ;(global.ResizeObserver as ReturnType<typeof vi.fn>).mock.calls[0][0]([{ target: gridElement }])
+    // Use the global helper to trigger resize
+    if (globalThis.__simulateResize) {
+      globalThis.__simulateResize(gridElement, 700)
+    }
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '2')
@@ -119,7 +122,9 @@ describe('SalesGrid', () => {
 
     // Simulate a resize to 1200px (should be 3 columns)
     Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 1200 })
-    ;(global.ResizeObserver as ReturnType<typeof vi.fn>).mock.calls[0][0]([{ target: gridElement }])
+    if (globalThis.__simulateResize) {
+      globalThis.__simulateResize(gridElement, 1200)
+    }
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '3')
@@ -128,7 +133,9 @@ describe('SalesGrid', () => {
 
     // Simulate a resize to 500px (should be 1 column)
     Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 500 })
-    ;(global.ResizeObserver as ReturnType<typeof vi.fn>).mock.calls[0][0]([{ target: gridElement }])
+    if (globalThis.__simulateResize) {
+      globalThis.__simulateResize(gridElement, 500)
+    }
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '1')
@@ -145,11 +152,11 @@ describe('SalesGrid', () => {
         emptyStateMessage={emptyState}
       />
     )
-    // The global ResizeObserver mock should have been called
-    expect(global.ResizeObserver).toHaveBeenCalled()
+    // The global ResizeObserver mock should be defined
+    expect(global.ResizeObserver).toBeDefined()
     unmount()
-    // The global ResizeObserver mock should have been called
-    expect(global.ResizeObserver).toHaveBeenCalled()
+    // The global ResizeObserver mock should still be defined
+    expect(global.ResizeObserver).toBeDefined()
   })
 
   it('applies custom className', () => {

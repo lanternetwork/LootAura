@@ -133,6 +133,33 @@ vi.mock('@/lib/supabase/client', () => ({
   },
 }))
 
+// Mock useSales hook globally for tests that rely on it implicitly
+vi.mock('@/lib/hooks/useSales', () => {
+  const defaultMutation = {
+    mutateAsync: vi.fn().mockResolvedValue({ id: 'test-id', title: 'Test Sale' }),
+    isPending: false,
+    error: null,
+    data: null,
+    variables: null,
+    isError: false,
+    isSuccess: false,
+    reset: vi.fn(),
+    mutate: vi.fn(),
+  }
+  return {
+    useCreateSale: vi.fn(() => defaultMutation),
+  }
+})
+
+// Mock geocoding module globally
+vi.mock('@/lib/geocode', () => ({
+  geocodeAddress: vi.fn().mockResolvedValue({
+    lat: 38.1405,
+    lng: -85.6936,
+    formatted_address: '123 Test St, Louisville, KY'
+  })
+}))
+
 // Google Maps not used anymore; remove related mocks/globals
 
 // Mock geolocation
@@ -150,7 +177,11 @@ const resizeCallbacks: Array<(entries: Array<{ target: Element; contentRect: DOM
 global.ResizeObserver = vi.fn().mockImplementation((cb: any) => {
   resizeCallbacks.push(cb)
   return {
-    observe: vi.fn(),
+    observe: vi.fn((el: Element) => {
+      // Trigger an initial resize with a reasonable width to produce 2 columns
+      const rect = (DOMRect as any).fromRect({ x: 0, y: 0, width: 900, height: 600 })
+      cb([{ target: el, contentRect: rect }])
+    }),
     unobserve: vi.fn(),
     disconnect: vi.fn(),
   }

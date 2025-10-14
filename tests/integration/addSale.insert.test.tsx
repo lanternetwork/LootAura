@@ -3,6 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMockSupabaseClient, getAddressFixtures } from '@/tests/utils/mocks'
 import { useCreateSale, useSales } from '@/lib/hooks/useSales'
+import Explore from '@/app/(app)/explore/page'
+
 vi.mock('@/app/(app)/explore/page', () => ({
   __esModule: true,
   default: function Explore() {
@@ -17,7 +19,6 @@ vi.mock('@/app/(app)/explore/page', () => ({
     )
   }
 }))
-import Explore from '@/app/(app)/explore/page'
 
 // Mock the hooks
 vi.mock('@/lib/hooks/useSales', () => ({

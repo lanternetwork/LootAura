@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { validateDateRange } from '@/lib/shared/dateBounds'
+import { validateDateRange, parseDateBounds, checkDateOverlap } from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 
 // Force dynamic rendering for this API route

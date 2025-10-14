@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Sale } from '@/lib/types'
 import { validateDateRange } from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
+import { toDbSet } from '@/lib/shared/categoryContract'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines

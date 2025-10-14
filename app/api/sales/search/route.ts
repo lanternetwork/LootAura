@@ -61,7 +61,6 @@ export async function GET(request: NextRequest) {
         error = salesError
       } else {
         // Client-side distance filtering using Haversine formula
-        const distanceMeters = distance * 1000
         sales = (salesData || [])
           .map((sale: any) => {
             // Haversine distance calculation
@@ -72,12 +71,12 @@ export async function GET(request: NextRequest) {
                      Math.cos(lat * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
                      Math.sin(dLng/2) * Math.sin(dLng/2)
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-            const distanceM = R * c
+            const _distanceM = R * c
             
             return {
               ...sale,
-              distance_m: Math.round(distanceM),
-              distance_km: Math.round(distanceM / 1000 * 100) / 100
+              distance_m: Math.round(_distanceM),
+              distance_km: Math.round(_distanceM / 1000 * 100) / 100
             }
           })
           .filter((sale: any) => sale.distance_km <= distance)

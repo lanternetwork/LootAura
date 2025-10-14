@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { T } from '@/lib/supabase/tables'
+import { T as _T } from '@/lib/supabase/tables'
 import webpush from 'web-push'
 
 function configureWebPushOrReturnError() {
@@ -18,7 +18,7 @@ function configureWebPushOrReturnError() {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const vapidError = configureWebPushOrReturnError()
     if (vapidError) {

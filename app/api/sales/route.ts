@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Sale } from '@/lib/types'
-import { parseDateBounds as _parseDateBounds, checkDateOverlap as _checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
+import { validateDateRange } from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
-import { toDbSet, buildDbMapping as _buildDbMapping } from '@/lib/shared/categoryContract'
+import { toDbSet } from '@/lib/shared/categoryContract'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines

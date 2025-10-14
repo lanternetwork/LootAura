@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const supabase = createSupabaseServerClient()
     
-    const { data, error } = await supabase
+    const { data: _data, error } = await supabase
       .from('sales')
       .select('id')
       .limit(1)

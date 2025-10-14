@@ -167,6 +167,12 @@ vi.mock('@/lib/hooks/useSales', () => {
   }
   return {
     useCreateSale: vi.fn(() => defaultMutation),
+    useSales: vi.fn(() => ({
+      data: [],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn()
+    }))
   }
 })
 
@@ -224,6 +230,22 @@ global.ResizeObserver = vi.fn().mockImplementation((cb: any) => {
     disconnect: vi.fn(),
   }
 })
+
+// Helper to trigger ResizeObserver with specific width for tests
+export const __simulateResize = (target: Element, width: number) => {
+  Object.defineProperty(target, 'offsetWidth', { configurable: true, value: width });
+  const entry = [{
+    target,
+    contentRect: {
+      x: 0, y: 0, width, height: 0, top: 0, left: 0, right: width, bottom: 0,
+      toJSON: () => ({ x: 0, y: 0, width, height: 0, top: 0, left: 0, right: width, bottom: 0 })
+    },
+    borderBoxSize: [],
+    contentBoxSize: [],
+    devicePixelContentBoxSize: []
+  }];
+  resizeCallbacks.forEach(callback => callback(entry, null as any));
+};
 
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),

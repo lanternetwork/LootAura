@@ -31,7 +31,6 @@ vi.mock('next/navigation', () => ({
 describe('Add Sale Integration', () => {
   let mockSupabase: any
   let queryClient: QueryClient
-  let mockCreateSale: any
 
   beforeEach(() => {
     mockSupabase = createMockSupabaseClient()
@@ -68,16 +67,8 @@ describe('Add Sale Integration', () => {
       updated_at: new Date().toISOString()
     }
 
-    mockCreateSale.mutateAsync.mockResolvedValue(createdSale)
-
-    // Mock the sales list to return the new sale
-    vi.mocked(useSales).mockReturnValue({
-      data: [createdSale as any],
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null
-    } as any)
+    // Use global mock from tests/setup.ts - it already returns the created sale
+    // The global mock will handle the mutation and React Query cache update
 
     render(
       <QueryClientProvider client={queryClient}>

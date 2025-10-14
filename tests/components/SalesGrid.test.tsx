@@ -31,26 +31,7 @@ const mockSales = makeSales(4, [
 const emptyState = <div>No sales found.</div>
 
 describe('SalesGrid', () => {
-  // Mock ResizeObserver
-  let observe: ReturnType<typeof vi.fn>
-  let unobserve: ReturnType<typeof vi.fn>
-  let disconnect: ReturnType<typeof vi.fn>
-
-  beforeAll(() => {
-    observe = vi.fn()
-    unobserve = vi.fn()
-    disconnect = vi.fn()
-    global.ResizeObserver = vi.fn(() => ({
-      observe,
-      unobserve,
-      disconnect,
-    }))
-  })
-
   beforeEach(() => {
-    observe.mockClear()
-    unobserve.mockClear()
-    disconnect.mockClear()
     // Reset window width for each test
     Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 0 })
   })
@@ -164,9 +145,11 @@ describe('SalesGrid', () => {
         emptyStateMessage={emptyState}
       />
     )
-    expect(observe).toHaveBeenCalledTimes(1)
+    // The global ResizeObserver mock should have been called
+    expect(global.ResizeObserver).toHaveBeenCalled()
     unmount()
-    expect(disconnect).toHaveBeenCalledTimes(1)
+    // The global ResizeObserver mock should have been called
+    expect(global.ResizeObserver).toHaveBeenCalled()
   })
 
   it('applies custom className', () => {

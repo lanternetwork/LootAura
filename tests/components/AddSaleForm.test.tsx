@@ -4,6 +4,21 @@ import AddSaleForm from '@/components/AddSaleForm'
 
 // Use global mocks from tests/setup.ts
 
+// Mock useCreateSale hook
+vi.mock('@/lib/hooks/useSales', () => ({
+  useCreateSale: vi.fn(() => ({
+    mutateAsync: vi.fn().mockResolvedValue({ id: 'test-id', title: 'Test Sale' }),
+    isPending: false,
+    error: null,
+    data: null,
+    variables: null,
+    isError: false,
+    isSuccess: false,
+    reset: vi.fn(),
+    mutate: vi.fn()
+  }))
+}))
+
 describe('AddSaleForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -83,20 +98,24 @@ describe('AddSaleForm', () => {
     })
   })
 
-  it('adds and removes tags', () => {
+  it('adds and removes tags', async () => {
     render(<AddSaleForm />)
     
     const tagInput = screen.getByPlaceholderText('Add a tag...')
     fireEvent.change(tagInput, { target: { value: 'furniture' } })
     fireEvent.keyDown(tagInput, { key: 'Enter' })
 
-    expect(screen.getByText('furniture')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('furniture')).toBeInTheDocument()
+    })
 
     // Remove tag
     const removeButtons = screen.getAllByRole('button')
     fireEvent.click(removeButtons.find(b => b.textContent === '×') as HTMLElement)
 
-    expect(screen.queryByText('furniture')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByText('furniture')).not.toBeInTheDocument()
+    })
   })
 
   it('validates price range', async () => {

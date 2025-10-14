@@ -8,10 +8,10 @@ describe('MAP Authority Query Building', () => {
       global.fetch = mockFetch
 
       // Mock arbiter with MAP authority
-      const arbiter = { authority: 'MAP' as const }
+      const arbiter: { authority: 'MAP' | 'FILTERS' } = { authority: 'MAP' }
       
-      // Simulate fetchSales call under MAP authority
-      const shouldCallWideSales = arbiter.authority === 'FILTERS'
+      // Simulate fetchSales call under MAP authority - should skip wide sales
+      const shouldCallWideSales = arbiter.authority !== 'MAP'
       
       expect(shouldCallWideSales).toBe(false)
       expect(mockFetch).not.toHaveBeenCalled()
@@ -22,7 +22,7 @@ describe('MAP Authority Query Building', () => {
       global.fetch = mockFetch
 
       // Mock arbiter with FILTERS authority
-      const arbiter = { authority: 'FILTERS' as const }
+      const arbiter: { authority: 'MAP' | 'FILTERS' } = { authority: 'FILTERS' }
       
       // Simulate fetchSales call under FILTERS authority
       const shouldCallWideSales = arbiter.authority === 'FILTERS'

@@ -254,8 +254,8 @@ export async function GET(request: NextRequest) {
           if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
           return { ...sale, lat: latNum, lng: lngNum }
         })
-        .filter((sale: Sale | null): sale is Sale => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
-        .filter((sale: Sale | null): sale is Sale => {
+        .filter((sale): sale is Sale => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
+        .filter((sale: Sale) => {
           if (!sale) return false
           if (!windowStart && !windowEnd) return true
           // Build sale start/end
@@ -281,7 +281,8 @@ export async function GET(request: NextRequest) {
           }
           return passes
         })
-        .map((sale: Sale) => {
+        .map((sale: Sale | null) => {
+          if (!sale) return null
           // Haversine distance calculation
           const R = 6371000 // Earth's radius in meters
           const dLat = ((sale.lat || 0) - latitude) * Math.PI / 180

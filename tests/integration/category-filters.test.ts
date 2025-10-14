@@ -6,9 +6,13 @@ const mockSupabase = {
   select: vi.fn((columns: string) => mockSupabase),
   in: vi.fn((column: string, values: any[]) => mockSupabase),
   data: null,
-  error: null,
-  then: vi.fn((resolve) => resolve({ data: mockSupabase.data, error: mockSupabase.error }))
+  error: null
 }
+
+// Make the mock methods return proper promises
+mockSupabase.from.mockReturnValue(mockSupabase)
+mockSupabase.select.mockReturnValue(mockSupabase)
+mockSupabase.in.mockReturnValue(Promise.resolve({ data: mockSupabase.data, error: mockSupabase.error }))
 
 // Mock fetch for API calls
 const mockFetch = vi.fn()
@@ -64,7 +68,7 @@ describe('Category Filter Integration Tests', () => {
         { sale_id: 'sale-1' },
         { sale_id: 'sale-2' },
         { sale_id: 'sale-3' }
-      ] as any
+      ]
       mockSupabase.error = null
 
       // Simulate the category filtering logic
@@ -82,7 +86,7 @@ describe('Category Filter Integration Tests', () => {
 
     it('should return empty result when no sales match categories', async () => {
       const categories = ['nonexistent-category']
-      mockSupabase.data = [] as any
+      mockSupabase.data = []
       mockSupabase.error = null
 
       const { data: salesWithCategories, error: categoryError } = await mockSupabase
@@ -97,7 +101,7 @@ describe('Category Filter Integration Tests', () => {
     it('should handle database errors gracefully', async () => {
       const categories = ['tools']
       mockSupabase.data = null
-      mockSupabase.error = { code: '42703', message: 'column items_v2.category does not exist' } as any
+      mockSupabase.error = { code: '42703', message: 'column items_v2.category does not exist' }
 
       const { data: salesWithCategories, error: categoryError } = await mockSupabase
         .from('items_v2')

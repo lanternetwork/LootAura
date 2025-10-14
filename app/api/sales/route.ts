@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
+import { Sale } from '@/lib/types'
+import { parseDateBounds as _parseDateBounds, checkDateOverlap as _checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
-import { toDbSet, buildDbMapping } from '@/lib/shared/categoryContract'
+import { toDbSet, buildDbMapping as _buildDbMapping } from '@/lib/shared/categoryContract'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     
     // 2. Parse & validate other parameters
     const distanceKm = Math.max(1, Math.min(
-      searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm')!) : 40,
+      searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm') || '40') : 40,
       160
     ))
     
@@ -76,8 +77,8 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
     
-    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 24, 48)
-    const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0, 0)
+    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24, 48)
+    const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset') || '0') : 0, 0)
     
     // Validate date range parameters
     const dateValidation = validateDateRange(startDate, endDate)
@@ -104,7 +105,7 @@ export async function GET(request: NextRequest) {
           startDateParam = now.toISOString().split('T')[0]
           endDateParam = now.toISOString().split('T')[0]
           break
-        case 'weekend':
+        case 'weekend': {
           const saturday = new Date(now)
           saturday.setDate(now.getDate() + (6 - now.getDay()))
           const sunday = new Date(saturday)
@@ -112,7 +113,8 @@ export async function GET(request: NextRequest) {
           startDateParam = saturday.toISOString().split('T')[0]
           endDateParam = sunday.toISOString().split('T')[0]
           break
-        case 'next_weekend':
+        }
+        case 'next_weekend': {
           const nextSaturday = new Date(now)
           nextSaturday.setDate(now.getDate() + (6 - now.getDay()) + 7)
           const nextSunday = new Date(nextSaturday)
@@ -120,12 +122,13 @@ export async function GET(request: NextRequest) {
           startDateParam = nextSaturday.toISOString().split('T')[0]
           endDateParam = nextSunday.toISOString().split('T')[0]
           break
+        }
       }
     }
     
     console.log(`[SALES] Query params: lat=${latitude}, lng=${longitude}, km=${distanceKm}, start=${startDateParam}, end=${endDateParam}, categories=[${categories.join(',')}], q=${q}, limit=${limit}, offset=${offset}`)
     
-    let results: any[] = []
+    let results: Sale[] = []
     let degraded = false
     
     // 3. Use direct query to sales_v2 view (RPC functions have permission issues)
@@ -244,14 +247,14 @@ export async function GET(request: NextRequest) {
       console.log('[SALES] Date filtering:', { startDateParam, endDateParam, windowStart, windowEnd })
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
-        .map((sale: any) => {
+        .map((sale: Sale) => {
           const latNum = typeof sale.lat === 'number' ? sale.lat : parseFloat(String(sale.lat))
           const lngNum = typeof sale.lng === 'number' ? sale.lng : parseFloat(String(sale.lng))
           if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
           return { ...sale, lat: latNum, lng: lngNum }
         })
-        .filter((sale: any) => sale && typeof sale.lat === 'number' && typeof sale.lng === 'number')
-        .filter((sale: any) => {
+        .filter((sale: Sale | null) => sale && typeof sale.lat === 'number' && typeof sale.lng === 'number')
+        .filter((sale: Sale) => {
           if (!windowStart && !windowEnd) return true
           // Build sale start/end
           const saleStart = sale.starts_at
@@ -280,7 +283,7 @@ export async function GET(request: NextRequest) {
           }
           return passes
         })
-        .map((sale: any) => {
+        .map((sale: Sale) => {
           // Haversine distance calculation
           const R = 6371000 // Earth's radius in meters
           const dLat = (sale.lat - latitude) * Math.PI / 180
@@ -298,8 +301,8 @@ export async function GET(request: NextRequest) {
             distance_km: Math.round(distanceKm * 100) / 100
           }
         })
-                .filter((sale: any) => sale.distance_km <= distanceKm)
-                .sort((a: any, b: any) => {
+                .filter((sale: Sale) => sale.distance_km <= distanceKm)
+                .sort((a: Sale, b: Sale) => {
                   // Primary sort: distance
                   if (a.distance_m !== b.distance_m) {
                     return a.distance_m - b.distance_m
@@ -346,7 +349,7 @@ export async function GET(request: NextRequest) {
       // Debug: Check if date filtering is actually being applied
       if (windowStart && windowEnd) {
         const salesBeforeDateFilter = (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number')
-        const salesAfterDateFilter = salesBeforeDateFilter.filter((sale: any) => {
+        const salesAfterDateFilter = salesBeforeDateFilter.filter((sale: Sale) => {
           const saleStart = sale.starts_at
             ? new Date(sale.starts_at)
             : (sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null)
@@ -500,7 +503,7 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json()
     
-    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags, contact } = body
+    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact } = body
     
     const { data, error } = await supabase
       .from('sales_v2')

@@ -4,7 +4,8 @@ import {
   toDbSet, 
   buildDbMapping, 
   getUICategories,
-  hasDbMapping 
+  hasDbMapping,
+  getDbMapping
 } from '@/lib/shared/categoryContract'
 
 describe('Category Contract', () => {

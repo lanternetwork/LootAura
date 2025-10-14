@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
-import { NextResponse, cookies, type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
+import { cookies } from 'next/headers'
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

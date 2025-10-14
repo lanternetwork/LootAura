@@ -87,7 +87,7 @@ describe('Grid Container Snapshot', () => {
     const saleCounts = [0, 1, 3, 6, 12]
     
     saleCounts.forEach(count => {
-      const sales = Array.from({ length: count }, (_, i) => ({
+      const sales = makeSales(count, Array.from({ length: count }, (_, i) => ({
         id: `${i + 1}`,
         title: `Sale ${i + 1}`,
         description: `Desc ${i + 1}`,
@@ -95,7 +95,7 @@ describe('Grid Container Snapshot', () => {
         lng: 0,
         date_start: '2025-01-01',
         time_start: '09:00'
-      }))
+      })))
 
       const { container } = render(
         <SalesClient

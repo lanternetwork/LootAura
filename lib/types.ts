@@ -20,6 +20,9 @@ export type Sale = {
   is_featured: boolean
   created_at: string
   updated_at: string
+  // Computed properties added during API processing
+  distance_m?: number
+  distance_km?: number
 }
 
 export type SaleItem = {
@@ -38,6 +41,7 @@ export type Profile = {
   id: string
   display_name?: string
   avatar_url?: string
+  bio?: string
   created_at?: string
 }
 

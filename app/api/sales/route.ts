@@ -258,12 +258,8 @@ export async function GET(request: NextRequest) {
         .filter((sale: Sale) => {
           if (!windowStart && !windowEnd) return true
           // Build sale start/end
-          const saleStart = sale.starts_at
-            ? new Date(sale.starts_at)
-            : (sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null)
-          const saleEnd = sale.ends_at
-            ? new Date(sale.ends_at)
-            : (sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null)
+          const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null
+          const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
           // If a date window is set, exclude rows with no date information to avoid always passing
           if ((windowStart || windowEnd) && !saleStart && !saleEnd) return false
           const s = saleStart || saleEnd
@@ -308,9 +304,11 @@ export async function GET(request: NextRequest) {
                   if (a.distance_m !== b.distance_m) {
                     return a.distance_m - b.distance_m
                   }
-                  // Secondary sort: starts_at
-                  if (a.starts_at !== b.starts_at) {
-                    return new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()
+                  // Secondary sort: date_start
+                  const aStart = a.date_start ? new Date(`${a.date_start}T${a.time_start || '00:00:00'}`).getTime() : 0
+                  const bStart = b.date_start ? new Date(`${b.date_start}T${b.time_start || '00:00:00'}`).getTime() : 0
+                  if (aStart !== bStart) {
+                    return aStart - bStart
                   }
                   // Tertiary sort: id (stable)
                   return a.id.localeCompare(b.id)
@@ -324,7 +322,7 @@ export async function GET(request: NextRequest) {
         console.log('[SALES] Sample filtered sales:', salesWithDistance.slice(0, 3).map(s => ({
           id: s.id,
           title: s.title,
-          starts_at: s.starts_at,
+          starts_at: s.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
           date_start: s.date_start,
           time_start: s.time_start
         })))
@@ -334,7 +332,7 @@ export async function GET(request: NextRequest) {
       console.log('[SALES] Raw data before filtering:', (salesData || []).slice(0, 3).map(s => ({
         id: s.id,
         title: s.title,
-        starts_at: s.starts_at,
+        starts_at: s.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
         date_start: s.date_start,
         time_start: s.time_start
       })))
@@ -351,12 +349,8 @@ export async function GET(request: NextRequest) {
       if (windowStart && windowEnd) {
         const salesBeforeDateFilter = (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number')
         const salesAfterDateFilter = salesBeforeDateFilter.filter((sale: Sale) => {
-          const saleStart = sale.starts_at
-            ? new Date(sale.starts_at)
-            : (sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null)
-          const saleEnd = sale.ends_at
-            ? new Date(sale.ends_at)
-            : (sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null)
+          const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null
+          const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
           if (!saleStart && !saleEnd) return true
           const s = saleStart || saleEnd
           const e = saleEnd || saleStart
@@ -387,12 +381,8 @@ export async function GET(request: NextRequest) {
           // date window overlap (exclude undated when window set)
           .filter((row: any) => {
             if (!windowStart && !windowEnd) return true
-            const saleStart = row.starts_at
-              ? new Date(row.starts_at)
-              : (row.date_start ? new Date(`${row.date_start}T${row.time_start || '00:00:00'}`) : null)
-            const saleEnd = row.ends_at
-              ? new Date(row.ends_at)
-              : (row.date_end ? new Date(`${row.date_end}T${row.time_end || '23:59:59'}`) : null)
+            const saleStart = row.date_start ? new Date(`${row.date_start}T${row.time_start || '00:00:00'}`) : null
+            const saleEnd = row.date_end ? new Date(`${row.date_end}T${row.time_end || '23:59:59'}`) : null
             if (!saleStart && !saleEnd) return false
             const s = saleStart || saleEnd
             const e = saleEnd || saleStart
@@ -426,8 +416,8 @@ export async function GET(request: NextRequest) {
         results = fallbackFiltered.map((row: any) => ({
           id: row.id,
           title: row.title,
-          starts_at: row.starts_at || (row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null),
-          ends_at: row.ends_at || (row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null),
+          starts_at: row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null,
+          ends_at: row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null,
           lat: row.lat,
           lng: row.lng,
           city: row.city,
@@ -442,8 +432,8 @@ export async function GET(request: NextRequest) {
           id: row.id,
           title: row.title,
           // Map to common fields
-          starts_at: row.starts_at || (row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null),
-          ends_at: row.ends_at || (row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null),
+          starts_at: row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null,
+          ends_at: row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null,
           lat: row.lat,
           lng: row.lng,
           city: row.city,

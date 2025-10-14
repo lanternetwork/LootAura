@@ -3,30 +3,31 @@ import { screen } from '@testing-library/react'
 import { renderWithProviders } from '../utils/renderWithProviders'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SalesList from '@/components/SalesList'
+import { makeSales } from '../_helpers/factories'
 
 // Mock the sales data
-const mockSales = [
+const mockSales = makeSales(2, [
   {
     id: '1',
     title: 'Vintage Chair',
     description: 'Beautiful vintage chair',
     price: 50,
-    location: 'Louisville, KY',
-    date: '2024-01-15',
-    category: 'furniture',
-    images: ['https://example.com/chair.jpg']
+    city: 'Louisville',
+    state: 'KY',
+    date_start: '2024-01-15',
+    time_start: '09:00'
   },
   {
     id: '2', 
     title: 'Power Tools',
     description: 'Set of power tools',
     price: 100,
-    location: 'Nashville, TN',
-    date: '2024-01-16',
-    category: 'tools',
-    images: ['https://example.com/tools.jpg']
+    city: 'Nashville',
+    state: 'TN',
+    date_start: '2024-01-16',
+    time_start: '10:00'
   }
-]
+])
 
 // Mock the useSales hook
 vi.mock('@/lib/hooks/useSales', () => ({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { validateDateRange, parseDateBounds, checkDateOverlap } from '@/lib/shared/dateBounds'
+import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 
 // Force dynamic rendering for this API route
@@ -129,19 +129,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Validate date range parameters
-    const dateValidation = validateDateRange(startDate, endDate)
+    const dateValidation = dateBounds.validateDateRange(startDate, endDate)
     if (!dateValidation.valid) {
       return NextResponse.json({ error: dateValidation.error }, { status: 400 })
     }
 
     // Parse date bounds using shared helper
-    const dateBounds = parseDateBounds(startDate, endDate)
+    const dateWindow = dateBounds.parseDateBounds(startDate, endDate)
     
     // Debug logging for date filtering
     console.log('[MARKERS API] Date filtering debug:', {
       startDate,
       endDate,
-      dateBounds,
+      dateBounds: dateWindow,
       totalRecords: data?.length || 0,
       url: request.url,
       sampleSales: data?.slice(0, 3).map((s: any) => ({
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
       .filter((sale: any) => {
         // Skip date filtering if no date bounds provided
-        if (!dateBounds) return true
+        if (!dateWindow) return true
         
         // Skip sales with no date information
         if (!sale.saleStart && !sale.saleEnd) {
@@ -203,14 +203,14 @@ export async function GET(request: NextRequest) {
           return false
         }
         
-        const overlaps = checkDateOverlap(sale.saleStart, sale.saleEnd, dateBounds)
+        const overlaps = dateBounds.checkDateOverlap(sale.saleStart, sale.saleEnd, dateWindow)
         if (!overlaps) {
           console.log('[MARKERS API] Sale filtered out by date:', {
             saleId: sale.id,
             title: sale.title,
             saleStart: sale.saleStart,
             saleEnd: sale.saleEnd,
-            dateBounds,
+            dateBounds: dateWindow,
             originalDateStart: sale.date_start,
             originalDateEnd: sale.date_end,
             originalTimeStart: sale.time_start,

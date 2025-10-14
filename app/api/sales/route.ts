@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Sale } from '@/lib/types'
-import { validateDateRange } from '@/lib/shared/dateBounds'
+import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
 
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset') || '0') : 0, 0)
     
     // Validate date range parameters
-    const dateValidation = validateDateRange(startDate, endDate)
+    const dateValidation = dateBounds.validateDateRange(startDate, endDate)
     if (!dateValidation.valid) {
       return NextResponse.json({ 
         ok: false, 

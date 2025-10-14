@@ -21,10 +21,23 @@ vi.mock('@/lib/hooks/useFilters', () => ({
   })
 }))
 
+// Mock to force FILTERS authority (not MAP) to prevent list suppression
+vi.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false
+  })
+}))
+
 vi.mock('@/lib/hooks/useSales', () => ({
   __esModule: true,
   default: () => ({
-    sales: [],
+    sales: makeSales(4, [
+      { title: 'Sale 1', description: 'Desc 1' },
+      { title: 'Sale 2', description: 'Desc 2' },
+      { title: 'Sale 3', description: 'Desc 3' },
+      { title: 'Sale 4', description: 'Desc 4' }
+    ]),
     loading: false,
     fetchSales: vi.fn(),
     fetchMapSales: vi.fn()

@@ -5,16 +5,23 @@ import * as matchers from '@testing-library/jest-dom/matchers'
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 
-// Extend Vitest's expect with jest-dom matchers
-expect.extend(matchers)
+// Idempotence guard to prevent multiple setup
+if (!globalThis.__testSetupInitialized) {
+  globalThis.__testSetupInitialized = true
 
-// Cleanup after each test
-afterEach(() => {
-  cleanup()
-})
+  // Extend Vitest's expect with jest-dom matchers
+  expect.extend(matchers)
 
-// MSW server for API mocking
-const server = setupServer(
+  // Cleanup after each test
+  afterEach(() => {
+    cleanup()
+  })
+}
+
+// MSW server for API mocking (only create once)
+let server: ReturnType<typeof setupServer>
+if (!globalThis.__mswServer) {
+  server = setupServer(
   // Mock /api/sales/markers endpoint
   http.get('/api/sales/markers', ({ request }) => {
     const url = new URL(request.url)
@@ -68,21 +75,30 @@ const server = setupServer(
     
     return HttpResponse.json({ ok: true, data: sales, count: sales.length })
   })
-)
-
-beforeAll(() => server.listen())
-afterEach(() => server.resetHandlers())
-afterAll(() => server.close())
+  )
+  
+  globalThis.__mswServer = server
+  
+  beforeAll(() => server.listen())
+  afterEach(() => server.resetHandlers())
+  afterAll(() => server.close())
+} else {
+  server = globalThis.__mswServer
+}
 
 // Export server for use in tests
 export { server }
 
-// Mock environment variables
-process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
-process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key'
-process.env.NEXT_PUBLIC_DEBUG = 'false'
-// Do not set service role in tests
+// Global registrations (only once)
+if (!globalThis.__globalsRegistered) {
+  globalThis.__globalsRegistered = true
+  
+  // Mock environment variables
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key'
+  process.env.NEXT_PUBLIC_DEBUG = 'false'
+  // Do not set service role in tests
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -338,16 +354,10 @@ global.fetch = vi.fn().mockImplementation((input: RequestInfo | URL, init?: Requ
   throw new Error(`fetch() called in test without mock: ${url}`)
 })
 
-// Mock next/image without JSX to keep this file .ts
-vi.mock('next/image', () => ({
-  default: ({ src, alt, ...props }: any) => {
-    return React.createElement('img', { src, alt, ...props })
-  },
-}))
-
-// Helper to simulate container resize in tests
-export function __simulateResize(target: Element, width: number, height = 600) {
-  Object.defineProperty(target, 'offsetWidth', { configurable: true, value: width })
-  const rect = (DOMRect as any).fromRect({ x: 0, y: 0, width, height })
-  resizeCallbacks.forEach(cb => cb([{ target, contentRect: rect } as any]))
+  // Mock next/image without JSX to keep this file .ts
+  vi.mock('next/image', () => ({
+    default: ({ src, alt, ...props }: any) => {
+      return React.createElement('img', { src, alt, ...props })
+    },
+  }))
 }

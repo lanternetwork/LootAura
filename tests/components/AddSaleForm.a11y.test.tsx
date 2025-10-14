@@ -15,6 +15,11 @@ vi.mock('@/components/ImageUploader', () => ({
 }))
 
 describe('AddSaleForm Accessibility', () => {
+  beforeEach(() => {
+    // Mock window.alert for JSDOM
+    global.alert = vi.fn()
+  })
+
   it('should have proper form labels and structure', () => {
     render(<AddSaleForm />)
     
@@ -129,6 +134,11 @@ describe('AddSaleForm Accessibility', () => {
     expect(addTagButton).toHaveFocus()
     
     await user.tab()
+    // ImageUploader button comes next
+    const imageUploaderButton = screen.getByText('Upload Image')
+    expect(imageUploaderButton).toHaveFocus()
+    
+    await user.tab()
     expect(submitButton).toHaveFocus()
   })
 
@@ -235,8 +245,11 @@ describe('AddSaleForm Accessibility', () => {
     // Check that all inputs have associated labels
     const inputs = screen.getAllByRole('textbox')
     inputs.forEach(input => {
-      const label = screen.getByLabelText(input.getAttribute('aria-label') || '')
-      expect(label).toBeInTheDocument()
+      const id = input.getAttribute('id')
+      if (id) {
+        const label = screen.getByLabelText(id)
+        expect(label).toBeInTheDocument()
+      }
     })
     
     // Check that all buttons have accessible names

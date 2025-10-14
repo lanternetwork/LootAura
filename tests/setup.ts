@@ -204,6 +204,29 @@ const geocodeHandlers = [
       }])
     }
     return HttpResponse.json([])
+  }),
+  http.get('https://maps.googleapis.com/maps/api/geocode/json', ({ request }) => {
+    const url = new URL(request.url)
+    const address = url.searchParams.get('address')
+    if (address && address.includes('Test')) {
+      return HttpResponse.json({
+        results: [{
+          geometry: {
+            location: {
+              lat: 38.1405,
+              lng: -85.6936
+            }
+          },
+          formatted_address: '123 Test St, Louisville, KY',
+          address_components: [
+            { long_name: 'Louisville', types: ['locality'] },
+            { short_name: 'KY', types: ['administrative_area_level_1'] },
+            { long_name: '40201', types: ['postal_code'] }
+          ]
+        }]
+      })
+    }
+    return HttpResponse.json({ results: [] })
   })
 ]
 
@@ -300,11 +323,12 @@ global.TextDecoder = TextDecoder
 global.fetch = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' ? input : (input as URL).toString()
   if (url.includes('nominatim.openstreetmap.org')) {
-    // Minimal Nominatim-like response
-    const payload = [
-      { lat: '38.1405', lon: '-85.6936', display_name: 'Test Address' }
-    ]
-    return Promise.resolve(new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    // Delegate to MSW for Nominatim
+    return server.handleRequest(new Request(input, init));
+  }
+  if (url.includes('maps.googleapis.com')) {
+    // Delegate to MSW for Google Maps
+    return server.handleRequest(new Request(input, init));
   }
   // Let MSW handlers for /api/sales and /api/sales/markers use the HttpResponse
   if (url.startsWith('/api/')) {

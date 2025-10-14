@@ -11,6 +11,7 @@ function normalizeZip(rawZip: string): string | null {
   const lastFive = digits.length > 5 ? digits.slice(-5) : digits
   
   // Left-pad with '0' to length 5
+  if (lastFive.length < 5) return null
   const normalized = lastFive.padStart(5, '0')
   
   // Validate final against /^\d{5}$/

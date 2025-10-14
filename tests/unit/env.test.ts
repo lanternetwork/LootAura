@@ -6,6 +6,8 @@ describe('Environment Validation', () => {
   beforeEach(() => {
     vi.resetModules()
     process.env = { ...originalEnv }
+    // Ensure required server env is present for tests that import lib/env
+    process.env.SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || 'test-service-role-1234567890'
   })
 
   afterEach(() => {

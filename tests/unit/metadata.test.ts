@@ -8,12 +8,14 @@ import {
 } from '@/lib/metadata'
 import { Sale } from '@/lib/types'
 
-// Mock environment variables
-vi.mock('process', () => ({
-  env: {
-    NEXT_PUBLIC_SITE_URL: 'https://yardsalefinder.com'
-  }
-}))
+// Ensure environment variable is set for site URL
+const originalEnv = process.env
+beforeEach(() => {
+  process.env = { ...originalEnv, NEXT_PUBLIC_SITE_URL: 'https://yardsalefinder.com' }
+})
+afterEach(() => {
+  process.env = originalEnv
+})
 
 describe('createPageMetadata', () => {
   it('should create basic page metadata', () => {

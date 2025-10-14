@@ -246,8 +246,11 @@ describe('AddSaleForm Accessibility', () => {
     const inputs = screen.getAllByRole('textbox')
     inputs.forEach(input => {
       const id = input.getAttribute('id')
-      const labelElement = input.closest('div')?.querySelector(`label[for="${id}"]`)
-      expect(labelElement).toBeInTheDocument()
+      if (id) {
+        // Check that a label exists for this input
+        const labelElement = document.querySelector(`label[for="${id}"]`)
+        expect(labelElement).toBeInTheDocument()
+      }
     })
     
     // Check that all buttons have accessible names

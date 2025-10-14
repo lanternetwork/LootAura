@@ -85,37 +85,52 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/',
 }))
 
-// Mock Supabase
+// Mock Supabase with table-aware chains
 vi.mock('@/lib/supabase/client', () => ({
-  createSupabaseBrowserClient: () => ({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
-      signOut: vi.fn(),
-    },
-    from: vi.fn(() => {
-      const chain = {
-        select: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        insert: vi.fn().mockReturnThis(),
-        update: vi.fn().mockReturnThis(),
-        delete: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        in: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockReturnThis(),
-        range: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: null, error: null }),
-      }
-      return chain
-    }),
-    storage: {
-      from: vi.fn(() => ({
-        upload: vi.fn(),
-        getPublicUrl: vi.fn(),
-      })),
-    },
-  }),
+  createSupabaseBrowserClient: () => {
+    const client: any = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+        signInWithPassword: vi.fn(),
+        signUp: vi.fn(),
+        signOut: vi.fn(),
+      },
+      from: vi.fn((table: string) => {
+        const state: any = { table, selects: '*', where: [] }
+        const chain: any = {
+          select: vi.fn((cols?: string) => { state.selects = cols || '*'; return chain }),
+          order: vi.fn(() => chain),
+          insert: vi.fn(() => ({ data: [{}], error: null })),
+          update: vi.fn(() => chain),
+          delete: vi.fn(() => chain),
+          eq: vi.fn((col: string, val: any) => { state.where.push({ col, val }); return chain }),
+          in: vi.fn(() => chain),
+          limit: vi.fn(() => chain),
+          range: vi.fn(() => chain),
+          single: vi.fn(async () => {
+            if (state.table === 'sales_v2') {
+              // Minimal shape required by ReviewsSection
+              return { data: { address_key: 'rk-addr', owner_id: 'owner-1' }, error: null }
+            }
+            if (state.table === 'reviews_v2') {
+              // Lookup specific user review
+              const hasUser = state.where.find((w: any) => w.col === 'user_id')
+              return { data: hasUser ? { id: 'rev-1', rating: 4, comment: 'Nice', user_id: hasUser.val } : null, error: null }
+            }
+            return { data: null, error: null }
+          }),
+        }
+        return chain
+      }),
+      storage: {
+        from: vi.fn(() => ({
+          upload: vi.fn(),
+          getPublicUrl: vi.fn(),
+        })),
+      },
+    }
+    return client
+  },
 }))
 
 // Google Maps not used anymore; remove related mocks/globals
@@ -131,11 +146,15 @@ Object.defineProperty(navigator, 'geolocation', {
 })
 
 // Global DOM shims for JSDOM
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}))
+const resizeCallbacks: Array<(entries: Array<{ target: Element; contentRect: DOMRectReadOnly }>) => void> = []
+global.ResizeObserver = vi.fn().mockImplementation((cb: any) => {
+  resizeCallbacks.push(cb)
+  return {
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }
+})
 
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
@@ -180,9 +199,22 @@ global.DOMRect = DOMRectMock
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder
 
-// Mock fetch globally to prevent network calls
-global.fetch = vi.fn().mockImplementation(() => {
-  throw new Error('fetch() called in test - use MSW or mock explicitly')
+// Mock fetch globally to prevent network calls but allow known test endpoints
+global.fetch = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === 'string' ? input : (input as URL).toString()
+  if (url.includes('nominatim.openstreetmap.org')) {
+    // Minimal Nominatim-like response
+    const payload = [
+      { lat: '38.1405', lon: '-85.6936', display_name: 'Test Address' }
+    ]
+    return Promise.resolve(new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+  }
+  // Let MSW handlers for /api/sales and /api/sales/markers use the HttpResponse
+  if (url.startsWith('/api/')) {
+    // Defer to MSW by returning a basic ok response; tests that assert data will use MSW server
+    return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+  }
+  throw new Error(`fetch() called in test without mock: ${url}`)
 })
 
 // Mock next/image without JSX to keep this file .ts
@@ -191,3 +223,10 @@ vi.mock('next/image', () => ({
     return React.createElement('img', { src, alt, ...props })
   },
 }))
+
+// Helper to simulate container resize in tests
+export function __simulateResize(target: Element, width: number, height = 600) {
+  Object.defineProperty(target, 'offsetWidth', { configurable: true, value: width })
+  const rect = (DOMRect as any).fromRect({ x: 0, y: 0, width, height })
+  resizeCallbacks.forEach(cb => cb([{ target, contentRect: rect } as any]))
+}

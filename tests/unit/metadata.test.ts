@@ -28,7 +28,7 @@ describe('createPageMetadata', () => {
     expect(metadata.title).toBe('Test Page | Loot Aura')
     expect(metadata.description).toBe('Test description')
     expect(metadata.openGraph?.title).toBe('Test Page | Loot Aura')
-    expect(metadata.openGraph?.url).toBe('https://yardsalefinder.com/test')
+    expect(metadata.openGraph?.url).toBe('https://lootaura.app/test')
   })
 
   it('should handle custom image', () => {
@@ -116,7 +116,7 @@ describe('createExploreMetadata', () => {
 
     expect(metadata.title).toBe('Explore Yard Sales | Loot Aura')
     expect(metadata.description).toContain('Browse and discover')
-    expect(metadata.openGraph?.url).toBe('https://yardsalefinder.com/explore')
+    expect(metadata.openGraph?.url).toBe('https://lootaura.app/explore')
   })
 })
 
@@ -127,7 +127,7 @@ describe('createHomepageStructuredData', () => {
     expect(data['@context']).toBe('https://schema.org')
     expect(data['@type']).toBe('WebSite')
     expect(data.name).toBe('Loot Aura')
-    expect(data.url).toBe('https://yardsalefinder.com')
+    expect(data.url).toBe('https://lootaura.app')
     expect(data.potentialAction['@type']).toBe('SearchAction')
   })
 })
@@ -139,7 +139,7 @@ describe('createOrganizationStructuredData', () => {
     expect(data['@context']).toBe('https://schema.org')
     expect(data['@type']).toBe('Organization')
     expect(data.name).toBe('Loot Aura')
-    expect(data.url).toBe('https://yardsalefinder.com')
-    expect(data.logo).toBe('https://yardsalefinder.com/icons/icon-512.png')
+    expect(data.url).toBe('https://lootaura.app')
+    expect(data.logo).toBe('https://lootaura.app/icons/icon-512.png')
   })
 })

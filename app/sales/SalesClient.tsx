@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
-import { GetSalesParams, formatDistance } from '@/lib/data/sales'
+import { GetSalesParams } from '@/lib/data/sales'
 import SalesMap from '@/components/location/SalesMap'
 import ZipInput from '@/components/location/ZipInput'
 import SaleCard from '@/components/SaleCard'
@@ -18,11 +18,11 @@ import { milesToKm } from '@/utils/geo'
 import LoadMoreButton from '@/components/LoadMoreButton'
 import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
-import { normalizeFilters, filtersEqual, normalizeCategoryParams, createCategoriesKey } from '@/lib/shared/categoryNormalizer'
+import { normalizeFilters, filtersEqual, createCategoriesKey } from '@/lib/shared/categoryNormalizer'
 import LayoutDiagnostic from '@/components/LayoutDiagnostic'
 import GridLayoutDiagnostic from '@/components/GridLayoutDiagnostic'
 import GridDebugOverlay from '@/components/GridDebugOverlay'
-import { resolveDatePreset, dateRangesEqual } from '@/lib/shared/resolveDatePreset'
+import { resolveDatePreset } from '@/lib/shared/resolveDatePreset'
 
 // Intent Arbiter types
 type ControlMode = 'initial' | 'map' | 'zip' | 'distance'
@@ -108,7 +108,7 @@ interface SalesClientProps {
   user: User | null
 }
 
-export default function SalesClient({ initialSales, initialSearchParams, initialCenter, user }: SalesClientProps) {
+export default function SalesClient({ initialSales, initialSearchParams: _initialSearchParams, initialCenter, user: _user }: SalesClientProps) {
   // Debug flag for console checkpoints
   const DEBUG = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_DEBUG === 'true'
   
@@ -131,7 +131,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         }
       }, 100) // Small delay to ensure styles are applied
     }
-  }, [])
+  }, [DEBUG])
   
   // Category change detection ref
   const prevCategoriesKeyRef = useRef<string>('')
@@ -142,7 +142,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   
   // Markers change signal for list updates
   const markersHashRef = useRef<string>('')
-  const router = useRouter()
+  const _router = useRouter()
   const searchParams = useSearchParams()
   const { filters, updateFilters, hasActiveFilters } = useFilters(
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
@@ -162,7 +162,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const mapAuthorityUntilRef = useRef<number>(0)
   
   // Track last resolved date range to prevent unnecessary fetches
-  const lastResolvedDateRangeRef = useRef<{ from?: string; to?: string } | null>(null)
+  const _lastResolvedDateRangeRef = useRef<{ from?: string; to?: string } | null>(null)
   
   // Idempotency guard to prevent ping-pong when results are repeatedly "0"
   const lastApplyStateRef = useRef<{
@@ -249,7 +249,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [])
 
   // Get effective query shape based on current authority
-  const getEffectiveQueryShape = useCallback((): QueryShape => {
+  const _getEffectiveQueryShape = useCallback((): QueryShape => {
     const dateRange = filters.dateRange === 'any' ? 'any' : filters.dateRange
     const categories = filters.categories || []
     
@@ -286,7 +286,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapUpdating, setMapUpdating] = useState(false)
-  const [mapSales, setMapSales] = useState<Sale[]>([])
+  const [_mapSales, _setMapSales] = useState<Sale[]>([])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
   const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
@@ -296,10 +296,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [visiblePinIdsState, setVisiblePinIdsState] = useState<string[]>([])
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
-  const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
+  const [_locationAccuracy, _setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
-  const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
+  const [_mapCenterOverride, _setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
   
   // Stable bbox hash for effect dependencies
@@ -327,7 +327,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const markersAbortRef = useRef<AbortController | null>(null)
   const debounceRef = useRef<number | null>(null)
   const markerSeqRef = useRef<number>(0)
-  const mapModeDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const _mapModeDebounceRef = useRef<NodeJS.Timeout | null>(null)
   
   // Request identity and stale-response guard
   const salesReqIdRef = useRef<number>(0)
@@ -340,22 +340,22 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const requestSeqRef = useRef<number>(0)
   
   // In-flight tracking and versioning
-  const [inFlightSales, setInFlightSales] = useState<boolean>(false)
-  const [inFlightMarkers, setInFlightMarkers] = useState<boolean>(false)
+  const [_inFlightSales, _setInFlightSales] = useState<boolean>(false)
+  const [_inFlightMarkers, _setInFlightMarkers] = useState<boolean>(false)
   const markersVersionRef = useRef<number>(0)
   const latestBoundsTsRef = useRef<number>(0)
-  const visibilityComputeKeyRef = useRef<string>('')
-  const lastVisibleIdsRef = useRef<string[]>([])
-  const visibilityComputeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const _visibilityComputeKeyRef = useRef<string>('')
+  const _lastVisibleIdsRef = useRef<string[]>([])
+  const _visibilityComputeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Map stability and idle tracking
-  const [mapReady, setMapReady] = useState<boolean>(false)
-  const firstStableViewportTsRef = useRef<number>(0)
+  const [_mapReady, _setMapReady] = useState<boolean>(false)
+  const _firstStableViewportTsRef = useRef<number>(0)
   const lastViewportEmitTsRef = useRef<number>(0)
   const boundsCoalesceKeyRef = useRef<string>('')
   const boundsDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingBoundsRef = useRef<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
-  const pendingStableTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const _pendingStableTimerRef = useRef<NodeJS.Timeout | null>(null)
   const latestBoundsKeyRef = useRef<string>('')
 
   // Helper to create bounds coalesce key
@@ -429,7 +429,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [viewportBounds, createBoundsKey])
 
   // Unified fetch function with request identity and stale-response guard
-  const fetchWithToken = useCallback(async (endpoint: 'sales' | 'markers', queryShape: QueryShape) => {
+  const _fetchWithToken = useCallback(async (endpoint: 'sales' | 'markers', queryShape: QueryShape) => {
     // Generate request identity
     const reqId = endpoint === 'sales' ? ++salesReqIdRef.current : ++markersReqIdRef.current
     const stateKey = createStateKey(arbiter.mode, {lat: queryShape.lat, lng: queryShape.lng}, queryShape.radiusKm, queryShape.dateRange, queryShape.categories)
@@ -566,12 +566,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const nearEq = (a: number, b: number) => Math.abs(a - b) < EPS_CENTER
 
   // Utility functions for value equality checks
-  const isEqualCenter = useCallback((a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null, tol = 1e-6) => {
+  const _isEqualCenter = useCallback((a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null, tol = 1e-6) => {
     if (!a || !b) return a === b
     return Math.abs(a.lat - b.lat) < tol && Math.abs(a.lng - b.lng) < tol
   }, [])
 
-  const isEqualBounds = useCallback((a: { north: number; south: number; east: number; west: number } | null, b: { north: number; south: number; east: number; west: number } | null, tol = 1e-6) => {
+  const _isEqualBounds = useCallback((a: { north: number; south: number; east: number; west: number } | null, b: { north: number; south: number; east: number; west: number } | null, tol = 1e-6) => {
     if (!a || !b) return a === b
     return Math.abs(a.north - b.north) < tol && Math.abs(a.south - b.south) < tol && 
            Math.abs(a.east - b.east) < tol && Math.abs(a.west - b.west) < tol
@@ -588,7 +588,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     console.log('[MAP] ready - will emit bounds only on idle')
   }, [])
 
-  const getVisibleSalesFromRenderedFeatures = useCallback((all: Sale[]) => {
+  const _getVisibleSalesFromRenderedFeatures = useCallback((all: Sale[]) => {
     // This function will be called from the map component with queryRenderedFeatures results
     // For now, return all sales - this will be updated when we implement the map integration
     return all
@@ -1085,7 +1085,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                 }
               }
             })
-            .catch(() => {})
+            .catch((error) => {
+              console.warn('Sales fetch error:', error)
+            })
         }
       } else {
         console.error('Sales API error:', data.error)
@@ -1394,7 +1396,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               if (pref.data.length < 24) setHasMore(false)
             }
           })
-          .catch(() => {})
+          .catch((error) => {
+            console.warn('Markers fetch error:', error)
+          })
       }
       return
     }
@@ -1642,8 +1646,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   useEffect(() => {
     // Defer crop until we have real bounds; avoid cropping against null/old bounds
     if (!viewportBounds) return
-    const now = Date.now()
-    const last = lastBoundsTsRef.current || 0
+    const _now = Date.now()
+    const _last = lastBoundsTsRef.current || 0
     // Visibility is now handled by the main useEffect
   }, [sales, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west])
 
@@ -1717,7 +1721,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               setLastLocSource('cookie')
               return
             }
-          } catch {}
+          } catch (error) {
+            console.warn('Location cookie parse error:', error)
+          }
         }
         // 3) server endpoint
         const res = await fetch('/api/location', { cache: 'no-store' })
@@ -1734,7 +1740,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             setLastLocSource(loc.source || 'headers')
           }
         }
-      } catch {}
+      } catch (error) {
+        console.warn('Location initialization error:', error)
+      }
     }
     tryInit()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1753,7 +1761,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         categories: filters.categories
       }
       sessionStorage.setItem('la_session_filters', JSON.stringify(toStore))
-    } catch {}
+    } catch (error) {
+      console.warn('Session storage error:', error)
+    }
   }, [filters.lat, filters.lng, filters.city, filters.distance, filters.dateRange, filters.categories])
 
   // Geolocation prompt removed by design; no client location requests
@@ -1867,7 +1877,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         categories: filters.categories
       }
       sessionStorage.setItem('la_session_filters', JSON.stringify(sessionData))
-    } catch {}
+    } catch (error) {
+      console.warn('Session storage error:', error)
+    }
 
     // Remove old map centering logic - now using fitBounds instead
     // The fitBounds will be handled by the map component and onFitBoundsComplete
@@ -2061,7 +2073,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                             // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
                             const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
                             
-                            return finalItemsToRender.map((item: any, idx: number) => (
+                            return finalItemsToRender.map((item: any, _idx: number) => (
                               <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
                             ))
                           })()}
@@ -2093,7 +2105,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                           {visibleSales.length > 24 && (
                             <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
                           )}
-                          {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => {
+                          {(isUpdating ? staleSales : renderedSales).map((item: any, _idx: number) => {
                             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
                               console.log('[DOM] list item rendered id=', item.id)
                             }
@@ -2269,7 +2281,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     try {
                       const saved = JSON.parse(localStorage.getItem('lootaura_last_location') || '{}')
                       localStorage.setItem('lootaura_last_location', JSON.stringify({ ...saved, lat: center.lat, lng: center.lng }))
-                    } catch {}
+                    } catch (error) {
+                      console.warn('Local storage error:', error)
+                    }
                   }}
                   onMoveEnd={() => {
                     // Clear guard after user interaction completes

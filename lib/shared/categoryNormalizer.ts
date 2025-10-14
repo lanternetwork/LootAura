@@ -91,6 +91,16 @@ export function normalizeFilters(filters: {
     normalized.dateRange = filters.dateRange
   }
   
+  // Include other non-empty fields
+  Object.keys(filters).forEach(key => {
+    if (key !== 'categories' && key !== 'city' && key !== 'dateRange') {
+      const value = filters[key]
+      if (value !== undefined && value !== null && value !== '') {
+        normalized[key] = value
+      }
+    }
+  })
+  
   return normalized
 }
 

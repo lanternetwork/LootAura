@@ -20,6 +20,10 @@ describe('Geocoding Fallback', () => {
       if ((global.fetch as any).mockReset) {
         (global.fetch as any).mockReset()
       }
+      // Clear the mock implementation to allow test to set its own
+      if ((global.fetch as any).mockImplementation) {
+        (global.fetch as any).mockImplementation = vi.fn()
+      }
     }
   })
 
@@ -105,7 +109,11 @@ describe('Geocoding Fallback', () => {
     const addresses = getAddressFixtures()
     const testAddress = addresses[0]
     
-    global.fetch = vi.fn().mockResolvedValueOnce({
+    // Spy on the global fetch to verify it's called
+    const fetchSpy = vi.spyOn(global, 'fetch')
+    
+    // Mock the Google Maps response
+    fetchSpy.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({
         results: [{
@@ -123,7 +131,7 @@ describe('Geocoding Fallback', () => {
           ]
         }]
       })
-    })
+    } as any)
 
     const result = await geocodeAddress(testAddress.address)
     
@@ -136,14 +144,13 @@ describe('Geocoding Fallback', () => {
       zip: testAddress.zip
     })
     
-    // Should only call Google Maps API (not Nominatim)
-    expect(global.fetch).toHaveBeenCalled()
-    if ((global.fetch as any).mock?.calls?.length > 0) {
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('maps.googleapis.com'),
-        expect.any(Object)
-      )
-    }
+    // Should call Google Maps API
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining('maps.googleapis.com'),
+      expect.any(Object)
+    )
+    
+    fetchSpy.mockRestore()
   })
 
   it('should handle Nominatim rate limiting gracefully', async () => {

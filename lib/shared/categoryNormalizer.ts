@@ -16,10 +16,15 @@ export function normalizeCategories(categories: string | string[] | null | undef
   
   if (typeof categories === 'string') {
     // Parse CSV string
-    categoryArray = categories.split(',').map(c => c.trim()).filter(Boolean)
+    categoryArray = categories
+      .split(',')
+      .map(c => c.trim().toLowerCase())
+      .filter(Boolean)
   } else if (Array.isArray(categories)) {
     // Already an array
-    categoryArray = categories.filter(c => c && c.trim().length > 0)
+    categoryArray = categories
+      .map(c => (c ?? '').toString().trim().toLowerCase())
+      .filter(c => c.length > 0)
   } else {
     return []
   }

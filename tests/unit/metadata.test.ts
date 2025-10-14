@@ -11,7 +11,7 @@ import { Sale } from '@/lib/types'
 // Ensure environment variable is set for site URL
 const originalEnv = process.env
 beforeEach(() => {
-  process.env = { ...originalEnv, NEXT_PUBLIC_SITE_URL: 'https://yardsalefinder.com' }
+  process.env = { ...originalEnv, NEXT_PUBLIC_SITE_URL: 'https://lootaura.app' }
 })
 afterEach(() => {
   process.env = originalEnv

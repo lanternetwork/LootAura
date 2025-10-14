@@ -33,6 +33,11 @@ export function parseDateBounds(fromDate?: string, toDate?: string): DateBounds 
     return null
   }
 
+  // If only fromDate is provided, treat it as a single-day window
+  if (fromDate && !toDate) {
+    return { start: toUtcStartOfDay(fromDate), end: toUtcEndOfDay(fromDate) }
+  }
+
   const start = fromDate ? toUtcStartOfDay(fromDate) : new Date(0) // Unix epoch
   const end = toDate ? toUtcEndOfDay(toDate) : new Date('2099-12-31T23:59:59.999Z') // Far future
 

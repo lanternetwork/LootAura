@@ -286,7 +286,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapUpdating, setMapUpdating] = useState(false)
-  const [_mapSales, _setMapSales] = useState<Sale[]>([])
+  const [mapSales, setMapSales] = useState<Sale[]>([])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
   const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
@@ -299,7 +299,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [_locationAccuracy, _setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
-  const [_mapCenterOverride, _setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
+  const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
   
   // Stable bbox hash for effect dependencies
@@ -340,8 +340,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const requestSeqRef = useRef<number>(0)
   
   // In-flight tracking and versioning
-  const [_inFlightSales, _setInFlightSales] = useState<boolean>(false)
-  const [_inFlightMarkers, _setInFlightMarkers] = useState<boolean>(false)
+  const [inFlightSales, setInFlightSales] = useState<boolean>(false)
+  const [inFlightMarkers, setInFlightMarkers] = useState<boolean>(false)
   const markersVersionRef = useRef<number>(0)
   const latestBoundsTsRef = useRef<number>(0)
   const _visibilityComputeKeyRef = useRef<string>('')
@@ -349,7 +349,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const _visibilityComputeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Map stability and idle tracking
-  const [_mapReady, _setMapReady] = useState<boolean>(false)
+  const [mapReady, setMapReady] = useState<boolean>(false)
   const _firstStableViewportTsRef = useRef<number>(0)
   const lastViewportEmitTsRef = useRef<number>(0)
   const boundsCoalesceKeyRef = useRef<string>('')

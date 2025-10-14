@@ -13,9 +13,10 @@ describe('Geocoding Fallback', () => {
     vi.resetModules()
     process.env = { ...originalEnv }
     vi.clearAllMocks()
-    // Reset fetch mock
+    // Reset fetch mock and allow test to override
     if (global.fetch && typeof global.fetch === 'function') {
       (global.fetch as any).mockClear?.()
+      (global.fetch as any).mockReset?.()
     }
   })
 

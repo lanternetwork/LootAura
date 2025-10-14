@@ -176,7 +176,32 @@ if (!globalThis.__testSetupInitialized) {
     return {
       useCreateSale: vi.fn(() => defaultMutation),
       useSales: vi.fn(() => ({
-        data: [],
+        data: [
+          {
+            id: 'test-sale-1',
+            title: 'Test Sale',
+            description: 'Test Description',
+            price: 100,
+            lat: 38.1405,
+            lng: -85.6936,
+            date_start: '2025-01-01',
+            time_start: '09:00',
+            date_end: '2025-01-01',
+            time_end: '17:00'
+          },
+          {
+            id: 'test-sale-2',
+            title: 'Vintage Chair',
+            description: 'Antique furniture',
+            price: 50,
+            lat: 38.1405,
+            lng: -85.6936,
+            date_start: '2025-01-01',
+            time_start: '09:00',
+            date_end: '2025-01-01',
+            time_end: '17:00'
+          }
+        ],
         isLoading: false,
         error: null,
         refetch: vi.fn()

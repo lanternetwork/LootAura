@@ -29,6 +29,7 @@ vi.mock('@/lib/hooks/useAuth', () => ({
   })
 }))
 
+// Use global useSales mock from tests/setup.ts
 vi.mock('@/lib/hooks/useSales', () => ({
   __esModule: true,
   default: () => ({

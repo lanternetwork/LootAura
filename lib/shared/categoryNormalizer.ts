@@ -78,13 +78,20 @@ export function normalizeFilters(filters: {
   dateRange?: string
   [key: string]: any
 } {
-  return {
-    ...filters,
-    categories: normalizeCategories(filters.categories),
-    // Remove empty/undefined values for cleaner comparison
-    ...(filters.city && filters.city !== '' && { city: filters.city }),
-    ...(filters.dateRange && filters.dateRange !== 'any' && { dateRange: filters.dateRange })
+  const normalized: any = {
+    categories: normalizeCategories(filters.categories)
   }
+  
+  // Only include non-empty values - explicitly check for empty strings
+  if (filters.city && filters.city.trim() !== '') {
+    normalized.city = filters.city
+  }
+  
+  if (filters.dateRange && filters.dateRange !== 'any') {
+    normalized.dateRange = filters.dateRange
+  }
+  
+  return normalized
 }
 
 /**

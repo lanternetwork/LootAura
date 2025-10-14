@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 import SalesGrid from '@/components/SalesGrid'
@@ -109,11 +109,13 @@ describe('SalesGrid', () => {
     expect(global.ResizeObserver).toBeDefined()
 
     // Simulate a resize to 700px (should be 2 columns)
-    Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 700 })
-    // Use the global helper to trigger resize
-    if (globalThis.__simulateResize) {
-      globalThis.__simulateResize(gridElement, 700)
-    }
+    await act(async () => {
+      Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 700 })
+      // Use the global helper to trigger resize
+      if (globalThis.__simulateResize) {
+        globalThis.__simulateResize(gridElement, 700)
+      }
+    })
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '2')
@@ -121,10 +123,12 @@ describe('SalesGrid', () => {
     })
 
     // Simulate a resize to 1200px (should be 3 columns)
-    Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 1200 })
-    if (globalThis.__simulateResize) {
-      globalThis.__simulateResize(gridElement, 1200)
-    }
+    await act(async () => {
+      Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 1200 })
+      if (globalThis.__simulateResize) {
+        globalThis.__simulateResize(gridElement, 1200)
+      }
+    })
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '3')
@@ -132,10 +136,12 @@ describe('SalesGrid', () => {
     })
 
     // Simulate a resize to 500px (should be 1 column)
-    Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 500 })
-    if (globalThis.__simulateResize) {
-      globalThis.__simulateResize(gridElement, 500)
-    }
+    await act(async () => {
+      Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 500 })
+      if (globalThis.__simulateResize) {
+        globalThis.__simulateResize(gridElement, 500)
+      }
+    })
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '1')

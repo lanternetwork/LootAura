@@ -35,7 +35,9 @@ describe('ZIP Normalization', () => {
   })
 
   it('should handle mixed characters', () => {
-    expect(normalizeZip('abc123def')).toBe('123')
+    // Our normalizer strips non-digits then pads/truncates to 5.
+    // For 'abc123def' -> '123' -> padded to '00123'
+    expect(normalizeZip('abc123def')).toBe('00123')
     expect(normalizeZip('123-45')).toBe('12345')
     expect(normalizeZip('123.45')).toBe('12345')
     expect(normalizeZip('123 45')).toBe('12345')

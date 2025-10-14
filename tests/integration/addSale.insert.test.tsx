@@ -2,8 +2,37 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMockSupabaseClient, getAddressFixtures } from '@/tests/utils/mocks'
-// Use global useSales mock from tests/setup.ts
-import Explore from '@/app/(app)/explore/page'
+
+// Hoist all mocks before imports
+vi.mock('@/lib/geocode', () => ({
+  geocodeAddress: vi.fn().mockResolvedValue({
+    lat: 38.1405,
+    lng: -85.6936,
+    formatted_address: '123 Test St, Louisville, KY',
+    city: 'Louisville',
+    state: 'KY',
+    zip: '40201'
+  })
+}))
+
+vi.mock('@/lib/hooks/useSales', () => ({
+  useCreateSale: vi.fn(() => ({
+    mutateAsync: vi.fn().mockResolvedValue({ id: 'test-id', title: 'Test Sale' }),
+    isPending: false,
+    error: null,
+    data: null,
+    variables: null,
+    isError: false,
+    isSuccess: false,
+    reset: vi.fn(),
+    mutate: vi.fn()
+  }))
+}))
+
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams('?tab=add'),
+  useRouter: () => ({ push: vi.fn() })
+}))
 
 vi.mock('@/app/(app)/explore/page', () => ({
   __esModule: true,
@@ -24,17 +53,7 @@ vi.mock('@/app/(app)/explore/page', () => ({
   }
 }))
 
-// Use global mocks from tests/setup.ts
-
-// Mock geocode module - use global mock from tests/setup.ts
-
-// Mock useSales hook - use global mock from tests/setup.ts
-
-// Mock Next.js navigation
-vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams('?tab=add'),
-  useRouter: () => ({ push: vi.fn() })
-}))
+import Explore from '@/app/(app)/explore/page'
 
 describe('Add Sale Integration', () => {
   let mockSupabase: any

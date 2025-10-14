@@ -90,8 +90,8 @@ if (!globalThis.__mswServer) {
   server = globalThis.__mswServer
 }
 
-// Export server for use in tests
-export { server }
+// Make server available globally for tests
+globalThis.__mswServer = server
 
 // Global registrations (only once)
 if (!globalThis.__globalsRegistered) {
@@ -281,7 +281,7 @@ global.ResizeObserver = vi.fn().mockImplementation((cb: any) => {
 })
 
 // Helper to trigger ResizeObserver with specific width for tests
-export const __simulateResize = (target: Element, width: number) => {
+globalThis.__simulateResize = (target: Element, width: number) => {
   Object.defineProperty(target, 'offsetWidth', { configurable: true, value: width });
   const entry = [{
     target,

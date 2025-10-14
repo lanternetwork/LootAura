@@ -84,6 +84,12 @@ describe('Grid Layout Integration', () => {
   })
 
   it('should have correct grid classes at different breakpoints', () => {
+    // Set deterministic width before rendering
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { 
+      configurable: true, 
+      value: 1200 
+    })
+    
     const { rerender } = render(
       <SalesClient
         initialSales={mockSales}
@@ -104,6 +110,12 @@ describe('Grid Layout Integration', () => {
   })
 
   it('should not have wrapper divs around sale cards', () => {
+    // Set deterministic width before rendering
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { 
+      configurable: true, 
+      value: 1200 
+    })
+    
     render(
       <SalesClient
         initialSales={mockSales}

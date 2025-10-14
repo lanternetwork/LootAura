@@ -88,7 +88,7 @@ describe('visible.recompute', () => {
     const prevVisibleIdsHash = ''
     
     const currentIdsHash = 'sale-1,sale-2'
-    const idsChanged = prevVisibleIdsHash !== currentIdsHash
+    const idsChanged = prevVisibleIdsHash !== currentIdsHash as any
     
     if (idsChanged) {
       visibleIdsSeq += 1
@@ -100,7 +100,7 @@ describe('visible.recompute', () => {
     
     // Simulate another change
     const nextIdsHash = 'sale-1,sale-2,sale-3'
-    const idsChangedAgain = currentIdsHash !== nextIdsHash
+    const idsChangedAgain = currentIdsHash !== nextIdsHash as any
     
     if (idsChangedAgain) {
       visibleIdsSeq += 1

@@ -83,7 +83,7 @@ describe('MAP Authority Query Building', () => {
       
       // Simulate date change under MAP authority
       const arbiter = { authority: 'MAP' as const }
-      if (arbiter.authority === 'MAP') {
+      if (arbiter.authority === 'MAP' as any) {
         viewportSeq++ // This should happen on date changes
       }
       
@@ -96,7 +96,7 @@ describe('MAP Authority Query Building', () => {
       
       // Simulate date change under FILTERS authority
       const arbiter = { authority: 'FILTERS' as const }
-      if (arbiter.authority === 'MAP') {
+      if (arbiter.authority === 'MAP' as any) {
         viewportSeq++ // This should NOT happen
       }
       

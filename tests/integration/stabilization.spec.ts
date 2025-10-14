@@ -71,14 +71,14 @@ describe('Stabilization Integration Tests', () => {
       const filters = { categories: ['tools'], distance: 10, city: 'Louisville' }
       const equalFilters = true
       const authority = 'MAP'
-      const shouldSuppress = equalFilters && authority === 'MAP'
+      const shouldSuppress = equalFilters && authority === 'MAP' as any
       expect(shouldSuppress).toBe(true)
     })
 
     it('should not suppress under FILTERS authority', () => {
       const equalFilters = true
       const authority = 'FILTERS'
-      const shouldSuppress = equalFilters && authority === 'MAP'
+      const shouldSuppress = equalFilters && authority === 'MAP' as any
       expect(shouldSuppress).toBe(false)
     })
   })

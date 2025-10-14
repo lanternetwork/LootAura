@@ -64,7 +64,7 @@ describe('Category Filter Integration Tests', () => {
         { sale_id: 'sale-1' },
         { sale_id: 'sale-2' },
         { sale_id: 'sale-3' }
-      ]
+      ] as any
       mockSupabase.error = null
 
       // Simulate the category filtering logic
@@ -82,7 +82,7 @@ describe('Category Filter Integration Tests', () => {
 
     it('should return empty result when no sales match categories', async () => {
       const categories = ['nonexistent-category']
-      mockSupabase.data = []
+      mockSupabase.data = [] as any
       mockSupabase.error = null
 
       const { data: salesWithCategories, error: categoryError } = await mockSupabase
@@ -97,7 +97,7 @@ describe('Category Filter Integration Tests', () => {
     it('should handle database errors gracefully', async () => {
       const categories = ['tools']
       mockSupabase.data = null
-      mockSupabase.error = { code: '42703', message: 'column items_v2.category does not exist' }
+      mockSupabase.error = { code: '42703', message: 'column items_v2.category does not exist' } as any
 
       const { data: salesWithCategories, error: categoryError } = await mockSupabase
         .from('items_v2')
@@ -115,7 +115,7 @@ describe('Category Filter Integration Tests', () => {
       const arbiter = { authority: 'FILTERS' as const }
       const categories = ['tools']
       
-      const shouldSuppressList = arbiter.authority === 'MAP'
+      const shouldSuppressList = arbiter.authority === 'MAP' as any
       const shouldAllowList = !shouldSuppressList || categories.length === 0
       
       expect(shouldSuppressList).toBe(false)

@@ -255,7 +255,8 @@ export async function GET(request: NextRequest) {
           return { ...sale, lat: latNum, lng: lngNum }
         })
         .filter((sale: Sale | null): sale is Sale => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
-        .filter((sale: Sale) => {
+        .filter((sale: Sale | null): sale is Sale => {
+          if (!sale) return false
           if (!windowStart && !windowEnd) return true
           // Build sale start/end
           const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null

@@ -111,34 +111,7 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
-// Mock Google Maps
-vi.mock('@googlemaps/js-api-loader', () => ({
-  Loader: vi.fn().mockImplementation(() => ({
-    load: vi.fn().mockResolvedValue({}),
-  })),
-}))
-
-// Mock @react-google-maps/api loader to be ready in tests
-vi.mock('@react-google-maps/api', () => ({
-  useJsApiLoader: () => ({ isLoaded: true, loadError: null }),
-}))
-
-// Provide minimal google maps globals/spies for components relying on them
-const Map = vi.fn(function Map(this: any, el: any, opts: any) { this.controls = []; this.fitBounds = vi.fn() })
-const Marker = vi.fn(function Marker(this: any, opts: any) { this.addListener = vi.fn() })
-const InfoWindow = vi.fn(function InfoWindow(this: any, opts: any) { this.open = vi.fn() })
-const LatLngBounds = vi.fn(function LatLngBounds(this: any) { this.extend = vi.fn() })
-// @ts-expect-error test globals
-globalThis.google = {
-  maps: {
-    Map,
-    Marker,
-    InfoWindow,
-    LatLngBounds,
-    event: { addListener: vi.fn() },
-    ControlPosition: { TOP_LEFT: Symbol.for('TOP_LEFT') },
-  },
-}
+// Google Maps not used anymore; remove related mocks/globals
 
 // Mock geolocation
 Object.defineProperty(navigator, 'geolocation', {

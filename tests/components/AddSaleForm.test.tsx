@@ -19,35 +19,7 @@ vi.mock('@/lib/geocode', () => ({
   })
 }))
 
-// Mock Google Maps
-vi.mock('@googlemaps/js-api-loader', () => ({
-  Loader: vi.fn().mockImplementation(() => ({
-    load: vi.fn().mockResolvedValue({})
-  }))
-}))
-
-// Mock Google Maps global object
-Object.defineProperty(window, 'google', {
-  value: {
-    maps: {
-      places: {
-        Autocomplete: vi.fn().mockImplementation(() => ({
-          addListener: vi.fn(),
-          getPlace: vi.fn().mockReturnValue({
-            geometry: {
-              location: {
-                lat: () => 37.7749,
-                lng: () => -122.4194
-              }
-            },
-            formatted_address: '123 Test St, San Francisco, CA'
-          })
-        }))
-      }
-    }
-  },
-  writable: true
-})
+// Removed Google Maps mocks (not used)
 
 // Mock the Supabase client
 vi.mock('@/lib/supabase/client', () => ({

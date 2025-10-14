@@ -254,7 +254,7 @@ export async function GET(request: NextRequest) {
           if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
           return { ...sale, lat: latNum, lng: lngNum }
         })
-        .filter((sale): sale is NonNullable<Sale> => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
+        .filter((sale): sale is Sale & { lat: number; lng: number } => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
         .filter((sale) => {
           if (!sale) return false
           if (!windowStart && !windowEnd) return true
@@ -300,7 +300,7 @@ export async function GET(request: NextRequest) {
             distance_km: Math.round(distanceKm * 100) / 100
           }
         })
-                .filter((sale) => (sale.distance_km || 0) <= distanceKm)
+                .filter((sale) => sale && (sale.distance_km || 0) <= distanceKm)
                 .sort((a, b) => {
                   if (!a || !b) return 0
                   // Primary sort: distance

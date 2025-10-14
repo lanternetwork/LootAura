@@ -165,7 +165,7 @@ describe('Category Filter Integration Tests', () => {
       const categories = ['tools']
       
       const shouldSuppressList = arbiter.authority === 'MAP' && categories.length === 0
-      const shouldAllowList = !shouldSuppressList || categories.length > 0
+      const shouldAllowList = arbiter.authority === 'FILTERS' || categories.length > 0
       
       expect(shouldSuppressList).toBe(false)
       expect(shouldAllowList).toBe(true)

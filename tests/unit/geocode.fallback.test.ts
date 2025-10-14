@@ -109,11 +109,9 @@ describe('Geocoding Fallback', () => {
     const addresses = getAddressFixtures()
     const testAddress = addresses[0]
     
-    // Spy on the global fetch to verify it's called
-    const fetchSpy = vi.spyOn(global, 'fetch')
-    
-    // Mock the Google Maps response
-    fetchSpy.mockResolvedValueOnce({
+    // Override the global fetch mock for this test
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({
         results: [{
@@ -145,12 +143,13 @@ describe('Geocoding Fallback', () => {
     })
     
     // Should call Google Maps API
-    expect(fetchSpy).toHaveBeenCalledWith(
+    expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('maps.googleapis.com'),
       expect.any(Object)
     )
     
-    fetchSpy.mockRestore()
+    // Restore original fetch
+    global.fetch = originalFetch
   })
 
   it('should handle Nominatim rate limiting gracefully', async () => {
@@ -180,6 +179,8 @@ describe('Geocoding Fallback', () => {
     const addresses = getAddressFixtures()
     const testAddress = addresses[0]
     
+    // Override the global fetch mock for this test
+    const originalFetch = global.fetch
     global.fetch = vi.fn()
       .mockResolvedValueOnce({
         ok: false,
@@ -196,10 +197,6 @@ describe('Geocoding Fallback', () => {
 
     const result = await geocodeAddress(testAddress.address)
     
-    // Debug: Check if fetch was called and log the result
-    console.log('Fetch calls:', (global.fetch as any).mock?.calls?.length || 0)
-    console.log('Result:', result)
-    
     // Check that fetch was called
     expect(global.fetch).toHaveBeenCalled()
     
@@ -215,6 +212,9 @@ describe('Geocoding Fallback', () => {
       expect(nominatimCall).toBeDefined()
       expect(nominatimCall[0]).toContain('nominatim.openstreetmap.org')
     }
+    
+    // Restore original fetch
+    global.fetch = originalFetch
   })
 
   it('should cache results to avoid repeated API calls', async () => {

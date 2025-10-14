@@ -1,6 +1,5 @@
 'use client'
-import { useRef, useState } from 'react'
-import type React from 'react'
+import { useRef, useState, type KeyboardEvent, type FormEvent } from 'react'
 import { useCreateSale } from '@/lib/hooks/useSales'
 import { geocodeAddress } from '@/lib/geocode'
 import { SaleSchema } from '@/lib/zodSchemas'
@@ -65,14 +64,14 @@ export default function AddSaleForm() {
     setTags(tags.filter(tag => tag !== tagToRemove))
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       addTag()
     }
   }
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
 

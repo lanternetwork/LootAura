@@ -3,7 +3,6 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Sale } from '@/lib/types'
 import { validateDateRange } from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
-import { toDbSet } from '@/lib/shared/categoryContract'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
@@ -101,10 +100,11 @@ export async function GET(request: NextRequest) {
     if (!startDateParam && !endDateParam && dateRange !== 'any') {
       const now = new Date()
       switch (dateRange) {
-        case 'today':
+        case 'today': {
           startDateParam = now.toISOString().split('T')[0]
           endDateParam = now.toISOString().split('T')[0]
           break
+        }
         case 'weekend': {
           const saturday = new Date(now)
           saturday.setDate(now.getDate() + (6 - now.getDay()))

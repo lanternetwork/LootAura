@@ -347,6 +347,8 @@ export default function SalesMap({
     return `${displayHour}:${minutes} ${ampm}`
   }
 
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+
   // Token via util for flexibility
   const token = getMapboxToken()
   if (!token) {
@@ -368,8 +370,6 @@ export default function SalesMap({
     // Only emit view change on move end, not during continuous movement
     // This prevents excessive refetches during pan/zoom
   }
-
-  const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const scheduleAutoSearch = () => {
     if (!onSearchArea) return

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMockSupabaseClient, getAddressFixtures } from '@/tests/utils/mocks'
-import { useCreateSale, useSales } from '@/lib/hooks/useSales'
+// Use global useSales mock from tests/setup.ts
 import Explore from '@/app/(app)/explore/page'
 
 vi.mock('@/app/(app)/explore/page', () => ({
@@ -42,13 +42,7 @@ describe('Add Sale Integration', () => {
       }
     })
 
-    mockCreateSale = {
-      mutateAsync: vi.fn(),
-      isPending: false,
-      error: null
-    }
-
-    vi.mocked(useCreateSale).mockReturnValue(mockCreateSale)
+    // Use global mock from tests/setup.ts
   })
 
   it('should insert sale with geocoded coordinates', async () => {

@@ -112,6 +112,8 @@ export default [
       'react-hooks/exhaustive-deps': 'off', // Temporarily disable to pass CI
       
       // General rules
+      // Disable no-undef for TypeScript; TS handles undefined symbols
+      'no-undef': 'off',
       'no-console': 'off', // Allow console for debugging
       'no-debugger': 'error',
       'no-unused-vars': 'off', // Use TypeScript version instead

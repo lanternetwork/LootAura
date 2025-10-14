@@ -12,7 +12,7 @@ const mockSupabase = {
 // Make the mock methods return proper promises
 mockSupabase.from.mockReturnValue(mockSupabase)
 mockSupabase.select.mockReturnValue(mockSupabase)
-mockSupabase.in.mockResolvedValue({ data: mockSupabase.data, error: mockSupabase.error })
+mockSupabase.in.mockReturnValue(mockSupabase)
 
 // Mock fetch for API calls
 const mockFetch = vi.fn()

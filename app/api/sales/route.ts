@@ -255,7 +255,7 @@ export async function GET(request: NextRequest) {
           return { ...sale, lat: latNum, lng: lngNum }
         })
         .filter((sale): sale is NonNullable<Sale> => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
-        .filter((sale: Sale) => {
+        .filter((sale) => {
           if (!sale) return false
           if (!windowStart && !windowEnd) return true
           // Build sale start/end
@@ -302,6 +302,7 @@ export async function GET(request: NextRequest) {
         })
                 .filter((sale) => (sale.distance_km || 0) <= distanceKm)
                 .sort((a, b) => {
+                  if (!a || !b) return 0
                   // Primary sort: distance
                   if ((a.distance_m || 0) !== (b.distance_m || 0)) {
                     return (a.distance_m || 0) - (b.distance_m || 0)

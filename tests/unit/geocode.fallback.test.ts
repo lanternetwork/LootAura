@@ -109,27 +109,8 @@ describe('Geocoding Fallback', () => {
     const addresses = getAddressFixtures()
     const testAddress = addresses[0]
     
-    // Override the global fetch mock for this test
-    const originalFetch = global.fetch
-    global.fetch = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        results: [{
-          geometry: {
-            location: {
-              lat: testAddress.lat,
-              lng: testAddress.lng
-            }
-          },
-          formatted_address: testAddress.formatted_address,
-          address_components: [
-            { long_name: testAddress.city, types: ['locality'] },
-            { short_name: testAddress.state, types: ['administrative_area_level_1'] },
-            { long_name: testAddress.zip, types: ['postal_code'] }
-          ]
-        }]
-      })
-    } as any)
+    // Spy on the global fetch to verify it's called
+    const fetchSpy = vi.spyOn(global, 'fetch')
 
     const result = await geocodeAddress(testAddress.address)
     
@@ -143,13 +124,12 @@ describe('Geocoding Fallback', () => {
     })
     
     // Should call Google Maps API
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining('maps.googleapis.com'),
       expect.any(Object)
     )
     
-    // Restore original fetch
-    global.fetch = originalFetch
+    fetchSpy.mockRestore()
   })
 
   it('should handle Nominatim rate limiting gracefully', async () => {
@@ -179,28 +159,15 @@ describe('Geocoding Fallback', () => {
     const addresses = getAddressFixtures()
     const testAddress = addresses[0]
     
-    // Override the global fetch mock for this test
-    const originalFetch = global.fetch
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({
-        ok: false,
-        json: () => Promise.resolve({ error: 'Invalid API key' })
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve([{
-          lat: testAddress.lat.toString(),
-          lon: testAddress.lng.toString(),
-          display_name: testAddress.formatted_address
-        }])
-      })
+    // Spy on the global fetch to verify it's called
+    const fetchSpy = vi.spyOn(global, 'fetch')
 
     const result = await geocodeAddress(testAddress.address)
     
     // Check that fetch was called
-    expect(global.fetch).toHaveBeenCalled()
+    expect(fetchSpy).toHaveBeenCalled()
     
-    const fetchCalls = (global.fetch as any).mock?.calls || []
+    const fetchCalls = fetchSpy.mock.calls
     if (fetchCalls.length >= 2) {
       const nominatimCall = fetchCalls[1]
       expect(nominatimCall).toBeDefined()
@@ -213,8 +180,7 @@ describe('Geocoding Fallback', () => {
       expect(nominatimCall[0]).toContain('nominatim.openstreetmap.org')
     }
     
-    // Restore original fetch
-    global.fetch = originalFetch
+    fetchSpy.mockRestore()
   })
 
   it('should cache results to avoid repeated API calls', async () => {

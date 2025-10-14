@@ -20,40 +20,12 @@ vi.mock('@/app/(app)/explore/page', () => ({
   }
 }))
 
-// Mock the hooks
-vi.mock('@/lib/hooks/useSales', () => ({
-  useSales: vi.fn(),
-  useCreateSale: vi.fn()
-}))
+// Use global mocks from tests/setup.ts
 
 // Mock Next.js navigation
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('?tab=add'),
   useRouter: () => ({ push: vi.fn() })
-}))
-
-// Google Maps not used; remove related mocks
-
-// Mock geocoding
-vi.mock('@/lib/geocode', () => ({
-  geocodeAddress: vi.fn().mockImplementation(async (address: string) => {
-    const addresses = getAddressFixtures()
-    const found = addresses.find(addr => 
-      addr.address.toLowerCase().includes(address.toLowerCase())
-    )
-    
-    if (found) {
-      return {
-        lat: found.lat,
-        lng: found.lng,
-        formatted_address: found.formatted_address,
-        city: found.city,
-        state: found.state,
-        zip: found.zip
-      }
-    }
-    return null
-  })
 }))
 
 describe('Add Sale Integration', () => {

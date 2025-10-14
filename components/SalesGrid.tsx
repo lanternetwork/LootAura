@@ -49,7 +49,7 @@ const SalesGrid: React.FC<SalesGridProps> = ({
     updateColumns() // Initial calculation
 
     const resizeObserver = new ResizeObserver(entries => {
-      for (let entry of entries) {
+      for (const entry of entries) {
         if (entry.target === gridRef.current) {
           updateColumns()
         }

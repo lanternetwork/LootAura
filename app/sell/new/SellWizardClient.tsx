@@ -36,7 +36,7 @@ const WIZARD_STEPS: WizardStep[] = [
   }
 ]
 
-export default function SellWizardClient({ initialData, isEdit = false, saleId }: { initialData?: Partial<SaleInput>; isEdit?: boolean; saleId?: string }) {
+export default function SellWizardClient({ initialData, isEdit: _isEdit = false, saleId: _saleId }: { initialData?: Partial<SaleInput>; isEdit?: boolean; saleId?: string }) {
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
   const [currentStep, setCurrentStep] = useState(0)

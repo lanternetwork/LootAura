@@ -24,7 +24,7 @@ interface DiagnosticOverlayProps {
 export default function DiagnosticOverlay({ isVisible, onToggle }: DiagnosticOverlayProps) {
   const [events, setEvents] = useState<FetchEvent[]>([])
   const [suppressedCount, setSuppressedCount] = useState(0)
-  const eventIdRef = useRef(0)
+  const _eventIdRef = useRef(0)
 
   useEffect(() => {
     // Listen for fetch events from the global event emitter

@@ -46,7 +46,7 @@ interface QueryShape {
   shapeHash: string
 }
 
-interface MapViewState {
+interface _MapViewState {
   center: { lat: number; lng: number }
   bounds: { west: number; south: number; east: number; north: number }
   zoom: number
@@ -67,7 +67,7 @@ function computeRadiusFromZoom(zoom: number): number {
   return Math.max(1, Math.min(160, baseRadius * zoomFactor))
 }
 
-function computeRadiusFromBounds(bounds: { west: number; south: number; east: number; north: number }): number {
+function _computeRadiusFromBounds(bounds: { west: number; south: number; east: number; north: number }): number {
   // Approximate radius from bounds using center and corner distance
   const centerLat = (bounds.north + bounds.south) / 2
   const centerLng = (bounds.east + bounds.west) / 2
@@ -286,7 +286,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapUpdating, setMapUpdating] = useState(false)
-  const [mapSales, setMapSales] = useState<Sale[]>([])
+  const [mapSales, _setMapSales] = useState<Sale[]>([])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
   const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
@@ -299,7 +299,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [_locationAccuracy, _setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
-  const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
+  const [mapCenterOverride, _setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
   
   // Stable bbox hash for effect dependencies
@@ -340,8 +340,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const requestSeqRef = useRef<number>(0)
   
   // In-flight tracking and versioning
-  const [inFlightSales, setInFlightSales] = useState<boolean>(false)
-  const [inFlightMarkers, setInFlightMarkers] = useState<boolean>(false)
+  const [_inFlightSales, _setInFlightSales] = useState<boolean>(false)
+  const [_inFlightMarkers, _setInFlightMarkers] = useState<boolean>(false)
   const markersVersionRef = useRef<number>(0)
   const latestBoundsTsRef = useRef<number>(0)
   const _visibilityComputeKeyRef = useRef<string>('')
@@ -349,7 +349,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const _visibilityComputeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Map stability and idle tracking
-  const [mapReady, setMapReady] = useState<boolean>(false)
+  const [_mapReady, _setMapReady] = useState<boolean>(false)
   const _firstStableViewportTsRef = useRef<number>(0)
   const lastViewportEmitTsRef = useRef<number>(0)
   const boundsCoalesceKeyRef = useRef<string>('')

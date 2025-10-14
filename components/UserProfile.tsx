@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useAuth, useProfile, useUpdateProfile, useSignOut } from '@/lib/hooks/useAuth'
-import { ProfileSchema } from '@/lib/zodSchemas'
+// import { ProfileSchema } from '@/lib/zodSchemas'
 
 export default function UserProfile() {
   const { data: user, isLoading: authLoading } = useAuth()

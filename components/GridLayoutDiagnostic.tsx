@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface GridLayoutDiagnosticProps {
   containerRef: React.RefObject<HTMLElement>
@@ -174,7 +174,7 @@ const GridLayoutDiagnostic: React.FC<GridLayoutDiagnosticProps> = ({
 
     // Set up ResizeObserver for continuous updates
     const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
+      for (const entry of entries) {
         if (entry.target === containerRef.current) {
           updateLayoutInfo()
         }

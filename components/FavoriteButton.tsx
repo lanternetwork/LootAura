@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 export default function FavoriteButton({ 
   saleId, 
-  initial = false
+  initial: _initial = false
 }: { 
   saleId: string
   initial?: boolean 

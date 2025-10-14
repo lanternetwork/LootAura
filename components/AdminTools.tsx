@@ -19,7 +19,7 @@ export default function AdminTools() {
   const [reviewInfo, setReviewInfo] = useState<ReviewKeyInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const supabase = createSupabaseBrowserClient()
+  const _supabase = createSupabaseBrowserClient()
 
   const handleLookup = async () => {
     if (!saleId.trim()) return

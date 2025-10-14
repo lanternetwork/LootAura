@@ -2,7 +2,7 @@
 import { FaExclamationCircle } from 'react-icons/fa';
 import Link from 'next/link';
 
-const ErrorPage = ({ error, reset }) => {
+const ErrorPage = ({ error, reset: _reset }) => {
   console.log(error);
   return (
     <section className='bg-blue-50 min-h-screen flex-grow'>

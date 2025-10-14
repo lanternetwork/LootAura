@@ -297,7 +297,7 @@ function FiltersContent({
   onDistanceChange,
   onDateRangeChange,
   onCategoryToggle,
-  onClearFilters,
+  onClearFilters: _onClearFilters,
   hasActiveFilters,
   arbiter
 }: FiltersContentProps) {

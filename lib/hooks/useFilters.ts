@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { normalizeCategoryParams, buildCategoryParams } from '@/lib/shared/categoryNormalizer'
+import { normalizeCategoryParams } from '@/lib/shared/categoryNormalizer'
 
 export interface FilterState {
   lat?: number

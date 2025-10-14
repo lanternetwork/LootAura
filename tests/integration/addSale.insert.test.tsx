@@ -32,12 +32,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() })
 }))
 
-// Mock Google Maps
-vi.mock('@googlemaps/js-api-loader', () => ({
-  Loader: vi.fn().mockImplementation(() => ({
-    load: vi.fn().mockResolvedValue({})
-  }))
-}))
+// Google Maps not used; remove related mocks
 
 // Mock geocoding
 vi.mock('@/lib/geocode', () => ({

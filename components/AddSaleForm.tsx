@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { Loader } from '@googlemaps/js-api-loader'
 import { useCreateSale } from '@/lib/hooks/useSales'
 import { geocodeAddress } from '@/lib/geocode'
 import { SaleSchema } from '@/lib/zodSchemas'
@@ -17,48 +16,7 @@ export default function AddSaleForm() {
   const [tagInput, setTagInput] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
-      setError('Google Maps API key not configured')
-      return
-    }
-
-    const loader = new Loader({
-      apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-      libraries: ['places']
-    })
-
-    loader.load().then(() => {
-      if (!addressRef.current) return
-
-      const autocomplete = new (window as any).google.maps.places.Autocomplete(addressRef.current, {
-        fields: ['formatted_address', 'geometry', 'address_components']
-      })
-
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace()
-        const geometry = place.geometry?.location
-        
-        if (geometry) {
-          const lat = geometry.lat()
-          const lng = geometry.lng()
-          setCoords({ lat, lng })
-          setAddress(place.formatted_address || '')
-          
-          logger.info('Address geocoded via Google Places', {
-            component: 'AddSaleForm',
-            operation: 'geocode_places',
-            address: place.formatted_address,
-            lat,
-            lng
-          })
-        }
-      })
-    }).catch((err: unknown) => {
-      console.error('Error loading Google Maps:', err)
-      setError('Failed to load address autocomplete')
-    })
-  }, [])
+  // Google Maps autocomplete removed; rely solely on fallback geocoder
 
   // Handle manual address geocoding
   const handleAddressChange = async (value: string) => {

@@ -138,6 +138,7 @@ export default function AddSaleForm() {
         <input 
           id="title"
           name="title" 
+          type="text"
           required 
           placeholder="e.g., Estate Sale - Antiques & Collectibles" 
           className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
@@ -149,6 +150,7 @@ export default function AddSaleForm() {
         <input 
           id="address"
           name="address" 
+          type="text"
           ref={addressRef} 
           required
           value={address}
@@ -225,15 +227,18 @@ export default function AddSaleForm() {
         <input 
           id="contact"
           name="contact" 
+          type="text"
           placeholder="Phone number or email" 
           className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Tags</label>
+        <label htmlFor="tags" className="block text-sm font-medium mb-2">Tags</label>
         <div className="flex gap-2 mb-2">
           <input 
+            id="tags"
+            type="text"
             value={tagInput}
             onChange={e => setTagInput(e.target.value)}
             onKeyPress={handleKeyPress}

@@ -51,10 +51,22 @@ const server = setupServer(
         time_start: '09:00',
         date_end: '2025-01-01',
         time_end: '17:00'
+      },
+      {
+        id: 'test-sale-2',
+        title: 'Vintage Chair',
+        description: 'Antique furniture',
+        price: 50,
+        lat: 38.1405,
+        lng: -85.6936,
+        date_start: '2025-01-01',
+        time_start: '09:00',
+        date_end: '2025-01-01',
+        time_end: '17:00'
       }
     ]
     
-    return HttpResponse.json(sales)
+    return HttpResponse.json({ ok: true, data: sales, count: sales.length })
   })
 )
 
@@ -85,7 +97,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/',
 }))
 
-// Mock Supabase with table-aware chains
+// Mock Supabase with table-aware chains and RLS support
 vi.mock('@/lib/supabase/client', () => ({
   createSupabaseBrowserClient: () => {
     const client: any = {
@@ -96,26 +108,33 @@ vi.mock('@/lib/supabase/client', () => ({
         signOut: vi.fn(),
       },
       from: vi.fn((table: string) => {
-        const state: any = { table, selects: '*', where: [] }
+        const state: any = { table, selects: '*', where: [], operation: 'select' }
         const chain: any = {
-          select: vi.fn((cols?: string) => { state.selects = cols || '*'; return chain }),
+          select: vi.fn((cols?: string) => { state.selects = cols || '*'; state.operation = 'select'; return chain }),
           order: vi.fn(() => chain),
-          insert: vi.fn(() => ({ data: [{}], error: null })),
-          update: vi.fn(() => chain),
-          delete: vi.fn(() => chain),
+          insert: vi.fn((data: any) => { state.operation = 'insert'; state.data = data; return { data: [{ id: 'test-id', ...data[0] }], error: null } }),
+          update: vi.fn((data: any) => { state.operation = 'update'; state.data = data; return chain }),
+          delete: vi.fn(() => { state.operation = 'delete'; return chain }),
           eq: vi.fn((col: string, val: any) => { state.where.push({ col, val }); return chain }),
           in: vi.fn(() => chain),
           limit: vi.fn(() => chain),
           range: vi.fn(() => chain),
           single: vi.fn(async () => {
             if (state.table === 'sales_v2') {
-              // Minimal shape required by ReviewsSection
               return { data: { address_key: 'rk-addr', owner_id: 'owner-1' }, error: null }
             }
             if (state.table === 'reviews_v2') {
-              // Lookup specific user review
               const hasUser = state.where.find((w: any) => w.col === 'user_id')
               return { data: hasUser ? { id: 'rev-1', rating: 4, comment: 'Nice', user_id: hasUser.val } : null, error: null }
+            }
+            // RLS simulation: check if operation should fail
+            if (state.operation === 'update' || state.operation === 'delete') {
+              const ownerCheck = state.where.find((w: any) => w.col === 'owner_id')
+              const currentUser = state.where.find((w: any) => w.col === 'id')
+              if (ownerCheck && currentUser && ownerCheck.val !== currentUser.val) {
+                return { data: null, error: { message: 'new row violates row-level security policy' } }
+              }
+              return { data: [{ id: 'test-id' }], error: null }
             }
             return { data: null, error: null }
           }),
@@ -159,6 +178,25 @@ vi.mock('@/lib/geocode', () => ({
     formatted_address: '123 Test St, Louisville, KY'
   })
 }))
+
+// Mock MSW handlers for geocoding endpoints
+const geocodeHandlers = [
+  http.get('https://nominatim.openstreetmap.org/search', ({ request }) => {
+    const url = new URL(request.url)
+    const q = url.searchParams.get('q')
+    if (q && q.includes('Test')) {
+      return HttpResponse.json([{
+        lat: '38.1405',
+        lon: '-85.6936',
+        display_name: '123 Test St, Louisville, KY'
+      }])
+    }
+    return HttpResponse.json([])
+  })
+]
+
+// Add geocoding handlers to server
+server.use(...geocodeHandlers)
 
 // Google Maps not used anymore; remove related mocks/globals
 

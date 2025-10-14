@@ -82,7 +82,7 @@ export function normalizeFilters(filters: {
     ...filters,
     categories: normalizeCategories(filters.categories),
     // Remove empty/undefined values for cleaner comparison
-    ...(filters.city && { city: filters.city }),
+    ...(filters.city && filters.city !== '' && { city: filters.city }),
     ...(filters.dateRange && filters.dateRange !== 'any' && { dateRange: filters.dateRange })
   }
 }

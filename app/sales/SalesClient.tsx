@@ -455,9 +455,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     
     // Set in-flight flags (don't clear arrays)
     if (endpoint === 'sales') {
-      setInFlightSales(true)
+      _setInFlightSales(true)
     } else {
-      setInFlightMarkers(true)
+      _setInFlightMarkers(true)
     }
 
     // Create new abort controller
@@ -487,7 +487,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         if (endpoint === 'sales') {
           // Atomic commit: set sales then schedule visibility computation
           setSales(data.data || [])
-          setInFlightSales(false)
+          _setInFlightSales(false)
           // Schedule visibility computation on next animation frame
           requestAnimationFrame(() => {
             // Visibility will be recomputed by the markers change handler
@@ -515,12 +515,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
               lastState.dateKey === currentState.dateKey &&
               lastState.markerIds === currentState.markerIds) {
             console.log('[MARKERS] idempotent apply - skipping update (same bbox|date|markers)')
-            setInFlightMarkers(false)
+            _setInFlightMarkers(false)
             return
           }
           
           setMapMarkers(newMarkers)
-          setInFlightMarkers(false)
+          _setInFlightMarkers(false)
           lastApplyStateRef.current = currentState
           console.log(`[MARKERS] set: ${newMarkers.length} version: ${markersVersionRef.current}`)
           
@@ -533,9 +533,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.error(`[NET] error ${endpoint}:`, data.error)
         // Clear in-flight flags on error
         if (endpoint === 'sales') {
-          setInFlightSales(false)
+          _setInFlightSales(false)
         } else {
-          setInFlightMarkers(false)
+          _setInFlightMarkers(false)
         }
       }
     } catch (error: any) {
@@ -551,9 +551,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         setAbortController(null)
         // Clear in-flight flags
         if (endpoint === 'sales') {
-          setInFlightSales(false)
+          _setInFlightSales(false)
         } else {
-          setInFlightMarkers(false)
+          _setInFlightMarkers(false)
         }
       }
     }
@@ -584,7 +584,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [emitBoundsDebounced])
 
   const onMapReady = useCallback(() => {
-    setMapReady(true)
+    _setMapReady(true)
     console.log('[MAP] ready - will emit bounds only on idle')
   }, [])
 

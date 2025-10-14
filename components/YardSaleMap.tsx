@@ -97,7 +97,7 @@ export default function YardSaleMap({ points }: { points: Marker[] }) {
       
       marker.addListener('click', () => {
         // Close other info windows
-        markers.forEach(m => {
+        markers.forEach(_m => {
           const iw = new (window as any).google.maps.InfoWindow()
           iw.close()
         })
@@ -122,7 +122,7 @@ export default function YardSaleMap({ points }: { points: Marker[] }) {
       // Ensure minimum zoom level
       const listener = (window as any).google.maps.event.addListener(map, 'idle', () => {
         if (map.getZoom()! > 15) map.setZoom(15)
-        (window as any).google.maps.event.removeListener(listener)
+        ;(window as any).google.maps.event.removeListener(listener)
       })
     }
   }, [map, points])

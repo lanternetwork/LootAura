@@ -54,7 +54,7 @@ export default function AddSaleForm() {
           })
         }
       })
-    }).catch(err => {
+    }).catch((err: unknown) => {
       console.error('Error loading Google Maps:', err)
       setError('Failed to load address autocomplete')
     })

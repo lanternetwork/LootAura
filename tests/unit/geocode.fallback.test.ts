@@ -16,7 +16,10 @@ describe('Geocoding Fallback', () => {
     // Reset fetch mock and allow test to override
     if (global.fetch && typeof global.fetch === 'function') {
       (global.fetch as any).mockClear?.()
-      (global.fetch as any).mockReset?.()
+      // Reset the mock implementation to allow test override
+      if ((global.fetch as any).mockReset) {
+        (global.fetch as any).mockReset()
+      }
     }
   })
 

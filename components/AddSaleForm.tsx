@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
+import type React from 'react'
 import { useCreateSale } from '@/lib/hooks/useSales'
 import { geocodeAddress } from '@/lib/geocode'
 import { SaleSchema } from '@/lib/zodSchemas'

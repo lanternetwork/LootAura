@@ -181,9 +181,15 @@ vi.mock('@/lib/geocode', () => ({
   geocodeAddress: vi.fn().mockResolvedValue({
     lat: 38.1405,
     lng: -85.6936,
-    formatted_address: '123 Test St, Louisville, KY'
+    formatted_address: '123 Test St, Louisville, KY',
+    city: 'Louisville',
+    state: 'KY',
+    zip: '40201'
   })
 }))
+
+// Mock alert to prevent jsdom crashes
+globalThis.alert = vi.fn()
 
 // Mock MSW handlers for geocoding endpoints
 const geocodeHandlers = [

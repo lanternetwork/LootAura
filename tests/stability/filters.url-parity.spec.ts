@@ -27,7 +27,7 @@ describe('filters.url-parity', () => {
     // Assert KEY cats string equals URL cats string
     const normalizedCats = normalizeCategories(filters.categories)
     const expectedCsv = normalizedCats.join(',')
-    expect(url).toContain(`categories=${expectedCsv}`)
+    expect(decodeURIComponent(url)).toContain(`categories=${expectedCsv}`)
   })
   
   it('should omit categories param when no categories are selected', () => {

@@ -73,7 +73,13 @@ describe('SalesList Integration', () => {
   })
 
   it('should filter sales by category', () => {
-    const filteredSales = mockSales.filter(sale => sale.tags?.includes('furniture'))
+    // Add tags to mock sales data
+    const salesWithTags = mockSales.map(sale => ({
+      ...sale,
+      tags: sale.title.includes('Vintage Chair') ? ['furniture'] : ['tools']
+    }))
+
+    const filteredSales = salesWithTags.filter(sale => sale.tags?.includes('furniture'))
     
     renderWithProviders(<SalesList sales={filteredSales} />)
 

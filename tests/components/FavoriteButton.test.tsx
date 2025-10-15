@@ -5,6 +5,11 @@ import FavoriteButton from '@/components/FavoriteButton'
 
 // Mock the auth hooks
 vi.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: vi.fn(() => ({
+    data: null,
+    isLoading: false,
+    error: null
+  })),
   useFavorites: vi.fn(() => ({
     data: []
   })),

@@ -7,26 +7,23 @@ function normalizeZip(rawZip: string): string | null {
   // Strip non-digits
   const digits = rawZip.replace(/\D/g, '')
   
-  // Validate we have at least some digits
-  if (digits.length === 0) return null
+  // Reject if less than 5 digits (before padding)
+  if (digits.length < 5) return null
   
   // If length > 5, take last 5
   const lastFive = digits.length > 5 ? digits.slice(-5) : digits
   
-  // Left-pad with '0' to length 5
-  const normalized = lastFive.padStart(5, '0')
-  
   // Validate final against /^\d{5}$/
-  if (!/^\d{5}$/.test(normalized)) {
+  if (!/^\d{5}$/.test(lastFive)) {
     return null
   }
   
   // Reject all zeros
-  if (normalized === '00000') {
+  if (lastFive === '00000') {
     return null
   }
   
-  return normalized
+  return lastFive
 }
 
 describe('ZIP Normalization', () => {
@@ -43,9 +40,8 @@ describe('ZIP Normalization', () => {
   })
 
   it('should handle mixed characters', () => {
-    // Our normalizer strips non-digits then pads/truncates to 5.
-    // For 'abc123def' -> '123' -> padded to '00123'
-    expect(normalizeZip('abc123def')).toBe('00123')
+    // Our normalizer strips non-digits then validates length >= 5 and truncates to last 5.
+    expect(normalizeZip('abc123def')).toBe(null)
     expect(normalizeZip('123-45')).toBe('12345')
     expect(normalizeZip('123.45')).toBe('12345')
     expect(normalizeZip('123 45')).toBe('12345')

@@ -23,6 +23,11 @@ describe('AddSaleForm', () => {
   it('validates required fields', async () => {
     render(<AddSaleForm />)
     
+    // Fill with invalid data that fails schema (title too short)
+    fireEvent.change(screen.getByLabelText('Sale Title *'), {
+      target: { value: 'Te' }
+    })
+
     const submitButton = screen.getByRole('button', { name: /post sale/i })
     fireEvent.click(submitButton)
 
@@ -89,7 +94,7 @@ describe('AddSaleForm', () => {
     
     const tagInput = screen.getByPlaceholderText('Add a tag...')
     fireEvent.change(tagInput, { target: { value: 'furniture' } })
-    fireEvent.keyDown(tagInput, { key: 'Enter' })
+    fireEvent.keyPress(tagInput, { key: 'Enter', code: 'Enter', charCode: 13 })
 
     await waitFor(() => {
       expect(screen.getByText('furniture')).toBeInTheDocument()

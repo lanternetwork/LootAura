@@ -88,7 +88,7 @@ A production-grade mobile-first web app for browsing, mapping, posting, and plan
 - ✅ `components/SalesList.tsx` - Sales list container
 - ✅ `components/SaleCard.tsx` - Individual sale card
 - ✅ `components/EmptyState.tsx` - Empty state component
-- ✅ `components/YardSaleMap.tsx` - Google Maps integration
+- ✅ `components/YardSaleMap.tsx` - Mapbox integration
 - ✅ `components/AddSaleForm.tsx` - Add sale form with Places API
 - ✅ `components/FavoriteButton.tsx` - Favorite toggle component
 - ✅ `components/UserProfile.tsx` - User profile management
@@ -139,8 +139,8 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 SUPABASE_SERVICE_ROLE=your_supabase_service_role_key_here
 
-# Google Maps API
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+# Mapbox API
+NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
 
 # Optional: Nominatim for free geocoding fallback
 NOMINATIM_APP_EMAIL=optional@email.tld
@@ -195,7 +195,7 @@ npm run format
 - **Landing Page**: Hero section with search and CTAs
 - **Explore Page**: Tabs for List, Map, Add, Find More
 - **Search & Filters**: Advanced filtering with categories, distance, dates, prices
-- **Map Integration**: Google Maps with markers, info windows, geolocation
+- **Map Integration**: Mapbox with markers, info windows, geolocation
 - **Add Sale Form**: Complete form with Places API, image upload, validation
 - **Sale Details**: Individual sale pages with map and contact info
 - **Favorites**: Save and manage favorite sales
@@ -365,14 +365,14 @@ npm run format
 
 ### MILESTONE 7 — Cost Optimization Review ✅
 - [x] Verify geocode only on WRITE; no reverse-geocode on read paths
-- [x] Google Maps dynamically imported only on map pages
+- [x] Mapbox dynamically imported only on map pages
 - [x] Confirm images compressed/cached; Supabase storage rules enforced
 - [x] Re-check DB indexes with EXPLAIN
 - [x] Add plan.md section estimating monthly costs
 
 **What changed:**
 - Created comprehensive cost optimization documentation (`docs/COST_OPTIMIZATION.md`)
-- Added dynamic imports for Google Maps components
+- Added dynamic imports for Mapbox components
 - Verified geocoding optimization (only on write operations)
 - Confirmed image optimization with Next.js Image and Supabase CDN
 - Added monthly cost estimates for different user scales
@@ -436,7 +436,7 @@ npm run format
 # Public (safe to expose to client)
 NEXT_PUBLIC_SUPABASE_URL=https://bbsxwwjgqucddgcfwvbl.supabase.co/
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBoSYlvSHgebFXtRZm9y9qPzV32cY36a4c
+NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
 
 # Server-only (never expose to client)
 SUPABASE_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -696,7 +696,7 @@ npm run smoke:scrape
 | DB insert blocked | RLS policy issues | Check Supabase RLS policies for yard_sales table |
 | Timeout errors | Network issues | Increase timeout values in API proxy |
 | Empty results | Parser regex mismatch | Update regex patterns in parseCraigslistList |
-| Geocoding failures | API key issues | Check Google Maps API key configuration |
+| Geocoding failures | API key issues | Check Nominatim configuration |
 
 ### Performance Optimizations
 - **Rate Limiting**: 500-1500ms delay between requests
@@ -736,7 +736,7 @@ Comprehensive end-to-end verification of the "Add a Sale" user flow including au
 
 ### Files Added/Modified
 - **Test Fixtures**: `tests/fixtures/addresses.json` - Address test data
-- **Mock Utilities**: `tests/utils/mocks.ts` - Google Maps, Nominatim, and Supabase mocks
+- **Mock Utilities**: `tests/utils/mocks.ts` - Nominatim and Supabase mocks
 - **Unit Tests**: Validation and geocoding fallback tests
 - **Integration Tests**: Database operations and map rendering tests
 - **E2E Tests**: Complete user journey tests with screenshots
@@ -755,12 +755,12 @@ Comprehensive end-to-end verification of the "Add a Sale" user flow including au
 ### Troubleshooting Guide
 | Issue | Root Cause | Fix |
 |-------|------------|-----|
-| Places doesn't load | Missing API key or libraries | Check `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` + libraries |
+| Places doesn't load | Missing API key or libraries | Check Nominatim configuration |
 | RLS permission error | Owner_id not set or policy issue | Check owner_id assignment + RLS policies |
 | Marker not on map | Missing lat/lng or lazy-load issue | Verify geocoding success + map initialization |
 | Nominatim blocked | Missing email or rate limit | Set `NOMINATIM_APP_EMAIL` + implement backoff |
 | Form validation fails | Zod schema mismatch | Check field names and types in SaleSchema |
-| Geocoding fails | API key issues or network | Check Google Maps API key + fallback to Nominatim |
+| Geocoding fails | API key issues or network | Check Nominatim configuration |
 
 ### Performance Optimizations
 - **Geocoding Caching**: Results cached to avoid repeated API calls
@@ -790,7 +790,7 @@ YardSaleFinder is **95% production-ready** with all core features implemented, c
 ### Key Findings
 - **Repository State**: ✅ Consolidated on `main` branch with proper CI/CD
 - **Code Quality**: ✅ All tests passing, TypeScript strict mode, comprehensive test coverage
-- **Infrastructure**: ✅ Supabase integration verified, Google Maps configured, Vercel deployment ready
+- **Infrastructure**: ✅ Supabase integration verified, Mapbox configured, Vercel deployment ready
 - **Security**: ✅ RLS policies, rate limiting, CSP headers, input validation
 - **Performance**: ✅ Optimized queries, image optimization, caching strategies
 - **Testing**: ✅ Unit, integration, E2E, and accessibility tests complete
@@ -833,7 +833,7 @@ Canonical domain set to `https://lootaura.com` across environment configuration 
 - NEXT_PUBLIC_SITE_URL set to `https://lootaura.com`
 - Vercel configured with custom domain `lootaura.com` (see deployment steps)
 - Supabase Auth redirect URLs include `https://lootaura.com/*`
-- Google Maps API key HTTP referrers include `https://lootaura.com/*`
+- Mapbox token configured for `https://lootaura.com/*`
 - SEO metadata, sitemap, and structured data use `https://lootaura.com` as canonical
 
 ### Notes

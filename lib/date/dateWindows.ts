@@ -46,7 +46,7 @@ export function getWeekendWindow(): DateWindow {
   sunday.setUTCDate(today.getUTCDate() + daysUntilSunday)
   
   const start = new Date(saturday.getTime())
-  const end = new Date(sunday.getTime() + 24 * 60 * 60 * 1000 - 1)
+  const end = new Date(sunday.getTime() + 24 * 60 * 60 * 1000 - 1000)
   
   return {
     start,
@@ -74,7 +74,7 @@ export function getNextWeekendWindow(): DateWindow {
   nextSunday.setUTCDate(today.getUTCDate() + daysUntilNextSunday)
   
   const start = new Date(nextSaturday.getTime())
-  const end = new Date(nextSunday.getTime() + 24 * 60 * 60 * 1000 - 1)
+  const end = new Date(nextSunday.getTime() + 24 * 60 * 60 * 1000 - 1000)
   
   return {
     start,

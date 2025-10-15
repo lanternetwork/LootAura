@@ -8,7 +8,7 @@ import ReviewsSection from '@/components/ReviewsSection'
 // Mock the auth hook
 vi.mock('@/lib/hooks/useAuth', () => ({
   useAuth: () => ({
-    user: { id: 'test-user' }
+    data: { id: 'test-user' }
   })
 }))
 

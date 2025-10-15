@@ -88,7 +88,6 @@ if (!globalThis.__testSetupInitialized) {
   // Mock environment variables
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
-  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key'
   process.env.NEXT_PUBLIC_DEBUG = 'false'
   process.env.NEXT_PUBLIC_SITE_URL = 'https://lootaura.app'
 
@@ -238,29 +237,6 @@ if (!globalThis.__testSetupInitialized) {
       }
       return HttpResponse.json([])
     }),
-    http.get('https://maps.googleapis.com/maps/api/geocode/json', ({ request }) => {
-      const url = new URL(request.url)
-      const address = url.searchParams.get('address')
-      if (address && (address.includes('Test') || address.includes('Amphitheatre') || address.includes('Apple'))) {
-        return HttpResponse.json({
-          results: [{
-            geometry: {
-              location: {
-                lat: 37.422,
-                lng: -122.084
-              }
-            },
-            formatted_address: '1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA',
-            address_components: [
-              { long_name: 'Mountain View', types: ['locality'] },
-              { short_name: 'CA', types: ['administrative_area_level_1'] },
-              { long_name: '94043', types: ['postal_code'] }
-            ]
-          }]
-        })
-      }
-      return HttpResponse.json({ results: [] })
-    })
   ]
 
   // Add geocoding handlers to server
@@ -355,10 +331,6 @@ if (!globalThis.__testSetupInitialized) {
     const url = typeof input === 'string' ? input : (input as URL).toString()
     if (url.includes('nominatim.openstreetmap.org')) {
       // Delegate to MSW for Nominatim
-      return server.handleRequest(new Request(input, init));
-    }
-    if (url.includes('maps.googleapis.com')) {
-      // Delegate to MSW for Google Maps
       return server.handleRequest(new Request(input, init));
     }
     // Let MSW handlers for /api/sales and /api/sales/markers use the HttpResponse

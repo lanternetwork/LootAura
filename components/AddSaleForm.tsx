@@ -16,7 +16,6 @@ export default function AddSaleForm() {
   const [tagInput, setTagInput] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  // Google Maps autocomplete removed; rely solely on fallback geocoder
 
   // Handle manual address geocoding
   const handleAddressChange = async (value: string) => {

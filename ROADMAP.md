@@ -41,7 +41,7 @@ LootAura is **95% production-ready** with all core features implemented, compreh
 - [ ] All required environment variables documented in `env.example`
 - [ ] Production environment variables configured in Vercel
 - [ ] Supabase project has correct RLS policies
-- [ ] Google Maps API key has proper restrictions
+- [ ] Mapbox token has proper restrictions
 - [ ] Health check endpoint returns `{ok: true}` in production
 
 **Effort**: S (2-4 hours)

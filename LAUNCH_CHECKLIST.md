@@ -140,7 +140,7 @@
 ### Cost Monitoring
 - [ ] **Vercel**: Usage within limits
 - [ ] **Supabase**: Database usage reasonable
-- [ ] **Google Maps**: API usage within budget
+- [ ] **Mapbox**: API usage within budget
 - [ ] **Redis**: Rate limiting costs minimal
 - [ ] **Sentry**: Error tracking costs reasonable
 

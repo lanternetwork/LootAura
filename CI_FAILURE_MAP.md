@@ -59,7 +59,7 @@ Based on analysis of the unified CI workflow, here are the expected failure patt
 1. **Owner Action Required**: Configure GitHub Secrets
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (optional)
+   - `NEXT_PUBLIC_MAPBOX_TOKEN` (optional)
 
 2. **Code Fixes Needed**: 
    - Remove console.log statements from production code

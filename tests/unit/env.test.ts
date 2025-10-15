@@ -18,20 +18,17 @@ describe('Environment Validation', () => {
     // Set up valid environment
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key-1234567890'
 
     const { ENV_PUBLIC } = await import('@/lib/env')
 
     expect(ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_URL).toBe('https://test.supabase.co')
     expect(ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_ANON_KEY).toBe('test-anon-key-1234567890')
-    expect(ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY).toBe('test-maps-key-1234567890')
   })
 
   it('should validate required server environment variables', async () => {
     // Set up valid environment
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key-1234567890'
     process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
 
     const { ENV_SERVER } = await import('@/lib/env')
@@ -53,7 +50,6 @@ describe('Environment Validation', () => {
   it('should throw error for invalid URL format', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'not-a-url'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key-1234567890'
 
     await expect(async () => {
       await import('@/lib/env')
@@ -63,7 +59,6 @@ describe('Environment Validation', () => {
   it('should throw error for short API keys', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'short'
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key-1234567890'
 
     await expect(async () => {
       await import('@/lib/env')
@@ -73,7 +68,6 @@ describe('Environment Validation', () => {
   it('should handle optional environment variables', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key-1234567890'
     process.env.NEXT_PUBLIC_SITE_URL = 'https://example.com'
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = 'test-vapid-key-1234567890'
 
@@ -86,7 +80,6 @@ describe('Environment Validation', () => {
   it('should handle missing optional variables', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key-1234567890'
     process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
 
     const { ENV_PUBLIC } = await import('@/lib/env')
@@ -99,7 +92,6 @@ describe('Environment Validation', () => {
   it('should validate email format for NOMINATIM_APP_EMAIL', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key-1234567890'
     process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
     process.env.NOMINATIM_APP_EMAIL = 'invalid-email'
 
@@ -111,7 +103,6 @@ describe('Environment Validation', () => {
   it('should accept valid email for NOMINATIM_APP_EMAIL', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = 'test-maps-key-1234567890'
     process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
     process.env.NOMINATIM_APP_EMAIL = 'test@example.com'
 

@@ -168,6 +168,12 @@ describe('Grid Layout Integration', () => {
   })
 
   it('should not have multiple column-defining classes', () => {
+    // Set deterministic width before rendering
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+      configurable: true,
+      value: 1200
+    })
+
     render(
       <SalesClient
         initialSales={mockSales}

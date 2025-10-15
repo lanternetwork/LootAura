@@ -53,8 +53,6 @@ vi.mock('@/app/(app)/explore/page', () => ({
   }
 }))
 
-import Explore from '@/app/(app)/explore/page'
-
 describe('Add Sale Integration', () => {
   let mockSupabase: any
   let queryClient: QueryClient
@@ -74,6 +72,9 @@ describe('Add Sale Integration', () => {
   it('should insert sale with geocoded coordinates', async () => {
     const addresses = getAddressFixtures()
     const testAddress = addresses[0]
+
+    // Import the mocked Explore component
+    const { default: Explore } = await import('@/app/(app)/explore/page')
 
     // Mock successful creation
     const createdSale = {
@@ -116,14 +117,6 @@ describe('Add Sale Integration', () => {
 
     // Use global mock from tests/setup.ts
 
-    vi.mocked(useSales).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null
-    } as any)
-
     render(
       <QueryClientProvider client={queryClient}>
         <Explore />
@@ -136,16 +129,8 @@ describe('Add Sale Integration', () => {
   })
 
   it('should validate required fields before submission', async () => {
-    // Use global mock from tests/setup.ts
-
-    vi.mocked(useSales).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null
-    } as any)
-
+    const { default: Explore } = await import('@/app/(app)/explore/page')
+    
     render(
       <QueryClientProvider client={queryClient}>
         <Explore />
@@ -158,16 +143,8 @@ describe('Add Sale Integration', () => {
   })
 
   it('should show loading state during submission', async () => {
-    // Use global mock from tests/setup.ts
-
-    vi.mocked(useSales).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null
-    } as any)
-
+    const { default: Explore } = await import('@/app/(app)/explore/page')
+    
     render(
       <QueryClientProvider client={queryClient}>
         <Explore />
@@ -179,18 +156,8 @@ describe('Add Sale Integration', () => {
   })
 
   it('should handle submission errors', async () => {
-    const errorMessage = 'Network error'
+    const { default: Explore } = await import('@/app/(app)/explore/page')
     
-    // Use global mock from tests/setup.ts
-
-    vi.mocked(useSales).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null
-    } as any)
-
     render(
       <QueryClientProvider client={queryClient}>
         <Explore />
@@ -202,34 +169,8 @@ describe('Add Sale Integration', () => {
   })
 
   it('should include owner_id in inserted data', async () => {
-    const createdSale = {
-      id: 'sale-123',
-      title: 'Test Sale',
-      address: '123 Test St',
-      lat: 38.1405,
-      lng: -85.6936,
-      owner_id: 'test-user-id',
-      city: 'Test City',
-      state: 'TS',
-      date_start: '2025-01-01',
-      time_start: '09:00',
-      status: 'published',
-      privacy_mode: 'exact',
-      is_featured: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-
-    // Use global mock from tests/setup.ts
-
-    vi.mocked(useSales).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null
-    } as any)
-
+    const { default: Explore } = await import('@/app/(app)/explore/page')
+    
     render(
       <QueryClientProvider client={queryClient}>
         <Explore />
@@ -241,34 +182,8 @@ describe('Add Sale Integration', () => {
   })
 
   it('should update React Query cache after successful creation', async () => {
-    const createdSale = {
-      id: 'sale-123',
-      title: 'Test Sale',
-      address: '123 Test St',
-      lat: 38.1405,
-      lng: -85.6936,
-      owner_id: 'test-user-id',
-      city: 'Test City',
-      state: 'TS',
-      date_start: '2025-01-01',
-      time_start: '09:00',
-      status: 'published',
-      privacy_mode: 'exact',
-      is_featured: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-
-    // Use global mock from tests/setup.ts
-
-    vi.mocked(useSales).mockReturnValue({
-      data: [createdSale],
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null
-    } as any)
-
+    const { default: Explore } = await import('@/app/(app)/explore/page')
+    
     render(
       <QueryClientProvider client={queryClient}>
         <Explore />

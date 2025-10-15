@@ -25,7 +25,8 @@ vi.mock('@/lib/hooks/useFilters', () => ({
 vi.mock('@/lib/hooks/useAuth', () => ({
   useAuth: () => ({
     user: null,
-    loading: false
+    loading: false,
+    authority: 'FILTERS' // Force FILTERS authority for this test
   })
 }))
 
@@ -179,8 +180,8 @@ describe('Grid Layout Integration', () => {
     const gridContainer = screen.getByTestId('sales-grid')
     const className = gridContainer.className
     
-    // Count grid-cols-* classes
-    const columnClasses = className.match(/grid-cols-\d+/g) || []
-    expect(columnClasses.length).toBeLessThanOrEqual(1) // Only base class, responsive classes are different
+    // Count base grid-cols-* classes (not responsive ones)
+    const baseColumnClasses = className.match(/\bgrid-cols-\d+\b/g) || []
+    expect(baseColumnClasses.length).toBeLessThanOrEqual(1) // Only base class, responsive classes are different
   })
 })

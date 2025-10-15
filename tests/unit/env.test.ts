@@ -40,7 +40,6 @@ describe('Environment Validation', () => {
     // Clear required variables
     delete process.env.NEXT_PUBLIC_SUPABASE_URL
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    delete process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
     await expect(async () => {
       await import('@/lib/env')

@@ -309,7 +309,7 @@
 ### Technical Issues
 - **Vercel Support**: [Vercel Support](https://vercel.com/support)
 - **Supabase Support**: [Supabase Support](https://supabase.com/support)
-- **Google Cloud Support**: [Google Cloud Support](https://cloud.google.com/support)
+- **Mapbox Support**: [Mapbox Support](https://support.mapbox.com)
 
 ### Business Issues
 - **Product Owner**: [Contact Info]

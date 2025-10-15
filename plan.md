@@ -720,7 +720,7 @@ Comprehensive end-to-end verification of the "Add a Sale" user flow including au
 ### What We Verified
 - **Authentication Flow**: User can access Add Sale form when authenticated
 - **Form Validation**: Required fields validated with proper error messages
-- **Geocoding Integration**: Google Places primary, Nominatim fallback with write-time only policy
+- **Geocoding Integration**: Nominatim geocoding with write-time only policy
 - **Database Operations**: Supabase insert with proper owner_id and RLS policies
 - **UI Rendering**: New sales appear immediately in List and Map tabs
 - **Details Page**: Correct field display and "Get Directions" functionality
@@ -778,7 +778,7 @@ Comprehensive end-to-end verification of the "Add a Sale" user flow including au
 
 ### Diagnostic Features
 - **Development Logging**: Structured logs with component context
-- **Geocoding Path Tracking**: Logs which geocoder was used (Google vs Nominatim)
+- **Geocoding Path Tracking**: Logs which geocoder was used (Nominatim)
 - **Map Rendering Stats**: Logs marker count and bounds information
 - **Sale Creation Tracking**: Logs successful creation with coordinates status
 
@@ -837,13 +837,13 @@ Canonical domain set to `https://lootaura.com` across environment configuration 
 - SEO metadata, sitemap, and structured data use `https://lootaura.com` as canonical
 
 ### Notes
-- No secrets committed; Supabase URLs and Google endpoints unchanged
+- No secrets committed; Supabase URLs unchanged
 - Environment validation continues to enforce proper URL format
 
 ## 🔐 Auth + Profile Milestone (In Progress)
 
 ### Scope
-- **Providers**: Email + Google only (no other social providers)
+- **Providers**: Email only (no social providers)
 - **Storage**: `profiles` table keyed by `auth.users(id)` with strict RLS
 - **Performance**: Auth/profile DB p95 ≤ 50ms, initial sales p95 ≤ 300ms
 - **Security**: Self-read/self-write only; no public reads by default
@@ -876,7 +876,7 @@ Canonical domain set to `https://lootaura.com` across environment configuration 
 - **Security Compliance**: OWASP Top 10, dependency scanning, CI security audit
 
 ### Implementation Tasks
-- [ ] Restore Google sign-in button and verify end-to-end flow
+- [ ] Verify email sign-in end-to-end flow
 - [ ] Verify Email auth (magic link/OTP) with proper error handling
 - [ ] Implement idempotent profile creation on first login
 - [ ] Add route gating with consistent navbar/session state

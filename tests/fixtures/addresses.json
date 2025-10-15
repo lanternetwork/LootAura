@@ -1,20 +1,20 @@
 [
   {
-    "address": "1600 Amphitheatre Parkway, Mountain View, CA",
-    "lat": 37.422,
-    "lng": -122.084,
-    "formatted_address": "1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA",
-    "city": "Mountain View",
-    "state": "CA",
-    "zip": "94043"
+    "address": "123 Test Street, Louisville, KY",
+    "lat": 38.1405,
+    "lng": -85.6936,
+    "formatted_address": "123 Test St, Louisville, KY 40201, USA",
+    "city": "Louisville",
+    "state": "KY",
+    "zip": "40201"
   },
   {
-    "address": "1 Apple Park Way, Cupertino, CA",
-    "lat": 37.3349,
-    "lng": -122.009,
-    "formatted_address": "1 Apple Park Way, Cupertino, CA 95014, USA",
-    "city": "Cupertino",
-    "state": "CA",
-    "zip": "95014"
+    "address": "456 Sample Avenue, Louisville, KY",
+    "lat": 38.1405,
+    "lng": -85.6936,
+    "formatted_address": "456 Sample Ave, Louisville, KY 40201, USA",
+    "city": "Louisville",
+    "state": "KY",
+    "zip": "40201"
   }
 ]

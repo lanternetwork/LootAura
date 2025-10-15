@@ -77,8 +77,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Skip external resources
-  if (url.hostname.includes('googleapis.com') || 
-      url.hostname.includes('google.com')) {
+  if (url.hostname.includes('googleapis.com')) {
     return
   }
 

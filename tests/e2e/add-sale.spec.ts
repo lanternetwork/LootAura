@@ -27,7 +27,7 @@ test.describe('Add Sale E2E Flow', () => {
           body: JSON.stringify({
             id: 'sale-123',
             title: 'Neighborhood Sale',
-            address: '1600 Amphitheatre Parkway, Mountain View, CA',
+            address: '123 Test Street, Louisville, KY',
             lat: 37.422,
             lng: -122.084,
             owner_id: 'test-user-id',
@@ -45,7 +45,7 @@ test.describe('Add Sale E2E Flow', () => {
             {
               id: 'sale-123',
               title: 'Neighborhood Sale',
-              address: '1600 Amphitheatre Parkway, Mountain View, CA',
+              address: '123 Test Street, Louisville, KY',
               lat: 37.422,
               lng: -122.084,
               owner_id: 'test-user-id',
@@ -73,7 +73,7 @@ test.describe('Add Sale E2E Flow', () => {
     
     // Fill in the form
     await page.fill('input[name="title"]', 'Neighborhood Sale')
-    await page.fill('input[name="address"]', '1600 Amphitheatre Parkway, Mountain View, CA')
+    await page.fill('input[name="address"]', '123 Test Street, Louisville, KY')
     
     // Wait for address autocomplete to trigger
     await page.waitForTimeout(500)
@@ -107,7 +107,7 @@ test.describe('Add Sale E2E Flow', () => {
     
     // Verify the new sale appears in the list
     await expect(page.locator('text=Neighborhood Sale')).toBeVisible()
-    await expect(page.locator('text=1600 Amphitheatre Parkway, Mountain View, CA')).toBeVisible()
+    await expect(page.locator('text=123 Test Street, Louisville, KY')).toBeVisible()
     
     // Navigate to Map tab
     await page.click('text=Map')
@@ -126,7 +126,7 @@ test.describe('Add Sale E2E Flow', () => {
     
     // Verify details page shows correct information
     await expect(page.locator('h1:has-text("Neighborhood Sale")')).toBeVisible()
-    await expect(page.locator('text=1600 Amphitheatre Parkway, Mountain View, CA')).toBeVisible()
+    await expect(page.locator('text=123 Test Street, Louisville, KY')).toBeVisible()
     await expect(page.locator('text=Get Directions →')).toBeVisible()
     
     // Take screenshot for verification

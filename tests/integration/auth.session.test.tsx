@@ -71,21 +71,21 @@ describe('Auth Session Integration', () => {
   })
 
   describe('Provider Fallback', () => {
-    it('should handle missing Google envs gracefully', async () => {
+    it('should handle missing OAuth envs gracefully', async () => {
       // This test will verify that the app doesn't crash when
-      // Google OAuth environment variables are missing
+      // OAuth environment variables are missing
       expect(true).toBe(true)
     })
 
-    it('should show user-friendly message when Google is unavailable', async () => {
+    it('should show user-friendly message when OAuth is unavailable', async () => {
       // This test will verify that a user-friendly message is shown
-      // when Google OAuth is not available
+      // when OAuth is not available
       expect(true).toBe(true)
     })
 
-    it('should fallback to email auth when Google fails', async () => {
+    it('should fallback to email auth when OAuth fails', async () => {
       // This test will verify that the app falls back to email auth
-      // when Google OAuth is not available
+      // when OAuth is not available
       expect(true).toBe(true)
     })
   })

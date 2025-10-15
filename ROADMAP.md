@@ -77,7 +77,7 @@ LootAura is **95% production-ready** with all core features implemented, compreh
 **Why it matters**: Maps functionality is core to the application and requires proper API configuration.
 
 **Files/areas to touch**:
-- Google Cloud Console API configuration
+- Mapbox API configuration
 - `next.config.js` (verify image domains)
 - `components/YardSaleMap.tsx` (verify dynamic import)
 

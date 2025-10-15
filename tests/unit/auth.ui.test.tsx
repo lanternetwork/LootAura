@@ -22,7 +22,6 @@ vi.mock('@/lib/env', () => ({
   env: {
     NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key',
-    NEXT_PUBLIC_GOOGLE_CLIENT_ID: 'test-google-client-id',
   },
 }))
 
@@ -32,21 +31,9 @@ describe('Auth UI Components', () => {
   })
 
   describe('SignInButton', () => {
-    it('should render Email and Google buttons when provider config is present', () => {
+    it('should render Email button when provider config is present', () => {
       // This test will be implemented when the SignInButton component is created
       // For now, it's a placeholder to ensure the test structure is in place
-      expect(true).toBe(true)
-    })
-
-    it('should hide Google button when Google env is missing', () => {
-      // This test will verify that the Google button is hidden or disabled
-      // when NEXT_PUBLIC_GOOGLE_CLIENT_ID is not present
-      expect(true).toBe(true)
-    })
-
-    it('should show user-friendly fallback when Google is unavailable', () => {
-      // This test will verify that a fallback message is shown
-      // instead of crashing when Google OAuth is not configured
       expect(true).toBe(true)
     })
   })

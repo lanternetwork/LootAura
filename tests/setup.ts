@@ -333,33 +333,106 @@ if (!globalThis.__testSetupInitialized) {
   global.TextEncoder = TextEncoder
   global.TextDecoder = TextDecoder
 
-  // Mock fetch globally to prevent network calls but allow known test endpoints
-  global.fetch = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-    // Extract URL from various input types (string, URL, Request)
-    let url: string
-    if (typeof input === 'string') {
-      url = input
-    } else if (input instanceof URL) {
-      url = input.toString()
-    } else if (input instanceof Request) {
-      url = input.url
-    } else {
-      url = String(input)
-    }
+  // Mock fetch globally to prevent network calls
+  global.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' 
+      ? input 
+      : input instanceof URL 
+        ? input.toString()
+        : input instanceof Request
+          ? input.url
+          : String(input)
 
-    // Delegate to MSW for nominatim
+    // Handle nominatim geocoding requests
     if (url.includes('nominatim.openstreetmap.org')) {
-      const req = input instanceof Request ? input : new Request(input as any, init)
-      return server.handleRequest(req)
+      // Return empty array for invalid addresses
+      if (url.includes('Invalid') || url.includes('Fail')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+      
+      // Return mock geocode result for valid addresses
+      return new Response(JSON.stringify([{
+        lat: '38.1405',
+        lon: '-85.6936',
+        display_name: '123 Test St, Louisville, KY',
+        address: {
+          city: 'Louisville',
+          state: 'KY',
+          postcode: '40201'
+        }
+      }]), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
-
-    // Delegate to MSW for /api/ endpoints to get full response
-    if (url.startsWith('/api/')) {
-      const req = input instanceof Request ? input : new Request(input as any, init)
-      return server.handleRequest(req)
+    
+    // Handle /api/sales/markers endpoint
+    if (url.includes('/api/sales/markers')) {
+      return new Response(JSON.stringify({ 
+        ok: true, 
+        data: [
+          { id: 'test-marker-1', lat: 38.1405, lng: -85.6936, title: 'Test Sale', price: 100 },
+          { id: 'test-marker-2', lat: 38.1505, lng: -85.7036, title: 'Another Sale', price: 75 }
+        ], 
+        count: 2 
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
-
-    // Throw for unexpected fetch calls
+    
+    // Handle /api/sales endpoint
+    if (url.includes('/api/sales')) {
+      return new Response(JSON.stringify({ 
+        ok: true, 
+        data: [
+          {
+            id: 'test-sale-1',
+            title: 'Test Sale',
+            description: 'Test Description',
+            price: 100,
+            lat: 38.1405,
+            lng: -85.6936,
+            date_start: '2025-01-01',
+            time_start: '09:00',
+            date_end: '2025-01-01',
+            time_end: '17:00',
+            owner_id: 'test-user',
+            status: 'published',
+            privacy_mode: 'exact',
+            is_featured: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 'test-sale-2',
+            title: 'Vintage Chair',
+            description: 'Antique furniture',
+            price: 50,
+            lat: 38.1405,
+            lng: -85.6936,
+            date_start: '2025-01-01',
+            time_start: '09:00',
+            date_end: '2025-01-01',
+            time_end: '17:00',
+            owner_id: 'test-user',
+            status: 'published',
+            privacy_mode: 'exact',
+            is_featured: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ], 
+        count: 2 
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+    
     throw new Error(`fetch() called in test without mock: ${url}`)
   })
 

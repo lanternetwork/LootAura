@@ -1,23 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import AddSaleForm from '@/components/AddSaleForm'
+import { useCreateSale } from '@/lib/hooks/useSales'
 
-// Use global mocks from tests/setup.ts
-
-// Mock useCreateSale hook
-vi.mock('@/lib/hooks/useSales', () => ({
-  useCreateSale: vi.fn(() => ({
-    mutateAsync: vi.fn().mockResolvedValue({ id: 'test-id', title: 'Test Sale' }),
-    isPending: false,
-    error: null,
-    data: null,
-    variables: null,
-    isError: false,
-    isSuccess: false,
-    reset: vi.fn(),
-    mutate: vi.fn()
-  }))
-}))
+// Use global mocks from tests/setup.ts (useCreateSale is already mocked)
 
 describe('AddSaleForm', () => {
   beforeEach(() => {
@@ -110,8 +96,8 @@ describe('AddSaleForm', () => {
     })
 
     // Remove tag
-    const removeButtons = screen.getAllByRole('button')
-    fireEvent.click(removeButtons.find(b => b.textContent === '×') as HTMLElement)
+    const removeButton = screen.getByTestId('tag-remove')
+    fireEvent.click(removeButton)
 
     await waitFor(() => {
       expect(screen.queryByText('furniture')).not.toBeInTheDocument()

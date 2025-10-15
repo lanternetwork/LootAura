@@ -257,11 +257,13 @@ export default function AddSaleForm() {
             {tags.map((tag, index) => (
               <span 
                 key={index}
+                data-testid="tag-item"
                 className="px-2 py-1 bg-amber-100 text-amber-800 rounded text-sm flex items-center gap-1"
               >
                 {tag}
                 <button 
                   type="button"
+                  data-testid="tag-remove"
                   onClick={() => removeTag(tag)}
                   className="text-amber-600 hover:text-amber-800"
                 >

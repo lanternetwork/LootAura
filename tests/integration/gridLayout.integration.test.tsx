@@ -33,16 +33,16 @@ vi.mock('@/lib/hooks/useAuth', () => ({
 // Use global useSales mock from tests/setup.ts
 vi.mock('@/lib/hooks/useSales', () => ({
   __esModule: true,
-  default: () => ({
-    sales: makeSales(4, [
+  useSales: () => ({
+    data: makeSales(4, [
       { title: 'Sale 1', description: 'Desc 1' },
       { title: 'Sale 2', description: 'Desc 2' },
       { title: 'Sale 3', description: 'Desc 3' },
       { title: 'Sale 4', description: 'Desc 4' }
     ]),
-    loading: false,
-    fetchSales: vi.fn(),
-    fetchMapSales: vi.fn()
+    isLoading: false,
+    error: null,
+    refetch: vi.fn()
   })
 }))
 
@@ -82,6 +82,9 @@ describe('Grid Layout Integration', () => {
     })
 
     const gridContainer = screen.getByTestId('sales-grid')
+    if (globalThis.__simulateResize) {
+      globalThis.__simulateResize(gridContainer, 1200)
+    }
     expect(gridContainer).toBeInTheDocument()
     expect(gridContainer).toHaveClass('grid')
     expect(gridContainer).toHaveClass('grid-cols-1')
@@ -106,6 +109,11 @@ describe('Grid Layout Integration', () => {
     )
 
     const gridContainer = screen.getByTestId('sales-grid')
+    
+    // Trigger deterministic resize
+    if (globalThis.__simulateResize) {
+      globalThis.__simulateResize(gridContainer, 1200)
+    }
     
     // Should have responsive grid classes
     expect(gridContainer.className).toContain('grid')
@@ -193,6 +201,6 @@ describe('Grid Layout Integration', () => {
     
     // Count base grid-cols-* classes (not responsive ones)
     const baseColumnClasses = className.match(/\bgrid-cols-\d+\b/g) || []
-    expect(baseColumnClasses.length).toBeLessThanOrEqual(1) // Only base class, responsive classes are different
+    expect(baseColumnClasses.length).toBe(1)
   })
 })

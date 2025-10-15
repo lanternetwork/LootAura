@@ -21,29 +21,30 @@ if (!globalThis.__testSetupInitialized) {
   const server = setupServer(
     // Mock /api/sales/markers endpoint
     http.get('/api/sales/markers', ({ request }) => {
-      const url = new URL(request.url)
-      const categories = url.searchParams.get('categories')
-      
-      // Return minimal valid markers response
-      const markers = categories ? [] : [
+      // Always return non-empty markers for tests
+      const markers = [
         {
           id: 'test-marker-1',
           lat: 38.1405,
           lng: -85.6936,
           title: 'Test Sale',
           price: 100
+        },
+        {
+          id: 'test-marker-2',
+          lat: 38.1505,
+          lng: -85.7036,
+          title: 'Another Sale',
+          price: 75
         }
       ]
       
-      return HttpResponse.json(markers)
+      return HttpResponse.json({ ok: true, data: markers, count: markers.length })
     }),
     
     // Mock /api/sales endpoint
     http.get('/api/sales', ({ request }) => {
-      const url = new URL(request.url)
-      const categories = url.searchParams.get('categories')
-      
-      const sales = categories ? [] : [
+      const sales = [
         {
           id: 'test-sale-1',
           title: 'Test Sale',
@@ -334,15 +335,18 @@ if (!globalThis.__testSetupInitialized) {
   // Mock fetch globally to prevent network calls but allow known test endpoints
   global.fetch = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : (input as URL).toString()
+    
+    // Delegate to MSW for nominatim
     if (url.includes('nominatim.openstreetmap.org')) {
-      // Delegate to MSW for Nominatim
-      return server.handleRequest(new Request(input, init));
+      return server.handleRequest(new Request(input, init))
     }
-    // Let MSW handlers for /api/sales and /api/sales/markers use the HttpResponse
+    
+    // Delegate to MSW for /api/ endpoints to get full response
     if (url.startsWith('/api/')) {
-      // Defer to MSW by returning a basic ok response; tests that assert data will use MSW server
-      return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+      return server.handleRequest(new Request(input, init))
     }
+    
+    // Throw for unexpected fetch calls
     throw new Error(`fetch() called in test without mock: ${url}`)
   })
 

@@ -246,15 +246,15 @@ if (!globalThis.__testSetupInitialized) {
           results: [{
             geometry: {
               location: {
-                lat: 38.1405,
-                lng: -85.6936
+                lat: 37.422,
+                lng: -122.084
               }
             },
-            formatted_address: '123 Test St, Louisville, KY',
+            formatted_address: '1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA',
             address_components: [
-              { long_name: 'Louisville', types: ['locality'] },
-              { short_name: 'KY', types: ['administrative_area_level_1'] },
-              { long_name: '40201', types: ['postal_code'] }
+              { long_name: 'Mountain View', types: ['locality'] },
+              { short_name: 'CA', types: ['administrative_area_level_1'] },
+              { long_name: '94043', types: ['postal_code'] }
             ]
           }]
         })

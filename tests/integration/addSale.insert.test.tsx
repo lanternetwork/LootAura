@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { screen, waitFor } from '@testing-library/react'
+import { QueryClient } from '@tanstack/react-query'
 import { renderWithProviders } from '../utils/renderWithProviders'
 import { createMockSupabaseClient, getAddressFixtures } from '@/tests/utils/mocks'
 
@@ -161,11 +161,7 @@ describe('Add Sale Integration', () => {
   it('should update React Query cache after successful creation', async () => {
     const { default: Explore } = await import('@/app/(app)/explore/page')
     
-    render(
-      <QueryClientProvider client={queryClient}>
-        <Explore />
-      </QueryClientProvider>
-    )
+    renderWithProviders(<Explore />, { queryClient })
 
     // Check that the form is rendered
     expect(screen.getByText('Post Your Sale')).toBeInTheDocument()

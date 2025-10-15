@@ -185,7 +185,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper fieldset and legend structure for grouped fields', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Check that date fields are properly grouped
     const startDateLabel = screen.getByLabelText('Start Date & Time')
@@ -204,7 +204,7 @@ describe('AddSaleForm Accessibility', () => {
 
   it('should have proper focus management', async () => {
     const user = userEvent.setup()
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Focus should start on first input
     const titleInput = screen.getByLabelText('Sale Title *')
@@ -218,7 +218,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper ARIA attributes', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Check for proper form role
     const form = screen.getByRole('form')
@@ -237,7 +237,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should support screen reader navigation', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // All form elements should be accessible to screen readers
     const form = screen.getByRole('form')

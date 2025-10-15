@@ -199,8 +199,9 @@ describe('Grid Layout Integration', () => {
     const gridContainer = screen.getByTestId('sales-grid')
     const className = gridContainer.className
     
-    // Count base grid-cols-* classes (not responsive ones)
-    const baseColumnClasses = className.match(/\bgrid-cols-\d+\b/g) || []
+    // Count only base grid-cols-* classes (exclude responsive variants like sm:, lg:)
+    const allClasses = className.split(' ')
+    const baseColumnClasses = allClasses.filter(cls => /^grid-cols-\d+$/.test(cls))
     expect(baseColumnClasses.length).toBe(1)
   })
 })

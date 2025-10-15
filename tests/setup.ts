@@ -334,18 +334,30 @@ if (!globalThis.__testSetupInitialized) {
 
   // Mock fetch globally to prevent network calls but allow known test endpoints
   global.fetch = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : (input as URL).toString()
-    
+    // Extract URL from various input types (string, URL, Request)
+    let url: string
+    if (typeof input === 'string') {
+      url = input
+    } else if (input instanceof URL) {
+      url = input.toString()
+    } else if (input instanceof Request) {
+      url = input.url
+    } else {
+      url = String(input)
+    }
+
     // Delegate to MSW for nominatim
     if (url.includes('nominatim.openstreetmap.org')) {
-      return server.handleRequest(new Request(input, init))
+      const req = input instanceof Request ? input : new Request(input as any, init)
+      return server.handleRequest(req)
     }
-    
+
     // Delegate to MSW for /api/ endpoints to get full response
     if (url.startsWith('/api/')) {
-      return server.handleRequest(new Request(input, init))
+      const req = input instanceof Request ? input : new Request(input as any, init)
+      return server.handleRequest(req)
     }
-    
+
     // Throw for unexpected fetch calls
     throw new Error(`fetch() called in test without mock: ${url}`)
   })

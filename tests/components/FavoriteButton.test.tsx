@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import FavoriteButton from '@/components/FavoriteButton'
+import { useFavorites, useToggleFavorite } from '@/lib/hooks/useAuth'
 
 // Mock the auth hooks
 vi.mock('@/lib/hooks/useAuth', () => ({
@@ -43,15 +44,17 @@ describe('FavoriteButton', () => {
       </TestWrapper>
     )
 
-    expect(screen.getByText('♡ Save')).toBeInTheDocument()
+    // Component uses icon, not text - check by aria-label
+    expect(screen.getByLabelText('Save sale')).toBeInTheDocument()
   })
 
   it('renders saved button when favorited', () => {
     // Mock the hook to return a favorited sale
-    const { useFavorites } = require('@/lib/hooks/useAuth')
-    vi.mocked(useFavorites).mockReturnValue({
-      data: [{ id: 'test-sale-id', title: 'Test Sale' }]
-    })
+    vi.mocked(useFavorites).mockReturnValueOnce({
+      data: [{ id: 'test-sale-id', title: 'Test Sale' }],
+      isLoading: false,
+      error: null
+    } as any)
 
     render(
       <TestWrapper>
@@ -59,16 +62,15 @@ describe('FavoriteButton', () => {
       </TestWrapper>
     )
 
-    expect(screen.getByText('♥ Saved')).toBeInTheDocument()
+    expect(screen.getByLabelText('Unsave sale')).toBeInTheDocument()
   })
 
   it('calls toggle function when clicked', async () => {
     const mockToggle = vi.fn()
-    const { useToggleFavorite } = require('@/lib/hooks/useAuth')
-    vi.mocked(useToggleFavorite).mockReturnValue({
+    vi.mocked(useToggleFavorite).mockReturnValueOnce({
       mutate: mockToggle,
       isPending: false
-    })
+    } as any)
 
     render(
       <TestWrapper>
@@ -86,11 +88,10 @@ describe('FavoriteButton', () => {
   })
 
   it('shows loading state when pending', () => {
-    const { useToggleFavorite } = require('@/lib/hooks/useAuth')
-    vi.mocked(useToggleFavorite).mockReturnValue({
+    vi.mocked(useToggleFavorite).mockReturnValueOnce({
       mutate: vi.fn(),
       isPending: true
-    })
+    } as any)
 
     render(
       <TestWrapper>
@@ -111,5 +112,6 @@ describe('FavoriteButton', () => {
 
     const button = screen.getByRole('button')
     expect(button).toHaveAttribute('aria-pressed', 'false')
+    expect(button).toHaveAttribute('aria-label', 'Save sale')
   })
 })

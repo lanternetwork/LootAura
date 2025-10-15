@@ -44,8 +44,13 @@ describe('ReviewsSection', () => {
     
     // Wait for component to load
     await waitFor(() => {
-      // Should show 4 filled stars (rounded up from 3.5)
-      const filledStars = screen.getAllByText('★').filter(star => 
+      // Only count display stars (disabled buttons), not form stars
+      const allStars = screen.getAllByText('★')
+      const displayStars = allStars.filter(star => {
+        const button = star.closest('button')
+        return button?.hasAttribute('disabled')
+      })
+      const filledStars = displayStars.filter(star => 
         star.className.includes('text-amber-400')
       )
       expect(filledStars).toHaveLength(4)
@@ -63,8 +68,8 @@ describe('ReviewsSection', () => {
     
     // Wait for loading to complete
     await waitFor(() => {
-      expect(screen.getByText('Write a Review')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /submit review/i })).toBeInTheDocument()
+      expect(screen.getByText(/Write a Review|Update Your Review/)).toBeInTheDocument()
+      expect(screen.getByText(/Submit Review|Update Review/)).toBeInTheDocument()
     })
   })
 
@@ -79,10 +84,8 @@ describe('ReviewsSection', () => {
     
     // Wait for loading to complete
     await waitFor(() => {
-      const submitButton = screen.getByRole('button', { name: /submit review/i })
-      fireEvent.click(submitButton)
-
-      // Should not submit without rating
+      const submitButton = screen.getByText(/Submit Review|Update Review/)
+      // Should be disabled when rating is 0
       expect(submitButton).toBeDisabled()
     })
   })

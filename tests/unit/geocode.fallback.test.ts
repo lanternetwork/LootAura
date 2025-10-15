@@ -2,9 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { geocodeAddress } from '@/lib/geocode'
 import { getAddressFixtures } from '@/tests/utils/mocks'
 
-// Ensure we're not mocking the geocode module
-vi.unmock('@/lib/geocode')
-
 // Mock environment variables
 const originalEnv = process.env
 
@@ -13,18 +10,6 @@ describe('Geocoding Fallback', () => {
     vi.resetModules()
     process.env = { ...originalEnv }
     vi.clearAllMocks()
-    // Reset fetch mock and allow test to override
-    if (global.fetch && typeof global.fetch === 'function') {
-      (global.fetch as any).mockClear?.()
-      // Reset the mock implementation to allow test override
-      if ((global.fetch as any).mockReset) {
-        (global.fetch as any).mockReset()
-      }
-      // Clear the mock implementation to allow test to set its own
-      if ((global.fetch as any).mockImplementation) {
-        (global.fetch as any).mockImplementation = vi.fn()
-      }
-    }
   })
 
   afterEach(() => {

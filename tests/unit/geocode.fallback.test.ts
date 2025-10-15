@@ -109,8 +109,8 @@ describe('Geocoding Fallback', () => {
     const addresses = getAddressFixtures()
     const testAddress = addresses[0]
     
-    // Spy on the global fetch to verify it's called
-    const fetchSpy = vi.spyOn(global, 'fetch')
+    // Clear any previous calls to the global fetch mock
+    vi.mocked(global.fetch).mockClear()
 
     const result = await geocodeAddress(testAddress.address)
     
@@ -123,13 +123,11 @@ describe('Geocoding Fallback', () => {
       zip: testAddress.zip
     })
     
-    // Should call Google Maps API
-    expect(fetchSpy).toHaveBeenCalledWith(
+    // Should call Google Maps API - check the mock's call history
+    expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('maps.googleapis.com'),
       expect.any(Object)
     )
-    
-    fetchSpy.mockRestore()
   })
 
   it('should handle Nominatim rate limiting gracefully', async () => {
@@ -159,15 +157,15 @@ describe('Geocoding Fallback', () => {
     const addresses = getAddressFixtures()
     const testAddress = addresses[0]
     
-    // Spy on the global fetch to verify it's called
-    const fetchSpy = vi.spyOn(global, 'fetch')
+    // Clear any previous calls to the global fetch mock
+    vi.mocked(global.fetch).mockClear()
 
     const result = await geocodeAddress(testAddress.address)
     
     // Check that fetch was called
-    expect(fetchSpy).toHaveBeenCalled()
+    expect(global.fetch).toHaveBeenCalled()
     
-    const fetchCalls = fetchSpy.mock.calls
+    const fetchCalls = (global.fetch as any).mock.calls
     if (fetchCalls.length >= 2) {
       const nominatimCall = fetchCalls[1]
       expect(nominatimCall).toBeDefined()
@@ -179,8 +177,6 @@ describe('Geocoding Fallback', () => {
       expect(nominatimCall).toBeDefined()
       expect(nominatimCall[0]).toContain('nominatim.openstreetmap.org')
     }
-    
-    fetchSpy.mockRestore()
   })
 
   it('should cache results to avoid repeated API calls', async () => {

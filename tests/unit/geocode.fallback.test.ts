@@ -100,12 +100,12 @@ describe('Geocoding Fallback', () => {
     const result = await geocodeAddress(testAddress.address)
     
     expect(result).toEqual({
-      lat: 38.1405,
-      lng: -85.6936,
-      formatted_address: '123 Test St, Louisville, KY',
-      city: 'Louisville',
-      state: 'KY',
-      zip: '40201'
+      lat: 37.422,
+      lng: -122.084,
+      formatted_address: '1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA',
+      city: 'Mountain View',
+      state: 'CA',
+      zip: '94043'
     })
     
     // Should call Google Maps API - check the mock's call history
@@ -146,6 +146,16 @@ describe('Geocoding Fallback', () => {
     vi.mocked(global.fetch).mockClear()
 
     const result = await geocodeAddress(testAddress.address)
+    
+    // Should get Louisville coordinates from Nominatim
+    expect(result).toEqual({
+      lat: 38.1405,
+      lng: -85.6936,
+      formatted_address: '123 Test St, Louisville, KY',
+      city: 'Louisville',
+      state: 'KY',
+      zip: '40201'
+    })
     
     // Check that fetch was called
     expect(global.fetch).toHaveBeenCalled()

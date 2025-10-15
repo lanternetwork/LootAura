@@ -15,7 +15,7 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    supabase.auth.getUser.mockResolvedValue({
+    ;(supabase.auth.getUser as any).mockResolvedValue({
       data: { user: { id: testUserId, email: 'test@example.com' } }
     })
 
@@ -44,7 +44,7 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock anonymous user
-    supabase.auth.getUser.mockResolvedValue({
+    ;(supabase.auth.getUser as any).mockResolvedValue({
       data: { user: null }
     })
 
@@ -74,7 +74,7 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    supabase.auth.getUser.mockResolvedValue({
+    ;(supabase.auth.getUser as any).mockResolvedValue({
       data: { user: { id: testUserId, email: 'test@example.com' } }
     })
 
@@ -110,7 +110,7 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    supabase.auth.getUser.mockResolvedValue({
+    ;(supabase.auth.getUser as any).mockResolvedValue({
       data: { user: { id: testUserId, email: 'test@example.com' } }
     })
 

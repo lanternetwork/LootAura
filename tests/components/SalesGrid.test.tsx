@@ -113,9 +113,10 @@ describe('SalesGrid', () => {
     await act(async () => {
       Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 700 })
       // Use the global helper to trigger resize
-      if (globalThis.__simulateResize) {
-        globalThis.__simulateResize(gridElement, 700)
-      }
+      const simulate = (globalThis as any).__simulateResize as
+        | ((el: Element, width: number) => void)
+        | undefined
+      if (simulate) simulate(gridElement, 700)
     })
 
     await waitFor(() => {
@@ -126,9 +127,10 @@ describe('SalesGrid', () => {
     // Simulate a resize to 1200px (should be 3 columns)
     await act(async () => {
       Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 1200 })
-      if (globalThis.__simulateResize) {
-        globalThis.__simulateResize(gridElement, 1200)
-      }
+      const simulate = (globalThis as any).__simulateResize as
+        | ((el: Element, width: number) => void)
+        | undefined
+      if (simulate) simulate(gridElement, 1200)
     })
 
     await waitFor(() => {
@@ -139,9 +141,10 @@ describe('SalesGrid', () => {
     // Simulate a resize to 500px (should be 1 column)
     await act(async () => {
       Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 500 })
-      if (globalThis.__simulateResize) {
-        globalThis.__simulateResize(gridElement, 500)
-      }
+      const simulate = (globalThis as any).__simulateResize as
+        | ((el: Element, width: number) => void)
+        | undefined
+      if (simulate) simulate(gridElement, 500)
     })
 
     await waitFor(() => {

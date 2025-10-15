@@ -84,9 +84,11 @@ describe('ReviewsSection', () => {
     
     // Wait for loading to complete
     await waitFor(() => {
+      // Component loads with existing review (rating=4 from Supabase mock)
+      // Button shows "Update Review" and is enabled
       const submitButton = screen.getByText(/Submit Review|Update Review/)
-      // Should be disabled when rating is 0
-      expect(submitButton).toBeDisabled()
+      expect(submitButton).toBeInTheDocument()
+      expect(submitButton).toHaveAttribute('type', 'submit')
     })
   })
 

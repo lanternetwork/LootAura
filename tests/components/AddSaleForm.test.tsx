@@ -36,7 +36,7 @@ describe('AddSaleForm', () => {
     fireEvent.click(submitButton)
 
     await waitFor(() => {
-      expect(screen.getByText('Please complete required fields')).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveTextContent('Please complete required fields')
     })
   })
 
@@ -113,9 +113,8 @@ describe('AddSaleForm', () => {
     })
   })
 
-  it('validates price range', async () => {
-    // This validation is not enforced by schema currently; skipping until implemented
-    it.skip('skipped: price range validation not enforced by schema', () => {})
+  it.skip('validates price range', async () => {
+    // Skipped: price range validation not currently enforced by schema
   })
 
   it('shows loading state during submission', () => {

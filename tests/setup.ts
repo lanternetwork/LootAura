@@ -15,6 +15,7 @@ if (!globalThis.__testSetupInitialized) {
   // Cleanup after each test
   afterEach(() => {
     cleanup()
+    vi.clearAllTimers()
   })
 
   // MSW server for API mocking

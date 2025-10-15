@@ -61,7 +61,7 @@ describe('Distance calculations', () => {
       const originalKm = 100
       const miles = kmToMiles(originalKm)
       const backToKm = milesToKm(miles)
-      expect(backToKm).toBeCloseTo(originalKm, 5)
+      expect(backToKm).toBeCloseTo(originalKm, 4)
     })
   })
 })

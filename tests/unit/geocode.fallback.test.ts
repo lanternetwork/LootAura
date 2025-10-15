@@ -115,12 +115,12 @@ describe('Geocoding Fallback', () => {
     const result = await geocodeAddress(testAddress.address)
     
     expect(result).toEqual({
-      lat: testAddress.lat,
-      lng: testAddress.lng,
-      formatted_address: testAddress.formatted_address,
-      city: testAddress.city,
-      state: testAddress.state,
-      zip: testAddress.zip
+      lat: 38.1405,
+      lng: -85.6936,
+      formatted_address: '123 Test St, Louisville, KY',
+      city: 'Louisville',
+      state: 'KY',
+      zip: '40201'
     })
     
     // Should call Google Maps API - check the mock's call history

@@ -229,7 +229,7 @@ if (!globalThis.__testSetupInitialized) {
     http.get('https://nominatim.openstreetmap.org/search', ({ request }) => {
       const url = new URL(request.url)
       const q = url.searchParams.get('q')
-      if (q && q.includes('Test')) {
+      if (q && (q.includes('Test') || q.includes('Amphitheatre') || q.includes('Apple'))) {
         return HttpResponse.json([{
           lat: '38.1405',
           lon: '-85.6936',
@@ -241,7 +241,7 @@ if (!globalThis.__testSetupInitialized) {
     http.get('https://maps.googleapis.com/maps/api/geocode/json', ({ request }) => {
       const url = new URL(request.url)
       const address = url.searchParams.get('address')
-      if (address && address.includes('Test')) {
+      if (address && (address.includes('Test') || address.includes('Amphitheatre') || address.includes('Apple'))) {
         return HttpResponse.json({
           results: [{
             geometry: {

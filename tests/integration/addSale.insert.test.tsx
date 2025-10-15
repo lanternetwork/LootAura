@@ -3,6 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMockSupabaseClient, getAddressFixtures } from '@/tests/utils/mocks'
 
+// Ensure we don't import the real Explore component
+vi.mock('@/app/(app)/explore/page')
+
 // Hoist all mocks before imports
 vi.mock('@/lib/geocode', () => ({
   geocodeAddress: vi.fn().mockResolvedValue({

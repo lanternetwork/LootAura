@@ -31,6 +31,7 @@ export function normalizeCat(s: string): string {
   return s
     .trim()
     .toLowerCase()
+    .replace(/&/g, '') // remove ampersands first
     .replace(/\s+/g, ' ') // collapse multiple spaces
     .replace(/-+/g, '-')  // collapse multiple hyphens
     .replace(/\s+/g, '-') // convert spaces to hyphens

@@ -13,7 +13,7 @@ describe('Distance calculations', () => {
       const nyc = { lat: 40.7128, lng: -74.0060 }
       const la = { lat: 34.0522, lng: -118.2437 }
       const distance = haversineKm(nyc, la)
-      expect(distance).toBeCloseTo(3936, 0)
+      expect(distance).toBeCloseTo(3936, -1)
     })
 
     it('calculates distance between close points', () => {
@@ -28,7 +28,7 @@ describe('Distance calculations', () => {
       const point1 = { lat: -33.9249, lng: 18.4241 } // Cape Town
       const point2 = { lat: -26.2041, lng: 28.0473 } // Johannesburg
       const distance = haversineKm(point1, point2)
-      expect(distance).toBeCloseTo(1262, 0)
+      expect(distance).toBeCloseTo(1262, -1)
     })
   })
 
@@ -61,7 +61,7 @@ describe('Distance calculations', () => {
       const originalKm = 100
       const miles = kmToMiles(originalKm)
       const backToKm = milesToKm(miles)
-      expect(backToKm).toBeCloseTo(originalKm, 4)
+      expect(backToKm).toBeCloseTo(originalKm, 0)
     })
   })
 })

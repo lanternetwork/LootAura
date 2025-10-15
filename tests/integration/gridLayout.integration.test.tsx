@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 import SalesClient from '@/app/sales/SalesClient'
@@ -66,7 +66,7 @@ const mockSales = makeSales(4, [
 ])
 
 describe('Grid Layout Integration', () => {
-  it('should render sales as direct children of grid container', () => {
+  it('should render sales as direct children of grid container', async () => {
     render(
       <SalesClient
         initialSales={mockSales}
@@ -75,6 +75,11 @@ describe('Grid Layout Integration', () => {
         user={null}
       />
     )
+
+    // Wait for sale cards to render
+    await waitFor(() => {
+      expect(screen.getAllByTestId('sale-card')).toHaveLength(mockSales.length)
+    })
 
     const gridContainer = screen.getByTestId('sales-grid')
     expect(gridContainer).toBeInTheDocument()

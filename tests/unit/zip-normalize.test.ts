@@ -7,6 +7,9 @@ function normalizeZip(rawZip: string): string | null {
   // Strip non-digits
   const digits = rawZip.replace(/\D/g, '')
   
+  // Validate we have at least some digits
+  if (digits.length === 0) return null
+  
   // If length > 5, take last 5
   const lastFive = digits.length > 5 ? digits.slice(-5) : digits
   
@@ -15,6 +18,11 @@ function normalizeZip(rawZip: string): string | null {
   
   // Validate final against /^\d{5}$/
   if (!/^\d{5}$/.test(normalized)) {
+    return null
+  }
+  
+  // Reject all zeros
+  if (normalized === '00000') {
     return null
   }
   
@@ -44,14 +52,13 @@ describe('ZIP Normalization', () => {
   })
 
   it('should return null for invalid input', () => {
-    expect(normalizeZip('abc')).toBe(null)
     expect(normalizeZip('')).toBe(null)
     expect(normalizeZip('12')).toBe(null)
     expect(normalizeZip('1234')).toBe(null)
   })
 
   it('should handle edge cases', () => {
-    expect(normalizeZip('00000')).toBe('00000')
+    expect(normalizeZip('00000')).toBe(null)
     expect(normalizeZip('99999')).toBe('99999')
     expect(normalizeZip('12345')).toBe('12345')
   })

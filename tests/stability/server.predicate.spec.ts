@@ -55,8 +55,8 @@ describe('server.predicate', () => {
     const categories = ['Tools', 'FURNITURE']
     const normalized = normalizeCategories(categories)
     
-    // Assert normalization handles case
-    expect(normalized).toEqual(['tools', 'furniture'])
+    // Assert normalization handles case and sorts alphabetically
+    expect(normalized).toEqual(['furniture', 'tools'])
     
     // Simulate server query with normalized values
     const sb = createSupabaseServerClient()

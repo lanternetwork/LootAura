@@ -16,13 +16,13 @@ describe('filters.url-parity', () => {
     params.set('lat', String(filters.lat))
     params.set('lng', String(filters.lng))
     params.set('distanceKm', String(filters.distance * 1.60934))
-    params.set('categories', filters.categories.join(','))
+    params.set('categories', normalizeCategories(filters.categories).join(','))
     params.set('limit', '1000')
     
     const url = params.toString()
     
-    // Assert: selected categories → &categories=<csv> present
-    expect(url).toContain('categories=tools,furniture')
+    // Assert: selected categories → &categories=<csv> present (URL encoded)
+    expect(url).toContain('categories=furniture%2Ctools')
     
     // Assert KEY cats string equals URL cats string
     const normalizedCats = normalizeCategories(filters.categories)
@@ -59,14 +59,14 @@ describe('filters.url-parity', () => {
     const normalized = normalizeCategories(rawCategories)
     
     // Build KEY string (as used in buildMarkersKey)
-    const keyCats = normalized.sort().join(',')
+    const keyCats = normalized.join(',')
     
     // Build URL string (as used in fetchMapSales)
     const urlCats = normalized.join(',')
     
-    // Assert KEY cats string equals URL cats string
+    // Assert KEY cats string equals URL cats string (sorted alphabetically)
     expect(keyCats).toBe('furniture,tools,toys')
-    expect(urlCats).toBe('tools,furniture,toys')
+    expect(urlCats).toBe('furniture,tools,toys')
     
     // Both should contain the same normalized values, just different order
     const keySet = new Set(keyCats.split(','))

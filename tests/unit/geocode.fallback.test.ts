@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { geocodeAddress } from '@/lib/geocode'
 import { getAddressFixtures } from '@/tests/utils/mocks'
 
-// Unmock the geocode module to use real implementation with MSW handlers
-vi.unmock('@/lib/geocode')
+// Use the global MSW handlers from tests/setup.ts
 
 // Mock environment variables
 const originalEnv = process.env
@@ -74,8 +73,7 @@ describe('Geocoding Fallback', () => {
     const addresses = getAddressFixtures()
     const testAddress = addresses[0]
     
-    // Clear any previous calls to the global fetch mock
-    vi.mocked(global.fetch).mockClear()
+    // Use the global fetch mock from tests/setup.ts
 
     const result = await geocodeAddress(testAddress.address)
     

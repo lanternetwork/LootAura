@@ -18,36 +18,36 @@ The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troub
 stdout | tests/components/AddSaleForm.a11y.test.tsx > AddSaleForm Accessibility > should support form submission with Enter key
 [usage] geocode call (count=1)
 
- ❯ tests/components/AddSaleForm.a11y.test.tsx (11 tests | 11 failed) 455ms
-   × AddSaleForm Accessibility > should have proper form labels and structure 78ms
+ ❯ tests/components/AddSaleForm.a11y.test.tsx (11 tests | 11 failed) 439ms
+   × AddSaleForm Accessibility > should have proper form labels and structure 76ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should have proper input types and attributes 17ms
+   × AddSaleForm Accessibility > should have proper input types and attributes 15ms
      → Invalid Chai property: toHaveAttribute
-   × AddSaleForm Accessibility > should have proper button roles and labels 29ms
+   × AddSaleForm Accessibility > should have proper button roles and labels 28ms
      → Invalid Chai property: toBeInTheDocument
    × AddSaleForm Accessibility > should support keyboard navigation 46ms
      → Invalid Chai property: toHaveFocus
-   × AddSaleForm Accessibility > should support form submission with Enter key 186ms
+   × AddSaleForm Accessibility > should support form submission with Enter key 170ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should support adding tags with Enter key 57ms
+   × AddSaleForm Accessibility > should support adding tags with Enter key 58ms
      → Invalid Chai property: toBeInTheDocument
    × AddSaleForm Accessibility > should have proper error handling and announcements 7ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should have proper fieldset and legend structure for grouped fields 8ms
+   × AddSaleForm Accessibility > should have proper fieldset and legend structure for grouped fields 10ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should have proper focus management 10ms
+   × AddSaleForm Accessibility > should have proper focus management 9ms
      → Invalid Chai property: toHaveFocus
-   × AddSaleForm Accessibility > should have proper ARIA attributes 9ms
+   × AddSaleForm Accessibility > should have proper ARIA attributes 10ms
      → Invalid Chai property: toBeInTheDocument
    × AddSaleForm Accessibility > should support screen reader navigation 7ms
      → Invalid Chai property: toBeInTheDocument
- ✓ tests/unit/categoryNormalizer.test.ts (34 tests) 10ms
+ ✓ tests/unit/categoryNormalizer.test.ts (34 tests) 8ms
  ✓ tests/integration/category-filters.test.ts (16 tests) 5ms
- ✓ tests/unit/server-stabilization.test.ts (14 tests) 3ms
+ ✓ tests/unit/server-stabilization.test.ts (14 tests) 4ms
  ✓ tests/unit/categoryNormalization.test.ts (16 tests) 4ms
- ✓ tests/unit/stabilization.test.ts (21 tests) 3ms
+ ✓ tests/unit/stabilization.test.ts (21 tests) 4ms
  ✓ tests/unit/arbiterDecisions.test.ts (14 tests) 2ms
- ✓ tests/integration/stabilization.spec.ts (16 tests) 4ms
+ ✓ tests/integration/stabilization.spec.ts (16 tests) 5ms
 stderr | tests/components/SalesGrid.test.tsx > SalesGrid > renders sales cards when not loading and sales are present
 Error: Uncaught [ReferenceError: ResizeObserver is not defined]
     at reportException (/home/runner/work/LootAura/LootAura/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
@@ -296,14 +296,14 @@ The above error occurred in the <SalesGrid> component:
 Consider adding an error boundary to your tree to customize error handling behavior.
 Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
 
- ❯ tests/components/SalesGrid.test.tsx (8 tests | 8 failed) 37ms
-   × SalesGrid > renders sales cards when not loading and sales are present 13ms
+ ❯ tests/components/SalesGrid.test.tsx (8 tests | 8 failed) 34ms
+   × SalesGrid > renders sales cards when not loading and sales are present 14ms
      → ResizeObserver is not defined
    × SalesGrid > renders skeletons when loading and not in MAP authority 4ms
      → ResizeObserver is not defined
-   × SalesGrid > renders empty state message when no sales and not loading 3ms
+   × SalesGrid > renders empty state message when no sales and not loading 2ms
      → ResizeObserver is not defined
-   × SalesGrid > does not render skeletons when in MAP authority, even if loading 6ms
+   × SalesGrid > does not render skeletons when in MAP authority, even if loading 2ms
      → ResizeObserver is not defined
    × SalesGrid > observes resize events and updates columns 3ms
      → ResizeObserver is not defined
@@ -311,14 +311,14 @@ Visit https://reactjs.org/link/error-boundaries to learn more about error bounda
      → ResizeObserver is not defined
    × SalesGrid > applies custom className 2ms
      → ResizeObserver is not defined
-   × SalesGrid > sets correct data attributes 2ms
+   × SalesGrid > sets correct data attributes 5ms
      → ResizeObserver is not defined
- ❯ tests/integration/rls.owner.test.ts (6 tests | 6 failed) 5ms
-   × RLS and Owner Permissions > should set owner_id to auth.uid() when inserting sale 3ms
+ ❯ tests/integration/rls.owner.test.ts (6 tests | 6 failed) 4ms
+   × RLS and Owner Permissions > should set owner_id to auth.uid() when inserting sale 2ms
      → supabase.auth.getUser.mockResolvedValue is not a function
-   × RLS and Owner Permissions > should allow public read access to sales list 1ms
+   × RLS and Owner Permissions > should allow public read access to sales list 0ms
      → supabase.auth.getUser.mockResolvedValue is not a function
-   × RLS and Owner Permissions > should allow owner to update their own sale 1ms
+   × RLS and Owner Permissions > should allow owner to update their own sale 0ms
      → supabase.auth.getUser.mockResolvedValue is not a function
    × RLS and Owner Permissions > should prevent non-owner from updating sale 0ms
      → supabase.auth.getUser.mockResolvedValue is not a function
@@ -326,14 +326,11 @@ Visit https://reactjs.org/link/error-boundaries to learn more about error bounda
      → supabase.auth.getUser.mockResolvedValue is not a function
    × RLS and Owner Permissions > should prevent non-owner from deleting sale 0ms
      → supabase.auth.getUser.mockResolvedValue is not a function
- ✓ tests/unit/category-serialization.test.ts (16 tests) 3ms
+ ✓ tests/unit/category-serialization.test.ts (16 tests) 4ms
  ✓ tests/unit/addSale.validation.test.ts (9 tests) 4ms
  ✓ tests/unit/dateBounds.test.ts (21 tests) 3ms
-stdout | tests/integration/addSale.insert.test.tsx
-[2025-10-15T16:16:01.842Z] [INFO] [AddSaleForm] [geocode_fallback] Address geocoded via fallback geocoder {"component":"AddSaleForm","operation":"geocode_fallback","address":"123 Test St","lat":41.2600717,"lng":-95.8429507,"geocoder":"nominatim"}
-
  ❯ tests/integration/addSale.insert.test.tsx (7 tests | 6 failed) 84ms
-   × Add Sale Integration > should handle geocoding failure gracefully 15ms
+   × Add Sale Integration > should handle geocoding failure gracefully 13ms
      → Found multiple elements with the role "button" and name `/post sale/i`
 
 Here are the matching elements:
@@ -439,7 +436,7 @@ Ignored nodes: comments, script, style
     </div>
   </div>
 </body>
-   × Add Sale Integration > should validate required fields before submission 13ms
+   × Add Sale Integration > should validate required fields before submission 11ms
      → Found multiple elements with the role "button" and name `/post sale/i`
 
 Here are the matching elements:
@@ -589,7 +586,7 @@ Ignored nodes: comments, script, style
     </div>
   </div>
 </body>
-   × Add Sale Integration > should show loading state during submission 4ms
+   × Add Sale Integration > should show loading state during submission 8ms
      → Found multiple elements with the text: Posting...
 
 Here are the matching elements:
@@ -775,7 +772,7 @@ Ignored nodes: comments, script, style
     </div>
   </div>
 </body>
-   × Add Sale Integration > should handle submission errors 14ms
+   × Add Sale Integration > should handle submission errors 16ms
      → Found multiple elements with the role "button" and name `/post sale/i`
 
 Here are the matching elements:
@@ -1013,7 +1010,7 @@ Ignored nodes: comments, script, style
     </div>
   </div>
 </body>
-   × Add Sale Integration > should include owner_id in inserted data 23ms
+   × Add Sale Integration > should include owner_id in inserted data 22ms
      → Found multiple elements with the role "button" and name `/post sale/i`
 
 Here are the matching elements:
@@ -1295,7 +1292,7 @@ Ignored nodes: comments, script, style
     </div>
   </div>
 </body>
-   × Add Sale Integration > should update React Query cache after successful creation 7ms
+   × Add Sale Integration > should update React Query cache after successful creation 5ms
      → Found multiple elements with the text: Post Your Sale
 
 Here are the matching elements:
@@ -1607,7 +1604,7 @@ Ignored nodes: comments, script, style
     </div>
   </div>
 </body>
- ✓ tests/unit/sanitize.test.ts (26 tests) 19ms
+ ✓ tests/unit/sanitize.test.ts (26 tests) 13ms
 stderr | tests/integration/gridLayout.integration.test.tsx > Grid Layout Integration > should render sales as direct children of grid container
 Error: Uncaught [ReferenceError: ResizeObserver is not defined]
     at reportException (/home/runner/work/LootAura/LootAura/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
@@ -1753,6 +1750,19 @@ The above error occurred in the <SalesGrid> component:
 Consider adding an error boundary to your tree to customize error handling behavior.
 Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
 
+ ❯ tests/integration/gridLayout.integration.test.tsx (6 tests | 6 failed) 16ms
+   × Grid Layout Integration > should render sales as direct children of grid container 5ms
+     → ResizeObserver is not defined
+   × Grid Layout Integration > should have correct grid classes at different breakpoints 3ms
+     → ResizeObserver is not defined
+   × Grid Layout Integration > should not have wrapper divs around sale cards 2ms
+     → ResizeObserver is not defined
+   × Grid Layout Integration > should maintain grid layout during loading states 2ms
+     → ResizeObserver is not defined
+   × Grid Layout Integration > should handle empty state without breaking grid 2ms
+     → ResizeObserver is not defined
+   × Grid Layout Integration > should not have multiple column-defining classes 2ms
+     → ResizeObserver is not defined
 stderr | tests/integration/gridLayout.integration.test.tsx > Grid Layout Integration > should not have multiple column-defining classes
 Error: Uncaught [ReferenceError: ResizeObserver is not defined]
     at reportException (/home/runner/work/LootAura/LootAura/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
@@ -1782,30 +1792,17 @@ The above error occurred in the <SalesGrid> component:
 Consider adding an error boundary to your tree to customize error handling behavior.
 Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
 
- ❯ tests/integration/gridLayout.integration.test.tsx (6 tests | 6 failed) 15ms
-   × Grid Layout Integration > should render sales as direct children of grid container 4ms
-     → ResizeObserver is not defined
-   × Grid Layout Integration > should have correct grid classes at different breakpoints 3ms
-     → ResizeObserver is not defined
-   × Grid Layout Integration > should not have wrapper divs around sale cards 2ms
-     → ResizeObserver is not defined
-   × Grid Layout Integration > should maintain grid layout during loading states 2ms
-     → ResizeObserver is not defined
-   × Grid Layout Integration > should handle empty state without breaking grid 1ms
-     → ResizeObserver is not defined
-   × Grid Layout Integration > should not have multiple column-defining classes 2ms
-     → ResizeObserver is not defined
- ✓ tests/unit/gridLayout.test.ts (6 tests) 2ms
- ❯ tests/unit/env.test.ts (9 tests | 1 failed) 22ms
-   × Environment Validation > should handle missing optional variables 3ms
-     → expected undefined to be 'https://lootaura.app' // Object.is equality
- ✓ tests/stability/list.dom.spec.tsx (6 tests) 20ms
-stderr | onSubmit (/home/runner/work/LootAura/LootAura/components/AddSaleForm.tsx:123:15)
+stderr | tests/unit/gridLayout.test.ts
 Error posting sale: Error: Could not find the 'address' column of 'sales_v2' in the schema cache
     at Object.mutationFn (/home/runner/work/LootAura/LootAura/lib/hooks/useSales.ts:133:15)
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
 
- ✓ tests/unit/metadata.test.ts (8 tests) 17ms
+ ✓ tests/unit/gridLayout.test.ts (6 tests) 3ms
+ ❯ tests/unit/env.test.ts (9 tests | 1 failed) 31ms
+   × Environment Validation > should handle missing optional variables 4ms
+     → expected undefined to be 'https://lootaura.app' // Object.is equality
+ ✓ tests/stability/list.dom.spec.tsx (6 tests) 21ms
+ ✓ tests/unit/metadata.test.ts (8 tests) 19ms
  ✓ tests/unit/mapAuthorityQuery.test.ts (7 tests) 2ms
  ✓ tests/unit/resolveDatePreset.test.ts (13 tests) 2ms
  ✓ tests/integration/auth.session.test.tsx (12 tests) 2ms
@@ -1927,10 +1924,13 @@ stdout | debouncedLog (/home/runner/work/LootAura/LootAura/lib/usageLogs.ts:50:1
 
  ↓ tests/snapshots/gridContainer.snapshot.test.tsx (3 tests | 3 skipped)
  ✓ tests/stability/visible.recompute.spec.ts (5 tests) 1ms
+stdout | tests/unit/rateLimiter.test.ts > RateLimiter > should reset after window expires
+[2025-10-15T16:26:17.743Z] [INFO] [AddSaleForm] [geocode_fallback] Address geocoded via fallback geocoder {"component":"AddSaleForm","operation":"geocode_fallback","address":"123 Test ","lat":41.2600717,"lng":-95.8429507,"geocoder":"nominatim"}
+
  ✓ tests/unit/rateLimiter.test.ts (6 tests) 155ms
  ✓ tests/stability/arbiter.contract.spec.ts (4 tests) 1ms
  ✓ tests/integration/rls.profiles.test.ts (13 tests) 2ms
- ✓ tests/unit/date-windows.test.ts (6 tests) 3ms
+ ✓ tests/unit/date-windows.test.ts (6 tests) 4ms
 stderr | tests/components/FavoriteButton.test.tsx > FavoriteButton > renders save button when not favorited
 Error: Uncaught [Error: invariant expected app router to be mounted]
     at reportException (/home/runner/work/LootAura/LootAura/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
@@ -2341,12 +2341,12 @@ The above error occurred in the <FavoriteButton> component:
 Consider adding an error boundary to your tree to customize error handling behavior.
 Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
 
- ❯ tests/components/FavoriteButton.test.tsx (5 tests | 5 failed) 16ms
+ ❯ tests/components/FavoriteButton.test.tsx (5 tests | 5 failed) 15ms
    × FavoriteButton > renders save button when not favorited 6ms
      → invariant expected app router to be mounted
-   × FavoriteButton > renders saved button when favorited 3ms
+   × FavoriteButton > renders saved button when favorited 2ms
      → invariant expected app router to be mounted
-   × FavoriteButton > calls toggle function when clicked 3ms
+   × FavoriteButton > calls toggle function when clicked 2ms
      → invariant expected app router to be mounted
    × FavoriteButton > shows loading state when pending 2ms
      → invariant expected app router to be mounted
@@ -2355,7 +2355,7 @@ Visit https://reactjs.org/link/error-boundaries to learn more about error bounda
 stderr | tests/unit/categoryContract.test.ts > Category Contract > toDbSet > should return normalized UI tokens when no mapping exists
 [CATEGORY CONTRACT] No DB mapping cache available, using normalized UI tokens
 
- ✓ tests/stability/server.predicate.spec.ts (5 tests) 1ms
+ ✓ tests/stability/server.predicate.spec.ts (5 tests) 2ms
 stdout | tests/unit/categoryContract.test.ts > Category Contract > toDbSet > should apply DB mapping when available
 [CATEGORY CONTRACT] Built DB mapping: 3 mappings
 
@@ -2365,7 +2365,7 @@ stdout | tests/unit/categoryContract.test.ts > Category Contract > buildDbMappin
 stdout | tests/unit/categoryContract.test.ts > Category Contract > buildDbMapping > should handle empty DB categories
 [CATEGORY CONTRACT] Built DB mapping: 0 mappings
 
- ✓ tests/unit/categoryContract.test.ts (10 tests) 2ms
+ ✓ tests/unit/categoryContract.test.ts (10 tests) 3ms
 stdout | tests/unit/categoryContract.test.ts > Category Contract > hasDbMapping > should return true for mapped categories
 [CATEGORY CONTRACT] Built DB mapping: 1 mappings
 
@@ -2552,6 +2552,44 @@ The above error occurred in the <FavoriteButton> component:
 Consider adding an error boundary to your tree to customize error handling behavior.
 Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
 
+ ❯ tests/integration/sales-list.spec.tsx (3 tests | 3 failed) 20ms
+   × SalesList Integration > should render sales list with proper grid layout 13ms
+     → invariant expected app router to be mounted
+   × SalesList Integration > should handle empty sales list 2ms
+     → Unable to find an element with the text: /no sales found/i. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body>
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+  <div />
+</body>
+   × SalesList Integration > should filter sales by category 4ms
+     → invariant expected app router to be mounted
+stdout | tests/integration/sales-list.spec.tsx > SalesList Integration > should filter sales by category
+[DOM] list item rendered id= 1
+[DOM] item mounts id= 1
+[DOM] list item rendered id= 1
+[DOM] item mounts id= 1
+
 stderr | tests/integration/sales-list.spec.tsx > SalesList Integration > should filter sales by category
 Error: Uncaught [Error: invariant expected app router to be mounted]
     at reportException (/home/runner/work/LootAura/LootAura/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
@@ -2639,55 +2677,17 @@ The above error occurred in the <FavoriteButton> component:
 Consider adding an error boundary to your tree to customize error handling behavior.
 Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
 
- ❯ tests/integration/sales-list.spec.tsx (3 tests | 3 failed) 20ms
-   × SalesList Integration > should render sales list with proper grid layout 12ms
-     → invariant expected app router to be mounted
-   × SalesList Integration > should handle empty sales list 3ms
-     → Unable to find an element with the text: /no sales found/i. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
-
-Ignored nodes: comments, script, style
-<body>
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-  <div />
-</body>
-   × SalesList Integration > should filter sales by category 5ms
-     → invariant expected app router to be mounted
-stdout | tests/integration/sales-list.spec.tsx > SalesList Integration > should filter sales by category
-[DOM] list item rendered id= 1
-[DOM] item mounts id= 1
-[DOM] list item rendered id= 1
-[DOM] item mounts id= 1
-
-stdout | Logger.info (/home/runner/work/LootAura/LootAura/lib/log.ts:32:15)
-[2025-10-15T16:16:02.716Z] [INFO] [AddSaleForm] [geocode_fallback] Address geocoded via fallback geocoder {"component":"AddSaleForm","operation":"geocode_fallback","address":"123 Te","lat":35.6892523,"lng":51.3896004,"geocoder":"nominatim"}
-
  ✓ tests/unit/profile.upsert.test.ts (9 tests) 2ms
- ✓ tests/unit/distance.test.ts (9 tests) 2ms
+ ✓ tests/unit/distance.test.ts (9 tests) 1ms
  ✓ tests/unit/categories-parse.test.ts (7 tests) 1ms
+stdout | tests/unit/auth.ui.test.tsx
+[2025-10-15T16:26:18.091Z] [INFO] [AddSaleForm] [geocode_fallback] Address geocoded via fallback geocoder {"component":"AddSaleForm","operation":"geocode_fallback","address":"123 Te","lat":35.6892523,"lng":51.3896004,"geocoder":"nominatim"}
+
  ✓ tests/unit/auth.ui.test.tsx (6 tests) 1ms
  ✓ tests/unit/arbiter.test.ts (5 tests) 1ms
  ✓ tests/unit/zip-normalize.test.ts (5 tests) 1ms
- ❯ tests/components/EmptyState.test.tsx (5 tests | 5 failed) 8ms
-   × EmptyState > renders with default title 3ms
+ ❯ tests/components/EmptyState.test.tsx (5 tests | 5 failed) 9ms
+   × EmptyState > renders with default title 2ms
      → Unable to find an element with the text: No Sales Found. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
 
 Ignored nodes: comments, script, style
@@ -2714,7 +2714,7 @@ Ignored nodes: comments, script, style
   <div />
   <div />
 </body>
-   × EmptyState > renders with custom title 1ms
+   × EmptyState > renders with custom title 2ms
      → Unable to find an element with the text: No favorites yet. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
 
 Ignored nodes: comments, script, style
@@ -2768,7 +2768,7 @@ Ignored nodes: comments, script, style
   <div />
   <div />
 </body>
-   × EmptyState > renders without CTA when not provided 1ms
+   × EmptyState > renders without CTA when not provided 2ms
      → Unable to find an element with the text: No CTA. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
 
 Ignored nodes: comments, script, style
@@ -5216,6 +5216,8 @@ The latest test that might've caused the error is "should filter sales by catego
 - The error was thrown, while Vitest was running this test.
 - If the error occurred after the test had been completed, this was the last documented test before it was thrown.
 
+(node:2179) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 unhandledRejection listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
 ⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
 
 Vitest caught 16 unhandled errors during the test run.
@@ -5224,8 +5226,8 @@ This might cause false positive tests. Resolve unhandled errors to make sure you
  Test Files  12 failed | 34 passed | 2 skipped (48)
       Tests  55 failed | 390 passed | 3 skipped | 1 todo (449)
      Errors  16 errors
-   Start at  16:15:59
-   Duration  3.18s (transform 619ms, setup 39ms, collect 1.13s, tests 966ms, environment 431ms, prepare 64ms)
+   Start at  16:26:14
+   Duration  3.19s (transform 594ms, setup 36ms, collect 1.05s, tests 956ms, environment 529ms, prepare 62ms)
 
 
 Error: Error: invariant expected app router to be mounted
@@ -5281,8 +5283,6 @@ The latest test that might've caused the error is "renders saved button when fav
 - The error was thrown, while Vitest was running this test.
 - If the error occurred after the test had been completed, this was the last documented test before it was thrown.
 
-(node:2186) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 unhandledRejection listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
-(Use `node --trace-warnings ...` to show where the warning was created)
 
 Error: Error: invariant expected app router to be mounted
  ❯ Proxy.useRouter node_modules/next/src/client/components/navigation.ts:113:11

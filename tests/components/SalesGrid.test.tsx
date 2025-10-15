@@ -1,5 +1,6 @@
 import React from 'react'
 import { render, screen, waitFor, act } from '@testing-library/react'
+import { renderWithProviders } from '../utils/renderWithProviders'
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 import SalesGrid from '@/components/SalesGrid'
@@ -37,7 +38,7 @@ describe('SalesGrid', () => {
   })
 
   it('renders sales cards when not loading and sales are present', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={mockSales}
         loading={false}
@@ -51,7 +52,7 @@ describe('SalesGrid', () => {
   })
 
   it('renders skeletons when loading and not in MAP authority', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={[]}
         loading={true}
@@ -66,7 +67,7 @@ describe('SalesGrid', () => {
   })
 
   it('renders empty state message when no sales and not loading', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={[]}
         loading={false}
@@ -80,7 +81,7 @@ describe('SalesGrid', () => {
   })
 
   it('does not render skeletons when in MAP authority, even if loading', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={[]}
         loading={true}
@@ -94,7 +95,7 @@ describe('SalesGrid', () => {
   })
 
   it('observes resize events and updates columns', async () => {
-    const { rerender } = render(
+    const { rerender } = renderWithProviders(
       <SalesGrid
         sales={mockSales}
         loading={false}
@@ -150,7 +151,7 @@ describe('SalesGrid', () => {
   })
 
   it('cleans up ResizeObserver on unmount', () => {
-    const { unmount } = render(
+    const { unmount } = renderWithProviders(
       <SalesGrid
         sales={mockSales}
         loading={false}
@@ -166,7 +167,7 @@ describe('SalesGrid', () => {
   })
 
   it('applies custom className', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={mockSales}
         loading={false}
@@ -180,7 +181,7 @@ describe('SalesGrid', () => {
   })
 
   it('sets correct data attributes', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={mockSales}
         loading={false}

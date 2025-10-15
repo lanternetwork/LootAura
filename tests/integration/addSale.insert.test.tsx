@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { renderWithProviders } from '../utils/renderWithProviders'
 import { createMockSupabaseClient, getAddressFixtures } from '@/tests/utils/mocks'
 
 // Ensure we don't import the real Explore component
@@ -101,11 +102,7 @@ describe('Add Sale Integration', () => {
     // Use global mock from tests/setup.ts - it already returns the created sale
     // The global mock will handle the mutation and React Query cache update
 
-    render(
-      <QueryClientProvider client={queryClient}>
-        <Explore />
-      </QueryClientProvider>
-    )
+    renderWithProviders(<Explore />, { queryClient })
 
     // Verify the form is rendered
     expect(screen.getByText('Post Your Sale')).toBeInTheDocument()
@@ -117,11 +114,7 @@ describe('Add Sale Integration', () => {
   it('should handle geocoding failure gracefully', async () => {
     const { default: Explore } = await import('@/app/(app)/explore/page')
     
-    render(
-      <QueryClientProvider client={queryClient}>
-        <Explore />
-      </QueryClientProvider>
-    )
+    renderWithProviders(<Explore />, { queryClient })
 
     // Try to submit without required fields
     const submitButton = screen.getByRole('button', { name: /post sale/i })
@@ -131,11 +124,7 @@ describe('Add Sale Integration', () => {
   it('should validate required fields before submission', async () => {
     const { default: Explore } = await import('@/app/(app)/explore/page')
     
-    render(
-      <QueryClientProvider client={queryClient}>
-        <Explore />
-      </QueryClientProvider>
-    )
+    renderWithProviders(<Explore />, { queryClient })
 
     // Try to submit without required fields
     const submitButton = screen.getByRole('button', { name: /post sale/i })
@@ -145,11 +134,7 @@ describe('Add Sale Integration', () => {
   it('should show loading state during submission', async () => {
     const { default: Explore } = await import('@/app/(app)/explore/page')
     
-    render(
-      <QueryClientProvider client={queryClient}>
-        <Explore />
-      </QueryClientProvider>
-    )
+    renderWithProviders(<Explore />, { queryClient })
 
     // Check for loading state
     expect(screen.getByText('Posting...')).toBeInTheDocument()
@@ -158,11 +143,7 @@ describe('Add Sale Integration', () => {
   it('should handle submission errors', async () => {
     const { default: Explore } = await import('@/app/(app)/explore/page')
     
-    render(
-      <QueryClientProvider client={queryClient}>
-        <Explore />
-      </QueryClientProvider>
-    )
+    renderWithProviders(<Explore />, { queryClient })
 
     // Check for error handling
     expect(screen.getByRole('button', { name: /post sale/i })).toBeInTheDocument()
@@ -171,11 +152,7 @@ describe('Add Sale Integration', () => {
   it('should include owner_id in inserted data', async () => {
     const { default: Explore } = await import('@/app/(app)/explore/page')
     
-    render(
-      <QueryClientProvider client={queryClient}>
-        <Explore />
-      </QueryClientProvider>
-    )
+    renderWithProviders(<Explore />, { queryClient })
 
     // Check that the form includes owner_id
     expect(screen.getByRole('button', { name: /post sale/i })).toBeInTheDocument()

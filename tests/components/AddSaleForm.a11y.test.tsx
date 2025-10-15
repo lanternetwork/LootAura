@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { renderWithProviders } from '../utils/renderWithProviders'
 import userEvent from '@testing-library/user-event'
 import AddSaleForm from '@/components/AddSaleForm'
 
@@ -21,7 +22,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper form labels and structure', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Check for proper form element
     const form = screen.getByRole('form')
@@ -40,7 +41,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper input types and attributes', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Check input types
     const titleInput = screen.getByLabelText('Sale Title *')
@@ -72,7 +73,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper button roles and labels', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Check submit button
     const submitButton = screen.getByRole('button', { name: /post sale/i })
@@ -87,7 +88,7 @@ describe('AddSaleForm Accessibility', () => {
 
   it('should support keyboard navigation', async () => {
     const user = userEvent.setup()
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Tab through form elements
     const titleInput = screen.getByLabelText('Sale Title *')
@@ -144,7 +145,7 @@ describe('AddSaleForm Accessibility', () => {
 
   it('should support form submission with Enter key', async () => {
     const user = userEvent.setup()
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Fill in required fields
     await user.type(screen.getByLabelText('Sale Title *'), 'Test Sale')
@@ -160,7 +161,7 @@ describe('AddSaleForm Accessibility', () => {
 
   it('should support adding tags with Enter key', async () => {
     const user = userEvent.setup()
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     const tagInput = screen.getByPlaceholderText('Add a tag...')
     const addTagButton = screen.getByRole('button', { name: /add/i })
@@ -174,7 +175,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper error handling and announcements', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Initially no error should be shown
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()

@@ -232,7 +232,12 @@ if (!globalThis.__testSetupInitialized) {
         return HttpResponse.json([{
           lat: '38.1405',
           lon: '-85.6936',
-          display_name: '123 Test St, Louisville, KY'
+          display_name: '123 Test St, Louisville, KY',
+          address: {
+            city: 'Louisville',
+            state: 'KY',
+            postcode: '40201'
+          }
         }])
       }
       return HttpResponse.json([])

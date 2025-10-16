@@ -70,25 +70,41 @@ process.env.NEXT_PUBLIC_SITE_URL = 'https://lootaura.app'
 process.env.NEXT_PUBLIC_DEBUG = 'false'
 
 // Global Browser API Mocks
+// Keep a registry of active ResizeObserver instances for deterministic test control
+;(globalThis as any).__activeResizeObservers = (globalThis as any).__activeResizeObservers || new Set<any>()
+
 globalThis.ResizeObserver = class ResizeObserver {
+  callback: ResizeObserverCallback
+  private targets: Set<Element>
+
   constructor(callback: ResizeObserverCallback) {
     this.callback = callback
+    this.targets = new Set<Element>()
+    ;(globalThis as any).__activeResizeObservers.add(this)
   }
-  callback: ResizeObserverCallback
-  observe() {
-    // Trigger callback immediately to simulate resize
-    setTimeout(() => {
-      this.callback([{
-        target: document.createElement('div'),
-        contentRect: new DOMRectMock(0, 0, 700, 100),
-        borderBoxSize: [{ inlineSize: 700, blockSize: 100 }],
-        contentBoxSize: [{ inlineSize: 700, blockSize: 100 }],
-        devicePixelContentBoxSize: [{ inlineSize: 700, blockSize: 100 }]
-      }], this)
-    }, 0)
+
+  observe(target: Element) {
+    this.targets.add(target)
+    // Fire an initial measurement so components can compute columns immediately
+    const width = (target as any).offsetWidth ?? 0
+    const entry = {
+      target,
+      contentRect: new DOMRectMock(0, 0, width, 100),
+      borderBoxSize: [{ inlineSize: width, blockSize: 100 }],
+      contentBoxSize: [{ inlineSize: width, blockSize: 100 }],
+      devicePixelContentBoxSize: [{ inlineSize: width, blockSize: 100 }]
+    } as unknown as ResizeObserverEntry
+    queueMicrotask(() => this.callback([entry], this))
   }
-  unobserve() {}
-  disconnect() {}
+
+  unobserve(target: Element) {
+    this.targets.delete(target)
+  }
+
+  disconnect() {
+    this.targets.clear()
+    ;(globalThis as any).__activeResizeObservers.delete(this)
+  }
 }
 
 globalThis.IntersectionObserver = class IntersectionObserver {
@@ -136,9 +152,21 @@ globalThis.DOMRect = DOMRectMock as any
 // Global resize simulation helper
 globalThis.__simulateResize = (element: Element, width: number) => {
   Object.defineProperty(element, 'offsetWidth', { configurable: true, value: width })
-  // Trigger a resize event
-  const resizeEvent = new Event('resize')
-  window.dispatchEvent(resizeEvent)
+  const observers: Set<any> = (globalThis as any).__activeResizeObservers
+  if (observers && observers.size > 0) {
+    observers.forEach((ro) => {
+      if (ro && ro.callback && ro["targets"] && ro["targets"].has(element)) {
+        const entry = {
+          target: element,
+          contentRect: new DOMRectMock(0, 0, width, 100),
+          borderBoxSize: [{ inlineSize: width, blockSize: 100 }],
+          contentBoxSize: [{ inlineSize: width, blockSize: 100 }],
+          devicePixelContentBoxSize: [{ inlineSize: width, blockSize: 100 }]
+        } as unknown as ResizeObserverEntry
+        ro.callback([entry], ro)
+      }
+    })
+  }
 }
 
 // Global fetch mock

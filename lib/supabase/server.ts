@@ -32,7 +32,7 @@ export function createSupabaseServerClient() {
   // Log schema once at startup
   logSchemaOnce();
 
-  const schema = getSchema();
+  const _schema = getSchema();
   const cookieStore = cookies()
 
   return createServerClient(url, anon, {

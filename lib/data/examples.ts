@@ -12,10 +12,10 @@ import {
   listItems, 
   createItem, 
   toggleFavorite,
-  type Item,
-  type GetSalesParams
+  // type Item,
+  // type GetSalesParams
 } from './sales'
-import { Sale } from '@/lib/types'
+// import { Sale } from '@/lib/types'
 
 // Example: Get sales with filters
 export async function getSalesExample() {

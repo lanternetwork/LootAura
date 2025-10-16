@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import { Sale } from '@/lib/types'
 
-const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app'
+const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app').replace(/\/$/, '')
 const siteName = 'Loot Aura'
 const description = 'Discover local yard sales, garage sales, and estate sales in your area. Never miss a great deal again!'
 
@@ -53,13 +53,9 @@ export function createPageMetadata({
     robots: {
       index: true,
       follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
     },
   }
 }

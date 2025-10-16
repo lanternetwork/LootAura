@@ -3,9 +3,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Map, { Marker, Popup } from 'react-map-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import mapboxgl from 'mapbox-gl'
+// import mapboxgl from 'mapbox-gl'
 import { Sale } from '@/lib/types'
-import { formatLocation } from '@/lib/location/client'
+// import { formatLocation } from '@/lib/location/client'
 import { getMapboxToken } from '@/lib/maps/token'
 import { incMapLoad } from '@/lib/usageLogs'
 
@@ -69,7 +69,7 @@ export default function SalesMap({
     longitude: center.lng,
     zoom: zoom
   })
-  const [moved, setMoved] = useState(false)
+  const [_moved, setMoved] = useState(false)
   const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [visiblePinCount, setVisiblePinCount] = useState(0)
   const autoFitAttemptedRef = useRef(false)
@@ -347,6 +347,8 @@ export default function SalesMap({
     return `${displayHour}:${minutes} ${ampm}`
   }
 
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+
   // Token via util for flexibility
   const token = getMapboxToken()
   if (!token) {
@@ -368,8 +370,6 @@ export default function SalesMap({
     // Only emit view change on move end, not during continuous movement
     // This prevents excessive refetches during pan/zoom
   }
-
-  const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const scheduleAutoSearch = () => {
     if (!onSearchArea) return
@@ -470,7 +470,7 @@ export default function SalesMap({
   }
 
 
-  const queryVisiblePins = () => {
+  const _queryVisiblePins = () => {
     return visiblePinCount
   }
 

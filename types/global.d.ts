@@ -26,11 +26,6 @@ declare module 'jsdom' {
   }
 }
 
-declare module '@types/google.maps' {
-  export interface Map {
-    // Basic map interface
-  }
-}
 
 // Jest-DOM matchers
 declare namespace jest {
@@ -45,58 +40,7 @@ declare namespace jest {
   }
 }
 
-// Google Maps global
-declare global {
-  namespace google {
-    namespace maps {
-      interface Map {
-        // Map interface
-      }
-      interface Marker {
-        // Marker interface
-      }
-      interface LatLng {
-        lat(): number;
-        lng(): number;
-      }
-      interface LatLngBounds {
-        // Bounds interface
-      }
-      interface MapOptions {
-        center?: LatLng;
-        zoom?: number;
-        mapTypeId?: string;
-      }
-      interface MarkerOptions {
-        position?: LatLng;
-        map?: Map;
-        title?: string;
-      }
-      class Map {
-        constructor(mapDiv: Element, opts?: MapOptions);
-        setCenter(latlng: LatLng): void;
-        setZoom(zoom: number): void;
-        getCenter(): LatLng;
-        getZoom(): number;
-      }
-      class Marker {
-        constructor(opts?: MarkerOptions);
-        setPosition(latlng: LatLng): void;
-        setMap(map: Map | null): void;
-      }
-      class LatLng {
-        constructor(lat: number, lng: number);
-        lat(): number;
-        lng(): number;
-      }
-      class LatLngBounds {
-        constructor();
-        extend(latlng: LatLng): void;
-        contains(latlng: LatLng): boolean;
-      }
-    }
-  }
-}
+// Removed Google Maps globals and types (not used)
 
 // Web Vitals
 declare module 'web-vitals' {

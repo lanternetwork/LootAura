@@ -1,0 +1,197 @@
+name: ci-failure-map
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number (optional)'
+        required: false
+      branch:
+        description: 'Branch name (defaults to milestone/auth-profile)'
+        required: false
+        default: 'milestone/auth-profile'
+  repository_dispatch:
+    types: [ci_completed]
+
+permissions:
+  actions: read
+  checks: read
+  contents: read
+  pull-requests: write
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Resolve target PR and branch
+        id: resolve
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const core = require('@actions/core')
+            const context = github.context
+            let prNumber = core.getInput('pr_number') || ''
+            let branch = core.getInput('branch') || 'milestone/auth-profile'
+
+            if (context.eventName === 'repository_dispatch') {
+              const payload = context.payload.client_payload || {}
+              if (payload.branch) branch = payload.branch
+              if (payload.pr_number) prNumber = String(payload.pr_number)
+              console.log(`Repository dispatch payload: ${JSON.stringify(payload)}`)
+            }
+
+            if (!prNumber) {
+              // Try to find an open PR for this branch
+              const prs = await github.rest.pulls.list({ owner: context.repo.owner, repo: context.repo.repo, state: 'open', head: `${context.repo.owner}:${branch}` })
+              if (prs.data.length > 0) prNumber = String(prs.data[0].number)
+            }
+
+            core.setOutput('branch', branch)
+            core.setOutput('pr', prNumber)
+
+      - name: Find latest ci run for branch
+        id: findrun
+        uses: actions/github-script@v7
+        env:
+          TARGET_BRANCH: ${{ steps.resolve.outputs.branch }}
+        with:
+          script: |
+            const context = github.context
+            // Find workflow id for 'ci'
+            const wfs = await github.rest.actions.listRepoWorkflows({ owner: context.repo.owner, repo: context.repo.repo })
+            const ci = wfs.data.workflows.find(w => (w.name || '').toLowerCase() === 'ci')
+            if (!ci) core.setFailed('ci workflow not found')
+            // List runs for this workflow on target branch
+            const runsResp = await github.rest.actions.listWorkflowRuns({ owner: context.repo.owner, repo: context.repo.repo, workflow_id: ci.id, branch: process.env.TARGET_BRANCH, per_page: 20 })
+            let runs = runsResp.data.workflow_runs.filter(r => r.status === 'completed' && r.conclusion)
+            if (runs.length === 0) core.setFailed(`No completed ci runs found for branch ${process.env.TARGET_BRANCH}`)
+            // Prefer pull_request runs over push if both exist for same SHA
+            const byConclusionTime = runs.sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at))
+            const prRun = byConclusionTime.find(r => r.event === 'pull_request')
+            const latest = prRun || byConclusionTime[0]
+            core.setOutput('run_id', String(latest.id))
+            core.setOutput('run_html', latest.html_url)
+
+      - name: List jobs for run
+        id: jobs
+        uses: actions/github-script@v7
+        env:
+          RUN_ID: ${{ steps.findrun.outputs.run_id }}
+        with:
+          script: |
+            const context = github.context
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({ owner: context.repo.owner, repo: context.repo.repo, run_id: Number(process.env.RUN_ID) })
+            const mapped = jobs.data.jobs.map(j => ({ id: j.id, name: j.name, conclusion: j.conclusion, html_url: j.html_url }))
+            core.setOutput('jobs', JSON.stringify(mapped))
+
+      - name: Download run logs
+        env:
+          RUN_ID: ${{ steps.findrun.outputs.run_id }}
+        run: |
+          curl -sSL -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/runs/${RUN_ID}/logs \
+            -o logs.zip
+          unzip -q logs.zip -d logs || true
+          find logs -maxdepth 2 -type f -name "*.txt" > logfiles.txt || true
+
+      - name: Extract first error lines
+        id: extract
+        env:
+          JOBS_JSON: ${{ steps.jobs.outputs.jobs }}
+        run: |
+          set -e
+          echo "Generating failure summary..."
+          node -e '
+            const fs = require("fs");
+            const jobs = JSON.parse(process.env.JOBS_JSON || "[]");
+            const failed = jobs.filter(j => j.conclusion && j.conclusion !== "success");
+            const patterns = [
+              /^Error:.+/,
+              /^npm ERR.*/i,
+              /^\s*TS\d{4}:.+/,
+              /^\s*✖ .+/, // eslint summary
+              /^\s*● .+/, // vitest failing test header
+              /^\s*FAIL .+/, // vitest fail line
+              /ESLintError/,
+              /^\s*TypeError:.+/,
+              /^\s*ReferenceError:.+/,
+            ];
+            let rows = [];
+            const files = fs.existsSync("logfiles.txt") ? fs.readFileSync("logfiles.txt", "utf8").trim().split(/\r?\n/) : [];
+            function firstErrorsFor(jobName){
+              // Try to pick files that include jobName token
+              const token = jobName.replace(/\s+/g, "_");
+              const candidates = files.filter(f => f.includes(token))
+                .concat(files.filter(f => !f.includes(token))); // fallback
+              const seen = new Set();
+              let found = [];
+              for (const f of candidates){
+                const lines = fs.readFileSync(f, "utf8").split(/\r?\n/);
+                for (const line of lines){
+                  const sanitized = line.replace(/https?:\/\/[^\s]+/g, "").trim();
+                  for (const p of patterns){
+                    if (p.test(sanitized)){
+                      if (!seen.has(sanitized)){
+                        // truncate long lines
+                        const msg = sanitized.length > 200 ? sanitized.slice(0, 197) + '…' : sanitized;
+                        seen.add(msg);
+                        found.push(msg);
+                        if (found.length >= 3) return found;
+                      }
+                    }
+                  }
+                }
+              }
+              return found;
+            }
+            for (const j of failed){
+              const errs = firstErrorsFor(j.name);
+              const summary = errs.length ? errs[0] : `Job ${j.name} failed; see logs`;
+              rows.push({ name: j.name, err: summary, url: j.html_url, extra: errs.slice(1) });
+            }
+            const max = 1800; // budget for comment body
+            let table = `| Job | First error line | Logs |\n|---|---|---|\n`;
+            for (const r of rows){
+              table += `| ${r.name} | ${r.err.replace(/\|/g, "\\|")} | [link](${r.url}) |\n`;
+            }
+            let note = "";
+            const extraLines = rows.flatMap(r => r.extra).join("\n");
+            if ((table + extraLines).length > max){
+              note = "\n(truncated)";
+            }
+            const ts = new Date().toISOString()
+            fs.writeFileSync("failure_map.md", `**CI Failure Map (snapshot)**\\n\\nRun: ${{ steps.findrun.outputs.run_id }} at ${ts}\\n\\n${table}${note}\\n`);
+          '
+          echo "failure_map.md generated"
+
+      - name: Upsert PR comment
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.resolve.outputs.pr }}
+        with:
+          script: |
+            const fs = require('fs')
+            const context = github.context
+            const prNumber = process.env.PR_NUMBER
+            if (!prNumber) {
+              core.info('No PR number found; skipping comment')
+              return
+            }
+            const body = fs.readFileSync('failure_map.md', 'utf8')
+            const { data: comments } = await github.rest.issues.listComments({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(prNumber) })
+            const existing = comments.find(c => (c.body || '').startsWith('**CI Failure Map (snapshot)**'))
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body })
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(prNumber), body })
+            }
+

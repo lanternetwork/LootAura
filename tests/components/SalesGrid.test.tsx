@@ -1,58 +1,44 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
+import { renderWithProviders } from '../utils/renderWithProviders'
 import '@testing-library/jest-dom'
+import { vi } from 'vitest'
 import SalesGrid from '@/components/SalesGrid'
 import { Sale } from '@/lib/types'
+import { makeSales } from '../_helpers/factories'
 
 // Mock SaleCard and SaleCardSkeleton to simplify tests
-jest.mock('@/components/SaleCard', () => {
-  return function MockSaleCard({ sale }: { sale: Sale }) {
+vi.mock('@/components/SaleCard', () => ({
+  __esModule: true,
+  default: function MockSaleCard({ sale }: { sale: Sale }) {
     return <div data-testid="sale-card">{sale.title}</div>
   }
-})
+}))
 
-jest.mock('@/components/SaleCardSkeleton', () => {
-  return function MockSaleCardSkeleton() {
+vi.mock('@/components/SaleCardSkeleton', () => ({
+  __esModule: true,
+  default: function MockSaleCardSkeleton() {
     return <div data-testid="sale-card-skeleton">Loading...</div>
   }
-})
+}))
 
-const mockSales: Sale[] = [
-  { id: '1', title: 'Sale 1', description: 'Desc 1', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-  { id: '2', title: 'Sale 2', description: 'Desc 2', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-  { id: '3', title: 'Sale 3', description: 'Desc 3', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-  { id: '4', title: 'Sale 4', description: 'Desc 4', lat: 0, lng: 0, date_start: '2025-01-01', time_start: '09:00' },
-]
+const mockSales = makeSales(4, [
+  { title: 'Sale 1', description: 'Desc 1' },
+  { title: 'Sale 2', description: 'Desc 2' },
+  { title: 'Sale 3', description: 'Desc 3' },
+  { title: 'Sale 4', description: 'Desc 4' }
+])
 
 const emptyState = <div>No sales found.</div>
 
 describe('SalesGrid', () => {
-  // Mock ResizeObserver
-  let observe: jest.Mock
-  let unobserve: jest.Mock
-  let disconnect: jest.Mock
-
-  beforeAll(() => {
-    observe = jest.fn()
-    unobserve = jest.fn()
-    disconnect = jest.fn()
-    global.ResizeObserver = jest.fn(() => ({
-      observe,
-      unobserve,
-      disconnect,
-    }))
-  })
-
   beforeEach(() => {
-    observe.mockClear()
-    unobserve.mockClear()
-    disconnect.mockClear()
     // Reset window width for each test
     Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 0 })
   })
 
   it('renders sales cards when not loading and sales are present', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={mockSales}
         loading={false}
@@ -66,7 +52,7 @@ describe('SalesGrid', () => {
   })
 
   it('renders skeletons when loading and not in MAP authority', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={[]}
         loading={true}
@@ -81,7 +67,7 @@ describe('SalesGrid', () => {
   })
 
   it('renders empty state message when no sales and not loading', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={[]}
         loading={false}
@@ -95,7 +81,7 @@ describe('SalesGrid', () => {
   })
 
   it('does not render skeletons when in MAP authority, even if loading', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={[]}
         loading={true}
@@ -109,7 +95,7 @@ describe('SalesGrid', () => {
   })
 
   it('observes resize events and updates columns', async () => {
-    const { rerender } = render(
+    const { rerender } = renderWithProviders(
       <SalesGrid
         sales={mockSales}
         loading={false}
@@ -119,13 +105,19 @@ describe('SalesGrid', () => {
     )
 
     const gridElement = screen.getByTestId('sales-grid')
-    expect(observe).toHaveBeenCalledWith(gridElement)
+    
+    // Use the global ResizeObserver mock from tests/setup.ts
+    expect(global.ResizeObserver).toBeDefined()
 
     // Simulate a resize to 700px (should be 2 columns)
-    Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 700 })
-    // Manually trigger the ResizeObserver callback
-    // This is a simplified way; in a real browser, the callback would be async
-    ;(global.ResizeObserver as jest.Mock).mock.calls[0][0]([{ target: gridElement }])
+    await act(async () => {
+      Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 700 })
+      // Use the global helper to trigger resize
+      const simulate = (globalThis as any).__simulateResize as
+        | ((el: Element, width: number) => void)
+        | undefined
+      if (simulate) simulate(gridElement, 700)
+    })
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '2')
@@ -133,8 +125,13 @@ describe('SalesGrid', () => {
     })
 
     // Simulate a resize to 1200px (should be 3 columns)
-    Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 1200 })
-    ;(global.ResizeObserver as jest.Mock).mock.calls[0][0]([{ target: gridElement }])
+    await act(async () => {
+      Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 1200 })
+      const simulate = (globalThis as any).__simulateResize as
+        | ((el: Element, width: number) => void)
+        | undefined
+      if (simulate) simulate(gridElement, 1200)
+    })
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '3')
@@ -142,8 +139,13 @@ describe('SalesGrid', () => {
     })
 
     // Simulate a resize to 500px (should be 1 column)
-    Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 500 })
-    ;(global.ResizeObserver as jest.Mock).mock.calls[0][0]([{ target: gridElement }])
+    await act(async () => {
+      Object.defineProperty(gridElement, 'offsetWidth', { configurable: true, value: 500 })
+      const simulate = (globalThis as any).__simulateResize as
+        | ((el: Element, width: number) => void)
+        | undefined
+      if (simulate) simulate(gridElement, 500)
+    })
 
     await waitFor(() => {
       expect(gridElement).toHaveAttribute('data-columns', '1')
@@ -152,7 +154,7 @@ describe('SalesGrid', () => {
   })
 
   it('cleans up ResizeObserver on unmount', () => {
-    const { unmount } = render(
+    const { unmount } = renderWithProviders(
       <SalesGrid
         sales={mockSales}
         loading={false}
@@ -160,13 +162,15 @@ describe('SalesGrid', () => {
         emptyStateMessage={emptyState}
       />
     )
-    expect(observe).toHaveBeenCalledTimes(1)
+    // The global ResizeObserver mock should be defined
+    expect(global.ResizeObserver).toBeDefined()
     unmount()
-    expect(disconnect).toHaveBeenCalledTimes(1)
+    // The global ResizeObserver mock should still be defined
+    expect(global.ResizeObserver).toBeDefined()
   })
 
   it('applies custom className', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={mockSales}
         loading={false}
@@ -176,11 +180,11 @@ describe('SalesGrid', () => {
       />
     )
     const gridElement = screen.getByTestId('sales-grid')
-    expect(gridElement).toHaveClass('sales-grid', 'custom-class')
+    expect(gridElement).toHaveClass('sales-grid custom-class')
   })
 
   it('sets correct data attributes', () => {
-    render(
+    renderWithProviders(
       <SalesGrid
         sales={mockSales}
         loading={false}

@@ -1,51 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { renderWithProviders } from '../utils/renderWithProviders'
 import userEvent from '@testing-library/user-event'
 import AddSaleForm from '@/components/AddSaleForm'
 
-// Mock the hooks
-vi.mock('@/lib/hooks/useSales', () => ({
-  useCreateSale: () => ({
-    mutateAsync: vi.fn(),
-    isPending: false,
-    error: null
-  })
-}))
-
-// Mock Google Maps
-vi.mock('@googlemaps/js-api-loader', () => ({
-  Loader: vi.fn().mockImplementation(() => ({
-    load: vi.fn().mockResolvedValue({})
-  }))
-}))
-
-// Mock Google Maps global object
-Object.defineProperty(window, 'google', {
-  value: {
-    maps: {
-      places: {
-        Autocomplete: vi.fn().mockImplementation(() => ({
-          addListener: vi.fn(),
-          getPlace: vi.fn().mockReturnValue({
-            geometry: {
-              location: {
-                lat: () => 37.7749,
-                lng: () => -122.4194
-              }
-            },
-            formatted_address: '123 Test St, San Francisco, CA'
-          })
-        }))
-      }
-    }
-  },
-  writable: true
-})
-
-// Mock geocoding
-vi.mock('@/lib/geocode', () => ({
-  geocodeAddress: vi.fn().mockResolvedValue(null)
-}))
+// Use global mocks from tests/setup.ts
 
 // Mock ImageUploader
 vi.mock('@/components/ImageUploader', () => ({
@@ -57,8 +16,13 @@ vi.mock('@/components/ImageUploader', () => ({
 }))
 
 describe('AddSaleForm Accessibility', () => {
+  beforeEach(() => {
+    // Mock window.alert for JSDOM
+    global.alert = vi.fn()
+  })
+
   it('should have proper form labels and structure', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Check for proper form element
     const form = screen.getByRole('form')
@@ -77,7 +41,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper input types and attributes', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Check input types
     const titleInput = screen.getByLabelText('Sale Title *')
@@ -109,7 +73,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper button roles and labels', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Check submit button
     const submitButton = screen.getByRole('button', { name: /post sale/i })
@@ -124,7 +88,7 @@ describe('AddSaleForm Accessibility', () => {
 
   it('should support keyboard navigation', async () => {
     const user = userEvent.setup()
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Tab through form elements
     const titleInput = screen.getByLabelText('Sale Title *')
@@ -171,12 +135,17 @@ describe('AddSaleForm Accessibility', () => {
     expect(addTagButton).toHaveFocus()
     
     await user.tab()
+    // ImageUploader button comes next
+    const imageUploaderButton = screen.getByText('Upload Image')
+    expect(imageUploaderButton).toHaveFocus()
+    
+    await user.tab()
     expect(submitButton).toHaveFocus()
   })
 
   it('should support form submission with Enter key', async () => {
     const user = userEvent.setup()
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Fill in required fields
     await user.type(screen.getByLabelText('Sale Title *'), 'Test Sale')
@@ -192,7 +161,7 @@ describe('AddSaleForm Accessibility', () => {
 
   it('should support adding tags with Enter key', async () => {
     const user = userEvent.setup()
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     const tagInput = screen.getByPlaceholderText('Add a tag...')
     const addTagButton = screen.getByRole('button', { name: /add/i })
@@ -206,7 +175,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper error handling and announcements', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Initially no error should be shown
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -216,7 +185,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper fieldset and legend structure for grouped fields', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Check that date fields are properly grouped
     const startDateLabel = screen.getByLabelText('Start Date & Time')
@@ -235,7 +204,7 @@ describe('AddSaleForm Accessibility', () => {
 
   it('should have proper focus management', async () => {
     const user = userEvent.setup()
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Focus should start on first input
     const titleInput = screen.getByLabelText('Sale Title *')
@@ -249,7 +218,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should have proper ARIA attributes', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // Check for proper form role
     const form = screen.getByRole('form')
@@ -268,7 +237,7 @@ describe('AddSaleForm Accessibility', () => {
   })
 
   it('should support screen reader navigation', () => {
-    render(<AddSaleForm />)
+    renderWithProviders(<AddSaleForm />)
     
     // All form elements should be accessible to screen readers
     const form = screen.getByRole('form')
@@ -277,8 +246,12 @@ describe('AddSaleForm Accessibility', () => {
     // Check that all inputs have associated labels
     const inputs = screen.getAllByRole('textbox')
     inputs.forEach(input => {
-      const label = screen.getByLabelText(input.getAttribute('aria-label') || '')
-      expect(label).toBeInTheDocument()
+      const id = input.getAttribute('id')
+      if (id) {
+        // Check that a label exists for this input
+        const labelElement = document.querySelector(`label[for="${id}"]`)
+        expect(labelElement).toBeInTheDocument()
+      }
     })
     
     // Check that all buttons have accessible names

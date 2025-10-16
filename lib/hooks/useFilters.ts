@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { normalizeCategoryParams } from '@/lib/shared/categoryNormalizer'
 
 export interface FilterState {
   lat?: number
@@ -45,7 +46,9 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     const distance = searchParams.get('dist') ? parseInt(searchParams.get('dist')!) : 25
     const dateParam = searchParams.get('date') as 'today' | 'weekend' | 'next_weekend' | 'any' | 'range' | null
     const dateRange = !dateParam || dateParam === 'range' ? 'any' : dateParam
-    const categories = searchParams.get('cat') ? searchParams.get('cat')!.split(',') : []
+    
+    // Use canonical parameter normalization
+    const { categories } = normalizeCategoryParams(searchParams)
     const city = searchParams.get('city') || undefined
 
     // Only update if URL has location params, otherwise keep initial location
@@ -100,11 +103,19 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
       params.delete('date')
     }
     
-    // Update categories
+    // Update categories using canonical parameter
     if (updatedFilters.categories.length > 0) {
-      params.set('cat', updatedFilters.categories.join(','))
+      params.set('categories', updatedFilters.categories.join(','))
     } else {
-      params.delete('cat')
+      params.delete('categories')
+    }
+    
+    // Remove legacy 'cat' parameter if it exists
+    params.delete('cat')
+    
+    // Debug assertion: ensure we never emit 'cat' parameter
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && params.get('cat')) {
+      console.error('[FILTER DEBUG] ERROR: URL writer emitted legacy cat parameter! This should never happen.')
     }
     
     // Update city

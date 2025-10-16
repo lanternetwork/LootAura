@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { T } from '@/lib/supabase/tables'
+import { T as _T } from '@/lib/supabase/tables'
 import { z } from 'zod'
 
 const SubscribeSchema = z.object({

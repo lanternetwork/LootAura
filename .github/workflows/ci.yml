@@ -1,30 +1,12 @@
-  css-scan:
-    name: css-scan
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-          path: .
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install dependencies
-        run: npm ci
-      - name: Check CSS tokens
-        run: node scripts/check-css-tokens.js
 name: ci
 
 on:
   pull_request:
     branches: ["main"]
   push:
-    branches: ["**"]
+    branches-ignore:
+      - main
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -34,6 +16,7 @@ jobs:
   env-presence:
     name: env-presence
     runs-on: ubuntu-latest
+    
     steps:
       - name: Check required environment variables
         run: |
@@ -48,19 +31,120 @@ jobs:
           fi
           echo "✅ All required environment variables present"
 
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript type checking
+        run: npm run typecheck
+
+  test-unit:
+    name: test-unit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
+          NEXT_PUBLIC_DEBUG: 'true'
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            test-results.xml
+            coverage/
+
+  test-integration:
+    name: test-integration
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run integration tests
+        run: npm run test -- tests/integration/
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
+          NEXT_PUBLIC_DEBUG: 'true'
+
   build:
     name: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+
       - name: Install dependencies
         run: npm ci
+
       - name: Build application
         run: npm run build
         env:
@@ -72,76 +156,110 @@ jobs:
           NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
           NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
 
-  typecheck:
-    name: typecheck
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Run TypeScript type checking
-        run: npm run typecheck
+      - name: List build outputs (debug)
+        if: always()
+        run: |
+          pwd
+          ls -la
+          echo "--- .next ---" || true
+          ls -la .next || true
+          echo "--- .next/static ---" || true
+          ls -la .next/static || true
+          echo "--- .next/standalone ---" || true
+          ls -la .next/standalone || true
 
-  test-unit:
-    name: test-unit
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-artifacts
+          path: |
+            .next
+            .next/static
+            .next/standalone
+            out
+          if-no-files-found: warn
+
+  css-scan:
+    name: css-scan
     runs-on: ubuntu-latest
+    needs: build
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+
       - name: Install dependencies
         run: npm ci
-      - name: Run unit tests
-        run: npm run test
+
+      - name: Build (fallback if artifacts not used)
+        run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_DEBUG: 'true'
+          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
+          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
+          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
 
-  lint:
-    name: lint
+      - name: Check CSS tokens
+        run: node scripts/check-css-tokens.js
+
+  migration-verify:
+    name: migration-verify
     runs-on: ubuntu-latest
+    
+    if: contains(github.event.head_commit.modified, '**/*.sql') || contains(github.event.head_commit.added, '**/*.sql')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
-      - name: Run ESLint
-        run: npm run lint
 
-  test-integration:
-    name: test-integration
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
       - name: Install dependencies
         run: npm ci
-      - name: Run integration tests
-        run: npm run test -- tests/integration/
+
+      - name: Verify migration
+        run: node scripts/verify-migration.js
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_DEBUG: 'true'
+
+  notify-completion:
+    name: notify-completion
+    runs-on: ubuntu-latest
+    needs: [env-presence, lint, typecheck, test-unit, test-integration, build, css-scan, migration-verify]
+    if: always()
+    steps:
+      - name: Emit ci_completed event
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // 'context' and 'github' are provided by github-script
+            const ref = context.ref || context.payload?.workflow_run?.head_branch || context.payload?.pull_request?.head?.ref || ''
+            const branch = (ref || '').replace('refs/heads/', '')
+            const prNumber = context.payload?.pull_request?.number || ''
+
+            await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'ci_completed',
+              client_payload: {
+                branch,
+                pr_number: prNumber,
+                run_id: context.runId,
+                conclusion: context.payload?.workflow_run?.conclusion || 'completed'
+              }
+            })
+
+            console.log(`Emitted ci_completed event for branch: ${branch}, PR: ${prNumber}`)

@@ -62,7 +62,7 @@ const content = `# Loot Aura Repository Status
 
 ## 6. Deployments
 - **Vercel URLs:** Production/Preview (insert)
-- **Environment vars:** NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, etc. (verify set)
+- **Environment vars:** NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_MAPBOX_TOKEN, etc. (verify set)
 - **Last deploy health:** unknown in this run
 
 ## 7. Known Issues / TODO

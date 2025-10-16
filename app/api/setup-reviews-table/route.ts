@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
     
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
     
     // 5. Test the setup
-    const { data: testData, error: testError } = await supabase
+    const { data: _testData, error: testError } = await supabase
       .from('reviews_v2')
       .select('*')
       .limit(1)

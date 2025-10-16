@@ -6,7 +6,7 @@ export async function GET() {
     const supabase = createSupabaseServerClient()
     
     // Test that we can access the sales table
-    const { data, error } = await supabase
+    const { data: _data, error } = await supabase
       .from('sales')
       .select('id')
       .limit(1)

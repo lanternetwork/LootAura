@@ -8,9 +8,9 @@ describe('MAP Authority Query Building', () => {
       global.fetch = mockFetch
 
       // Mock arbiter with MAP authority
-      const arbiter = { authority: 'MAP' as const }
+      const arbiter: { authority: 'MAP' | 'FILTERS' } = { authority: 'MAP' }
       
-      // Simulate fetchSales call under MAP authority
+      // Simulate fetchSales call under MAP authority - should skip wide sales
       const shouldCallWideSales = arbiter.authority !== 'MAP'
       
       expect(shouldCallWideSales).toBe(false)
@@ -22,10 +22,10 @@ describe('MAP Authority Query Building', () => {
       global.fetch = mockFetch
 
       // Mock arbiter with FILTERS authority
-      const arbiter = { authority: 'FILTERS' as const }
+      const arbiter: { authority: 'MAP' | 'FILTERS' } = { authority: 'FILTERS' }
       
       // Simulate fetchSales call under FILTERS authority
-      const shouldCallWideSales = arbiter.authority !== 'MAP'
+      const shouldCallWideSales = arbiter.authority === 'FILTERS'
       
       expect(shouldCallWideSales).toBe(true)
     })
@@ -83,7 +83,7 @@ describe('MAP Authority Query Building', () => {
       
       // Simulate date change under MAP authority
       const arbiter = { authority: 'MAP' as const }
-      if (arbiter.authority === 'MAP') {
+      if (arbiter.authority === 'MAP' as any) {
         viewportSeq++ // This should happen on date changes
       }
       
@@ -96,7 +96,7 @@ describe('MAP Authority Query Building', () => {
       
       // Simulate date change under FILTERS authority
       const arbiter = { authority: 'FILTERS' as const }
-      if (arbiter.authority === 'MAP') {
+      if (arbiter.authority === 'MAP' as any) {
         viewportSeq++ // This should NOT happen
       }
       

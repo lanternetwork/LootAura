@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
-import { GetSalesParams, formatDistance } from '@/lib/data/sales'
+import { GetSalesParams } from '@/lib/data/sales'
 import SalesMap from '@/components/location/SalesMap'
 import ZipInput from '@/components/location/ZipInput'
 import SaleCard from '@/components/SaleCard'
@@ -18,10 +18,11 @@ import { milesToKm } from '@/utils/geo'
 import LoadMoreButton from '@/components/LoadMoreButton'
 import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
+import { normalizeFilters, filtersEqual, createCategoriesKey } from '@/lib/shared/categoryNormalizer'
 import LayoutDiagnostic from '@/components/LayoutDiagnostic'
 import GridLayoutDiagnostic from '@/components/GridLayoutDiagnostic'
 import GridDebugOverlay from '@/components/GridDebugOverlay'
-import { resolveDatePreset, dateRangesEqual } from '@/lib/shared/resolveDatePreset'
+import { resolveDatePreset } from '@/lib/shared/resolveDatePreset'
 
 // Intent Arbiter types
 type ControlMode = 'initial' | 'map' | 'zip' | 'distance'
@@ -45,7 +46,7 @@ interface QueryShape {
   shapeHash: string
 }
 
-interface MapViewState {
+interface _MapViewState {
   center: { lat: number; lng: number }
   bounds: { west: number; south: number; east: number; north: number }
   zoom: number
@@ -66,7 +67,7 @@ function computeRadiusFromZoom(zoom: number): number {
   return Math.max(1, Math.min(160, baseRadius * zoomFactor))
 }
 
-function computeRadiusFromBounds(bounds: { west: number; south: number; east: number; north: number }): number {
+function _computeRadiusFromBounds(bounds: { west: number; south: number; east: number; north: number }): number {
   // Approximate radius from bounds using center and corner distance
   const centerLat = (bounds.north + bounds.south) / 2
   const centerLng = (bounds.east + bounds.west) / 2
@@ -107,8 +108,41 @@ interface SalesClientProps {
   user: User | null
 }
 
-export default function SalesClient({ initialSales, initialSearchParams, initialCenter, user }: SalesClientProps) {
-  const router = useRouter()
+export default function SalesClient({ initialSales, initialSearchParams: _initialSearchParams, initialCenter, user: _user }: SalesClientProps) {
+  // Debug flag for console checkpoints
+  const DEBUG = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_DEBUG === 'true'
+  
+  // Container mount checkpoint
+  useEffect(() => {
+    if (DEBUG) {
+      console.log('[DOM][LIST] container mounted')
+      
+      // One-time computed-style debug for grid layout
+      setTimeout(() => {
+        const listContainer = document.querySelector('[data-panel="list"]')
+        if (listContainer) {
+          const computedStyle = window.getComputedStyle(listContainer)
+          const display = computedStyle.display
+          const gtc = computedStyle.gridTemplateColumns
+          const parent = listContainer.parentElement
+          const parentDisplay = parent ? window.getComputedStyle(parent).display : 'none'
+          const parentWidth = parent ? window.getComputedStyle(parent).width : '0px'
+          console.log(`[DOM][LIST] grid display=${display} gtc=${gtc} parentDisplay=${parentDisplay} parentWidth=${parentWidth}`)
+        }
+      }, 100) // Small delay to ensure styles are applied
+    }
+  }, [DEBUG])
+  
+  // Category change detection ref
+  const prevCategoriesKeyRef = useRef<string>('')
+  
+  // List store sequence for UI updates
+  const listStoreSeqRef = useRef<number>(0)
+  const prevVisibleIdsHashRef = useRef<string>('')
+  
+  // Markers change signal for list updates
+  const markersHashRef = useRef<string>('')
+  const _router = useRouter()
   const searchParams = useSearchParams()
   const { filters, updateFilters, hasActiveFilters } = useFilters(
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
@@ -128,7 +162,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const mapAuthorityUntilRef = useRef<number>(0)
   
   // Track last resolved date range to prevent unnecessary fetches
-  const lastResolvedDateRangeRef = useRef<{ from?: string; to?: string } | null>(null)
+  const _lastResolvedDateRangeRef = useRef<{ from?: string; to?: string } | null>(null)
   
   // Idempotency guard to prevent ping-pong when results are repeatedly "0"
   const lastApplyStateRef = useRef<{
@@ -215,7 +249,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [])
 
   // Get effective query shape based on current authority
-  const getEffectiveQueryShape = useCallback((): QueryShape => {
+  const _getEffectiveQueryShape = useCallback((): QueryShape => {
     const dateRange = filters.dateRange === 'any' ? 'any' : filters.dateRange
     const categories = filters.categories || []
     
@@ -252,7 +286,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapUpdating, setMapUpdating] = useState(false)
-  const [mapSales, setMapSales] = useState<Sale[]>([])
+  const [mapSales, _setMapSales] = useState<Sale[]>([])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
   const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
@@ -262,10 +296,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [visiblePinIdsState, setVisiblePinIdsState] = useState<string[]>([])
   const [nextPageCache, setNextPageCache] = useState<Sale[] | null>(null)
-  const [locationAccuracy, setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
+  const [_locationAccuracy, _setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
-  const [mapCenterOverride, setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
+  const [mapCenterOverride, _setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
   
   // Stable bbox hash for effect dependencies
@@ -293,7 +327,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const markersAbortRef = useRef<AbortController | null>(null)
   const debounceRef = useRef<number | null>(null)
   const markerSeqRef = useRef<number>(0)
-  const mapModeDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const _mapModeDebounceRef = useRef<NodeJS.Timeout | null>(null)
   
   // Request identity and stale-response guard
   const salesReqIdRef = useRef<number>(0)
@@ -306,22 +340,22 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const requestSeqRef = useRef<number>(0)
   
   // In-flight tracking and versioning
-  const [inFlightSales, setInFlightSales] = useState<boolean>(false)
-  const [inFlightMarkers, setInFlightMarkers] = useState<boolean>(false)
+  const [_inFlightSales, _setInFlightSales] = useState<boolean>(false)
+  const [_inFlightMarkers, _setInFlightMarkers] = useState<boolean>(false)
   const markersVersionRef = useRef<number>(0)
   const latestBoundsTsRef = useRef<number>(0)
-  const visibilityComputeKeyRef = useRef<string>('')
-  const lastVisibleIdsRef = useRef<string[]>([])
-  const visibilityComputeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const _visibilityComputeKeyRef = useRef<string>('')
+  const _lastVisibleIdsRef = useRef<string[]>([])
+  const _visibilityComputeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Map stability and idle tracking
-  const [mapReady, setMapReady] = useState<boolean>(false)
-  const firstStableViewportTsRef = useRef<number>(0)
+  const [_mapReady, _setMapReady] = useState<boolean>(false)
+  const _firstStableViewportTsRef = useRef<number>(0)
   const lastViewportEmitTsRef = useRef<number>(0)
   const boundsCoalesceKeyRef = useRef<string>('')
   const boundsDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pendingBoundsRef = useRef<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
-  const pendingStableTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const _pendingStableTimerRef = useRef<NodeJS.Timeout | null>(null)
   const latestBoundsKeyRef = useRef<string>('')
 
   // Helper to create bounds coalesce key
@@ -395,7 +429,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [viewportBounds, createBoundsKey])
 
   // Unified fetch function with request identity and stale-response guard
-  const fetchWithToken = useCallback(async (endpoint: 'sales' | 'markers', queryShape: QueryShape) => {
+  const _fetchWithToken = useCallback(async (endpoint: 'sales' | 'markers', queryShape: QueryShape) => {
     // Generate request identity
     const reqId = endpoint === 'sales' ? ++salesReqIdRef.current : ++markersReqIdRef.current
     const stateKey = createStateKey(arbiter.mode, {lat: queryShape.lat, lng: queryShape.lng}, queryShape.radiusKm, queryShape.dateRange, queryShape.categories)
@@ -421,9 +455,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     
     // Set in-flight flags (don't clear arrays)
     if (endpoint === 'sales') {
-      setInFlightSales(true)
+      _setInFlightSales(true)
     } else {
-      setInFlightMarkers(true)
+      _setInFlightMarkers(true)
     }
 
     // Create new abort controller
@@ -453,7 +487,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         if (endpoint === 'sales') {
           // Atomic commit: set sales then schedule visibility computation
           setSales(data.data || [])
-          setInFlightSales(false)
+          _setInFlightSales(false)
           // Schedule visibility computation on next animation frame
           requestAnimationFrame(() => {
             // Visibility will be recomputed by the markers change handler
@@ -481,12 +515,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               lastState.dateKey === currentState.dateKey &&
               lastState.markerIds === currentState.markerIds) {
             console.log('[MARKERS] idempotent apply - skipping update (same bbox|date|markers)')
-            setInFlightMarkers(false)
+            _setInFlightMarkers(false)
             return
           }
           
           setMapMarkers(newMarkers)
-          setInFlightMarkers(false)
+          _setInFlightMarkers(false)
           lastApplyStateRef.current = currentState
           console.log(`[MARKERS] set: ${newMarkers.length} version: ${markersVersionRef.current}`)
           
@@ -499,9 +533,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         console.error(`[NET] error ${endpoint}:`, data.error)
         // Clear in-flight flags on error
         if (endpoint === 'sales') {
-          setInFlightSales(false)
+          _setInFlightSales(false)
         } else {
-          setInFlightMarkers(false)
+          _setInFlightMarkers(false)
         }
       }
     } catch (error: any) {
@@ -517,9 +551,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         setAbortController(null)
         // Clear in-flight flags
         if (endpoint === 'sales') {
-          setInFlightSales(false)
+          _setInFlightSales(false)
         } else {
-          setInFlightMarkers(false)
+          _setInFlightMarkers(false)
         }
       }
     }
@@ -532,12 +566,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const nearEq = (a: number, b: number) => Math.abs(a - b) < EPS_CENTER
 
   // Utility functions for value equality checks
-  const isEqualCenter = useCallback((a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null, tol = 1e-6) => {
+  const _isEqualCenter = useCallback((a: { lat: number; lng: number } | null, b: { lat: number; lng: number } | null, tol = 1e-6) => {
     if (!a || !b) return a === b
     return Math.abs(a.lat - b.lat) < tol && Math.abs(a.lng - b.lng) < tol
   }, [])
 
-  const isEqualBounds = useCallback((a: { north: number; south: number; east: number; west: number } | null, b: { north: number; south: number; east: number; west: number } | null, tol = 1e-6) => {
+  const _isEqualBounds = useCallback((a: { north: number; south: number; east: number; west: number } | null, b: { north: number; south: number; east: number; west: number } | null, tol = 1e-6) => {
     if (!a || !b) return a === b
     return Math.abs(a.north - b.north) < tol && Math.abs(a.south - b.south) < tol && 
            Math.abs(a.east - b.east) < tol && Math.abs(a.west - b.west) < tol
@@ -550,11 +584,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   }, [emitBoundsDebounced])
 
   const onMapReady = useCallback(() => {
-    setMapReady(true)
+    _setMapReady(true)
     console.log('[MAP] ready - will emit bounds only on idle')
   }, [])
 
-  const getVisibleSalesFromRenderedFeatures = useCallback((all: Sale[]) => {
+  const _getVisibleSalesFromRenderedFeatures = useCallback((all: Sale[]) => {
     // This function will be called from the map component with queryRenderedFeatures results
     // For now, return all sales - this will be updated when we implement the map integration
     return all
@@ -601,31 +635,39 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     if (arbiter.authority === 'MAP') {
       const ids = visiblePinIdsState
       
-      // Circuit breaker: skip if visible pins haven't changed
-      const idsString = ids.join(',')
-      const lastIdsString = lastVisiblePinsRef.current.join(',')
+      // Circuit breaker: skip if visible pins haven't changed (using hash for better change detection)
+      const idsString = ids.sort().join(',')
+      const lastIdsString = lastVisiblePinsRef.current.sort().join(',')
       if (idsString === lastIdsString) {
-        console.log('[LIST] visible pins unchanged - skipping effect to prevent loop')
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[LIST] visible pins unchanged - skipping effect to prevent loop')
+        }
         return
       }
       lastVisiblePinsRef.current = [...ids]
       
       const haveInDict = ids.filter(id => !!mapMarkers.find(m => String(m.id) === String(id))).length
       const missing = ids.filter(id => !mapMarkers.find(m => String(m.id) === String(id))).slice(0, 3)
-      console.log(`[LIST][MAP] seq=${seq} ids.count=${ids.length} sample=${ids.slice(0,3)} haveInDict=${haveInDict} missing=${missing}`)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[LIST][MAP] seq=${seq} ids.count=${ids.length} sample=${ids.slice(0,3)} haveInDict=${haveInDict} missing=${missing}`)
+      }
 
       // If we have no visible pins, that's fine - just return empty
       if (ids.length === 0) {
         setVisibleSales([])
         setRenderedSales([])
-        console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=0 rendered=0`)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=0 rendered=0`)
+        }
         return
       }
 
       // If visible pins don't match current markers, let the map recalculate naturally
       // Don't clear visible pins here as it prevents the map from recalculating them
       if (haveInDict === 0) {
-        console.log(`[LIST][MAP] visible pins don't match current markers - waiting for map to recalculate`)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[LIST][MAP] visible pins don't match current markers - waiting for map to recalculate`)
+        }
         setVisibleSales([])
         setRenderedSales([])
         return
@@ -656,13 +698,47 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       const rendered = hydrated.slice(0, 24)
       setVisibleSales(hydrated)
       setRenderedSales(rendered)
-      console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=${hydrated.length} rendered=${rendered.length}`)
+      
+      // List store update with sequence tracking
+      const currentIdsHash = hydrated.map(s => s.id).sort().join(',')
+      const idsChanged = prevVisibleIdsHashRef.current !== currentIdsHash
+      
+      if (idsChanged) {
+        listStoreSeqRef.current += 1
+        prevVisibleIdsHashRef.current = currentIdsHash
+      }
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[LIST][DIFF] seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}... prevSeq=${listStoreSeqRef.current - 1} changed=${idsChanged}`)
+        console.log(`[LIST] apply visible count=${hydrated.length} seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}...`)
+      }
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=${hydrated.length} rendered=${rendered.length}`)
+      }
     } else if (viewportBounds) {
       const inView = cropSalesToViewport(sales, viewportBounds)
       const rendered = inView.slice(0, 24)
       setVisibleSales(inView)
       setRenderedSales(rendered)
-      console.log(`[LIST] update (filters) seq=${seq} inView=${inView.length} rendered=${rendered.length}`)
+      
+      // List store update with sequence tracking
+      const currentIdsHash = inView.map(s => s.id).sort().join(',')
+      const idsChanged = prevVisibleIdsHashRef.current !== currentIdsHash
+      
+      if (idsChanged) {
+        listStoreSeqRef.current += 1
+        prevVisibleIdsHashRef.current = currentIdsHash
+      }
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[LIST][DIFF] seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}... prevSeq=${listStoreSeqRef.current - 1} changed=${idsChanged}`)
+        console.log(`[LIST] apply visible count=${inView.length} seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}...`)
+      }
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[LIST] update (filters) seq=${seq} inView=${inView.length} rendered=${rendered.length}`)
+      }
     }
   }, [arbiter.authority, visiblePinIdsState, mapMarkers, sales, viewportBounds, cropSalesToViewport])
 
@@ -670,21 +746,22 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   useEffect(() => {
     if (arbiter.authority !== 'MAP') return
     
-    // Check for sales list container with both possible selectors
-    const listContainer = document.querySelector('[data-debug="sales-list"]') || document.querySelector('[data-panel="list"]')
+    // Check for sales list container - use the actual panel selector
+    const listContainer = document.querySelector('[data-panel="list"]')
     if (!listContainer) {
-      console.error('[DOM] no [data-debug="sales-list"] or [data-panel="list"] found - sales list container missing')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DOM][LIST] MISSING container (BUG)')
+        console.error('[DOM] no [data-panel="list"] found - sales list container missing')
+      }
       return
     }
     
-    const els = document.querySelectorAll('[data-sale-id]')
-    console.log('[DOM] nodes in panel =', els.length, ' expected =', visiblePinIdsState.length)
-    console.log('[DOM] list container found:', !!listContainer, 'visible pins:', visiblePinIdsState.length)
+    // Use descendant query for structure-proof counting
+    const cardsInPanel = listContainer.querySelectorAll('[data-card="sale"]').length
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[DOM][LIST] cards in panel=${cardsInPanel} expected=${visiblePinIdsState.length}`)
+    }
     
-    els.forEach((el) => {
-      const rect = (el as HTMLElement).getBoundingClientRect()
-      console.log('[DOM] node rect h=', rect.height)
-    })
   }, [arbiter.authority, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west, visiblePinIdsState.length])
 
   // Approximate radius (km) from Mapbox zoom level at mid-latitudes
@@ -841,6 +918,28 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       limit: 24,
       offset: append ? sales.length : 0,
     }
+    
+    // Debug list payload
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const listPayload = {
+        lat: useLat,
+        lng: useLng,
+        distanceKm: distanceKmForRequest ?? milesToKm(filters.distance),
+        city: filters.city,
+        categories: filters.categories.length > 0 ? filters.categories : undefined,
+        dateFrom,
+        dateTo,
+        limit: 24,
+        offset: append ? sales.length : 0
+      }
+      console.log('[FILTER DEBUG] listPayload =', listPayload)
+      
+      // Assertion: if categories are selected, ensure they're in the payload
+      if (filters.categories.length > 0 && !listPayload.categories) {
+        console.error('[FILTER DEBUG] ERROR: Categories selected but not included in list payload!')
+      }
+    }
+    
     console.log('[SALES] fetch params:', { ...params, mode })
     console.debug('[SALES] center', useLat, useLng, 'dist', filters.distance, 'date', filters.dateRange)
 
@@ -861,6 +960,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       // HARD GUARD: Suppress wide /api/sales under MAP authority
       if (arbiter.authority === 'MAP') {
         console.log('[GUARD] Suppressed wide /api/sales under MAP authority')
+        
+        // Warning: Check if categories are present but list is suppressed
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' && filters.categories.length > 0) {
+          console.warn('[FILTER DEBUG] WARNING: Categories present but list fetch suppressed under MAP authority')
+          console.warn('[FILTER DEBUG] Ensure markers query includes same category filters')
+        }
         
         // Dev-only verification logging
         if (process.env.NEXT_PUBLIC_DEBUG === '1') {
@@ -899,6 +1004,33 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[NET] ok sales', { seq, mode: arbiter.authority, viewportSeq: viewportSeqRef.current })
       console.log(`[SALES] API response:`, data)
       console.debug('[SALES] results', data.data?.length || 0)
+      
+      // Debug response count
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] response.count =', data.count || data.data?.length || 0)
+        
+        // List container and ID parity checks
+        const listContainer = document.querySelector('[data-testid="sales-grid"]')
+        if (!listContainer) {
+          console.error('[LIST DEBUG] ERROR: Sales list container missing!')
+        } else {
+          console.log('[LIST DEBUG] Sales list container found')
+        }
+        
+        // Check ID parity between markers and list
+        const visibleIds = data.data?.slice(0, 5).map((sale: any) => sale.id) || []
+        const listIds = Array.from(document.querySelectorAll('[data-sale-id]')).map(el => el.getAttribute('data-sale-id'))
+        const sampleIdParity = visibleIds.reduce((acc: any, id: string) => {
+          acc[id] = listIds.includes(id)
+          return acc
+        }, {})
+        
+        console.log('[LIST DEBUG] ID parity check:', {
+          markersCount: data.data?.length || 0,
+          sampleIdParity,
+          listCount: listIds.length
+        })
+      }
       
       if (data.ok) {
         const newSales = data.data || []
@@ -953,7 +1085,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                 }
               }
             })
-            .catch(() => {})
+            .catch((error) => {
+              console.warn('Sales fetch error:', error)
+            })
         }
       } else {
         console.error('Sales API error:', data.error)
@@ -1038,6 +1172,14 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
     
     try {
       console.log('[MAP] fetchMapSales called with filters:', filters, 'centerOverride:', centerOverride)
+      
+      // Debug category filter flow
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] selectedCategories =', filters.categories)
+        console.log('[FILTER DEBUG] arbiter.authority =', arbiter.authority)
+        console.log('[FILTER DEBUG] suppressed =', arbiter.authority === 'MAP' ? 'false (markers allowed)' : 'true (list suppressed)')
+      }
+      
       // Resolve dateRange preset to concrete dates
       console.log('[MAP] Resolving dateRange:', filters.dateRange)
       const resolvedDates = resolveDatePreset(filters.dateRange)
@@ -1061,14 +1203,44 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       // distanceKm depends on control mode
       const distanceKm = String(distanceKmForRequest ?? milesToKm(filters.distance))
       params.set('distanceKm', distanceKm)
-      if (filters.categories.length > 0) params.set('categories', filters.categories.join(','))
+      // Always include categories parameter for consistency
+      params.set('categories', filters.categories.join(','))
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[NET][markers] mode=${mode} cats=${filters.categories.join(',')}`)
+      }
       if (dateFrom) params.set('from', dateFrom)
       if (dateTo) params.set('to', dateTo)
       params.set('limit', '1000')
       
+      // Debug markers payload
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const markersPayload = {
+          lat: useLat,
+          lng: useLng,
+          distanceKm: distanceKm,
+          categories: filters.categories,
+          from: dateFrom,
+          to: dateTo,
+          limit: '1000'
+        }
+        console.log('[FILTER DEBUG] markersPayload =', markersPayload)
+        
+        // Assertion: if categories are selected, ensure they're in the markers payload
+        if (filters.categories.length > 0 && (!markersPayload.categories || markersPayload.categories.length === 0)) {
+          console.error('[FILTER DEBUG] ERROR: Categories selected but not included in markers payload!')
+        }
+      }
+      
 
       console.log('[MAP] Fetching markers from:', `/api/sales/markers?${params.toString()}`, { mode })
       console.log('[MAP] Date parameters being sent:', { from: dateFrom, to: dateTo, dateRange: filters.dateRange })
+      
+      // Debug: Verify categories are included in the markers request
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const categoriesParam = params.get('categories')
+        console.log('[FILTER DEBUG] Markers request categories param:', categoriesParam)
+        console.log('[FILTER DEBUG] Markers request full URL:', `/api/sales/markers?${params.toString()}`)
+      }
       
       // Test with a hardcoded date to verify the pipeline works
       if (filters.dateRange === 'any') {
@@ -1107,6 +1279,11 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       console.log('[NET] ok markers', { seq })
       console.log('[MAP] Markers response:', data)
       console.debug('[MARKERS] markers', data?.data ? data.data.length : 0)
+      
+      // Debug response count
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] response.count =', data.count || data.data?.length || 0)
+      }
       if (data?.ok && Array.isArray(data.data)) {
         // Normalize id to a stable value (prefer saleId if present), then deduplicate
         const normalized = data.data.map((m: any) => {
@@ -1122,11 +1299,31 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         setMapMarkers(uniqueMarkers)
         setMapError(null) // Clear any previous errors
         setMapUpdating(false) // Reset map updating state
+        
+        // Update markers hash for change detection
+        const newMarkersHash = uniqueMarkers.map((m: any) => m.id).sort().join(',')
+        const markersChanged = markersHashRef.current !== newMarkersHash
+        markersHashRef.current = newMarkersHash
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' && markersChanged) {
+          console.log(`[MAP][MARKERS] changed size=${uniqueMarkers.length}`)
+        }
+        
         console.debug('[MARKERS] got', uniqueMarkers.length)
       } else {
         console.log('[MAP] Setting mapMarkers to empty array')
         setMapMarkers([])
         setMapUpdating(false) // Reset map updating state
+        
+        // Update markers hash for change detection
+        const newMarkersHash = ''
+        const markersChanged = markersHashRef.current !== newMarkersHash
+        markersHashRef.current = newMarkersHash
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' && markersChanged) {
+          console.log(`[MAP][MARKERS] changed size=0`)
+        }
+        
         console.debug('[MARKERS] got', 0)
       }
     } catch (error: any) {
@@ -1138,6 +1335,15 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
       setMapMarkers([])
       setMapError('Failed to load map markers')
       setMapUpdating(false) // Reset map updating state
+      
+      // Update markers hash for change detection
+      const newMarkersHash = ''
+      const markersChanged = markersHashRef.current !== newMarkersHash
+      markersHashRef.current = newMarkersHash
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true' && markersChanged) {
+        console.log(`[MAP][MARKERS] changed size=0 (error)`)
+      }
       // Clear error after 3 seconds
       setTimeout(() => setMapError(null), 3000)
     } finally {
@@ -1190,7 +1396,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               if (pref.data.length < 24) setHasMore(false)
             }
           })
-          .catch(() => {})
+          .catch((error) => {
+            console.warn('Markers fetch error:', error)
+          })
       }
       return
     }
@@ -1230,11 +1438,79 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   const triggerFetches = useCallback(() => {
     console.log('[TRIGGER] triggerFetches called - DEPLOYMENT TEST')
     
-    // For MAP authority, trigger markers fetch immediately (no debounce)
-    // For other authority, use debounced trigger
+    // Category change detection
+    const currentCategoriesKey = createCategoriesKey(filters.categories)
+    const categoriesChanged = prevCategoriesKeyRef.current !== currentCategoriesKey
+    
+    if (DEBUG && categoriesChanged) {
+      console.log(`[FILTERS] cats norm prev=${prevCategoriesKeyRef.current} next=${currentCategoriesKey} changed=true`)
+    }
+    
+    // Bump sequence on category changes to force UI updates
+    if (categoriesChanged) {
+      listStoreSeqRef.current += 1
+      if (DEBUG) {
+        console.log(`[LIST][CATEGORY] seq bumped to ${listStoreSeqRef.current} due to category change`)
+      }
+    }
+    
+    prevCategoriesKeyRef.current = currentCategoriesKey
+    
+    // For MAP authority, check if we can suppress list fetch
     if (arbiter.authority === 'MAP') {
+      // Build the filter sets that would be used for list and markers
+      const listFilters = normalizeFilters({
+        categories: filters.categories,
+        city: filters.city,
+        dateRange: filters.dateRange
+      })
+      
+      const markersFilters = normalizeFilters({
+        categories: filters.categories,
+        city: filters.city,
+        dateRange: filters.dateRange
+      })
+      
+      // Check if filters are identical
+      const equalFilters = filtersEqual(listFilters, markersFilters)
+      
+      // Split decisions: network vs UI updates
+      const shouldSkipNetwork = equalFilters && !categoriesChanged
+      const shouldUpdateUI = categoriesChanged || !equalFilters
+      
+      if (DEBUG) {
+        console.log(`[ARB] evaluate mapAuth=true shouldSkipNetwork=${shouldSkipNetwork} shouldUpdateUI=${shouldUpdateUI}`)
+      }
+      
+      // Debug suppression decision
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] normalizedFilters =', { categories: listFilters.categories })
+        console.log('[FILTER DEBUG] suppression_decision =', {
+          authority: arbiter.authority,
+          equalFilters,
+          suppressed: shouldSkipNetwork,
+          listFilters,
+          markersFilters
+        })
+      }
+      
       console.log('[NET] start markers {seq: 1} (MAP authority)')
       fetchMapSales()
+      
+      // Only suppress network fetch if filters are identical and no category change
+      if (shouldSkipNetwork) {
+        console.log('[FILTER DEBUG] Suppressing list fetch - markers include identical filters')
+      } else {
+        console.log('[FILTER DEBUG] Allowing list fetch - filters differ or categories changed')
+        // Don't suppress when categories are present unless we're certain filters are identical
+        return // Exit early to allow list fetch
+      }
+      
+      // Warning: Check if categories are present but list is suppressed under MAP authority
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true' && filters.categories.length > 0) {
+        console.warn('[FILTER DEBUG] WARNING: Categories present but list fetch suppressed under MAP authority')
+        console.warn('[FILTER DEBUG] Ensure markers query includes same category filters')
+      }
     } else {
       debouncedTrigger(() => {
         console.log('[NET] start sales {seq: 1, mode: \'FILTERS\'}')
@@ -1242,7 +1518,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         fetchMapSales()
       })
     }
-  }, [debouncedTrigger, fetchSales, fetchMapSales, arbiter.authority])
+  }, [debouncedTrigger, fetchSales, fetchMapSales, arbiter.authority, filters.categories, filters.city, filters.dateRange])
 
   // Debounced visible list recompute
 
@@ -1370,8 +1646,8 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
   useEffect(() => {
     // Defer crop until we have real bounds; avoid cropping against null/old bounds
     if (!viewportBounds) return
-    const now = Date.now()
-    const last = lastBoundsTsRef.current || 0
+    const _now = Date.now()
+    const _last = lastBoundsTsRef.current || 0
     // Visibility is now handled by the main useEffect
   }, [sales, viewportBounds?.north, viewportBounds?.south, viewportBounds?.east, viewportBounds?.west])
 
@@ -1445,7 +1721,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
               setLastLocSource('cookie')
               return
             }
-          } catch {}
+          } catch (error) {
+            console.warn('Location cookie parse error:', error)
+          }
         }
         // 3) server endpoint
         const res = await fetch('/api/location', { cache: 'no-store' })
@@ -1462,7 +1740,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
             setLastLocSource(loc.source || 'headers')
           }
         }
-      } catch {}
+      } catch (error) {
+        console.warn('Location initialization error:', error)
+      }
     }
     tryInit()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1481,7 +1761,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         categories: filters.categories
       }
       sessionStorage.setItem('la_session_filters', JSON.stringify(toStore))
-    } catch {}
+    } catch (error) {
+      console.warn('Session storage error:', error)
+    }
   }, [filters.lat, filters.lng, filters.city, filters.distance, filters.dateRange, filters.categories])
 
   // Geolocation prompt removed by design; no client location requests
@@ -1595,7 +1877,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
         categories: filters.categories
       }
       sessionStorage.setItem('la_session_filters', JSON.stringify(sessionData))
-    } catch {}
+    } catch (error) {
+      console.warn('Session storage error:', error)
+    }
 
     // Remove old map centering logic - now using fitBounds instead
     // The fitBounds will be handled by the map component and onFitBoundsComplete
@@ -1732,7 +2016,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                 {/* Sales list grid container - single source of truth */}
                 <div
                   ref={gridContainerRef}
-                  className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${
+                  className={`w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${
                     arbiter.authority === 'MAP' 
                       ? (mapUpdating ? 'opacity-50' : 'opacity-100')
                       : (loading ? 'opacity-75' : 'opacity-100')
@@ -1746,9 +2030,10 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     } : {})
                   }}
                   data-testid="sales-grid"
+                  data-panel="list"
                   {...(process.env.NEXT_PUBLIC_DEBUG === 'true' && { 'data-grid-debug': 'true' })}
-                  // Avoid re-keying container in MAP to prevent unmounts before effects run
-                  key={arbiter.authority==='MAP' ? 'map-stable' : 'filters'}
+                  // Always use stable key to prevent unmounting
+                  key="sales-list-stable"
                 >
                   {/* Debug overlay - only in development with NEXT_PUBLIC_DEBUG */}
                   {process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEBUG === 'true' && (
@@ -1788,7 +2073,7 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                             // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
                             const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
                             
-                            return finalItemsToRender.map((item: any, idx: number) => (
+                            return finalItemsToRender.map((item: any, _idx: number) => (
                               <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
                             ))
                           })()}
@@ -1820,11 +2105,12 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                           {visibleSales.length > 24 && (
                             <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
                           )}
-                          {(isUpdating ? staleSales : renderedSales).map((item: any, idx: number) => (
-                            (console.log('[DOM] list item rendered id=', item.id),
-                              <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
-                            )
-                          ))}
+                          {(isUpdating ? staleSales : renderedSales).map((item: any, _idx: number) => {
+                            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                              console.log('[DOM] list item rendered id=', item.id)
+                            }
+                            return <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                          })}
                         </>
                       )}
                     </>
@@ -1931,15 +2217,21 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                   onMapReady={onMapReady}
                   onVisiblePinsChange={(visibleIds, count) => {
                     const seq = viewportSeqRef.current
-                    console.log(`[LIST] visible pins seq=${seq} count=${count} ids=[${visibleIds.join(',')}]`)
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log(`[LIST] visible pins seq=${seq} count=${count} ids=[${visibleIds.join(',')}]`)
+                    }
                     
                     // Circuit breaker: only update if visible pins actually changed
                     const newVisibleIds = visibleIds.map(String)
                     const currentVisibleIds = visiblePinIdsState
                     
-                    if (newVisibleIds.length === currentVisibleIds.length && 
-                        newVisibleIds.every(id => currentVisibleIds.includes(id))) {
-                      console.log('[LIST] visible pins unchanged - skipping update to prevent loop')
+                    // Use hash-based change detection instead of length-only check
+                    const newIdsHash = newVisibleIds.sort().join(',')
+                    const currentIdsHash = currentVisibleIds.sort().join(',')
+                    if (newIdsHash === currentIdsHash) {
+                      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                        console.log('[LIST] visible pins unchanged - skipping update to prevent loop')
+                      }
                       return
                     }
                     
@@ -1989,7 +2281,9 @@ export default function SalesClient({ initialSales, initialSearchParams, initial
                     try {
                       const saved = JSON.parse(localStorage.getItem('lootaura_last_location') || '{}')
                       localStorage.setItem('lootaura_last_location', JSON.stringify({ ...saved, lat: center.lat, lng: center.lng }))
-                    } catch {}
+                    } catch (error) {
+                      console.warn('Local storage error:', error)
+                    }
                   }}
                   onMoveEnd={() => {
                     // Clear guard after user interaction completes

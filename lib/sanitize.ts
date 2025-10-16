@@ -147,7 +147,7 @@ export function sanitizeAddress(input: string): string {
   if (!input || typeof input !== 'string') return ''
 
   // Remove HTML tags and normalize
-  let sanitized = input
+  const sanitized = input
     .replace(/<[^>]*>/g, '')
     .replace(/\s+/g, ' ')
     .trim()

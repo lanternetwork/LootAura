@@ -1,10 +1,27 @@
-# YardSaleFinder - Complete Implementation Plan
+# LootAura - Complete Implementation Plan
+
+**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
 
 ## 🎯 Project Summary
-A production-grade mobile-first web app for browsing, mapping, posting, and planning yard/garage/estate sales with robust scraping, offline PWA capabilities, and cost-effective operation.
+A production-grade mobile-first web app for browsing, mapping, posting, and planning yard/garage/estate sales with robust scraping, offline PWA capabilities, and cost-effective operation. Built with enterprise-grade architecture featuring map-centric source of truth, arbiter logic, and comprehensive CI/CD pipeline.
 
 ## 🏗️ Enterprise Grid System
 **Status**: ✅ **COMPLETED** - Map + Filter Sync Milestone
+
+## 🔧 Category Filter Regression Fix
+**Status**: ✅ **COMPLETED** - Phase 0: Filters Regression Fix
+
+### Root Cause Analysis
+- **Issue**: Category filters returning zero results due to missing database column and inconsistent parameter parsing
+- **Solution**: Database migration, canonical parameter parsing, and authority-aware suppression
+- **Authority**: MAP authority suppresses list only when markers include identical filters
+
+### Implementation Details
+- **Database Schema**: Applied migration `035_fix_items_v2_category.sql` to expose category column in `items_v2` view
+- **Parameter Format**: Canonical CSV format (`?categories=tools,furniture`) with server-side normalization
+- **Suppression Logic**: List fetch suppressed only when markers carry identical filter set
+- **Predicate Semantics**: OR semantics using `category = ANY($1)` for single-valued category column
+- **Normalization**: Sorted, deduplicated arrays for consistent equality checks
 
 ### Root Cause Analysis
 - **Issue**: Sales list rendered as single column due to conflicting CSS and wrapper divs
@@ -71,7 +88,7 @@ A production-grade mobile-first web app for browsing, mapping, posting, and plan
 - ✅ `components/SalesList.tsx` - Sales list container
 - ✅ `components/SaleCard.tsx` - Individual sale card
 - ✅ `components/EmptyState.tsx` - Empty state component
-- ✅ `components/YardSaleMap.tsx` - Google Maps integration
+- ✅ `components/YardSaleMap.tsx` - Mapbox integration
 - ✅ `components/AddSaleForm.tsx` - Add sale form with Places API
 - ✅ `components/FavoriteButton.tsx` - Favorite toggle component
 - ✅ `components/UserProfile.tsx` - User profile management
@@ -122,8 +139,8 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 SUPABASE_SERVICE_ROLE=your_supabase_service_role_key_here
 
-# Google Maps API
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+# Mapbox API
+NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
 
 # Optional: Nominatim for free geocoding fallback
 NOMINATIM_APP_EMAIL=optional@email.tld
@@ -178,7 +195,7 @@ npm run format
 - **Landing Page**: Hero section with search and CTAs
 - **Explore Page**: Tabs for List, Map, Add, Find More
 - **Search & Filters**: Advanced filtering with categories, distance, dates, prices
-- **Map Integration**: Google Maps with markers, info windows, geolocation
+- **Map Integration**: Mapbox with markers, info windows, geolocation
 - **Add Sale Form**: Complete form with Places API, image upload, validation
 - **Sale Details**: Individual sale pages with map and contact info
 - **Favorites**: Save and manage favorite sales
@@ -348,14 +365,14 @@ npm run format
 
 ### MILESTONE 7 — Cost Optimization Review ✅
 - [x] Verify geocode only on WRITE; no reverse-geocode on read paths
-- [x] Google Maps dynamically imported only on map pages
+- [x] Mapbox dynamically imported only on map pages
 - [x] Confirm images compressed/cached; Supabase storage rules enforced
 - [x] Re-check DB indexes with EXPLAIN
 - [x] Add plan.md section estimating monthly costs
 
 **What changed:**
 - Created comprehensive cost optimization documentation (`docs/COST_OPTIMIZATION.md`)
-- Added dynamic imports for Google Maps components
+- Added dynamic imports for Mapbox components
 - Verified geocoding optimization (only on write operations)
 - Confirmed image optimization with Next.js Image and Supabase CDN
 - Added monthly cost estimates for different user scales
@@ -419,7 +436,7 @@ npm run format
 # Public (safe to expose to client)
 NEXT_PUBLIC_SUPABASE_URL=https://bbsxwwjgqucddgcfwvbl.supabase.co/
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBoSYlvSHgebFXtRZm9y9qPzV32cY36a4c
+NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
 
 # Server-only (never expose to client)
 SUPABASE_SERVICE_ROLE=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -679,7 +696,7 @@ npm run smoke:scrape
 | DB insert blocked | RLS policy issues | Check Supabase RLS policies for yard_sales table |
 | Timeout errors | Network issues | Increase timeout values in API proxy |
 | Empty results | Parser regex mismatch | Update regex patterns in parseCraigslistList |
-| Geocoding failures | API key issues | Check Google Maps API key configuration |
+| Geocoding failures | API key issues | Check Nominatim configuration |
 
 ### Performance Optimizations
 - **Rate Limiting**: 500-1500ms delay between requests
@@ -703,7 +720,7 @@ Comprehensive end-to-end verification of the "Add a Sale" user flow including au
 ### What We Verified
 - **Authentication Flow**: User can access Add Sale form when authenticated
 - **Form Validation**: Required fields validated with proper error messages
-- **Geocoding Integration**: Google Places primary, Nominatim fallback with write-time only policy
+- **Geocoding Integration**: Nominatim geocoding with write-time only policy
 - **Database Operations**: Supabase insert with proper owner_id and RLS policies
 - **UI Rendering**: New sales appear immediately in List and Map tabs
 - **Details Page**: Correct field display and "Get Directions" functionality
@@ -719,7 +736,7 @@ Comprehensive end-to-end verification of the "Add a Sale" user flow including au
 
 ### Files Added/Modified
 - **Test Fixtures**: `tests/fixtures/addresses.json` - Address test data
-- **Mock Utilities**: `tests/utils/mocks.ts` - Google Maps, Nominatim, and Supabase mocks
+- **Mock Utilities**: `tests/utils/mocks.ts` - Nominatim and Supabase mocks
 - **Unit Tests**: Validation and geocoding fallback tests
 - **Integration Tests**: Database operations and map rendering tests
 - **E2E Tests**: Complete user journey tests with screenshots
@@ -738,12 +755,12 @@ Comprehensive end-to-end verification of the "Add a Sale" user flow including au
 ### Troubleshooting Guide
 | Issue | Root Cause | Fix |
 |-------|------------|-----|
-| Places doesn't load | Missing API key or libraries | Check `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` + libraries |
+| Places doesn't load | Missing API key or libraries | Check Nominatim configuration |
 | RLS permission error | Owner_id not set or policy issue | Check owner_id assignment + RLS policies |
 | Marker not on map | Missing lat/lng or lazy-load issue | Verify geocoding success + map initialization |
 | Nominatim blocked | Missing email or rate limit | Set `NOMINATIM_APP_EMAIL` + implement backoff |
 | Form validation fails | Zod schema mismatch | Check field names and types in SaleSchema |
-| Geocoding fails | API key issues or network | Check Google Maps API key + fallback to Nominatim |
+| Geocoding fails | API key issues or network | Check Nominatim configuration |
 
 ### Performance Optimizations
 - **Geocoding Caching**: Results cached to avoid repeated API calls
@@ -761,7 +778,7 @@ Comprehensive end-to-end verification of the "Add a Sale" user flow including au
 
 ### Diagnostic Features
 - **Development Logging**: Structured logs with component context
-- **Geocoding Path Tracking**: Logs which geocoder was used (Google vs Nominatim)
+- **Geocoding Path Tracking**: Logs which geocoder was used (Nominatim)
 - **Map Rendering Stats**: Logs marker count and bounds information
 - **Sale Creation Tracking**: Logs successful creation with coordinates status
 
@@ -773,7 +790,7 @@ YardSaleFinder is **95% production-ready** with all core features implemented, c
 ### Key Findings
 - **Repository State**: ✅ Consolidated on `main` branch with proper CI/CD
 - **Code Quality**: ✅ All tests passing, TypeScript strict mode, comprehensive test coverage
-- **Infrastructure**: ✅ Supabase integration verified, Google Maps configured, Vercel deployment ready
+- **Infrastructure**: ✅ Supabase integration verified, Mapbox configured, Vercel deployment ready
 - **Security**: ✅ RLS policies, rate limiting, CSP headers, input validation
 - **Performance**: ✅ Optimized queries, image optimization, caching strategies
 - **Testing**: ✅ Unit, integration, E2E, and accessibility tests complete
@@ -816,9 +833,94 @@ Canonical domain set to `https://lootaura.com` across environment configuration 
 - NEXT_PUBLIC_SITE_URL set to `https://lootaura.com`
 - Vercel configured with custom domain `lootaura.com` (see deployment steps)
 - Supabase Auth redirect URLs include `https://lootaura.com/*`
-- Google Maps API key HTTP referrers include `https://lootaura.com/*`
+- Mapbox token configured for `https://lootaura.com/*`
 - SEO metadata, sitemap, and structured data use `https://lootaura.com` as canonical
 
 ### Notes
-- No secrets committed; Supabase URLs and Google endpoints unchanged
+- No secrets committed; Supabase URLs unchanged
 - Environment validation continues to enforce proper URL format
+
+## 🔐 Auth + Profile Milestone (In Progress)
+
+### Scope
+- **Providers**: Email only (no social providers)
+- **Storage**: `profiles` table keyed by `auth.users(id)` with strict RLS
+- **Performance**: Auth/profile DB p95 ≤ 50ms, initial sales p95 ≤ 300ms
+- **Security**: Self-read/self-write only; no public reads by default
+
+### Architecture
+- **Auth Client/Server Boundaries**: Supabase Auth for session management
+- **Session Handling**: Server-side session validation with RLS policies
+- **Route Gating**: Protected routes require authentication
+- **Profile Model**: `profiles(user_id PK → auth.users(id), display_name, avatar_url, timestamps)`
+
+### RLS Policy Intent
+- **Read**: Users can only read their own profile row
+- **Write**: Users can only insert/update their own profile row
+- **Public Access**: No public reads by default (privacy-first)
+
+### Performance Budgets
+- **Auth/Profile Operations**: p95 ≤ 50ms database response
+- **Initial Sales Load**: p95 ≤ 300ms database response
+- **Bundle Growth**: ≤ +5KB gzip (no new dependencies without approval)
+
+### Index Strategy
+- **Primary**: `profiles.user_id` (already indexed as PK)
+- **Future**: Defer heavy new indexes for sales until proposal approved
+- **Monitoring**: Document query performance and propose optimizations
+
+### Enterprise Development Process
+- **CI/CD Pipeline**: Automated testing, type checking, and deployment gates
+- **Stability Contracts**: Comprehensive test suite under `tests/stability/`
+- **Environment Configuration**: Strict environment variable validation
+- **Security Compliance**: OWASP Top 10, dependency scanning, CI security audit
+
+### Implementation Tasks
+- [ ] Verify email sign-in end-to-end flow
+- [ ] Verify Email auth (magic link/OTP) with proper error handling
+- [ ] Implement idempotent profile creation on first login
+- [ ] Add route gating with consistent navbar/session state
+- [ ] Add comprehensive test coverage for auth flows
+- [ ] Implement debug diagnostics (gated by NEXT_PUBLIC_DEBUG)
+- [ ] Document performance monitoring and index proposals
+
+### CI/CD Integration
+- **Unified Workflow**: Single `.github/workflows/ci.yml` with stable job names
+- **Required Checks**: ci/env-presence, ci/lint, ci/typecheck, ci/test-unit, ci/test-integration, ci/build
+- **Optional Checks**: ci/css-scan, ci/migration-verify
+- **Test Coverage**: Unit, integration, and E2E tests for all auth flows
+- **Security Gates**: RLS policy verification and authentication testing
+- **Performance Gates**: Auth operation timing and bundle size validation
+- **Deployment Gates**: Environment validation and health checks
+
+## Grid Invariants
+- **Container Structure**: List container always present with `data-panel="list"`
+- **Direct Children**: Cards are direct children of grid container
+- **Grid Classes**: Applied to container, not intermediate wrappers
+- **Ancestor Requirements**: Ancestor must have `min-w-0` to prevent overflow
+- **No Wrappers**: No intermediate divs between grid and cards
+
+## Filter Canonicalization
+- **Parameter Key**: `categories` (CSV on URL; array in code)
+- **Legacy Support**: `cat` accepted read-only; never emitted
+- **Normalization**: All arrays sorted + deduplicated before comparison
+- **Consistency**: Same parameter names in markers and list requests
+
+## Suppression Equality
+- **MAP Authority**: Suppress `/api/sales` only if markers include identical normalized filter set
+- **Filter Change**: Any filter change prevents suppression
+- **Empty Handling**: "Empty == empty" must NOT hide user-initiated filter updates
+- **Equality Check**: Deep comparison of normalized filter objects
+
+## DB Predicate Choice
+- **Single Category**: `category = ANY($1::text[])` for TEXT/ENUM columns
+- **Array Category**: `categories && $1::text[]` for TEXT[] columns with GIN index
+- **Schema Match**: Use predicate that matches actual schema
+- **Consistency**: Same predicate for both markers and list endpoints
+
+## Performance Budgets
+- **Auth/Profile Operations**: p95 ≤ 50ms database response
+- **Visible Sales Load**: p95 ≤ 300ms database response
+- **Category Filtering**: p95 ≤ 200ms database response
+- **Map Render**: < 700ms client-side rendering
+- **List Update**: < 300ms DOM updates

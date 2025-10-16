@@ -7,7 +7,7 @@ import { geocodeAddress } from '@/lib/geocode'
 export default function CSVImportExport() {
   const { data: sales = [] } = useSales()
   const createSale = useCreateSale()
-  const [csvData, setCsvData] = useState('')
+  const [_csvData, setCsvData] = useState('')
   const [parsedData, setParsedData] = useState<CSVRow[]>([])
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
   const [importing, setImporting] = useState(false)

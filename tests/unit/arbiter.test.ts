@@ -47,7 +47,7 @@ describe('Arbiter Sequencing', () => {
       mode: 'map' as const
     }
     
-    const shouldSuppressWideFetch = arbiter.authority === 'MAP'
+    const shouldSuppressWideFetch = arbiter.authority === 'MAP' as any
     expect(shouldSuppressWideFetch).toBe(true)
   })
 
@@ -57,7 +57,7 @@ describe('Arbiter Sequencing', () => {
       mode: 'distance' as const
     }
     
-    const shouldSuppressWideFetch = arbiter.authority === 'MAP'
+    const shouldSuppressWideFetch = arbiter.authority === 'MAP' as any
     expect(shouldSuppressWideFetch).toBe(false)
   })
 })

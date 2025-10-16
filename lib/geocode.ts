@@ -24,16 +24,7 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
   }
 
   try {
-    // Try Google Geocoding API first
-    if (process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
-      const result = await geocodeWithGoogle(address)
-      if (result) {
-        geocodeCache.set(address.toLowerCase(), result)
-        return result
-      }
-    }
-
-    // Fallback to Nominatim (free)
+    // Use Nominatim for geocoding
     const result = await geocodeWithNominatim(address)
     if (result) {
       geocodeCache.set(address.toLowerCase(), result)
@@ -47,38 +38,6 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
   }
 }
 
-async function geocodeWithGoogle(address: string): Promise<GeocodeResult | null> {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-  if (!apiKey) return null
-
-  const response = await fetch(
-    `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
-  )
-  
-  const data = await response.json()
-  
-  if (data.results && data.results.length > 0) {
-    const result = data.results[0]
-    const location = result.geometry.location
-    
-    // Extract address components
-    const components = result.address_components || []
-    const city = components.find((c: any) => c.types.includes('locality'))?.long_name
-    const state = components.find((c: any) => c.types.includes('administrative_area_level_1'))?.short_name
-    const zip = components.find((c: any) => c.types.includes('postal_code'))?.long_name
-
-    return {
-      lat: location.lat,
-      lng: location.lng,
-      formatted_address: result.formatted_address,
-      city,
-      state,
-      zip
-    }
-  }
-
-  return null
-}
 
 async function geocodeWithNominatim(address: string): Promise<GeocodeResult | null> {
   const email = process.env.NOMINATIM_APP_EMAIL || 'noreply@yardsalefinder.com'

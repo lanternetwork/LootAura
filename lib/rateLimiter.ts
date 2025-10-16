@@ -54,7 +54,7 @@ export class RateLimiter {
     }
   }
 
-  private async checkLimitRedis(key: string, now: number, windowStart: number): Promise<RateLimitResult> {
+  private async checkLimitRedis(key: string, now: number, _windowStart: number): Promise<RateLimitResult> {
     try {
       // Get current count
       const currentCount = await redis!.get(key) || 0
@@ -100,7 +100,7 @@ export class RateLimiter {
     }
   }
 
-  private checkLimitMemory(key: string, now: number, windowStart: number): RateLimitResult {
+  private checkLimitMemory(key: string, now: number, _windowStart: number): RateLimitResult {
     const entry = memoryStore.get(key)
     
     if (!entry || entry.resetTime < now) {

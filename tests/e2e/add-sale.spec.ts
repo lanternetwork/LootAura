@@ -27,7 +27,7 @@ test.describe('Add Sale E2E Flow', () => {
           body: JSON.stringify({
             id: 'sale-123',
             title: 'Neighborhood Sale',
-            address: '1600 Amphitheatre Parkway, Mountain View, CA',
+            address: '123 Test Street, Louisville, KY',
             lat: 37.422,
             lng: -122.084,
             owner_id: 'test-user-id',
@@ -45,7 +45,7 @@ test.describe('Add Sale E2E Flow', () => {
             {
               id: 'sale-123',
               title: 'Neighborhood Sale',
-              address: '1600 Amphitheatre Parkway, Mountain View, CA',
+              address: '123 Test Street, Louisville, KY',
               lat: 37.422,
               lng: -122.084,
               owner_id: 'test-user-id',
@@ -58,142 +58,7 @@ test.describe('Add Sale E2E Flow', () => {
       }
     })
 
-    // Mock Google Maps API
-    await page.route('**/maps.googleapis.com/maps/api/**', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          results: [{
-            geometry: {
-              location: {
-                lat: 37.422,
-                lng: -122.084
-              }
-            },
-            formatted_address: '1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA',
-            address_components: [
-              { long_name: 'Mountain View', types: ['locality'] },
-              { short_name: 'CA', types: ['administrative_area_level_1'] },
-              { long_name: '94043', types: ['postal_code'] }
-            ]
-          }]
-        })
-      })
-    })
 
-    // Mock Google Maps JS API
-    await page.addInitScript(() => {
-      (window as any).google = {
-        maps: {
-          places: {
-            Autocomplete: class MockAutocomplete {
-              input: HTMLInputElement
-              options: any
-              constructor(input: HTMLInputElement, options: any) {
-                this.input = input
-                this.options = options
-              }
-              
-              addListener(event: string, callback: Function) {
-                if (event === 'place_changed') {
-                  // Simulate place selection after typing
-                  this.input.addEventListener('input', () => {
-                    if (this.input.value.includes('Amphitheatre')) {
-                      setTimeout(() => callback(), 100)
-                    }
-                  })
-                }
-              }
-              
-              getPlace() {
-                if (this.input.value.includes('Amphitheatre')) {
-                  return {
-                    formatted_address: '1600 Amphitheatre Pkwy, Mountain View, CA 94043, USA',
-                    geometry: {
-                      location: {
-                        lat: () => 37.422,
-                        lng: () => -122.084
-                      }
-                    },
-                    address_components: [
-                      { long_name: 'Mountain View', types: ['locality'] },
-                      { short_name: 'CA', types: ['administrative_area_level_1'] },
-                      { long_name: '94043', types: ['postal_code'] }
-                    ]
-                  }
-                }
-                return { formatted_address: this.input.value, geometry: null }
-              }
-            }
-          },
-          Map: class MockMap {
-            constructor(container: HTMLElement, options: any) {
-              // Mock map initialization
-            }
-          },
-          Marker: class MockMarker {
-            constructor(options: any) {
-              // Mock marker creation
-            }
-            setMap(map: any) {
-              // Mock setMap
-            }
-            addListener(event: string, callback: Function) {
-              // Mock event listener
-            }
-            getPosition() {
-              return { lat: () => 37.422, lng: () => -122.084 }
-            }
-          },
-          InfoWindow: class MockInfoWindow {
-            constructor(options: any) {
-              // Mock info window
-            }
-            open(options: any) {
-              // Mock open
-            }
-            close() {
-              // Mock close
-            }
-          },
-          LatLngBounds: class MockLatLngBounds {
-            extend(position: any) {
-              // Mock extend
-            }
-            isEmpty() {
-              return false
-            }
-          },
-          LatLng: class MockLatLng {
-            constructor(public lat: number, public lng: number) {}
-          },
-          event: {
-            addListener: (map: any, event: string, callback: Function) => {
-              return { remove: () => {} }
-            },
-            removeListener: (listener: any) => {}
-          },
-          ControlPosition: {
-            TOP_LEFT: 'TOP_LEFT'
-          },
-          Size: class MockSize {
-            constructor(public width: number, public height: number) {}
-          }
-        }
-      }
-    })
-
-    // Mock Google Maps Loader
-    await page.addInitScript(() => {
-      (window as any).google = {
-        ...(window as any).google,
-        maps: {
-          ...(window as any).google?.maps,
-          // Add any additional mocks if needed
-        }
-      }
-    })
   })
 
   test('should complete full add sale flow', async ({ page }) => {
@@ -208,7 +73,7 @@ test.describe('Add Sale E2E Flow', () => {
     
     // Fill in the form
     await page.fill('input[name="title"]', 'Neighborhood Sale')
-    await page.fill('input[name="address"]', '1600 Amphitheatre Parkway, Mountain View, CA')
+    await page.fill('input[name="address"]', '123 Test Street, Louisville, KY')
     
     // Wait for address autocomplete to trigger
     await page.waitForTimeout(500)
@@ -242,7 +107,7 @@ test.describe('Add Sale E2E Flow', () => {
     
     // Verify the new sale appears in the list
     await expect(page.locator('text=Neighborhood Sale')).toBeVisible()
-    await expect(page.locator('text=1600 Amphitheatre Parkway, Mountain View, CA')).toBeVisible()
+    await expect(page.locator('text=123 Test Street, Louisville, KY')).toBeVisible()
     
     // Navigate to Map tab
     await page.click('text=Map')
@@ -261,7 +126,7 @@ test.describe('Add Sale E2E Flow', () => {
     
     // Verify details page shows correct information
     await expect(page.locator('h1:has-text("Neighborhood Sale")')).toBeVisible()
-    await expect(page.locator('text=1600 Amphitheatre Parkway, Mountain View, CA')).toBeVisible()
+    await expect(page.locator('text=123 Test Street, Louisville, KY')).toBeVisible()
     await expect(page.locator('text=Get Directions →')).toBeVisible()
     
     // Take screenshot for verification
@@ -281,13 +146,11 @@ test.describe('Add Sale E2E Flow', () => {
 
   test('should handle geocoding failure gracefully', async ({ page }) => {
     // Mock geocoding to fail
-    await page.route('**/maps.googleapis.com/maps/api/geocode/**', async (route) => {
+    await page.route('**/nominatim.openstreetmap.org/search**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          results: []
-        })
+        body: JSON.stringify([])
       })
     })
 

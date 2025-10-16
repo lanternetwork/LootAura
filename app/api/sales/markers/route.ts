@@ -1,6 +1,8 @@
+/* eslint-disable no-undef */
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
+import * as dateBounds from '@/lib/shared/dateBounds'
+import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -21,7 +23,8 @@ export async function GET(request: NextRequest) {
     const endDate = q.get('to') || q.get('dateTo') || q.get('endDate') || undefined
     
     const limitParam = q.get('limit')
-    const catsParam = q.get('categories') || q.get('tags') || ''
+    // Accept both canonical 'categories' and legacy 'cat' parameters
+    const catsParam = q.get('categories') || q.get('cat') || q.get('cats') || ''
 
     // Validate lat/lng
     const originLat = latParam !== null ? parseFloat(latParam) : NaN
@@ -32,16 +35,86 @@ export async function GET(request: NextRequest) {
     // Normalize distance (km)
     const distanceKm = Number.isFinite(parseFloat(String(distanceParam))) ? Math.max(0, parseFloat(String(distanceParam))) : 40
     const limit = Number.isFinite(parseFloat(String(limitParam))) ? Math.min(parseInt(String(limitParam), 10), 1000) : 1000
-    const categories = catsParam ? catsParam.split(',').map(s => s.trim()).filter(Boolean) : []
+    // Canonical parameter parsing - normalize to sorted, deduplicated array
+    const categories = normalizeCategories(catsParam)
+    const catsCsv = categories.join(',')
+    
+    // Use categories directly since they match the computed column values
+    const dbCategories = categories
+
+    // Debug server-side category processing
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[API][markers] cats received=${catsParam} norm=${catsCsv}`)
+    }
 
     const sb = createSupabaseServerClient()
 
-    // Fetch a slice with precisely the used columns from the public view
-    const { data, error } = await sb
+    // Build query with category filtering if categories are provided
+    let query = sb
       .from('sales_v2')
       .select('id, title, description, lat, lng, starts_at, ends_at, date_start, date_end, time_start, time_end')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
+
+    // Apply category filtering by joining with items table
+    if (categories.length > 0) {
+      console.log('[MARKERS API] Applying category filter:', categories)
+      
+      // Debug: Check if items_v2 table has category column
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTER DEBUG] Checking items_v2 table structure...')
+        const { data: tableInfo, error: tableError } = await sb
+          .from('items_v2')
+          .select('*')
+          .limit(1)
+        
+        if (tableError) {
+          console.error('[FILTER DEBUG] Error checking items_v2 table:', tableError)
+        } else {
+          console.log('[FILTER DEBUG] items_v2 sample row:', tableInfo?.[0])
+        }
+      }
+      
+      // Use a subquery approach to find sales that have items matching the categories
+      // Since category is a computed text column, use exact matching
+      const { data: salesWithCategories, error: categoryError } = await sb
+        .from('items_v2')
+        .select('sale_id')
+        .in('category', dbCategories)
+      
+      if (categoryError) {
+        console.error('[MARKERS API] Category filter error:', categoryError)
+        return NextResponse.json({
+          error: 'Category filter failed',
+          code: (categoryError as any)?.code,
+          details: (categoryError as any)?.message
+        }, { status: 500 })
+      }
+      
+      const saleIds = salesWithCategories?.map(item => item.sale_id) || []
+      console.log('[MARKERS API] Found sales with matching categories:', saleIds.length)
+      
+      // Debug server-side category filtering results
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[API][markers] cats norm=${catsCsv} where=in count=${saleIds.length}`)
+      }
+      
+      if (saleIds.length > 0) {
+        query = query.in('id', saleIds)
+      } else {
+        // No sales match the categories, return empty result
+        return NextResponse.json({
+          ok: true,
+          data: [],
+          center: { lat: originLat, lng: originLng },
+          distanceKm,
+          count: 0,
+          durationMs: Date.now() - startedAt
+        })
+      }
+    }
+
+    const { data, error } = await query
       .order('id', { ascending: true })
       .limit(Math.min(limit, 1000))
 
@@ -57,19 +130,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Validate date range parameters
-    const dateValidation = validateDateRange(startDate, endDate)
+    const dateValidation = dateBounds.validateDateRange(startDate, endDate)
     if (!dateValidation.valid) {
       return NextResponse.json({ error: dateValidation.error }, { status: 400 })
     }
 
     // Parse date bounds using shared helper
-    const dateBounds = parseDateBounds(startDate, endDate)
+    const dateWindow = dateBounds.parseDateBounds(startDate, endDate)
     
     // Debug logging for date filtering
     console.log('[MARKERS API] Date filtering debug:', {
       startDate,
       endDate,
-      dateBounds,
+      dateBounds: dateWindow,
       totalRecords: data?.length || 0,
       url: request.url,
       sampleSales: data?.slice(0, 3).map((s: any) => ({
@@ -120,7 +193,7 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
       .filter((sale: any) => {
         // Skip date filtering if no date bounds provided
-        if (!dateBounds) return true
+        if (!dateWindow) return true
         
         // Skip sales with no date information
         if (!sale.saleStart && !sale.saleEnd) {
@@ -131,14 +204,14 @@ export async function GET(request: NextRequest) {
           return false
         }
         
-        const overlaps = checkDateOverlap(sale.saleStart, sale.saleEnd, dateBounds)
+        const overlaps = dateBounds.checkDateOverlap(sale.saleStart, sale.saleEnd, dateWindow)
         if (!overlaps) {
           console.log('[MARKERS API] Sale filtered out by date:', {
             saleId: sale.id,
             title: sale.title,
             saleStart: sale.saleStart,
             saleEnd: sale.saleEnd,
-            dateBounds,
+            dateBounds: dateWindow,
             originalDateStart: sale.date_start,
             originalDateEnd: sale.date_end,
             originalTimeStart: sale.time_start,

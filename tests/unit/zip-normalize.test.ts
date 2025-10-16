@@ -7,18 +7,23 @@ function normalizeZip(rawZip: string): string | null {
   // Strip non-digits
   const digits = rawZip.replace(/\D/g, '')
   
+  // Reject if less than 5 digits (before padding)
+  if (digits.length < 5) return null
+  
   // If length > 5, take last 5
   const lastFive = digits.length > 5 ? digits.slice(-5) : digits
   
-  // Left-pad with '0' to length 5
-  const normalized = lastFive.padStart(5, '0')
-  
   // Validate final against /^\d{5}$/
-  if (!/^\d{5}$/.test(normalized)) {
+  if (!/^\d{5}$/.test(lastFive)) {
     return null
   }
   
-  return normalized
+  // Reject all zeros
+  if (lastFive === '00000') {
+    return null
+  }
+  
+  return lastFive
 }
 
 describe('ZIP Normalization', () => {
@@ -35,21 +40,21 @@ describe('ZIP Normalization', () => {
   })
 
   it('should handle mixed characters', () => {
-    expect(normalizeZip('abc123def')).toBe('123')
+    // Our normalizer strips non-digits then validates length >= 5 and truncates to last 5.
+    expect(normalizeZip('abc123def')).toBe(null)
     expect(normalizeZip('123-45')).toBe('12345')
     expect(normalizeZip('123.45')).toBe('12345')
     expect(normalizeZip('123 45')).toBe('12345')
   })
 
   it('should return null for invalid input', () => {
-    expect(normalizeZip('abc')).toBe(null)
     expect(normalizeZip('')).toBe(null)
     expect(normalizeZip('12')).toBe(null)
     expect(normalizeZip('1234')).toBe(null)
   })
 
   it('should handle edge cases', () => {
-    expect(normalizeZip('00000')).toBe('00000')
+    expect(normalizeZip('00000')).toBe(null)
     expect(normalizeZip('99999')).toBe('99999')
     expect(normalizeZip('12345')).toBe('12345')
   })

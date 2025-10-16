@@ -45,7 +45,11 @@ SELECT
     name,
     description,
     price,
-    image_url
+    category,
+    condition,
+    images,
+    is_sold,
+    updated_at
 FROM lootaura_v2.items;
 
 CREATE VIEW public.favorites_v2 AS

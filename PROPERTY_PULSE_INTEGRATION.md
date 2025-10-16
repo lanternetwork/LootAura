@@ -1,6 +1,28 @@
 # Property Pulse Integration
 
-This branch integrates the Property Pulse Next.js template while preserving the existing Yard Sale Tracker functionality.
+**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
+
+This branch integrates the Property Pulse Next.js template while preserving the existing LootAura functionality.
+
+## Isolation Policy and Compatibility Mode
+
+### Sandboxed Integration
+- **Isolation**: Property Pulse components run in isolated namespace
+- **No Conflicts**: Existing LootAura functionality remains unchanged
+- **Compatibility**: Both systems can coexist without interference
+- **Future Merge**: Integration plan documented for enterprise structure
+
+### External Template Registration
+- **Integration Rules**: All external templates must register through `docs/operating-handbook.md`
+- **Approval Process**: Template integration requires enterprise standards compliance
+- **Documentation**: Integration patterns documented for future templates
+- **Testing**: Comprehensive testing required for all integrations
+
+### Filter Integration Compliance
+- **Parameter Keys**: Must use canonical `categories` parameter (not legacy `cat`)
+- **Shared Predicates**: Must use same database predicates as main application
+- **Suppression Logic**: Must respect MAP authority suppression rules
+- **Debug Integration**: Must use `NEXT_PUBLIC_DEBUG` flag for all debug features
 
 ## Structure
 

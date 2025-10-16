@@ -29,13 +29,13 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     user = null
   }
 
-  // Parse search parameters
-  const lat = searchParams.lat ? parseFloat(searchParams.lat) : undefined
-  const lng = searchParams.lng ? parseFloat(searchParams.lng) : undefined
-  const distanceKm = searchParams.distanceKm ? parseFloat(searchParams.distanceKm) : 25
-  const city = searchParams.city
-  const categories = searchParams.categories ? searchParams.categories.split(',') : undefined
-  const pageSize = searchParams.pageSize ? parseInt(searchParams.pageSize) : 50
+  // Parse search parameters (for future use)
+  const _lat = searchParams.lat ? parseFloat(searchParams.lat) : undefined
+  const _lng = searchParams.lng ? parseFloat(searchParams.lng) : undefined
+  const _distanceKm = searchParams.distanceKm ? parseFloat(searchParams.distanceKm) : 25
+  const _city = searchParams.city
+  const _categories = searchParams.categories ? searchParams.categories.split(',') : undefined
+  const _pageSize = searchParams.pageSize ? parseInt(searchParams.pageSize) : 50
 
   // Resolve initial center server-side
   const cookieStore = cookies()
@@ -145,7 +145,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   }
 
   // Start with empty sales; client fetches immediately using initialCenter
-  let initialSales: any[] = []
+  const initialSales: any[] = []
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -162,7 +162,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   )
 }
 
-function SalesSkeleton() {
+function _SalesSkeleton() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="space-y-8">

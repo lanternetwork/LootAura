@@ -1,6 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
-import { Loader } from '@googlemaps/js-api-loader'
+import { useRef, useState, type KeyboardEvent, type FormEvent } from 'react'
 import { useCreateSale } from '@/lib/hooks/useSales'
 import { geocodeAddress } from '@/lib/geocode'
 import { SaleSchema } from '@/lib/zodSchemas'
@@ -17,48 +16,6 @@ export default function AddSaleForm() {
   const [tagInput, setTagInput] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
-      setError('Google Maps API key not configured')
-      return
-    }
-
-    const loader = new Loader({
-      apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-      libraries: ['places']
-    })
-
-    loader.load().then(() => {
-      if (!addressRef.current) return
-
-      const autocomplete = new (window as any).google.maps.places.Autocomplete(addressRef.current, {
-        fields: ['formatted_address', 'geometry', 'address_components']
-      })
-
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace()
-        const geometry = place.geometry?.location
-        
-        if (geometry) {
-          const lat = geometry.lat()
-          const lng = geometry.lng()
-          setCoords({ lat, lng })
-          setAddress(place.formatted_address || '')
-          
-          logger.info('Address geocoded via Google Places', {
-            component: 'AddSaleForm',
-            operation: 'geocode_places',
-            address: place.formatted_address,
-            lat,
-            lng
-          })
-        }
-      })
-    }).catch(err => {
-      console.error('Error loading Google Maps:', err)
-      setError('Failed to load address autocomplete')
-    })
-  }, [])
 
   // Handle manual address geocoding
   const handleAddressChange = async (value: string) => {
@@ -106,14 +63,14 @@ export default function AddSaleForm() {
     setTags(tags.filter(tag => tag !== tagToRemove))
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault()
       addTag()
     }
   }
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
 
@@ -168,7 +125,7 @@ export default function AddSaleForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form role="form" onSubmit={onSubmit} className="space-y-4">
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700">
           {error}
@@ -176,9 +133,11 @@ export default function AddSaleForm() {
       )}
       
       <div>
-        <label className="block text-sm font-medium mb-1">Sale Title *</label>
+        <label htmlFor="title" className="block text-sm font-medium mb-1">Sale Title *</label>
         <input 
+          id="title"
           name="title" 
+          type="text"
           required 
           placeholder="e.g., Estate Sale - Antiques & Collectibles" 
           className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
@@ -186,9 +145,11 @@ export default function AddSaleForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Address *</label>
+        <label htmlFor="address" className="block text-sm font-medium mb-1">Address *</label>
         <input 
+          id="address"
           name="address" 
+          type="text"
           ref={addressRef} 
           required
           value={address}
@@ -202,8 +163,9 @@ export default function AddSaleForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Description</label>
+        <label htmlFor="description" className="block text-sm font-medium mb-1">Description</label>
         <textarea 
+          id="description"
           name="description" 
           placeholder="Describe what you're selling..." 
           rows={3}
@@ -213,16 +175,18 @@ export default function AddSaleForm() {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Start Date & Time</label>
+          <label htmlFor="start_at" className="block text-sm font-medium mb-1">Start Date & Time</label>
           <input 
+            id="start_at"
             type="datetime-local" 
             name="start_at" 
             className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">End Date & Time</label>
+          <label htmlFor="end_at" className="block text-sm font-medium mb-1">End Date & Time</label>
           <input 
+            id="end_at"
             type="datetime-local" 
             name="end_at" 
             className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
@@ -232,8 +196,9 @@ export default function AddSaleForm() {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Min Price ($)</label>
+          <label htmlFor="price_min" className="block text-sm font-medium mb-1">Min Price ($)</label>
           <input 
+            id="price_min"
             type="number" 
             name="price_min" 
             min="0"
@@ -243,8 +208,9 @@ export default function AddSaleForm() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Max Price ($)</label>
+          <label htmlFor="price_max" className="block text-sm font-medium mb-1">Max Price ($)</label>
           <input 
+            id="price_max"
             type="number" 
             name="price_max" 
             min="0"
@@ -256,18 +222,22 @@ export default function AddSaleForm() {
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Contact Info</label>
+        <label htmlFor="contact" className="block text-sm font-medium mb-1">Contact Info</label>
         <input 
+          id="contact"
           name="contact" 
+          type="text"
           placeholder="Phone number or email" 
           className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Tags</label>
+        <label htmlFor="tags" className="block text-sm font-medium mb-2">Tags</label>
         <div className="flex gap-2 mb-2">
           <input 
+            id="tags"
+            type="text"
             value={tagInput}
             onChange={e => setTagInput(e.target.value)}
             onKeyPress={handleKeyPress}
@@ -287,11 +257,13 @@ export default function AddSaleForm() {
             {tags.map((tag, index) => (
               <span 
                 key={index}
+                data-testid="tag-item"
                 className="px-2 py-1 bg-amber-100 text-amber-800 rounded text-sm flex items-center gap-1"
               >
                 {tag}
                 <button 
                   type="button"
+                  data-testid="tag-remove"
                   onClick={() => removeTag(tag)}
                   className="text-amber-600 hover:text-amber-800"
                 >
@@ -308,6 +280,12 @@ export default function AddSaleForm() {
         maxImages={5}
         existingImages={photos}
       />
+
+      {error && (
+        <div role="alert" className="text-red-600 text-sm mb-4">
+          {error}
+        </div>
+      )}
 
       <button 
         type="submit"

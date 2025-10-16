@@ -1,0 +1,52 @@
+name: lockfile-sync-on-push
+
+on:
+  push:
+    branches:
+      - milestone/auth-profile
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[run-lockfile-sync]')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - run: |
+          node -v && npm -v
+          git rev-parse --abbrev-ref HEAD
+          git rev-parse HEAD
+
+      - name: Print eslint deps
+        run: |
+          node -e "const p=require('./package.json'); console.log({eslint:p.devDependencies?.eslint, eslintJs:p.devDependencies?.['@eslint/js'], tsESLint:p.devDependencies?.['@typescript-eslint/eslint-plugin'], testingLib:p.devDependencies?.['eslint-plugin-testing-library']});"
+
+      - name: Hard regenerate lockfile
+        run: |
+          rm -f package-lock.json
+          rm -rf node_modules
+          npm install --no-audit --no-fund
+          npm dedupe || true
+
+      - name: Commit & push if changed
+        run: |
+          if [ -n "$(git status --porcelain package-lock.json)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json package.json
+            git commit -m "ci: hard-regenerate package-lock.json [lockfile-sync]"
+            git push
+          else
+            echo "No lockfile changes detected."
+          fi
+

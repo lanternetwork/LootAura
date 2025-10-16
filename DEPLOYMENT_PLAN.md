@@ -1,4 +1,6 @@
-# YardSaleFinder - Deployment Plan
+# LootAura - Deployment Plan
+
+**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
 
 ## Target Stack
 
@@ -8,6 +10,15 @@
 - **Monitoring**: Sentry (error tracking)
 - **Analytics**: Web Vitals + Custom events
 - **Rate Limiting**: Upstash Redis (production)
+
+## Environment Segregation
+
+| Environment | URL | Purpose | Database | Monitoring |
+|-------------|-----|---------|----------|------------|
+| **Development** | `localhost:3000` | Local development | Supabase dev | Console logs |
+| **Preview** | `*.vercel.app` | Feature testing | Supabase dev | Sentry preview |
+| **Staging** | `staging.lootaura.com` | Pre-production | Supabase staging | Full monitoring |
+| **Production** | `lootaura.com` | Live application | Supabase prod | Full monitoring |
 
 ## Pre-Deploy Checklist
 
@@ -21,6 +32,26 @@
 - [x] **Custom Domain**: Add `lootaura.com` in Vercel → Project → Domains
 - [x] **DNS**: Point `lootaura.com` (A/AAAA or CNAME) to Vercel
 - [x] **Supabase Auth Redirects**: Add `https://lootaura.com/*` to Redirect URLs
+
+## CI/CD Gates
+
+### Build Gates
+- [ ] **Type Checking**: TypeScript validation passes
+- [ ] **Linting**: ESLint rules pass
+- [ ] **Build Success**: Next.js build completes without errors
+- [ ] **Test Coverage**: All tests pass (unit, integration, E2E)
+
+### Smoke Gates
+- [ ] **Health Check**: `/api/health` returns success
+- [ ] **Database Connection**: Supabase connectivity verified
+- [ ] **Environment Variables**: All required vars present
+- [ ] **Security Scan**: No critical vulnerabilities
+
+### Promote Gates
+- [ ] **Performance**: Core Web Vitals within targets
+- [ ] **Security**: Security headers and CSP active
+- [ ] **Monitoring**: Error tracking and analytics active
+- [ ] **Documentation**: Deployment docs updated
 
 ### Required Environment Variables
 
@@ -154,6 +185,66 @@ Run these migrations in order:
 2. **Update Environment Variables**
    - Update `NEXT_PUBLIC_SITE_URL` to `https://lootaura.com`
    - Redeploy to apply changes
+
+## Canary Rollout & Rollback Plan
+
+### Canary Deployment Strategy
+1. **5% Traffic**: Initial canary deployment to 5% of users
+2. **Monitor Metrics**: Watch error rates, performance, user feedback
+3. **Gradual Increase**: 25% → 50% → 100% based on success metrics
+4. **Rollback Triggers**: >1% error rate, performance degradation, user complaints
+
+### Rollback Plan
+1. **Immediate**: Revert to previous deployment via Vercel dashboard
+2. **Environment**: Revert environment variables if needed
+3. **Database**: Restore from backup if data corruption detected
+4. **Communication**: Notify users of rollback if necessary
+
+### Config-Drift Prevention
+- **Schema Checksum**: Verify database schema matches expected state
+- **Environment Validation**: Automated checks for required variables
+- **Health Monitoring**: Continuous health checks with alerting
+
+## Migration Order & Verification
+
+### Migration Application Order
+1. **Development**: Apply migrations to local Supabase instance
+2. **Preview**: Apply migrations to preview Supabase instance
+3. **Production**: Apply migrations to production Supabase instance
+
+### Verification Queries
+```sql
+-- Verify schema matches invariants
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'items_v2'
+AND column_name = 'category';
+
+-- Verify indexes exist
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE tablename = 'items_v2' AND indexname LIKE '%category%';
+
+-- Verify RLS policies
+SELECT policyname, permissive, roles, cmd, qual
+FROM pg_policies
+WHERE tablename = 'items_v2';
+```
+
+### Rollback Steps
+1. **Immediate**: Revert to previous deployment via Vercel dashboard
+2. **Database**: Execute rollback migration if available
+3. **Environment**: Revert environment variables if needed
+4. **Verification**: Run verification queries to confirm rollback
+5. **Monitoring**: Monitor system health after rollback
+
+### Migration Checklist
+- [ ] Migration script reviewed and approved
+- [ ] Rollback procedure tested
+- [ ] Backup created before migration
+- [ ] Verification queries prepared
+- [ ] Monitoring in place
+- [ ] Team notified of migration schedule
 
 ## Post-Deploy Validation
 

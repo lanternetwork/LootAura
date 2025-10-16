@@ -1,6 +1,10 @@
+/* eslint-disable no-undef */
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { parseDateBounds, checkDateOverlap, validateDateRange } from '@/lib/shared/dateBounds'
+import { Sale } from '@/lib/types'
+import * as dateBounds from '@/lib/shared/dateBounds'
+import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
+import { toDbSet } from '@/lib/shared/categoryContract'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
@@ -38,7 +42,7 @@ export async function GET(request: NextRequest) {
     
     // 2. Parse & validate other parameters
     const distanceKm = Math.max(1, Math.min(
-      searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm')!) : 40,
+      searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm') || '40') : 40,
       160
     ))
     
@@ -47,10 +51,24 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('to') || searchParams.get('dateTo') || searchParams.get('endDate') || undefined
     
     
-    const categoriesParam = searchParams.get('categories')
-    const categories = categoriesParam 
-      ? categoriesParam.split(',').map(c => c.trim()).filter(c => c.length > 0).slice(0, 10)
-      : []
+    // Accept both canonical 'categories' and legacy 'cat' parameters
+    const categoriesParam = searchParams.get('categories') || searchParams.get('cat')
+    // Canonical parameter parsing - normalize to sorted, deduplicated array
+    const categories = normalizeCategories(categoriesParam)
+    
+    // Apply UI→DB mapping
+    const dbCategories = toDbSet(categories)
+    
+    // Debug server-side category processing
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[FILTER DEBUG] Server received categories:', categories)
+      console.log('[FILTER DEBUG] categoriesParam =', categoriesParam)
+      console.log('[FILTER DEBUG] normalized categories:', categories)
+      console.log('[FILTER DEBUG] db mapped categories:', dbCategories)
+      console.log('[FILTER DEBUG] categories param source:', searchParams.get('categories') ? 'categories' : searchParams.get('cat') ? 'cat (legacy)' : 'none')
+      console.log('[FILTER DEBUG] relationUsed = public.items_v2')
+      console.log('[FILTER DEBUG] predicateChosen = = ANY')
+    }
     
     const q = searchParams.get('q')
     if (q && q.length > 64) {
@@ -60,11 +78,11 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
     
-    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 24, 48)
-    const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0, 0)
+    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24, 48)
+    const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset') || '0') : 0, 0)
     
     // Validate date range parameters
-    const dateValidation = validateDateRange(startDate, endDate)
+    const dateValidation = dateBounds.validateDateRange(startDate, endDate)
     if (!dateValidation.valid) {
       return NextResponse.json({ 
         ok: false, 
@@ -84,11 +102,12 @@ export async function GET(request: NextRequest) {
     if (!startDateParam && !endDateParam && dateRange !== 'any') {
       const now = new Date()
       switch (dateRange) {
-        case 'today':
+        case 'today': {
           startDateParam = now.toISOString().split('T')[0]
           endDateParam = now.toISOString().split('T')[0]
           break
-        case 'weekend':
+        }
+        case 'weekend': {
           const saturday = new Date(now)
           saturday.setDate(now.getDate() + (6 - now.getDay()))
           const sunday = new Date(saturday)
@@ -96,7 +115,8 @@ export async function GET(request: NextRequest) {
           startDateParam = saturday.toISOString().split('T')[0]
           endDateParam = sunday.toISOString().split('T')[0]
           break
-        case 'next_weekend':
+        }
+        case 'next_weekend': {
           const nextSaturday = new Date(now)
           nextSaturday.setDate(now.getDate() + (6 - now.getDay()) + 7)
           const nextSunday = new Date(nextSaturday)
@@ -104,12 +124,13 @@ export async function GET(request: NextRequest) {
           startDateParam = nextSaturday.toISOString().split('T')[0]
           endDateParam = nextSunday.toISOString().split('T')[0]
           break
+        }
       }
     }
     
     console.log(`[SALES] Query params: lat=${latitude}, lng=${longitude}, km=${distanceKm}, start=${startDateParam}, end=${endDateParam}, categories=[${categories.join(',')}], q=${q}, limit=${limit}, offset=${offset}`)
     
-    let results: any[] = []
+    let results: Sale[] = []
     let degraded = false
     
     // 3. Use direct query to sales_v2 view (RPC functions have permission issues)
@@ -133,16 +154,62 @@ export async function GET(request: NextRequest) {
       
       // NOTE: We filter by date window after fetching to avoid PostgREST OR-composition issues
       
-      // Add category filters - fallback to text search if tags array not present
+      // Add category filters by joining with items table
       if (categories.length > 0) {
-        const ors: string[] = []
-        for (const c of categories) {
-          const safe = c.replace(/[%_]/g, '')
-          ors.push(`title.ilike.%${safe}%`)
-          ors.push(`description.ilike.%${safe}%`)
+        console.log('[SALES] Applying category filter:', categories)
+        
+        // Debug: Check if items_v2 table has category column
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FILTER DEBUG] Checking items_v2 table structure...')
+          const { data: tableInfo, error: tableError } = await supabase
+            .from('items_v2')
+            .select('*')
+            .limit(1)
+          
+          if (tableError) {
+            console.error('[FILTER DEBUG] Error checking items_v2 table:', tableError)
+          } else {
+            console.log('[FILTER DEBUG] items_v2 sample row:', tableInfo?.[0])
+          }
         }
-        if (ors.length > 0) {
-          query = query.or(ors.join(','))
+        
+        // Use a subquery approach to find sales that have items matching the categories
+        const { data: salesWithCategories, error: categoryError } = await supabase
+          .from('items_v2')
+          .select('sale_id')
+          .in('category', dbCategories)
+        
+        if (categoryError) {
+          console.error('[SALES] Category filter error:', categoryError)
+          return NextResponse.json({
+            ok: false,
+            error: 'Category filter failed',
+            code: (categoryError as any)?.code,
+            details: (categoryError as any)?.message
+          }, { status: 500 })
+        }
+        
+        const saleIds = salesWithCategories?.map(item => item.sale_id) || []
+        console.log('[SALES] Found sales with matching categories:', saleIds.length)
+        
+        // Debug server-side category filtering results
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FILTER DEBUG] Server found saleIds:', saleIds.length, 'for categories:', dbCategories)
+          console.log('[FILTER DEBUG] sqlParamsPreview =', dbCategories)
+        }
+        
+        if (saleIds.length > 0) {
+          query = query.in('id', saleIds)
+        } else {
+          // No sales match the categories, return empty result
+          return NextResponse.json({
+            ok: true,
+            data: [],
+            center: { lat: latitude, lng: longitude },
+            distanceKm,
+            count: 0,
+            durationMs: Date.now() - startedAt
+          })
         }
       }
 
@@ -182,22 +249,19 @@ export async function GET(request: NextRequest) {
       console.log('[SALES] Date filtering:', { startDateParam, endDateParam, windowStart, windowEnd })
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
-        .map((sale: any) => {
+        .map((sale: Sale) => {
           const latNum = typeof sale.lat === 'number' ? sale.lat : parseFloat(String(sale.lat))
           const lngNum = typeof sale.lng === 'number' ? sale.lng : parseFloat(String(sale.lng))
           if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null
           return { ...sale, lat: latNum, lng: lngNum }
         })
-        .filter((sale: any) => sale && typeof sale.lat === 'number' && typeof sale.lng === 'number')
-        .filter((sale: any) => {
+        .filter((sale): sale is Sale & { lat: number; lng: number } => sale !== null && typeof sale.lat === 'number' && typeof sale.lng === 'number')
+        .filter((sale) => {
+          if (!sale) return false
           if (!windowStart && !windowEnd) return true
           // Build sale start/end
-          const saleStart = sale.starts_at
-            ? new Date(sale.starts_at)
-            : (sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null)
-          const saleEnd = sale.ends_at
-            ? new Date(sale.ends_at)
-            : (sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null)
+          const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null
+          const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
           // If a date window is set, exclude rows with no date information to avoid always passing
           if ((windowStart || windowEnd) && !saleStart && !saleEnd) return false
           const s = saleStart || saleEnd
@@ -218,13 +282,14 @@ export async function GET(request: NextRequest) {
           }
           return passes
         })
-        .map((sale: any) => {
+        .map((sale: Sale | null) => {
+          if (!sale) return null
           // Haversine distance calculation
           const R = 6371000 // Earth's radius in meters
-          const dLat = (sale.lat - latitude) * Math.PI / 180
-          const dLng = (sale.lng - longitude) * Math.PI / 180
+          const dLat = ((sale.lat || 0) - latitude) * Math.PI / 180
+          const dLng = ((sale.lng || 0) - longitude) * Math.PI / 180
           const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                   Math.cos(latitude * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
+                   Math.cos(latitude * Math.PI / 180) * Math.cos((sale.lat || 0) * Math.PI / 180) *
                    Math.sin(dLng/2) * Math.sin(dLng/2)
           const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
           const distanceM = R * c
@@ -236,15 +301,18 @@ export async function GET(request: NextRequest) {
             distance_km: Math.round(distanceKm * 100) / 100
           }
         })
-                .filter((sale: any) => sale.distance_km <= distanceKm)
-                .sort((a: any, b: any) => {
+                .filter((sale) => sale && (sale.distance_km || 0) <= distanceKm)
+                .sort((a, b) => {
+                  if (!a || !b) return 0
                   // Primary sort: distance
-                  if (a.distance_m !== b.distance_m) {
-                    return a.distance_m - b.distance_m
+                  if ((a.distance_m || 0) !== (b.distance_m || 0)) {
+                    return (a.distance_m || 0) - (b.distance_m || 0)
                   }
-                  // Secondary sort: starts_at
-                  if (a.starts_at !== b.starts_at) {
-                    return new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()
+                  // Secondary sort: date_start
+                  const aStart = a.date_start ? new Date(`${a.date_start}T${a.time_start || '00:00:00'}`).getTime() : 0
+                  const bStart = b.date_start ? new Date(`${b.date_start}T${b.time_start || '00:00:00'}`).getTime() : 0
+                  if (aStart !== bStart) {
+                    return aStart - bStart
                   }
                   // Tertiary sort: id (stable)
                   return a.id.localeCompare(b.id)
@@ -256,11 +324,11 @@ export async function GET(request: NextRequest) {
       // Debug: Log sample sales and their dates
       if (salesWithDistance.length > 0) {
         console.log('[SALES] Sample filtered sales:', salesWithDistance.slice(0, 3).map(s => ({
-          id: s.id,
-          title: s.title,
-          starts_at: s.starts_at,
-          date_start: s.date_start,
-          time_start: s.time_start
+          id: s?.id,
+          title: s?.title,
+          starts_at: s?.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
+          date_start: s?.date_start,
+          time_start: s?.time_start
         })))
       }
       
@@ -268,7 +336,7 @@ export async function GET(request: NextRequest) {
       console.log('[SALES] Raw data before filtering:', (salesData || []).slice(0, 3).map(s => ({
         id: s.id,
         title: s.title,
-        starts_at: s.starts_at,
+        starts_at: s.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
         date_start: s.date_start,
         time_start: s.time_start
       })))
@@ -284,13 +352,9 @@ export async function GET(request: NextRequest) {
       // Debug: Check if date filtering is actually being applied
       if (windowStart && windowEnd) {
         const salesBeforeDateFilter = (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number')
-        const salesAfterDateFilter = salesBeforeDateFilter.filter((sale: any) => {
-          const saleStart = sale.starts_at
-            ? new Date(sale.starts_at)
-            : (sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null)
-          const saleEnd = sale.ends_at
-            ? new Date(sale.ends_at)
-            : (sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null)
+        const salesAfterDateFilter = salesBeforeDateFilter.filter((sale: Sale) => {
+          const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null
+          const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
           if (!saleStart && !saleEnd) return true
           const s = saleStart || saleEnd
           const e = saleEnd || saleStart
@@ -321,12 +385,8 @@ export async function GET(request: NextRequest) {
           // date window overlap (exclude undated when window set)
           .filter((row: any) => {
             if (!windowStart && !windowEnd) return true
-            const saleStart = row.starts_at
-              ? new Date(row.starts_at)
-              : (row.date_start ? new Date(`${row.date_start}T${row.time_start || '00:00:00'}`) : null)
-            const saleEnd = row.ends_at
-              ? new Date(row.ends_at)
-              : (row.date_end ? new Date(`${row.date_end}T${row.time_end || '23:59:59'}`) : null)
+            const saleStart = row.date_start ? new Date(`${row.date_start}T${row.time_start || '00:00:00'}`) : null
+            const saleEnd = row.date_end ? new Date(`${row.date_end}T${row.time_end || '23:59:59'}`) : null
             if (!saleStart && !saleEnd) return false
             const s = saleStart || saleEnd
             const e = saleEnd || saleStart
@@ -357,34 +417,53 @@ export async function GET(request: NextRequest) {
           .sort((a: any, b: any) => a.distance_m - b.distance_m)
           .slice(0, limit)
 
-        results = fallbackFiltered.map((row: any) => ({
+        results = fallbackFiltered.map((row: any): Sale => ({
           id: row.id,
+          owner_id: row.owner_id || '',
           title: row.title,
-          starts_at: row.starts_at || (row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null),
-          ends_at: row.ends_at || (row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null),
-          lat: row.lat,
-          lng: row.lng,
+          description: row.description,
+          address: row.address,
           city: row.city,
           state: row.state,
-          zip: row.zip_code,
-          categories: row.tags || [],
-          cover_image_url: null,
+          zip_code: row.zip_code,
+          lat: row.lat,
+          lng: row.lng,
+          date_start: row.date_start || '',
+          time_start: row.time_start || '',
+          date_end: row.date_end,
+          time_end: row.time_end,
+          price: row.price,
+          tags: row.tags || [],
+          status: row.status || 'published',
+          privacy_mode: row.privacy_mode || 'exact',
+          is_featured: row.is_featured || false,
+          created_at: row.created_at || new Date().toISOString(),
+          updated_at: row.updated_at || new Date().toISOString(),
           distance_m: row.distance_m
         }))
       } else {
-        results = salesWithDistance.map((row: any) => ({
+        results = salesWithDistance.map((row: any): Sale => ({
           id: row.id,
+          owner_id: row.owner_id || '',
           title: row.title,
-          // Map to common fields
-          starts_at: row.starts_at || (row.date_start ? `${row.date_start}T${row.time_start || '08:00:00'}` : null),
-          ends_at: row.ends_at || (row.date_end ? `${row.date_end}T${row.time_end || '23:59:59'}` : null),
-          lat: row.lat,
-          lng: row.lng,
+          description: row.description,
+          address: row.address,
           city: row.city,
           state: row.state,
-          zip: row.zip_code,
-          categories: row.tags || [],
-          cover_image_url: null,
+          zip_code: row.zip_code,
+          lat: row.lat,
+          lng: row.lng,
+          date_start: row.date_start || '',
+          time_start: row.time_start || '',
+          date_end: row.date_end,
+          time_end: row.time_end,
+          price: row.price,
+          tags: row.tags || [],
+          status: row.status || 'published',
+          privacy_mode: row.privacy_mode || 'exact',
+          is_featured: row.is_featured || false,
+          created_at: row.created_at || new Date().toISOString(),
+          updated_at: row.updated_at || new Date().toISOString(),
           distance_m: row.distance_m
         }))
       }
@@ -438,7 +517,7 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json()
     
-    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags, contact } = body
+    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact } = body
     
     const { data, error } = await supabase
       .from('sales_v2')

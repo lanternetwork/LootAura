@@ -1,10 +1,13 @@
 # Loot Aura Repository Status
 
+Conflict reconciled on 2025-10-13 — stabilization content retained; recent main entries preserved.
+
 ## 1. Branch & Commit
-- **Current branch:** main
-- **Latest commit:** 7a5b049 — Close Milestone: Map + Filter Sync — enforce single grid container, fix layout hierarchy, verify arbiter authority, add tests & CI guards (by lanternetwork on 2025-10-12 17:11:56 -0400)
-- **Active PR:** n/a
-- **CI status:** running, last run: run 18449563326
+- **Current branch:** milestone/auth-profile
+- **Latest commit (branch):** e55f25a — ci: redeploy trigger (by system)
+- **Recent on main:** 7a5b049 — Close Milestone: Map + Filter Sync — enforce single grid container, fix layout hierarchy, verify arbiter authority, add tests & CI guards (by lanternetwork on 2025-10-12 17:11:56 -0400)
+- **Active PR:** milestone/auth-profile → main
+- **CI status:** pending (will start after conflicts resolved)
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -35,7 +38,7 @@
 
 ## 6. Deployments
 - **Vercel URLs:** Production/Preview (insert)
-- **Environment vars:** NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, etc. (verify set)
+- **Environment vars:** NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_MAPBOX_TOKEN, etc. (verify set)
 - **Last deploy health:** unknown in this run
 
 ## 7. Known Issues / TODO
@@ -45,8 +48,34 @@
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
-## 8. Next Milestone
+## 8. CI Hygiene
+
+### Workflow Cleanup
+- **Legacy workflows removed**: bootstrap.yml, ci-main.yml, generate-lockfile.yml, update-status.yml, ingest-craigslist-backup.yml, test.yml, ysf-step-b.yml
+- **Unified workflow only**: `.github/workflows/ci.yml`
+- **Standard job names**: env-presence, lint, typecheck, test-unit, test-integration, build, css-scan, migration-verify
+- **Required checks for Rulesets/Vercel**: ci/env-presence, ci/lint, ci/typecheck, ci/test-unit, ci/test-integration, ci/build
+
+### CI Stabilization: Red→Green
+- **ESLint Configuration**: Added comprehensive rules for TypeScript, React, testing
+- **Test Harness**: Added global DOM shims, fetch mocking, network isolation
+- **Harness Parse Fixes**: DOMRect.fromRect, JSX-free setup.ts, JSX tests renamed to .tsx
+- **Env-aware Lint**: Browser/Node overrides; legacy folder ignored
+- **Environment Handling**: Public envs only, no service role in CI
+- **CSS Validation**: Tailwind grid token scanner for responsive layouts
+- **Migration Verification**: Database schema validation on SQL changes
+- **Build Process**: Next.js build with proper environment variables
+- **Status**: Foundation ready, awaiting Owner secrets configuration
+- **CI Failure Map**: `ci-failure-map` workflow auto-posts the first failing lines per job after `ci` completes, or can be run manually (Actions → ci-failure-map → Run). Use it to target the next fix quickly.
+
+### CI Status
+- **Single workflow**: Only `ci` workflow is active
+- **Triggers**: pull_request to main, push to any branch
+- **Concurrency**: Single-key per-branch to cancel superseded runs
+- **Environment validation**: Fast failure on missing required variables
+
+## 9. Next Milestone
 - Bulk generator + clustering polish
 
 ---
-Updated automatically by Cursor on 2025-10-12T21:12:34.152Z
+Updated automatically by Cursor on 2025-10-13T12:00:00.000Z

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const zip = searchParams.get('zip')
     const state = searchParams.get('state')
     const city = searchParams.get('city')
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 10
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit') || '10') : 10
 
     let query = supabase
       .from('zipcodes')

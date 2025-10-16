@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
     
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       if (statement.trim()) {
         try {
           console.log(`[MIGRATION] Executing: ${statement.substring(0, 100)}...`)
-          const { data, error } = await supabase.rpc('exec_sql', { sql: statement })
+          const { data: _data, error } = await supabase.rpc('exec_sql', { sql: statement })
           
           if (error) {
             console.log(`[MIGRATION] Error in statement: ${error.message}`)

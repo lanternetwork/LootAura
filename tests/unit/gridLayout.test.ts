@@ -60,7 +60,7 @@ describe('Grid Layout', () => {
   it('should not have multiple column-defining classes', () => {
     const hasMultipleColumnClasses = (className: string) => {
       const columnClasses = className.match(/(?:^|\s)(?:grid-cols-\d+|auto-cols-)/g)
-      return columnClasses && columnClasses.length > 1
+      return columnClasses ? columnClasses.length > 1 : false
     }
 
     expect(hasMultipleColumnClasses('grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3')).toBe(false)

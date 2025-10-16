@@ -23,12 +23,16 @@ export async function GET(request: NextRequest) {
         if (parsed && typeof parsed.lat === 'number' && typeof parsed.lng === 'number') {
           return NextResponse.json({ city: parsed.city || undefined, lat: parsed.lat, lng: parsed.lng, source: 'cookie' })
         }
-      } catch {}
+      } catch (error) {
+        // Invalid JSON in cookie - ignore and use fallback
+        console.warn('Invalid location cookie:', error)
+      }
     }
 
     return NextResponse.json({ city: 'United States', lat: 39.8283, lng: -98.5795, source: 'fallback' })
-  } catch {
+  } catch (error) {
     // Do not include sensitive info in errors
+    console.error('Location API error:', error)
     return NextResponse.json({ city: 'United States', lat: 39.8283, lng: -98.5795, source: 'fallback' })
   }
 }

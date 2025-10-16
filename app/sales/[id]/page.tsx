@@ -16,7 +16,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
     notFound()
   }
 
-  const metadata = createSaleMetadata(sale)
+  const _metadata = createSaleMetadata(sale)
 
   return (
     <div className="min-h-screen bg-gray-50">

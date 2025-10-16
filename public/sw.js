@@ -76,10 +76,8 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Skip map tiles and external resources
-  if (url.hostname.includes('googleapis.com') || 
-      url.hostname.includes('google.com') ||
-      url.hostname.includes('maps.googleapis.com')) {
+  // Skip external resources
+  if (url.hostname.includes('googleapis.com')) {
     return
   }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { FaCloudUploadAlt, FaSpinner, FaExclamationTriangle, FaImage } from 'react-icons/fa'
+import { FaCloudUploadAlt, FaSpinner, FaExclamationTriangle } from 'react-icons/fa'
 
 interface CloudinaryUploadWidgetProps {
   onUpload: (urls: string[]) => void

@@ -8,12 +8,14 @@ import {
 } from '@/lib/metadata'
 import { Sale } from '@/lib/types'
 
-// Mock environment variables
-vi.mock('process', () => ({
-  env: {
-    NEXT_PUBLIC_SITE_URL: 'https://yardsalefinder.com'
-  }
-}))
+// Ensure environment variable is set for site URL
+const originalEnv = process.env
+beforeEach(() => {
+  process.env = { ...originalEnv, NEXT_PUBLIC_SITE_URL: 'https://lootaura.app' }
+})
+afterEach(() => {
+  process.env = originalEnv
+})
 
 describe('createPageMetadata', () => {
   it('should create basic page metadata', () => {
@@ -23,10 +25,10 @@ describe('createPageMetadata', () => {
       path: '/test'
     })
 
-    expect(metadata.title).toBe('Test Page | YardSaleFinder')
+    expect(metadata.title).toBe('Test Page | Loot Aura')
     expect(metadata.description).toBe('Test description')
-    expect(metadata.openGraph?.title).toBe('Test Page | YardSaleFinder')
-    expect(metadata.openGraph?.url).toBe('https://yardsalefinder.com/test')
+    expect(metadata.openGraph?.title).toBe('Test Page | Loot Aura')
+    expect(metadata.openGraph?.url).toBe('https://lootaura.app/test')
   })
 
   it('should handle custom image', () => {
@@ -78,7 +80,7 @@ describe('createSaleMetadata', () => {
 
     const metadata = createSaleMetadata(sale)
 
-    expect(metadata.title).toBe('Test Sale | YardSaleFinder')
+    expect(metadata.title).toBe('Test Sale | Loot Aura')
     expect(metadata.description).toContain('Test description')
     // OpenGraph type property doesn't exist in the metadata type
     // Photos field doesn't exist in new schema, so no image URL expected
@@ -112,9 +114,9 @@ describe('createExploreMetadata', () => {
   it('should create explore metadata', () => {
     const metadata = createExploreMetadata()
 
-    expect(metadata.title).toBe('Explore Yard Sales | YardSaleFinder')
+    expect(metadata.title).toBe('Explore Yard Sales | Loot Aura')
     expect(metadata.description).toContain('Browse and discover')
-    expect(metadata.openGraph?.url).toBe('https://yardsalefinder.com/explore')
+    expect(metadata.openGraph?.url).toBe('https://lootaura.app/explore')
   })
 })
 
@@ -124,8 +126,8 @@ describe('createHomepageStructuredData', () => {
 
     expect(data['@context']).toBe('https://schema.org')
     expect(data['@type']).toBe('WebSite')
-    expect(data.name).toBe('YardSaleFinder')
-    expect(data.url).toBe('https://yardsalefinder.com')
+    expect(data.name).toBe('Loot Aura')
+    expect(data.url).toBe('https://lootaura.app')
     expect(data.potentialAction['@type']).toBe('SearchAction')
   })
 })
@@ -136,8 +138,8 @@ describe('createOrganizationStructuredData', () => {
 
     expect(data['@context']).toBe('https://schema.org')
     expect(data['@type']).toBe('Organization')
-    expect(data.name).toBe('YardSaleFinder')
-    expect(data.url).toBe('https://yardsalefinder.com')
-    expect(data.logo).toBe('https://yardsalefinder.com/icons/icon-512.png')
+    expect(data.name).toBe('Loot Aura')
+    expect(data.url).toBe('https://lootaura.app')
+    expect(data.logo).toBe('https://lootaura.app/icons/icon-512.png')
   })
 })

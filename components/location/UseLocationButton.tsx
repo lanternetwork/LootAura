@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React from 'react'
 import { FaLocationArrow, FaSpinner, FaExclamationTriangle } from 'react-icons/fa'
 
 interface UseLocationButtonProps {

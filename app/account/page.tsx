@@ -42,7 +42,7 @@ export default function AccountPage() {
   return (
     <main className="max-w-6xl mx-auto p-4">
       <h1 className="text-2xl font-semibold mb-4">Your Account</h1>
-      <AccountClient user={user} profile={profile} />
+      <AccountClient user={user} profile={profile || null} />
     </main>
   )
 }

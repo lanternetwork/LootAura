@@ -190,7 +190,7 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    supabase.auth.getUser.mockResolvedValue({
+    ;(supabase.auth.getUser as any).mockResolvedValue({
       data: { user: { id: testUserId, email: 'test@example.com' } }
     })
 

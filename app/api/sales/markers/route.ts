@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
+import { toDbSet } from '@/lib/shared/categoryContract'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -40,8 +41,8 @@ export async function GET(request: NextRequest) {
     // Treat empty result as undefined (no category filter)
     const catsCsv = categories.length > 0 ? categories.join(',') : ''
     
-    // Use categories directly since they match the computed column values
-    const dbCategories = categories
+    // Map UI categories to DB tokens exactly like list endpoint
+    const dbCategories = toDbSet(categories)
 
     // Debug server-side category processing
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -59,7 +60,9 @@ export async function GET(request: NextRequest) {
 
     // Apply category filtering by joining with items table
     if (Array.isArray(categories) && categories.length > 0) {
-      console.log('[MARKERS API] Applying category filter:', categories)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MARKERS API] Applying category filter:', { categories, dbCategories })
+      }
       
       // Debug: Check if items_v2 table has category column
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

@@ -106,10 +106,12 @@ export async function GET(request: NextRequest) {
       
       if (nominatimData && nominatimData.length > 0) {
         const result = nominatimData[0]
+        console.log(`[ZIP] Nominatim result for ${normalizedZip}:`, JSON.stringify(result, null, 2))
         const lat = parseFloat(result.lat)
         const lng = parseFloat(result.lon)
         const city = result.address?.city || result.address?.town || result.address?.village || null
         const state = result.address?.state || null
+        console.log(`[ZIP] Parsed city/state: city=${city}, state=${state}`)
         
         // Optional write-back to local table
         const enableWriteback = process.env.ENABLE_ZIP_WRITEBACK === 'true'
@@ -145,7 +147,8 @@ export async function GET(request: NextRequest) {
           }
         })
       } else {
-        console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim status=miss`)
+        console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim status=miss - no results from Nominatim`)
+        console.log(`[ZIP] Nominatim response:`, JSON.stringify(nominatimData, null, 2))
         return NextResponse.json({ 
           ok: false, 
           error: 'ZIP not found' 

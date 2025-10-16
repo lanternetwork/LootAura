@@ -1510,8 +1510,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.log('[FILTER DEBUG] Suppressing list fetch - markers include identical filters')
       } else {
         console.log('[FILTER DEBUG] Allowing list fetch - filters differ or categories changed')
-        // Don't suppress when categories are present unless we're certain filters are identical
-        return // Exit early to allow list fetch
+        // Force a one-shot list fetch when categories changed or filters not equal
+        debouncedTrigger(() => {
+          console.log('[NET] start sales {seq: 1, mode: "MAP-override"}')
+          fetchSales()
+        })
       }
       
       // Warning: Check if categories are present but list is suppressed under MAP authority

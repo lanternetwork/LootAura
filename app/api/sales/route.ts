@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     
     
     // Accept both canonical 'categories' and legacy 'cat' parameters
-    const categoriesParam = searchParams.get('categories') || searchParams.get('cat')
+    const categoriesParam = searchParams.get('categories') || searchParams.get('cat') || undefined
     // Canonical parameter parsing - normalize to sorted, deduplicated array
     const categories = normalizeCategories(categoriesParam)
     

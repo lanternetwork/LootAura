@@ -465,9 +465,17 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     setAbortController(newController)
 
     try {
-      const url = endpoint === 'sales' 
-        ? `/api/sales?lat=${queryShape.lat}&lng=${queryShape.lng}&distanceKm=${queryShape.radiusKm}&dateRange=${queryShape.dateRange}&categories=${queryShape.categories.join(',')}`
-        : `/api/sales/markers?lat=${queryShape.lat}&lng=${queryShape.lng}&distanceKm=${queryShape.radiusKm}&dateRange=${queryShape.dateRange}&categories=${queryShape.categories.join(',')}`
+      const params = new URLSearchParams()
+      params.set('lat', String(queryShape.lat))
+      params.set('lng', String(queryShape.lng))
+      params.set('distanceKm', String(queryShape.radiusKm))
+      params.set('dateRange', String(queryShape.dateRange))
+      if (Array.isArray(queryShape.categories) && queryShape.categories.length > 0) {
+        params.set('categories', queryShape.categories.join(','))
+      }
+      const url = endpoint === 'sales'
+        ? `/api/sales?${params.toString()}`
+        : `/api/sales/markers?${params.toString()}`
 
       console.log(`[NET] start ${endpoint} {seq: ${reqId}} key=${stateKey}`)
       

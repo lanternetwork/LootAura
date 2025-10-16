@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     
     const limitParam = q.get('limit')
     // Accept both canonical 'categories' and legacy 'cat' parameters
-    const catsParam = q.get('categories') || q.get('cat') || q.get('cats') || ''
+    const catsParam = q.get('categories') || q.get('cat') || q.get('cats') || undefined
 
     // Validate lat/lng
     const originLat = latParam !== null ? parseFloat(latParam) : NaN
@@ -37,7 +37,8 @@ export async function GET(request: NextRequest) {
     const limit = Number.isFinite(parseFloat(String(limitParam))) ? Math.min(parseInt(String(limitParam), 10), 1000) : 1000
     // Canonical parameter parsing - normalize to sorted, deduplicated array
     const categories = normalizeCategories(catsParam)
-    const catsCsv = categories.join(',')
+    // Treat empty result as undefined (no category filter)
+    const catsCsv = categories.length > 0 ? categories.join(',') : ''
     
     // Use categories directly since they match the computed column values
     const dbCategories = categories
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
       .not('lng', 'is', null)
 
     // Apply category filtering by joining with items table
-    if (categories.length > 0) {
+    if (Array.isArray(categories) && categories.length > 0) {
       console.log('[MARKERS API] Applying category filter:', categories)
       
       // Debug: Check if items_v2 table has category column

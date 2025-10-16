@@ -333,6 +333,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const salesReqIdRef = useRef<number>(0)
   const markersReqIdRef = useRef<number>(0)
   const currentSalesRequestRef = useRef<{reqId: number, stateKey: string} | null>(null)
+  // Epoch guard to drop stale responses when filters change
+  const filtersEpochRef = useRef(0)
   const currentMarkersRequestRef = useRef<{reqId: number, stateKey: string} | null>(null)
   
   // Arbiter sequencing for latest-wins behavior
@@ -831,7 +833,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     return key
   }, [arbiter.mode, mapView.center, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.dateRange, filters.categories, approximateRadiusKmFromZoom])
 
-  const fetchSales = useCallback(async (append = false, centerOverride?: { lat: number; lng: number }) => {
+  const fetchSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }) => {
     // Abort previous sales request
     abortPrevious('sales')
     
@@ -864,14 +866,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     }
 
     console.log('[SALES] fetchSales start', { append, mode, useLat, useLng, distanceKmForRequest, filters, centerOverride })
-    if (append) {
-      setLoadingMore(true)
-    } else {
-      setLoading(true)
-      setIsUpdating(true)
-      // Keep stale data during fetch
-      setStaleSales(sales)
-    }
+    setLoading(true)
+    setIsUpdating(true)
+    setStaleSales(sales)
     console.log(`[SALES] fetchSales called with location: ${useLat}, ${useLng}, append: ${append}`)
     
     // If no location, don't try to fetch sales yet
@@ -966,7 +963,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
     try {
       // HARD GUARD: Suppress wide /api/sales under MAP authority
-      if (arbiter.authority === 'MAP') {
+    if (arbiter.authority === 'MAP' && startEpoch === undefined) {
         console.log('[GUARD] Suppressed wide /api/sales under MAP authority')
         
         // Warning: Check if categories are present but list is suppressed
@@ -1008,6 +1005,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.log('[DROP] stale response sales (seq mismatch)', { seq, current: requestSeqRef.current })
         return
       }
+      if (startEpoch !== undefined && filtersEpochRef.current !== startEpoch) {
+        console.log('[DROP] stale response sales (epoch mismatch)', { startEpoch, current: filtersEpochRef.current })
+        return
+      }
       
       console.log('[NET] ok sales', { seq, mode: arbiter.authority, viewportSeq: viewportSeqRef.current })
       console.log(`[SALES] API response:`, data)
@@ -1047,12 +1048,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           console.log('[DROP] stale/wide response (MAP authority active)')
           return
         }
-        if (append) {
-          setSales(prev => [...prev, ...newSales])
-        } else {
-          setSales(newSales)
-          setIsUpdating(false)
-        }
+        setSales(newSales)
+        setIsUpdating(false)
         setDateWindow(data.dateWindow || null)
         setDegraded(data.degraded || false)
         const pageHasMore = newSales.length === 24
@@ -1124,18 +1121,14 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (salesAbortRef.current === controller) {
         salesAbortRef.current = null
       }
-      if (append) {
-        setLoadingMore(false)
-      } else {
-        setLoading(false)
-      }
+      setLoading(false)
     }
   }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious])
 
   // Client-side geolocation removed; handlers not used
 
   // Fetch markers for map pins using dedicated markers endpoint
-  const fetchMapSales = useCallback(async (centerOverride?: { lat: number; lng: number }) => {
+  const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }) => {
     // Check if we need to fetch based on key change
     const key = buildMarkersKey()
     if (key === lastMarkersKeyRef.current) {
@@ -1281,6 +1274,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       // Check if this request was aborted
       if (markerSeqRef.current !== seq) {
         console.log('[NET] aborted markers', { seq })
+        return
+      }
+      if (startEpoch !== undefined && filtersEpochRef.current !== startEpoch) {
+        console.log('[DROP] stale response markers (epoch mismatch)', { startEpoch, current: filtersEpochRef.current })
         return
       }
       
@@ -1457,8 +1454,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     // Bump sequence on category changes to force UI updates
     if (categoriesChanged) {
       listStoreSeqRef.current += 1
+      filtersEpochRef.current += 1
       if (DEBUG) {
-        console.log(`[LIST][CATEGORY] seq bumped to ${listStoreSeqRef.current} due to category change`)
+        console.log(`[LIST][CATEGORY] seq bumped to ${listStoreSeqRef.current} epoch=${filtersEpochRef.current} (category change)`)
       }
     }
     
@@ -1502,8 +1500,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         })
       }
       
-      console.log('[NET] start markers {seq: 1} (MAP authority)')
-      fetchMapSales()
+      const startEpoch = filtersEpochRef.current
+      console.log('[NET] start markers {seq: 1} (MAP authority)', { epoch: startEpoch })
+      fetchMapSales(startEpoch)
       
       // Only suppress network fetch if filters are identical and no category change
       if (shouldSkipNetwork) {
@@ -1511,9 +1510,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       } else {
         console.log('[FILTER DEBUG] Allowing list fetch - filters differ or categories changed')
         // Force a one-shot list fetch when categories changed or filters not equal
+        const startEpoch = filtersEpochRef.current
         debouncedTrigger(() => {
-          console.log('[NET] start sales {seq: 1, mode: "MAP-override"}')
-          fetchSales()
+          console.log('[NET] start sales {seq: 1, mode: "MAP-override"}', { epoch: startEpoch })
+          fetchSales(startEpoch)
         })
       }
       

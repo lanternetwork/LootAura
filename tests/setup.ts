@@ -3,12 +3,36 @@ import '@testing-library/jest-dom/vitest'
 import { vi } from 'vitest'
 
 // Minimal globals to satisfy failing tests
-;(globalThis as any).ResizeObserver = class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+// Functional ResizeObserver mock with simulation hook used by tests
+{
+  type ROCallback = (entries: Array<{ target: Element; contentRect: { width: number; height: number } }>) => void
+  const targets = new WeakMap<Element, { cb: ROCallback }>()
+
+  class RO {
+    private cb: ROCallback
+    constructor(cb: ROCallback) {
+      this.cb = cb
+    }
+    observe(target: Element) {
+      targets.set(target, { cb: this.cb })
+    }
+    unobserve(target: Element) {
+      targets.delete(target)
+    }
+    disconnect() {
+      // no-op
+    }
+  }
+  (globalThis as any).ResizeObserver = RO as any
+  (globalThis as any).__simulateResize = (target: Element, width = 700, height = 600) => {
+    const entry = targets.get(target)
+    if (entry) {
+      entry.cb([{ target, contentRect: { width, height } } as any])
+    }
+  }
 }
 
+// @ts-ignore vitest mock hoisting in test env
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
@@ -26,6 +50,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 // Some Next versions resolve the hook from internal paths; mock them too
+// @ts-ignore vitest mock hoisting in test env
 vi.mock('next/dist/client/components/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
@@ -36,6 +61,7 @@ vi.mock('next/dist/client/components/navigation', () => ({
     prefetch: vi.fn(),
   }),
 }))
+// @ts-ignore vitest mock hoisting in test env
 vi.mock('next/src/client/components/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
@@ -51,6 +77,7 @@ vi.mock('next/src/client/components/navigation', () => ({
 process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app'
 
 // Supabase client mock used by tests
+// @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/supabase/client', () => ({
   createSupabaseBrowserClient: () => ({
     auth: {
@@ -59,18 +86,21 @@ vi.mock('@/lib/supabase/client', () => ({
       signUp: vi.fn(),
       signOut: vi.fn(),
     },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn(() => ({ data: [{ id: 'test-id', owner_id: 'test-user' }], error: null })),
-      update: vi.fn().mockReturnThis(),
-      delete: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }),
-    })),
+    from: vi.fn(() => {
+      const chain: any = {}
+      chain.select = vi.fn(() => chain)
+      chain.insert = vi.fn((rows: any[]) => ({ data: rows, error: null }))
+      chain.update = vi.fn(() => chain)
+      chain.delete = vi.fn(() => chain)
+      chain.eq = vi.fn(() => chain)
+      chain.single = vi.fn(async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
+      return chain
+    }),
   }),
 }))
 
 // Geocode mock ensuring non-null for valid addresses
+// @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/geocode', () => ({
   geocodeAddress: vi.fn(async (addr: string) => {
     if (!addr || /invalid|fail/i.test(addr)) return null
@@ -85,4 +115,27 @@ vi.mock('@/lib/geocode', () => ({
   }),
   clearGeocodeCache: vi.fn(),
 }))
+
+// Fetch mock for Nominatim fallback used by geocode module (always override)
+const g: any = globalThis as any
+g.fetch = vi.fn(async (input: any) => {
+  const url = typeof input === 'string' ? input : input?.url ?? ''
+  if (/nominatim\.openstreetmap\.org/.test(url)) {
+    if (/invalid|fail/i.test(url)) {
+      return new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    return new Response(
+      JSON.stringify([
+        {
+          lat: '38.1405',
+          lon: '-85.6936',
+          display_name: '123 Test St, Louisville, KY',
+          address: { city: 'Louisville', state: 'KY', postcode: '40201' },
+        },
+      ]),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+})
 

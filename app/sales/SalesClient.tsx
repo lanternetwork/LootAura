@@ -1844,19 +1844,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const currentCenter = { lat, lng }
     const bbox = computeBboxForRadius(currentCenter, filters.distance)
     
-    // Check if map movement is guarded
-    if (arbiter.guardMapMove) {
-      console.log('[MAP] ignoring auto-fit (guarded) - ZIP search blocked')
-      return
-    }
+    // ZIP searches should always move the map, regardless of current state
+    // Clear any existing guards for ZIP searches
+    setGuardMapMove(false, 'ZIP search - allow movement')
+    console.log('[MAP] ZIP search - clearing guards to allow map movement')
     
-    // In MAP authority mode, never call fitBounds automatically
-    if (arbiter.authority === 'MAP') {
-      console.log('[MAP] ignoring auto-fit - MAP authority mode prevents automatic movement')
-      return
-    }
-    
-    setFitBounds(bbox)
+    setFitBounds({ ...bbox, reason: 'zip' })
     console.log('[ZIP] computed bbox for dist=${filters.distance} -> n=${bbox.north},s=${bbox.south},e=${bbox.east},w=${bbox.west}')
     console.log('[MAP] fitBounds(zip) north=${bbox.north}, south=${bbox.south}, east=${bbox.east}, west=${bbox.west}')
     

@@ -228,9 +228,9 @@ export default function SalesMap({
       try {
         const map = mapRef.current?.getMap?.()
         if (map) {
-          // Block programmatic movement in MAP authority mode
-          if (arbiterAuthority === 'MAP') {
-            console.log('[BLOCK] centerOverride suppressed (mode=map)')
+          // Allow centerOverride for ZIP searches even in MAP authority mode
+          if (arbiterAuthority === 'MAP' && centerOverride.reason !== 'zip') {
+            console.log('[BLOCK] centerOverride suppressed (mode=map, not ZIP)')
             return
           }
           
@@ -255,9 +255,9 @@ export default function SalesMap({
   // Handle fitBounds for distance changes
   useEffect(() => {
     if (fitBounds) {
-      // Block programmatic movement in MAP authority mode
-      if (arbiterAuthority === 'MAP') {
-        console.log('[BLOCK] programmatic move suppressed (map authoritative)')
+      // Allow fitBounds for ZIP searches even in MAP authority mode
+      if (arbiterAuthority === 'MAP' && !fitBounds.reason) {
+        console.log('[BLOCK] programmatic move suppressed (map authoritative, not ZIP)')
         return
       }
       

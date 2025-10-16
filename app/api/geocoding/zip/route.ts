@@ -78,15 +78,15 @@ export async function GET(request: NextRequest) {
     console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=local`)
     const { data: localData, error: localError } = await supabase
       .from('lootaura_v2.zipcodes')
-      .select('zip, lat, lng, city, state')
-      .eq('zip', normalizedZip) // TEXT comparison, no parseInt
+      .select('zip_code, lat, lng, city, state')
+      .eq('zip_code', normalizedZip) // TEXT comparison, no parseInt
       .single()
     
     if (!localError && localData) {
       console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=local status=ok`)
       return NextResponse.json({
         ok: true,
-        zip: localData.zip,
+        zip: localData.zip_code,
         lat: localData.lat,
         lng: localData.lng,
         city: localData.city,
@@ -118,12 +118,12 @@ export async function GET(request: NextRequest) {
             await supabase
               .from('lootaura_v2.zipcodes')
               .upsert({
-                zip: normalizedZip, // Use normalized ZIP for storage
+                zip_code: normalizedZip, // Use normalized ZIP for storage
                 lat,
                 lng,
                 city,
                 state
-              }, { onConflict: 'zip' })
+              }, { onConflict: 'zip_code' })
             console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim writeback=success`)
           } catch (writebackError) {
             console.error(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim writeback=failed`, writebackError)

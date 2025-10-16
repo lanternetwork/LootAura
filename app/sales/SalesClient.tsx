@@ -865,7 +865,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       distanceKmForRequest = milesToKm(filters.distance)
     }
 
-    console.log('[SALES] fetchSales start', { append, mode, useLat, useLng, distanceKmForRequest, filters, centerOverride })
+    console.log('[SALES] fetchSales start', { append, mode, useLat, useLng, distanceKmForRequest, filters, centerOverride, epoch: filtersEpochRef.current })
     setLoading(true)
     setIsUpdating(true)
     setStaleSales(sales)
@@ -1004,6 +1004,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (requestSeqRef.current !== seq) {
         console.log('[DROP] stale response sales (seq mismatch)', { seq, current: requestSeqRef.current })
         return
+      }
+      if (filtersEpochRef.current !== (filtersEpochRef.current)) {
+        // this comparison is tautological; leave only logging of epoch for debugging
+        console.log('[DEBUG] sales epoch at completion', { epoch: filtersEpochRef.current })
       }
       if (startEpoch !== undefined && filtersEpochRef.current !== startEpoch) {
         console.log('[DROP] stale response sales (epoch mismatch)', { startEpoch, current: filtersEpochRef.current })
@@ -1149,8 +1153,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const controller = new AbortController()
     markersAbortRef.current = controller
     const seq = ++markerSeqRef.current
+    const startedEpoch = filtersEpochRef.current
     
-    console.log('[NET] start markers', { seq })
+    console.log('[NET] start markers', { seq, epoch: startedEpoch })
     
     const mode = arbiter?.mode || 'initial'
     let useLat = centerOverride?.lat ?? filters.lat
@@ -1274,6 +1279,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       // Check if this request was aborted
       if (markerSeqRef.current !== seq) {
         console.log('[NET] aborted markers', { seq })
+        return
+      }
+      if (filtersEpochRef.current !== startedEpoch) {
+        console.log('[DROP] stale response markers (epoch mismatch)', { startedEpoch, current: filtersEpochRef.current })
         return
       }
       if (startEpoch !== undefined && filtersEpochRef.current !== startEpoch) {
@@ -1500,9 +1509,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         })
       }
       
-      const startEpoch = filtersEpochRef.current
-      console.log('[NET] start markers {seq: 1} (MAP authority)', { epoch: startEpoch })
-      fetchMapSales(startEpoch)
+      console.log('[NET] start markers {seq: 1} (MAP authority)', { epoch: filtersEpochRef.current })
+      fetchMapSales()
       
       // Only suppress network fetch if filters are identical and no category change
       if (shouldSkipNetwork) {
@@ -1510,10 +1518,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       } else {
         console.log('[FILTER DEBUG] Allowing list fetch - filters differ or categories changed')
         // Force a one-shot list fetch when categories changed or filters not equal
-        const startEpoch = filtersEpochRef.current
         debouncedTrigger(() => {
-          console.log('[NET] start sales {seq: 1, mode: "MAP-override"}', { epoch: startEpoch })
-          fetchSales(startEpoch)
+          console.log('[NET] start sales {seq: 1, mode: "MAP-override"}', { epoch: filtersEpochRef.current })
+          fetchSales(false)
         })
       }
       

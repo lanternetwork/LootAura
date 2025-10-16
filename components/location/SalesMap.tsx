@@ -18,8 +18,8 @@ interface SalesMapProps {
   selectedSaleId?: string
   onSearchArea?: (args: { bounds: { north: number; south: number; east: number; west: number }, center: { lat: number; lng: number }, zoom: number }) => void
   onViewChange?: (args: { center: { lat: number; lng: number }, zoom: number, userInteraction: boolean }) => void
-  centerOverride?: { lat: number; lng: number; zoom?: number } | null
-  fitBounds?: { north: number; south: number; east: number; west: number } | null
+  centerOverride?: { lat: number; lng: number; zoom?: number; reason?: string } | null
+  fitBounds?: { north: number; south: number; east: number; west: number; reason?: string } | null
   onFitBoundsComplete?: () => void
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number; ts: number } | undefined) => void
   onVisiblePinsChange?: (visibleIds: string[], count: number) => void

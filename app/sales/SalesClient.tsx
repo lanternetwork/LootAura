@@ -299,7 +299,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [_locationAccuracy, _setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
-  const [mapCenterOverride, _setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
+  const [mapCenterOverride, _setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number; reason?: string } | null>(null)
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
   
   // Stable bbox hash for effect dependencies
@@ -318,7 +318,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [viewportBounds])
   const lastBoundsTsRef = useRef<number | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
-  const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
+  const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number; reason?: string } | null>(null)
   const [isUpdating, setIsUpdating] = useState<boolean>(false)
   const [staleSales, setStaleSales] = useState<Sale[]>(initialSales) // Keep previous data during fetch
   const [renderedSales, setRenderedSales] = useState<Sale[]>(initialSales) // Sales visible on map

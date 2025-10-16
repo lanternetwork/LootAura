@@ -246,21 +246,21 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const ctx = github.context
-            const ref = ctx.ref || ctx.payload?.workflow_run?.head_branch || ctx.payload?.pull_request?.head?.ref || ''
-            const branch = ref.replace('refs/heads/', '')
-            const prNumber = ctx.payload?.pull_request?.number || ''
-            
+            // 'context' and 'github' are provided by github-script
+            const ref = context.ref || context.payload?.workflow_run?.head_branch || context.payload?.pull_request?.head?.ref || ''
+            const branch = (ref || '').replace('refs/heads/', '')
+            const prNumber = context.payload?.pull_request?.number || ''
+
             await github.rest.repos.createDispatchEvent({
-              owner: ctx.repo.owner,
-              repo: ctx.repo.repo,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               event_type: 'ci_completed',
               client_payload: {
-                branch: branch,
+                branch,
                 pr_number: prNumber,
-                run_id: ctx.runId,
-                conclusion: ctx.payload.workflow_run?.conclusion || 'completed'
+                run_id: context.runId,
+                conclusion: context.payload?.workflow_run?.conclusion || 'completed'
               }
             })
-            
+
             console.log(`Emitted ci_completed event for branch: ${branch}, PR: ${prNumber}`)

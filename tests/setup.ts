@@ -70,13 +70,28 @@ process.env.NEXT_PUBLIC_SITE_URL = 'https://lootaura.app'
 process.env.NEXT_PUBLIC_DEBUG = 'false'
 
 // Global Browser API Mocks
-global.ResizeObserver = class ResizeObserver {
-  observe() {}
+globalThis.ResizeObserver = class ResizeObserver {
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback
+  }
+  callback: ResizeObserverCallback
+  observe() {
+    // Trigger callback immediately to simulate resize
+    setTimeout(() => {
+      this.callback([{
+        target: document.createElement('div'),
+        contentRect: new DOMRectMock(0, 0, 700, 100),
+        borderBoxSize: [{ inlineSize: 700, blockSize: 100 }],
+        contentBoxSize: [{ inlineSize: 700, blockSize: 100 }],
+        devicePixelContentBoxSize: [{ inlineSize: 700, blockSize: 100 }]
+      }], this)
+    }, 0)
+  }
   unobserve() {}
   disconnect() {}
 }
 
-global.IntersectionObserver = class IntersectionObserver {
+globalThis.IntersectionObserver = class IntersectionObserver {
   observe() {}
   unobserve() {}
   disconnect() {}
@@ -86,7 +101,7 @@ global.IntersectionObserver = class IntersectionObserver {
   takeRecords() { return [] }
 }
 
-global.matchMedia = vi.fn().mockImplementation((query: string) => ({
+globalThis.matchMedia = vi.fn().mockImplementation((query: string) => ({
   matches: false,
   media: query,
   onchange: null,
@@ -116,10 +131,10 @@ class DOMRectMock implements DOMRect {
   }
 }
 
-global.DOMRect = DOMRectMock as any
+globalThis.DOMRect = DOMRectMock as any
 
 // Global fetch mock
-global.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' 
     ? input 
     : input instanceof URL 
@@ -193,7 +208,7 @@ vi.mock('@/lib/supabase/client', () => ({
   createSupabaseBrowserClient: () => ({
     auth: {
       getUser: vi.fn().mockResolvedValue({ 
-        data: { user: { id: 'test-user', email: 'test@example.com' } }, 
+        data: { user: { id: 'test-user-id', email: 'test@example.com' } }, 
         error: null 
       }),
       signInWithPassword: vi.fn().mockResolvedValue({ data: {}, error: null }),

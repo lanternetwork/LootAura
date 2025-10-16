@@ -14,53 +14,40 @@ The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troub
 
  RUN  v2.1.9 /home/runner/work/LootAura/LootAura
 
- ✓ tests/integration/categoryFilters.test.ts (22 tests) 21ms
- ✓ tests/unit/categoryNormalizer.test.ts (34 tests) 16ms
+ ✓ tests/integration/categoryFilters.test.ts (22 tests) 16ms
+ ✓ tests/unit/categoryNormalizer.test.ts (34 tests) 21ms
+ ✓ tests/integration/category-filters.test.ts (16 tests) 17ms
+ ✓ tests/unit/server-stabilization.test.ts (14 tests) 11ms
 stdout | tests/components/AddSaleForm.a11y.test.tsx > AddSaleForm Accessibility > should support form submission with Enter key
 [usage] geocode call (count=1)
 
- ✓ tests/integration/category-filters.test.ts (16 tests) 11ms
- ✓ tests/unit/server-stabilization.test.ts (14 tests) 8ms
- ❯ tests/components/AddSaleForm.a11y.test.tsx (11 tests | 11 failed) 697ms
-   × AddSaleForm Accessibility > should have proper form labels and structure 116ms
+ ❯ tests/components/AddSaleForm.a11y.test.tsx (11 tests | 11 failed) 795ms
+   × AddSaleForm Accessibility > should have proper form labels and structure 136ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should have proper input types and attributes 23ms
+   × AddSaleForm Accessibility > should have proper input types and attributes 27ms
      → Invalid Chai property: toHaveAttribute
-   × AddSaleForm Accessibility > should have proper button roles and labels 51ms
+   × AddSaleForm Accessibility > should have proper button roles and labels 60ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should support keyboard navigation 79ms
+   × AddSaleForm Accessibility > should support keyboard navigation 80ms
      → Invalid Chai property: toHaveFocus
-   × AddSaleForm Accessibility > should support form submission with Enter key 252ms
+   × AddSaleForm Accessibility > should support form submission with Enter key 328ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should support adding tags with Enter key 108ms
+   × AddSaleForm Accessibility > should support adding tags with Enter key 100ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should have proper error handling and announcements 11ms
+   × AddSaleForm Accessibility > should have proper error handling and announcements 10ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should have proper fieldset and legend structure for grouped fields 14ms
+   × AddSaleForm Accessibility > should have proper fieldset and legend structure for grouped fields 16ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should have proper focus management 20ms
+   × AddSaleForm Accessibility > should have proper focus management 13ms
      → Invalid Chai property: toHaveFocus
-   × AddSaleForm Accessibility > should have proper ARIA attributes 14ms
+   × AddSaleForm Accessibility > should have proper ARIA attributes 13ms
      → Invalid Chai property: toBeInTheDocument
-   × AddSaleForm Accessibility > should support screen reader navigation 8ms
+   × AddSaleForm Accessibility > should support screen reader navigation 9ms
      → Invalid Chai property: toBeInTheDocument
+ ✓ tests/unit/categoryNormalization.test.ts (16 tests) 13ms
  ✓ tests/unit/stabilization.test.ts (21 tests) 12ms
- ✓ tests/unit/categoryNormalization.test.ts (16 tests) 10ms
- ✓ tests/unit/arbiterDecisions.test.ts (14 tests) 11ms
+ ✓ tests/unit/arbiterDecisions.test.ts (14 tests) 10ms
  ✓ tests/integration/stabilization.spec.ts (16 tests) 15ms
- ❯ tests/integration/rls.owner.test.ts (6 tests | 6 failed) 98ms
-   × RLS and Owner Permissions > should set owner_id to auth.uid() when inserting sale 90ms
-     → vi.mocked(...).mockResolvedValue is not a function
-   × RLS and Owner Permissions > should allow public read access to sales list 2ms
-     → vi.mocked(...).mockResolvedValue is not a function
-   × RLS and Owner Permissions > should allow owner to update their own sale 1ms
-     → vi.mocked(...).mockResolvedValue is not a function
-   × RLS and Owner Permissions > should prevent non-owner from updating sale 1ms
-     → vi.mocked(...).mockResolvedValue is not a function
-   × RLS and Owner Permissions > should allow owner to delete their own sale 1ms
-     → vi.mocked(...).mockResolvedValue is not a function
-   × RLS and Owner Permissions > should prevent non-owner from deleting sale 1ms
-     → supabase.auth.getUser.mockResolvedValue is not a function
 stderr | tests/components/SalesGrid.test.tsx > SalesGrid > renders sales cards when not loading and sales are present
 Error: Uncaught [ReferenceError: ResizeObserver is not defined]
     at reportException (/home/runner/work/LootAura/LootAura/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
@@ -309,72 +296,85 @@ The above error occurred in the <SalesGrid> component:
 Consider adding an error boundary to your tree to customize error handling behavior.
 Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
 
- ❯ tests/components/SalesGrid.test.tsx (8 tests | 8 failed) 87ms
-   × SalesGrid > renders sales cards when not loading and sales are present 48ms
+ ❯ tests/components/SalesGrid.test.tsx (8 tests | 8 failed) 68ms
+   × SalesGrid > renders sales cards when not loading and sales are present 36ms
      → ResizeObserver is not defined
-   × SalesGrid > renders skeletons when loading and not in MAP authority 6ms
+   × SalesGrid > renders skeletons when loading and not in MAP authority 5ms
      → ResizeObserver is not defined
-   × SalesGrid > renders empty state message when no sales and not loading 6ms
+   × SalesGrid > renders empty state message when no sales and not loading 4ms
      → ResizeObserver is not defined
-   × SalesGrid > does not render skeletons when in MAP authority, even if loading 4ms
+   × SalesGrid > does not render skeletons when in MAP authority, even if loading 5ms
      → ResizeObserver is not defined
    × SalesGrid > observes resize events and updates columns 5ms
      → ResizeObserver is not defined
-   × SalesGrid > cleans up ResizeObserver on unmount 7ms
+   × SalesGrid > cleans up ResizeObserver on unmount 4ms
      → ResizeObserver is not defined
-   × SalesGrid > applies custom className 6ms
+   × SalesGrid > applies custom className 4ms
      → ResizeObserver is not defined
-   × SalesGrid > sets correct data attributes 5ms
+   × SalesGrid > sets correct data attributes 4ms
      → ResizeObserver is not defined
- ✓ tests/unit/category-serialization.test.ts (16 tests) 10ms
+ ❯ tests/integration/rls.owner.test.ts (6 tests | 6 failed) 87ms
+   × RLS and Owner Permissions > should set owner_id to auth.uid() when inserting sale 81ms
+     → vi.mocked(...).mockResolvedValue is not a function
+   × RLS and Owner Permissions > should allow public read access to sales list 2ms
+     → vi.mocked(...).mockResolvedValue is not a function
+   × RLS and Owner Permissions > should allow owner to update their own sale 1ms
+     → vi.mocked(...).mockResolvedValue is not a function
+   × RLS and Owner Permissions > should prevent non-owner from updating sale 1ms
+     → vi.mocked(...).mockResolvedValue is not a function
+   × RLS and Owner Permissions > should allow owner to delete their own sale 1ms
+     → vi.mocked(...).mockResolvedValue is not a function
+   × RLS and Owner Permissions > should prevent non-owner from deleting sale 1ms
+     → supabase.auth.getUser.mockResolvedValue is not a function
+ ✓ tests/unit/category-serialization.test.ts (16 tests) 14ms
  ✓ tests/unit/addSale.validation.test.ts (9 tests) 13ms
  ✓ tests/unit/dateBounds.test.ts (21 tests) 12ms
- ✓ tests/unit/gridLayout.test.ts (6 tests) 7ms
- ❯ tests/integration/addSale.insert.test.tsx (7 tests | 7 failed) 149ms
-   × Add Sale Integration > should insert sale with geocoded coordinates 39ms
+ ✓ tests/unit/sanitize.test.ts (26 tests) 32ms
+ ✓ tests/unit/gridLayout.test.ts (6 tests) 8ms
+ ❯ tests/integration/addSale.insert.test.tsx (7 tests | 7 failed) 170ms
+   × Add Sale Integration > should insert sale with geocoded coordinates 49ms
      → Invalid Chai property: toBeInTheDocument
-   × Add Sale Integration > should handle geocoding failure gracefully 71ms
+   × Add Sale Integration > should handle geocoding failure gracefully 69ms
      → Invalid Chai property: toBeInTheDocument
-   × Add Sale Integration > should validate required fields before submission 11ms
+   × Add Sale Integration > should validate required fields before submission 14ms
      → Invalid Chai property: toBeInTheDocument
-   × Add Sale Integration > should show loading state during submission 4ms
+   × Add Sale Integration > should show loading state during submission 7ms
      → Invalid Chai property: toBeInTheDocument
-   × Add Sale Integration > should handle submission errors 11ms
+   × Add Sale Integration > should handle submission errors 13ms
      → Invalid Chai property: toBeInTheDocument
-   × Add Sale Integration > should include owner_id in inserted data 8ms
+   × Add Sale Integration > should include owner_id in inserted data 11ms
      → Invalid Chai property: toBeInTheDocument
-   × Add Sale Integration > should update React Query cache after successful creation 3ms
+   × Add Sale Integration > should update React Query cache after successful creation 4ms
      → Invalid Chai property: toBeInTheDocument
- ✓ tests/unit/sanitize.test.ts (26 tests) 30ms
- ❯ tests/unit/env.test.ts (9 tests | 1 failed) 58ms
-   × Environment Validation > should handle missing optional variables 8ms
+ ❯ tests/unit/env.test.ts (9 tests | 1 failed) 77ms
+   × Environment Validation > should handle missing optional variables 12ms
      → expected undefined to be 'https://lootaura.app' // Object.is equality
- ✓ tests/unit/metadata.test.ts (8 tests) 24ms
- ❯ tests/stability/list.dom.spec.tsx (6 tests | 4 failed) 75ms
-   × list.dom > should render list panel with correct data attribute 45ms
+ ❯ tests/stability/list.dom.spec.tsx (6 tests | 4 failed) 76ms
+   × list.dom > should render list panel with correct data attribute 48ms
      → Invalid Chai property: toHaveAttribute
-   × list.dom > should render sale cards as descendants of list panel 11ms
+   × list.dom > should render sale cards as descendants of list panel 10ms
      → Invalid Chai property: toHaveAttribute
-   × list.dom > should have grid wrapper classes on list panel 5ms
+   × list.dom > should have grid wrapper classes on list panel 3ms
      → Invalid Chai property: toHaveClass
-   × list.dom > should maintain grid structure with single card 4ms
+   × list.dom > should maintain grid structure with single card 8ms
      → Invalid Chai property: toHaveClass
- ✓ tests/unit/mapAuthorityQuery.test.ts (7 tests) 10ms
- ✓ tests/unit/resolveDatePreset.test.ts (13 tests) 9ms
- ✓ tests/integration/auth.session.test.tsx (12 tests) 8ms
+ ✓ tests/unit/metadata.test.ts (8 tests) 43ms
+ ✓ tests/unit/mapAuthorityQuery.test.ts (7 tests) 8ms
+ ✓ tests/unit/resolveDatePreset.test.ts (13 tests) 10ms
+ ✓ tests/integration/auth.session.test.tsx (12 tests) 7ms
 stdout | tests/unit/geocode.fallback.test.ts > Geocoding Fallback > should geocode address using Nominatim
 [usage] geocode call (count=1)
 
- ✓ tests/stability/visible.recompute.spec.ts (5 tests) 5ms
+ ✓ tests/stability/visible.recompute.spec.ts (5 tests) 6ms
  ↓ tests/snapshots/gridContainer.snapshot.test.tsx (3 tests | 3 skipped)
+ ✓ tests/unit/rateLimiter.test.ts (6 tests) 161ms
+ ✓ tests/stability/arbiter.contract.spec.ts (4 tests) 4ms
 stdout | tests/unit/geocode.fallback.test.ts > Geocoding Fallback > should return null when Nominatim fails
 [usage] geocode call (count=2)
 
- ✓ tests/stability/arbiter.contract.spec.ts (4 tests) 5ms
- ✓ tests/unit/rateLimiter.test.ts (6 tests) 163ms
- ✓ tests/integration/rls.profiles.test.ts (13 tests) 8ms
+ ✓ tests/integration/rls.profiles.test.ts (13 tests) 6ms
  ✓ tests/unit/date-windows.test.ts (6 tests) 7ms
- ✓ tests/stability/server.predicate.spec.ts (5 tests) 6ms
+ ✓ tests/stability/server.predicate.spec.ts (5 tests) 8ms
 stderr | tests/components/FavoriteButton.test.tsx > FavoriteButton > renders save button when not favorited
 Error: Uncaught [Error: invariant expected app router to be mounted]
     at reportException (/home/runner/work/LootAura/LootAura/node_modules/jsdom/lib/jsdom/living/helpers/runtime-script-errors.js:66:24)
@@ -635,20 +635,17 @@ The above error occurred in the <FavoriteButton> component:
 Consider adding an error boundary to your tree to customize error handling behavior.
 Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
 
- ❯ tests/components/FavoriteButton.test.tsx (5 tests | 5 failed) 43ms
-   × FavoriteButton > renders save button when not favorited 27ms
+ ❯ tests/components/FavoriteButton.test.tsx (5 tests | 5 failed) 45ms
+   × FavoriteButton > renders save button when not favorited 29ms
      → invariant expected app router to be mounted
    × FavoriteButton > renders saved button when favorited 4ms
      → invariant expected app router to be mounted
-   × FavoriteButton > calls toggle function when clicked 3ms
+   × FavoriteButton > calls toggle function when clicked 4ms
      → invariant expected app router to be mounted
    × FavoriteButton > shows loading state when pending 3ms
      → invariant expected app router to be mounted
    × FavoriteButton > has correct ARIA attributes 4ms
      → invariant expected app router to be mounted
-stdout | tests/unit/geocode.fallback.test.ts > Geocoding Fallback > should handle Nominatim rate limiting gracefully
-[usage] geocode call (count=4)
-
 stderr | tests/unit/categoryContract.test.ts > Category Contract > toDbSet > should return normalized UI tokens when no mapping exists
 [CATEGORY CONTRACT] No DB mapping cache available, using normalized UI tokens
 
@@ -661,12 +658,15 @@ stdout | tests/unit/categoryContract.test.ts > Category Contract > buildDbMappin
 stdout | tests/unit/categoryContract.test.ts > Category Contract > buildDbMapping > should handle empty DB categories
 [CATEGORY CONTRACT] Built DB mapping: 0 mappings
 
+ ✓ tests/unit/categoryContract.test.ts (10 tests) 9ms
 stdout | tests/unit/categoryContract.test.ts > Category Contract > hasDbMapping > should return true for mapped categories
 [CATEGORY CONTRACT] Built DB mapping: 1 mappings
 
- ✓ tests/unit/categoryContract.test.ts (10 tests) 9ms
  ✓ tests/stability/filters.url-parity.spec.ts (3 tests) 6ms
- ✓ tests/unit/profile.upsert.test.ts (9 tests) 7ms
+stdout | tests/unit/geocode.fallback.test.ts > Geocoding Fallback > should handle Nominatim rate limiting gracefully
+[usage] geocode call (count=4)
+
+ ✓ tests/unit/profile.upsert.test.ts (9 tests) 5ms
 stdout | tests/integration/sales-list.spec.tsx > SalesList Integration > should render sales list with proper grid layout
 [DOM] list item rendered id= 1
 [DOM] list item rendered id= 2
@@ -852,50 +852,50 @@ stdout | tests/integration/sales-list.spec.tsx > SalesList Integration > should 
 [DOM] list item rendered id= 1
 [DOM] item mounts id= 1
 
- ❯ tests/integration/sales-list.spec.tsx (3 tests | 3 failed) 85ms
-   × SalesList Integration > should render sales list with proper grid layout 62ms
+ ❯ tests/integration/sales-list.spec.tsx (3 tests | 3 failed) 88ms
+   × SalesList Integration > should render sales list with proper grid layout 60ms
      → invariant expected app router to be mounted
-   × SalesList Integration > should handle empty sales list 16ms
+   × SalesList Integration > should handle empty sales list 18ms
      → Invalid Chai property: toBeInTheDocument
-   × SalesList Integration > should filter sales by category 7ms
+   × SalesList Integration > should filter sales by category 8ms
      → invariant expected app router to be mounted
- ✓ tests/unit/distance.test.ts (9 tests) 5ms
+ ✓ tests/unit/distance.test.ts (9 tests) 6ms
+ ✓ tests/unit/categories-parse.test.ts (7 tests) 6ms
 stdout | tests/unit/geocode.fallback.test.ts > Geocoding Fallback > should cache results to avoid repeated API calls
 [usage] geocode call (count=6)
 
- ✓ tests/unit/categories-parse.test.ts (7 tests) 6ms
  ✓ tests/unit/auth.ui.test.tsx (6 tests) 4ms
  ✓ tests/unit/arbiter.test.ts (5 tests) 3ms
-stdout | tests/unit/geocode.fallback.test.ts > Geocoding Fallback > should handle malformed Nominatim responses
-[usage] geocode call (count=7)
-
  ✓ tests/unit/zip-normalize.test.ts (5 tests) 4ms
- ❯ tests/components/EmptyState.test.tsx (5 tests | 5 failed) 54ms
-   × EmptyState > renders with default title 37ms
+ ❯ tests/components/EmptyState.test.tsx (5 tests | 5 failed) 49ms
+   × EmptyState > renders with default title 32ms
      → Invalid Chai property: toBeInTheDocument
    × EmptyState > renders with custom title 4ms
      → Invalid Chai property: toBeInTheDocument
-   × EmptyState > renders with custom CTA 5ms
+   × EmptyState > renders with custom CTA 4ms
      → Invalid Chai property: toBeInTheDocument
    × EmptyState > renders without CTA when not provided 3ms
      → Invalid Chai property: toBeInTheDocument
    × EmptyState > has correct structure 3ms
      → Invalid Chai property: toHaveClass
- ✓ tests/build-time/css-tokens.test.ts (2 tests) 3ms
- ❯ tests/unit/geocode.fallback.test.ts (8 tests | 4 failed) 7495ms
-   × Geocoding Fallback > should geocode address using Nominatim 1166ms
-     → expected null to deeply equal { lat: 38.1405, lng: -85.6936, …(4) }
-   ✓ Geocoding Fallback > should return null when Nominatim fails 332ms
-   × Geocoding Fallback > should geocode address with valid input 1828ms
-     → expected null to deeply equal { lat: 38.1405, lng: -85.6936, …(4) }
-   × Geocoding Fallback > should include proper headers for Nominatim requests 1603ms
-     → expected null to deeply equal { lat: 38.1405, lng: -85.6936, …(4) }
-   × Geocoding Fallback > should cache results to avoid repeated API calls 1134ms
-     → expected null to be truthy
-   ✓ Geocoding Fallback > should handle network errors gracefully 1001ms
- ✓ tests/unit/filters.test.ts (5 tests) 7ms
+stdout | tests/unit/geocode.fallback.test.ts > Geocoding Fallback > should handle malformed Nominatim responses
+[usage] geocode call (count=7)
+
+ ✓ tests/build-time/css-tokens.test.ts (2 tests) 5ms
+ ✓ tests/unit/filters.test.ts (5 tests) 4ms
  ↓ tests/integration/map.render.test.tsx (1 test | 1 skipped)
  ❯ tests/components/AddSaleForm.test.tsx (0 test)
+ ❯ tests/unit/geocode.fallback.test.ts (8 tests | 4 failed) 7926ms
+   × Geocoding Fallback > should geocode address using Nominatim 1345ms
+     → expected null to deeply equal { lat: 38.1405, lng: -85.6936, …(4) }
+   ✓ Geocoding Fallback > should return null when Nominatim fails 470ms
+   × Geocoding Fallback > should geocode address with valid input 1665ms
+     → expected null to deeply equal { lat: 38.1405, lng: -85.6936, …(4) }
+   × Geocoding Fallback > should include proper headers for Nominatim requests 1714ms
+     → expected null to deeply equal { lat: 38.1405, lng: -85.6936, …(4) }
+   × Geocoding Fallback > should cache results to avoid repeated API calls 1231ms
+     → expected null to be truthy
+   ✓ Geocoding Fallback > should handle network errors gracefully 1068ms
  ❯ tests/components/ReviewsSection.test.tsx (0 test)
  ❯ tests/integration/gridLayout.integration.test.tsx (0 test)
 
@@ -1355,15 +1355,10 @@ Error: Invalid Chai property: toHaveAttribute
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/57]⎯
 
- Test Files  13 failed | 33 passed | 2 skipped (48)
  FAIL  tests/stability/list.dom.spec.tsx > list.dom > should have grid wrapper classes on list panel
-      Tests  54 failed | 385 passed | 3 skipped | 1 todo (443)
 Error: Invalid Chai property: toHaveClass
-   Start at  05:00:00
  ❯ tests/stability/list.dom.spec.tsx:81:21
-   Duration  17.30s (transform 881ms, setup 149ms, collect 3.20s, tests 9.32s, environment 26.25s, prepare 3.73s)
      79|     
-
      80|     // Confirm grid wrapper class presence
      81|     expect(listPanel).toHaveClass('w-full')
        |                     ^
@@ -1386,6 +1381,11 @@ Error: Invalid Chai property: toHaveClass
 
  FAIL  tests/unit/env.test.ts > Environment Validation > should handle missing optional variables
 AssertionError: expected undefined to be 'https://lootaura.app' // Object.is equality
+
+ Test Files  13 failed | 33 passed | 2 skipped (48)
+      Tests  54 failed | 385 passed | 3 skipped | 1 todo (443)
+   Start at  05:07:12
+   Duration  17.55s (transform 896ms, setup 150ms, collect 3.28s, tests 9.89s, environment 26.02s, prepare 3.83s)
 
 - Expected: 
 "https://lootaura.app"
@@ -1871,6 +1871,8 @@ Error: Error: Invalid Chai property: toHaveAttribute
  ❯ tests/stability/list.dom.spec.tsx:67:16
 
 
+(node:2208) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 unhandledRejection listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
 
 Error: Error: Invalid Chai property: toHaveClass
  ❯ tests/stability/list.dom.spec.tsx:81:21
@@ -1962,6 +1964,4 @@ null
  ❯ tests/unit/geocode.fallback.test.ts:103:21
 
 
-(node:2180) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 unhandledRejection listeners added to [process]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
-(Use `node --trace-warnings ...` to show where the warning was created)
 Error: Process completed with exit code 1.

@@ -108,7 +108,7 @@ describe('Add Sale Integration', () => {
     expect(screen.getByText('Post Your Sale')).toBeInTheDocument()
     expect(screen.getByLabelText('Sale Title *')).toBeInTheDocument()
     expect(screen.getByLabelText('Address *')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /post sale/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^post sale$/i })).toBeInTheDocument()
   })
 
   it('should handle geocoding failure gracefully', async () => {
@@ -117,7 +117,7 @@ describe('Add Sale Integration', () => {
     renderWithProviders(<Explore />, { queryClient })
 
     // Try to submit without required fields
-    const submitButton = screen.getByRole('button', { name: /post sale/i })
+    const submitButton = screen.getByRole('button', { name: /^post sale$/i })
     expect(submitButton).toBeInTheDocument()
   })
 
@@ -127,7 +127,7 @@ describe('Add Sale Integration', () => {
     renderWithProviders(<Explore />, { queryClient })
 
     // Try to submit without required fields
-    const submitButton = screen.getByRole('button', { name: /post sale/i })
+    const submitButton = screen.getByRole('button', { name: /^post sale$/i })
     expect(submitButton).toBeInTheDocument()
   })
 
@@ -137,7 +137,7 @@ describe('Add Sale Integration', () => {
     renderWithProviders(<Explore />, { queryClient })
 
     // Check for loading state
-    expect(screen.getByText('Posting...')).toBeInTheDocument()
+    expect(screen.getAllByText('Posting...')[0]).toBeInTheDocument()
   })
 
   it('should handle submission errors', async () => {
@@ -146,7 +146,7 @@ describe('Add Sale Integration', () => {
     renderWithProviders(<Explore />, { queryClient })
 
     // Check for error handling
-    expect(screen.getByRole('button', { name: /post sale/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^post sale$/i })).toBeInTheDocument()
   })
 
   it('should include owner_id in inserted data', async () => {
@@ -155,7 +155,7 @@ describe('Add Sale Integration', () => {
     renderWithProviders(<Explore />, { queryClient })
 
     // Check that the form includes owner_id
-    expect(screen.getByRole('button', { name: /post sale/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^post sale$/i })).toBeInTheDocument()
   })
 
   it('should update React Query cache after successful creation', async () => {

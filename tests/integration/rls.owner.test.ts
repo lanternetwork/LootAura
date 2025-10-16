@@ -1,4 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('RLS and Owner Permissions', () => {
   it('should set owner_id to auth.uid() when inserting sale', async () => {
@@ -15,8 +19,9 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    ;(supabase.auth.getUser as any).mockResolvedValue({
-      data: { user: { id: testUserId, email: 'test@example.com' } }
+    vi.mocked(supabase.auth.getUser).mockResolvedValue({
+      data: { user: { id: testUserId, email: 'test@example.com' } },
+      error: null
     })
 
     // Simulate the insert operation
@@ -44,8 +49,9 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock anonymous user
-    ;(supabase.auth.getUser as any).mockResolvedValue({
-      data: { user: null }
+    vi.mocked(supabase.auth.getUser).mockResolvedValue({
+      data: { user: null },
+      error: null
     })
 
     // Mock successful select
@@ -74,8 +80,9 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    ;(supabase.auth.getUser as any).mockResolvedValue({
-      data: { user: { id: testUserId, email: 'test@example.com' } }
+    vi.mocked(supabase.auth.getUser).mockResolvedValue({
+      data: { user: { id: testUserId, email: 'test@example.com' } },
+      error: null
     })
 
     // Mock successful update
@@ -110,8 +117,9 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    ;(supabase.auth.getUser as any).mockResolvedValue({
-      data: { user: { id: testUserId, email: 'test@example.com' } }
+    vi.mocked(supabase.auth.getUser).mockResolvedValue({
+      data: { user: { id: testUserId, email: 'test@example.com' } },
+      error: null
     })
 
     // Mock RLS policy violation
@@ -146,8 +154,9 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    ;(supabase.auth.getUser as any).mockResolvedValue({
-      data: { user: { id: testUserId, email: 'test@example.com' } }
+    vi.mocked(supabase.auth.getUser).mockResolvedValue({
+      data: { user: { id: testUserId, email: 'test@example.com' } },
+      error: null
     })
 
     // Mock successful delete

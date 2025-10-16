@@ -833,7 +833,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     return key
   }, [arbiter.mode, mapView.center, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.dateRange, filters.categories, approximateRadiusKmFromZoom])
 
-  const fetchSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }) => {
+  const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }) => {
     // Abort previous sales request
     abortPrevious('sales')
     
@@ -879,11 +879,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       setDateWindow(null)
       setDegraded(false)
       setHasMore(true)
-      if (append) {
-        setLoadingMore(false)
-      } else {
-        setLoading(false)
-      }
+      if (append) setLoadingMore(false); else setLoading(false)
       return
     }
 
@@ -963,7 +959,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
     try {
       // HARD GUARD: Suppress wide /api/sales under MAP authority
-    if (arbiter.authority === 'MAP' && startEpoch === undefined) {
+      if (arbiter.authority === 'MAP') {
         console.log('[GUARD] Suppressed wide /api/sales under MAP authority')
         
         // Warning: Check if categories are present but list is suppressed
@@ -1005,14 +1001,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.log('[DROP] stale response sales (seq mismatch)', { seq, current: requestSeqRef.current })
         return
       }
-      if (filtersEpochRef.current !== (filtersEpochRef.current)) {
-        // this comparison is tautological; leave only logging of epoch for debugging
-        console.log('[DEBUG] sales epoch at completion', { epoch: filtersEpochRef.current })
-      }
-      if (startEpoch !== undefined && filtersEpochRef.current !== startEpoch) {
-        console.log('[DROP] stale response sales (epoch mismatch)', { startEpoch, current: filtersEpochRef.current })
-        return
-      }
+      // Epoch guard handled by markers path that triggers this fetch
       
       console.log('[NET] ok sales', { seq, mode: arbiter.authority, viewportSeq: viewportSeqRef.current })
       console.log(`[SALES] API response:`, data)
@@ -1532,7 +1521,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     } else {
       debouncedTrigger(() => {
         console.log('[NET] start sales {seq: 1, mode: \'FILTERS\'}')
-        fetchSales()
+        fetchSales(false)
         fetchMapSales()
       })
     }

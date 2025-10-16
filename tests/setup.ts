@@ -133,6 +133,14 @@ class DOMRectMock implements DOMRect {
 
 globalThis.DOMRect = DOMRectMock as any
 
+// Global resize simulation helper
+globalThis.__simulateResize = (element: Element, width: number) => {
+  Object.defineProperty(element, 'offsetWidth', { configurable: true, value: width })
+  // Trigger a resize event
+  const resizeEvent = new Event('resize')
+  window.dispatchEvent(resizeEvent)
+}
+
 // Global fetch mock
 globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === 'string' 
@@ -218,7 +226,7 @@ vi.mock('@/lib/supabase/client', () => ({
     from: vi.fn((table: string) => {
       const chain: any = {
         select: vi.fn(() => chain),
-        insert: vi.fn(() => ({ data: [{ id: 'test-id' }], error: null })),
+        insert: vi.fn(() => ({ data: [{ id: 'test-id', owner_id: 'test-user-id' }], error: null })),
         update: vi.fn(() => chain),
         delete: vi.fn(() => chain),
         eq: vi.fn(() => chain),

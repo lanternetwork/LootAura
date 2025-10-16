@@ -157,15 +157,28 @@ jobs:
           NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
           NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
 
+      - name: List build outputs (debug)
+        if: always()
+        run: |
+          pwd
+          ls -la
+          echo "--- .next ---" || true
+          ls -la .next || true
+          echo "--- .next/static ---" || true
+          ls -la .next/static || true
+          echo "--- .next/standalone ---" || true
+          ls -la .next/standalone || true
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: build-artifacts
           path: |
-            .next/
-            dist/
-          if-no-files-found: warn
+            .next/**
+            .next/static/**
+            .next/standalone/**
+          if-no-files-found: error
 
   css-scan:
     name: css-scan

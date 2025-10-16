@@ -2255,7 +2255,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       }
                     }
                     fetchSales(false, center)
-                    fetchMapSales(center)
+                    fetchMapSales(undefined, center)
                   }}
                   onViewChange={({ center, zoom, userInteraction }) => {
                     setMapView({ center, zoom })

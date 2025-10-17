@@ -71,7 +71,7 @@ export function adjacentTileIds(tileId: string): string[] {
 /**
  * Convert viewport to tile bounds
  */
-export function viewportToTileBounds(viewport: Viewport, _zoom: number): TileBounds {
+export function viewportToTileBounds(viewport: Viewport, zoom: number): TileBounds {
   return {
     north: viewport.ne[1],
     south: viewport.sw[1],

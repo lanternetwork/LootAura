@@ -16,7 +16,7 @@ import {
   type ClusterPoint
 } from '@/lib/clustering'
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
-import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
+import { saveViewportState, loadViewportState, type ViewportState } from '@/lib/map/viewportPersistence'
 import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
 import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'
 import { fetchWithCache } from '@/lib/cache/offline'
@@ -236,7 +236,7 @@ export default function SalesMapClustered({
     if (isOfflineCacheEnabled()) {
       const currentTileId = getCurrentTileId(viewport, currentZoom)
       const adjacentTiles = adjacentTileIds(currentTileId)
-      const filterHash = hashFilters(currentFilters)
+      const _filterHash = hashFilters(currentFilters)
       
       adjacentTiles.forEach(tileId => {
         logPrefetchStart(tileId)

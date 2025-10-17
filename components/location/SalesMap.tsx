@@ -63,7 +63,7 @@ export default function SalesMap({
       onMapReady()
     }
   }, [onMapReady])
-  const [_selectedSale, setSelectedSale] = useState<Sale | null>(null)
+  const [_selectedSale, _setSelectedSale] = useState<Sale | null>(null)
   const mapRef = useRef<any>(null)
   const _fitTokenRef = useRef<string | null>(null)
   const _suppressEmitsRef = useRef(false)
@@ -72,10 +72,10 @@ export default function SalesMap({
     latitude: center.lat,
     zoom: zoom
   })
-  const [_mapLoaded, setMapLoaded] = useState(false)
+  const [_mapLoaded, _setMapLoaded] = useState(false)
   const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [visiblePinCount, setVisiblePinCount] = useState(0)
-  const [_moved, setMoved] = useState(false)
+  const [_moved, _setMoved] = useState(false)
   const autoFitAttemptedRef = useRef(false)
   
   // All remaining hooks must be called unconditionally

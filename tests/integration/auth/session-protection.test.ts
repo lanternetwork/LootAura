@@ -129,8 +129,7 @@ describe('Session Protection Middleware', () => {
       
       // The middleware should log authentication checking for protected routes
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[MIDDLEWARE] checking authentication for'),
-        expect.stringContaining('/account')
+        '[MIDDLEWARE] checking authentication for → /account'
       )
 
       consoleSpy.mockRestore()

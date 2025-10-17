@@ -143,28 +143,30 @@ export async function middleware(req: NextRequest) {
       const { createServerSupabaseClient } = await import('@/lib/auth/server-session')
       const supabase = createServerSupabaseClient(cookieStore)
       
-      const { data: profile } = await supabase
-        .from('profiles_v2')
-        .select('home_zip')
-        .eq('id', session.user.id)
-        .maybeSingle()
+      if (supabase && supabase.from) {
+        const { data: profile } = await supabase
+          .from('profiles_v2')
+          .select('home_zip')
+          .eq('id', session.user.id)
+          .maybeSingle()
 
-      // Best-effort: if la_loc cookie missing and profile has home_zip, resolve coordinates and set la_loc
-      const hasCookie = !!cookieStore.get('la_loc')?.value
-      const homeZip = profile?.home_zip as string | undefined
-      if (!hasCookie && homeZip) {
-        try {
-          const url = new URL(req.url)
-          const geoUrl = `${url.origin}/api/geocoding/zip?zip=${encodeURIComponent(homeZip)}`
-          const r = await fetch(geoUrl, { cache: 'no-store' })
-          if (r.ok) {
-            const z = await r.json()
-            if (z?.ok && z.lat && z.lng) {
-              const payload = JSON.stringify({ lat: z.lat, lng: z.lng, zip: z.zip, city: z.city, state: z.state })
-              cookieStore.set({ name: 'la_loc', value: payload, httpOnly: false, maxAge: 60 * 60 * 24, sameSite: 'lax', path: '/' })
+        // Best-effort: if la_loc cookie missing and profile has home_zip, resolve coordinates and set la_loc
+        const hasCookie = !!cookieStore.get('la_loc')?.value
+        const homeZip = profile?.home_zip as string | undefined
+        if (!hasCookie && homeZip) {
+          try {
+            const url = new URL(req.url)
+            const geoUrl = `${url.origin}/api/geocoding/zip?zip=${encodeURIComponent(homeZip)}`
+            const r = await fetch(geoUrl, { cache: 'no-store' })
+            if (r.ok) {
+              const z = await r.json()
+              if (z?.ok && z.lat && z.lng) {
+                const payload = JSON.stringify({ lat: z.lat, lng: z.lng, zip: z.zip, city: z.city, state: z.state })
+                cookieStore.set({ name: 'la_loc', value: payload, httpOnly: false, maxAge: 60 * 60 * 24, sameSite: 'lax', path: '/' })
+              }
             }
-          }
-        } catch {}
+          } catch {}
+        }
       }
     } catch (error) {
       console.error('Error upserting profile:', error)

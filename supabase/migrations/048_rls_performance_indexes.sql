@@ -3,53 +3,95 @@
 -- and ensure queries remain fast with the new security policies.
 
 -- Sales table indexes for RLS policies
-CREATE INDEX IF NOT EXISTS idx_sales_rls_owner_status 
-    ON lootaura_v2.sales (owner_id, status) 
-    WHERE status = 'published';
+-- Check if table exists before creating indexes
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'lootaura_v2' AND table_name = 'sales') THEN
+        CREATE INDEX IF NOT EXISTS idx_sales_rls_owner_status 
+            ON lootaura_v2.sales (owner_id, status) 
+            WHERE status = 'published';
 
-CREATE INDEX IF NOT EXISTS idx_sales_rls_status_created 
-    ON lootaura_v2.sales (status, created_at DESC) 
-    WHERE status = 'published';
+        CREATE INDEX IF NOT EXISTS idx_sales_rls_status_created 
+            ON lootaura_v2.sales (status, created_at DESC) 
+            WHERE status = 'published';
+    END IF;
+END $$;
 
 -- Profiles table indexes for RLS policies
-CREATE INDEX IF NOT EXISTS idx_profiles_rls_id 
-    ON lootaura_v2.profiles (id);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'lootaura_v2' AND table_name = 'profiles') THEN
+        CREATE INDEX IF NOT EXISTS idx_profiles_rls_id 
+            ON lootaura_v2.profiles (id);
+    END IF;
+END $$;
 
 -- Favorites table indexes for RLS policies
-CREATE INDEX IF NOT EXISTS idx_favorites_rls_user_id 
-    ON lootaura_v2.favorites (user_id);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'lootaura_v2' AND table_name = 'favorites') THEN
+        CREATE INDEX IF NOT EXISTS idx_favorites_rls_user_id 
+            ON lootaura_v2.favorites (user_id);
 
-CREATE INDEX IF NOT EXISTS idx_favorites_rls_sale_id 
-    ON lootaura_v2.favorites (sale_id);
+        CREATE INDEX IF NOT EXISTS idx_favorites_rls_sale_id 
+            ON lootaura_v2.favorites (sale_id);
+    END IF;
+END $$;
 
 -- Items table indexes for RLS policies (via sales relationship)
-CREATE INDEX IF NOT EXISTS idx_items_rls_sale_id 
-    ON lootaura_v2.items (sale_id);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'lootaura_v2' AND table_name = 'items') THEN
+        CREATE INDEX IF NOT EXISTS idx_items_rls_sale_id 
+            ON lootaura_v2.items (sale_id);
+    END IF;
+END $$;
 
 -- Composite index for items + sales join performance
-CREATE INDEX IF NOT EXISTS idx_items_sales_join 
-    ON lootaura_v2.items (sale_id, id);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'lootaura_v2' AND table_name = 'items') THEN
+        CREATE INDEX IF NOT EXISTS idx_items_sales_join 
+            ON lootaura_v2.items (sale_id, id);
+    END IF;
+END $$;
 
 -- Spatial indexes for public sales queries (already exist but ensure they're optimized)
-CREATE INDEX IF NOT EXISTS idx_sales_spatial_public 
-    ON lootaura_v2.sales USING GIST (geom) 
-    WHERE status = 'published' AND geom IS NOT NULL;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'lootaura_v2' AND table_name = 'sales') THEN
+        CREATE INDEX IF NOT EXISTS idx_sales_spatial_public 
+            ON lootaura_v2.sales USING GIST (geom) 
+            WHERE status = 'published' AND geom IS NOT NULL;
 
--- Date range indexes for public sales queries
-CREATE INDEX IF NOT EXISTS idx_sales_date_public 
-    ON lootaura_v2.sales (date_start, date_end, status) 
-    WHERE status = 'published';
+        -- Date range indexes for public sales queries
+        CREATE INDEX IF NOT EXISTS idx_sales_date_public 
+            ON lootaura_v2.sales (date_start, date_end, status) 
+            WHERE status = 'published';
 
--- Text search index for public sales (title, description, address)
-CREATE INDEX IF NOT EXISTS idx_sales_text_public 
-    ON lootaura_v2.sales USING GIN (to_tsvector('english', title || ' ' || COALESCE(description, '') || ' ' || address)) 
-    WHERE status = 'published';
+        -- Text search index for public sales (title, description, address)
+        CREATE INDEX IF NOT EXISTS idx_sales_text_public 
+            ON lootaura_v2.sales USING GIN (to_tsvector('english', title || ' ' || COALESCE(description, '') || ' ' || address)) 
+            WHERE status = 'published';
+    END IF;
+END $$;
 
 -- Analyze tables to update statistics for query planner
-ANALYZE lootaura_v2.sales;
-ANALYZE lootaura_v2.profiles;
-ANALYZE lootaura_v2.favorites;
-ANALYZE lootaura_v2.items;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'lootaura_v2' AND table_name = 'sales') THEN
+        ANALYZE lootaura_v2.sales;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'lootaura_v2' AND table_name = 'profiles') THEN
+        ANALYZE lootaura_v2.profiles;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'lootaura_v2' AND table_name = 'favorites') THEN
+        ANALYZE lootaura_v2.favorites;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'lootaura_v2' AND table_name = 'items') THEN
+        ANALYZE lootaura_v2.items;
+    END IF;
+END $$;
 
 -- Create a function to monitor RLS policy performance
 CREATE OR REPLACE FUNCTION get_rls_performance_stats()

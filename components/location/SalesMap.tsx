@@ -18,8 +18,8 @@ interface SalesMapProps {
   selectedSaleId?: string
   onSearchArea?: (args: { bounds: { north: number; south: number; east: number; west: number }, center: { lat: number; lng: number }, zoom: number }) => void
   onViewChange?: (args: { center: { lat: number; lng: number }, zoom: number, userInteraction: boolean }) => void
-  centerOverride?: { lat: number; lng: number; zoom?: number } | null
-  fitBounds?: { north: number; south: number; east: number; west: number } | null
+  centerOverride?: { lat: number; lng: number; zoom?: number; reason?: string } | null
+  fitBounds?: { north: number; south: number; east: number; west: number; reason?: string } | null
   onFitBoundsComplete?: () => void
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number; ts: number } | undefined) => void
   onVisiblePinsChange?: (visibleIds: string[], count: number) => void
@@ -228,9 +228,9 @@ export default function SalesMap({
       try {
         const map = mapRef.current?.getMap?.()
         if (map) {
-          // Block programmatic movement in MAP authority mode
-          if (arbiterAuthority === 'MAP') {
-            console.log('[BLOCK] centerOverride suppressed (mode=map)')
+          // Allow centerOverride for ZIP searches even in MAP authority mode
+          if (arbiterAuthority === 'MAP' && centerOverride.reason !== 'zip') {
+            console.log('[BLOCK] centerOverride suppressed (mode=map, not ZIP)')
             return
           }
           
@@ -255,9 +255,9 @@ export default function SalesMap({
   // Handle fitBounds for distance changes
   useEffect(() => {
     if (fitBounds) {
-      // Block programmatic movement in MAP authority mode
-      if (arbiterAuthority === 'MAP') {
-        console.log('[BLOCK] programmatic move suppressed (map authoritative)')
+      // Allow fitBounds for ZIP searches even in MAP authority mode
+      if (arbiterAuthority === 'MAP' && !fitBounds.reason) {
+        console.log('[BLOCK] programmatic move suppressed (map authoritative, not ZIP)')
         return
       }
       

@@ -299,7 +299,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [_locationAccuracy, _setLocationAccuracy] = useState<'server' | 'client' | 'fallback'>('server')
   const [bannerShown, setBannerShown] = useState<boolean>(false)
   const [lastLocSource, setLastLocSource] = useState<string | undefined>(undefined)
-  const [mapCenterOverride, _setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null)
+  const [mapCenterOverride, _setMapCenterOverride] = useState<{ lat: number; lng: number; zoom?: number; reason?: string } | null>(null)
   const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number; ts: number } | null>(null)
   
   // Stable bbox hash for effect dependencies
@@ -318,7 +318,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [viewportBounds])
   const lastBoundsTsRef = useRef<number | null>(null)
   const [visibleSales, setVisibleSales] = useState<Sale[]>(initialSales)
-  const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
+  const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number; reason?: string } | null>(null)
   const [isUpdating, setIsUpdating] = useState<boolean>(false)
   const [staleSales, setStaleSales] = useState<Sale[]>(initialSales) // Keep previous data during fetch
   const [renderedSales, setRenderedSales] = useState<Sale[]>(initialSales) // Sales visible on map
@@ -333,6 +333,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const salesReqIdRef = useRef<number>(0)
   const markersReqIdRef = useRef<number>(0)
   const currentSalesRequestRef = useRef<{reqId: number, stateKey: string} | null>(null)
+  // Epoch guard to drop stale responses when filters change
+  const filtersEpochRef = useRef(0)
   const currentMarkersRequestRef = useRef<{reqId: number, stateKey: string} | null>(null)
   
   // Arbiter sequencing for latest-wins behavior
@@ -465,9 +467,17 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     setAbortController(newController)
 
     try {
-      const url = endpoint === 'sales' 
-        ? `/api/sales?lat=${queryShape.lat}&lng=${queryShape.lng}&distanceKm=${queryShape.radiusKm}&dateRange=${queryShape.dateRange}&categories=${queryShape.categories.join(',')}`
-        : `/api/sales/markers?lat=${queryShape.lat}&lng=${queryShape.lng}&distanceKm=${queryShape.radiusKm}&dateRange=${queryShape.dateRange}&categories=${queryShape.categories.join(',')}`
+      const params = new URLSearchParams()
+      params.set('lat', String(queryShape.lat))
+      params.set('lng', String(queryShape.lng))
+      params.set('distanceKm', String(queryShape.radiusKm))
+      params.set('dateRange', String(queryShape.dateRange))
+      if (Array.isArray(queryShape.categories) && queryShape.categories.length > 0) {
+        params.set('categories', queryShape.categories.join(','))
+      }
+      const url = endpoint === 'sales'
+        ? `/api/sales?${params.toString()}`
+        : `/api/sales/markers?${params.toString()}`
 
       console.log(`[NET] start ${endpoint} {seq: ${reqId}} key=${stateKey}`)
       
@@ -823,7 +833,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     return key
   }, [arbiter.mode, mapView.center, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.dateRange, filters.categories, approximateRadiusKmFromZoom])
 
-  const fetchSales = useCallback(async (append = false, centerOverride?: { lat: number; lng: number }) => {
+  const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }) => {
     // Abort previous sales request
     abortPrevious('sales')
     
@@ -855,15 +865,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       distanceKmForRequest = milesToKm(filters.distance)
     }
 
-    console.log('[SALES] fetchSales start', { append, mode, useLat, useLng, distanceKmForRequest, filters, centerOverride })
-    if (append) {
-      setLoadingMore(true)
-    } else {
-      setLoading(true)
-      setIsUpdating(true)
-      // Keep stale data during fetch
-      setStaleSales(sales)
-    }
+    console.log('[SALES] fetchSales start', { append, mode, useLat, useLng, distanceKmForRequest, filters, centerOverride, epoch: filtersEpochRef.current })
+    setLoading(true)
+    setIsUpdating(true)
+    setStaleSales(sales)
     console.log(`[SALES] fetchSales called with location: ${useLat}, ${useLng}, append: ${append}`)
     
     // If no location, don't try to fetch sales yet
@@ -874,11 +879,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       setDateWindow(null)
       setDegraded(false)
       setHasMore(true)
-      if (append) {
-        setLoadingMore(false)
-      } else {
-        setLoading(false)
-      }
+      if (append) setLoadingMore(false); else setLoading(false)
       return
     }
 
@@ -1000,6 +1001,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.log('[DROP] stale response sales (seq mismatch)', { seq, current: requestSeqRef.current })
         return
       }
+      // Epoch guard handled by markers path that triggers this fetch
       
       console.log('[NET] ok sales', { seq, mode: arbiter.authority, viewportSeq: viewportSeqRef.current })
       console.log(`[SALES] API response:`, data)
@@ -1039,12 +1041,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           console.log('[DROP] stale/wide response (MAP authority active)')
           return
         }
-        if (append) {
-          setSales(prev => [...prev, ...newSales])
-        } else {
-          setSales(newSales)
-          setIsUpdating(false)
-        }
+        setSales(newSales)
+        setIsUpdating(false)
         setDateWindow(data.dateWindow || null)
         setDegraded(data.degraded || false)
         const pageHasMore = newSales.length === 24
@@ -1116,18 +1114,14 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (salesAbortRef.current === controller) {
         salesAbortRef.current = null
       }
-      if (append) {
-        setLoadingMore(false)
-      } else {
-        setLoading(false)
-      }
+      setLoading(false)
     }
   }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious])
 
   // Client-side geolocation removed; handlers not used
 
   // Fetch markers for map pins using dedicated markers endpoint
-  const fetchMapSales = useCallback(async (centerOverride?: { lat: number; lng: number }) => {
+  const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }) => {
     // Check if we need to fetch based on key change
     const key = buildMarkersKey()
     if (key === lastMarkersKeyRef.current) {
@@ -1148,8 +1142,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const controller = new AbortController()
     markersAbortRef.current = controller
     const seq = ++markerSeqRef.current
+    const startedEpoch = filtersEpochRef.current
     
-    console.log('[NET] start markers', { seq })
+    console.log('[NET] start markers', { seq, epoch: startedEpoch })
     
     const mode = arbiter?.mode || 'initial'
     let useLat = centerOverride?.lat ?? filters.lat
@@ -1273,6 +1268,14 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       // Check if this request was aborted
       if (markerSeqRef.current !== seq) {
         console.log('[NET] aborted markers', { seq })
+        return
+      }
+      if (filtersEpochRef.current !== startedEpoch) {
+        console.log('[DROP] stale response markers (epoch mismatch)', { startedEpoch, current: filtersEpochRef.current })
+        return
+      }
+      if (startEpoch !== undefined && filtersEpochRef.current !== startEpoch) {
+        console.log('[DROP] stale response markers (epoch mismatch)', { startEpoch, current: filtersEpochRef.current })
         return
       }
       
@@ -1449,8 +1452,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     // Bump sequence on category changes to force UI updates
     if (categoriesChanged) {
       listStoreSeqRef.current += 1
+      filtersEpochRef.current += 1
       if (DEBUG) {
-        console.log(`[LIST][CATEGORY] seq bumped to ${listStoreSeqRef.current} due to category change`)
+        console.log(`[LIST][CATEGORY] seq bumped to ${listStoreSeqRef.current} epoch=${filtersEpochRef.current} (category change)`)
       }
     }
     
@@ -1494,7 +1498,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         })
       }
       
-      console.log('[NET] start markers {seq: 1} (MAP authority)')
+      console.log('[NET] start markers {seq: 1} (MAP authority)', { epoch: filtersEpochRef.current })
       fetchMapSales()
       
       // Only suppress network fetch if filters are identical and no category change
@@ -1502,8 +1506,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.log('[FILTER DEBUG] Suppressing list fetch - markers include identical filters')
       } else {
         console.log('[FILTER DEBUG] Allowing list fetch - filters differ or categories changed')
-        // Don't suppress when categories are present unless we're certain filters are identical
-        return // Exit early to allow list fetch
+        // Force a one-shot list fetch when categories changed or filters not equal
+        debouncedTrigger(() => {
+          console.log('[NET] start sales {seq: 1, mode: "MAP-override"}', { epoch: filtersEpochRef.current })
+          fetchSales(false)
+        })
       }
       
       // Warning: Check if categories are present but list is suppressed under MAP authority
@@ -1514,7 +1521,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     } else {
       debouncedTrigger(() => {
         console.log('[NET] start sales {seq: 1, mode: \'FILTERS\'}')
-        fetchSales()
+        fetchSales(false)
         fetchMapSales()
       })
     }
@@ -1837,19 +1844,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const currentCenter = { lat, lng }
     const bbox = computeBboxForRadius(currentCenter, filters.distance)
     
-    // Check if map movement is guarded
-    if (arbiter.guardMapMove) {
-      console.log('[MAP] ignoring auto-fit (guarded) - ZIP search blocked')
-      return
-    }
+    // ZIP searches should always move the map, regardless of current state
+    // Clear any existing guards for ZIP searches
+    setGuardMapMove(false, 'ZIP search - allow movement')
+    console.log('[MAP] ZIP search - clearing guards to allow map movement')
     
-    // In MAP authority mode, never call fitBounds automatically
-    if (arbiter.authority === 'MAP') {
-      console.log('[MAP] ignoring auto-fit - MAP authority mode prevents automatic movement')
-      return
-    }
-    
-    setFitBounds(bbox)
+    setFitBounds({ ...bbox, reason: 'zip' })
     console.log('[ZIP] computed bbox for dist=${filters.distance} -> n=${bbox.north},s=${bbox.south},e=${bbox.east},w=${bbox.west}')
     console.log('[MAP] fitBounds(zip) north=${bbox.north}, south=${bbox.south}, east=${bbox.east}, west=${bbox.west}')
     
@@ -2248,7 +2248,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       }
                     }
                     fetchSales(false, center)
-                    fetchMapSales(center)
+                    fetchMapSales(undefined, center)
                   }}
                   onViewChange={({ center, zoom, userInteraction }) => {
                     setMapView({ center, zoom })

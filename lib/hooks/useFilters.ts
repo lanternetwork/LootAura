@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { normalizeCategoryParams } from '@/lib/shared/categoryNormalizer'
+import { normalizeCategoryParams, normalizeCategories } from '@/lib/shared/categoryNormalizer'
 
 export interface FilterState {
   lat?: number
@@ -103,9 +103,10 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
       params.delete('date')
     }
     
-    // Update categories using canonical parameter
-    if (updatedFilters.categories.length > 0) {
-      params.set('categories', updatedFilters.categories.join(','))
+    // Update categories using canonical parameter (normalize and drop empties)
+    const normalizedCats = normalizeCategories(updatedFilters.categories)
+    if (normalizedCats.length > 0) {
+      params.set('categories', normalizedCats.join(','))
     } else {
       params.delete('categories')
     }

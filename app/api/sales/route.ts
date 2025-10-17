@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     
     
     // Accept both canonical 'categories' and legacy 'cat' parameters
-    const categoriesParam = searchParams.get('categories') || searchParams.get('cat')
+    const categoriesParam = searchParams.get('categories') || searchParams.get('cat') || undefined
     // Canonical parameter parsing - normalize to sorted, deduplicated array
     const categories = normalizeCategories(categoriesParam)
     
@@ -494,7 +494,13 @@ export async function GET(request: NextRequest) {
     
     console.log(`[SALES] Final result: ${results.length} sales, degraded=${degraded}, duration=${Date.now() - startedAt}ms`)
     
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'public, max-age=60, s-maxage=300', // 1 min client, 5 min CDN
+        'CDN-Cache-Control': 'public, max-age=300',
+        'Vary': 'Accept-Encoding'
+      }
+    })
     
   } catch (error: any) {
     console.log(`[SALES][ERROR] Unexpected error: ${error?.message || error}`)

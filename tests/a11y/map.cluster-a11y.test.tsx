@@ -93,7 +93,9 @@ describe('Cluster Marker Accessibility', () => {
     )
 
     const button = screen.getByRole('button')
-    expect(button).toHaveClass('focus:outline-none', 'focus:ring-2', 'focus:ring-blue-500')
+    expect(button).toHaveClass('focus:outline-none')
+    expect(button).toHaveClass('focus:ring-2')
+    expect(button).toHaveClass('focus:ring-blue-500')
   })
 
   it('should show cluster count', () => {
@@ -117,7 +119,9 @@ describe('Cluster Marker Accessibility', () => {
     )
 
     let button = screen.getByRole('button')
-    expect(button).toHaveClass('w-8', 'h-8', 'text-xs')
+    expect(button).toHaveClass('w-8')
+    expect(button).toHaveClass('h-8')
+    expect(button).toHaveClass('text-xs')
     unmount()
 
     // Test medium size
@@ -129,7 +133,9 @@ describe('Cluster Marker Accessibility', () => {
     )
 
     button = screen.getByRole('button')
-    expect(button).toHaveClass('w-10', 'h-10', 'text-sm')
+    expect(button).toHaveClass('w-10')
+    expect(button).toHaveClass('h-10')
+    expect(button).toHaveClass('text-sm')
     unmount()
 
     // Test large size
@@ -141,7 +147,9 @@ describe('Cluster Marker Accessibility', () => {
     )
 
     button = screen.getByRole('button')
-    expect(button).toHaveClass('w-12', 'h-12', 'text-base')
+    expect(button).toHaveClass('w-12')
+    expect(button).toHaveClass('h-12')
+    expect(button).toHaveClass('text-base')
   })
 
   it('should have high contrast colors', () => {
@@ -153,7 +161,9 @@ describe('Cluster Marker Accessibility', () => {
     )
 
     const button = screen.getByRole('button')
-    expect(button).toHaveClass('bg-blue-600', 'text-white', 'border-white')
+    expect(button).toHaveClass('bg-blue-600')
+    expect(button).toHaveClass('text-white')
+    expect(button).toHaveClass('border-white')
   })
 
   it('should handle hover states', () => {
@@ -165,7 +175,8 @@ describe('Cluster Marker Accessibility', () => {
     )
 
     const button = screen.getByRole('button')
-    expect(button).toHaveClass('hover:bg-blue-700', 'hover:shadow-xl')
+    expect(button).toHaveClass('hover:bg-blue-700')
+    expect(button).toHaveClass('hover:shadow-xl')
   })
 
   it('should not render for point markers', () => {

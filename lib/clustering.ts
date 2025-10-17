@@ -35,8 +35,8 @@ export interface ClusterOptions {
 
 export interface ClusterIndex {
   getClusters(bbox: [number, number, number, number], zoom: number): any[]
-  getChildren(clusterId: number): ClusterPoint[]
-  getLeaves(clusterId: number, limit?: number, offset?: number): ClusterPoint[]
+  getChildren(clusterId: number): any[]
+  getLeaves(clusterId: number, limit?: number, offset?: number): any[]
   getClusterExpansionZoom(clusterId: number): number
   getTile(z: number, x: number, y: number): any
 }
@@ -73,7 +73,6 @@ export function buildClusterIndex(
   index.load(points.map(point => ({
     type: 'Feature',
     properties: {
-      id: point.id,
       category: point.category,
       ...point
     },
@@ -166,11 +165,11 @@ export function getClusterChildren(
   limit?: number,
   offset?: number
 ): ClusterPoint[] {
-  return index.getLeaves(clusterId, limit, offset).map(leaf => ({
-    id: leaf.properties.id,
+  return index.getLeaves(clusterId, limit, offset).map((leaf: any) => ({
+    id: leaf.properties?.id || 'unknown',
     lon: leaf.geometry.coordinates[0],
     lat: leaf.geometry.coordinates[1],
-    category: leaf.properties.category,
+    category: leaf.properties?.category,
     ...leaf.properties
   }))
 }

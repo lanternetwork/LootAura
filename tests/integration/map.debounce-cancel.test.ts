@@ -156,7 +156,7 @@ describe('Map Debounce and Cancel', () => {
   })
 
   it('should not degrade payload when within limits', () => {
-    const smallData = [{ id: '1', title: 'Test' }]
+    const smallData = [{ id: '1', title: 'Test', lat: 38.2527, lng: -85.7585 }]
     const result = degradePayloadIfNeeded(smallData, 10000)
 
     expect(result).toEqual(smallData)

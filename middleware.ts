@@ -74,7 +74,7 @@ export async function middleware(req: NextRequest) {
   // 6. Protected routes that require authentication
   const isProtectedRoute = 
     pathname.startsWith('/favorites/') ||
-    pathname.startsWith('/account/') ||
+    pathname.startsWith('/account') ||  // Remove trailing slash to match /account
     pathname.startsWith('/admin/');
   
   // 7. Write APIs that require authentication

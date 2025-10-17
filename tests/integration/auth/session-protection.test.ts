@@ -127,6 +127,7 @@ describe('Session Protection Middleware', () => {
       const request = new NextRequest('http://localhost:3000/account')
       await middleware(request)
       
+      // The middleware should log authentication checking for protected routes
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('[MIDDLEWARE] checking authentication for'),
         expect.stringContaining('/account')

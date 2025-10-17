@@ -6,15 +6,10 @@ import { POST as logoutPOST } from '@/app/api/auth/logout/route'
 
 // Mock the server session module
 vi.mock('@/lib/auth/server-session', () => ({
-  createServerSupabaseClient: vi.fn(() => ({
-    auth: {
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
-      signOut: vi.fn(),
-    },
-  })),
+  createServerSupabaseClient: vi.fn(),
   setSessionCookies: vi.fn(),
   clearSessionCookies: vi.fn(),
+  isValidSession: vi.fn(),
 }))
 
 // Mock cookies
@@ -90,8 +85,9 @@ describe('Auth API Routes', () => {
         },
       }
 
-      const { createServerSupabaseClient } = await import('@/lib/auth/server-session')
+      const { createServerSupabaseClient, isValidSession } = await import('@/lib/auth/server-session')
       vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+      vi.mocked(isValidSession).mockReturnValue(true)
 
       const request = new NextRequest('http://localhost:3000/api/auth/signin', {
         method: 'POST',
@@ -170,8 +166,9 @@ describe('Auth API Routes', () => {
         },
       }
 
-      const { createServerSupabaseClient } = await import('@/lib/auth/server-session')
+      const { createServerSupabaseClient, isValidSession } = await import('@/lib/auth/server-session')
       vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+      vi.mocked(isValidSession).mockReturnValue(true)
 
       const request = new NextRequest('http://localhost:3000/api/auth/signup', {
         method: 'POST',

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
 import { cookies } from 'next/headers'
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     // Check authentication
     const cookieStore = cookies()
-    const supabase = createServerSupabaseClient()
+    const supabase = createSupabaseServerClient()
     
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {

@@ -45,8 +45,8 @@ describe('Upload Rate Limiting', () => {
       },
     }
 
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+    const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+    vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
     const request = new NextRequest('http://localhost:3000/api/upload/signed-url', {
       method: 'POST',

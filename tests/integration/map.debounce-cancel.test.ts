@@ -29,7 +29,10 @@ describe('Map Debounce and Cancel', () => {
     vi.useFakeTimers()
     
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createTestableDebouncedFetcher(fetchFn, { debounceMs: 50 })
+    const fetcher = createTestableDebouncedFetcher(fetchFn, { 
+      debounceMs: 50,
+      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay))
+    })
 
     // Make multiple rapid requests
     const promise1 = fetcher.fetch()
@@ -67,6 +70,7 @@ describe('Map Debounce and Cancel', () => {
     const abortSpy = vi.fn()
     const fetcher = createTestableDebouncedFetcher(fetchFn, { 
       debounceMs: 50,
+      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay)),
       onAbort: abortSpy
     })
 
@@ -196,7 +200,10 @@ describe('Map Debounce and Cancel', () => {
     vi.useFakeTimers()
     
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createTestableDebouncedFetcher(fetchFn, { debounceMs: 50 })
+    const fetcher = createTestableDebouncedFetcher(fetchFn, { 
+      debounceMs: 50,
+      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay))
+    })
 
     // Simulate rapid requests - make them truly synchronous
     const promise1 = fetcher.fetch()
@@ -228,7 +235,8 @@ describe('Map Debounce and Cancel', () => {
     )
     
     const fetcher = createTestableDebouncedFetcher(fetchFn, { 
-      debounceMs: 50
+      debounceMs: 50,
+      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay))
     })
 
     const promise = fetcher.fetch()
@@ -281,7 +289,10 @@ describe('Map Debounce and Cancel', () => {
     const fetchFn = (signal: AbortSignal) => 
       fetch('/api/markers', { signal }).then(res => res.json())
     
-    const fetcher = createTestableDebouncedFetcher(fetchFn, { debounceMs: 50 })
+    const fetcher = createTestableDebouncedFetcher(fetchFn, { 
+      debounceMs: 50,
+      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay))
+    })
 
     // Burst A: several rapid requests
     const promisesA = Array.from({ length: 5 }, () => fetcher.fetch())

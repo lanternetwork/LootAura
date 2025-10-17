@@ -262,6 +262,12 @@ export async function GET(request: NextRequest) {
       distanceKm,
       count: markers.length,
       durationMs: Date.now() - startedAt
+    }, {
+      headers: {
+        'Cache-Control': 'public, max-age=120, s-maxage=600', // 2 min client, 10 min CDN
+        'CDN-Cache-Control': 'public, max-age=600',
+        'Vary': 'Accept-Encoding'
+      }
     })
   } catch (error: any) {
     console.error('Markers API error:', error)

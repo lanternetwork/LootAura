@@ -22,7 +22,7 @@ describe('Map Debounce and Cancel', () => {
     const promise3 = fetcher.fetch()
 
     // Wait for debounce to complete
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await new Promise(resolve => setTimeout(resolve, 5))
 
     const [result1, result2, result3] = await Promise.all([promise1, promise2, promise3])
 
@@ -155,24 +155,22 @@ describe('Map Debounce and Cancel', () => {
 
   it('should handle rapid pan/zoom with debouncing', async () => {
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 1 })
+    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 5 })
 
-    // Simulate rapid requests
-    const promises = []
-    for (let i = 0; i < 2; i++) {
-      promises.push(fetcher.fetch())
-      await new Promise(resolve => setTimeout(resolve, 1))
-    }
+    // Simulate rapid requests - make them truly synchronous
+    const promise1 = fetcher.fetch()
+    const promise2 = fetcher.fetch()
 
-    // Wait for all to complete
+    // Wait for debounce to complete
     await new Promise(resolve => setTimeout(resolve, 10))
 
-    const results = await Promise.all(promises)
+    const [result1, result2] = await Promise.all([promise1, promise2])
 
     // Only the last request should have executed
     expect(fetchFn).toHaveBeenCalledTimes(1)
-    expect(results[results.length - 1].cancelled).toBe(false)
-    expect(results.slice(0, -1).every(r => r.cancelled)).toBe(true)
+    expect(result1.cancelled).toBe(true)
+    expect(result2.cancelled).toBe(false)
+    expect(result2.data).toBe('data')
   })
 
   it('should respect timeout limits', async () => {

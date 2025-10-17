@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerSupabaseClient, setSessionCookies } from '@/lib/auth/server-session'
+import { createServerSupabaseClient, setSessionCookies, isValidSession } from '@/lib/auth/server-session'
 import { cookies } from 'next/headers'
 
 const signupSchema = z.object({
@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // If session is available, set cookies
-    if (data.session) {
+    // If session is available and valid, set cookies
+    if (data.session && isValidSession(data.session) && data.user) {
       const response = NextResponse.json(
         { 
           user: {

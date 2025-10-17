@@ -23,6 +23,18 @@ export interface SupabaseSession {
   }
 }
 
+// Type guard to check if session has required properties
+export function isValidSession(session: any): session is SupabaseSession {
+  return (
+    session &&
+    typeof session.access_token === 'string' &&
+    typeof session.refresh_token === 'string' &&
+    typeof session.expires_at === 'number' &&
+    session.user &&
+    typeof session.user.id === 'string'
+  )
+}
+
 /**
  * Create a Supabase server client bound to request cookies
  * Uses service role key for server-side operations

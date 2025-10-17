@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerSupabaseClient, setSessionCookies } from '@/lib/auth/server-session'
+import { createServerSupabaseClient, setSessionCookies, isValidSession } from '@/lib/auth/server-session'
 import { cookies } from 'next/headers'
 
 const signinSchema = z.object({
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       password,
     })
 
-    if (error || !data.session) {
+    if (error || !data.session || !isValidSession(data.session)) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[AUTH] Sign-in failed:', { event: 'signin', status: 'fail', error: error?.message })
       }

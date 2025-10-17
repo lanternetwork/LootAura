@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, clearSessionCookies } from '@/lib/auth/server-session'
 import { cookies } from 'next/headers'
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const cookieStore = cookies()
     const supabase = createServerSupabaseClient(cookieStore)

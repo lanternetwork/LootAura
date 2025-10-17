@@ -63,11 +63,11 @@ export default function SalesMap({
       onMapReady()
     }
   }, [onMapReady])
-  const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
+  const [_selectedSale, setSelectedSale] = useState<Sale | null>(null)
   const mapRef = useRef<any>(null)
-  const fitTokenRef = useRef<string | null>(null)
-  const suppressEmitsRef = useRef(false)
-  const [viewState, setViewState] = useState({
+  const _fitTokenRef = useRef<string | null>(null)
+  const _suppressEmitsRef = useRef(false)
+  const [_viewState, setViewState] = useState({
     longitude: center.lng,
     latitude: center.lat,
     zoom: zoom
@@ -341,7 +341,7 @@ export default function SalesMap({
   }, [recomputeVisiblePins, onZoomEnd])
 
   // Handle search area
-  const handleSearchArea = useCallback((args: { bounds: { north: number; south: number; east: number; west: number }, center: { lat: number; lng: number }, zoom: number }) => {
+  const _handleSearchArea = useCallback((args: { bounds: { north: number; south: number; east: number; west: number }, center: { lat: number; lng: number }, zoom: number }) => {
     if (onSearchArea) {
       onSearchArea(args)
     }

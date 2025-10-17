@@ -14,7 +14,7 @@ describe('Map Debounce and Cancel', () => {
 
   it('should debounce multiple requests', async () => {
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 1 })
+    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 10 })
 
     // Make multiple rapid requests
     const promise1 = fetcher.fetch()
@@ -22,7 +22,7 @@ describe('Map Debounce and Cancel', () => {
     const promise3 = fetcher.fetch()
 
     // Wait for debounce to complete
-    await new Promise(resolve => setTimeout(resolve, 5))
+    await new Promise(resolve => setTimeout(resolve, 20))
 
     const [result1, result2, result3] = await Promise.all([promise1, promise2, promise3])
 
@@ -155,14 +155,14 @@ describe('Map Debounce and Cancel', () => {
 
   it('should handle rapid pan/zoom with debouncing', async () => {
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 5 })
+    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 10 })
 
     // Simulate rapid requests - make them truly synchronous
     const promise1 = fetcher.fetch()
     const promise2 = fetcher.fetch()
 
     // Wait for debounce to complete
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await new Promise(resolve => setTimeout(resolve, 20))
 
     const [result1, result2] = await Promise.all([promise1, promise2])
 
@@ -176,12 +176,12 @@ describe('Map Debounce and Cancel', () => {
   it('should respect timeout limits', async () => {
     const fetchFn = vi.fn().mockImplementation(() => 
       new Promise((resolve, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 50)
+        setTimeout(() => reject(new Error('Timeout')), 30)
       })
     )
     
     const fetcher = createDebouncedFetcher(fetchFn, { 
-      debounceMs: 1
+      debounceMs: 10
     })
 
     const result = await fetcher.fetch()

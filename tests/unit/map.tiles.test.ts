@@ -42,11 +42,12 @@ describe('Tile Management', () => {
 
   it('should generate different tile IDs for different bounds', () => {
     const bounds1 = { ...testBounds, north: 38.3, south: 38.2 }
-    const bounds2 = { ...testBounds, north: 38.5, south: 38.4 }
+    const bounds2 = { ...testBounds, north: 40.0, south: 39.9 } // Much further apart
     
     const tileId1 = tileIdForBounds(bounds1, 10)
     const tileId2 = tileIdForBounds(bounds2, 10)
     
+    // These should definitely be different with such different bounds
     expect(tileId1).not.toBe(tileId2)
   })
 

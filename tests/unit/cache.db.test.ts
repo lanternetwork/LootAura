@@ -17,6 +17,7 @@ const mockDB = {
   markersByTile: {
     get: vi.fn(),
     put: vi.fn(),
+    delete: vi.fn(),
     where: vi.fn().mockReturnValue({
       below: vi.fn().mockReturnValue({
         delete: vi.fn()

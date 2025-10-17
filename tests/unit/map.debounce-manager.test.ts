@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest'
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
 
 // Test utilities
@@ -19,12 +19,12 @@ async function flushMicrotasks() {
 
 describe('Viewport Fetch Manager', () => {
   let manager: ReturnType<typeof createViewportFetchManager>
-  let mockFetcher: vi.Mock
-  let mockSchedule: vi.Mock
-  let mockControllerFactory: vi.Mock
-  let onAbort: vi.Mock
-  let onStart: vi.Mock
-  let onResolve: vi.Mock
+  let mockFetcher: MockedFunction<any>
+  let mockSchedule: MockedFunction<any>
+  let mockControllerFactory: MockedFunction<any>
+  let onAbort: MockedFunction<any>
+  let onStart: MockedFunction<any>
+  let onResolve: MockedFunction<any>
 
   beforeEach(() => {
     vi.useFakeTimers()

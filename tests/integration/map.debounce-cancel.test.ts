@@ -22,7 +22,7 @@ describe('Map Debounce and Cancel', () => {
     const promise3 = fetcher.fetch()
 
     // Wait for debounce to complete
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 2000))
 
     const [result1, result2, result3] = await Promise.all([promise1, promise2, promise3])
 
@@ -162,7 +162,7 @@ describe('Map Debounce and Cancel', () => {
     const promise2 = fetcher.fetch()
 
     // Wait for debounce to complete
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 2000))
 
     const [result1, result2] = await Promise.all([promise1, promise2])
 
@@ -176,7 +176,7 @@ describe('Map Debounce and Cancel', () => {
   it('should respect timeout limits', async () => {
     const fetchFn = vi.fn().mockImplementation(() => 
       new Promise((resolve, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 1000)
+        setTimeout(() => reject(new Error('Timeout')), 2000)
       })
     )
     

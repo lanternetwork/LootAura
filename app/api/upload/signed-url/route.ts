@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
-import { cookies } from 'next/headers'
 
 // Validation schema
 const uploadRequestSchema = z.object({

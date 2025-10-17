@@ -91,27 +91,52 @@ describe('Cache DB', () => {
       ttl: CACHE_TTL_MS
     }
 
-    const { default: Dexie } = await import('dexie')
-    const mockDB = new Dexie()
-    vi.mocked(mockDB.markersByTile.get).mockResolvedValue(expiredCached)
-    vi.mocked(mockDB.markersByTile.delete).mockResolvedValue(undefined)
+    // Mock the database methods
+    const mockGet = vi.fn().mockResolvedValue(expiredCached)
+    const mockDelete = vi.fn().mockResolvedValue(undefined)
+    
+    // Mock the getDB function to return our mock
+    vi.doMock('@/lib/cache/db', async () => {
+      const actual = await vi.importActual('@/lib/cache/db')
+      return {
+        ...actual,
+        getDB: () => ({
+          markersByTile: {
+            get: mockGet,
+            delete: mockDelete
+          }
+        })
+      }
+    })
 
     const result = await getCachedMarkers('tile1', 'hash1')
     
     expect(result).toBeNull()
-    expect(mockDB.markersByTile.delete).toHaveBeenCalledWith('tile1:hash1')
+    expect(mockDelete).toHaveBeenCalledWith('tile1:hash1')
   })
 
   it('should store markers in cache', async () => {
     const markers = [{ id: '1', lat: 38.2527, lng: -85.7585 }]
     
-    const { default: Dexie } = await import('dexie')
-    const mockDB = new Dexie()
-    vi.mocked(mockDB.markersByTile.put).mockResolvedValue(undefined)
+    // Mock the database methods
+    const mockPut = vi.fn().mockResolvedValue(undefined)
+    
+    // Mock the getDB function to return our mock
+    vi.doMock('@/lib/cache/db', async () => {
+      const actual = await vi.importActual('@/lib/cache/db')
+      return {
+        ...actual,
+        getDB: () => ({
+          markersByTile: {
+            put: mockPut
+          }
+        })
+      }
+    })
 
     await putCachedMarkers('tile1', 'hash1', markers)
     
-    expect(mockDB.markersByTile.put).toHaveBeenCalledWith({
+    expect(mockPut).toHaveBeenCalledWith({
       id: 'tile1:hash1',
       tileId: 'tile1',
       filterHash: 'hash1',
@@ -122,20 +147,34 @@ describe('Cache DB', () => {
   })
 
   it('should prune old cache entries', async () => {
-    const { default: Dexie } = await import('dexie')
-    const mockDB = new Dexie()
+    // Mock the database methods
     const mockWhere = vi.fn().mockReturnValue({
       below: vi.fn().mockReturnValue({
         delete: vi.fn().mockResolvedValue(undefined)
       })
     })
-    vi.mocked(mockDB.markersByTile.where).mockReturnValue(mockWhere)
-    vi.mocked(mockDB.metadata.put).mockResolvedValue(undefined)
+    const mockPut = vi.fn().mockResolvedValue(undefined)
+    
+    // Mock the getDB function to return our mock
+    vi.doMock('@/lib/cache/db', async () => {
+      const actual = await vi.importActual('@/lib/cache/db')
+      return {
+        ...actual,
+        getDB: () => ({
+          markersByTile: {
+            where: mockWhere
+          },
+          metadata: {
+            put: mockPut
+          }
+        })
+      }
+    })
 
     await pruneCache()
     
-    expect(mockDB.markersByTile.where).toHaveBeenCalledWith('timestamp')
-    expect(mockDB.metadata.put).toHaveBeenCalledWith({
+    expect(mockWhere).toHaveBeenCalledWith('timestamp')
+    expect(mockPut).toHaveBeenCalledWith({
       id: 'lastPrune',
       schemaVersion: SCHEMA_VERSION,
       lastPrune: expect.any(Number)
@@ -143,15 +182,28 @@ describe('Cache DB', () => {
   })
 
   it('should clear all cache data', async () => {
-    const { default: Dexie } = await import('dexie')
-    const mockDB = new Dexie()
-    vi.mocked(mockDB.markersByTile.clear).mockResolvedValue(undefined)
-    vi.mocked(mockDB.metadata.clear).mockResolvedValue(undefined)
+    // Mock the database methods
+    const mockClear = vi.fn().mockResolvedValue(undefined)
+    
+    // Mock the getDB function to return our mock
+    vi.doMock('@/lib/cache/db', async () => {
+      const actual = await vi.importActual('@/lib/cache/db')
+      return {
+        ...actual,
+        getDB: () => ({
+          markersByTile: {
+            clear: mockClear
+          },
+          metadata: {
+            clear: mockClear
+          }
+        })
+      }
+    })
 
     await clearCache()
     
-    expect(mockDB.markersByTile.clear).toHaveBeenCalled()
-    expect(mockDB.metadata.clear).toHaveBeenCalled()
+    expect(mockClear).toHaveBeenCalledTimes(2)
   })
 
   it('should get cache statistics', async () => {

@@ -33,10 +33,9 @@ export async function POST(request: NextRequest) {
 
     // Validate input
     const body = await request.json()
-    const { mimeType, sizeBytes, ext, entity, entityId } = uploadRequestSchema.parse(body)
+    const { mimeType, sizeBytes, ext, entity, entityId: _entityId } = uploadRequestSchema.parse(body)
 
     // Check authentication
-    const cookieStore = cookies()
     const supabase = createSupabaseServerClient()
     
     const { data: { user }, error: authError } = await supabase.auth.getUser()

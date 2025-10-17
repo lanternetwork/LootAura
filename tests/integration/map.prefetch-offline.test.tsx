@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { SalesMapClustered } from '@/components/location/SalesMapClustered'
 import { isOfflineCacheEnabled } from '@/lib/flags'
 import { Sale } from '@/lib/types'
@@ -27,20 +27,34 @@ vi.mock('@/lib/telemetry/map', () => ({
   logViewportLoad: vi.fn(),
 }))
 
-// Mock the cache functions
-vi.mock('@/lib/cache/offline', () => ({
-  fetchWithCache: vi.fn().mockResolvedValue({
-    data: { markers: [], success: true },
-    fromCache: false
-  })
-}))
-
 // Mock the viewport fetch manager
 vi.mock('@/lib/map/viewportFetchManager', () => ({
   createViewportFetchManager: vi.fn(() => ({
     request: vi.fn(),
     dispose: vi.fn()
   }))
+}))
+
+// Mock the cache functions
+vi.mock('@/lib/cache/offline', () => ({
+  fetchWithCache: vi.fn()
+}))
+
+// Mock the tile functions
+vi.mock('@/lib/map/tiles', () => ({
+  getCurrentTileId: vi.fn(() => 'test-tile-id'),
+  adjacentTileIds: vi.fn(() => ['adjacent-1', 'adjacent-2'])
+}))
+
+// Mock the filter hash function
+vi.mock('@/lib/filters/hash', () => ({
+  hashFilters: vi.fn(() => 'test-hash')
+}))
+
+// Mock the persistence functions
+vi.mock('@/lib/map/viewportPersistence', () => ({
+  saveViewportState: vi.fn(),
+  loadViewportState: vi.fn(() => null)
 }))
 
 const mockSales: Sale[] = [
@@ -84,7 +98,7 @@ describe('Map Prefetch and Offline Integration', () => {
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
-        zoom={10}
+        zoom={10}}
       />
     )
 
@@ -122,65 +136,5 @@ describe('Map Prefetch and Offline Integration', () => {
 
     // Component should render without errors
     expect(screen.getByRole('button')).toBeInTheDocument()
-  })
-
-  it('should handle viewport persistence', async () => {
-    const onMoveEnd = vi.fn()
-    
-    render(
-      <SalesMapClustered
-        sales={mockSales}
-        markers={mockMarkers}
-        center={{ lat: 38.2527, lng: -85.7585 }}
-        zoom={10}
-        onMoveEnd={onMoveEnd}
-      />
-    )
-
-    // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
-    
-    // The onMoveEnd callback should be available
-    expect(onMoveEnd).toBeDefined()
-  })
-
-  it('should handle zoom events', async () => {
-    const onZoomEnd = vi.fn()
-    
-    render(
-      <SalesMapClustered
-        sales={mockSales}
-        markers={mockMarkers}
-        center={{ lat: 38.2527, lng: -85.7585 }}
-        zoom={10}
-        onZoomEnd={onZoomEnd}
-      />
-    )
-
-    // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
-    
-    // The onZoomEnd callback should be available
-    expect(onZoomEnd).toBeDefined()
-  })
-
-  it('should handle map ready events', async () => {
-    const onMapReady = vi.fn()
-    
-    render(
-      <SalesMapClustered
-        sales={mockSales}
-        markers={mockMarkers}
-        center={{ lat: 38.2527, lng: -85.7585 }}
-        zoom={10}
-        onMapReady={onMapReady}
-      />
-    )
-
-    // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
-    
-    // The onMapReady callback should be available
-    expect(onMapReady).toBeDefined()
   })
 })

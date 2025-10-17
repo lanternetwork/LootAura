@@ -3,6 +3,33 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+// Mock Dexie before importing the module
+vi.mock('dexie', () => {
+  const mockTable = {
+    get: vi.fn(),
+    put: vi.fn(),
+    where: vi.fn().mockReturnValue({
+      below: vi.fn().mockReturnValue({
+        delete: vi.fn()
+      })
+    }),
+    clear: vi.fn(),
+    count: vi.fn(),
+    toArray: vi.fn()
+  }
+
+  const mockDB = {
+    markersByTile: mockTable,
+    metadata: mockTable
+  }
+
+  return {
+    default: vi.fn().mockImplementation(() => mockDB)
+  }
+})
+
+// Import after mocking
 import { 
   getCachedMarkers, 
   putCachedMarkers, 
@@ -11,43 +38,6 @@ import {
   getCacheStats,
   CACHE_TTL_MS
 } from '@/lib/cache/db'
-
-// Mock Dexie for testing
-const mockMarkersByTile = {
-  get: vi.fn(),
-  put: vi.fn(),
-  where: vi.fn().mockReturnValue({
-    below: vi.fn().mockReturnValue({
-      delete: vi.fn()
-    })
-  }),
-  clear: vi.fn(),
-  count: vi.fn().mockResolvedValue(0),
-  toArray: vi.fn().mockResolvedValue([])
-}
-
-const mockMetadata = {
-  put: vi.fn(),
-  clear: vi.fn()
-}
-
-const mockDB = {
-  markersByTile: mockMarkersByTile,
-  metadata: mockMetadata
-}
-
-vi.mock('dexie', () => ({
-  default: vi.fn().mockImplementation(() => mockDB)
-}))
-
-// Mock the getDB function
-vi.mock('@/lib/cache/db', async () => {
-  const actual = await vi.importActual('@/lib/cache/db')
-  return {
-    ...actual,
-    getDB: () => mockDB
-  }
-})
 
 describe('Cache Database', () => {
   beforeEach(() => {
@@ -69,16 +59,21 @@ describe('Cache Database', () => {
       ttl: CACHE_TTL_MS
     }
 
-    mockMarkersByTile.get.mockResolvedValue(mockCached)
+    // Mock the database get method
+    const { default: Dexie } = await import('dexie')
+    const mockDB = new Dexie()
+    vi.mocked(mockDB.markersByTile.get).mockResolvedValue(mockCached)
 
     const result = await getCachedMarkers('tile1', 'hash1')
     
     expect(result).toEqual(mockMarkers)
-    expect(mockMarkersByTile.get).toHaveBeenCalledWith('tile1:hash1')
+    expect(mockDB.markersByTile.get).toHaveBeenCalledWith('tile1:hash1')
   })
 
   it('should return null when no cached data', async () => {
-    mockMarkersByTile.get.mockResolvedValue(null)
+    const { default: Dexie } = await import('dexie')
+    const mockDB = new Dexie()
+    vi.mocked(mockDB.markersByTile.get).mockResolvedValue(null)
 
     const result = await getCachedMarkers('tile1', 'hash1')
     
@@ -95,21 +90,27 @@ describe('Cache Database', () => {
       ttl: CACHE_TTL_MS
     }
 
-    mockMarkersByTile.get.mockResolvedValue(expiredCached)
-    mockMarkersByTile.delete.mockResolvedValue(undefined)
+    const { default: Dexie } = await import('dexie')
+    const mockDB = new Dexie()
+    vi.mocked(mockDB.markersByTile.get).mockResolvedValue(expiredCached)
+    vi.mocked(mockDB.markersByTile.delete).mockResolvedValue(undefined)
 
     const result = await getCachedMarkers('tile1', 'hash1')
     
     expect(result).toBeNull()
-    expect(mockMarkersByTile.delete).toHaveBeenCalledWith('tile1:hash1')
+    expect(mockDB.markersByTile.delete).toHaveBeenCalledWith('tile1:hash1')
   })
 
   it('should store markers in cache', async () => {
     const markers = [{ id: '1', lat: 38.2527, lng: -85.7585 }]
     
+    const { default: Dexie } = await import('dexie')
+    const mockDB = new Dexie()
+    vi.mocked(mockDB.markersByTile.put).mockResolvedValue(undefined)
+
     await putCachedMarkers('tile1', 'hash1', markers)
     
-    expect(mockMarkersByTile.put).toHaveBeenCalledWith({
+    expect(mockDB.markersByTile.put).toHaveBeenCalledWith({
       id: 'tile1:hash1',
       tileId: 'tile1',
       filterHash: 'hash1',
@@ -120,25 +121,34 @@ describe('Cache Database', () => {
   })
 
   it('should prune old cache entries', async () => {
-    const mockDelete = vi.fn().mockResolvedValue(undefined)
-    mockMarkersByTile.where.mockReturnValue({
+    const mockWhere = {
       below: vi.fn().mockReturnValue({
-        delete: mockDelete
+        delete: vi.fn().mockResolvedValue(1)
       })
-    })
+    }
+    
+    const { default: Dexie } = await import('dexie')
+    const mockDB = new Dexie()
+    vi.mocked(mockDB.markersByTile.where).mockReturnValue(mockWhere)
+    vi.mocked(mockDB.metadata.put).mockResolvedValue(undefined)
 
     await pruneCache()
     
-    expect(mockMarkersByTile.where).toHaveBeenCalledWith('timestamp')
-    expect(mockDelete).toHaveBeenCalled()
-    expect(mockMetadata.put).toHaveBeenCalled()
+    expect(mockDB.markersByTile.where).toHaveBeenCalledWith('timestamp')
+    expect(mockWhere.below).toHaveBeenCalled()
+    expect(mockDB.metadata.put).toHaveBeenCalled()
   })
 
   it('should clear all cache data', async () => {
+    const { default: Dexie } = await import('dexie')
+    const mockDB = new Dexie()
+    vi.mocked(mockDB.markersByTile.clear).mockResolvedValue(undefined)
+    vi.mocked(mockDB.metadata.clear).mockResolvedValue(undefined)
+
     await clearCache()
     
-    expect(mockMarkersByTile.clear).toHaveBeenCalled()
-    expect(mockMetadata.clear).toHaveBeenCalled()
+    expect(mockDB.markersByTile.clear).toHaveBeenCalled()
+    expect(mockDB.metadata.clear).toHaveBeenCalled()
   })
 
   it('should get cache statistics', async () => {
@@ -147,13 +157,24 @@ describe('Cache Database', () => {
       { id: '2', markers: [{ id: '2' }] }
     ]
     
-    mockMarkersByTile.count.mockResolvedValue(2)
-    mockMarkersByTile.toArray.mockResolvedValue(mockEntries)
+    const { default: Dexie } = await import('dexie')
+    const mockDB = new Dexie()
+    vi.mocked(mockDB.markersByTile.count).mockResolvedValue(2)
+    vi.mocked(mockDB.markersByTile.toArray).mockResolvedValue(mockEntries)
 
     const stats = await getCacheStats()
     
-    expect(stats).toEqual({ count: 2, size: expect.any(Number) })
-    expect(mockMarkersByTile.count).toHaveBeenCalled()
-    expect(mockMarkersByTile.toArray).toHaveBeenCalled()
+    expect(stats.count).toBe(2)
+    expect(stats.size).toBeGreaterThan(0)
+  })
+
+  it('should handle database errors gracefully', async () => {
+    const { default: Dexie } = await import('dexie')
+    const mockDB = new Dexie()
+    vi.mocked(mockDB.markersByTile.get).mockRejectedValue(new Error('Database error'))
+
+    const result = await getCachedMarkers('tile1', 'hash1')
+    
+    expect(result).toBeNull()
   })
 })

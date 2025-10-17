@@ -20,14 +20,17 @@ export interface Viewport {
  * Uses a simple grid system based on zoom level and geographic bounds
  */
 export function tileIdForBounds(bounds: TileBounds, zoom: number): string {
-  // Use a grid system based on zoom level
+  // Use a more precise grid system based on zoom level
   const gridSize = Math.pow(2, Math.max(0, zoom - 8)) // Start grid at zoom 8
   const latStep = 180 / gridSize
   const lngStep = 360 / gridSize
   
-  // Calculate grid coordinates
-  const latIndex = Math.floor((bounds.north + 90) / latStep)
-  const lngIndex = Math.floor((bounds.west + 180) / lngStep)
+  // Calculate grid coordinates using center of bounds for more precision
+  const centerLat = (bounds.north + bounds.south) / 2
+  const centerLng = (bounds.east + bounds.west) / 2
+  
+  const latIndex = Math.floor((centerLat + 90) / latStep)
+  const lngIndex = Math.floor((centerLng + 180) / lngStep)
   
   return `${zoom}-${latIndex}-${lngIndex}`
 }

@@ -73,7 +73,7 @@ describe('Rate Limiter', () => {
     const middleware = createRateLimitMiddleware({
       limit: 1,
       windowMs: 60000,
-      keyGenerator: (request) => `key-${request.url}`
+      keyGenerator: (request: Request) => `key-${request.url}`
     })
 
     const request1 = new Request('http://localhost:3000/test1')

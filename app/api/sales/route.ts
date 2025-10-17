@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
     
     console.log(`[SALES] Query params: lat=${latitude}, lng=${longitude}, km=${distanceKm}, start=${startDateParam}, end=${endDateParam}, categories=[${categories.join(',')}], q=${q}, limit=${limit}, offset=${offset}`)
     
-    let results: Sale[] = []
+    let results: PublicSale[] = []
     let degraded = false
     
     // 3. Use direct query to sales_v2 view (RPC functions have permission issues)

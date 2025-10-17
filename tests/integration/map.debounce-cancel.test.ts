@@ -9,7 +9,7 @@ import {
   degradePayloadIfNeeded
 } from '@/lib/debouncedFetch'
 import { createTestableDebouncedFetcher } from '@/lib/debouncedFetch.testable'
-import { createDeferred, flushMicrotasks } from '../__testlib__/testUtils'
+import { createDeferred, flushMicrotasks } from '../__utils__/async'
 
 // MSW server for deterministic network testing
 const server = setupServer()
@@ -22,6 +22,9 @@ describe('Map Debounce and Cancel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useRealTimers()
+    // Silence debug logs during tests
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   it('should debounce multiple requests', async () => {

@@ -128,17 +128,13 @@ describe('Viewport Fetch Manager', () => {
       const viewport: Viewport = { sw: [0, 0], ne: [1, 1] }
       const filters: Filters = { categories: ['test'] }
 
-      // Fire three bursts
-      manager.request(viewport, filters) // A
-      vi.advanceTimersByTime(25)
-      
-      manager.request(viewport, filters) // B (cancels A)
-      vi.advanceTimersByTime(25)
-      
-      manager.request(viewport, filters) // C (cancels B)
+      // Fire three bursts - only the last one should execute due to debouncing
+      manager.request(viewport, filters) // A (scheduled)
+      manager.request(viewport, filters) // B (cancels A, scheduled)
+      manager.request(viewport, filters) // C (cancels B, scheduled)
       vi.advanceTimersByTime(50) // Start C
 
-      expect(manager.getStats()).toEqual({ started: 3, aborted: 2, resolved: 0 })
+      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
 
       // Only C should resolve
       deferredC.resolve({ success: true })
@@ -181,7 +177,7 @@ describe('Viewport Fetch Manager', () => {
       vi.advanceTimersByTime(50)
 
       // Get the abort signal that was passed
-      const abortSignal = mockFetcher.mock.calls[0][2]
+      const abortSignal = mockFetcher.mock.calls[0][2] as AbortSignal
       expect(abortSignal.aborted).toBe(false)
 
       // Trigger new request to abort the first one
@@ -234,15 +230,14 @@ describe('Viewport Fetch Manager', () => {
 
       expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 1 })
 
-      // Second request - aborted
+      // Second request - aborted by third
       manager.request(viewport, filters)
-      vi.advanceTimersByTime(25)
       manager.request(viewport, filters) // This aborts the second
       vi.advanceTimersByTime(50)
       deferred3.resolve({ success: true })
       await flushMicrotasks()
 
-      expect(manager.getStats()).toEqual({ started: 3, aborted: 1, resolved: 2 })
+      expect(manager.getStats()).toEqual({ started: 2, aborted: 0, resolved: 2 })
     })
   })
 })

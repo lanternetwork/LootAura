@@ -44,7 +44,7 @@ export function createViewportFetchManager(options: ViewportFetchManagerOptions)
 
   let timeoutId: any = null
   let currentController: AbortController | null = null
-  let stats = { started: 0, aborted: 0, resolved: 0 }
+  const stats = { started: 0, aborted: 0, resolved: 0 }
 
   const request = (viewport: Viewport, filters: Filters): void => {
     // Clear previous timeout
@@ -82,7 +82,7 @@ export function createViewportFetchManager(options: ViewportFetchManagerOptions)
             }
           }
         })
-        .catch((error) => {
+        .catch((_error) => {
           // Only count as error if not aborted
           if (currentController && !currentController.signal.aborted) {
             if (onAbort) {
@@ -107,6 +107,7 @@ export function createViewportFetchManager(options: ViewportFetchManagerOptions)
     }
     if (currentController) {
       currentController.abort()
+      stats.aborted++
       currentController = null
     }
   }

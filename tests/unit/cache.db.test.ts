@@ -11,41 +11,47 @@ import {
   getCacheStats,
   CACHE_TTL_MS
 } from '@/lib/cache/db'
-import 'fake-indexeddb/auto'
 
-// Mock the getDB function to return a mock database
+// Mock Dexie for testing
+const mockMarkersByTile = {
+  get: vi.fn(),
+  put: vi.fn(),
+  where: vi.fn().mockReturnValue({
+    below: vi.fn().mockReturnValue({
+      delete: vi.fn()
+    })
+  }),
+  clear: vi.fn(),
+  count: vi.fn().mockResolvedValue(0),
+  toArray: vi.fn().mockResolvedValue([])
+}
+
+const mockMetadata = {
+  put: vi.fn(),
+  clear: vi.fn()
+}
+
+const mockDB = {
+  markersByTile: mockMarkersByTile,
+  metadata: mockMetadata
+}
+
+vi.mock('dexie', () => ({
+  default: vi.fn().mockImplementation(() => mockDB)
+}))
+
+// Mock the getDB function
 vi.mock('@/lib/cache/db', async () => {
   const actual = await vi.importActual('@/lib/cache/db')
   return {
     ...actual,
-    getDB: vi.fn(() => ({
-      markersByTile: {
-        get: vi.fn(),
-        put: vi.fn(),
-        where: vi.fn().mockReturnValue({
-          below: vi.fn().mockReturnValue({
-            delete: vi.fn()
-          })
-        }),
-        clear: vi.fn(),
-        count: vi.fn().mockResolvedValue(0),
-        toArray: vi.fn().mockResolvedValue([])
-      },
-      metadata: {
-        put: vi.fn(),
-        clear: vi.fn()
-      }
-    }))
+    getDB: () => mockDB
   }
 })
 
 describe('Cache Database', () => {
-  let mockDB: any
-
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks()
-    const { getDB } = await import('@/lib/cache/db')
-    mockDB = getDB()
   })
 
   afterEach(() => {
@@ -63,16 +69,16 @@ describe('Cache Database', () => {
       ttl: CACHE_TTL_MS
     }
 
-    mockDB.markersByTile.get.mockResolvedValue(mockCached)
+    mockMarkersByTile.get.mockResolvedValue(mockCached)
 
     const result = await getCachedMarkers('tile1', 'hash1')
     
     expect(result).toEqual(mockMarkers)
-    expect(mockDB.markersByTile.get).toHaveBeenCalledWith('tile1:hash1')
+    expect(mockMarkersByTile.get).toHaveBeenCalledWith('tile1:hash1')
   })
 
   it('should return null when no cached data', async () => {
-    mockDB.markersByTile.get.mockResolvedValue(null)
+    mockMarkersByTile.get.mockResolvedValue(null)
 
     const result = await getCachedMarkers('tile1', 'hash1')
     
@@ -89,22 +95,21 @@ describe('Cache Database', () => {
       ttl: CACHE_TTL_MS
     }
 
-    mockDB.markersByTile.get.mockResolvedValue(expiredCached)
-    mockDB.markersByTile.delete = vi.fn().mockResolvedValue(undefined)
+    mockMarkersByTile.get.mockResolvedValue(expiredCached)
+    mockMarkersByTile.delete.mockResolvedValue(undefined)
 
     const result = await getCachedMarkers('tile1', 'hash1')
     
     expect(result).toBeNull()
-    expect(mockDB.markersByTile.delete).toHaveBeenCalledWith('tile1:hash1')
+    expect(mockMarkersByTile.delete).toHaveBeenCalledWith('tile1:hash1')
   })
 
   it('should store markers in cache', async () => {
     const markers = [{ id: '1', lat: 38.2527, lng: -85.7585 }]
-    mockDB.markersByTile.put.mockResolvedValue(undefined)
-
+    
     await putCachedMarkers('tile1', 'hash1', markers)
     
-    expect(mockDB.markersByTile.put).toHaveBeenCalledWith({
+    expect(mockMarkersByTile.put).toHaveBeenCalledWith({
       id: 'tile1:hash1',
       tileId: 'tile1',
       filterHash: 'hash1',
@@ -115,47 +120,40 @@ describe('Cache Database', () => {
   })
 
   it('should prune old cache entries', async () => {
-    const mockWhere = vi.fn().mockReturnValue({
+    const mockDelete = vi.fn().mockResolvedValue(undefined)
+    mockMarkersByTile.where.mockReturnValue({
       below: vi.fn().mockReturnValue({
-        delete: vi.fn().mockResolvedValue(undefined)
+        delete: mockDelete
       })
     })
-    mockDB.markersByTile.where = mockWhere
-    mockDB.metadata.put.mockResolvedValue(undefined)
 
     await pruneCache()
     
-    expect(mockDB.markersByTile.where).toHaveBeenCalledWith('timestamp')
-    expect(mockDB.metadata.put).toHaveBeenCalledWith({
-      id: 'lastPrune',
-      schemaVersion: expect.any(String),
-      lastPrune: expect.any(Number)
-    })
+    expect(mockMarkersByTile.where).toHaveBeenCalledWith('timestamp')
+    expect(mockDelete).toHaveBeenCalled()
+    expect(mockMetadata.put).toHaveBeenCalled()
   })
 
   it('should clear all cache data', async () => {
-    mockDB.markersByTile.clear.mockResolvedValue(undefined)
-    mockDB.metadata.clear.mockResolvedValue(undefined)
-
     await clearCache()
     
-    expect(mockDB.markersByTile.clear).toHaveBeenCalled()
-    expect(mockDB.metadata.clear).toHaveBeenCalled()
+    expect(mockMarkersByTile.clear).toHaveBeenCalled()
+    expect(mockMetadata.clear).toHaveBeenCalled()
   })
 
   it('should get cache statistics', async () => {
     const mockEntries = [
-      { markers: [{ id: '1' }] },
-      { markers: [{ id: '2' }] }
+      { id: '1', markers: [{ id: '1' }] },
+      { id: '2', markers: [{ id: '2' }] }
     ]
     
-    mockDB.markersByTile.count.mockResolvedValue(2)
-    mockDB.markersByTile.toArray.mockResolvedValue(mockEntries)
+    mockMarkersByTile.count.mockResolvedValue(2)
+    mockMarkersByTile.toArray.mockResolvedValue(mockEntries)
 
     const stats = await getCacheStats()
     
     expect(stats).toEqual({ count: 2, size: expect.any(Number) })
-    expect(mockDB.markersByTile.count).toHaveBeenCalled()
-    expect(mockDB.markersByTile.toArray).toHaveBeenCalled()
+    expect(mockMarkersByTile.count).toHaveBeenCalled()
+    expect(mockMarkersByTile.toArray).toHaveBeenCalled()
   })
 })

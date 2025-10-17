@@ -85,10 +85,30 @@ The following paths are publicly accessible:
 - `SUPABASE_SERVICE_ROLE_KEY` - Required for server-side Supabase operations
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `NEXT_PUBLIC_DEBUG` - Debug logging flag
+- `NEXT_PUBLIC_SITE_URL` - Required for email confirmation redirects
+- `NEXT_PUBLIC_GOOGLE_ENABLED` - Optional, defaults to enabled for Google OAuth
 
 ### GitHub Actions Secrets
 The following secrets must be configured in GitHub Actions:
 - `SUPABASE_SERVICE_ROLE_KEY` - For CI/CD authentication
+
+## Email Confirmations & OAuth
+
+### Email Redirect Configuration
+- **`NEXT_PUBLIC_SITE_URL`**: Required for proper email confirmation redirects
+- **Fallback**: If not set, uses Supabase default redirect (with warning log)
+- **Redirect URL**: `${NEXT_PUBLIC_SITE_URL}/auth/callback`
+
+### Google OAuth Integration
+- **Provider**: Google OAuth via Supabase
+- **Button Visibility**: Controlled by `NEXT_PUBLIC_GOOGLE_ENABLED` (defaults to enabled)
+- **Session Cookies**: Main session cookies remain `SameSite=Strict`
+- **OAuth State**: Uses short-lived `SameSite=Lax` cookie during callback exchange only
+
+### Resend Confirmation
+- **Endpoint**: `POST /api/auth/resend`
+- **UI Component**: `<ResendConfirmation email={email} />`
+- **Rate Limiting**: Handled by Supabase
 
 ## Test Coverage
 
@@ -97,6 +117,9 @@ The following secrets must be configured in GitHub Actions:
 - **Input Validation**: Tests for email format and password strength validation
 - **API Endpoints**: Tests for sign-in, sign-up, and logout endpoints
 - **Error Handling**: Tests for various error scenarios
+- **Email Redirects**: Tests for `NEXT_PUBLIC_SITE_URL` configuration
+- **Google OAuth**: Tests for OAuth initiation and callback handling
+- **Resend Confirmation**: Tests for resend email functionality
 
 ### Integration Tests
 - **Session Protection**: Tests for protected route access control

@@ -1,35 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, setSessionCookies, isValidSession } from '@/lib/auth/server-session'
+import { cookies } from 'next/headers'
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
-  const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
-  const redirectTo = searchParams.get('redirectTo') ?? '/'
+  try {
+    const cookieStore = cookies()
+    const supabase = createServerSupabaseClient(cookieStore)
 
-  if (code) {
-    const supabase = createSupabaseServerClient()
-    
-    try {
-      const { error } = await supabase.auth.exchangeCodeForSession(code)
-      
-      if (!error) {
-        // Get the user to trigger profile creation in middleware
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        if (user) {
-          console.log('User authenticated:', user.id)
-        }
-        
-        // Redirect to the intended destination
-        const finalRedirect = redirectTo !== '/' ? redirectTo : next
-        return NextResponse.redirect(`${origin}${finalRedirect}`)
+    // Handle OAuth callback
+    const { data, error } = await supabase.auth.getSession()
+
+    if (error || !data.session || !isValidSession(data.session)) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[AUTH] OAuth callback failed:', { event: 'oauth-callback', status: 'fail' })
       }
-    } catch (error) {
-      console.error('Auth callback error:', error)
+      
+      // Redirect to signin with error
+      const signinUrl = new URL('/auth/signin', request.url)
+      signinUrl.searchParams.set('error', 'oauth_failed')
+      return NextResponse.redirect(signinUrl)
     }
-  }
 
-  // If there's an error or no code, redirect to login
-  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
+    // Set session cookies
+    const response = NextResponse.redirect(new URL('/', request.url))
+    setSessionCookies(response, data.session)
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[AUTH] OAuth callback successful:', { event: 'oauth-callback', status: 'ok' })
+    }
+
+    return response
+
+  } catch (error) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[AUTH] OAuth callback error:', { event: 'oauth-callback', status: 'fail' })
+    }
+
+    // Redirect to signin with error
+    const signinUrl = new URL('/auth/signin', request.url)
+    signinUrl.searchParams.set('error', 'oauth_error')
+    return NextResponse.redirect(signinUrl)
+  }
 }

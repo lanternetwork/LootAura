@@ -24,11 +24,11 @@ export async function POST(request: NextRequest) {
 
     if (error || !data.session || !isValidSession(data.session)) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AUTH] Sign-in failed:', { event: 'signin', status: 'fail', error: error?.message })
+        console.log('[AUTH] Sign-in failed:', { event: 'signin', status: 'fail', code: error?.message })
       }
       
       return NextResponse.json(
-        { error: 'Invalid credentials' },
+        { code: error?.message || 'Invalid session', message: 'Auth failed' },
         { status: 401 }
       )
     }
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     setSessionCookies(response, data.session)
 
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH] Sign-in successful:', { event: 'signin', status: 'ok', userId: data.user.id })
+      console.log('[AUTH] Sign-in successful:', { event: 'signin', status: 'ok' })
     }
 
     return response

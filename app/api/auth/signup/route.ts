@@ -18,19 +18,33 @@ export async function POST(request: NextRequest) {
     const cookieStore = cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
+    // Configure email redirect URL
+    const emailRedirectTo = process.env.NEXT_PUBLIC_SITE_URL
+      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+      : undefined
+
+    if (!emailRedirectTo && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[AUTH] WARNING: NEXT_PUBLIC_SITE_URL not set, using Supabase default email redirect')
+    }
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[AUTH] Sign-up redirect configured:', { event: 'signup', redirectToSet: !!emailRedirectTo })
+    }
+
     // Attempt to sign up with Supabase
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: { emailRedirectTo }
     })
 
     if (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AUTH] Sign-up failed:', { event: 'signup', status: 'fail', error: error.message })
+        console.log('[AUTH] Sign-up failed:', { event: 'signup', status: 'fail', code: error.message })
       }
       
       return NextResponse.json(
-        { error: 'Failed to create account' },
+        { code: error.message, message: 'Auth failed' },
         { status: 400 }
       )
     }
@@ -66,7 +80,7 @@ export async function POST(request: NextRequest) {
       setSessionCookies(response, data.session)
 
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AUTH] Sign-up successful:', { event: 'signup', status: 'ok', userId: data.user.id })
+        console.log('[AUTH] Sign-up successful:', { event: 'signup', status: 'ok' })
       }
 
       return response

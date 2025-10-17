@@ -1,6 +1,25 @@
 # LootAura Changelog
 
-**Last updated: 2025-10-15 — Performance Optimization Implementation**
+**Last updated: 2025-10-17 — Stable Debounce Manager + CI All Green**
+
+## [2025-10-17] Stable Debounce Manager + CI All Green
+
+### Added
+- `docs/architecture/fetching.md`: Architecture doc covering debounce modes (`leading`, `trailing`, `leading-trailing`), abort/cancel behavior, and test invariants.
+
+### Changed
+- Debounce manager tests aligned to `trailing` mode for deterministic collapse of rapid requests.
+- Refined test expectations to match mode semantics and fixed deferred-resolution in tests.
+- Deflaked cluster performance consistency test using median-of-middle and a tolerance suited for CI variance.
+
+### Fixed
+- Persistent timeouts and mismatched expectations in debounce/cancel tests.
+- Incorrect deferred promise resolutions in trailing mode unit tests.
+
+### Testing
+- Counters (`started`, `aborted`, `resolved`) asserted across scenarios: collapse, cancel/replace, abort signal propagation, and dispose.
+
+---
 
 ## [2025-10-15] Performance Optimization Implementation
 

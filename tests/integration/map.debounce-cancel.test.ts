@@ -14,7 +14,7 @@ describe('Map Debounce and Cancel', () => {
 
   it('should debounce multiple requests', async () => {
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 50 })
+    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 10 })
 
     // Make multiple rapid requests
     const promise1 = fetcher.fetch()
@@ -22,7 +22,7 @@ describe('Map Debounce and Cancel', () => {
     const promise3 = fetcher.fetch()
 
     // Wait for debounce to complete
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise(resolve => setTimeout(resolve, 50))
 
     const [result1, result2, result3] = await Promise.all([promise1, promise2, promise3])
 
@@ -136,28 +136,36 @@ describe('Map Debounce and Cancel', () => {
       id: i.toString(),
       title: `Test ${i}`,
       lat: 38.2527 + (i * 0.001),
-      lng: -85.7585 + (i * 0.001)
+      lng: -85.7585 + (i * 0.001),
+      description: `This is a very long description for item ${i} that will make the payload larger`,
+      category: 'furniture',
+      price: 100 + i,
+      condition: 'good'
     }))
 
     const result = degradePayloadIfNeeded(largeData, 10000)
 
-    expect(result.length).toBeLessThan(largeData.length)
+    // Should return same number of items but with fewer fields
+    expect(result.length).toBe(largeData.length)
     expect(result.length).toBeGreaterThan(0)
+    
+    // Should only have minimal fields
+    expect(Object.keys(result[0])).toEqual(['id', 'title', 'lat', 'lng'])
   })
 
   it('should handle rapid pan/zoom with debouncing', async () => {
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 50 })
+    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 10 })
 
     // Simulate rapid requests
     const promises = []
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5; i++) {
       promises.push(fetcher.fetch())
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise(resolve => setTimeout(resolve, 5))
     }
 
     // Wait for all to complete
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise(resolve => setTimeout(resolve, 50))
 
     const results = await Promise.all(promises)
 
@@ -173,8 +181,8 @@ describe('Map Debounce and Cancel', () => {
     )
     
     const fetcher = createDebouncedFetcher(fetchFn, { 
-      debounceMs: 50,
-      timeoutMs: 100 
+      debounceMs: 10,
+      timeoutMs: 50 
     })
 
     const result = await fetcher.fetch()

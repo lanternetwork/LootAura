@@ -8,6 +8,8 @@ import { Sale } from '@/lib/types'
 // import { formatLocation } from '@/lib/location/client'
 import { getMapboxToken } from '@/lib/maps/token'
 import { incMapLoad } from '@/lib/usageLogs'
+import { isClusteringEnabled } from '@/lib/clustering'
+import SalesMapClustered from './SalesMapClustered'
 
 interface SalesMapProps {
   sales: Sale[]
@@ -50,6 +52,31 @@ export default function SalesMap({
   arbiterMode,
   arbiterAuthority
 }: SalesMapProps) {
+  // Use clustering if enabled, otherwise fall back to individual markers
+  if (isClusteringEnabled()) {
+    return (
+      <SalesMapClustered
+        sales={sales}
+        markers={markers}
+        center={center}
+        zoom={zoom}
+        onSaleClick={onSaleClick}
+        selectedSaleId={selectedSaleId}
+        onSearchArea={onSearchArea}
+        onViewChange={onViewChange}
+        centerOverride={centerOverride}
+        fitBounds={fitBounds}
+        onFitBoundsComplete={onFitBoundsComplete}
+        onBoundsChange={onBoundsChange}
+        onVisiblePinsChange={onVisiblePinsChange}
+        onMoveEnd={onMoveEnd}
+        onZoomEnd={onZoomEnd}
+        onMapReady={onMapReady}
+        arbiterMode={arbiterMode}
+        arbiterAuthority={arbiterAuthority}
+      />
+    )
+  }
   useEffect(() => {
     incMapLoad()
   }, [])

@@ -352,11 +352,11 @@ function FiltersContent({
           <span className="text-gray-500 mr-2"></span>
           <label className="text-sm font-medium text-gray-700">Categories</label>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
           {CATEGORY_OPTIONS.map((category) => (
             <label
               key={category.value}
-              className={`flex items-center p-2 rounded-lg border cursor-pointer transition-colors ${
+              className={`flex items-center p-2 rounded-lg border cursor-pointer transition-colors min-h-[44px] ${
                 filters.categories.includes(category.value)
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -366,7 +366,7 @@ function FiltersContent({
                 type="checkbox"
                 checked={filters.categories.includes(category.value)}
                 onChange={() => onCategoryToggle(category.value)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 min-h-4 min-w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
               />
               <span className="ml-2 text-sm font-medium">{category.icon}</span>
               <span className="ml-1 text-sm">{category.label}</span>

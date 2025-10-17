@@ -117,8 +117,8 @@ describe('Viewport Fetch Manager', () => {
       // Now the fetch should start
       expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
       
-      // Resolve the fetch
-      deferredB.resolve({ success: true })
+      // Resolve the fetch (it will use deferredA since there's only one call in trailing mode)
+      deferredA.resolve({ success: true })
       await flushMicrotasks()
 
       expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 1 })
@@ -156,8 +156,8 @@ describe('Viewport Fetch Manager', () => {
       vi.advanceTimersByTime(300)
       expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
 
-      // Only C should resolve
-      deferredC.resolve({ success: true })
+      // Only the first deferred should resolve (since there's only one call in trailing mode)
+      deferredA.resolve({ success: true })
       await flushMicrotasks()
 
       expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 1 })

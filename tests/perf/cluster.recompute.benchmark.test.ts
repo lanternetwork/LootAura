@@ -82,7 +82,7 @@ describe('Cluster Performance Benchmarks', () => {
     
     // Simulate rapid viewport changes
     for (let i = 0; i < 10; i++) {
-      const bbox = bboxes[i % bboxes.length]
+      const bbox = bboxes[i % bboxes.length] as [number, number, number, number]
       const zoom = 8 + (i % 8)
       getClustersForViewport(index, bbox, zoom)
     }

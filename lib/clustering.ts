@@ -19,6 +19,10 @@ export interface ClusterResult {
   lat: number
   children?: ClusterPoint[]
   properties?: Record<string, any>
+  geometry?: {
+    type: 'Point'
+    coordinates: [number, number]
+  }
 }
 
 export interface ClusterOptions {
@@ -30,7 +34,7 @@ export interface ClusterOptions {
 }
 
 export interface ClusterIndex {
-  getClusters(bbox: [number, number, number, number], zoom: number): ClusterResult[]
+  getClusters(bbox: [number, number, number, number], zoom: number): any[]
   getChildren(clusterId: number): ClusterPoint[]
   getLeaves(clusterId: number, limit?: number, offset?: number): ClusterPoint[]
   getClusterExpansionZoom(clusterId: number): number
@@ -114,16 +118,18 @@ export function getClustersForViewport(
         count: cluster.properties.point_count,
         lon: cluster.geometry.coordinates[0],
         lat: cluster.geometry.coordinates[1],
-        properties: cluster.properties
+        properties: cluster.properties,
+        geometry: cluster.geometry
       }
     } else {
       // This is a point
       return {
         type: 'point',
-        id: cluster.properties.id,
+        id: cluster.properties?.id || 'unknown',
         lon: cluster.geometry.coordinates[0],
         lat: cluster.geometry.coordinates[1],
-        properties: cluster.properties
+        properties: cluster.properties,
+        geometry: cluster.geometry
       }
     }
   })

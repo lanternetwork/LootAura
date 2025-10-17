@@ -137,6 +137,8 @@ describe('Map Debounce and Cancel', () => {
     const largeData = new Array(1000).fill({ 
       id: '1', 
       title: 'Test', 
+      lat: 38.2527,
+      lng: -85.7585,
       description: 'Long description',
       extra: 'data'
     })
@@ -146,8 +148,8 @@ describe('Map Debounce and Cancel', () => {
     expect(degraded[0]).toEqual({
       id: '1',
       title: 'Test',
-      lat: undefined,
-      lng: undefined
+      lat: 38.2527,
+      lng: -85.7585
     })
     expect(degraded[0]).not.toHaveProperty('description')
     expect(degraded[0]).not.toHaveProperty('extra')

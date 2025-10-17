@@ -60,11 +60,11 @@ describe('Cluster Marker Accessibility', () => {
     
     // Test Enter key
     fireEvent.keyDown(button, { key: 'Enter' })
-    expect(onKeyDown).toHaveBeenCalledWith(mockCluster, expect.any(Object))
+    expect(onKeyDown).toHaveBeenCalledWith(mockCluster)
     
     // Test Space key
     fireEvent.keyDown(button, { key: ' ' })
-    expect(onKeyDown).toHaveBeenCalledWith(mockCluster, expect.any(Object))
+    expect(onKeyDown).toHaveBeenCalledWith(mockCluster)
   })
 
   it('should handle click events', () => {
@@ -108,7 +108,8 @@ describe('Cluster Marker Accessibility', () => {
   })
 
   it('should apply correct size classes', () => {
-    const { rerender } = render(
+    // Test small size
+    const { unmount } = render(
       <ClusterMarker
         cluster={mockCluster}
         size="small"
@@ -117,8 +118,10 @@ describe('Cluster Marker Accessibility', () => {
 
     let button = screen.getByRole('button')
     expect(button).toHaveClass('w-8', 'h-8', 'text-xs')
+    unmount()
 
-    rerender(
+    // Test medium size
+    render(
       <ClusterMarker
         cluster={mockCluster}
         size="medium"
@@ -127,8 +130,10 @@ describe('Cluster Marker Accessibility', () => {
 
     button = screen.getByRole('button')
     expect(button).toHaveClass('w-10', 'h-10', 'text-sm')
+    unmount()
 
-    rerender(
+    // Test large size
+    render(
       <ClusterMarker
         cluster={mockCluster}
         size="large"

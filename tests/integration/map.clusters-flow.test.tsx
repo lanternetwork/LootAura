@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { SalesMapClustered } from '@/components/location/SalesMapClustered'
+import SalesMapClustered from '@/components/location/SalesMapClustered'
 import { Sale } from '@/lib/types'
 
 // Mock react-map-gl
@@ -40,7 +40,10 @@ describe('Map Clusters Flow', () => {
       privacy_mode: 'exact',
       is_featured: false,
       created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z'
+      updated_at: '2024-01-01T00:00:00Z',
+      owner_id: 'user-1',
+      city: 'Louisville',
+      state: 'KY'
     },
     {
       id: '2',
@@ -53,7 +56,10 @@ describe('Map Clusters Flow', () => {
       privacy_mode: 'exact',
       is_featured: false,
       created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z'
+      updated_at: '2024-01-01T00:00:00Z',
+      owner_id: 'user-2',
+      city: 'Louisville',
+      state: 'KY'
     }
   ]
 

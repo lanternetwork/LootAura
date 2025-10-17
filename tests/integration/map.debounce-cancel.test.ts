@@ -34,7 +34,8 @@ describe('Map Debounce and Cancel', () => {
     const fetchFn = vi.fn().mockResolvedValue('data')
     const fetcher = createTestableDebouncedFetcher(fetchFn, { 
       debounceMs: 50,
-      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay))
+      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay)),
+      clearScheduler: vi.fn().mockImplementation((id) => clearTimeout(id))
     })
 
     // Make multiple rapid requests
@@ -74,6 +75,7 @@ describe('Map Debounce and Cancel', () => {
     const fetcher = createTestableDebouncedFetcher(fetchFn, { 
       debounceMs: 50,
       scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay)),
+      clearScheduler: vi.fn().mockImplementation((id) => clearTimeout(id)),
       onAbort: abortSpy
     })
 
@@ -205,7 +207,8 @@ describe('Map Debounce and Cancel', () => {
     const fetchFn = vi.fn().mockResolvedValue('data')
     const fetcher = createTestableDebouncedFetcher(fetchFn, { 
       debounceMs: 50,
-      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay))
+      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay)),
+      clearScheduler: vi.fn().mockImplementation((id) => clearTimeout(id))
     })
 
     // Simulate rapid requests - make them truly synchronous
@@ -239,7 +242,8 @@ describe('Map Debounce and Cancel', () => {
     
     const fetcher = createTestableDebouncedFetcher(fetchFn, { 
       debounceMs: 50,
-      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay))
+      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay)),
+      clearScheduler: vi.fn().mockImplementation((id) => clearTimeout(id))
     })
 
     const promise = fetcher.fetch()
@@ -294,7 +298,8 @@ describe('Map Debounce and Cancel', () => {
     
     const fetcher = createTestableDebouncedFetcher(fetchFn, { 
       debounceMs: 50,
-      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay))
+      scheduler: vi.fn().mockImplementation((fn, delay) => setTimeout(fn, delay)),
+      clearScheduler: vi.fn().mockImplementation((id) => clearTimeout(id))
     })
 
     // Burst A: several rapid requests

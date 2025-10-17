@@ -6,6 +6,7 @@ export interface TestableDebouncedFetchOptions {
   maxRetries?: number
   timeoutMs?: number
   scheduler?: (fn: () => void, delay: number) => NodeJS.Timeout
+  clearScheduler?: (id: NodeJS.Timeout) => void
   onAbort?: (requestId: number) => void
 }
 
@@ -29,6 +30,7 @@ class TestableDebouncedFetcher<T> {
       maxRetries: 3,
       timeoutMs: 10000,
       scheduler: setTimeout,
+      clearScheduler: clearTimeout,
       ...options
     }
   }
@@ -44,7 +46,7 @@ class TestableDebouncedFetcher<T> {
 
     // Clear previous timeout
     if (this.timeoutId) {
-      clearTimeout(this.timeoutId)
+      this.options.clearScheduler!(this.timeoutId)
     }
 
     // Create new abort controller
@@ -88,7 +90,7 @@ class TestableDebouncedFetcher<T> {
       }
     }
     if (this.timeoutId) {
-      clearTimeout(this.timeoutId)
+      this.options.clearScheduler!(this.timeoutId)
     }
   }
 

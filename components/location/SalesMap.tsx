@@ -77,6 +77,8 @@ export default function SalesMap({
       />
     )
   }
+
+  // All hooks for non-clustered map (called after conditional return)
   useEffect(() => {
     incMapLoad()
   }, [])
@@ -92,14 +94,13 @@ export default function SalesMap({
   const fitTokenRef = useRef<string | null>(null)
   const suppressEmitsRef = useRef(false)
   const [viewState, setViewState] = useState({
-    latitude: center.lat,
     longitude: center.lng,
+    latitude: center.lat,
     zoom: zoom
   })
-  const [_moved, setMoved] = useState(false)
+  const [mapLoaded, setMapLoaded] = useState(false)
   const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [visiblePinCount, setVisiblePinCount] = useState(0)
-  const autoFitAttemptedRef = useRef(false)
   
   useEffect(() => {
     console.log('[MAP] initialized with', sales.length, 'sales')

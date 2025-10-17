@@ -5,15 +5,12 @@ import Map, { Marker, Popup } from 'react-map-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Sale } from '@/lib/types'
 import { getMapboxToken } from '@/lib/maps/token'
-import { incMapLoad } from '@/lib/usageLogs'
 import { 
   buildClusterIndex, 
   getClustersForViewport, 
   getClusterExpansionZoom,
-  getClusterChildren,
   isClusteringEnabled,
   getClusterSizeTier,
-  getClusterLabel,
   type ClusterIndex,
   type ClusterResult,
   type ClusterPoint
@@ -48,25 +45,25 @@ export default function SalesMapClustered({
   zoom = 10,
   onSaleClick,
   selectedSaleId,
-  onSearchArea,
+  onSearchArea: _onSearchArea,
   onViewChange,
-  centerOverride,
-  fitBounds,
-  onFitBoundsComplete,
-  onBoundsChange,
+  centerOverride: _centerOverride,
+  fitBounds: _fitBounds,
+  onFitBoundsComplete: _onFitBoundsComplete,
+  onBoundsChange: _onBoundsChange,
   onVisiblePinsChange,
   onMoveEnd,
   onZoomEnd,
   onMapReady,
-  arbiterMode,
-  arbiterAuthority
+  arbiterMode: _arbiterMode,
+  arbiterAuthority: _arbiterAuthority
 }: SalesMapClusteredProps) {
   const mapRef = useRef<any>(null)
-  const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
-  const [visiblePinCount, setVisiblePinCount] = useState(0)
+  const [_visiblePinIds, setVisiblePinIds] = useState<string[]>([])
+  const [_visiblePinCount, setVisiblePinCount] = useState(0)
   const [clusters, setClusters] = useState<ClusterResult[]>([])
   const [clusterIndex, setClusterIndex] = useState<ClusterIndex | null>(null)
-  const [mapLoaded, setMapLoaded] = useState(false)
+  const [_mapLoaded, setMapLoaded] = useState(false)
 
   // Convert markers to cluster points
   const clusterPoints = useMemo((): ClusterPoint[] => {

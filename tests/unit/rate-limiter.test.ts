@@ -4,16 +4,14 @@ import { checkRateLimit, createRateLimitMiddleware, RATE_LIMITS } from '@/lib/ra
 describe('Rate Limiter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Clear any existing rate limit data
     vi.clearAllTimers()
   })
 
   it('should allow requests within limit', () => {
     const key = 'test-key'
     const limit = 3
-    const windowMs = 60000 // 1 minute
+    const windowMs = 60000
 
-    // First 3 requests should be allowed
     expect(checkRateLimit(key, limit, windowMs)).toBe(true)
     expect(checkRateLimit(key, limit, windowMs)).toBe(true)
     expect(checkRateLimit(key, limit, windowMs)).toBe(true)
@@ -22,31 +20,22 @@ describe('Rate Limiter', () => {
   it('should block requests after limit exceeded', () => {
     const key = 'test-key-2'
     const limit = 2
-    const windowMs = 60000 // 1 minute
+    const windowMs = 60000
 
-    // First 2 requests should be allowed
     expect(checkRateLimit(key, limit, windowMs)).toBe(true)
     expect(checkRateLimit(key, limit, windowMs)).toBe(true)
-    
-    // Third request should be blocked
     expect(checkRateLimit(key, limit, windowMs)).toBe(false)
   })
 
   it('should reset after window expires', () => {
     const key = 'test-key-3'
     const limit = 1
-    const windowMs = 100 // Very short window
+    const windowMs = 100
 
-    // First request should be allowed
     expect(checkRateLimit(key, limit, windowMs)).toBe(true)
-    
-    // Second request should be blocked
     expect(checkRateLimit(key, limit, windowMs)).toBe(false)
     
-    // Wait for window to expire
     vi.advanceTimersByTime(windowMs + 1)
-    
-    // Request should be allowed again
     expect(checkRateLimit(key, limit, windowMs)).toBe(true)
   })
 
@@ -59,11 +48,9 @@ describe('Rate Limiter', () => {
 
     const mockRequest = new Request('http://localhost:3000/test')
 
-    // First 2 requests should be allowed
     expect(middleware(mockRequest).allowed).toBe(true)
     expect(middleware(mockRequest).allowed).toBe(true)
     
-    // Third request should be blocked
     const result = middleware(mockRequest)
     expect(result.allowed).toBe(false)
     expect(result.error).toBe('Too many requests. Please try again later.')
@@ -79,16 +66,15 @@ describe('Rate Limiter', () => {
     const request1 = new Request('http://localhost:3000/test1')
     const request2 = new Request('http://localhost:3000/test2')
 
-    // Both should be allowed since they have different keys
     expect(middleware(request1).allowed).toBe(true)
     expect(middleware(request2).allowed).toBe(true)
   })
 
   it('should have correct rate limit configurations', () => {
     expect(RATE_LIMITS.AUTH.limit).toBe(10)
-    expect(RATE_LIMITS.AUTH.windowMs).toBe(15 * 60 * 1000) // 15 minutes
+    expect(RATE_LIMITS.AUTH.windowMs).toBe(15 * 60 * 1000)
     
     expect(RATE_LIMITS.UPLOAD_SIGNER.limit).toBe(5)
-    expect(RATE_LIMITS.UPLOAD_SIGNER.windowMs).toBe(60 * 1000) // 1 minute
+    expect(RATE_LIMITS.UPLOAD_SIGNER.windowMs).toBe(60 * 1000)
   })
 })

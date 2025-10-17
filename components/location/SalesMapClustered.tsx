@@ -15,6 +15,7 @@ import {
   type ClusterResult,
   type ClusterPoint
 } from '@/lib/clustering'
+import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
 import ClusterMarker from './ClusterMarker'
 
 interface SalesMapClusteredProps {
@@ -65,6 +66,42 @@ export default function SalesMapClustered({
   const [clusterIndex, setClusterIndex] = useState<ClusterIndex | null>(null)
   const [_mapLoaded, setMapLoaded] = useState(false)
 
+  // Create viewport fetch manager for debounced viewport-based data fetching
+  const viewportFetchManager = useMemo(() => {
+    return createViewportFetchManager({
+      debounceMs: 300,
+      fetcher: async (viewport: Viewport, filters: Filters, signal: AbortSignal) => {
+        // This is a placeholder - in a real implementation, this would fetch data
+        // based on the viewport bounds and filters
+        console.log('[VIEWPORT] Fetch request', { viewport, filters })
+        
+        // Simulate async operation
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        if (signal.aborted) {
+          throw new Error('Request aborted')
+        }
+        
+        return { success: true }
+      },
+      onStart: () => {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[VIEWPORT] Fetch started')
+        }
+      },
+      onResolve: (result) => {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[VIEWPORT] Fetch resolved', result)
+        }
+      },
+      onAbort: (reason) => {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[VIEWPORT] Fetch aborted', reason)
+        }
+      }
+    })
+  }, [])
+
   // Convert markers to cluster points
   const clusterPoints = useMemo((): ClusterPoint[] => {
     return markers.map(marker => ({
@@ -100,6 +137,13 @@ export default function SalesMapClustered({
     }
   }, [clusterPoints])
 
+  // Cleanup viewport fetch manager on unmount
+  useEffect(() => {
+    return () => {
+      viewportFetchManager.dispose()
+    }
+  }, [viewportFetchManager])
+
   // Update clusters when viewport changes
   const updateClusters = useCallback((map: any) => {
     if (!isClusteringEnabled() || !clusterIndex) {
@@ -131,7 +175,17 @@ export default function SalesMapClustered({
     if (onVisiblePinsChange) {
       onVisiblePinsChange(visibleIds, visibleIds.length)
     }
-  }, [clusterIndex, onVisiblePinsChange])
+
+    // Trigger viewport fetch request for additional data
+    const viewport: Viewport = {
+      sw: [bounds.getWest(), bounds.getSouth()],
+      ne: [bounds.getEast(), bounds.getNorth()]
+    }
+    const filters: Filters = {
+      // Add any relevant filters here
+    }
+    viewportFetchManager.request(viewport, filters)
+  }, [clusterIndex, onVisiblePinsChange, viewportFetchManager])
 
   // Handle cluster click - zoom to cluster bounds
   const handleClusterClick = useCallback((cluster: ClusterResult) => {

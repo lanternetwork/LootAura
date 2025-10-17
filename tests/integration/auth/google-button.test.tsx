@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 
 // Mock fetch
@@ -69,8 +69,10 @@ describe('Google Sign-In Button', () => {
       method: 'POST',
     })
 
-    // Should redirect to Google OAuth URL
-    expect(window.location.href).toBe('https://accounts.google.com/oauth/authorize?client_id=...')
+    // Wait for the async operation to complete and check redirect
+    await waitFor(() => {
+      expect(window.location.href).toBe('https://accounts.google.com/oauth/authorize?client_id=...')
+    })
   })
 
   it('should show loading state during sign-in', async () => {

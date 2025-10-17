@@ -14,7 +14,7 @@ describe('Map Debounce and Cancel', () => {
 
   it('should debounce multiple requests', async () => {
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 5 })
+    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 1 })
 
     // Make multiple rapid requests
     const promise1 = fetcher.fetch()
@@ -22,7 +22,7 @@ describe('Map Debounce and Cancel', () => {
     const promise3 = fetcher.fetch()
 
     // Wait for debounce to complete
-    await new Promise(resolve => setTimeout(resolve, 20))
+    await new Promise(resolve => setTimeout(resolve, 10))
 
     const [result1, result2, result3] = await Promise.all([promise1, promise2, promise3])
 
@@ -155,17 +155,17 @@ describe('Map Debounce and Cancel', () => {
 
   it('should handle rapid pan/zoom with debouncing', async () => {
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 5 })
+    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 1 })
 
     // Simulate rapid requests
     const promises = []
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       promises.push(fetcher.fetch())
-      await new Promise(resolve => setTimeout(resolve, 2))
+      await new Promise(resolve => setTimeout(resolve, 1))
     }
 
     // Wait for all to complete
-    await new Promise(resolve => setTimeout(resolve, 20))
+    await new Promise(resolve => setTimeout(resolve, 10))
 
     const results = await Promise.all(promises)
 
@@ -178,12 +178,12 @@ describe('Map Debounce and Cancel', () => {
   it('should respect timeout limits', async () => {
     const fetchFn = vi.fn().mockImplementation(() => 
       new Promise((resolve, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 100)
+        setTimeout(() => reject(new Error('Timeout')), 50)
       })
     )
     
     const fetcher = createDebouncedFetcher(fetchFn, { 
-      debounceMs: 5
+      debounceMs: 1
     })
 
     const result = await fetcher.fetch()

@@ -38,7 +38,7 @@ describe('Viewport Fetch Manager', () => {
 
     manager = createViewportFetchManager({
       debounceMs: 300,
-      debounceMode: 'leading-trailing',
+      debounceMode: 'trailing',
       schedule: mockSchedule,
       fetcher: mockFetcher,
       controllerFactory: mockControllerFactory,
@@ -66,23 +66,23 @@ describe('Viewport Fetch Manager', () => {
         manager.request(viewport, filters)
       }
 
-      // First request should start immediately (leading)
-      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
-      expect(mockFetcher).toHaveBeenCalledTimes(1)
-      expect(onStart).toHaveBeenCalledTimes(1)
+      // No requests should start immediately in trailing mode
+      expect(manager.getStats()).toEqual({ started: 0, aborted: 0, resolved: 0 })
+      expect(mockFetcher).toHaveBeenCalledTimes(0)
+      expect(onStart).toHaveBeenCalledTimes(0)
 
       // Advance timers to trigger trailing execution
       vi.advanceTimersByTime(300)
 
-      // Should still be only one fetch (trailing replaces the same request)
-      expect(manager.getStats()).toEqual({ started: 2, aborted: 1, resolved: 0 })
-      expect(mockFetcher).toHaveBeenCalledTimes(2)
+      // Should be only one fetch (trailing mode collapses all requests)
+      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
+      expect(mockFetcher).toHaveBeenCalledTimes(1)
 
       // Resolve the final fetch
       deferred.resolve({ success: true })
       await flushMicrotasks()
 
-      expect(manager.getStats()).toEqual({ started: 2, aborted: 1, resolved: 1 })
+      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 1 })
       expect(onResolve).toHaveBeenCalledWith({ success: true })
     })
   })
@@ -101,20 +101,27 @@ describe('Viewport Fetch Manager', () => {
 
       // Trigger first request
       manager.request(viewport, filters)
-      vi.advanceTimersByTime(50) // Start fetch A
+      vi.advanceTimersByTime(50) // No fetch yet in trailing mode
 
-      // Trigger second request before A completes
+      // Trigger second request - should cancel the first trailing timer
       manager.request(viewport, filters)
-      vi.advanceTimersByTime(50) // Start fetch B
+      vi.advanceTimersByTime(50) // Still no fetch yet
 
-      expect(manager.getStats()).toEqual({ started: 2, aborted: 1, resolved: 0 })
-      expect(onAbort).toHaveBeenCalledWith('new request')
+      // No requests should have started yet in trailing mode
+      expect(manager.getStats()).toEqual({ started: 0, aborted: 0, resolved: 0 })
+      expect(onAbort).not.toHaveBeenCalled()
 
-      // Resolve B
+      // Advance timers to trigger the trailing execution
+      vi.advanceTimersByTime(300)
+      
+      // Now the fetch should start
+      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
+      
+      // Resolve the fetch
       deferredB.resolve({ success: true })
       await flushMicrotasks()
 
-      expect(manager.getStats()).toEqual({ started: 2, aborted: 1, resolved: 1 })
+      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 1 })
       expect(onResolve).toHaveBeenCalledWith({ success: true })
     })
   })
@@ -133,25 +140,27 @@ describe('Viewport Fetch Manager', () => {
       const viewport: Viewport = { sw: [0, 0], ne: [1, 1] }
       const filters: Filters = { categories: ['test'] }
 
-      // Start A immediately (leading)
+      // In trailing mode, no requests start immediately
       manager.request(viewport, filters) // A
-      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
+      expect(manager.getStats()).toEqual({ started: 0, aborted: 0, resolved: 0 })
 
-      // Call B, advance by 300ms → starts B & aborts A
+      // Call B - should cancel A's timer
       manager.request(viewport, filters) // B
-      vi.advanceTimersByTime(300)
-      expect(manager.getStats()).toEqual({ started: 2, aborted: 1, resolved: 0 })
+      expect(manager.getStats()).toEqual({ started: 0, aborted: 0, resolved: 0 })
 
-      // Call C, advance by 300ms → starts C & aborts B
+      // Call C - should cancel B's timer
       manager.request(viewport, filters) // C
+      expect(manager.getStats()).toEqual({ started: 0, aborted: 0, resolved: 0 })
+
+      // Advance timers to trigger the final trailing execution
       vi.advanceTimersByTime(300)
-      expect(manager.getStats()).toEqual({ started: 3, aborted: 2, resolved: 0 })
+      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
 
       // Only C should resolve
       deferredC.resolve({ success: true })
       await flushMicrotasks()
 
-      expect(manager.getStats()).toEqual({ started: 3, aborted: 2, resolved: 1 })
+      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 1 })
       expect(onResolve).toHaveBeenCalledWith({ success: true })
     })
   })
@@ -165,7 +174,7 @@ describe('Viewport Fetch Manager', () => {
       const filters: Filters = { categories: ['test'] }
 
       manager.request(viewport, filters)
-      vi.advanceTimersByTime(50)
+      vi.advanceTimersByTime(300) // Trigger trailing execution
 
       expect(mockFetcher).toHaveBeenCalledWith(
         viewport,
@@ -185,16 +194,17 @@ describe('Viewport Fetch Manager', () => {
       const filters: Filters = { categories: ['test'] }
 
       manager.request(viewport, filters)
-      vi.advanceTimersByTime(50)
+      vi.advanceTimersByTime(300) // Trigger first trailing execution
 
       // Get the abort signal that was passed
       const abortSignal = mockFetcher.mock.calls[0][2] as AbortSignal
       expect(abortSignal.aborted).toBe(false)
 
-      // Trigger new request to abort the first one
+      // Trigger new request - this should cancel the first timer and start a new one
       manager.request(viewport, filters)
-      vi.advanceTimersByTime(50)
+      vi.advanceTimersByTime(300) // Trigger second trailing execution
 
+      // The first signal should be aborted by the second request
       expect(abortSignal.aborted).toBe(true)
     })
   })
@@ -208,14 +218,14 @@ describe('Viewport Fetch Manager', () => {
       const filters: Filters = { categories: ['test'] }
 
       manager.request(viewport, filters)
-      vi.advanceTimersByTime(50)
+      vi.advanceTimersByTime(50) // No fetch yet in trailing mode
 
-      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
+      expect(manager.getStats()).toEqual({ started: 0, aborted: 0, resolved: 0 })
 
-      // Dispose should cancel the request
+      // Dispose should cancel the timer
       manager.dispose()
 
-      expect(manager.getStats()).toEqual({ started: 1, aborted: 1, resolved: 0 })
+      expect(manager.getStats()).toEqual({ started: 0, aborted: 0, resolved: 0 })
     })
   })
 
@@ -239,7 +249,7 @@ describe('Viewport Fetch Manager', () => {
       deferred1.resolve({ success: true })
       await flushMicrotasks()
 
-      expect(manager.getStats()).toEqual({ started: 2, aborted: 1, resolved: 1 })
+      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 1 })
 
       // Second request - complete
       manager.request(viewport, filters)
@@ -247,7 +257,7 @@ describe('Viewport Fetch Manager', () => {
       deferred2.resolve({ success: true })
       await flushMicrotasks()
 
-      expect(manager.getStats()).toEqual({ started: 3, aborted: 1, resolved: 2 })
+      expect(manager.getStats()).toEqual({ started: 2, aborted: 0, resolved: 2 })
     })
   })
 })

@@ -98,7 +98,7 @@ describe('Map Prefetch and Offline Integration', () => {
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
-        zoom={10}}
+        zoom={10}
       />
     )
 

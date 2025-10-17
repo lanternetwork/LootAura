@@ -16,12 +16,12 @@ import {
   type ClusterPoint
 } from '@/lib/clustering'
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
-import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
-import { getCurrentTileId, adjacentTileIds, type TileBounds } from '@/lib/map/tiles'
+import { saveViewportState, loadViewportState, type ViewportState } from '@/lib/map/viewportPersistence'
+import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
 import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'
 import { fetchWithCache } from '@/lib/cache/offline'
 import { isOfflineCacheEnabled } from '@/lib/flags'
-import { logPrefetchStart, logPrefetchDone, logViewportSave, logViewportLoad, logPrefetchSkip } from '@/lib/telemetry/map'
+import { logPrefetchStart, logPrefetchDone, logViewportSave, logViewportLoad } from '@/lib/telemetry/map'
 import ClusterMarker from './ClusterMarker'
 import OfflineBanner from '../OfflineBanner'
 
@@ -74,12 +74,12 @@ export default function SalesMapClustered({
   const [_mapLoaded, setMapLoaded] = useState(false)
   
   // Offline state
-  const [isOffline, setIsOffline] = useState(false)
+  const [isOffline, _setIsOffline] = useState(false)
   const [showOfflineBanner, setShowOfflineBanner] = useState(false)
   const [cachedMarkerCount, setCachedMarkerCount] = useState(0)
   
   // Current filter state for persistence and caching
-  const [currentFilters, setCurrentFilters] = useState<FilterStateType>({
+  const [currentFilters, _setCurrentFilters] = useState<FilterStateType>({
     dateRange: 'any',
     categories: [],
     radius: 25

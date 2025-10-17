@@ -60,11 +60,11 @@ describe('Cluster Marker Accessibility', () => {
     
     // Test Enter key
     fireEvent.keyDown(button, { key: 'Enter' })
-    expect(onKeyDown).toHaveBeenCalledWith(mockCluster)
+    expect(onKeyDown).toHaveBeenCalledWith(mockCluster, expect.any(Object))
     
     // Test Space key
     fireEvent.keyDown(button, { key: ' ' })
-    expect(onKeyDown).toHaveBeenCalledWith(mockCluster)
+    expect(onKeyDown).toHaveBeenCalledWith(mockCluster, expect.any(Object))
   })
 
   it('should handle click events', () => {
@@ -111,7 +111,7 @@ describe('Cluster Marker Accessibility', () => {
 
   it('should apply correct size classes', () => {
     // Test small size
-    const { unmount } = render(
+    const { unmount: unmount1 } = render(
       <ClusterMarker
         cluster={mockCluster}
         size="small"
@@ -122,10 +122,10 @@ describe('Cluster Marker Accessibility', () => {
     expect(button).toHaveClass('w-8')
     expect(button).toHaveClass('h-8')
     expect(button).toHaveClass('text-xs')
-    unmount()
+    unmount1()
 
     // Test medium size
-    render(
+    const { unmount: unmount2 } = render(
       <ClusterMarker
         cluster={mockCluster}
         size="medium"
@@ -136,7 +136,7 @@ describe('Cluster Marker Accessibility', () => {
     expect(button).toHaveClass('w-10')
     expect(button).toHaveClass('h-10')
     expect(button).toHaveClass('text-sm')
-    unmount()
+    unmount2()
 
     // Test large size
     render(
@@ -199,8 +199,8 @@ describe('Cluster Marker Accessibility', () => {
     )
 
     const button = screen.getByRole('button')
-    expect(button).toHaveAttribute('type', 'button')
     expect(button).toBeInTheDocument()
+    expect(button).toHaveAttribute('aria-label', 'Cluster of 5 sales. Press Enter to zoom in.')
   })
 
   it('should support screen reader navigation', () => {

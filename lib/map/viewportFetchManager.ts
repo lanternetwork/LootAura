@@ -49,6 +49,13 @@ export function createViewportFetchManager(options: ViewportFetchManagerOptions)
   let lastArgs: { v: Viewport; f: Filters } | null = null
   const stats = { started: 0, aborted: 0, resolved: 0 }
 
+  const logStats = (): void => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      // eslint-disable-next-line no-console
+      console.debug('[MAP:DEBOUNCE]', { ...stats })
+    }
+  }
+
   const startFetch = async (args: { v: Viewport; f: Filters }): Promise<void> => {
     // Abort inflight if needed
     if (inflight) {
@@ -57,12 +64,14 @@ export function createViewportFetchManager(options: ViewportFetchManagerOptions)
       if (onAbort) {
         onAbort('trailing-replace')
       }
+      logStats()
     }
 
     // Create new controller
     const controller = controllerFactory()
     inflight = { controller }
     stats.started++
+    logStats()
     
     if (onStart) {
       onStart()
@@ -77,6 +86,7 @@ export function createViewportFetchManager(options: ViewportFetchManagerOptions)
         if (onResolve) {
           onResolve(result)
         }
+        logStats()
       }
     } catch (error) {
       // Only count as error if not aborted
@@ -108,6 +118,7 @@ export function createViewportFetchManager(options: ViewportFetchManagerOptions)
       if (onAbort) {
         onAbort('trailing-replace')
       }
+      logStats()
     }
     
     startFetch(lastArgs)
@@ -144,6 +155,7 @@ export function createViewportFetchManager(options: ViewportFetchManagerOptions)
       inflight.controller.abort()
       stats.aborted++
       inflight = null
+      logStats()
     }
   }
 

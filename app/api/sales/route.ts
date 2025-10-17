@@ -1,7 +1,7 @@
 /* eslint-disable no-undef */
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { Sale } from '@/lib/types'
+import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
     
     console.log(`[SALES] Query params: lat=${latitude}, lng=${longitude}, km=${distanceKm}, start=${startDateParam}, end=${endDateParam}, categories=[${categories.join(',')}], q=${q}, limit=${limit}, offset=${offset}`)
     
-    let results: Sale[] = []
+    let results: PublicSale[] = []
     let degraded = false
     
     // 3. Use direct query to sales_v2 view (RPC functions have permission issues)
@@ -417,9 +417,9 @@ export async function GET(request: NextRequest) {
           .sort((a: any, b: any) => a.distance_m - b.distance_m)
           .slice(0, limit)
 
-        results = fallbackFiltered.map((row: any): Sale => ({
+        results = fallbackFiltered.map((row: any): PublicSale => ({
           id: row.id,
-          owner_id: row.owner_id || '',
+          // owner_id removed for security - not exposed in public API
           title: row.title,
           description: row.description,
           address: row.address,
@@ -442,9 +442,9 @@ export async function GET(request: NextRequest) {
           distance_m: row.distance_m
         }))
       } else {
-        results = salesWithDistance.map((row: any): Sale => ({
+        results = salesWithDistance.map((row: any): PublicSale => ({
           id: row.id,
-          owner_id: row.owner_id || '',
+          // owner_id removed for security - not exposed in public API
           title: row.title,
           description: row.description,
           address: row.address,
@@ -518,6 +518,9 @@ export async function POST(request: NextRequest) {
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Auth failed:', { event: 'sales-create', status: 'fail', code: authError?.message })
+      }
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
     
@@ -525,6 +528,8 @@ export async function POST(request: NextRequest) {
     
     const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact } = body
     
+    // Ensure owner_id is set server-side from authenticated user
+    // Never trust client payload for owner_id
     const { data, error } = await supabase
       .from('sales_v2')
       .insert({
@@ -541,18 +546,28 @@ export async function POST(request: NextRequest) {
         date_end,
         time_end,
         status: 'published',
-        owner_id: user.id
+        owner_id: user.id // Server-side binding - never trust client
       })
       .select()
       .single()
     
     if (error) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Insert failed:', { event: 'sales-create', status: 'fail', code: error.message })
+      }
       console.error('Sales insert error:', error)
       return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
     }
     
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES] Sale created:', { event: 'sales-create', status: 'ok', saleId: data.id })
+    }
+    
     return NextResponse.json({ ok: true, sale: data })
   } catch (error: any) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES] Unexpected error:', { event: 'sales-create', status: 'fail' })
+    }
     console.error('Sales POST error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

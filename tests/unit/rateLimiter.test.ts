@@ -1,123 +1,87 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { RateLimiter, clearMemoryStore } from '@/lib/rateLimiter'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { createRateLimitMiddleware, RATE_LIMITS, checkRateLimit } from '@/lib/rateLimiter'
 
-// Clear memory store before each test
-beforeEach(() => {
-  clearMemoryStore()
-  vi.clearAllMocks()
-})
-
-// Mock the Upstash Redis client
-vi.mock('@upstash/redis', () => ({
-  Redis: vi.fn().mockImplementation(() => ({
-    get: vi.fn(),
-    set: vi.fn(),
-    incr: vi.fn(),
-    expire: vi.fn(),
-    ttl: vi.fn(),
-    pipeline: vi.fn(() => ({
-      incr: vi.fn(),
-      expire: vi.fn(),
-      exec: vi.fn()
-    }))
-  }))
-}))
-
-describe('RateLimiter', () => {
-  let rateLimiter: RateLimiter
-  let mockRequest: Request
-
+describe('RateLimiter (in-memory)', () => {
   beforeEach(() => {
-    rateLimiter = new RateLimiter({
-      windowMs: 60000, // 1 minute
-      maxRequests: 5
-    })
-
-    mockRequest = new Request('https://example.com/api/test', {
-      method: 'POST',
-      headers: {
-        'x-forwarded-for': '192.168.1.1'
-      }
-    })
+    // nothing to reset explicitly; window-based counters will naturally expire
   })
 
-  it('should allow requests within limit', async () => {
-    const result = await rateLimiter.checkLimit(mockRequest)
-    
-    expect(result.success).toBe(true)
-    expect(result.limit).toBe(5)
-    expect(result.remaining).toBe(4)
-    expect(result.resetTime).toBeGreaterThan(Date.now())
+  it('allows requests within limit', () => {
+    const key = 'unit:within-limit'
+    const limit = 3
+    const windowMs = 1000
+
+    expect(checkRateLimit(key, limit, windowMs)).toBe(true)
+    expect(checkRateLimit(key, limit, windowMs)).toBe(true)
+    expect(checkRateLimit(key, limit, windowMs)).toBe(true)
   })
 
-  it('should reject requests over limit', async () => {
-    // Make 5 requests to reach the limit
-    for (let i = 0; i < 5; i++) {
-      await rateLimiter.checkLimit(mockRequest)
-    }
+  it('blocks after exceeding limit', () => {
+    const key = 'unit:exceed-limit'
+    const limit = 2
+    const windowMs = 1000
 
-    // The 6th request should be rejected
-    const result = await rateLimiter.checkLimit(mockRequest)
-    
-    expect(result.success).toBe(false)
-    expect(result.remaining).toBe(0)
-    expect(result.retryAfter).toBeDefined()
+    expect(checkRateLimit(key, limit, windowMs)).toBe(true)
+    expect(checkRateLimit(key, limit, windowMs)).toBe(true)
+    expect(checkRateLimit(key, limit, windowMs)).toBe(false)
   })
 
-  it('should reset after window expires', async () => {
-    // Create a rate limiter with a very short window
-    const shortWindowLimiter = new RateLimiter({
-      windowMs: 100, // 100ms
-      maxRequests: 2
+  it('middleware enforces limits per IP', () => {
+    const middleware = createRateLimitMiddleware({
+      limit: 2,
+      windowMs: 1000,
+      keyGenerator: (request: Request) => {
+        const ip = request.headers.get('x-forwarded-for') || 'unknown'
+        return `test:${ip}`
+      },
     })
 
-    // Make 2 requests to reach the limit
-    await shortWindowLimiter.checkLimit(mockRequest)
-    await shortWindowLimiter.checkLimit(mockRequest)
-
-    // Should be rejected
-    let result = await shortWindowLimiter.checkLimit(mockRequest)
-    expect(result.success).toBe(false)
-
-    // Wait for window to expire
-    await new Promise(resolve => setTimeout(resolve, 150))
-
-    // Should be allowed again
-    result = await shortWindowLimiter.checkLimit(mockRequest)
-    expect(result.success).toBe(true)
-  })
-
-  it('should use custom key generator', async () => {
-    const customLimiter = new RateLimiter({
-      windowMs: 60000,
-      maxRequests: 5,
-      keyGenerator: (req) => 'custom-key'
+    const req = new Request('https://example.com/api/test', {
+      headers: { 'x-forwarded-for': '1.2.3.4' },
     })
 
-    const result = await customLimiter.checkLimit(mockRequest)
-    expect(result.success).toBe(true)
+    expect(middleware(req).allowed).toBe(true)
+    expect(middleware(req).allowed).toBe(true)
+    expect(middleware(req).allowed).toBe(false)
   })
 
-  it('should handle different IP addresses separately', async () => {
-    const request1 = new Request('https://example.com/api/test', {
-      headers: { 'x-forwarded-for': '192.168.1.1' }
-    })
-    const request2 = new Request('https://example.com/api/test', {
-      headers: { 'x-forwarded-for': '192.168.1.2' }
+  it('uses custom key generator', () => {
+    const middleware = createRateLimitMiddleware({
+      limit: 1,
+      windowMs: 1000,
+      keyGenerator: (_req: Request) => 'custom-key',
     })
 
-    // Both should be allowed since they're different IPs
-    const result1 = await rateLimiter.checkLimit(request1)
-    const result2 = await rateLimiter.checkLimit(request2)
-
-    expect(result1.success).toBe(true)
-    expect(result2.success).toBe(true)
+    const req = new Request('https://example.com/api/test')
+    expect(middleware(req).allowed).toBe(true)
+    expect(middleware(req).allowed).toBe(false)
   })
 
-  it('should handle requests without IP address', async () => {
-    const requestWithoutIP = new Request('https://example.com/api/test')
-    
-    const result = await rateLimiter.checkLimit(requestWithoutIP)
-    expect(result.success).toBe(true)
+  it('treats different IPs separately', () => {
+    const middleware = createRateLimitMiddleware({
+      limit: 1,
+      windowMs: 1000,
+      keyGenerator: (request: Request) => {
+        const ip = request.headers.get('x-forwarded-for') || 'unknown'
+        return `per-ip:${ip}`
+      },
+    })
+
+    const req1 = new Request('https://example.com/api/test', {
+      headers: { 'x-forwarded-for': '10.0.0.1' },
+    })
+    const req2 = new Request('https://example.com/api/test', {
+      headers: { 'x-forwarded-for': '10.0.0.2' },
+    })
+
+    expect(middleware(req1).allowed).toBe(true)
+    expect(middleware(req2).allowed).toBe(true)
+  })
+
+  it('has expected RATE_LIMITS defaults', () => {
+    expect(RATE_LIMITS.AUTH.limit).toBe(10)
+    expect(RATE_LIMITS.AUTH.windowMs).toBe(15 * 60 * 1000)
+    expect(RATE_LIMITS.UPLOAD_SIGNER.limit).toBe(5)
+    expect(RATE_LIMITS.UPLOAD_SIGNER.windowMs).toBe(60 * 1000)
   })
 })

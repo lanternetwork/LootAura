@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 // Mock the server client
 vi.mock('@/lib/supabase/server', () => ({
@@ -64,10 +64,10 @@ describe('Public Read Shape Validation', () => {
       })),
     }
 
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+    const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+    vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createSupabaseServerClient()
     const { data, error } = await supabase
       .from('sales_v2')
       .select('id, title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, status, is_featured, created_at, updated_at')
@@ -76,14 +76,14 @@ describe('Public Read Shape Validation', () => {
     expect(data).toEqual(mockSales)
 
     // Verify that sensitive fields are not present
-    data?.forEach(sale => {
+    data?.forEach((sale: any) => {
       expect(sale).not.toHaveProperty('owner_id')
       expect(sale).not.toHaveProperty('home_zip')
       expect(sale).not.toHaveProperty('preferences')
     })
 
     // Verify that required public fields are present
-    data?.forEach(sale => {
+    data?.forEach((sale: any) => {
       expect(sale).toHaveProperty('id')
       expect(sale).toHaveProperty('title')
       expect(sale).toHaveProperty('description')
@@ -123,10 +123,10 @@ describe('Public Read Shape Validation', () => {
       })),
     }
 
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+    const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+    vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createSupabaseServerClient()
     const { data, error } = await supabase
       .from('sales_v2')
       .select('id, title, lat, lng')
@@ -135,7 +135,7 @@ describe('Public Read Shape Validation', () => {
     expect(data).toEqual(mockMarkers)
 
     // Verify that only minimal fields are present
-    data?.forEach(marker => {
+    data?.forEach((marker: any) => {
       expect(marker).toHaveProperty('id')
       expect(marker).toHaveProperty('title')
       expect(marker).toHaveProperty('lat')
@@ -175,10 +175,10 @@ describe('Public Read Shape Validation', () => {
       })),
     }
 
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+    const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+    vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createSupabaseServerClient()
     const { data, error } = await supabase
       .from('profiles_v2')
       .select('id, username, full_name, avatar_url')
@@ -187,13 +187,13 @@ describe('Public Read Shape Validation', () => {
     expect(data).toEqual(mockProfiles)
 
     // Verify that sensitive fields are not present
-    data?.forEach(profile => {
+    data?.forEach((profile: any) => {
       expect(profile).not.toHaveProperty('home_zip')
       expect(profile).not.toHaveProperty('preferences')
     })
 
     // Verify that required public fields are present
-    data?.forEach(profile => {
+    data?.forEach((profile: any) => {
       expect(profile).toHaveProperty('id')
       expect(profile).toHaveProperty('username')
       expect(profile).toHaveProperty('full_name')
@@ -226,10 +226,10 @@ describe('Public Read Shape Validation', () => {
       })),
     }
 
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+    const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+    vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createSupabaseServerClient()
     const { data, error } = await supabase
       .from('items_v2')
       .select('id, sale_id, name, description, price, category, condition, images, is_sold, created_at, updated_at')
@@ -238,7 +238,7 @@ describe('Public Read Shape Validation', () => {
     expect(data).toEqual(mockItems)
 
     // Verify that required fields are present
-    data?.forEach(item => {
+    data?.forEach((item: any) => {
       expect(item).toHaveProperty('id')
       expect(item).toHaveProperty('sale_id')
       expect(item).toHaveProperty('name')
@@ -262,10 +262,10 @@ describe('Public Read Shape Validation', () => {
       })),
     }
 
-    const { createServerSupabaseClient } = await import('@/lib/supabase/server')
-    vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
+    const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+    vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
 
-    const supabase = createServerSupabaseClient()
+    const supabase = createSupabaseServerClient()
     const { data, error } = await supabase
       .from('sales_v2')
       .select('id, title') // Only select safe fields
@@ -277,7 +277,7 @@ describe('Public Read Shape Validation', () => {
     ])
 
     // Verify owner_id is not present in the response
-    data?.forEach(item => {
+    data?.forEach((item: any) => {
       expect(item).not.toHaveProperty('owner_id')
     })
   })

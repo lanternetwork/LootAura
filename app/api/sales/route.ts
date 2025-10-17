@@ -1,7 +1,7 @@
 /* eslint-disable no-undef */
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { Sale } from '@/lib/types'
+import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
@@ -417,7 +417,7 @@ export async function GET(request: NextRequest) {
           .sort((a: any, b: any) => a.distance_m - b.distance_m)
           .slice(0, limit)
 
-        results = fallbackFiltered.map((row: any): Sale => ({
+        results = fallbackFiltered.map((row: any): PublicSale => ({
           id: row.id,
           // owner_id removed for security - not exposed in public API
           title: row.title,
@@ -442,7 +442,7 @@ export async function GET(request: NextRequest) {
           distance_m: row.distance_m
         }))
       } else {
-        results = salesWithDistance.map((row: any): Sale => ({
+        results = salesWithDistance.map((row: any): PublicSale => ({
           id: row.id,
           // owner_id removed for security - not exposed in public API
           title: row.title,

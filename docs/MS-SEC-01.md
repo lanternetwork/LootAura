@@ -157,6 +157,46 @@ The following secrets must be configured in GitHub Actions:
 - **Middleware Logic**: Tests for middleware session validation
 - **Debug Logging**: Tests for debug output when enabled
 
+## Signed Uploads
+
+### Upload Flow
+1. **Client Request**: POST `/api/upload/signed-url` with file metadata
+2. **Server Validation**: Check file size, type, and user authentication
+3. **Signed URL Generation**: Create short-lived (1 hour) signed URL for upload
+4. **Client Upload**: PUT file directly to signed URL
+5. **Public URL**: Use returned public URL in application
+
+### Upload Constraints
+- **Allowed Types**: JPEG, PNG, WebP only
+- **Max Size**: 5MB (configurable via `MAX_UPLOAD_SIZE_BYTES`)
+- **Authentication**: Required for all upload requests
+- **Rate Limiting**: 5 requests per minute per IP
+- **Expiration**: Signed URLs expire after 1 hour
+
+### Storage Policies
+- **Public Read**: Images are publicly readable for display
+- **Server Write Only**: Direct client uploads blocked
+- **Signed URLs**: Only server-generated signed URLs can upload
+- **No Client Updates**: Direct client updates/deletes blocked
+
+## Rate Limits
+
+### Auth Routes
+- **Limit**: 10 requests per 15 minutes per IP
+- **Routes**: `/api/auth/signin`, `/api/auth/signup`
+- **Response**: 429 with generic error message
+
+### Upload Signer
+- **Limit**: 5 requests per minute per IP
+- **Route**: `/api/upload/signed-url`
+- **Response**: 429 with generic error message
+
+### Rate Limit Implementation
+- **Storage**: In-memory (consider Redis for production)
+- **Key Strategy**: IP-based with route differentiation
+- **Cleanup**: Automatic cleanup of expired entries
+- **Logging**: Debug-gated, no PII exposure
+
 ### Test Matrix
 | Test Case | Expected Result |
 |-----------|----------------|

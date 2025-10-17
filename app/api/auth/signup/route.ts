@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient, setSessionCookies, isValidSession } from '@/lib/auth/server-session'
+import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
 import { cookies } from 'next/headers'
 
 const signupSchema = z.object({
@@ -12,6 +13,17 @@ const signupSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMITS.AUTH)
+    const { allowed, error: rateLimitError } = rateLimitMiddleware(request)
+    
+    if (!allowed) {
+      return NextResponse.json(
+        { error: rateLimitError },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const { email, password } = signupSchema.parse(body)
 

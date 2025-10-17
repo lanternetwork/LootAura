@@ -100,7 +100,7 @@ export default function SalesMapClustered({
     return createViewportFetchManager({
       debounceMs: 300,
       fetcher: async (viewport: Viewport, filters: Filters, signal: AbortSignal) => {
-        const tileId = getCurrentTileId(viewport, Math.round(filters.zoom || 10))
+        const tileId = getCurrentTileId(viewport, 10) // Use default zoom level
         const filterHash = hashFilters(currentFilters)
         
         if (isOfflineCacheEnabled()) {

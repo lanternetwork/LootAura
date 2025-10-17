@@ -18,7 +18,7 @@ export default function PerformanceOptimizer({
   currentFilters, 
   onPrefetchData 
 }: PerformanceOptimizerProps) {
-  const router = useRouter()
+  const _router = useRouter()
   const prefetchCache = useRef<Map<string, boolean>>(new Map())
   const prefetchTimeout = useRef<NodeJS.Timeout>()
 
@@ -26,7 +26,7 @@ export default function PerformanceOptimizer({
   const prefetchAdjacentData = useCallback(() => {
     if (!currentFilters.lat || !currentFilters.lng) return
 
-    const baseKey = `${currentFilters.lat},${currentFilters.lng}`
+    const _baseKey = `${currentFilters.lat},${currentFilters.lng}`
     
     // Prefetch nearby areas (adjacent map tiles)
     const adjacentOffsets = [

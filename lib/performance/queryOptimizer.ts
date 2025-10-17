@@ -222,7 +222,7 @@ export class ConnectionPool {
     return createSupabaseServerClient()
   }
 
-  releaseConnection(connection: any) {
+  releaseConnection(_connection: any) {
     // Supabase handles connection cleanup internally
   }
 }

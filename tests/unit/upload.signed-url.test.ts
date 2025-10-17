@@ -4,7 +4,7 @@ import { POST } from '@/app/api/upload/signed-url/route'
 
 // Mock the server client
 vi.mock('@/lib/supabase/server', () => ({
-  createServerSupabaseClient: vi.fn(),
+  createSupabaseServerClient: vi.fn(),
 }))
 
 // Mock rate limiter

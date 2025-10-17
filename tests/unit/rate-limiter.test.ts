@@ -3,8 +3,12 @@ import { checkRateLimit, createRateLimitMiddleware, RATE_LIMITS } from '@/lib/ra
 
 describe('Rate Limiter', () => {
   beforeEach(() => {
+    vi.useFakeTimers()
     vi.clearAllMocks()
-    vi.clearAllTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('should allow requests within limit', () => {

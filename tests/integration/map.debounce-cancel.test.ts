@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, beforeAll, afterEach, afterAll, vi } from 'vitest'
+import { setupServer } from 'msw/node'
+import { http, HttpResponse } from 'msw'
 import { 
   createDebouncedFetcher, 
   fetchMarkersDebounced,
@@ -6,23 +8,37 @@ import {
   isPayloadWithinLimits,
   degradePayloadIfNeeded
 } from '@/lib/debouncedFetch'
+import { createTestableDebouncedFetcher } from '@/lib/debouncedFetch.testable'
+import { createDeferred, flushMicrotasks } from '../__testlib__/testUtils'
+
+// MSW server for deterministic network testing
+const server = setupServer()
+
+beforeAll(() => server.listen())
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
 
 describe('Map Debounce and Cancel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
   })
 
   it('should debounce multiple requests', async () => {
+    // Use fake timers for deterministic testing
+    vi.useFakeTimers()
+    
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 10 })
+    const fetcher = createTestableDebouncedFetcher(fetchFn, { debounceMs: 50 })
 
     // Make multiple rapid requests
     const promise1 = fetcher.fetch()
     const promise2 = fetcher.fetch()
     const promise3 = fetcher.fetch()
 
-    // Wait for debounce to complete
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // Advance timers to trigger debounced execution
+    vi.advanceTimersByTime(50)
+    await flushMicrotasks()
 
     const [result1, result2, result3] = await Promise.all([promise1, promise2, promise3])
 
@@ -32,32 +48,54 @@ describe('Map Debounce and Cancel', () => {
     expect(result2.cancelled).toBe(true)
     expect(result3.cancelled).toBe(false)
     expect(result3.data).toBe('data')
+    
+    vi.useRealTimers()
   })
 
   it('should cancel previous requests on new request', async () => {
-    const fetchFn = vi.fn()
-      .mockImplementationOnce(() => new Promise(resolve => setTimeout(() => resolve('data1'), 50)))
-      .mockImplementationOnce(() => new Promise(resolve => setTimeout(() => resolve('data2'), 50)))
+    // Use fake timers for deterministic testing
+    vi.useFakeTimers()
     
-    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 25 })
+    // Create deferred promises for controlled resolution
+    const deferred1 = createDeferred<string>()
+    const deferred2 = createDeferred<string>()
+    
+    const fetchFn = vi.fn()
+      .mockImplementationOnce(() => deferred1.promise)
+      .mockImplementationOnce(() => deferred2.promise)
+    
+    const abortSpy = vi.fn()
+    const fetcher = createTestableDebouncedFetcher(fetchFn, { 
+      debounceMs: 50,
+      onAbort: abortSpy
+    })
 
     // First request
     const promise1 = fetcher.fetch()
     
-    // Wait for first request to start
-    await new Promise(resolve => setTimeout(resolve, 30))
+    // Advance timers to start first request
+    vi.advanceTimersByTime(50)
+    await flushMicrotasks()
     
     // Second request before first completes
     const promise2 = fetcher.fetch()
     
-    // Wait for second request to complete
-    await new Promise(resolve => setTimeout(resolve, 100))
+    // Advance timers to start second request
+    vi.advanceTimersByTime(50)
+    await flushMicrotasks()
+    
+    // Resolve only the second request
+    deferred2.resolve('data2')
+    await flushMicrotasks()
 
     const [result1, result2] = await Promise.all([promise1, promise2])
 
     expect(result1.cancelled).toBe(true)
     expect(result2.cancelled).toBe(false)
     expect(result2.data).toBe('data2')
+    expect(abortSpy).toHaveBeenCalled()
+    
+    vi.useRealTimers()
   })
 
   it('should handle fetch errors gracefully', async () => {
@@ -154,15 +192,19 @@ describe('Map Debounce and Cancel', () => {
   })
 
   it('should handle rapid pan/zoom with debouncing', async () => {
+    // Use fake timers for deterministic testing
+    vi.useFakeTimers()
+    
     const fetchFn = vi.fn().mockResolvedValue('data')
-    const fetcher = createDebouncedFetcher(fetchFn, { debounceMs: 10 })
+    const fetcher = createTestableDebouncedFetcher(fetchFn, { debounceMs: 50 })
 
     // Simulate rapid requests - make them truly synchronous
     const promise1 = fetcher.fetch()
     const promise2 = fetcher.fetch()
 
-    // Wait for debounce to complete
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // Advance timers to trigger debounced execution
+    vi.advanceTimersByTime(50)
+    await flushMicrotasks()
 
     const [result1, result2] = await Promise.all([promise1, promise2])
 
@@ -171,24 +213,102 @@ describe('Map Debounce and Cancel', () => {
     expect(result1.cancelled).toBe(true)
     expect(result2.cancelled).toBe(false)
     expect(result2.data).toBe('data')
+    
+    vi.useRealTimers()
   })
 
   it('should respect timeout limits', async () => {
+    // Use fake timers for deterministic testing
+    vi.useFakeTimers()
+    
     const fetchFn = vi.fn().mockImplementation(() => 
       new Promise((resolve, reject) => {
-        setTimeout(() => reject(new Error('Timeout')), 2000)
+        setTimeout(() => reject(new Error('Timeout')), 100)
       })
     )
     
-    const fetcher = createDebouncedFetcher(fetchFn, { 
-      debounceMs: 10
+    const fetcher = createTestableDebouncedFetcher(fetchFn, { 
+      debounceMs: 50
     })
 
-    const result = await fetcher.fetch()
+    const promise = fetcher.fetch()
+    
+    // Advance timers to trigger debounced execution
+    vi.advanceTimersByTime(50)
+    await flushMicrotasks()
+    
+    // Advance timers to trigger timeout
+    vi.advanceTimersByTime(100)
+    await flushMicrotasks()
+    
+    const result = await promise
     
     // Should return error from fetch function
     expect(result.error).toBeInstanceOf(Error)
     expect(result.error?.message).toBe('Timeout')
     expect(result.cancelled).toBe(false)
+    
+    vi.useRealTimers()
+  })
+
+  it('should handle MSW requests with proper counting', async () => {
+    // Use fake timers for deterministic testing
+    vi.useFakeTimers()
+    
+    let requestsStarted = 0
+    let requestsResolved = 0
+    const deferreds: Array<{ resolve: (value: any) => void; reject: (error: Error) => void }> = []
+    
+    // MSW handler that counts requests and holds them
+    server.use(
+      http.get('/api/markers', () => {
+        requestsStarted++
+        const deferred = createDeferred<{ id: string; title: string; lat: number; lng: number }[]>()
+        deferreds.push(deferred)
+        
+        return new Promise((resolve) => {
+          deferred.promise.then((data) => {
+            requestsResolved++
+            resolve(HttpResponse.json(data))
+          }).catch((error) => {
+            requestsResolved++
+            resolve(HttpResponse.error())
+          })
+        })
+      })
+    )
+    
+    const fetchFn = (signal: AbortSignal) => 
+      fetch('/api/markers', { signal }).then(res => res.json())
+    
+    const fetcher = createTestableDebouncedFetcher(fetchFn, { debounceMs: 50 })
+
+    // Burst A: several rapid requests
+    const promisesA = Array.from({ length: 5 }, () => fetcher.fetch())
+    
+    // Advance timers to trigger debounced execution
+    vi.advanceTimersByTime(50)
+    await flushMicrotasks()
+    
+    // Burst B: more rapid requests
+    const promisesB = Array.from({ length: 3 }, () => fetcher.fetch())
+    
+    // Advance timers to trigger debounced execution
+    vi.advanceTimersByTime(50)
+    await flushMicrotasks()
+    
+    // Resolve only the latest request
+    if (deferreds.length > 0) {
+      const latestDeferred = deferreds[deferreds.length - 1]
+      latestDeferred.resolve([{ id: '1', title: 'Test', lat: 38.2527, lng: -85.7585 }])
+    }
+    
+    await flushMicrotasks()
+    
+    // Assert request counting
+    expect(requestsStarted).toBe(2) // Only 2 requests should have started (one per burst)
+    expect(requestsResolved).toBe(1) // Only 1 should have resolved (the latest)
+    
+    vi.useRealTimers()
   })
 })

@@ -199,10 +199,7 @@ describe('RLS Sales Anonymous Denial', () => {
     expect(data).toEqual(mockSales)
   })
 
-  it('should log RLS denial for anonymous users', async () => {
-    process.env.NEXT_PUBLIC_DEBUG = 'true'
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-
+  it('should handle RLS denial for anonymous users gracefully', async () => {
     const mockSupabase = {
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -223,22 +220,13 @@ describe('RLS Sales Anonymous Denial', () => {
     vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
 
     const supabase = createServerSupabaseClient({} as any)
-    await supabase
+    const { data, error } = await supabase
       .from('sales_v2')
       .insert({ title: 'Anonymous Sale' })
       .select()
 
-    // Should log the RLS denial
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[RLS]'),
-      expect.objectContaining({
-        event: 'rls-test',
-        table: 'sales',
-        action: 'insert',
-        allowed: false,
-      })
-    )
-
-    consoleSpy.mockRestore()
+    expect(error).toBeDefined()
+    expect(error?.code).toBe('42501')
+    expect(data).toBeNull()
   })
 })

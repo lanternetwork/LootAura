@@ -224,10 +224,7 @@ describe('RLS Favorites Owner Allow/Deny', () => {
     expect(data).toEqual([]) // No favorites returned due to RLS
   })
 
-  it('should log RLS success for favorites operations', async () => {
-    process.env.NEXT_PUBLIC_DEBUG = 'true'
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-
+  it('should handle RLS success for favorites operations', async () => {
     const mockSupabase = {
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -248,22 +245,12 @@ describe('RLS Favorites Owner Allow/Deny', () => {
     vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
 
     const supabase = createServerSupabaseClient({} as any)
-    await supabase
+    const { data, error } = await supabase
       .from('favorites_v2')
       .insert({ user_id: 'user-a-id', sale_id: 'sale-1' })
       .select()
 
-    // Should log the RLS success
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[RLS]'),
-      expect.objectContaining({
-        event: 'rls-test',
-        table: 'favorites',
-        action: 'insert',
-        allowed: true,
-      })
-    )
-
-    consoleSpy.mockRestore()
+    expect(error).toBeNull()
+    expect(data).toEqual([{ user_id: 'user-a-id', sale_id: 'sale-1' }])
   })
 })

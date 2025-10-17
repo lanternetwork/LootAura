@@ -256,7 +256,10 @@ describe('Public Read Shape Validation', () => {
     const mockSupabase = {
       from: vi.fn(() => ({
         select: vi.fn().mockResolvedValue({
-          data: mockData,
+          data: [
+            { id: '1', title: 'Sale 1' }, // Only return selected fields
+            { id: '2', title: 'Sale 2' }, // Only return selected fields
+          ],
           error: null,
         }),
       })),

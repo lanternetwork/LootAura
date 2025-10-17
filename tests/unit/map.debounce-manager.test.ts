@@ -37,7 +37,8 @@ describe('Viewport Fetch Manager', () => {
     onResolve = vi.fn()
 
     manager = createViewportFetchManager({
-      debounceMs: 50,
+      debounceMs: 300,
+      debounceMode: 'leading-trailing',
       schedule: mockSchedule,
       fetcher: mockFetcher,
       controllerFactory: mockControllerFactory,
@@ -65,19 +66,23 @@ describe('Viewport Fetch Manager', () => {
         manager.request(viewport, filters)
       }
 
-      // Advance timers to trigger debounced execution
-      vi.advanceTimersByTime(50)
-
-      // Should only have started one fetch
+      // First request should start immediately (leading)
       expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
       expect(mockFetcher).toHaveBeenCalledTimes(1)
       expect(onStart).toHaveBeenCalledTimes(1)
 
-      // Resolve the fetch
+      // Advance timers to trigger trailing execution
+      vi.advanceTimersByTime(300)
+
+      // Should still be only one fetch (trailing replaces the same request)
+      expect(manager.getStats()).toEqual({ started: 2, aborted: 1, resolved: 0 })
+      expect(mockFetcher).toHaveBeenCalledTimes(2)
+
+      // Resolve the final fetch
       deferred.resolve({ success: true })
       await flushMicrotasks()
 
-      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 1 })
+      expect(manager.getStats()).toEqual({ started: 2, aborted: 1, resolved: 1 })
       expect(onResolve).toHaveBeenCalledWith({ success: true })
     })
   })
@@ -128,13 +133,19 @@ describe('Viewport Fetch Manager', () => {
       const viewport: Viewport = { sw: [0, 0], ne: [1, 1] }
       const filters: Filters = { categories: ['test'] }
 
-      // Fire three bursts - only the last one should execute due to debouncing
-      manager.request(viewport, filters) // A (scheduled)
-      manager.request(viewport, filters) // B (cancels A, scheduled)
-      manager.request(viewport, filters) // C (cancels B, scheduled)
-      vi.advanceTimersByTime(50) // Start C
-
+      // Start A immediately (leading)
+      manager.request(viewport, filters) // A
       expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 0 })
+
+      // Call B, advance by 300ms → starts B & aborts A
+      manager.request(viewport, filters) // B
+      vi.advanceTimersByTime(300)
+      expect(manager.getStats()).toEqual({ started: 2, aborted: 1, resolved: 0 })
+
+      // Call C, advance by 300ms → starts C & aborts B
+      manager.request(viewport, filters) // C
+      vi.advanceTimersByTime(300)
+      expect(manager.getStats()).toEqual({ started: 3, aborted: 2, resolved: 0 })
 
       // Only C should resolve
       deferredC.resolve({ success: true })
@@ -224,20 +235,19 @@ describe('Viewport Fetch Manager', () => {
 
       // First request - complete
       manager.request(viewport, filters)
-      vi.advanceTimersByTime(50)
+      vi.advanceTimersByTime(300) // Wait for trailing
       deferred1.resolve({ success: true })
       await flushMicrotasks()
 
-      expect(manager.getStats()).toEqual({ started: 1, aborted: 0, resolved: 1 })
+      expect(manager.getStats()).toEqual({ started: 2, aborted: 1, resolved: 1 })
 
-      // Second request - aborted by third
+      // Second request - complete
       manager.request(viewport, filters)
-      manager.request(viewport, filters) // This aborts the second
-      vi.advanceTimersByTime(50)
-      deferred3.resolve({ success: true })
+      vi.advanceTimersByTime(300) // Wait for trailing
+      deferred2.resolve({ success: true })
       await flushMicrotasks()
 
-      expect(manager.getStats()).toEqual({ started: 2, aborted: 0, resolved: 2 })
+      expect(manager.getStats()).toEqual({ started: 3, aborted: 1, resolved: 2 })
     })
   })
 })

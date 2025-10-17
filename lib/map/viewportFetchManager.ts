@@ -17,6 +17,7 @@ export type Filters = {
 
 export interface ViewportFetchManagerOptions {
   debounceMs?: number
+  debounceMode?: 'trailing' | 'leading' | 'leading-trailing'
   schedule?: (fn: () => void, ms: number) => any
   fetcher: (viewport: Viewport, filters: Filters, signal: AbortSignal) => Promise<any>
   controllerFactory?: () => AbortController
@@ -34,6 +35,7 @@ export interface ViewportFetchManager {
 export function createViewportFetchManager(options: ViewportFetchManagerOptions): ViewportFetchManager {
   const {
     debounceMs = 300,
+    debounceMode = 'trailing',
     schedule = (fn, ms) => setTimeout(fn, ms),
     fetcher,
     controllerFactory = () => new AbortController(),
@@ -42,58 +44,91 @@ export function createViewportFetchManager(options: ViewportFetchManagerOptions)
     onResolve
   } = options
 
-  let timeoutId: any = null
-  let currentController: AbortController | null = null
+  let inflight: { controller: AbortController } | null = null
+  let debounceTimer: any = null
+  let lastArgs: { v: Viewport; f: Filters } | null = null
   const stats = { started: 0, aborted: 0, resolved: 0 }
 
-  const request = (viewport: Viewport, filters: Filters): void => {
-    // Clear previous timeout
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-    }
-
-    // Abort previous request if still in flight
-    if (currentController) {
-      currentController.abort()
+  const startFetch = async (args: { v: Viewport; f: Filters }): Promise<void> => {
+    // Abort inflight if needed
+    if (inflight) {
+      inflight.controller.abort()
       stats.aborted++
       if (onAbort) {
-        onAbort('new request')
+        onAbort('trailing-replace')
       }
     }
 
-    // Schedule new request
-    timeoutId = schedule(() => {
-      // Create new abort controller
-      currentController = controllerFactory()
-      stats.started++
-      
-      if (onStart) {
-        onStart()
-      }
+    // Create new controller
+    const controller = controllerFactory()
+    inflight = { controller }
+    stats.started++
+    
+    if (onStart) {
+      onStart()
+    }
 
-      // Execute fetch
-      fetcher(viewport, filters, currentController.signal)
-        .then((result) => {
-          // Only resolve if this is still the current request
-          if (currentController && !currentController.signal.aborted) {
-            stats.resolved++
-            if (onResolve) {
-              onResolve(result)
-            }
-          }
-        })
-        .catch((_error) => {
-          // Only count as error if not aborted
-          if (currentController && !currentController.signal.aborted) {
-            if (onAbort) {
-              onAbort('fetch error')
-            }
-          }
-        })
-        .finally(() => {
-          currentController = null
-        })
-    }, debounceMs)
+    try {
+      const result = await fetcher(args.v, args.f, controller.signal)
+      
+      // Only resolve if this is still the current request
+      if (inflight && inflight.controller === controller && !controller.signal.aborted) {
+        stats.resolved++
+        if (onResolve) {
+          onResolve(result)
+        }
+      }
+    } catch (error) {
+      // Only count as error if not aborted
+      if (inflight && inflight.controller === controller && !controller.signal.aborted) {
+        if (onAbort) {
+          onAbort('fetch error')
+        }
+      }
+    } finally {
+      if (inflight && inflight.controller === controller) {
+        inflight = null
+      }
+    }
+  }
+
+  const scheduleTrailing = (): void => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+    }
+    debounceTimer = schedule(() => runTrailing(), debounceMs)
+  }
+
+  const runTrailing = (): void => {
+    if (!lastArgs) return
+    
+    if (inflight) {
+      inflight.controller.abort()
+      stats.aborted++
+      if (onAbort) {
+        onAbort('trailing-replace')
+      }
+    }
+    
+    startFetch(lastArgs)
+  }
+
+  const request = (viewport: Viewport, filters: Filters): void => {
+    lastArgs = { v: viewport, f: filters }
+
+    if (debounceMode === 'trailing') {
+      scheduleTrailing()
+    } else if (debounceMode === 'leading') {
+      if (!inflight && !debounceTimer) {
+        startFetch(lastArgs)
+      }
+      scheduleTrailing()
+    } else if (debounceMode === 'leading-trailing') {
+      if (!inflight) {
+        startFetch(lastArgs)
+      }
+      scheduleTrailing()
+    }
   }
 
   const getStats = (): { started: number; aborted: number; resolved: number } => {
@@ -101,14 +136,14 @@ export function createViewportFetchManager(options: ViewportFetchManagerOptions)
   }
 
   const dispose = (): void => {
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-      timeoutId = null
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
     }
-    if (currentController) {
-      currentController.abort()
+    if (inflight) {
+      inflight.controller.abort()
       stats.aborted++
-      currentController = null
+      inflight = null
     }
   }
 

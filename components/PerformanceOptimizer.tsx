@@ -133,12 +133,15 @@ export default function PerformanceOptimizer({
       prefetchCache.current.clear()
     }
 
-    router.events?.on('routeChangeStart', handleRouteChange)
+    // Note: Next.js App Router doesn't have router.events
+    // This is a placeholder for future route change detection
+    // In App Router, we rely on component unmounting for cleanup
     
     return () => {
-      router.events?.off('routeChangeStart', handleRouteChange)
+      // Cleanup on component unmount
+      handleRouteChange()
     }
-  }, [router])
+  }, [])
 
   return null // This is a background component
 }

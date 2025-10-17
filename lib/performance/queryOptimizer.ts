@@ -47,7 +47,7 @@ class QueryOptimizer {
   generateCacheKey(query: string, params: Record<string, any> = {}): string {
     const sortedParams = Object.keys(params)
       .sort()
-      .map(key => `${key}:${params[key]}`)
+      .map(key => `${key}:${params[key] ?? ''}`)
       .join('|')
     
     return `${query}|${sortedParams}`

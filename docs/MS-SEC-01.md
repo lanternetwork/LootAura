@@ -110,6 +110,28 @@ The following secrets must be configured in GitHub Actions:
 - **UI Component**: `<ResendConfirmation email={email} />`
 - **Rate Limiting**: Handled by Supabase
 
+## RLS Coverage Matrix
+
+### Current State (Before Hardening)
+| Table/View | Purpose | Current Policy Summary | Security Gaps |
+|------------|---------|----------------------|---------------|
+| `lootaura_v2.sales` | Sales listings | Public read, owner write | Exposes `owner_id` in public reads |
+| `lootaura_v2.profiles` | User profiles | Public read, owner write | Exposes sensitive profile data |
+| `lootaura_v2.favorites` | User favorites | Owner-only access | ✅ Secure |
+| `lootaura_v2.items` | Sale items | Public read, owner write | Exposes via sales relationship |
+| `public.sales_v2` | Public sales view | Inherits from base table | Exposes `owner_id` column |
+| `public.items_v2` | Public items view | Inherits from base table | ✅ Minimal exposure |
+
+### Target State (After Hardening)
+| Table/View | Purpose | New Policy Summary | Security Improvements |
+|------------|---------|-------------------|---------------------|
+| `lootaura_v2.sales` | Sales listings | Minimal public read, owner-only write | Remove `owner_id` from public projection |
+| `lootaura_v2.profiles` | User profiles | Minimal public read, owner-only write | Limit public fields to display_name, avatar_url |
+| `lootaura_v2.favorites` | User favorites | Owner-only access | ✅ Already secure |
+| `lootaura_v2.items` | Sale items | Public read via sales, owner write | ✅ Secure via sales relationship |
+| `public.sales_v2` | Public sales view | Minimal column projection | Remove sensitive columns |
+| `public.items_v2` | Public items view | ✅ Already minimal | ✅ No changes needed |
+
 ## Test Coverage
 
 ### Unit Tests
@@ -120,6 +142,14 @@ The following secrets must be configured in GitHub Actions:
 - **Email Redirects**: Tests for `NEXT_PUBLIC_SITE_URL` configuration
 - **Google OAuth**: Tests for OAuth initiation and callback handling
 - **Resend Confirmation**: Tests for resend email functionality
+
+### RLS Security Tests
+- **Non-owner Denial**: User B cannot modify User A's sales
+- **Owner Success**: User A can modify own sales
+- **Anon Denial**: Anonymous users cannot write
+- **Public Read Minimality**: Public APIs return only safe fields
+- **Profile Security**: Owner-only profile updates
+- **Favorites Security**: Owner-only favorites management
 
 ### Integration Tests
 - **Session Protection**: Tests for protected route access control

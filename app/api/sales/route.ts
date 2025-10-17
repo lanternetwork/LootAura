@@ -419,7 +419,7 @@ export async function GET(request: NextRequest) {
 
         results = fallbackFiltered.map((row: any): Sale => ({
           id: row.id,
-          owner_id: row.owner_id || '',
+          // owner_id removed for security - not exposed in public API
           title: row.title,
           description: row.description,
           address: row.address,
@@ -444,7 +444,7 @@ export async function GET(request: NextRequest) {
       } else {
         results = salesWithDistance.map((row: any): Sale => ({
           id: row.id,
-          owner_id: row.owner_id || '',
+          // owner_id removed for security - not exposed in public API
           title: row.title,
           description: row.description,
           address: row.address,
@@ -518,6 +518,9 @@ export async function POST(request: NextRequest) {
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Auth failed:', { event: 'sales-create', status: 'fail', code: authError?.message })
+      }
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
     
@@ -525,6 +528,8 @@ export async function POST(request: NextRequest) {
     
     const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact } = body
     
+    // Ensure owner_id is set server-side from authenticated user
+    // Never trust client payload for owner_id
     const { data, error } = await supabase
       .from('sales_v2')
       .insert({
@@ -541,18 +546,28 @@ export async function POST(request: NextRequest) {
         date_end,
         time_end,
         status: 'published',
-        owner_id: user.id
+        owner_id: user.id // Server-side binding - never trust client
       })
       .select()
       .single()
     
     if (error) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Insert failed:', { event: 'sales-create', status: 'fail', code: error.message })
+      }
       console.error('Sales insert error:', error)
       return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
     }
     
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES] Sale created:', { event: 'sales-create', status: 'ok', saleId: data.id })
+    }
+    
     return NextResponse.json({ ok: true, sale: data })
   } catch (error: any) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES] Unexpected error:', { event: 'sales-create', status: 'fail' })
+    }
     console.error('Sales POST error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

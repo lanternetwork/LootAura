@@ -19,7 +19,9 @@ class QueryOptimizer {
     // Remove oldest entries if cache is full
     if (this.queryCache.size >= this.MAX_CACHE_SIZE) {
       const oldestKey = this.queryCache.keys().next().value
-      this.queryCache.delete(oldestKey)
+      if (oldestKey) {
+        this.queryCache.delete(oldestKey)
+      }
     }
 
     this.queryCache.set(key, {

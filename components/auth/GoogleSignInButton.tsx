@@ -15,7 +15,15 @@ export default function GoogleSignInButton() {
 
       if (response.ok) {
         // The response will be a redirect, so we need to follow it
-        window.location.href = response.url
+        if (response.redirected && response.url) {
+          window.location.href = response.url
+        } else {
+          // Handle the case where we get a redirect response
+          const data = await response.json()
+          if (data.url) {
+            window.location.href = data.url
+          }
+        }
       } else {
         const data = await response.json()
         console.error('Google sign-in failed:', data.message)

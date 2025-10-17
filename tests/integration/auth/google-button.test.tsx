@@ -49,10 +49,16 @@ describe('Google Sign-In Button', () => {
   it('should handle Google sign-in click', async () => {
     process.env.NEXT_PUBLIC_GOOGLE_ENABLED = 'true'
 
-    vi.mocked(fetch).mockResolvedValueOnce({
+    const mockResponse = {
       ok: true,
+      redirected: false,
       url: 'https://accounts.google.com/oauth/authorize?client_id=...',
-    } as Response)
+      json: vi.fn().mockResolvedValue({
+        url: 'https://accounts.google.com/oauth/authorize?client_id=...'
+      })
+    } as any
+
+    vi.mocked(fetch).mockResolvedValueOnce(mockResponse)
 
     render(<GoogleSignInButton />)
 
@@ -67,8 +73,18 @@ describe('Google Sign-In Button', () => {
     expect(window.location.href).toBe('https://accounts.google.com/oauth/authorize?client_id=...')
   })
 
-  it('should show loading state during sign-in', () => {
+  it('should show loading state during sign-in', async () => {
     process.env.NEXT_PUBLIC_GOOGLE_ENABLED = 'true'
+
+    // Mock a slow response
+    vi.mocked(fetch).mockImplementation(() => 
+      new Promise(resolve => setTimeout(() => resolve({
+        ok: true,
+        redirected: false,
+        url: 'https://accounts.google.com/oauth/authorize?client_id=...',
+        json: vi.fn().mockResolvedValue({ url: 'https://accounts.google.com/oauth/authorize?client_id=...' })
+      } as any), 100))
+    )
 
     render(<GoogleSignInButton />)
 

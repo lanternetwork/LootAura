@@ -45,7 +45,7 @@ describe('Google OAuth', () => {
 
     const response = await googlePOST(request)
 
-    expect(response.status).toBe(302) // Redirect
+    expect(response.status).toBe(307) // Redirect
     expect(mockSupabase.auth.signInWithOAuth).toHaveBeenCalledWith({
       provider: 'google',
       options: {

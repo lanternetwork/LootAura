@@ -6,30 +6,30 @@ DELETE FROM lootaura_v2.items WHERE sale_id IN (SELECT id FROM lootaura_v2.sales
 DELETE FROM lootaura_v2.sales WHERE title LIKE 'Weekend Test%';
 
 -- Get current date for reference
--- Current weekend: January 18-19, 2025 (Saturday-Sunday)
--- Next weekend: January 25-26, 2025 (Saturday-Sunday)
+-- Current weekend: October 19-20, 2025 (Saturday-Sunday) 
+-- Next weekend: October 26-27, 2025 (Saturday-Sunday)
 
--- Create sales for THIS weekend (January 18-19, 2025)
+-- Create sales for THIS weekend (October 19-20, 2025)
 INSERT INTO lootaura_v2.sales (
     id, owner_id, title, description, address, city, state, zip_code, 
     lat, lng, date_start, time_start, date_end, time_end, status, created_at
 ) VALUES 
--- Saturday, January 18, 2025
-('b0000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Saturday Morning Sale', 'Early bird furniture and electronics', '2001 Saturday St', 'Louisville', 'KY', '40204', 38.235, -85.708, '2025-01-18', '08:00:00', '2025-01-18', '12:00:00', 'published', NOW()),
-('b0000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Saturday Afternoon Sale', 'Tools, toys, and household items', '2002 Saturday Ave', 'Louisville', 'KY', '40204', 38.240, -85.710, '2025-01-18', '13:00:00', '2025-01-18', '17:00:00', 'published', NOW()),
-('b0000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Saturday Evening Sale', 'Books, games, and collectibles', '2003 Saturday Rd', 'Louisville', 'KY', '40204', 38.230, -85.705, '2025-01-18', '18:00:00', '2025-01-18', '21:00:00', 'published', NOW()),
+-- Saturday, October 19, 2025
+('b0000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Saturday Morning Sale', 'Early bird furniture and electronics', '2001 Saturday St', 'Louisville', 'KY', '40204', 38.235, -85.708, '2025-10-19', '08:00:00', '2025-10-19', '12:00:00', 'published', NOW()),
+('b0000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Saturday Afternoon Sale', 'Tools, toys, and household items', '2002 Saturday Ave', 'Louisville', 'KY', '40204', 38.240, -85.710, '2025-10-19', '13:00:00', '2025-10-19', '17:00:00', 'published', NOW()),
+('b0000000-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Saturday Evening Sale', 'Books, games, and collectibles', '2003 Saturday Rd', 'Louisville', 'KY', '40204', 38.230, -85.705, '2025-10-19', '18:00:00', '2025-10-19', '21:00:00', 'published', NOW()),
 
--- Sunday, January 19, 2025
-('b0000000-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Sunday Morning Sale', 'Clothing, shoes, and accessories', '2004 Sunday St', 'Louisville', 'KY', '40204', 38.245, -85.715, '2025-01-19', '09:00:00', '2025-01-19', '13:00:00', 'published', NOW()),
-('b0000000-0000-0000-0000-000000000005', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Sunday Afternoon Sale', 'Kitchen items, decor, and home goods', '2005 Sunday Ave', 'Louisville', 'KY', '40204', 38.238, -85.720, '2025-01-19', '14:00:00', '2025-01-19', '18:00:00', 'published', NOW()),
+-- Sunday, October 20, 2025
+('b0000000-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Sunday Morning Sale', 'Clothing, shoes, and accessories', '2004 Sunday St', 'Louisville', 'KY', '40204', 38.245, -85.715, '2025-10-20', '09:00:00', '2025-10-20', '13:00:00', 'published', NOW()),
+('b0000000-0000-0000-0000-000000000005', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Sunday Afternoon Sale', 'Kitchen items, decor, and home goods', '2005 Sunday Ave', 'Louisville', 'KY', '40204', 38.238, -85.720, '2025-10-20', '14:00:00', '2025-10-20', '18:00:00', 'published', NOW()),
 
--- NEXT weekend (January 25-26, 2025)
-('b0000000-0000-0000-0000-000000000006', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Next Saturday Sale', 'Sports equipment and outdoor gear', '2006 Next Saturday St', 'Louisville', 'KY', '40204', 38.242, -85.712, '2025-01-25', '10:00:00', '2025-01-25', '16:00:00', 'published', NOW()),
-('b0000000-0000-0000-0000-000000000007', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Next Sunday Sale', 'Vintage items and antiques', '2007 Next Sunday Ave', 'Louisville', 'KY', '40204', 38.232, -85.718, '2025-01-26', '11:00:00', '2025-01-26', '17:00:00', 'published', NOW()),
+-- NEXT weekend (October 26-27, 2025)
+('b0000000-0000-0000-0000-000000000006', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Next Saturday Sale', 'Sports equipment and outdoor gear', '2006 Next Saturday St', 'Louisville', 'KY', '40204', 38.242, -85.712, '2025-10-26', '10:00:00', '2025-10-26', '16:00:00', 'published', NOW()),
+('b0000000-0000-0000-0000-000000000007', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Next Sunday Sale', 'Vintage items and antiques', '2007 Next Sunday Ave', 'Louisville', 'KY', '40204', 38.232, -85.718, '2025-10-27', '11:00:00', '2025-10-27', '17:00:00', 'published', NOW()),
 
 -- Mixed weekend sales with various categories
-('b0000000-0000-0000-0000-000000000008', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Multi-Category Sale', 'Furniture, electronics, and more', '2008 Multi St', 'Louisville', 'KY', '40204', 38.248, -85.708, '2025-01-18', '10:00:00', '2025-01-19', '16:00:00', 'published', NOW()),
-('b0000000-0000-0000-0000-000000000009', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Next Multi-Category Sale', 'Tools, toys, books, and games', '2009 Next Multi Ave', 'Louisville', 'KY', '40204', 38.225, -85.725, '2025-01-25', '09:00:00', '2025-01-26', '15:00:00', 'published', NOW());
+('b0000000-0000-0000-0000-000000000008', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Multi-Category Sale', 'Furniture, electronics, and more', '2008 Multi St', 'Louisville', 'KY', '40204', 38.248, -85.708, '2025-10-19', '10:00:00', '2025-10-20', '16:00:00', 'published', NOW()),
+('b0000000-0000-0000-0000-000000000009', '11111111-1111-1111-1111-111111111111', 'Weekend Test - Next Multi-Category Sale', 'Tools, toys, books, and games', '2009 Next Multi Ave', 'Louisville', 'KY', '40204', 38.225, -85.725, '2025-10-26', '09:00:00', '2025-10-27', '15:00:00', 'published', NOW());
 
 -- Create items for each weekend sale with diverse categories
 INSERT INTO lootaura_v2.items (sale_id, name, description, price, category) VALUES 

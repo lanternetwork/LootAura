@@ -76,7 +76,7 @@ INSERT INTO lootaura_v2.items (sale_id, name, description, price, category) VALU
 
 -- Multi-Category Sale items (Next weekend)
 ('b0000000-0000-0000-0000-000000000009', 'Tool Set', 'Complete workshop tool set', 149.99, 'tools'),
-('b0000000-0000-0000-0000-000000000009', 'Children\'s Toys', 'Assorted children\'s toys', 79.99, 'toys'),
+('b0000000-0000-0000-0000-000000000009', 'Children''s Toys', 'Assorted children''s toys', 79.99, 'toys'),
 ('b0000000-0000-0000-0000-000000000009', 'Book Library', 'Extensive book collection', 99.99, 'books'),
 ('b0000000-0000-0000-0000-000000000009', 'Puzzle Collection', 'Jigsaw puzzles and brain teasers', 49.99, 'games');
 

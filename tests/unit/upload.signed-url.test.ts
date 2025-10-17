@@ -123,8 +123,7 @@ describe('Upload Signed URL API', () => {
       body: JSON.stringify({
         mimeType: 'image/jpeg',
         sizeBytes: 1024,
-        entity: 'sale',
-        entityId: 'sale-123'
+        entity: 'sale'
       }),
       headers: {
         'Content-Type': 'application/json',

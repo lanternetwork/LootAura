@@ -23,7 +23,7 @@ export default function ResendConfirmation({ email }: ResendConfirmationProps) {
         body: JSON.stringify({ email }),
       })
 
-      const data = await response.json()
+      const _data = await response.json()
 
       if (response.ok) {
         setMessage('Confirmation email sent! Please check your inbox.')

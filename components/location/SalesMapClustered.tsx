@@ -85,10 +85,83 @@ export default function SalesMapClustered({
     radius: 25
   })
 
+  // Accessibility state
+  const [announcement, setAnnouncement] = useState('')
+  const [focusedClusterId, setFocusedClusterId] = useState<string | null>(null)
+
   // Type guard to ensure filter state compatibility
   const isFilterState = (filters: any): filters is FilterState => {
     return filters && typeof filters.dateRange === 'string' && Array.isArray(filters.categories)
   }
+
+  // Keyboard navigation handlers
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    const map = mapRef.current?.getMap?.()
+    if (!map) return
+
+    const panDistance = 0.01 // Adjust for pan sensitivity
+    const zoomStep = 1
+
+    switch (event.key) {
+      case 'ArrowUp':
+        event.preventDefault()
+        map.panBy([0, 50])
+        break
+      case 'ArrowDown':
+        event.preventDefault()
+        map.panBy([0, -50])
+        break
+      case 'ArrowLeft':
+        event.preventDefault()
+        map.panBy([50, 0])
+        break
+      case 'ArrowRight':
+        event.preventDefault()
+        map.panBy([-50, 0])
+        break
+      case '+':
+      case '=':
+        event.preventDefault()
+        map.zoomIn({ duration: 300 })
+        break
+      case '-':
+        event.preventDefault()
+        map.zoomOut({ duration: 300 })
+        break
+      case 'Enter':
+        event.preventDefault()
+        // Focus nearest cluster
+        if (clusters.length > 0) {
+          const nearestCluster = clusters[0]
+          if (nearestCluster) {
+            setFocusedClusterId(nearestCluster.id)
+            // Announce cluster info
+            setAnnouncement(`Focused on cluster with ${nearestCluster.point_count} sales`)
+          }
+        }
+        break
+      case 'Escape':
+        event.preventDefault()
+        setFocusedClusterId(null)
+        setAnnouncement('')
+        break
+    }
+  }, [clusters])
+
+  // Announce updates for screen readers
+  const announceUpdate = useCallback((message: string) => {
+    setAnnouncement(message)
+    // Clear announcement after a delay
+    setTimeout(() => setAnnouncement(''), 1000)
+  }, [])
+
+  // Check for reduced motion preference
+  const prefersReducedMotion = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    }
+    return false
+  }, [])
 
   // Load persisted state on mount
   useEffect(() => {
@@ -99,6 +172,12 @@ export default function SalesMapClustered({
       setCurrentFilters(persisted.filters)
     }
   }, [])
+
+  // Add keyboard event listener
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   // Monitor offline status
   useEffect(() => {
@@ -421,6 +500,10 @@ export default function SalesMapClustered({
         onZoomEnd={handleZoomEnd}
         onMove={onViewChange}
         interactiveLayerIds={[]}
+        // Accessibility attributes
+        role="img"
+        aria-label="Interactive map showing yard sales"
+        tabIndex={0}
       >
         {renderClusters}
         
@@ -440,6 +523,26 @@ export default function SalesMapClustered({
           </Popup>
         )}
       </Map>
+      
+      {/* Screen reader announcements */}
+      {announcement && (
+        <div 
+          role="status" 
+          aria-live="polite" 
+          className="sr-only"
+        >
+          {announcement}
+        </div>
+      )}
+      
+      {/* Keyboard navigation instructions */}
+      <div className="absolute bottom-4 left-4 bg-white bg-opacity-90 p-2 rounded text-xs text-gray-600 max-w-xs">
+        <div className="font-semibold mb-1">Keyboard Navigation:</div>
+        <div>Arrow keys: Pan map</div>
+        <div>+/-: Zoom in/out</div>
+        <div>Enter: Focus nearest cluster</div>
+        <div>Escape: Clear focus</div>
+      </div>
     </div>
   )
 }

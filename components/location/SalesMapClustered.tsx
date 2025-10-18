@@ -74,8 +74,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   className,
   style,
   id,
-  'data-testid': dataTestId,
-  ...restProps
+  'data-testid': dataTestId
 }, ref) => {
   const mapRef = useRef<any>(null)
   const [_visiblePinIds, setVisiblePinIds] = useState<string[]>([])

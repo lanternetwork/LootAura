@@ -87,7 +87,15 @@ describe('URL State Management', () => {
     it('should preserve state through serialize/deserialize', () => {
       const serialized = serializeState(customState)
       const deserialized = deserializeState(serialized)
-      expect(deserialized).toEqual(customState)
+      // Categories will be sorted during serialization, so we need to sort them for comparison
+      const expectedState = {
+        ...customState,
+        filters: {
+          ...customState.filters,
+          categories: [...customState.filters.categories].sort()
+        }
+      }
+      expect(deserialized).toEqual(expectedState)
     })
 
     it('should preserve default state through serialize/deserialize', () => {

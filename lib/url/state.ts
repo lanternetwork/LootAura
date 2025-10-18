@@ -53,29 +53,36 @@ export function serializeState(state: AppState): string {
 }
 
 /**
- * Deserialize URL query string to validated state
- * Ignores unknown keys and provides defaults for missing values
+ * Deserialize URL query string or JSON to validated state
+ * Handles both URL query strings and JSON format for backward compatibility
  */
-export function deserializeState(search: string): AppState {
-  const params = new URLSearchParams(search)
-  
-  // Default viewport (Louisville, KY)
-  const lat = parseFloat(params.get('lat') || '38.2527')
-  const lng = parseFloat(params.get('lng') || '-85.7585')
-  const zoom = parseFloat(params.get('zoom') || '10')
-  
-  // Default filters
-  const dateRange = params.get('date') || 'any'
-  const categories = params.get('cats')?.split(',').filter(Boolean) || []
-  const radius = parseFloat(params.get('radius') || '25')
-  
-  const state: AppState = {
-    view: { lat, lng, zoom },
-    filters: { dateRange, categories, radius }
+export function deserializeState(input: string): AppState {
+  // Try to parse as JSON first (new format)
+  try {
+    const parsed = JSON.parse(input)
+    return StateSchema.parse(parsed)
+  } catch {
+    // Fall back to URL query string format (legacy)
+    const params = new URLSearchParams(input)
+    
+    // Default viewport (Louisville, KY)
+    const lat = parseFloat(params.get('lat') || '38.2527')
+    const lng = parseFloat(params.get('lng') || '-85.7585')
+    const zoom = parseFloat(params.get('zoom') || '10')
+    
+    // Default filters
+    const dateRange = params.get('date') || 'any'
+    const categories = params.get('cats')?.split(',').filter(Boolean) || []
+    const radius = parseFloat(params.get('radius') || '25')
+    
+    const state: AppState = {
+      view: { lat, lng, zoom },
+      filters: { dateRange, categories, radius }
+    }
+    
+    // Validate and return
+    return StateSchema.parse(state)
   }
-  
-  // Validate and return
-  return StateSchema.parse(state)
 }
 
 /**

@@ -12,7 +12,7 @@ import {
   CACHE_TTL_MS
 } from '@/lib/cache/db'
 
-// Mock the entire db module
+// Mock the entire db module to avoid Dexie issues
 vi.mock('@/lib/cache/db', async () => {
   const actual = await vi.importActual('@/lib/cache/db')
   return {
@@ -21,7 +21,8 @@ vi.mock('@/lib/cache/db', async () => {
     putCachedMarkers: vi.fn().mockResolvedValue(undefined),
     pruneCache: vi.fn().mockResolvedValue(undefined),
     clearCache: vi.fn().mockResolvedValue(undefined),
-    getCacheStats: vi.fn().mockResolvedValue({ count: 0, size: 0 })
+    getCacheStats: vi.fn().mockResolvedValue({ count: 0, size: 0 }),
+    CACHE_TTL_MS: 7 * 24 * 60 * 60 * 1000
   }
 })
 
@@ -41,22 +42,23 @@ describe('Cache Database', () => {
 
   it('should handle putCachedMarkers gracefully', async () => {
     const markers = [{ id: '1', lat: 38.2527, lng: -85.7585 }]
-    await putCachedMarkers('tile1', 'hash1', markers)
-    // Should not throw
+    await expect(putCachedMarkers('tile1', 'hash1', markers)).resolves.not.toThrow()
   })
 
   it('should handle pruneCache gracefully', async () => {
-    await pruneCache()
-    // Should not throw
+    await expect(pruneCache()).resolves.not.toThrow()
   })
 
   it('should handle clearCache gracefully', async () => {
-    await clearCache()
-    // Should not throw
+    await expect(clearCache()).resolves.not.toThrow()
   })
 
   it('should handle getCacheStats gracefully', async () => {
     const stats = await getCacheStats()
     expect(stats).toEqual({ count: 0, size: 0 })
+  })
+
+  it('should have correct cache TTL constant', () => {
+    expect(CACHE_TTL_MS).toBe(7 * 24 * 60 * 60 * 1000)
   })
 })

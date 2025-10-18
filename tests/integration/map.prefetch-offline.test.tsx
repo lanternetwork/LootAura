@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import SalesMapClustered from '@/components/location/SalesMapClustered'
+import { SalesMapClustered } from '@/components/location/SalesMapClustered'
 import { isOfflineCacheEnabled } from '@/lib/flags'
 import { Sale } from '@/lib/types'
 
@@ -40,21 +40,21 @@ vi.mock('@/lib/cache/offline', () => ({
   fetchWithCache: vi.fn()
 }))
 
-// Mock the tile functions
-vi.mock('@/lib/map/tiles', () => ({
-  getCurrentTileId: vi.fn(() => 'test-tile-id'),
-  adjacentTileIds: vi.fn(() => ['adjacent-1', 'adjacent-2'])
-}))
-
-// Mock the filter hash function
-vi.mock('@/lib/filters/hash', () => ({
-  hashFilters: vi.fn(() => 'test-hash')
-}))
-
 // Mock the persistence functions
 vi.mock('@/lib/map/viewportPersistence', () => ({
   saveViewportState: vi.fn(),
   loadViewportState: vi.fn(() => null)
+}))
+
+// Mock the hash function
+vi.mock('@/lib/filters/hash', () => ({
+  hashFilters: vi.fn(() => 'mock-hash')
+}))
+
+// Mock the tile functions
+vi.mock('@/lib/map/tiles', () => ({
+  getCurrentTileId: vi.fn(() => 'mock-tile-id'),
+  adjacentTileIds: vi.fn(() => ['adjacent-tile-1', 'adjacent-tile-2'])
 }))
 
 const mockSales: Sale[] = [
@@ -74,13 +74,13 @@ const mockSales: Sale[] = [
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z'
   }
-] as Sale[]
+]
 
 const mockMarkers = mockSales.map(sale => ({
   id: sale.id,
   title: sale.title,
-  lat: sale.lat as number,
-  lng: sale.lng as number,
+  lat: sale.lat,
+  lng: sale.lng,
 }))
 
 describe('Map Prefetch and Offline Integration', () => {
@@ -93,7 +93,7 @@ describe('Map Prefetch and Offline Integration', () => {
   })
 
   it('should render without crashing', () => {
-    const { container } = render(
+    render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
@@ -102,14 +102,14 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors - check for map container div
-    expect(container.querySelector('.w-full.h-full')).toBeInTheDocument()
+    // Component should render without errors
+    expect(screen.getByRole('button')).toBeInTheDocument()
   })
 
   it('should handle offline cache when enabled', () => {
     vi.mocked(isOfflineCacheEnabled).mockReturnValue(true)
     
-    const { container } = render(
+    render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
@@ -119,13 +119,13 @@ describe('Map Prefetch and Offline Integration', () => {
     )
 
     // Component should render without errors
-    expect(container.querySelector('.w-full.h-full')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toBeInTheDocument()
   })
 
   it('should handle offline cache when disabled', () => {
     vi.mocked(isOfflineCacheEnabled).mockReturnValue(false)
     
-    const { container } = render(
+    render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
@@ -135,6 +135,40 @@ describe('Map Prefetch and Offline Integration', () => {
     )
 
     // Component should render without errors
-    expect(container.querySelector('.w-full.h-full')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toBeInTheDocument()
+  })
+
+  it('should handle onMoveEnd callback', () => {
+    const onMoveEnd = vi.fn()
+    
+    render(
+      <SalesMapClustered
+        sales={mockSales}
+        markers={mockMarkers}
+        center={{ lat: 38.2527, lng: -85.7585 }}
+        zoom={10}
+        onMoveEnd={onMoveEnd}
+      />
+    )
+
+    // Component should render without errors
+    expect(screen.getByRole('button')).toBeInTheDocument()
+  })
+
+  it('should handle onZoomEnd callback', () => {
+    const onZoomEnd = vi.fn()
+    
+    render(
+      <SalesMapClustered
+        sales={mockSales}
+        markers={mockMarkers}
+        center={{ lat: 38.2527, lng: -85.7585 }}
+        zoom={10}
+        onZoomEnd={onZoomEnd}
+      />
+    )
+
+    // Component should render without errors
+    expect(screen.getByRole('button')).toBeInTheDocument()
   })
 })

@@ -29,8 +29,6 @@ export default defineConfig({
     },
     // Reduce memory usage
     maxConcurrency: 1,
-    minThreads: 1,
-    maxThreads: 1,
   },
   resolve: {
     alias: {

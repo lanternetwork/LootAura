@@ -100,7 +100,7 @@ describe('URL State Management', () => {
       expect(decompressed).toEqual(customState)
     })
 
-    it('should produce base64-encoded strings for complex states', () => {
+    it('should produce shorter strings for complex states', () => {
       // Create a more complex state that would benefit from compression
       const complexState: AppState = {
         view: { lat: 40.7128, lng: -74.006, zoom: 12 },
@@ -112,10 +112,10 @@ describe('URL State Management', () => {
       }
       const serialized = serializeState(complexState)
       const compressed = compressState(complexState)
-      // Base64 encoding makes strings longer, not shorter
-      expect(compressed.length).toBeGreaterThan(serialized.length)
-      // But it should be a valid base64url string
-      expect(compressed).toMatch(/^[A-Za-z0-9_-]+$/)
+      // With custom compression, compressed should be shorter than serialized
+      expect(compressed.length).toBeLessThan(serialized.length)
+      // Should start with compression prefix
+      expect(compressed).toMatch(/^c:/)
     })
   })
 

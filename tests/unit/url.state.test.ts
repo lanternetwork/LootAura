@@ -92,7 +92,7 @@ describe('URL State Management', () => {
         ...customState,
         filters: {
           ...customState.filters,
-          categories: [...customState.filters.categories].sort()
+          categories: [...(customState.filters.categories || [])].sort()
         }
       }
       expect(deserialized).toEqual(expectedState)
@@ -128,9 +128,16 @@ describe('URL State Management', () => {
       // Should start with either compression or JSON prefix
       expect(compressed).toMatch(/^[cj]:/)
       
-      // Should be able to decompress back to original state
+      // Should be able to decompress back to original state (categories will be sorted)
       const decompressed = decompressState(compressed)
-      expect(decompressed).toEqual(complexState)
+      const expectedState = {
+        ...complexState,
+        filters: {
+          ...complexState.filters,
+          categories: [...complexState.filters.categories].sort()
+        }
+      }
+      expect(decompressed).toEqual(expectedState)
       
       // Verify the compressed format works correctly
       expect(compressed.length).toBeGreaterThan(0)

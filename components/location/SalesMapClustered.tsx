@@ -251,8 +251,8 @@ export default function SalesMapClustered({
         }, 100)
       })
       
-      // Use filterHash to avoid unused variable warning
-      console.debug('Prefetching with filter hash:', filterHash)
+      // Use _filterHash to avoid unused variable warning
+      console.debug('Prefetching with filter hash:', _filterHash)
     }
   }, [clusterIndex, onVisiblePinsChange, viewportFetchManager, currentFilters])
 

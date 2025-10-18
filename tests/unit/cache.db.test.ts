@@ -41,15 +41,18 @@ describe('Cache Database', () => {
 
   it('should handle putCachedMarkers gracefully', async () => {
     const markers = [{ id: '1', lat: 38.2527, lng: -85.7585 }]
-    await expect(putCachedMarkers('tile1', 'hash1', markers)).resolves.not.toThrow()
+    await putCachedMarkers('tile1', 'hash1', markers)
+    // Should not throw
   })
 
   it('should handle pruneCache gracefully', async () => {
-    await expect(pruneCache()).resolves.not.toThrow()
+    await pruneCache()
+    // Should not throw
   })
 
   it('should handle clearCache gracefully', async () => {
-    await expect(clearCache()).resolves.not.toThrow()
+    await clearCache()
+    // Should not throw
   })
 
   it('should handle getCacheStats gracefully', async () => {

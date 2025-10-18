@@ -79,8 +79,8 @@ const mockSales: Sale[] = [
 const mockMarkers = mockSales.map(sale => ({
   id: sale.id,
   title: sale.title,
-  lat: sale.lat,
-  lng: sale.lng,
+  lat: sale.lat as number,
+  lng: sale.lng as number,
 }))
 
 describe('Map Prefetch and Offline Integration', () => {

@@ -30,11 +30,6 @@ export default function PresetMenu({ currentState, onApplyPreset, className = ''
     setDefaultPreset 
   } = usePresets()
 
-  // Don't render if feature is disabled
-  if (!isSavedPresetsEnabled()) {
-    return null
-  }
-
   const handleSavePreset = useCallback(async () => {
     if (!presetName.trim()) return
 
@@ -72,6 +67,11 @@ export default function PresetMenu({ currentState, onApplyPreset, className = ''
       console.error('Failed to set default preset:', err)
     }
   }, [setDefaultPreset])
+
+  // Don't render if feature is disabled
+  if (!isSavedPresetsEnabled()) {
+    return null
+  }
 
   return (
     <div className={`relative ${className}`}>

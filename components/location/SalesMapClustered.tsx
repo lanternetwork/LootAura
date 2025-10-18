@@ -87,7 +87,7 @@ export default function SalesMapClustered({
 
   // Accessibility state
   const [announcement, setAnnouncement] = useState('')
-  const [focusedClusterId, setFocusedClusterId] = useState<string | null>(null)
+  const [_focusedClusterId, setFocusedClusterId] = useState<string | null>(null)
 
   // Type guard to ensure filter state compatibility
   const isFilterState = (filters: any): filters is FilterState => {
@@ -99,8 +99,8 @@ export default function SalesMapClustered({
     const map = mapRef.current?.getMap?.()
     if (!map) return
 
-    const panDistance = 0.01 // Adjust for pan sensitivity
-    const zoomStep = 1
+    const _panDistance = 0.01 // Adjust for pan sensitivity
+    const _zoomStep = 1
 
     switch (event.key) {
       case 'ArrowUp':
@@ -149,14 +149,14 @@ export default function SalesMapClustered({
   }, [clusters])
 
   // Announce updates for screen readers
-  const announceUpdate = useCallback((message: string) => {
+  const _announceUpdate = useCallback((message: string) => {
     setAnnouncement(message)
     // Clear announcement after a delay
     setTimeout(() => setAnnouncement(''), 1000)
   }, [])
 
   // Check for reduced motion preference
-  const prefersReducedMotion = useMemo(() => {
+  const _prefersReducedMotion = useMemo(() => {
     if (typeof window !== 'undefined') {
       return window.matchMedia('(prefers-reduced-motion: reduce)').matches
     }

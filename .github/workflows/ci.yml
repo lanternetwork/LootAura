@@ -50,6 +50,8 @@ jobs:
             npm ci
           else
             npm install
+            # Generate package-lock.json for consistent dependency resolution
+            npm install --package-lock-only
           fi
 
       - name: Run ESLint
@@ -75,6 +77,8 @@ jobs:
             npm ci
           else
             npm install
+            # Generate package-lock.json for consistent dependency resolution
+            npm install --package-lock-only
           fi
 
       - name: Run TypeScript type checking
@@ -100,10 +104,12 @@ jobs:
             npm ci
           else
             npm install
+            # Generate package-lock.json for consistent dependency resolution
+            npm install --package-lock-only
           fi
 
       - name: Run unit tests
-        run: npm run test
+        run: npm run test -- tests/unit/
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -139,6 +145,8 @@ jobs:
             npm ci
           else
             npm install
+            # Generate package-lock.json for consistent dependency resolution
+            npm install --package-lock-only
           fi
 
       - name: Run integration tests
@@ -168,6 +176,8 @@ jobs:
             npm ci
           else
             npm install
+            # Generate package-lock.json for consistent dependency resolution
+            npm install --package-lock-only
           fi
 
       - name: Build application
@@ -224,6 +234,8 @@ jobs:
             npm ci
           else
             npm install
+            # Generate package-lock.json for consistent dependency resolution
+            npm install --package-lock-only
           fi
 
       - name: Build (fallback if artifacts not used)
@@ -261,6 +273,8 @@ jobs:
             npm ci
           else
             npm install
+            # Generate package-lock.json for consistent dependency resolution
+            npm install --package-lock-only
           fi
 
       - name: Verify migration

@@ -5,7 +5,7 @@ import { Sale } from '@/lib/types'
 
 // Mock mapbox token
 vi.mock('@/lib/maps/token', () => ({
-  getMapboxToken: () => 'mock-token'
+  getMapboxToken: () => 'test-token'
 }))
 
 // Mock clustering
@@ -17,28 +17,72 @@ vi.mock('@/lib/clustering', () => ({
   getClusterSizeTier: () => 'small'
 }))
 
+// Mock viewport fetch manager
+vi.mock('@/lib/map/viewportFetchManager', () => ({
+  createViewportFetchManager: () => ({
+    fetchMarkers: vi.fn().mockResolvedValue({ data: { markers: [] }, error: null }),
+    abort: vi.fn(),
+    isFetching: false
+  })
+}))
+
+// Mock viewport persistence
+vi.mock('@/lib/map/viewportPersistence', () => ({
+  saveViewportState: vi.fn(),
+  loadViewportState: vi.fn().mockReturnValue(null)
+}))
+
+// Mock tiles
+vi.mock('@/lib/map/tiles', () => ({
+  getCurrentTileId: vi.fn().mockReturnValue('test-tile'),
+  adjacentTileIds: vi.fn().mockReturnValue(['test-tile-1', 'test-tile-2'])
+}))
+
+// Mock filters hash
+vi.mock('@/lib/filters/hash', () => ({
+  hashFilters: vi.fn().mockReturnValue('test-hash')
+}))
+
+// Mock cache offline
+vi.mock('@/lib/cache/offline', () => ({
+  fetchWithCache: vi.fn().mockResolvedValue({ data: { markers: [] }, error: null })
+}))
+
+// Mock flags
+vi.mock('@/lib/flags', () => ({
+  isOfflineCacheEnabled: () => false
+}))
+
+// Mock telemetry
+vi.mock('@/lib/telemetry/map', () => ({
+  logPrefetchStart: vi.fn(),
+  logPrefetchDone: vi.fn(),
+  logViewportSave: vi.fn(),
+  logViewportLoad: vi.fn()
+}))
+
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  default: ({ children, onLoad, onMoveEnd, onZoomEnd }: any) => {
+  default: ({ children, onLoad, onMoveEnd, onZoomEnd, ...props }: any) => {
     // Simulate map load
     setTimeout(() => {
       if (onLoad) onLoad()
     }, 0)
     
     return (
-      <div data-testid="map-container">
+      <div data-testid="map-container" {...props}>
         {children}
         <button 
           data-testid="trigger-move"
           onClick={() => onMoveEnd && onMoveEnd()}
         >
-          Trigger Move
+          Move End
         </button>
         <button 
           data-testid="trigger-zoom"
           onClick={() => onZoomEnd && onZoomEnd()}
         >
-          Trigger Zoom
+          Zoom End
         </button>
       </div>
     )
@@ -86,7 +130,7 @@ describe('Map Debounce UI Smoke Test', () => {
     cleanup()
   })
 
-  it('should render map with clustering disabled', () => {
+  it('should render map with clustering disabled', async () => {
     render(
       <SalesMapClustered
         sales={mockSales}
@@ -95,6 +139,9 @@ describe('Map Debounce UI Smoke Test', () => {
         zoom={10}
       />
     )
+
+    // Wait for component to render
+    await new Promise(resolve => setTimeout(resolve, 10))
 
     expect(screen.getByTestId('map-container')).toBeInTheDocument()
   })
@@ -127,7 +174,7 @@ describe('Map Debounce UI Smoke Test', () => {
     expect(screen.getByTestId('map-container')).toBeInTheDocument()
   })
 
-  it('should render individual markers when clustering is disabled', () => {
+  it('should render individual markers when clustering is disabled', async () => {
     render(
       <SalesMapClustered
         sales={mockSales}
@@ -136,6 +183,9 @@ describe('Map Debounce UI Smoke Test', () => {
         zoom={10}
       />
     )
+
+    // Wait for component to render
+    await new Promise(resolve => setTimeout(resolve, 10))
 
     // Should render individual markers since clustering is disabled
     expect(screen.getByTestId('marker')).toBeInTheDocument()

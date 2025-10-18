@@ -3,6 +3,37 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+// Mock Dexie to avoid IndexedDB issues in test environment
+vi.mock('dexie', () => {
+  const mockDB = {
+    markersByTile: {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      where: vi.fn().mockReturnValue({
+        below: vi.fn().mockReturnValue({
+          delete: vi.fn().mockResolvedValue(0)
+        })
+      }),
+      clear: vi.fn().mockResolvedValue(undefined),
+      count: vi.fn().mockResolvedValue(0),
+      toArray: vi.fn().mockResolvedValue([])
+    },
+    metadata: {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn().mockResolvedValue(undefined)
+    },
+    version: vi.fn().mockReturnThis(),
+    stores: vi.fn().mockReturnThis()
+  }
+  return {
+    __esModule: true,
+    default: vi.fn(() => mockDB)
+  }
+})
+
+// Import after mocking
 import { 
   getCachedMarkers, 
   putCachedMarkers, 
@@ -11,20 +42,6 @@ import {
   getCacheStats,
   CACHE_TTL_MS
 } from '@/lib/cache/db'
-
-// Mock the entire db module to avoid Dexie issues
-vi.mock('@/lib/cache/db', async () => {
-  const actual = await vi.importActual('@/lib/cache/db')
-  return {
-    ...actual,
-    getCachedMarkers: vi.fn().mockResolvedValue(null),
-    putCachedMarkers: vi.fn().mockResolvedValue(undefined),
-    pruneCache: vi.fn().mockResolvedValue(undefined),
-    clearCache: vi.fn().mockResolvedValue(undefined),
-    getCacheStats: vi.fn().mockResolvedValue({ count: 0, size: 0 }),
-    CACHE_TTL_MS: 7 * 24 * 60 * 60 * 1000
-  }
-})
 
 describe('Cache Database', () => {
   beforeEach(() => {
@@ -59,8 +76,9 @@ describe('Cache Database', () => {
   it('should handle getCacheStats gracefully', async () => {
     const stats = await getCacheStats()
     // Just check that the function executes without throwing an error
-    // The mock might return undefined, so we just verify it doesn't throw
-    expect(() => getCacheStats()).not.toThrow()
+    expect(stats).toBeDefined()
+    expect(stats).toHaveProperty('count')
+    expect(stats).toHaveProperty('size')
   })
 
   it('should have correct cache TTL constant', () => {

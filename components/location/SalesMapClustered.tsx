@@ -16,7 +16,7 @@ import {
   type ClusterPoint
 } from '@/lib/clustering'
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
-import { saveViewportState, loadViewportState, type ViewportState } from '@/lib/map/viewportPersistence'
+import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
 import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
 import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'
 import { fetchWithCache } from '@/lib/cache/offline'
@@ -74,24 +74,43 @@ export default function SalesMapClustered({
   const [_mapLoaded, setMapLoaded] = useState(false)
   
   // Offline state
-  const [isOffline, _setIsOffline] = useState(false)
+  const [isOffline, setIsOffline] = useState(false)
   const [showOfflineBanner, setShowOfflineBanner] = useState(false)
   const [cachedMarkerCount, setCachedMarkerCount] = useState(0)
   
   // Current filter state for persistence and caching
-  const [currentFilters, _setCurrentFilters] = useState<FilterStateType>({
+  const [currentFilters, setCurrentFilters] = useState<FilterStateType>({
     dateRange: 'any',
     categories: [],
     radius: 25
   })
 
+  // Type guard to ensure filter state compatibility
+  const isFilterState = (filters: any): filters is FilterState => {
+    return filters && typeof filters.dateRange === 'string' && Array.isArray(filters.categories)
+  }
+
   // Load persisted state on mount
   useEffect(() => {
     const persisted = loadViewportState()
-    if (persisted) {
+    if (persisted && isFilterState(persisted.filters)) {
       logViewportLoad(persisted.viewport)
       // Apply persisted viewport and filters
-      // This would typically update parent component state
+      setCurrentFilters(persisted.filters)
+    }
+  }, [])
+
+  // Monitor offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false)
+    const handleOffline = () => setIsOffline(true)
+    
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
     }
   }, [])
 
@@ -100,7 +119,7 @@ export default function SalesMapClustered({
     return createViewportFetchManager({
       debounceMs: 300,
       fetcher: async (viewport: Viewport, filters: Filters, signal: AbortSignal) => {
-        const tileId = getCurrentTileId(viewport, 10) // Use default zoom level
+        const tileId = getCurrentTileId(viewport, filters.zoom || 10)
         const filterHash = hashFilters(currentFilters)
         
         if (isOfflineCacheEnabled()) {
@@ -232,7 +251,8 @@ export default function SalesMapClustered({
       dateRange: currentFilters.dateRange === 'any' ? undefined : {
         from: '2025-01-01',
         to: '2025-12-31'
-      }
+      },
+      zoom: currentZoom
     }
     viewportFetchManager.request(viewport, filters)
     
@@ -240,19 +260,19 @@ export default function SalesMapClustered({
     if (isOfflineCacheEnabled()) {
       const currentTileId = getCurrentTileId(viewport, currentZoom)
       const adjacentTiles = adjacentTileIds(currentTileId)
-      const _filterHash = hashFilters(currentFilters)
+      const filterHash = hashFilters(currentFilters)
       
       adjacentTiles.forEach(tileId => {
         logPrefetchStart(tileId)
+        
+        // Use filterHash for cache key in real implementation
+        console.debug(`[PREFETCH] Tile: ${tileId}, Filter: ${filterHash}`)
         
         // Simulate prefetch (in real implementation, this would fetch data)
         setTimeout(() => {
           logPrefetchDone(tileId, 50, 10) // Simulated timing and count
         }, 100)
       })
-      
-      // Use _filterHash to avoid unused variable warning
-      console.debug('Prefetching with filter hash:', _filterHash)
     }
   }, [clusterIndex, onVisiblePinsChange, viewportFetchManager, currentFilters])
 

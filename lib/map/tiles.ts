@@ -10,6 +10,11 @@ export interface TileBounds {
   west: number
 }
 
+// Helper function to create tile bounds from coordinates
+export function createTileBounds(north: number, south: number, east: number, west: number): TileBounds {
+  return { north, south, east, west }
+}
+
 export interface Viewport {
   sw: [number, number]
   ne: [number, number]
@@ -74,13 +79,13 @@ export function adjacentTileIds(tileId: string): string[] {
 /**
  * Convert viewport to tile bounds
  */
-export function viewportToTileBounds(viewport: Viewport, _zoom: number): TileBounds {
-  return {
-    north: viewport.ne[1],
-    south: viewport.sw[1],
-    east: viewport.ne[0],
-    west: viewport.sw[0]
-  }
+export function viewportToTileBounds(viewport: Viewport, zoom: number): TileBounds {
+  return createTileBounds(
+    viewport.ne[1],
+    viewport.sw[1],
+    viewport.ne[0],
+    viewport.sw[0]
+  )
 }
 
 /**

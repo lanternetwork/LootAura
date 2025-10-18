@@ -13,6 +13,7 @@ export type Filters = {
     from: string
     to: string
   }
+  zoom?: number
 }
 
 export interface ViewportFetchManagerOptions {

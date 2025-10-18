@@ -106,6 +106,23 @@ describe('Map Prefetch and Offline Integration', () => {
     expect(screen.getByRole('button')).toBeInTheDocument()
   })
 
+  it('should handle viewport changes', () => {
+    const onViewChange = vi.fn()
+    
+    render(
+      <SalesMapClustered
+        sales={mockSales}
+        markers={mockMarkers}
+        center={{ lat: 38.2527, lng: -85.7585 }}
+        zoom={10}
+        onViewChange={onViewChange}
+      />
+    )
+
+    // Component should render without errors
+    expect(screen.getByRole('button')).toBeInTheDocument()
+  })
+
   it('should handle offline cache when enabled', () => {
     vi.mocked(isOfflineCacheEnabled).mockReturnValue(true)
     

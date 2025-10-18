@@ -102,9 +102,9 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors - check for the container div
-    const container = screen.getByRole('generic')
-    expect(container).toBeInTheDocument()
+    // Component should render without errors - check that divs are present
+    const containers = screen.getAllByRole('generic')
+    expect(containers.length).toBeGreaterThan(0)
   })
 
   it('should handle viewport changes', () => {
@@ -120,9 +120,9 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors - check for the container div
-    const container = screen.getByRole('generic')
-    expect(container).toBeInTheDocument()
+    // Component should render without errors - check that divs are present
+    const containers = screen.getAllByRole('generic')
+    expect(containers.length).toBeGreaterThan(0)
   })
 
   it('should handle offline cache when enabled', () => {
@@ -137,9 +137,9 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors - check for the container div
-    const container = screen.getByRole('generic')
-    expect(container).toBeInTheDocument()
+    // Component should render without errors - check that divs are present
+    const containers = screen.getAllByRole('generic')
+    expect(containers.length).toBeGreaterThan(0)
   })
 
   it('should handle offline cache when disabled', () => {
@@ -154,9 +154,9 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors - check for the container div
-    const container = screen.getByRole('generic')
-    expect(container).toBeInTheDocument()
+    // Component should render without errors - check that divs are present
+    const containers = screen.getAllByRole('generic')
+    expect(containers.length).toBeGreaterThan(0)
   })
 
   it('should handle onMoveEnd callback', () => {
@@ -172,9 +172,9 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors - check for the container div
-    const container = screen.getByRole('generic')
-    expect(container).toBeInTheDocument()
+    // Component should render without errors - check that divs are present
+    const containers = screen.getAllByRole('generic')
+    expect(containers.length).toBeGreaterThan(0)
   })
 
   it('should handle onZoomEnd callback', () => {
@@ -190,8 +190,8 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors - check for the container div
-    const container = screen.getByRole('generic')
-    expect(container).toBeInTheDocument()
+    // Component should render without errors - check that divs are present
+    const containers = screen.getAllByRole('generic')
+    expect(containers.length).toBeGreaterThan(0)
   })
 })

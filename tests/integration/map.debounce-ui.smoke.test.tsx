@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, cleanup } from '@testing-library/react'
 import SalesMapClustered from '@/components/location/SalesMapClustered'
 import { Sale } from '@/lib/types'
 
@@ -72,7 +72,14 @@ describe('Map Debounce UI Smoke Test', () => {
   ]
 
   beforeEach(() => {
+    // Clean up any previous renders
+    cleanup()
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    // Ensure clean state between tests
+    cleanup()
   })
 
   it('should render map with clustering disabled', () => {

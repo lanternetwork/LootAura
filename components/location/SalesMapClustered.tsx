@@ -457,6 +457,7 @@ export default function SalesMapClustered({
           longitude={marker.lng}
           latitude={marker.lat}
           anchor="center"
+          data-testid="marker"
         >
           <button
             className="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -507,6 +508,7 @@ export default function SalesMapClustered({
         interactiveLayerIds={[]}
         // Accessibility attributes
         role="img"
+        data-testid="map-container"
         aria-label="Interactive map showing yard sales"
         tabIndex={0}
       >

@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "NODE_OPTIONS='--max-old-space-size=8192 --expose-gc' vitest run",
+    "test": "NODE_OPTIONS='--max-old-space-size=8192 --expose-gc --optimize-for-size --gc-interval=100' vitest run",
     "test:ui": "vitest",
     "test:e2e": "playwright test",
     "format": "prettier -w .",

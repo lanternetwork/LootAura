@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { POST, GET } from '@/app/api/share/route'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 // Mock Supabase server client
 vi.mock('@/lib/supabase/server', () => ({
@@ -23,7 +24,7 @@ describe('Share API', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(require('@/lib/supabase/server').createSupabaseServerClient).mockReturnValue(mockSupabase as any)
+    vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
   })
 
   afterEach(() => {

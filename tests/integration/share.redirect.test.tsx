@@ -56,13 +56,13 @@ describe('Share Redirect Integration', () => {
     mockSupabase.from.mockReturnValue({ select: mockSelect })
 
     const { serializeState } = await import('@/lib/url/state')
-    vi.mocked(serializeState).mockReturnValue('lat=40.7128&lng=-74.0060&zoom=12')
+    vi.mocked(serializeState).mockReturnValue('lat=40.7128&lng=-74.006&zoom=12')
 
     await ShortlinkPage({ params: { id: 'test12345' } })
 
     expect(mockSupabase.from).toHaveBeenCalledWith('shared_states')
     expect(serializeState).toHaveBeenCalledWith(mockState)
-    expect(redirect).toHaveBeenCalledWith('/explore?lat=40.7128&lng=-74.0060&zoom=12')
+    expect(redirect).toHaveBeenCalledWith('/explore?lat=40.7128&lng=-74.006&zoom=12')
   })
 
   it('should call notFound for invalid short ID', async () => {

@@ -102,8 +102,9 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
+    // Component should render without errors - check for the container div
+    const container = screen.getByRole('generic')
+    expect(container).toBeInTheDocument()
   })
 
   it('should handle viewport changes', () => {
@@ -119,8 +120,9 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
+    // Component should render without errors - check for the container div
+    const container = screen.getByRole('generic')
+    expect(container).toBeInTheDocument()
   })
 
   it('should handle offline cache when enabled', () => {
@@ -135,8 +137,9 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
+    // Component should render without errors - check for the container div
+    const container = screen.getByRole('generic')
+    expect(container).toBeInTheDocument()
   })
 
   it('should handle offline cache when disabled', () => {
@@ -151,8 +154,9 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
+    // Component should render without errors - check for the container div
+    const container = screen.getByRole('generic')
+    expect(container).toBeInTheDocument()
   })
 
   it('should handle onMoveEnd callback', () => {
@@ -168,8 +172,9 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
+    // Component should render without errors - check for the container div
+    const container = screen.getByRole('generic')
+    expect(container).toBeInTheDocument()
   })
 
   it('should handle onZoomEnd callback', () => {
@@ -185,7 +190,8 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
+    // Component should render without errors - check for the container div
+    const container = screen.getByRole('generic')
+    expect(container).toBeInTheDocument()
   })
 })

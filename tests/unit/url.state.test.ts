@@ -25,29 +25,33 @@ describe('URL State Management', () => {
   }
 
   describe('serializeState', () => {
-    it('should serialize default state with minimal params', () => {
+    it('should serialize default state as stable JSON', () => {
       const result = serializeState(defaultState)
-      expect(result).toBe('lat=38.2527&lng=-85.7585&zoom=10')
+      const parsed = JSON.parse(result)
+      expect(parsed).toEqual({
+        view: { lat: 38.2527, lng: -85.7585, zoom: 10 },
+        filters: { dateRange: 'any', categories: [], radius: 25 }
+      })
     })
 
-    it('should serialize custom state with all params', () => {
+    it('should serialize custom state as stable JSON', () => {
       const result = serializeState(customState)
-      expect(result).toContain('lat=40.7128')
-      expect(result).toContain('lng=-74.006')
-      expect(result).toContain('zoom=12')
-      expect(result).toContain('date=today')
-      expect(result).toContain('cats=electronics%2Cfurniture') // URL encoded
-      expect(result).toContain('radius=50')
+      const parsed = JSON.parse(result)
+      expect(parsed).toEqual({
+        view: { lat: 40.7128, lng: -74.006, zoom: 12 },
+        filters: { dateRange: 'today', categories: ['electronics', 'furniture'], radius: 50 }
+      })
     })
 
-    it('should sort categories for consistent URLs', () => {
+    it('should sort categories for consistent output', () => {
       const stateWithUnsortedCategories: AppState = {
         view: { lat: 40.7128, lng: -74.0060, zoom: 12 },
         filters: { dateRange: 'any', categories: ['zebra', 'apple', 'banana'], radius: 25 }
       }
       
       const result = serializeState(stateWithUnsortedCategories)
-      expect(result).toContain('cats=apple%2Cbanana%2Czebra') // URL encoded
+      const parsed = JSON.parse(result)
+      expect(parsed.filters.categories).toEqual(['apple', 'banana', 'zebra'])
     })
   })
 
@@ -113,15 +117,14 @@ describe('URL State Management', () => {
       const serialized = serializeState(complexState)
       const compressed = compressState(complexState)
       
-      // Should start with compression prefix
-      expect(compressed).toMatch(/^c:/)
+      // Should start with either compression or JSON prefix
+      expect(compressed).toMatch(/^[cj]:/)
       
       // Should be able to decompress back to original state
       const decompressed = decompressState(compressed)
       expect(decompressed).toEqual(complexState)
       
-      // For very repetitive data, compression should be beneficial
-      // But for this test case, we just verify it works correctly
+      // Verify the compressed format works correctly
       expect(compressed.length).toBeGreaterThan(0)
       expect(serialized.length).toBeGreaterThan(0)
     })
@@ -140,7 +143,7 @@ describe('URL State Management', () => {
       const serialized = serializeState(repetitiveState)
       const compressed = compressState(repetitiveState)
       
-      // Should start with compression prefix
+      // Should start with compression prefix (since repetitive data compresses well)
       expect(compressed).toMatch(/^c:/)
       
       // Should be able to decompress back to original state

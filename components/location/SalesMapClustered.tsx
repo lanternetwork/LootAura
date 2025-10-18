@@ -16,7 +16,14 @@ import {
   type ClusterPoint
 } from '@/lib/clustering'
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
+import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
+import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
+import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'
+import { fetchWithCache } from '@/lib/cache/offline'
+import { isOfflineCacheEnabled } from '@/lib/flags'
+import { logPrefetchStart, logPrefetchDone, logViewportSave, logViewportLoad } from '@/lib/telemetry/map'
 import ClusterMarker from './ClusterMarker'
+import OfflineBanner from '../OfflineBanner'
 
 interface SalesMapClusteredProps {
   sales: Sale[]
@@ -65,24 +72,82 @@ export default function SalesMapClustered({
   const [clusters, setClusters] = useState<ClusterResult[]>([])
   const [clusterIndex, setClusterIndex] = useState<ClusterIndex | null>(null)
   const [_mapLoaded, setMapLoaded] = useState(false)
+  
+  // Offline state
+  const [isOffline, setIsOffline] = useState(false)
+  const [showOfflineBanner, setShowOfflineBanner] = useState(false)
+  const [cachedMarkerCount, setCachedMarkerCount] = useState(0)
+  
+  // Current filter state for persistence and caching
+  const [currentFilters, setCurrentFilters] = useState<FilterStateType>({
+    dateRange: 'any',
+    categories: [],
+    radius: 25
+  })
+
+  // Type guard to ensure filter state compatibility
+  const isFilterState = (filters: any): filters is FilterState => {
+    return filters && typeof filters.dateRange === 'string' && Array.isArray(filters.categories)
+  }
+
+  // Load persisted state on mount
+  useEffect(() => {
+    const persisted = loadViewportState()
+    if (persisted && isFilterState(persisted.filters)) {
+      logViewportLoad(persisted.viewport)
+      // Apply persisted viewport and filters
+      setCurrentFilters(persisted.filters)
+    }
+  }, [])
+
+  // Monitor offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false)
+    const handleOffline = () => setIsOffline(true)
+    
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   // Create viewport fetch manager for debounced viewport-based data fetching
   const viewportFetchManager = useMemo(() => {
     return createViewportFetchManager({
       debounceMs: 300,
       fetcher: async (viewport: Viewport, filters: Filters, signal: AbortSignal) => {
-        // This is a placeholder - in a real implementation, this would fetch data
-        // based on the viewport bounds and filters
-        console.log('[VIEWPORT] Fetch request', { viewport, filters })
+        const tileId = getCurrentTileId(viewport, filters.zoom || 10)
+        const filterHash = hashFilters(currentFilters)
         
-        // Simulate async operation
-        await new Promise(resolve => setTimeout(resolve, 100))
-        
-        if (signal.aborted) {
-          throw new Error('Request aborted')
+        if (isOfflineCacheEnabled()) {
+          const result = await fetchWithCache(
+            `${tileId}:${filterHash}`,
+            async () => {
+              // Simulate network fetch
+              await new Promise(resolve => setTimeout(resolve, 100))
+              if (signal.aborted) throw new Error('Request aborted')
+              return { markers: markers, success: true }
+            },
+            { tileId, filterHash, ttlMs: 7 * 24 * 60 * 60 * 1000 }
+          )
+          
+          if (result.fromCache) {
+            setShowOfflineBanner(true)
+            setCachedMarkerCount(result.data?.markers?.length || 0)
+          } else {
+            setShowOfflineBanner(false)
+          }
+          
+          return result.data || { success: false }
+        } else {
+          // Fallback to simple fetch without cache
+          await new Promise(resolve => setTimeout(resolve, 100))
+          if (signal.aborted) throw new Error('Request aborted')
+          return { success: true }
         }
-        
-        return { success: true }
       },
       onStart: () => {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -100,7 +165,7 @@ export default function SalesMapClustered({
         }
       }
     })
-  }, [])
+  }, [markers, currentFilters])
 
   // Convert markers to cluster points
   const clusterPoints = useMemo((): ClusterPoint[] => {
@@ -182,10 +247,34 @@ export default function SalesMapClustered({
       ne: [bounds.getEast(), bounds.getNorth()]
     }
     const filters: Filters = {
-      // Add any relevant filters here
+      categories: currentFilters.categories,
+      dateRange: currentFilters.dateRange === 'any' ? undefined : {
+        from: '2025-01-01',
+        to: '2025-12-31'
+      },
+      zoom: currentZoom
     }
     viewportFetchManager.request(viewport, filters)
-  }, [clusterIndex, onVisiblePinsChange, viewportFetchManager])
+    
+    // Prefetch adjacent tiles if offline cache is enabled
+    if (isOfflineCacheEnabled()) {
+      const currentTileId = getCurrentTileId(viewport, currentZoom)
+      const adjacentTiles = adjacentTileIds(currentTileId)
+      const filterHash = hashFilters(currentFilters)
+      
+      adjacentTiles.forEach(tileId => {
+        logPrefetchStart(tileId)
+        
+        // Use filterHash for cache key in real implementation
+        console.debug(`[PREFETCH] Tile: ${tileId}, Filter: ${filterHash}`)
+        
+        // Simulate prefetch (in real implementation, this would fetch data)
+        setTimeout(() => {
+          logPrefetchDone(tileId, 50, 10) // Simulated timing and count
+        }, 100)
+      })
+    }
+  }, [clusterIndex, onVisiblePinsChange, viewportFetchManager, currentFilters])
 
   // Handle cluster click - zoom to cluster bounds
   const handleClusterClick = useCallback((cluster: ClusterResult) => {
@@ -227,16 +316,42 @@ export default function SalesMapClustered({
     if (!map) return
 
     updateClusters(map)
+    
+    // Persist viewport state
+    const center = map.getCenter()
+    const zoom = map.getZoom()
+    const viewport: ViewportState = {
+      lat: center.lat,
+      lng: center.lng,
+      zoom
+    }
+    
+    saveViewportState(viewport, currentFilters)
+    logViewportSave(viewport)
+    
     onMoveEnd?.()
-  }, [updateClusters, onMoveEnd])
+  }, [updateClusters, onMoveEnd, currentFilters])
 
   const handleZoomEnd = useCallback(() => {
     const map = mapRef.current?.getMap?.()
     if (!map) return
 
     updateClusters(map)
+    
+    // Persist viewport state
+    const center = map.getCenter()
+    const zoom = map.getZoom()
+    const viewport: ViewportState = {
+      lat: center.lat,
+      lng: center.lng,
+      zoom
+    }
+    
+    saveViewportState(viewport, currentFilters)
+    logViewportSave(viewport)
+    
     onZoomEnd?.()
-  }, [updateClusters, onZoomEnd])
+  }, [updateClusters, onZoomEnd, currentFilters])
 
   const handleMapLoad = useCallback(() => {
     setMapLoaded(true)
@@ -286,6 +401,11 @@ export default function SalesMapClustered({
 
   return (
     <div className="w-full h-full">
+      <OfflineBanner 
+        isVisible={showOfflineBanner}
+        isOffline={isOffline}
+        cachedCount={cachedMarkerCount}
+      />
       <Map
         ref={mapRef}
         mapboxAccessToken={getMapboxToken()}

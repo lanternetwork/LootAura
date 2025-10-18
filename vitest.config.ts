@@ -29,6 +29,9 @@ export default defineConfig({
     },
     // Reduce memory usage
     maxConcurrency: 1,
+    // Constrain worker count to prevent OOMs
+    maxWorkers: 4,
+    minWorkers: 1,
   },
   resolve: {
     alias: {

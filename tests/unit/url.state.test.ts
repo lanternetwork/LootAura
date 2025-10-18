@@ -31,7 +31,7 @@ describe('URL State Management', () => {
     })
 
     it('should serialize custom state with all params', () => {
-      const result = serializeState(customState)
+      const result = serializeState(complexState)
       expect(result).toContain('lat=40.7128')
       expect(result).toContain('lng=-74.006')
       expect(result).toContain('zoom=12')
@@ -81,7 +81,7 @@ describe('URL State Management', () => {
 
   describe('round-trip serialization', () => {
     it('should preserve state through serialize/deserialize', () => {
-      const serialized = serializeState(customState)
+      const serialized = serializeState(complexState)
       const deserialized = deserializeState(serialized)
       expect(deserialized).toEqual(customState)
     })
@@ -95,14 +95,14 @@ describe('URL State Management', () => {
 
   describe('compressState', () => {
     it('should compress and decompress state correctly', () => {
-      const compressed = compressState(customState)
+      const compressed = compressState(complexState)
       const decompressed = decompressState(compressed)
       expect(decompressed).toEqual(customState)
     })
 
     it('should produce shorter strings for complex states', () => {
-      const serialized = serializeState(customState)
-      const compressed = compressState(customState)
+      const serialized = serializeState(complexState)
+      const compressed = compressState(complexState)
       expect(compressed.length).toBeLessThan(serialized.length)
     })
   })
@@ -134,6 +134,8 @@ describe('URL State Management', () => {
     })
   })
 })
+
+
 
 
 

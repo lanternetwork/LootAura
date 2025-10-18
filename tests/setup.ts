@@ -99,6 +99,29 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
+// Supabase server mock used by tests
+// @ts-ignore vitest mock hoisting in test env
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(() => ({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+      signInWithPassword: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    },
+    from: vi.fn(() => {
+      const chain: any = {}
+      chain.select = vi.fn(() => chain)
+      chain.insert = vi.fn((rows: any[]) => ({ data: rows, error: null }))
+      chain.update = vi.fn(() => chain)
+      chain.delete = vi.fn(() => chain)
+      chain.eq = vi.fn(() => chain)
+      chain.single = vi.fn(async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
+      return chain
+    }),
+  })),
+}))
+
 // Geocode mock ensuring non-null for valid addresses
 // @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/geocode', () => ({
@@ -137,5 +160,20 @@ g.fetch = vi.fn(async (input: any) => {
     )
   }
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+})
+
+// Mock window.matchMedia for JSDOM test environment
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // deprecated
+    removeListener: vi.fn(), // deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
 })
 

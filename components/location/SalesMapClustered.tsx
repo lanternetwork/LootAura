@@ -230,8 +230,8 @@ export default function SalesMapClustered({
     const filters: Filters = {
       categories: currentFilters.categories,
       dateRange: currentFilters.dateRange === 'any' ? undefined : {
-        from: currentFilters.dateRange,
-        to: currentFilters.dateRange
+        from: '2025-01-01',
+        to: '2025-12-31'
       }
     }
     viewportFetchManager.request(viewport, filters)
@@ -240,7 +240,7 @@ export default function SalesMapClustered({
     if (isOfflineCacheEnabled()) {
       const currentTileId = getCurrentTileId(viewport, currentZoom)
       const adjacentTiles = adjacentTileIds(currentTileId)
-      const filterHash = hashFilters(currentFilters)
+      const _filterHash = hashFilters(currentFilters)
       
       adjacentTiles.forEach(tileId => {
         logPrefetchStart(tileId)

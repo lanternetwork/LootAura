@@ -12,29 +12,16 @@ import {
   CACHE_TTL_MS
 } from '@/lib/cache/db'
 
-// Mock Dexie for testing
-vi.mock('dexie', () => {
-  const mockDB = {
-    markersByTile: {
-      get: vi.fn(),
-      put: vi.fn(),
-      where: vi.fn().mockReturnValue({
-        below: vi.fn().mockReturnValue({
-          delete: vi.fn()
-        })
-      }),
-      clear: vi.fn(),
-      count: vi.fn(),
-      toArray: vi.fn()
-    },
-    metadata: {
-      put: vi.fn(),
-      clear: vi.fn()
-    }
-  }
-
+// Mock the entire db module
+vi.mock('@/lib/cache/db', async () => {
+  const actual = await vi.importActual('@/lib/cache/db')
   return {
-    default: vi.fn().mockImplementation(() => mockDB)
+    ...actual,
+    getCachedMarkers: vi.fn().mockResolvedValue(null),
+    putCachedMarkers: vi.fn().mockResolvedValue(undefined),
+    pruneCache: vi.fn().mockResolvedValue(undefined),
+    clearCache: vi.fn().mockResolvedValue(undefined),
+    getCacheStats: vi.fn().mockResolvedValue({ count: 0, size: 0 })
   }
 })
 

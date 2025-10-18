@@ -136,7 +136,7 @@ export default function SalesMapClustered({
           if (nearestCluster) {
             setFocusedClusterId(nearestCluster.id)
             // Announce cluster info
-            setAnnouncement(`Focused on cluster with ${nearestCluster.point_count} sales`)
+            setAnnouncement(`Focused on cluster with ${nearestCluster.count || 0} sales`)
           }
         }
         break

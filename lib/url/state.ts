@@ -102,34 +102,9 @@ export function compressState(state: AppState): string {
   
   const json = JSON.stringify(compactState)
   
-  // Use a simple but effective compression: replace common patterns
-  // Use unique single characters to avoid conflicts
-  const compressed = json
-    .replace(/"this-weekend"/g, 'W')
-    .replace(/"next-weekend"/g, 'N')
-    .replace(/"automotive"/g, 'A')
-    .replace(/"electronics"/g, 'E')
-    .replace(/"furniture"/g, 'F')
-    .replace(/"clothing"/g, 'C')
-    .replace(/"today"/g, 'T')
-    .replace(/"tools"/g, 'O')
-    .replace(/"books"/g, 'B')
-    .replace(/"sports"/g, 'S')
-    .replace(/"toys"/g, 'Y')
-    .replace(/"home"/g, 'H')
-    .replace(/"garden"/g, 'G')
-    .replace(/"any"/g, 'a')
-    .replace(/"lat":/g, 'l')
-    .replace(/"lng":/g, 'n')
-    .replace(/"zoom":/g, 'z')
-    .replace(/"dateRange":/g, 'd')
-    .replace(/"categories":/g, 'c')
-    .replace(/"radius":/g, 'r')
-    .replace(/"view":/g, 'v')
-    .replace(/"filters":/g, 'f')
-  
-  // Encode to base64url but with a prefix to indicate this is compressed
-  return 'c:' + btoa(compressed)
+  // Simple compression: just use base64url with a prefix
+  // This is still shorter than the full serialized query string for complex states
+  return 'c:' + btoa(json)
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=/g, '')
@@ -150,32 +125,7 @@ export function decompressState(compressed: string): AppState {
   // Remove prefix and decode
   const encoded = compressed.slice(2)
   const padded = encoded + '='.repeat((4 - encoded.length % 4) % 4)
-  const decompressed = atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
-  
-  // Reverse the compression
-  const json = decompressed
-    .replace(/W/g, '"this-weekend"')
-    .replace(/N/g, '"next-weekend"')
-    .replace(/A/g, '"automotive"')
-    .replace(/E/g, '"electronics"')
-    .replace(/F/g, '"furniture"')
-    .replace(/C/g, '"clothing"')
-    .replace(/T/g, '"today"')
-    .replace(/O/g, '"tools"')
-    .replace(/B/g, '"books"')
-    .replace(/S/g, '"sports"')
-    .replace(/Y/g, '"toys"')
-    .replace(/H/g, '"home"')
-    .replace(/G/g, '"garden"')
-    .replace(/a/g, '"any"')
-    .replace(/l/g, '"lat":')
-    .replace(/n/g, '"lng":')
-    .replace(/z/g, '"zoom":')
-    .replace(/d/g, '"dateRange":')
-    .replace(/c/g, '"categories":')
-    .replace(/r/g, '"radius":')
-    .replace(/v/g, '"view":')
-    .replace(/f/g, '"filters":')
+  const json = atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
   
   const parsed = JSON.parse(json)
   

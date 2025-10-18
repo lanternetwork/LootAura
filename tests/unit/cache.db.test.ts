@@ -2,34 +2,32 @@
  * Unit tests for IndexedDB cache functionality
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 // Mock Dexie to avoid IndexedDB issues in test environment
-const mockDB = {
-  markersByTile: {
-    get: vi.fn().mockResolvedValue(null),
-    put: vi.fn().mockResolvedValue(undefined),
-    where: vi.fn().mockReturnValue({
-      below: vi.fn().mockReturnValue({
-        delete: vi.fn().mockResolvedValue(0)
-      })
-    }),
-    clear: vi.fn().mockResolvedValue(undefined),
-    count: vi.fn().mockResolvedValue(0),
-    toArray: vi.fn().mockResolvedValue([])
-  },
-  metadata: {
-    get: vi.fn().mockResolvedValue(null),
-    put: vi.fn().mockResolvedValue(undefined),
-    clear: vi.fn().mockResolvedValue(undefined)
-  },
-  version: vi.fn().mockReturnThis(),
-  stores: vi.fn().mockReturnThis()
-}
-
 vi.mock('dexie', () => ({
   __esModule: true,
-  default: vi.fn(() => mockDB)
+  default: vi.fn(() => ({
+    markersByTile: {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      where: vi.fn().mockReturnValue({
+        below: vi.fn().mockReturnValue({
+          delete: vi.fn().mockResolvedValue(0)
+        })
+      }),
+      clear: vi.fn().mockResolvedValue(undefined),
+      count: vi.fn().mockResolvedValue(0),
+      toArray: vi.fn().mockResolvedValue([])
+    },
+    metadata: {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      clear: vi.fn().mockResolvedValue(undefined)
+    },
+    version: vi.fn().mockReturnThis(),
+    stores: vi.fn().mockReturnThis()
+  }))
 }))
 
 // Import after mocking
@@ -43,23 +41,6 @@ import {
 } from '@/lib/cache/db'
 
 describe('Cache Database', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    // Reset mock implementations
-    mockDB.markersByTile.get.mockResolvedValue(null)
-    mockDB.markersByTile.put.mockResolvedValue(undefined)
-    mockDB.markersByTile.clear.mockResolvedValue(undefined)
-    mockDB.markersByTile.count.mockResolvedValue(0)
-    mockDB.markersByTile.toArray.mockResolvedValue([])
-    mockDB.metadata.get.mockResolvedValue(null)
-    mockDB.metadata.put.mockResolvedValue(undefined)
-    mockDB.metadata.clear.mockResolvedValue(undefined)
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   it('should handle getCachedMarkers gracefully', async () => {
     const result = await getCachedMarkers('tile1', 'hash1')
     expect(result).toBeNull()

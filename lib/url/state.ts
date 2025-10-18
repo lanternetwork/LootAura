@@ -104,7 +104,7 @@ export function compressState(state: AppState): string {
   
   // Use a simple but effective compression: replace common patterns
   // Use unique single characters to avoid conflicts
-  let compressed = json
+  const compressed = json
     .replace(/"this-weekend"/g, 'W')
     .replace(/"next-weekend"/g, 'N')
     .replace(/"automotive"/g, 'A')
@@ -153,7 +153,7 @@ export function decompressState(compressed: string): AppState {
   const decompressed = atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
   
   // Reverse the compression
-  let json = decompressed
+  const json = decompressed
     .replace(/W/g, '"this-weekend"')
     .replace(/N/g, '"next-weekend"')
     .replace(/A/g, '"automotive"')

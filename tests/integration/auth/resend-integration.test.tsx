@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import ResendConfirmation from '@/components/auth/ResendConfirmation'
 
 // Mock fetch
@@ -7,8 +7,15 @@ global.fetch = vi.fn()
 
 describe('Resend Confirmation Integration', () => {
   beforeEach(() => {
+    // Clean up any previous renders
+    cleanup()
     vi.clearAllMocks()
     vi.mocked(fetch).mockClear()
+  })
+
+  afterEach(() => {
+    // Ensure clean state between tests
+    cleanup()
   })
 
   it('should show resend link and handle successful resend', async () => {

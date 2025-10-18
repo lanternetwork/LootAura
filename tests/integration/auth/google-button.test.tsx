@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 
 // Mock fetch
@@ -15,10 +15,17 @@ Object.defineProperty(window, 'location', {
 
 describe('Google Sign-In Button', () => {
   beforeEach(() => {
+    // Clean up any previous renders
+    cleanup()
     vi.clearAllMocks()
     vi.mocked(fetch).mockClear()
     // Reset environment
     delete process.env.NEXT_PUBLIC_GOOGLE_ENABLED
+  })
+
+  afterEach(() => {
+    // Ensure clean state between tests
+    cleanup()
   })
 
   it('should render Google button when enabled', () => {

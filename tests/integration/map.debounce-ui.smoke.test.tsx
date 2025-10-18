@@ -43,7 +43,11 @@ vi.mock('react-map-gl', () => ({
       </div>
     )
   },
-  Marker: ({ children }: any) => <div data-testid="marker">{children}</div>,
+  Marker: ({ children, ...props }: any) => (
+    <div data-testid="marker" {...props}>
+      {children}
+    </div>
+  ),
   Popup: ({ children }: any) => <div data-testid="popup">{children}</div>
 }))
 

@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { SalesMapClustered } from '@/components/location/SalesMapClustered'
+import SalesMapClustered from '@/components/location/SalesMapClustered'
 import { isOfflineCacheEnabled } from '@/lib/flags'
 import { Sale } from '@/lib/types'
 

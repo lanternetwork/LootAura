@@ -21,7 +21,7 @@ describe('URL State Management', () => {
 
   const customState: AppState = {
     view: { lat: 40.7128, lng: -74.0060, zoom: 12 },
-    filters: { dateRange: 'today', categories: ['furniture', 'electronics'], radius: 50 }
+    filters: { dateRange: 'today', categories: ['electronics', 'furniture'], radius: 50 }
   }
 
   describe('serializeState', () => {
@@ -33,10 +33,10 @@ describe('URL State Management', () => {
     it('should serialize custom state with all params', () => {
       const result = serializeState(customState)
       expect(result).toContain('lat=40.7128')
-      expect(result).toContain('lng=-74.0060')
+      expect(result).toContain('lng=-74.006')
       expect(result).toContain('zoom=12')
       expect(result).toContain('date=today')
-      expect(result).toContain('cats=electronics,furniture') // sorted
+      expect(result).toContain('cats=electronics%2Cfurniture') // sorted
       expect(result).toContain('radius=50')
     })
 
@@ -47,7 +47,7 @@ describe('URL State Management', () => {
       }
       
       const result = serializeState(stateWithUnsortedCategories)
-      expect(result).toContain('cats=apple,banana,zebra')
+      expect(result).toContain('cats=apple%2Cbanana%2Czebra')
     })
   })
 
@@ -58,18 +58,18 @@ describe('URL State Management', () => {
     })
 
     it('should deserialize full URL with all params', () => {
-      const result = deserializeState('lat=40.7128&lng=-74.0060&zoom=12&date=today&cats=electronics,furniture&radius=50')
+      const result = deserializeState('lat=40.7128&lng=-74.006&zoom=12&date=today&cats=electronics%2Cfurniture&radius=50')
       expect(result).toEqual(customState)
     })
 
     it('should handle missing params with defaults', () => {
-      const result = deserializeState('lat=40.7128&lng=-74.0060')
+      const result = deserializeState('lat=40.7128&lng=-74.006')
       expect(result.view).toEqual({ lat: 40.7128, lng: -74.0060, zoom: 10 })
       expect(result.filters).toEqual({ dateRange: 'any', categories: [], radius: 25 })
     })
 
     it('should ignore unknown parameters', () => {
-      const result = deserializeState('lat=40.7128&lng=-74.0060&unknown=value&other=123')
+      const result = deserializeState('lat=40.7128&lng=-74.006&unknown=value&other=123')
       expect(result.view).toEqual({ lat: 40.7128, lng: -74.0060, zoom: 10 })
     })
 
@@ -134,3 +134,5 @@ describe('URL State Management', () => {
     })
   })
 })
+
+

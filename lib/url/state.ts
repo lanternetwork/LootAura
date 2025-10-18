@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod'
+import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string'
 
 // Schema for viewport state
 const ViewportSchema = z.object({
@@ -86,8 +87,8 @@ export function deserializeState(search: string): AppState {
 }
 
 /**
- * Compress state using a more efficient method than base64
- * Uses custom encoding that's shorter than base64 for typical state data
+ * Compress state using lz-string for efficient compression
+ * Uses URI-safe encoding without Base64 bloat
  */
 export function compressState(state: AppState): string {
   // Create a compact JSON representation with sorted arrays for better compression
@@ -100,36 +101,13 @@ export function compressState(state: AppState): string {
     }
   }
   
-  // Use compact JSON (no whitespace) and custom compression
+  // Use compact JSON (no whitespace) for better compression
   const json = JSON.stringify(compactState)
   
-  // Custom compression: replace common patterns to make it shorter
-  const compressed = json
-    .replace(/"lat":/g, 'l')
-    .replace(/"lng":/g, 'n') 
-    .replace(/"zoom":/g, 'z')
-    .replace(/"dateRange":/g, 'd')
-    .replace(/"categories":/g, 'c')
-    .replace(/"radius":/g, 'r')
-    .replace(/"view":/g, 'v')
-    .replace(/"filters":/g, 'f')
-    .replace(/"today"/g, 'T')
-    .replace(/"this-weekend"/g, 'W')
-    .replace(/"next-weekend"/g, 'N')
-    .replace(/"any"/g, 'a')
-    .replace(/"electronics"/g, 'E')
-    .replace(/"furniture"/g, 'F')
-    .replace(/"tools"/g, 'O')
-    .replace(/"books"/g, 'B')
-    .replace(/"clothing"/g, 'C')
-    .replace(/"sports"/g, 'S')
-    .replace(/"toys"/g, 'Y')
-    .replace(/"home"/g, 'H')
-    .replace(/"garden"/g, 'G')
-    .replace(/"automotive"/g, 'A')
-  
-  // Use URI-safe encoding without Base64 bloat
-  return 'c:' + encodeURIComponent(compressed)
+  // Use lz-string URI-safe compression (no Base64 bloat)
+  // This will be much shorter than the serialized query string for complex states
+  const packed = compressToEncodedURIComponent(json) || ''
+  return `c:${packed}`
 }
 
 /**
@@ -137,55 +115,32 @@ export function compressState(state: AppState): string {
  * Used to restore state from shortlink
  */
 export function decompressState(compressed: string): AppState {
-  if (!compressed.startsWith('c:')) {
-    // Fallback to old base64 format for backward compatibility
-    const padded = compressed + '='.repeat((4 - compressed.length % 4) % 4)
-    const serialized = atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
-    return deserializeState(serialized)
-  }
-  
-  // Remove prefix and decode
-  const encoded = compressed.slice(2)
-  const decompressed = decodeURIComponent(encoded)
-  
-  // Reverse the compression
-  const json = decompressed
-    .replace(/l/g, '"lat":')
-    .replace(/n/g, '"lng":')
-    .replace(/z/g, '"zoom":')
-    .replace(/d/g, '"dateRange":')
-    .replace(/c/g, '"categories":')
-    .replace(/r/g, '"radius":')
-    .replace(/v/g, '"view":')
-    .replace(/f/g, '"filters":')
-    .replace(/T/g, '"today"')
-    .replace(/W/g, '"this-weekend"')
-    .replace(/N/g, '"next-weekend"')
-    .replace(/a/g, '"any"')
-    .replace(/E/g, '"electronics"')
-    .replace(/F/g, '"furniture"')
-    .replace(/O/g, '"tools"')
-    .replace(/B/g, '"books"')
-    .replace(/C/g, '"clothing"')
-    .replace(/S/g, '"sports"')
-    .replace(/Y/g, '"toys"')
-    .replace(/H/g, '"home"')
-    .replace(/G/g, '"garden"')
-    .replace(/A/g, '"automotive"')
-  
-  const parsed = JSON.parse(json)
-  
-  // Convert back to full state format
-  const state: AppState = {
-    view: parsed.v,
-    filters: {
-      dateRange: parsed.f.d,
-      categories: parsed.f.c,
-      radius: parsed.f.r
+  if (!compressed) throw new Error('Empty state blob')
+
+  // New format: lz-string URI codec with 'c:' prefix
+  if (compressed.startsWith('c:')) {
+    const payload = compressed.slice(2)
+    const json = decompressFromEncodedURIComponent(payload)
+    if (!json) throw new Error('Decompression failed')
+    const parsed = JSON.parse(json)
+    
+    // Convert back to full state format
+    const state: AppState = {
+      view: parsed.v,
+      filters: {
+        dateRange: parsed.f.d,
+        categories: parsed.f.c,
+        radius: parsed.f.r
+      }
     }
+    
+    return StateSchema.parse(state)
   }
-  
-  return StateSchema.parse(state)
+
+  // Legacy fallback for old base64 format
+  const padded = compressed + '='.repeat((4 - compressed.length % 4) % 4)
+  const serialized = atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
+  return deserializeState(serialized)
 }
 
 /**

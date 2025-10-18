@@ -157,8 +157,13 @@ export default function SalesMapClustered({
 
   // Check for reduced motion preference
   const _prefersReducedMotion = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      try {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      } catch (error) {
+        // Fallback for test environments where matchMedia might not be available
+        return false
+      }
     }
     return false
   }, [])

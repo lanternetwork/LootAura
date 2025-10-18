@@ -177,3 +177,18 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
+// Also mock it on globalThis for broader compatibility
+Object.defineProperty(globalThis, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // deprecated
+    removeListener: vi.fn(), // deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+})
+

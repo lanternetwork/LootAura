@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { notFound, redirect } from 'next/navigation'
 import ShortlinkPage from '@/app/s/[id]/page'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 // Mock Next.js navigation
 vi.mock('next/navigation', () => ({
@@ -30,7 +31,8 @@ describe('Share Redirect Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(require('@/lib/supabase/server').createSupabaseServerClient).mockReturnValue(mockSupabase as any)
+    // The mock is already set up in tests/setup.ts, just reset it
+    vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
   })
 
   afterEach(() => {

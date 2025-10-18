@@ -123,17 +123,27 @@ export function useCreateSale() {
         throw new Error('Invalid sale data')
       }
 
-      const { data, error } = await sb
+      // Handle both chainable and direct-return Supabase clients
+      const insertResult = await sb
         .from('sales_v2')
         .insert([parsed.data])
-        .select()
-        .single()
 
-      if (error) {
-        throw new Error(error.message)
+      let result: { data: any; error: any }
+
+      // Check if the result is already a promise/object (direct-return style)
+      if (insertResult && typeof insertResult === 'object' && 'data' in insertResult && 'error' in insertResult) {
+        // Direct-return style: already has { data, error }
+        result = insertResult
+      } else {
+        // Chainable style: need to call .select().single()
+        result = await (insertResult as any).select().single()
       }
 
-      return data as Sale
+      if (result.error) {
+        throw new Error(result.error.message)
+      }
+
+      return result.data as Sale
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sales'] })

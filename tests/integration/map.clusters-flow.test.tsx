@@ -6,7 +6,7 @@ import { Sale } from '@/lib/types'
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
   default: ({ children, onLoad, onMoveEnd, onZoomEnd, ...props }: any) => (
-    <div data-testid="map" {...props}>
+    <div data-testid="map-container" {...props}>
       {children}
       <button onClick={onLoad}>Load Map</button>
       <button onClick={onMoveEnd}>Move End</button>
@@ -84,7 +84,7 @@ describe('Map Clusters Flow', () => {
       />
     )
 
-    expect(screen.getByTestId('map')).toBeInTheDocument()
+    expect(screen.getByTestId('map-container')).toBeInTheDocument()
   })
 
   it('should handle cluster clicks and zoom to bounds', async () => {
@@ -104,7 +104,7 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Load Map'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container')).toBeInTheDocument()
     })
   })
 
@@ -125,7 +125,7 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Load Map'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container')).toBeInTheDocument()
     })
   })
 
@@ -149,7 +149,7 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Move End'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container')).toBeInTheDocument()
     })
   })
 
@@ -173,7 +173,7 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Zoom End'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container')).toBeInTheDocument()
     })
   })
 
@@ -189,7 +189,7 @@ describe('Map Clusters Flow', () => {
       />
     )
 
-    expect(screen.getByTestId('map')).toBeInTheDocument()
+    expect(screen.getByTestId('map-container')).toBeInTheDocument()
   })
 
   it('should handle empty markers array', () => {
@@ -202,7 +202,7 @@ describe('Map Clusters Flow', () => {
       />
     )
 
-    expect(screen.getByTestId('map')).toBeInTheDocument()
+    expect(screen.getByTestId('map-container')).toBeInTheDocument()
   })
 
   it('should maintain arbiter authority with clustering', async () => {
@@ -226,7 +226,7 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Move End'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container')).toBeInTheDocument()
     })
   })
 })

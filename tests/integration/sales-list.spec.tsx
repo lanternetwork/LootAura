@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { screen, cleanup } from '@testing-library/react'
 import { renderWithProviders } from '../utils/renderWithProviders'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SalesList from '@/components/SalesList'
@@ -43,6 +43,8 @@ describe('SalesList Integration', () => {
   let queryClient: QueryClient
 
   beforeEach(() => {
+    // Clean up any previous renders
+    cleanup()
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -50,6 +52,11 @@ describe('SalesList Integration', () => {
         },
       },
     })
+  })
+
+  afterEach(() => {
+    // Ensure clean state between tests
+    cleanup()
   })
 
   it('should render sales list with proper grid layout', () => {

@@ -104,7 +104,7 @@ export function compressState(state: AppState): string {
   const json = JSON.stringify(compactState)
   
   // Custom compression: replace common patterns to make it shorter
-  let compressed = json
+  const compressed = json
     .replace(/"lat":/g, 'l')
     .replace(/"lng":/g, 'n') 
     .replace(/"zoom":/g, 'z')
@@ -149,7 +149,7 @@ export function decompressState(compressed: string): AppState {
   const decompressed = decodeURIComponent(encoded)
   
   // Reverse the compression
-  let json = decompressed
+  const json = decompressed
     .replace(/l/g, '"lat":')
     .replace(/n/g, '"lng":')
     .replace(/z/g, '"zoom":')

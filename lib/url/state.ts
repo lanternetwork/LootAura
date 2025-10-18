@@ -31,116 +31,110 @@ export type FilterState = z.infer<typeof FilterSchema>
 export type AppState = z.infer<typeof StateSchema>
 
 /**
- * Serialize state to URL query string
- * Ensures stable key order and sorted arrays for consistent URLs
+ * Serialize state to stable JSON string
+ * Ensures deterministic output with sorted keys for consistent compression
  */
 export function serializeState(state: AppState): string {
-  const params = new URLSearchParams()
-  
-  // Viewport (always present)
-  params.set('lat', state.view.lat.toString())
-  params.set('lng', state.view.lng.toString())
-  params.set('zoom', state.view.zoom.toString())
-  
-  // Filters (only if not default values)
-  if (state.filters.dateRange && state.filters.dateRange !== 'any') {
-    params.set('date', state.filters.dateRange)
+  // Create a normalized state with sorted keys for deterministic output
+  const normalizedState = {
+    view: {
+      lat: state.view.lat,
+      lng: state.view.lng,
+      zoom: state.view.zoom
+    },
+    filters: {
+      dateRange: state.filters.dateRange || 'any',
+      categories: state.filters.categories ? [...state.filters.categories].sort() : [],
+      radius: state.filters.radius || 25
+    }
   }
   
-  if (state.filters.categories && state.filters.categories.length > 0) {
-    // Sort categories for consistent URLs
-    const sortedCategories = [...state.filters.categories].sort()
-    params.set('cats', sortedCategories.join(','))
-  }
-  
-  if (state.filters.radius && state.filters.radius !== 25) {
-    params.set('radius', state.filters.radius.toString())
-  }
-  
-  return params.toString()
+  return JSON.stringify(normalizedState)
 }
 
 /**
- * Deserialize URL query string to validated state
- * Ignores unknown keys and provides defaults for missing values
+ * Deserialize URL query string or JSON to validated state
+ * Handles both URL query strings and JSON format for backward compatibility
  */
-export function deserializeState(search: string): AppState {
-  const params = new URLSearchParams(search)
-  
-  // Default viewport (Louisville, KY)
-  const lat = parseFloat(params.get('lat') || '38.2527')
-  const lng = parseFloat(params.get('lng') || '-85.7585')
-  const zoom = parseFloat(params.get('zoom') || '10')
-  
-  // Default filters
-  const dateRange = params.get('date') || 'any'
-  const categories = params.get('cats')?.split(',').filter(Boolean) || []
-  const radius = parseFloat(params.get('radius') || '25')
-  
-  const state: AppState = {
-    view: { lat, lng, zoom },
-    filters: { dateRange, categories, radius }
+export function deserializeState(input: string): AppState {
+  // Try to parse as JSON first (new format)
+  try {
+    const parsed = JSON.parse(input)
+    return StateSchema.parse(parsed)
+  } catch {
+    // Fall back to URL query string format (legacy)
+    const params = new URLSearchParams(input)
+    
+    // Default viewport (Louisville, KY)
+    const lat = parseFloat(params.get('lat') || '38.2527')
+    const lng = parseFloat(params.get('lng') || '-85.7585')
+    const zoom = parseFloat(params.get('zoom') || '10')
+    
+    // Default filters
+    const dateRange = params.get('date') || 'any'
+    const categories = params.get('cats')?.split(',').filter(Boolean) || []
+    const radius = parseFloat(params.get('radius') || '25')
+    
+    const state: AppState = {
+      view: { lat, lng, zoom },
+      filters: { dateRange, categories, radius }
+    }
+    
+    // Validate and return
+    return StateSchema.parse(state)
   }
-  
-  // Validate and return
-  return StateSchema.parse(state)
 }
 
 /**
  * Compress state using lz-string for efficient compression
- * Uses URI-safe encoding without Base64 bloat
+ * Returns prefixed format: "c:<compressed>" if shorter, "j:<raw-json>" otherwise
  */
 export function compressState(state: AppState): string {
-  // Create a compact JSON representation with sorted arrays for better compression
-  const compactState = {
-    v: state.view,
-    f: {
-      d: state.filters.dateRange,
-      c: state.filters.categories?.sort() || [],
-      r: state.filters.radius
-    }
+  // Get the stable JSON representation
+  const json = serializeState(state)
+  
+  // Try compression
+  const compressed = compressToEncodedURIComponent(json) || ''
+  
+  // If compressed is shorter, use compressed format
+  if (compressed.length < json.length) {
+    return `c:${compressed}`
   }
   
-  // Use compact JSON (no whitespace) for better compression
-  const json = JSON.stringify(compactState)
-  
-  // Use lz-string URI-safe compression (no Base64 bloat)
-  // This will be much shorter than the serialized query string for complex states
-  const packed = compressToEncodedURIComponent(json) || ''
-  return `c:${packed}`
+  // Otherwise, fall back to raw JSON with prefix
+  return `j:${json}`
 }
 
 /**
  * Decompress state from compressed format
- * Used to restore state from shortlink
+ * Handles "c:<compressed>", "j:<raw-json>", and bare JSON (back-compat)
  */
 export function decompressState(compressed: string): AppState {
   if (!compressed) throw new Error('Empty state blob')
 
-  // New format: lz-string URI codec with 'c:' prefix
+  // Compressed format: "c:<payload>"
   if (compressed.startsWith('c:')) {
     const payload = compressed.slice(2)
     const json = decompressFromEncodedURIComponent(payload)
     if (!json) throw new Error('Decompression failed')
     const parsed = JSON.parse(json)
-    
-    // Convert back to full state format
-    const state: AppState = {
-      view: parsed.v,
-      filters: {
-        dateRange: parsed.f.d,
-        categories: parsed.f.c,
-        radius: parsed.f.r
-      }
-    }
-    
-    return StateSchema.parse(state)
+    return StateSchema.parse(parsed)
   }
 
-  // Legacy fallback for old base64 format
-  const padded = compressed + '='.repeat((4 - compressed.length % 4) % 4)
-  const serialized = atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
-  return deserializeState(serialized)
+  // Raw JSON format: "j:<json>"
+  if (compressed.startsWith('j:')) {
+    const json = compressed.slice(2)
+    const parsed = JSON.parse(json)
+    return StateSchema.parse(parsed)
+  }
+
+  // Back-compat: bare JSON (legacy format)
+  try {
+    const parsed = JSON.parse(compressed)
+    return StateSchema.parse(parsed)
+  } catch {
+    throw new Error('Invalid state format')
+  }
 }
 
 /**

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useRef, useCallback, useMemo, forwardRef } from 'react'
 import Map, { Marker, Popup } from 'react-map-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Sale } from '@/lib/types'
@@ -44,9 +44,14 @@ interface SalesMapClusteredProps {
   onMapReady?: () => void
   arbiterMode?: 'initial' | 'map' | 'zip' | 'distance'
   arbiterAuthority?: 'FILTERS' | 'MAP'
+  // DOM props that can be safely passed to wrapper
+  className?: string
+  style?: React.CSSProperties
+  id?: string
+  'data-testid'?: string
 }
 
-export default function SalesMapClustered({ 
+const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({ 
   sales, 
   markers = [],
   center = { lat: 38.2527, lng: -85.7585 }, 
@@ -64,8 +69,13 @@ export default function SalesMapClustered({
   onZoomEnd,
   onMapReady,
   arbiterMode: _arbiterMode,
-  arbiterAuthority: _arbiterAuthority
-}: SalesMapClusteredProps) {
+  arbiterAuthority: _arbiterAuthority,
+  // DOM props
+  className,
+  style,
+  id,
+  'data-testid': dataTestId
+}, ref) => {
   const mapRef = useRef<any>(null)
   const [_visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [_visiblePinCount, setVisiblePinCount] = useState(0)
@@ -485,14 +495,19 @@ export default function SalesMapClustered({
   }, [clusters, markers, sales, onSaleClick, handleClusterClick, handlePointClick, handleClusterKeyDown])
 
   return (
-    <div className="w-full h-full">
+    <div 
+      className={`w-full h-full ${className || ''}`}
+      style={style}
+      id={id}
+      data-testid={dataTestId}
+    >
       <OfflineBanner 
         isVisible={showOfflineBanner}
         isOffline={isOffline}
         cachedCount={cachedMarkerCount}
       />
       <Map
-        ref={mapRef}
+        ref={ref || mapRef}
         mapboxAccessToken={getMapboxToken()}
         initialViewState={{
           longitude: center.lng,
@@ -552,4 +567,8 @@ export default function SalesMapClustered({
       </div>
     </div>
   )
-}
+})
+
+SalesMapClustered.displayName = 'SalesMapClustered'
+
+export default SalesMapClustered

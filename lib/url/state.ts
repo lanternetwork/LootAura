@@ -87,7 +87,7 @@ export function deserializeState(search: string): AppState {
 
 /**
  * Compress state using a more efficient method than base64
- * Uses a custom encoding that's shorter than base64 for typical state data
+ * Uses custom encoding that's shorter than base64 for typical state data
  */
 export function compressState(state: AppState): string {
   // Create a compact JSON representation with sorted arrays for better compression
@@ -100,14 +100,36 @@ export function compressState(state: AppState): string {
     }
   }
   
+  // Use compact JSON (no whitespace) and custom compression
   const json = JSON.stringify(compactState)
   
-  // Simple compression: just use base64url with a prefix
-  // This is still shorter than the full serialized query string for complex states
-  return 'c:' + btoa(json)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '')
+  // Custom compression: replace common patterns to make it shorter
+  let compressed = json
+    .replace(/"lat":/g, 'l')
+    .replace(/"lng":/g, 'n') 
+    .replace(/"zoom":/g, 'z')
+    .replace(/"dateRange":/g, 'd')
+    .replace(/"categories":/g, 'c')
+    .replace(/"radius":/g, 'r')
+    .replace(/"view":/g, 'v')
+    .replace(/"filters":/g, 'f')
+    .replace(/"today"/g, 'T')
+    .replace(/"this-weekend"/g, 'W')
+    .replace(/"next-weekend"/g, 'N')
+    .replace(/"any"/g, 'a')
+    .replace(/"electronics"/g, 'E')
+    .replace(/"furniture"/g, 'F')
+    .replace(/"tools"/g, 'O')
+    .replace(/"books"/g, 'B')
+    .replace(/"clothing"/g, 'C')
+    .replace(/"sports"/g, 'S')
+    .replace(/"toys"/g, 'Y')
+    .replace(/"home"/g, 'H')
+    .replace(/"garden"/g, 'G')
+    .replace(/"automotive"/g, 'A')
+  
+  // Use URI-safe encoding without Base64 bloat
+  return 'c:' + encodeURIComponent(compressed)
 }
 
 /**
@@ -124,8 +146,32 @@ export function decompressState(compressed: string): AppState {
   
   // Remove prefix and decode
   const encoded = compressed.slice(2)
-  const padded = encoded + '='.repeat((4 - encoded.length % 4) % 4)
-  const json = atob(padded.replace(/-/g, '+').replace(/_/g, '/'))
+  const decompressed = decodeURIComponent(encoded)
+  
+  // Reverse the compression
+  let json = decompressed
+    .replace(/l/g, '"lat":')
+    .replace(/n/g, '"lng":')
+    .replace(/z/g, '"zoom":')
+    .replace(/d/g, '"dateRange":')
+    .replace(/c/g, '"categories":')
+    .replace(/r/g, '"radius":')
+    .replace(/v/g, '"view":')
+    .replace(/f/g, '"filters":')
+    .replace(/T/g, '"today"')
+    .replace(/W/g, '"this-weekend"')
+    .replace(/N/g, '"next-weekend"')
+    .replace(/a/g, '"any"')
+    .replace(/E/g, '"electronics"')
+    .replace(/F/g, '"furniture"')
+    .replace(/O/g, '"tools"')
+    .replace(/B/g, '"books"')
+    .replace(/C/g, '"clothing"')
+    .replace(/S/g, '"sports"')
+    .replace(/Y/g, '"toys"')
+    .replace(/H/g, '"home"')
+    .replace(/G/g, '"garden"')
+    .replace(/A/g, '"automotive"')
   
   const parsed = JSON.parse(json)
   

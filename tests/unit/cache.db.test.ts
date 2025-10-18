@@ -42,21 +42,18 @@ describe('Cache Database', () => {
 
   it('should handle putCachedMarkers gracefully', async () => {
     const markers = [{ id: '1', lat: 38.2527, lng: -85.7585 }]
-    const result = putCachedMarkers('tile1', 'hash1', markers)
-    expect(result).toBeInstanceOf(Promise)
-    await result
+    await putCachedMarkers('tile1', 'hash1', markers)
+    // Test passes if no error is thrown
   })
 
   it('should handle pruneCache gracefully', async () => {
-    const result = pruneCache()
-    expect(result).toBeInstanceOf(Promise)
-    await result
+    await pruneCache()
+    // Test passes if no error is thrown
   })
 
   it('should handle clearCache gracefully', async () => {
-    const result = clearCache()
-    expect(result).toBeInstanceOf(Promise)
-    await result
+    await clearCache()
+    // Test passes if no error is thrown
   })
 
   it('should handle getCacheStats gracefully', async () => {

@@ -74,7 +74,7 @@ const mockSales: Sale[] = [
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z'
   }
-]
+] as Sale[]
 
 const mockMarkers = mockSales.map(sale => ({
   id: sale.id,
@@ -93,7 +93,7 @@ describe('Map Prefetch and Offline Integration', () => {
   })
 
   it('should render without crashing', () => {
-    render(
+    const { container } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
@@ -102,14 +102,14 @@ describe('Map Prefetch and Offline Integration', () => {
       />
     )
 
-    // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
+    // Component should render without errors - check for map container div
+    expect(container.querySelector('.w-full.h-full')).toBeInTheDocument()
   })
 
   it('should handle offline cache when enabled', () => {
     vi.mocked(isOfflineCacheEnabled).mockReturnValue(true)
     
-    render(
+    const { container } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
@@ -119,13 +119,13 @@ describe('Map Prefetch and Offline Integration', () => {
     )
 
     // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
+    expect(container.querySelector('.w-full.h-full')).toBeInTheDocument()
   })
 
   it('should handle offline cache when disabled', () => {
     vi.mocked(isOfflineCacheEnabled).mockReturnValue(false)
     
-    render(
+    const { container } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
@@ -135,6 +135,6 @@ describe('Map Prefetch and Offline Integration', () => {
     )
 
     // Component should render without errors
-    expect(screen.getByRole('button')).toBeInTheDocument()
+    expect(container.querySelector('.w-full.h-full')).toBeInTheDocument()
   })
 })

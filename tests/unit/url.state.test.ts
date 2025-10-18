@@ -128,11 +128,12 @@ describe('URL State Management', () => {
 
     it('should compress highly repetitive data effectively', () => {
       // Create a state with highly repetitive data that should compress well
+      // Use many repeated categories to create a large dataset that benefits from compression
       const repetitiveState: AppState = {
         view: { lat: 40.7128, lng: -74.006, zoom: 12 },
         filters: { 
           dateRange: 'today', 
-          categories: ['electronics', 'electronics', 'electronics', 'electronics', 'electronics'], 
+          categories: Array(20).fill('electronics'), // 20 repetitions
           radius: 50 
         }
       }

@@ -263,6 +263,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Convert markers to cluster points
   const clusterPoints = useMemo((): ClusterPoint[] => {
+    console.log('[CLUSTER] Converting markers to cluster points:', { markersCount: markers.length, markers: markers.slice(0, 3) })
     return markers.map(marker => ({
       id: marker.id,
       lon: marker.lng,
@@ -273,7 +274,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Build cluster index when points change
   useEffect(() => {
+    console.log('[CLUSTER] Building cluster index:', { 
+      isClusteringEnabled: isClusteringEnabled(), 
+      clusterPointsLength: clusterPoints.length,
+      clusterPoints: clusterPoints.slice(0, 3)
+    })
+    
     if (!isClusteringEnabled() || clusterPoints.length === 0) {
+      console.log('[CLUSTER] Skipping cluster build:', { 
+        reason: !isClusteringEnabled() ? 'clustering disabled' : 'no points',
+        isClusteringEnabled: isClusteringEnabled(),
+        clusterPointsLength: clusterPoints.length
+      })
       setClusterIndex(null)
       setClusters([])
       return
@@ -287,13 +299,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     })
     setClusterIndex(index)
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[CLUSTER] Index built', {
-        event: 'cluster-build',
-        points: clusterPoints.length,
-        ms: Math.round(performance.now() - startTime)
-      })
-    }
+    console.log('[CLUSTER] Index built', {
+      event: 'cluster-build',
+      points: clusterPoints.length,
+      ms: Math.round(performance.now() - startTime)
+    })
   }, [clusterPoints])
 
   // Cleanup viewport fetch manager on unmount

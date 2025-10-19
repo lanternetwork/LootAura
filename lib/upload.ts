@@ -1,6 +1,6 @@
 // Client-side upload utility using server-signed URLs
 
-import { getMaxUploadSize, isFileSizeValid, getFileSizeErrorMessage } from './config/upload'
+import { isFileSizeValid, getFileSizeErrorMessage } from './config/upload'
 
 export interface UploadRequest {
   mimeType: string

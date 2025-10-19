@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest'
 
 describe('ZIP Lookup Simple Tests', () => {
   describe('ZIP Code Normalization', () => {
+    beforeEach(() => {
+      // Clear any state between tests
+    })
+
     it('should normalize ZIP codes correctly', () => {
       const normalizeZip = (rawZip: string) => {
         if (!rawZip) return null
@@ -23,7 +27,7 @@ describe('ZIP Lookup Simple Tests', () => {
         return normalized
       }
 
-      // Test individual cases
+      // Test individual cases with specific assertions
       expect(normalizeZip('90078')).toBe('90078')
       expect(normalizeZip('90078-1234')).toBe('90078')
       expect(normalizeZip('90078 1234')).toBe('90078')

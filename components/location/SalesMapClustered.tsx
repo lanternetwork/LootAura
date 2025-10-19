@@ -423,8 +423,17 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     saveViewportState(viewport, currentFilters)
     logViewportSave(viewport)
     
+    // Notify parent component of view change
+    if (onViewChange) {
+      onViewChange({
+        center: { lat: center.lat, lng: center.lng },
+        zoom: zoom,
+        userInteraction: true
+      })
+    }
+    
     onMoveEnd?.()
-  }, [updateClusters, onMoveEnd, currentFilters])
+  }, [updateClusters, onMoveEnd, onViewChange, currentFilters])
 
   const handleZoomEnd = useCallback(() => {
     const map = mapRef.current?.getMap?.()
@@ -444,8 +453,17 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     saveViewportState(viewport, currentFilters)
     logViewportSave(viewport)
     
+    // Notify parent component of view change
+    if (onViewChange) {
+      onViewChange({
+        center: { lat: center.lat, lng: center.lng },
+        zoom: zoom,
+        userInteraction: true
+      })
+    }
+    
     onZoomEnd?.()
-  }, [updateClusters, onZoomEnd, currentFilters])
+  }, [updateClusters, onZoomEnd, onViewChange, currentFilters])
 
   const handleMapLoad = useCallback(() => {
     setMapLoaded(true)
@@ -457,34 +475,6 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [updateClusters, onMapReady])
 
-  // Handle view changes from map movement
-  const handleViewChange = useCallback((evt: any) => {
-    if (!onViewChange) return
-    
-    try {
-      // Check if evt.viewState exists and has the expected structure
-      if (!evt || !evt.viewState) {
-        console.warn('[MAP] Invalid event structure:', evt)
-        return
-      }
-      
-      const { center: newCenter, zoom: newZoom } = evt.viewState
-      
-      // Validate center object
-      if (!newCenter || typeof newCenter.lat !== 'number' || typeof newCenter.lng !== 'number') {
-        console.warn('[MAP] Invalid center data:', newCenter)
-        return
-      }
-      
-      onViewChange({
-        center: { lat: newCenter.lat, lng: newCenter.lng },
-        zoom: newZoom || 10,
-        userInteraction: evt.isDragging || evt.isZooming || false
-      })
-    } catch (error) {
-      console.warn('[MAP] View change error:', error, 'Event:', evt)
-    }
-  }, [onViewChange])
 
   // Render cluster markers
   const renderClusters = useMemo(() => {
@@ -548,7 +538,6 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         onLoad={handleMapLoad}
         onMoveEnd={handleMoveEnd}
         onZoomEnd={handleZoomEnd}
-        onMove={handleViewChange}
         interactiveLayerIds={[]}
         // Accessibility attributes
         role="img"

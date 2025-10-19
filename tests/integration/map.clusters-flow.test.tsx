@@ -6,7 +6,7 @@ import { Sale } from '@/lib/types'
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  default: ({ children, onLoad, onMoveEnd, onZoomEnd, ref, ...props }: any) => {
+  default: React.forwardRef<any, any>(({ children, onLoad, onMoveEnd, onZoomEnd, ...props }, ref) => {
     // Only pass safe DOM props to avoid React warnings
     const { mapboxAccessToken, initialViewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
     
@@ -25,7 +25,7 @@ vi.mock('react-map-gl', () => ({
         <button onClick={onZoomEnd}>Zoom End</button>
       </div>
     )
-  },
+  }),
   Marker: ({ children, ...props }: any) => <div data-testid="marker" {...props}>{children}</div>,
   Popup: ({ children, ...props }: any) => <div data-testid="popup" {...props}>{children}</div>
 }))
@@ -99,10 +99,7 @@ describe('Map Clusters Flow', () => {
 
     // Wait for map to load (handle loading skeleton)
     await waitFor(() => {
-      // Wait for map to load (handle loading skeleton)
-    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
-    }, { timeout: 5000 })
     }, { timeout: 5000 })
   })
 
@@ -123,11 +120,8 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Load Map'))
     
     await waitFor(() => {
-      // Wait for map to load (handle loading skeleton)
-    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
     }, { timeout: 5000 })
-    })
   })
 
   it('should handle individual point clicks', async () => {
@@ -147,11 +141,8 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Load Map'))
     
     await waitFor(() => {
-      // Wait for map to load (handle loading skeleton)
-    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
     }, { timeout: 5000 })
-    })
   })
 
   it('should update clusters on viewport change', async () => {
@@ -174,11 +165,8 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Move End'))
     
     await waitFor(() => {
-      // Wait for map to load (handle loading skeleton)
-    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
     }, { timeout: 5000 })
-    })
   })
 
   it('should handle zoom changes', async () => {
@@ -201,11 +189,8 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Zoom End'))
     
     await waitFor(() => {
-      // Wait for map to load (handle loading skeleton)
-    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
     }, { timeout: 5000 })
-    })
   })
 
   it('should fall back to individual markers when clustering disabled', () => {
@@ -263,10 +248,7 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Move End'))
     
     await waitFor(() => {
-      // Wait for map to load (handle loading skeleton)
-    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
     }, { timeout: 5000 })
-    })
   })
 })

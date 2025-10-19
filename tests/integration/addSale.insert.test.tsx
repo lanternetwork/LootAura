@@ -62,8 +62,6 @@ describe('Add Sale Integration', () => {
   let queryClient: QueryClient
 
   beforeEach(() => {
-    // Clean up any previous renders
-    cleanup()
     mockSupabase = createMockSupabaseClient()
     queryClient = new QueryClient({
       defaultOptions: {

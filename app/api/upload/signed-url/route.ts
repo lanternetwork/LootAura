@@ -9,7 +9,7 @@ const uploadRequestSchema = z.object({
     errorMap: () => ({ message: 'Only JPEG, PNG, and WebP images are allowed' })
   }),
   sizeBytes: z.number().int().positive().max(
-    parseInt(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE || '5242880'), // 5MB default
+    parseInt(process.env.MAX_UPLOAD_SIZE_BYTES || '5242880'), // 5MB default
     { message: 'File size exceeds maximum allowed' }
   ),
   ext: z.string().optional(),

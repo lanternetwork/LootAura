@@ -24,7 +24,6 @@ This document provides a comprehensive matrix of all environment variables acros
 | `NEXT_PUBLIC_FLAG_SAVED_PRESETS` | Boolean | `true` | `true` | `true` | Saved presets feature |
 | `NEXT_PUBLIC_FLAG_SHARE_LINKS` | Boolean | `true` | `true` | `true` | Share links feature |
 | `NEXT_PUBLIC_GOOGLE_ENABLED` | Boolean | `true` | `true` | `true` | Google OAuth feature |
-| `NEXT_PUBLIC_MAX_UPLOAD_SIZE` | Number | `5242880` | `5242880` | `5242880` | Upload size limit |
 | `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | String | ❌ | ✅ | ✅ | Cloudinary cloud name |
 | `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` | String | ❌ | ✅ | ✅ | Cloudinary upload preset |
 | **Server-Only Variables (Never Client-Exposed)** |
@@ -34,7 +33,12 @@ This document provides a comprehensive matrix of all environment variables acros
 | `UPSTASH_REDIS_REST_TOKEN` | String | ❌ | ✅ | ✅ | **SERVER-ONLY** - Rate limiting |
 | `NOMINATIM_APP_EMAIL` | String | ❌ | ✅ | ✅ | **SERVER-ONLY** - Geocoding fallback |
 | `MAPBOX_GEOCODING_ENDPOINT` | String | ❌ | ✅ | ✅ | **SERVER-ONLY** - Geocoding override |
+| `MAX_UPLOAD_SIZE_BYTES` | Number | `5242880` | `5242880` | `5242880` | **SERVER-ONLY** - Upload size limit |
 | `MANUAL_LOCATION_OVERRIDE` | String | ❌ | ❌ | ❌ | **DEV-ONLY** - Testing override |
+
+## Upload Size Configuration Rationale
+
+**Server-Owned Limit Prevents Drift**: The upload size limit is controlled by a single server-side environment variable (`MAX_UPLOAD_SIZE_BYTES`) rather than separate client and server variables. This design prevents configuration drift where client and server limits could become inconsistent over time. The client references the server's limit through a typed configuration module (`lib/config/upload.ts`) that provides consistent validation and error messages, ensuring users see accurate size limits that match what the server will actually enforce. This approach eliminates the risk of client-side validation passing while server-side validation fails, providing a more reliable and maintainable upload system.
 
 ## Security Verification
 

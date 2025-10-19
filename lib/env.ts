@@ -14,7 +14,6 @@ const publicSchema = z.object({
   NEXT_PUBLIC_FLAG_SAVED_PRESETS: z.enum(['true', 'false']).optional(),
   NEXT_PUBLIC_FLAG_SHARE_LINKS: z.enum(['true', 'false']).optional(),
   NEXT_PUBLIC_GOOGLE_ENABLED: z.enum(['true', 'false']).optional(),
-  NEXT_PUBLIC_MAX_UPLOAD_SIZE: z.string().regex(/^\d+$/).optional(),
   NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: z.string().min(1).optional(),
   NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: z.string().min(1).optional(),
 })
@@ -26,6 +25,7 @@ const serverSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().min(10).optional(),
   NOMINATIM_APP_EMAIL: z.string().email().optional(),
   MAPBOX_GEOCODING_ENDPOINT: z.string().url().optional(),
+  MAX_UPLOAD_SIZE_BYTES: z.string().regex(/^\d+$/).optional(),
 })
 
 // Validate public environment variables
@@ -43,7 +43,6 @@ export const ENV_PUBLIC = publicSchema.parse({
   NEXT_PUBLIC_FLAG_SAVED_PRESETS: process.env.NEXT_PUBLIC_FLAG_SAVED_PRESETS,
   NEXT_PUBLIC_FLAG_SHARE_LINKS: process.env.NEXT_PUBLIC_FLAG_SHARE_LINKS,
   NEXT_PUBLIC_GOOGLE_ENABLED: process.env.NEXT_PUBLIC_GOOGLE_ENABLED,
-  NEXT_PUBLIC_MAX_UPLOAD_SIZE: process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE,
   NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
   NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
 })
@@ -56,6 +55,7 @@ export const ENV_SERVER = serverSchema.parse({
   UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
   NOMINATIM_APP_EMAIL: process.env.NOMINATIM_APP_EMAIL,
   MAPBOX_GEOCODING_ENDPOINT: process.env.MAPBOX_GEOCODING_ENDPOINT,
+  MAX_UPLOAD_SIZE_BYTES: process.env.MAX_UPLOAD_SIZE_BYTES,
 })
 
 // Type exports for better TypeScript support

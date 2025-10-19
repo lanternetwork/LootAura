@@ -1,5 +1,7 @@
 // Client-side upload utility using server-signed URLs
 
+import { getMaxUploadSize, isFileSizeValid, getFileSizeErrorMessage } from './config/upload'
+
 export interface UploadRequest {
   mimeType: string
   sizeBytes: number
@@ -96,11 +98,10 @@ export async function uploadImage(
       }
     }
 
-    const maxSize = parseInt(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE || '5242880') // 5MB default
-    if (file.size > maxSize) {
+    if (!isFileSizeValid(file.size)) {
       return {
         success: false,
-        error: `File size must be less than ${Math.round(maxSize / 1024 / 1024)}MB`
+        error: getFileSizeErrorMessage(file.size)
       }
     }
 

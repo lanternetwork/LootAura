@@ -87,7 +87,7 @@ describe('Map Clusters Flow', () => {
     process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'true'
   })
 
-  it('should render map with clustering enabled', () => {
+  it('should render map with clustering enabled', async () => {
     render(
       <SalesMapClustered
         sales={mockSales}
@@ -193,7 +193,7 @@ describe('Map Clusters Flow', () => {
     }, { timeout: 5000 })
   })
 
-  it('should fall back to individual markers when clustering disabled', () => {
+  it('should fall back to individual markers when clustering disabled', async () => {
     process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'false'
     
     render(
@@ -211,7 +211,7 @@ describe('Map Clusters Flow', () => {
     }, { timeout: 5000 })
   })
 
-  it('should handle empty markers array', () => {
+  it('should handle empty markers array', async () => {
     render(
       <SalesMapClustered
         sales={[]}

@@ -155,14 +155,13 @@ describe('Map Debounce UI Smoke Test', () => {
   ]
 
   beforeEach(() => {
-    // Clean up any previous renders
-    cleanup()
+    // Clear mocks before each test
     vi.clearAllMocks()
   })
 
   afterEach(() => {
-    // Ensure clean state between tests
-    cleanup()
+    // Clean up mocks and reset state
+    vi.clearAllMocks()
   })
 
   it('should render map with clustering disabled', async () => {

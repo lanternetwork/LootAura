@@ -15,8 +15,7 @@ Object.defineProperty(window, 'location', {
 
 describe('Google Sign-In Button', () => {
   beforeEach(() => {
-    // Clean up any previous renders
-    cleanup()
+    // Clear mocks before each test
     vi.clearAllMocks()
     vi.mocked(fetch).mockClear()
     // Reset environment
@@ -24,8 +23,8 @@ describe('Google Sign-In Button', () => {
   })
 
   afterEach(() => {
-    // Ensure clean state between tests
-    cleanup()
+    // Clean up mocks and reset state
+    vi.clearAllMocks()
   })
 
   it('should render Google button when enabled', () => {

@@ -7,15 +7,14 @@ global.fetch = vi.fn()
 
 describe('Resend Confirmation Integration', () => {
   beforeEach(() => {
-    // Clean up any previous renders
-    cleanup()
+    // Clear mocks before each test
     vi.clearAllMocks()
     vi.mocked(fetch).mockClear()
   })
 
   afterEach(() => {
-    // Ensure clean state between tests
-    cleanup()
+    // Clean up mocks and reset state
+    vi.clearAllMocks()
   })
 
   it('should show resend link and handle successful resend', async () => {

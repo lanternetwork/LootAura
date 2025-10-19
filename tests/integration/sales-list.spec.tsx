@@ -43,8 +43,8 @@ describe('SalesList Integration', () => {
   let queryClient: QueryClient
 
   beforeEach(() => {
-    // Clean up any previous renders
-    cleanup()
+    // Clear mocks and create fresh query client
+    vi.clearAllMocks()
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -55,8 +55,8 @@ describe('SalesList Integration', () => {
   })
 
   afterEach(() => {
-    // Ensure clean state between tests
-    cleanup()
+    // Clean up mocks and reset state
+    vi.clearAllMocks()
   })
 
   it('should render sales list with proper grid layout', () => {

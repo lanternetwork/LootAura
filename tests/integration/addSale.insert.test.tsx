@@ -74,8 +74,8 @@ describe('Add Sale Integration', () => {
   })
 
   afterEach(() => {
-    // Ensure clean state between tests
-    cleanup()
+    // Clean up mocks and reset state
+    vi.clearAllMocks()
   })
 
   it('should insert sale with geocoded coordinates', async () => {

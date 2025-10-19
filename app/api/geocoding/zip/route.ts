@@ -177,8 +177,6 @@ export async function GET(request: NextRequest) {
       '98101': { lat: 47.6062, lng: -122.3321, city: 'Seattle', state: 'WA' },
       // Additional ZIP codes for testing
       '90078': { lat: 34.0522, lng: -118.2437, city: 'Los Angeles', state: 'CA' },
-      '10001': { lat: 40.7505, lng: -73.9934, city: 'New York', state: 'NY' },
-      '60601': { lat: 41.8781, lng: -87.6298, city: 'Chicago', state: 'IL' },
       // More common ZIP codes
       '02101': { lat: 42.3601, lng: -71.0589, city: 'Boston', state: 'MA' },
       '02102': { lat: 42.3601, lng: -71.0589, city: 'Boston', state: 'MA' },

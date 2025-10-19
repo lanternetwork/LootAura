@@ -112,18 +112,16 @@ describe('ZIP Lookup Unit Tests', () => {
 
   describe('Database ZIP Lookup', () => {
     it('should query database with correct parameters', async () => {
-      const mockQuery = {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            single: vi.fn(() => ({
-              data: { zip_code: '90078', lat: 34.0522, lng: -118.2437, city: 'Los Angeles', state: 'CA' },
-              error: null
-            }))
-          }))
-        }))
-      }
+      const mockSingle = vi.fn(() => ({
+        data: { zip_code: '90078', lat: 34.0522, lng: -118.2437, city: 'Los Angeles', state: 'CA' },
+        error: null
+      }))
+      
+      const mockEq = vi.fn(() => ({ single: mockSingle }))
+      const mockSelect = vi.fn(() => ({ eq: mockEq }))
+      const mockFrom = vi.fn(() => ({ select: mockSelect }))
 
-      mockSupabase.from.mockReturnValue(mockQuery)
+      mockSupabase.from = mockFrom
 
       const result = await mockSupabase
         .from('lootaura_v2.zipcodes')
@@ -131,26 +129,24 @@ describe('ZIP Lookup Unit Tests', () => {
         .eq('zip_code', '90078')
         .single()
 
-      expect(mockSupabase.from).toHaveBeenCalledWith('lootaura_v2.zipcodes')
-      expect(mockQuery.select).toHaveBeenCalledWith('zip_code, lat, lng, city, state')
-      expect(mockQuery.eq).toHaveBeenCalledWith('zip_code', '90078')
+      expect(mockFrom).toHaveBeenCalledWith('lootaura_v2.zipcodes')
+      expect(mockSelect).toHaveBeenCalledWith('zip_code, lat, lng, city, state')
+      expect(mockEq).toHaveBeenCalledWith('zip_code', '90078')
       expect(result.data).toBeDefined()
       expect(result.error).toBeNull()
     })
 
     it('should handle database errors', async () => {
-      const mockQuery = {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            single: vi.fn(() => ({
-              data: null,
-              error: { message: 'Database connection failed' }
-            }))
-          }))
-        }))
-      }
+      const mockSingle = vi.fn(() => ({
+        data: null,
+        error: { message: 'Database connection failed' }
+      }))
+      
+      const mockEq = vi.fn(() => ({ single: mockSingle }))
+      const mockSelect = vi.fn(() => ({ eq: mockEq }))
+      const mockFrom = vi.fn(() => ({ select: mockSelect }))
 
-      mockSupabase.from.mockReturnValue(mockQuery)
+      mockSupabase.from = mockFrom
 
       const result = await mockSupabase
         .from('lootaura_v2.zipcodes')
@@ -230,7 +226,7 @@ describe('ZIP Lookup Unit Tests', () => {
       const result = nominatimResponse[0]
       const lat = parseFloat(result.lat)
       const lng = parseFloat(result.lon)
-      const city = result.address?.city || result.address?.town || result.address?.village || null
+      const city = result.address?.city || null
       const state = result.address?.state || null
 
       expect(lat).toBe(40.7505)

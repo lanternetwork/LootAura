@@ -399,10 +399,7 @@ export default function SalesMap({
         onMove={handleViewChange}
         interactiveLayerIds={[]}
         // Performance optimizations
-        preserveDrawingBuffer={false}
         // Reduce initial load time
-        attributionControl={false}
-        logoPosition="bottom-right"
       >
         {markers.map(marker => (
           <Marker

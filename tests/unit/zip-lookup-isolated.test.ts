@@ -1,20 +1,22 @@
 import { describe, it, expect } from 'vitest'
 
-describe('ZIP Lookup Basic Tests', () => {
-  it('should normalize ZIP code 90078 correctly', () => {
+describe('ZIP Lookup Isolated Tests', () => {
+  it('should normalize ZIP code 90078', () => {
     const normalizeZip = (rawZip: string) => {
       if (!rawZip) return null
       const digits = rawZip.replace(/\D/g, '')
+      if (digits.length === 0) return null
       const lastFive = digits.length > 5 ? digits.slice(-5) : digits
       const normalized = lastFive.padStart(5, '0')
       if (!/^\d{5}$/.test(normalized)) return null
       return normalized
     }
 
-    expect(normalizeZip('90078')).toBe('90078')
+    const result = normalizeZip('90078')
+    expect(result).toBe('90078')
   })
 
-  it('should normalize ZIP code with extension correctly', () => {
+  it('should normalize ZIP code with extension', () => {
     const normalizeZip = (rawZip: string) => {
       if (!rawZip) return null
       const digits = rawZip.replace(/\D/g, '')
@@ -29,7 +31,7 @@ describe('ZIP Lookup Basic Tests', () => {
     expect(result).toBe('90078')
   })
 
-  it('should handle empty ZIP code', () => {
+  it('should handle empty input', () => {
     const normalizeZip = (rawZip: string) => {
       if (!rawZip) return null
       const digits = rawZip.replace(/\D/g, '')
@@ -44,28 +46,30 @@ describe('ZIP Lookup Basic Tests', () => {
     expect(result).toBe(null)
   })
 
-  it('should handle invalid ZIP code', () => {
+  it('should handle invalid input', () => {
     const normalizeZip = (rawZip: string) => {
       if (!rawZip) return null
       const digits = rawZip.replace(/\D/g, '')
-      if (digits.length === 0) return null // No digits found
+      if (digits.length === 0) return null
       const lastFive = digits.length > 5 ? digits.slice(-5) : digits
       const normalized = lastFive.padStart(5, '0')
       if (!/^\d{5}$/.test(normalized)) return null
       return normalized
     }
 
-    expect(normalizeZip('abc')).toBe(null)
+    const result = normalizeZip('abc')
+    expect(result).toBe(null)
   })
 
-  it('should find ZIP code in hardcoded list', () => {
+  it('should find ZIP in hardcoded list', () => {
     const hardcodedZips: Record<string, { lat: number; lng: number; city: string; state: string }> = {
       '90078': { lat: 34.0522, lng: -118.2437, city: 'Los Angeles', state: 'CA' }
     }
 
-    expect(hardcodedZips['90078']).toBeDefined()
-    expect(hardcodedZips['90078'].lat).toBe(34.0522)
-    expect(hardcodedZips['90078'].city).toBe('Los Angeles')
+    const result = hardcodedZips['90078']
+    expect(result).toBeDefined()
+    expect(result.lat).toBe(34.0522)
+    expect(result.city).toBe('Los Angeles')
   })
 
   it('should handle database response', () => {

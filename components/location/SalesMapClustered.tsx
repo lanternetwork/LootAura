@@ -25,6 +25,7 @@ import { logPrefetchStart, logPrefetchDone, logViewportSave, logViewportLoad } f
 import ClusterMarker from './ClusterMarker'
 import OfflineBanner from '../OfflineBanner'
 import MapLoadingSkeleton from './MapLoadingSkeleton'
+import mapDebug from '@/lib/debug/mapDebug'
 
 interface SalesMapClusteredProps {
   sales: Sale[]
@@ -306,9 +307,13 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Update clusters when viewport changes
   const updateClusters = useCallback((map: any) => {
+    const startTime = Date.now()
+    mapDebug.group('Cluster Update')
+    
     if (!isClusteringEnabled() || !clusterIndex) {
-      // Fall back to individual markers
+      mapDebug.log('Clustering disabled or no cluster index, falling back to individual markers')
       setClusters([])
+      mapDebug.groupEnd()
       return
     }
 
@@ -331,6 +336,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     
     setVisiblePinIds(visibleIds)
     setVisiblePinCount(visibleIds.length)
+    
+    mapDebug.log('Clusters updated', { 
+      totalClusters: viewportClusters.length,
+      visiblePoints: visibleIds.length,
+      clusterTypes: viewportClusters.reduce((acc, c) => {
+        acc[c.type] = (acc[c.type] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+    })
+    
+    mapDebug.logPerformance('Cluster update', startTime)
+    mapDebug.groupEnd()
     
     if (onVisiblePinsChange) {
       onVisiblePinsChange(visibleIds, visibleIds.length)
@@ -449,21 +466,26 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   }, [updateClusters, onZoomEnd, currentFilters])
 
   const handleMapLoad = useCallback(() => {
-    console.log('[MAP] handleMapLoad called in clustered map, setting mapLoaded to true')
+    mapDebug.logMapLoad('SalesMapClustered', 'success', { onMapReady: !!onMapReady })
     setMapLoaded(true)
     onMapReady?.()
     
     const map = mapRef.current?.getMap?.()
     if (map) {
+      mapDebug.log('Updating clusters after map load')
       updateClusters(map)
     }
   }, [updateClusters, onMapReady])
 
   // Fallback timeout to ensure map loads even if onLoad doesn't fire
   useEffect(() => {
+    const startTime = Date.now()
+    mapDebug.logMapLoad('SalesMapClustered', 'start')
+    
     const fallbackTimeout = setTimeout(() => {
       if (!mapLoaded) {
-        console.log('[MAP] Fallback timeout reached in clustered map, forcing map to load')
+        mapDebug.logMapLoad('SalesMapClustered', 'timeout')
+        mapDebug.logPerformance('Map load (timeout)', startTime)
         handleMapLoad()
       }
     }, 3000) // 3 second timeout
@@ -510,7 +532,8 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Show loading skeleton while map loads (but not in test environment)
   if (!mapLoaded && process.env.NODE_ENV !== 'test') {
-    console.log('[MAP] Clustered map not loaded yet, showing loading skeleton. Mapbox token:', getMapboxToken() ? 'present' : 'missing')
+    mapDebug.log('Clustered map not loaded yet, showing loading skeleton')
+    mapDebug.logTokenStatus(getMapboxToken())
     return <MapLoadingSkeleton className={className} />
   }
 

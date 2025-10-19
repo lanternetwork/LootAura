@@ -11,6 +11,7 @@ import { incMapLoad } from '@/lib/usageLogs'
 import { isClusteringEnabled } from '@/lib/clustering'
 import SalesMapClustered from './SalesMapClustered'
 import MapLoadingSkeleton from './MapLoadingSkeleton'
+import mapDebug from '@/lib/debug/mapDebug'
 
 interface SalesMapProps {
   sales: Sale[]
@@ -60,7 +61,7 @@ export default function SalesMap({
 
   // Call onMapReady when map loads (not onLoad bounds emission)
   const handleMapLoad = useCallback(() => {
-    console.log('[MAP] handleMapLoad called, setting mapLoaded to true')
+    mapDebug.logMapLoad('SalesMap', 'success', { onMapReady: !!onMapReady })
     setMapLoaded(true)
     if (onMapReady) {
       onMapReady()
@@ -83,7 +84,12 @@ export default function SalesMap({
   
   // All remaining hooks must be called unconditionally
   useEffect(() => {
-    console.log('[MAP] initialized with', sales.length, 'sales')
+    mapDebug.logMapState('SalesMap', { 
+      salesCount: sales.length, 
+      markersCount: markers.length,
+      center,
+      zoom 
+    })
   }, [])
 
   const recomputeVisiblePins = useCallback((reason: string) => {
@@ -140,7 +146,7 @@ export default function SalesMap({
 
   // Recompute visible pins when markers change
   useEffect(() => {
-    console.log('[MARKERS] set:', markers.length)
+    mapDebug.log('Markers updated', { count: markers.length })
     // Recompute immediately when markers change
     recomputeVisiblePins('markers-updated')
     
@@ -215,33 +221,44 @@ export default function SalesMap({
 
   // Call onMapReady when map loads (no bounds emission on onLoad)
   useEffect(() => {
+    const startTime = Date.now()
+    mapDebug.logMapLoad('SalesMap', 'start')
+    
     try {
       const map = mapRef.current?.getMap?.()
-      if (!map) return
+      if (!map) {
+        mapDebug.warn('Map ref not available')
+        return
+      }
+      
       const handleLoad = () => {
-        console.log('[MAP] onLoad event fired, setting mapLoaded to true')
+        mapDebug.logMapLoad('SalesMap', 'success')
+        mapDebug.logPerformance('Map load', startTime)
         handleMapLoad()
         // Don't emit bounds on onLoad - only on idle
       }
+      
       if (map.loaded?.()) {
-        console.log('[MAP] Map already loaded, calling handleLoad immediately')
+        mapDebug.log('Map already loaded, calling handleLoad immediately')
         handleLoad()
       } else {
-        console.log('[MAP] Map not loaded yet, waiting for load event')
+        mapDebug.log('Map not loaded yet, waiting for load event')
         map.once?.('load', handleLoad)
       }
       
       // Fallback timeout to ensure map loads even if onLoad doesn't fire
       const fallbackTimeout = setTimeout(() => {
         if (!mapLoaded) {
-          console.log('[MAP] Fallback timeout reached, forcing map to load')
+          mapDebug.logMapLoad('SalesMap', 'timeout')
+          mapDebug.logPerformance('Map load (timeout)', startTime)
           handleMapLoad()
         }
       }, 3000) // 3 second timeout
       
       return () => clearTimeout(fallbackTimeout)
     } catch (error) {
-      console.error('[MAP] Error in map load effect:', error)
+      mapDebug.logMapLoad('SalesMap', 'error', error)
+      mapDebug.error('Error in map load effect', error)
     }
   }, [handleMapLoad, mapLoaded])
 
@@ -393,7 +410,8 @@ export default function SalesMap({
 
   // Show loading skeleton while map loads (but not in test environment)
   if (!mapLoaded && process.env.NODE_ENV !== 'test') {
-    console.log('[MAP] Map not loaded yet, showing loading skeleton. Mapbox token:', getMapboxToken() ? 'present' : 'missing')
+    mapDebug.log('Map not loaded yet, showing loading skeleton')
+    mapDebug.logTokenStatus(getMapboxToken())
     return <MapLoadingSkeleton />
   }
 

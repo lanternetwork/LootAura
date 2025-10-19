@@ -205,7 +205,7 @@ export default function SalesMap({
         
         const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : (zoom || 11)
         // Do not force a minimum zoom during programmatic recenters; respect current zoom
-        map.easeTo({ center: [center.lng, center.lat], zoom: currentZoom, duration: 600 })
+        map.easeTo({ center: [center.lng, center.lat], zoom: currentZoom, duration: 0 })
       }
     } catch {}
   }, [center.lat, center.lng, arbiterAuthority])
@@ -283,7 +283,7 @@ export default function SalesMap({
         ]
         
         console.log('[MAP] fitBounds: calling map.fitBounds with bounds:', bounds)
-        map.fitBounds(bounds, { padding: 50, maxZoom: 15 })
+        map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 0 })
         
         if (onFitBoundsComplete) {
           onFitBoundsComplete()

@@ -427,7 +427,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     map.easeTo({
       center: [cluster.lon, cluster.lat],
       zoom: Math.min(expansionZoom, 16),
-      duration: 500
+      duration: 0
     })
   }, [clusterIndex])
 
@@ -552,7 +552,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         ]
         
         console.log('[MAP] fitBounds: calling map.fitBounds with bounds:', bounds)
-        map.fitBounds(bounds, { padding: 50, maxZoom: 15 })
+        map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 0 })
         
         if (_onFitBoundsComplete) {
           _onFitBoundsComplete()

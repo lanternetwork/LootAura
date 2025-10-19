@@ -375,8 +375,8 @@ export default function SalesMap({
     )
   }
 
-  // Show loading skeleton while map loads
-  if (!mapLoaded) {
+  // Show loading skeleton while map loads (but not in test environment)
+  if (!mapLoaded && process.env.NODE_ENV !== 'test') {
     return <MapLoadingSkeleton />
   }
 

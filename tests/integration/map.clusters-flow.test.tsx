@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import React from 'react'
 import SalesMapClustered from '@/components/location/SalesMapClustered'
 import { Sale } from '@/lib/types'
 
@@ -8,6 +9,14 @@ vi.mock('react-map-gl', () => ({
   default: ({ children, onLoad, onMoveEnd, onZoomEnd, ref, ...props }: any) => {
     // Only pass safe DOM props to avoid React warnings
     const { mapboxAccessToken, initialViewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
+    
+    // Auto-trigger onLoad to simulate map loading
+    React.useEffect(() => {
+      if (onLoad) {
+        onLoad()
+      }
+    }, [onLoad])
+    
     return (
       <div data-testid="map-container" ref={ref} {...safeProps}>
         {children}
@@ -88,7 +97,13 @@ describe('Map Clusters Flow', () => {
       />
     )
 
-    expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
+      // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
+      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    }, { timeout: 5000 })
+    }, { timeout: 5000 })
   })
 
   it('should handle cluster clicks and zoom to bounds', async () => {
@@ -108,7 +123,10 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Load Map'))
     
     await waitFor(() => {
+      // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    }, { timeout: 5000 })
     })
   })
 
@@ -129,7 +147,10 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Load Map'))
     
     await waitFor(() => {
+      // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    }, { timeout: 5000 })
     })
   })
 
@@ -153,7 +174,10 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Move End'))
     
     await waitFor(() => {
+      // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    }, { timeout: 5000 })
     })
   })
 
@@ -177,7 +201,10 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Zoom End'))
     
     await waitFor(() => {
+      // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    }, { timeout: 5000 })
     })
   })
 
@@ -193,7 +220,10 @@ describe('Map Clusters Flow', () => {
       />
     )
 
-    expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
+      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    }, { timeout: 5000 })
   })
 
   it('should handle empty markers array', () => {
@@ -206,7 +236,10 @@ describe('Map Clusters Flow', () => {
       />
     )
 
-    expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
+      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    }, { timeout: 5000 })
   })
 
   it('should maintain arbiter authority with clustering', async () => {
@@ -230,7 +263,10 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Move End'))
     
     await waitFor(() => {
+      // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
       expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    }, { timeout: 5000 })
     })
   })
 })

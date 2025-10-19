@@ -449,6 +449,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   }, [updateClusters, onZoomEnd, currentFilters])
 
   const handleMapLoad = useCallback(() => {
+    console.log('[MAP] handleMapLoad called in clustered map, setting mapLoaded to true')
     setMapLoaded(true)
     onMapReady?.()
     
@@ -457,6 +458,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       updateClusters(map)
     }
   }, [updateClusters, onMapReady])
+
+  // Fallback timeout to ensure map loads even if onLoad doesn't fire
+  useEffect(() => {
+    const fallbackTimeout = setTimeout(() => {
+      if (!mapLoaded) {
+        console.log('[MAP] Fallback timeout reached in clustered map, forcing map to load')
+        handleMapLoad()
+      }
+    }, 3000) // 3 second timeout
+    
+    return () => clearTimeout(fallbackTimeout)
+  }, [handleMapLoad, mapLoaded])
 
   // Render cluster markers
   const renderClusters = useMemo(() => {
@@ -497,6 +510,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Show loading skeleton while map loads (but not in test environment)
   if (!mapLoaded && process.env.NODE_ENV !== 'test') {
+    console.log('[MAP] Clustered map not loaded yet, showing loading skeleton. Mapbox token:', getMapboxToken() ? 'present' : 'missing')
     return <MapLoadingSkeleton className={className} />
   }
 

@@ -60,6 +60,7 @@ export default function SalesMap({
 
   // Call onMapReady when map loads (not onLoad bounds emission)
   const handleMapLoad = useCallback(() => {
+    console.log('[MAP] handleMapLoad called, setting mapLoaded to true')
     setMapLoaded(true)
     if (onMapReady) {
       onMapReady()
@@ -218,16 +219,31 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (!map) return
       const handleLoad = () => {
+        console.log('[MAP] onLoad event fired, setting mapLoaded to true')
         handleMapLoad()
         // Don't emit bounds on onLoad - only on idle
       }
       if (map.loaded?.()) {
+        console.log('[MAP] Map already loaded, calling handleLoad immediately')
         handleLoad()
       } else {
+        console.log('[MAP] Map not loaded yet, waiting for load event')
         map.once?.('load', handleLoad)
       }
-    } catch {}
-  }, [handleMapLoad])
+      
+      // Fallback timeout to ensure map loads even if onLoad doesn't fire
+      const fallbackTimeout = setTimeout(() => {
+        if (!mapLoaded) {
+          console.log('[MAP] Fallback timeout reached, forcing map to load')
+          handleMapLoad()
+        }
+      }, 3000) // 3 second timeout
+      
+      return () => clearTimeout(fallbackTimeout)
+    } catch (error) {
+      console.error('[MAP] Error in map load effect:', error)
+    }
+  }, [handleMapLoad, mapLoaded])
 
   // Handle center override
   useEffect(() => {
@@ -377,6 +393,7 @@ export default function SalesMap({
 
   // Show loading skeleton while map loads (but not in test environment)
   if (!mapLoaded && process.env.NODE_ENV !== 'test') {
+    console.log('[MAP] Map not loaded yet, showing loading skeleton. Mapbox token:', getMapboxToken() ? 'present' : 'missing')
     return <MapLoadingSkeleton />
   }
 

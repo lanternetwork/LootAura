@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     // Build query with category filtering if categories are provided
     let query = sb
       .from('sales_v2')
-      .select('id, title, description, lat, lng, starts_at, ends_at, date_start, date_end, time_start, time_end')
+      .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
 

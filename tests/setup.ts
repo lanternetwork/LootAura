@@ -208,10 +208,13 @@ const ALLOWED_PATTERNS = [
   /^Failed to get cache stats:/, // Expected cache error logging
   /^Shortlink resolution error:/, // Expected shortlink test errors
   /^Warning: Function components cannot be given refs/, // React forwardRef warnings in tests
+  /^Warning: .*: `ref` is not a prop/, // React ref prop warnings in tests
+  /^Warning: %s: `ref` is not a prop/, // React ref prop warnings with placeholder in tests
   /^The above error occurred in the/, // React error boundary messages
   /^Consider adding an error boundary/, // React error boundary suggestions
   /^This error originated in/, // React error origin messages
   /^The latest test that might've caused/, // React test error context
+  /^Error: Unexpected console.error:/, // Nested console guardrail errors
 ]
 
 const isAllowedMessage = (message: string): boolean => {

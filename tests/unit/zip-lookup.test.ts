@@ -27,6 +27,10 @@ describe('ZIP Lookup Unit Tests', () => {
   })
 
   describe('ZIP Code Normalization', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+    })
+
     it('should normalize ZIP codes correctly', () => {
       const normalizeZip = (rawZip: string) => {
         if (!rawZip) return null
@@ -286,6 +290,8 @@ describe('ZIP Lookup Unit Tests', () => {
 
         if (invalidZip === '' || invalidZip === 'abc' || invalidZip === 'invalid') {
           expect(isValid).toBe(false)
+        } else if (invalidZip === '123') {
+          expect(isValid).toBe(true) // '123' becomes '00123' which is valid
         } else {
           expect(isValid).toBe(true)
         }

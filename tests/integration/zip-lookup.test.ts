@@ -32,9 +32,9 @@ describe('ZIP Lookup Integration Tests', () => {
         error: null
       }))
       
-      const mockEq = vi.fn(() => ({ single: mockSingle }))
-      const mockSelect = vi.fn(() => ({ eq: mockEq }))
-      const mockFrom = vi.fn(() => ({ select: mockSelect }))
+      const mockEq = vi.fn().mockReturnValue({ single: mockSingle })
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq })
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect })
 
       mockSupabase.from = mockFrom
 
@@ -59,9 +59,9 @@ describe('ZIP Lookup Integration Tests', () => {
         error: { message: 'No rows found' }
       }))
       
-      const mockEq = vi.fn(() => ({ single: mockSingle }))
-      const mockSelect = vi.fn(() => ({ eq: mockEq }))
-      const mockFrom = vi.fn(() => ({ select: mockSelect }))
+      const mockEq = vi.fn().mockReturnValue({ single: mockSingle })
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq })
+      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect })
 
       mockSupabase.from = mockFrom
 

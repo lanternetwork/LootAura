@@ -18,32 +18,37 @@ describe('ZIP Lookup Basic Tests', () => {
     const normalizeZip = (rawZip: string) => {
       if (!rawZip) return null
       const digits = rawZip.replace(/\D/g, '')
+      if (digits.length === 0) return null
       const lastFive = digits.length > 5 ? digits.slice(-5) : digits
       const normalized = lastFive.padStart(5, '0')
       if (!/^\d{5}$/.test(normalized)) return null
       return normalized
     }
 
-    expect(normalizeZip('90078-1234')).toBe('90078')
+    const result = normalizeZip('90078-1234')
+    expect(result).toBe('90078')
   })
 
   it('should handle empty ZIP code', () => {
     const normalizeZip = (rawZip: string) => {
       if (!rawZip) return null
       const digits = rawZip.replace(/\D/g, '')
+      if (digits.length === 0) return null
       const lastFive = digits.length > 5 ? digits.slice(-5) : digits
       const normalized = lastFive.padStart(5, '0')
       if (!/^\d{5}$/.test(normalized)) return null
       return normalized
     }
 
-    expect(normalizeZip('')).toBe(null)
+    const result = normalizeZip('')
+    expect(result).toBe(null)
   })
 
   it('should handle invalid ZIP code', () => {
     const normalizeZip = (rawZip: string) => {
       if (!rawZip) return null
       const digits = rawZip.replace(/\D/g, '')
+      if (digits.length === 0) return null // No digits found
       const lastFive = digits.length > 5 ? digits.slice(-5) : digits
       const normalized = lastFive.padStart(5, '0')
       if (!/^\d{5}$/.test(normalized)) return null

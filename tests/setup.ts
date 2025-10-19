@@ -206,6 +206,8 @@ const ALLOWED_PATTERNS = [
   /^Failed to prune cache:/, // Expected cache error logging
   /^Failed to clear cache:/, // Expected cache error logging
   /^Failed to get cache stats:/, // Expected cache error logging
+  /^Shortlink resolution error:/, // Expected shortlink test errors
+  /^Warning: Function components cannot be given refs/, // React forwardRef warnings in tests
   /^The above error occurred in the/, // React error boundary messages
   /^Consider adding an error boundary/, // React error boundary suggestions
   /^This error originated in/, // React error origin messages

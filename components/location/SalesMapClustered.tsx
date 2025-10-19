@@ -462,14 +462,27 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     if (!onViewChange) return
     
     try {
+      // Check if evt.viewState exists and has the expected structure
+      if (!evt || !evt.viewState) {
+        console.warn('[MAP] Invalid event structure:', evt)
+        return
+      }
+      
       const { center: newCenter, zoom: newZoom } = evt.viewState
+      
+      // Validate center object
+      if (!newCenter || typeof newCenter.lat !== 'number' || typeof newCenter.lng !== 'number') {
+        console.warn('[MAP] Invalid center data:', newCenter)
+        return
+      }
+      
       onViewChange({
         center: { lat: newCenter.lat, lng: newCenter.lng },
-        zoom: newZoom,
-        userInteraction: evt.isDragging || evt.isZooming
+        zoom: newZoom || 10,
+        userInteraction: evt.isDragging || evt.isZooming || false
       })
     } catch (error) {
-      console.warn('[MAP] View change error:', error)
+      console.warn('[MAP] View change error:', error, 'Event:', evt)
     }
   }, [onViewChange])
 

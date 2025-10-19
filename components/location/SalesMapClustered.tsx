@@ -475,6 +475,68 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [updateClusters, onMapReady])
 
+  // Handle fit bounds
+  useEffect(() => {
+    console.log('[MAP] fitBounds useEffect triggered:', { fitBounds: _fitBounds, arbiterAuthority: _arbiterAuthority })
+    if (!_fitBounds) return
+    
+    const executeFitBounds = () => {
+      try {
+        const map = mapRef.current?.getMap?.()
+        if (!map) {
+          console.log('[MAP] fitBounds: map not ready')
+          return false
+        }
+        
+        // Check if map is fully loaded
+        if (!map.loaded || !map.loaded()) {
+          console.log('[MAP] fitBounds: map not loaded yet')
+          return false
+        }
+        
+        console.log('[MAP] fitBounds: checking authority', { arbiterAuthority: _arbiterAuthority, reason: _fitBounds.reason })
+        // Allow fitBounds for ZIP searches even in MAP authority mode
+        if (_arbiterAuthority === 'MAP' && _fitBounds.reason !== 'zip') {
+          console.log('[BLOCK] fit bounds suppressed (map authoritative)')
+          return true
+        }
+        
+        console.log('[MAP] fitBounds executing:', _fitBounds.reason || 'unknown')
+        const bounds = [
+          [_fitBounds.west, _fitBounds.south],
+          [_fitBounds.east, _fitBounds.north]
+        ]
+        
+        console.log('[MAP] fitBounds: calling map.fitBounds with bounds:', bounds)
+        map.fitBounds(bounds, { padding: 50, maxZoom: 15 })
+        
+        if (_onFitBoundsComplete) {
+          _onFitBoundsComplete()
+        }
+        return true
+      } catch (error) {
+        console.error('[MAP] fitBounds error:', error)
+        return false
+      }
+    }
+    
+    // Try to execute immediately
+    if (executeFitBounds()) {
+      return
+    }
+    
+    // If map not ready, wait for it to load
+    const map = mapRef.current?.getMap?.()
+    if (map) {
+      const handleLoad = () => {
+        console.log('[MAP] fitBounds: map loaded, retrying fitBounds')
+        executeFitBounds()
+        map.off('load', handleLoad)
+      }
+      map.once('load', handleLoad)
+    }
+  }, [_fitBounds, _arbiterAuthority, _onFitBoundsComplete])
+
 
   // Render cluster markers
   const renderClusters = useMemo(() => {

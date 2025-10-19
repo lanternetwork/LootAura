@@ -352,7 +352,7 @@ function FiltersContent({
           <span className="text-gray-500 mr-2"></span>
           <label className="text-sm font-medium text-gray-700">Categories</label>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
           {CATEGORY_OPTIONS.map((category) => (
             <label
               key={category.value}
@@ -368,8 +368,8 @@ function FiltersContent({
                 onChange={() => onCategoryToggle(category.value)}
                 className="h-4 w-4 min-h-4 min-w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
               />
-              <span className="ml-2 text-sm font-medium">{category.icon}</span>
-              <span className="ml-1 text-sm">{category.label}</span>
+              <span className="ml-2 text-sm font-medium flex-shrink-0">{category.icon}</span>
+              <span className="ml-1 text-sm flex-1 min-w-0">{category.label}</span>
             </label>
           ))}
         </div>

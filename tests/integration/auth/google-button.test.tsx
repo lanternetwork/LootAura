@@ -24,6 +24,7 @@ describe('Google Sign-In Button', () => {
 
   afterEach(() => {
     // Clean up mocks and reset state
+    cleanup()
     vi.clearAllMocks()
   })
 
@@ -33,7 +34,7 @@ describe('Google Sign-In Button', () => {
     render(<GoogleSignInButton />)
 
     expect(screen.getByText('Continue with Google')).toBeInTheDocument()
-    expect(screen.getByRole('button')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument()
   })
 
   it('should not render when explicitly disabled', () => {
@@ -68,7 +69,7 @@ describe('Google Sign-In Button', () => {
 
     render(<GoogleSignInButton />)
 
-    const button = screen.getByRole('button')
+    const button = screen.getByRole('button', { name: 'Continue with Google' })
     fireEvent.click(button)
 
     expect(fetch).toHaveBeenCalledWith('/api/auth/google', {
@@ -96,7 +97,7 @@ describe('Google Sign-In Button', () => {
 
     render(<GoogleSignInButton />)
 
-    const button = screen.getByRole('button')
+    const button = screen.getByRole('button', { name: 'Continue with Google' })
     fireEvent.click(button)
 
     // Button should be disabled and show loading text
@@ -116,7 +117,7 @@ describe('Google Sign-In Button', () => {
 
     render(<GoogleSignInButton />)
 
-    const button = screen.getByRole('button')
+    const button = screen.getByRole('button', { name: 'Continue with Google' })
     fireEvent.click(button)
 
     await new Promise(resolve => setTimeout(resolve, 0)) // Wait for async operations

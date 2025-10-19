@@ -14,6 +14,7 @@ describe('Resend Confirmation Integration', () => {
 
   afterEach(() => {
     // Clean up mocks and reset state
+    cleanup()
     vi.clearAllMocks()
   })
 
@@ -28,7 +29,7 @@ describe('Resend Confirmation Integration', () => {
     // Check that the resend link is visible
     expect(screen.getByText("Didn't receive the confirmation email?")).toBeInTheDocument()
     
-    const resendButton = screen.getByText('Resend confirmation email')
+    const resendButton = screen.getByRole('button', { name: 'Resend confirmation email' })
     expect(resendButton).toBeInTheDocument()
 
     // Click the resend button
@@ -60,7 +61,7 @@ describe('Resend Confirmation Integration', () => {
 
     render(<ResendConfirmation email="test@example.com" />)
 
-    const resendButton = screen.getByText('Resend confirmation email')
+    const resendButton = screen.getByRole('button', { name: 'Resend confirmation email' })
     fireEvent.click(resendButton)
 
     await waitFor(() => {
@@ -73,7 +74,7 @@ describe('Resend Confirmation Integration', () => {
 
     render(<ResendConfirmation email="test@example.com" />)
 
-    const resendButton = screen.getByText('Resend confirmation email')
+    const resendButton = screen.getByRole('button', { name: 'Resend confirmation email' })
     fireEvent.click(resendButton)
 
     await waitFor(() => {

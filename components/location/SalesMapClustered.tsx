@@ -595,7 +595,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
           data-testid="marker"
         >
           <button
-            className="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500"
             onClick={() => {
               const sale = sales.find(s => s.id === marker.id)
               if (sale && onSaleClick) {

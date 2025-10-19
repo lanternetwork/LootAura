@@ -258,12 +258,13 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (!map) return
       
-      // Block programmatic movement in MAP authority mode
-      if (arbiterAuthority === 'MAP') {
+      // Allow fitBounds for ZIP searches even in MAP authority mode
+      if (arbiterAuthority === 'MAP' && fitBounds.reason !== 'zip') {
         console.log('[BLOCK] fit bounds suppressed (map authoritative)')
         return
       }
       
+      console.log('[MAP] fitBounds executing:', fitBounds.reason || 'unknown')
       const bounds = [
         [fitBounds.west, fitBounds.south],
         [fitBounds.east, fitBounds.north]

@@ -43,8 +43,8 @@ export interface ClusterIndex {
 
 // Default clustering options optimized for preventing pin overlap
 const DEFAULT_OPTIONS: Required<ClusterOptions> = {
-  radius: 8, // 8px radius - only cluster within ~200 yards
-  maxZoom: 12, // Clusters break apart at zoom 12+ (street level)
+  radius: 1, // 1px radius - only cluster when pins are essentially on top of each other
+  maxZoom: 15, // Clusters break apart at zoom 15+ (very close)
   minPoints: 2, // Minimum 2 points to form a cluster
   extent: 512, // Tile extent
   nodeSize: 64 // Node size for tree structure

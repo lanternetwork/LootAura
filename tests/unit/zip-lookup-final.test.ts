@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
-describe('ZIP Lookup Isolated Tests', () => {
-  it('should normalize ZIP code 90078', () => {
+describe('ZIP Lookup Final Tests', () => {
+  it('should normalize basic ZIP code', () => {
     const normalizeZip = (rawZip: string) => {
       if (!rawZip) return null
       const digits = rawZip.replace(/\D/g, '')
@@ -12,11 +12,10 @@ describe('ZIP Lookup Isolated Tests', () => {
       return normalized
     }
 
-    const result = normalizeZip('90078')
-    expect(result).toBe('90078')
+    expect(normalizeZip('90078')).toBe('90078')
   })
 
-  it('should normalize ZIP code with extension', () => {
+  it('should normalize ZIP with extension', () => {
     const normalizeZip = (rawZip: string) => {
       if (!rawZip) return null
       const digits = rawZip.replace(/\D/g, '')
@@ -27,11 +26,10 @@ describe('ZIP Lookup Isolated Tests', () => {
       return normalized
     }
 
-    const result = normalizeZip('90078-1234')
-    expect(result).toBe('90078')
+    expect(normalizeZip('90078-1234')).toBe('90078')
   })
 
-  it('should handle empty input', () => {
+  it('should handle empty string', () => {
     const normalizeZip = (rawZip: string) => {
       if (!rawZip) return null
       const digits = rawZip.replace(/\D/g, '')
@@ -42,8 +40,7 @@ describe('ZIP Lookup Isolated Tests', () => {
       return normalized
     }
 
-    const result = normalizeZip('')
-    expect(result).toBe(null)
+    expect(normalizeZip('')).toBe(null)
   })
 
   it('should handle invalid input', () => {
@@ -57,8 +54,7 @@ describe('ZIP Lookup Isolated Tests', () => {
       return normalized
     }
 
-    const result = normalizeZip('abc')
-    expect(result).toBe(null)
+    expect(normalizeZip('abc')).toBe(null)
   })
 
   it('should find ZIP in hardcoded list', () => {
@@ -66,13 +62,12 @@ describe('ZIP Lookup Isolated Tests', () => {
       '90078': { lat: 34.0522, lng: -118.2437, city: 'Los Angeles', state: 'CA' }
     }
 
-    const result = hardcodedZips['90078']
-    expect(result).toBeDefined()
-    expect(result.lat).toBe(34.0522)
-    expect(result.city).toBe('Los Angeles')
+    expect(hardcodedZips['90078']).toBeDefined()
+    expect(hardcodedZips['90078'].lat).toBe(34.0522)
+    expect(hardcodedZips['90078'].city).toBe('Los Angeles')
   })
 
-  it('should handle database response', () => {
+  it('should handle database success response', () => {
     const mockResponse = {
       data: { zip_code: '90078', lat: 34.0522, lng: -118.2437, city: 'Los Angeles', state: 'CA' },
       error: null
@@ -83,7 +78,7 @@ describe('ZIP Lookup Isolated Tests', () => {
     expect(mockResponse.data.zip_code).toBe('90078')
   })
 
-  it('should handle database error', () => {
+  it('should handle database error response', () => {
     const mockResponse = {
       data: null,
       error: { message: 'Database connection failed' }

@@ -399,7 +399,6 @@ export default function SalesMap({
         onMove={handleViewChange}
         interactiveLayerIds={[]}
         // Performance optimizations
-        antialias={false}
         preserveDrawingBuffer={false}
         // Reduce initial load time
         attributionControl={false}

@@ -352,7 +352,7 @@ function FiltersContent({
           <span className="text-gray-500 mr-2"></span>
           <label className="text-sm font-medium text-gray-700">Categories</label>
         </div>
-        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
           {CATEGORY_OPTIONS.map((category) => (
             <label
               key={category.value}

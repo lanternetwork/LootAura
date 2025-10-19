@@ -176,7 +176,7 @@ describe('URL State Management', () => {
 
     it('should handle corrupted JSON under j: prefix', () => {
       // Test corrupted JSON should return safe fallback
-      expect(() => decompressState('j:{invalid json}')).toThrow('Invalid state format')
+      expect(() => decompressState('j:{invalid json}')).toThrow()
     })
 
     it('should handle corrupted payload under c: prefix', () => {

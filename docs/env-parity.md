@@ -24,7 +24,9 @@ This document provides a comprehensive matrix of all environment variables acros
 | `NEXT_PUBLIC_FLAG_SAVED_PRESETS` | Boolean | `true` | `true` | `true` | Saved presets feature |
 | `NEXT_PUBLIC_FLAG_SHARE_LINKS` | Boolean | `true` | `true` | `true` | Share links feature |
 | `NEXT_PUBLIC_GOOGLE_ENABLED` | Boolean | `true` | `true` | `true` | Google OAuth feature |
-| `NEXT_PUBLIC_MAX_UPLOAD_SIZE` | Number | `5242880` | `5242880` | `5242880` | Client upload size limit |
+| `NEXT_PUBLIC_MAX_UPLOAD_SIZE` | Number | `5242880` | `5242880` | `5242880` | Upload size limit |
+| `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | String | ❌ | ✅ | ✅ | Cloudinary cloud name |
+| `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` | String | ❌ | ✅ | ✅ | Cloudinary upload preset |
 | **Server-Only Variables (Never Client-Exposed)** |
 | `SUPABASE_SERVICE_ROLE` | String | ✅ | ✅ | ✅ | **SERVER-ONLY** - Bypasses RLS |
 | `VAPID_PRIVATE_KEY` | String | ❌ | ✅ | ✅ | **SERVER-ONLY** - Push notifications |

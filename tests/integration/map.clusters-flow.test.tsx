@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import React from 'react'
 import SalesMapClustered from '@/components/location/SalesMapClustered'
 import { Sale } from '@/lib/types'
@@ -41,6 +41,10 @@ vi.mock('@/lib/usageLogs', () => ({
 }))
 
 describe('Map Clusters Flow', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
   const mockSales: Sale[] = [
     {
       id: '1',

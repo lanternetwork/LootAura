@@ -24,7 +24,7 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.com
 NEXT_PUBLIC_SUPABASE_SCHEMA=lootaura_v2  # Defaults to 'public'
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
 NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=your-upload-preset
-NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=your-mapbox-token
 ```
 
 ### GitHub Secrets
@@ -35,7 +35,7 @@ Set these in your GitHub repository settings:
 - `NEXT_PUBLIC_SUPABASE_SCHEMA`
 - `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`
 - `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET`
-- `NEXT_PUBLIC_MAPBOX_TOKEN`
+- `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`
 - `NEXT_PUBLIC_SITE_URL`
 - `VERCEL_TOKEN` (for deployment)
 - `VERCEL_ORG_ID` (for deployment)

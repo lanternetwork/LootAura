@@ -52,23 +52,17 @@ describe('ZIP Lookup Unit Tests', () => {
         return normalized
       }
 
-      const testCases = [
-        { input: '90078', expected: '90078' },
-        { input: '90078-1234', expected: '90078' },
-        { input: '90078 1234', expected: '90078' },
-        { input: '90078-', expected: '90078' },
-        { input: '90078 ', expected: '90078' },
-        { input: '1234', expected: '01234' },
-        { input: '123456789', expected: '56789' },
-        { input: '', expected: null },
-        { input: 'abc', expected: null },
-        { input: '123', expected: '00123' }
-      ]
-
-      for (const testCase of testCases) {
-        const result = normalizeZip(testCase.input)
-        expect(result).toBe(testCase.expected)
-      }
+      // Test individual cases to avoid loop issues
+      expect(normalizeZip('90078')).toBe('90078')
+      expect(normalizeZip('90078-1234')).toBe('90078')
+      expect(normalizeZip('90078 1234')).toBe('90078')
+      expect(normalizeZip('90078-')).toBe('90078')
+      expect(normalizeZip('90078 ')).toBe('90078')
+      expect(normalizeZip('1234')).toBe('01234')
+      expect(normalizeZip('123456789')).toBe('56789')
+      expect(normalizeZip('')).toBe(null)
+      expect(normalizeZip('abc')).toBe(null)
+      expect(normalizeZip('123')).toBe('00123')
     })
   })
 

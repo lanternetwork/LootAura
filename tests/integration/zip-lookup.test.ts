@@ -27,18 +27,24 @@ describe('ZIP Lookup Integration Tests', () => {
   describe('Database ZIP Lookup (Method 1)', () => {
     it('should find ZIP codes in database', async () => {
       // Mock successful database response
-      const mockSingle = vi.fn(() => ({
+      // Mock the Supabase response directly
+      const mockResponse = {
         data: { zip_code: '40204', lat: 38.2380249, lng: -85.7246945, city: 'Louisville', state: 'KY' },
         error: null
-      }))
-      
-      const mockEq = vi.fn().mockReturnValue({ single: mockSingle })
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq })
-      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect })
+      }
 
-      mockSupabase.from = mockFrom
+      // Mock the entire chain
+      const mockSupabaseClient = {
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue(mockResponse)
+            })
+          })
+        })
+      }
 
-      const { data, error } = await mockSupabase
+      const { data, error } = await mockSupabaseClient
         .from('lootaura_v2.zipcodes')
         .select('zip_code, lat, lng, city, state')
         .eq('zip_code', '40204')
@@ -59,11 +65,22 @@ describe('ZIP Lookup Integration Tests', () => {
         error: { message: 'No rows found' }
       }))
       
-      const mockEq = vi.fn().mockReturnValue({ single: mockSingle })
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq })
-      const mockFrom = vi.fn().mockReturnValue({ select: mockSelect })
+      // Mock the Supabase response directly
+      const mockResponse = {
+        data: null,
+        error: { message: 'No rows found' }
+      }
 
-      mockSupabase.from = mockFrom
+      // Mock the entire chain
+      const mockSupabaseClient = {
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue(mockResponse)
+            })
+          })
+        })
+      }
 
       const { data, error } = await mockSupabase
         .from('lootaura_v2.zipcodes')

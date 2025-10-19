@@ -296,7 +296,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const startTime = performance.now()
     const index = buildClusterIndex(clusterPoints, {
       radius: 1, // Minimal radius - only cluster when pins are essentially on top of each other
-      maxZoom: 15, // Clusters break apart at zoom 15+ (very close)
+      maxZoom: 20, // Allow clustering at all zoom levels - let algorithm decide when to break
       minPoints: 2 // Minimum 2 points to form a cluster
     })
     setClusterIndex(index)

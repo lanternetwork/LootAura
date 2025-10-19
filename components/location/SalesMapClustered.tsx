@@ -276,22 +276,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Build cluster index when points change
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[CLUSTER] Building cluster index:', { 
-        isClusteringEnabled: isClusteringEnabled(), 
-        clusterPointsLength: clusterPoints.length,
-        clusterPoints: clusterPoints.slice(0, 3)
-      })
-    }
+    console.log('[CLUSTER] Building cluster index:', { 
+      isClusteringEnabled: isClusteringEnabled(), 
+      clusterPointsLength: clusterPoints.length,
+      clusterPoints: clusterPoints.slice(0, 3)
+    })
     
     if (!isClusteringEnabled() || clusterPoints.length === 0) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[CLUSTER] Skipping cluster build:', { 
-          reason: !isClusteringEnabled() ? 'clustering disabled' : 'no points',
-          isClusteringEnabled: isClusteringEnabled(),
-          clusterPointsLength: clusterPoints.length
-        })
-      }
+      console.log('[CLUSTER] Skipping cluster build:', { 
+        reason: !isClusteringEnabled() ? 'clustering disabled' : 'no points',
+        isClusteringEnabled: isClusteringEnabled(),
+        clusterPointsLength: clusterPoints.length
+      })
       setClusterIndex(null)
       setClusters([])
       return
@@ -305,13 +301,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     })
     setClusterIndex(index)
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[CLUSTER] Index built', {
-        event: 'cluster-build',
-        points: clusterPoints.length,
-        ms: Math.round(performance.now() - startTime)
-      })
-    }
+    console.log('[CLUSTER] Index built', {
+      event: 'cluster-build',
+      points: clusterPoints.length,
+      ms: Math.round(performance.now() - startTime)
+    })
   }, [clusterPoints])
 
   // Cleanup viewport fetch manager on unmount
@@ -323,21 +317,17 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Update clusters when viewport changes
   const updateClusters = useCallback((map: any) => {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[CLUSTER] updateClusters called:', { 
-        isClusteringEnabled: isClusteringEnabled(), 
-        hasClusterIndex: !!clusterIndex
-      })
-    }
+    console.log('[CLUSTER] updateClusters called:', { 
+      isClusteringEnabled: isClusteringEnabled(), 
+      hasClusterIndex: !!clusterIndex
+    })
     
     if (!isClusteringEnabled() || !clusterIndex) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[CLUSTER] Skipping cluster update:', { 
-          reason: !isClusteringEnabled() ? 'clustering disabled' : 'no cluster index',
-          isClusteringEnabled: isClusteringEnabled(),
-          hasClusterIndex: !!clusterIndex
-        })
-      }
+      console.log('[CLUSTER] Skipping cluster update:', { 
+        reason: !isClusteringEnabled() ? 'clustering disabled' : 'no cluster index',
+        isClusteringEnabled: isClusteringEnabled(),
+        hasClusterIndex: !!clusterIndex
+      })
       // Fall back to individual markers
       setClusters([])
       return
@@ -352,21 +342,17 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     ]
     const currentZoom = map.getZoom()
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[CLUSTER] Getting clusters for viewport:', { 
-        bbox, 
-        currentZoom
-      })
-    }
+    console.log('[CLUSTER] Getting clusters for viewport:', { 
+      bbox, 
+      currentZoom
+    })
 
     const viewportClusters = getClustersForViewport(clusterIndex, bbox, currentZoom)
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[CLUSTER] Viewport clusters result:', { 
-        clustersCount: viewportClusters.length,
-        clusters: viewportClusters.slice(0, 3)
-      })
-    }
+    console.log('[CLUSTER] Viewport clusters result:', { 
+      clustersCount: viewportClusters.length,
+      clusters: viewportClusters.slice(0, 3)
+    })
     
     setClusters(viewportClusters)
 
@@ -422,9 +408,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     if (clusterIndex && _mapLoaded) {
       const map = mapRef.current?.getMap?.()
       if (map) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[CLUSTER] Cluster index changed, updating clusters for current viewport')
-        }
+        console.log('[CLUSTER] Cluster index changed, updating clusters for current viewport')
         updateClusters(map)
       }
     }

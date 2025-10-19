@@ -252,12 +252,17 @@ export default function SalesMap({
 
   // Handle fit bounds
   useEffect(() => {
+    console.log('[MAP] fitBounds useEffect triggered:', { fitBounds, arbiterAuthority })
     if (!fitBounds) return
     
     try {
       const map = mapRef.current?.getMap?.()
-      if (!map) return
+      if (!map) {
+        console.log('[MAP] fitBounds: map not ready')
+        return
+      }
       
+      console.log('[MAP] fitBounds: checking authority', { arbiterAuthority, reason: fitBounds.reason })
       // Allow fitBounds for ZIP searches even in MAP authority mode
       if (arbiterAuthority === 'MAP' && fitBounds.reason !== 'zip') {
         console.log('[BLOCK] fit bounds suppressed (map authoritative)')
@@ -270,12 +275,15 @@ export default function SalesMap({
         [fitBounds.east, fitBounds.north]
       ]
       
+      console.log('[MAP] fitBounds: calling map.fitBounds with bounds:', bounds)
       map.fitBounds(bounds, { padding: 50, maxZoom: 15 })
       
       if (onFitBoundsComplete) {
         onFitBoundsComplete()
       }
-    } catch {}
+    } catch (error) {
+      console.error('[MAP] fitBounds error:', error)
+    }
   }, [fitBounds, arbiterAuthority, onFitBoundsComplete])
 
   // Handle view changes

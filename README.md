@@ -11,6 +11,8 @@ A modern web application for discovering and managing yard sales, garage sales, 
 - **Deployment**: See [DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md) for production deployment
 - **Launch**: See [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) for launch validation
 - **Roadmap**: See [ROADMAP.md](ROADMAP.md) for development milestones
+- **What's New**: See [docs/CHANGELOG.md](docs/CHANGELOG.md) for latest updates and release notes
+- **Environment Setup**: See [docs/env-parity.md](docs/env-parity.md) for environment variable configuration
 
 ## 🏗️ Architecture Invariants
 
@@ -207,5 +209,26 @@ LootAura uses advanced PostGIS distance calculations for accurate location-based
 ### Performance Indicators
 - **Normal Mode**: PostGIS distance calculations (most accurate)
 - **Degraded Mode**: Only appears if PostGIS fails (rare)
-- **Real-time**: Results update as filters change#   F o r c e   r e d e p l o y   -   1 0 / 1 3 / 2 0 2 5   2 0 : 4 7 : 1 6  
+- **Real-time**: Results update as filters change
+
+## Operations
+
+### Rollback Procedures
+- **Emergency Rollback**: See [docs/runbook-rollback.md](docs/runbook-rollback.md) for detailed rollback procedures
+- **Owner's Runbook**: See [docs/owners-runbook.md](docs/owners-runbook.md) for incident response procedures
+- **Health Checks**: Monitor `/api/health` endpoint for system status
+- **Feature Flags**: Use environment variables to disable features during incidents
+
+### Monitoring & Alerts
+- **Error Tracking**: Sentry integration for real-time error monitoring
+- **Performance**: Web Vitals monitoring for Core Web Vitals metrics
+- **Database**: Supabase monitoring for query performance and RLS policies
+- **External Services**: Mapbox, Redis, and CDN status monitoring
+
+### Quality Assurance
+- **Accessibility**: See [docs/a11y-check.md](docs/a11y-check.md) for manual accessibility testing
+- **Testing**: Comprehensive test suite with unit, integration, and E2E tests
+- **Security**: RLS policies and privilege escalation testing
+- **Performance**: Bundle size monitoring and memory optimization#   F o r c e   r e d e p l o y   -   1 0 / 1 3 / 2 0 2 5   2 0 : 4 7 : 1 6 
+ 
  

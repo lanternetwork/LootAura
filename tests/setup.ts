@@ -193,28 +193,42 @@ const originalConsoleError = console.error
 const originalConsoleWarn = console.warn
 
 // Allowlist for known intentional console messages
+// Each entry includes: pattern, owning test file, and reason for allowance
 const ALLOWED_PATTERNS = [
-  /^\[MAP:DEBOUNCE\]/, // Debug logging from debounce manager
-  /^\[usage\]/, // Usage logging
-  /^\[CATEGORY CONTRACT\]/, // Category contract logging
-  /^\[CACHE\]/, // Cache logging
-  /^Share API error:/, // Expected API error logging
-  /^Failed to store shared state:/, // Expected error logging
-  /^Failed to retrieve shared state:/, // Expected error logging
-  /^Failed to get cached markers:/, // Expected cache error logging
-  /^Failed to store markers:/, // Expected cache error logging
-  /^Failed to prune cache:/, // Expected cache error logging
-  /^Failed to clear cache:/, // Expected cache error logging
-  /^Failed to get cache stats:/, // Expected cache error logging
-  /^Shortlink resolution error:/, // Expected shortlink test errors
-  /^Warning: Function components cannot be given refs/, // React forwardRef warnings in tests
-  /^Warning: .*: `ref` is not a prop/, // React ref prop warnings in tests
-  /^Warning: %s: `ref` is not a prop/, // React ref prop warnings with placeholder in tests
-  /^The above error occurred in the/, // React error boundary messages
-  /^Consider adding an error boundary/, // React error boundary suggestions
-  /^This error originated in/, // React error origin messages
-  /^The latest test that might've caused/, // React test error context
-  /^Error: Unexpected console.error:/, // Nested console guardrail errors
+  // Debug logging (tests/setup.ts, lib/map/viewportFetchManager.ts)
+  /^\[MAP:DEBOUNCE\]/, // Debug logging from debounce manager - tests/integration/map.debounce-cancel.test.ts
+  /^\[usage\]/, // Usage logging - tests/unit/usage-logs.test.ts
+  /^\[CATEGORY CONTRACT\]/, // Category contract logging - tests/unit/category-parse-url.test.ts
+  /^\[CACHE\]/, // Cache logging - tests/unit/cache.db.test.ts, tests/integration/map.prefetch-offline.test.tsx
+  
+  // Expected API error logging (app/api/share/route.ts)
+  /^Share API error:/, // Expected API error logging - tests/unit/share.api.test.ts
+  /^Failed to store shared state:/, // Expected error logging - tests/unit/share.api.test.ts
+  /^Failed to retrieve shared state:/, // Expected error logging - tests/unit/share.api.test.ts
+  
+  // Expected cache error logging (lib/cache/db.ts)
+  /^Failed to get cached markers:/, // Expected cache error logging - tests/unit/cache.db.test.ts
+  /^Failed to store markers:/, // Expected cache error logging - tests/unit/cache.db.test.ts
+  /^Failed to prune cache:/, // Expected cache error logging - tests/unit/cache.db.test.ts
+  /^Failed to clear cache:/, // Expected cache error logging - tests/unit/cache.db.test.ts
+  /^Failed to get cache stats:/, // Expected cache error logging - tests/unit/cache.db.test.ts
+  
+  // Expected shortlink test errors (app/s/[id]/page.tsx)
+  /^Shortlink resolution error:/, // Expected shortlink test errors - tests/integration/share.redirect.test.tsx
+  
+  // React forwardRef warnings (components/location/SalesMapClustered.tsx)
+  /^Warning: Function components cannot be given refs/, // React forwardRef warnings - tests/integration/map.clusters-flow.test.tsx
+  /^Warning: .*: `ref` is not a prop/, // React ref prop warnings - tests/integration/map.clusters-flow.test.tsx
+  /^Warning: %s: `ref` is not a prop/, // React ref prop warnings with placeholder - tests/integration/map.clusters-flow.test.tsx
+  
+  // React error boundary messages (React error boundaries)
+  /^The above error occurred in the/, // React error boundary messages - tests/components/AddSaleForm.a11y.test.tsx
+  /^Consider adding an error boundary/, // React error boundary suggestions - tests/components/AddSaleForm.a11y.test.tsx
+  /^This error originated in/, // React error origin messages - tests/components/AddSaleForm.a11y.test.tsx
+  /^The latest test that might've caused/, // React test error context - tests/components/AddSaleForm.a11y.test.tsx
+  
+  // Nested console guardrail errors (tests/setup.ts)
+  /^Error: Unexpected console.error:/, // Nested console guardrail errors - tests/setup.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {

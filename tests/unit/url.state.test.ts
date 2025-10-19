@@ -92,7 +92,7 @@ describe('URL State Management', () => {
         ...customState,
         filters: {
           ...customState.filters,
-          categories: [...(customState.filters.categories || [])].sort()
+          categories: customState.filters.categories ? Array.from(customState.filters.categories).sort() : []
         }
       }
       expect(deserialized).toEqual(expectedState)
@@ -134,7 +134,7 @@ describe('URL State Management', () => {
         ...complexState,
         filters: {
           ...complexState.filters,
-          categories: [...complexState.filters.categories].sort()
+          categories: complexState.filters.categories ? [...complexState.filters.categories].sort() : []
         }
       }
       expect(decompressed).toEqual(expectedState)

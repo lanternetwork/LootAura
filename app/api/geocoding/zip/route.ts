@@ -174,7 +174,11 @@ export async function GET(request: NextRequest) {
       '30301': { lat: 33.7490, lng: -84.3880, city: 'Atlanta', state: 'GA' },
       '85001': { lat: 33.4484, lng: -112.0740, city: 'Phoenix', state: 'AZ' },
       '75201': { lat: 32.7767, lng: -96.7970, city: 'Dallas', state: 'TX' },
-      '98101': { lat: 47.6062, lng: -122.3321, city: 'Seattle', state: 'WA' }
+      '98101': { lat: 47.6062, lng: -122.3321, city: 'Seattle', state: 'WA' },
+      // Additional ZIP codes for testing
+      '90078': { lat: 34.0522, lng: -118.2437, city: 'Los Angeles', state: 'CA' },
+      '10001': { lat: 40.7505, lng: -73.9934, city: 'New York', state: 'NY' },
+      '60601': { lat: 41.8781, lng: -87.6298, city: 'Chicago', state: 'IL' }
     }
     
     if (hardcodedZips[normalizedZip]) {

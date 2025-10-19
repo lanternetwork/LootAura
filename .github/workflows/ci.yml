@@ -115,6 +115,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
           NEXT_PUBLIC_DEBUG: 'true'
+          NOMINATIM_APP_EMAIL: 'test@example.com'
+          MAX_UPLOAD_SIZE_BYTES: '5242880'
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -156,6 +158,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
           NEXT_PUBLIC_DEBUG: 'true'
+          NOMINATIM_APP_EMAIL: 'test@example.com'
+          MAX_UPLOAD_SIZE_BYTES: '5242880'
 
   build:
     name: build

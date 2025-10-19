@@ -321,19 +321,6 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [viewportFetchManager])
 
-  // Update clusters when cluster index changes
-  useEffect(() => {
-    if (clusterIndex && _mapLoaded) {
-      const map = mapRef.current?.getMap?.()
-      if (map) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[CLUSTER] Cluster index changed, updating clusters for current viewport')
-        }
-        updateClusters(map)
-      }
-    }
-  }, [clusterIndex, _mapLoaded, updateClusters])
-
   // Update clusters when viewport changes
   const updateClusters = useCallback((map: any) => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -431,6 +418,19 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       })
     }
   }, [clusterIndex, onVisiblePinsChange, viewportFetchManager, currentFilters])
+
+  // Update clusters when cluster index changes
+  useEffect(() => {
+    if (clusterIndex && _mapLoaded) {
+      const map = mapRef.current?.getMap?.()
+      if (map) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[CLUSTER] Cluster index changed, updating clusters for current viewport')
+        }
+        updateClusters(map)
+      }
+    }
+  }, [clusterIndex, _mapLoaded, updateClusters])
 
   // Handle cluster click - zoom to cluster bounds
   const handleClusterClick = useCallback((cluster: ClusterResult) => {

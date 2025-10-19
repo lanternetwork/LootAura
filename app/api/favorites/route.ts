@@ -8,7 +8,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 /**
  * GET /api/favorites - Get user favorites
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
     

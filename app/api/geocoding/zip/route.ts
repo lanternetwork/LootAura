@@ -40,7 +40,7 @@ async function lookupNominatim(zip: string): Promise<any> {
   }
   lastNominatimCall = Date.now()
 
-  const email = process.env.NOMINATIM_EMAIL || 'admin@lootaura.com'
+  const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
   const url = `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=US&format=json&limit=1&email=${email}`
   
   const response = await fetch(url, {

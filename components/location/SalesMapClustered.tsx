@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useRef, useCallback, useMemo, forwardRef } from 'react'
 import Map, { Marker, Popup } from 'react-map-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { Sale } from '@/lib/types'
@@ -44,9 +44,14 @@ interface SalesMapClusteredProps {
   onMapReady?: () => void
   arbiterMode?: 'initial' | 'map' | 'zip' | 'distance'
   arbiterAuthority?: 'FILTERS' | 'MAP'
+  // DOM props that can be safely passed to wrapper
+  className?: string
+  style?: React.CSSProperties
+  id?: string
+  'data-testid'?: string
 }
 
-export default function SalesMapClustered({ 
+const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({ 
   sales, 
   markers = [],
   center = { lat: 38.2527, lng: -85.7585 }, 
@@ -64,8 +69,13 @@ export default function SalesMapClustered({
   onZoomEnd,
   onMapReady,
   arbiterMode: _arbiterMode,
-  arbiterAuthority: _arbiterAuthority
-}: SalesMapClusteredProps) {
+  arbiterAuthority: _arbiterAuthority,
+  // DOM props
+  className,
+  style,
+  id,
+  'data-testid': dataTestId
+}, ref) => {
   const mapRef = useRef<any>(null)
   const [_visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [_visiblePinCount, setVisiblePinCount] = useState(0)
@@ -85,10 +95,88 @@ export default function SalesMapClustered({
     radius: 25
   })
 
+  // Accessibility state
+  const [announcement, setAnnouncement] = useState('')
+  const [_focusedClusterId, setFocusedClusterId] = useState<string | null>(null)
+
   // Type guard to ensure filter state compatibility
   const isFilterState = (filters: any): filters is FilterState => {
     return filters && typeof filters.dateRange === 'string' && Array.isArray(filters.categories)
   }
+
+  // Keyboard navigation handlers
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    const map = mapRef.current?.getMap?.()
+    if (!map) return
+
+    const _panDistance = 0.01 // Adjust for pan sensitivity
+    const _zoomStep = 1
+
+    switch (event.key) {
+      case 'ArrowUp':
+        event.preventDefault()
+        map.panBy([0, 50])
+        break
+      case 'ArrowDown':
+        event.preventDefault()
+        map.panBy([0, -50])
+        break
+      case 'ArrowLeft':
+        event.preventDefault()
+        map.panBy([50, 0])
+        break
+      case 'ArrowRight':
+        event.preventDefault()
+        map.panBy([-50, 0])
+        break
+      case '+':
+      case '=':
+        event.preventDefault()
+        map.zoomIn({ duration: 300 })
+        break
+      case '-':
+        event.preventDefault()
+        map.zoomOut({ duration: 300 })
+        break
+      case 'Enter':
+        event.preventDefault()
+        // Focus nearest cluster
+        if (clusters.length > 0) {
+          const nearestCluster = clusters[0]
+          if (nearestCluster) {
+            setFocusedClusterId(nearestCluster.id)
+            // Announce cluster info
+            setAnnouncement(`Focused on cluster with ${nearestCluster.count || 0} sales`)
+          }
+        }
+        break
+      case 'Escape':
+        event.preventDefault()
+        setFocusedClusterId(null)
+        setAnnouncement('')
+        break
+    }
+  }, [clusters])
+
+  // Announce updates for screen readers
+  const _announceUpdate = useCallback((message: string) => {
+    setAnnouncement(message)
+    // Clear announcement after a delay
+    setTimeout(() => setAnnouncement(''), 1000)
+  }, [])
+
+  // Check for reduced motion preference
+  const _prefersReducedMotion = useMemo(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      try {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      } catch (error) {
+        // Fallback for test environments where matchMedia might not be available
+        return false
+      }
+    }
+    return false
+  }, [])
 
   // Load persisted state on mount
   useEffect(() => {
@@ -99,6 +187,12 @@ export default function SalesMapClustered({
       setCurrentFilters(persisted.filters)
     }
   }, [])
+
+  // Add keyboard event listener
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   // Monitor offline status
   useEffect(() => {
@@ -373,6 +467,7 @@ export default function SalesMapClustered({
           longitude={marker.lng}
           latitude={marker.lat}
           anchor="center"
+          data-testid="marker"
         >
           <button
             className="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -400,14 +495,19 @@ export default function SalesMapClustered({
   }, [clusters, markers, sales, onSaleClick, handleClusterClick, handlePointClick, handleClusterKeyDown])
 
   return (
-    <div className="w-full h-full">
+    <div 
+      className={`w-full h-full ${className || ''}`}
+      style={style}
+      id={id}
+      data-testid={dataTestId}
+    >
       <OfflineBanner 
         isVisible={showOfflineBanner}
         isOffline={isOffline}
         cachedCount={cachedMarkerCount}
       />
       <Map
-        ref={mapRef}
+        ref={ref || mapRef}
         mapboxAccessToken={getMapboxToken()}
         initialViewState={{
           longitude: center.lng,
@@ -421,6 +521,11 @@ export default function SalesMapClustered({
         onZoomEnd={handleZoomEnd}
         onMove={onViewChange}
         interactiveLayerIds={[]}
+        // Accessibility attributes
+        role="img"
+        data-testid="map-container"
+        aria-label="Interactive map showing yard sales"
+        tabIndex={0}
       >
         {renderClusters}
         
@@ -440,6 +545,30 @@ export default function SalesMapClustered({
           </Popup>
         )}
       </Map>
+      
+      {/* Screen reader announcements */}
+      {announcement && (
+        <div 
+          role="status" 
+          aria-live="polite" 
+          className="sr-only"
+        >
+          {announcement}
+        </div>
+      )}
+      
+      {/* Keyboard navigation instructions */}
+      <div className="absolute bottom-4 left-4 bg-white bg-opacity-90 p-2 rounded text-xs text-gray-600 max-w-xs">
+        <div className="font-semibold mb-1">Keyboard Navigation:</div>
+        <div>Arrow keys: Pan map</div>
+        <div>+/-: Zoom in/out</div>
+        <div>Enter: Focus nearest cluster</div>
+        <div>Escape: Clear focus</div>
+      </div>
     </div>
   )
-}
+})
+
+SalesMapClustered.displayName = 'SalesMapClustered'
+
+export default SalesMapClustered

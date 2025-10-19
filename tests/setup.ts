@@ -99,6 +99,29 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
+// Supabase server mock used by tests
+// @ts-ignore vitest mock hoisting in test env
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(() => ({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+      signInWithPassword: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    },
+    from: vi.fn(() => {
+      const chain: any = {}
+      chain.select = vi.fn(() => chain)
+      chain.insert = vi.fn((rows: any[]) => ({ data: rows, error: null }))
+      chain.update = vi.fn(() => chain)
+      chain.delete = vi.fn(() => chain)
+      chain.eq = vi.fn(() => chain)
+      chain.single = vi.fn(async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
+      return chain
+    }),
+  })),
+}))
+
 // Geocode mock ensuring non-null for valid addresses
 // @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/geocode', () => ({
@@ -138,4 +161,79 @@ g.fetch = vi.fn(async (input: any) => {
   }
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
 })
+
+// Mock window.matchMedia for JSDOM test environment
+const mockMatchMedia = vi.fn().mockImplementation((query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: vi.fn(), // deprecated
+  removeListener: vi.fn(), // deprecated
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
+}))
+
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: mockMatchMedia,
+})
+
+// Also mock it on globalThis for broader compatibility
+Object.defineProperty(globalThis, 'matchMedia', {
+  writable: true,
+  value: mockMatchMedia,
+})
+
+// Ensure it's available on the global object as well
+;(global as any).matchMedia = mockMatchMedia
+
+// Console noise guardrail - fail tests on unexpected console output
+const originalConsoleError = console.error
+const originalConsoleWarn = console.warn
+
+// Allowlist for known intentional console messages
+const ALLOWED_PATTERNS = [
+  /^\[MAP:DEBOUNCE\]/, // Debug logging from debounce manager
+  /^\[usage\]/, // Usage logging
+  /^\[CATEGORY CONTRACT\]/, // Category contract logging
+  /^\[CACHE\]/, // Cache logging
+  /^Share API error:/, // Expected API error logging
+  /^Failed to store shared state:/, // Expected error logging
+  /^Failed to retrieve shared state:/, // Expected error logging
+  /^Failed to get cached markers:/, // Expected cache error logging
+  /^Failed to store markers:/, // Expected cache error logging
+  /^Failed to prune cache:/, // Expected cache error logging
+  /^Failed to clear cache:/, // Expected cache error logging
+  /^Failed to get cache stats:/, // Expected cache error logging
+  /^Shortlink resolution error:/, // Expected shortlink test errors
+  /^Warning: Function components cannot be given refs/, // React forwardRef warnings in tests
+  /^Warning: .*: `ref` is not a prop/, // React ref prop warnings in tests
+  /^Warning: %s: `ref` is not a prop/, // React ref prop warnings with placeholder in tests
+  /^The above error occurred in the/, // React error boundary messages
+  /^Consider adding an error boundary/, // React error boundary suggestions
+  /^This error originated in/, // React error origin messages
+  /^The latest test that might've caused/, // React test error context
+  /^Error: Unexpected console.error:/, // Nested console guardrail errors
+]
+
+const isAllowedMessage = (message: string): boolean => {
+  return ALLOWED_PATTERNS.some(pattern => pattern.test(message))
+}
+
+console.error = (...args: any[]) => {
+  const message = args.join(' ')
+  if (!isAllowedMessage(message)) {
+    throw new Error(`Unexpected console.error: ${message}`)
+  }
+  originalConsoleError(...args)
+}
+
+console.warn = (...args: any[]) => {
+  const message = args.join(' ')
+  if (!isAllowedMessage(message)) {
+    throw new Error(`Unexpected console.warn: ${message}`)
+  }
+  originalConsoleWarn(...args)
+}
 

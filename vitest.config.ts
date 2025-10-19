@@ -19,6 +19,19 @@ export default defineConfig({
     // Ensure no network calls in tests
     testTimeout: 10000,
     hookTimeout: 10000,
+    // Memory optimization settings
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true,
+        isolate: false,
+      },
+    },
+    // Reduce memory usage
+    maxConcurrency: 1,
+    // Constrain worker count to prevent OOMs
+    maxWorkers: 4,
+    minWorkers: 1,
   },
   resolve: {
     alias: {

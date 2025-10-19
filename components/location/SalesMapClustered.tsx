@@ -457,6 +457,22 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [updateClusters, onMapReady])
 
+  // Handle view changes from map movement
+  const handleViewChange = useCallback((evt: any) => {
+    if (!onViewChange) return
+    
+    try {
+      const { center: newCenter, zoom: newZoom } = evt.viewState
+      onViewChange({
+        center: { lat: newCenter.lat, lng: newCenter.lng },
+        zoom: newZoom,
+        userInteraction: evt.isDragging || evt.isZooming
+      })
+    } catch (error) {
+      console.warn('[MAP] View change error:', error)
+    }
+  }, [onViewChange])
+
   // Render cluster markers
   const renderClusters = useMemo(() => {
     if (!isClusteringEnabled()) {
@@ -519,7 +535,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         onLoad={handleMapLoad}
         onMoveEnd={handleMoveEnd}
         onZoomEnd={handleZoomEnd}
-        onMove={onViewChange}
+        onMove={handleViewChange}
         interactiveLayerIds={[]}
         // Accessibility attributes
         role="img"

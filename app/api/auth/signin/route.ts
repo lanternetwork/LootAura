@@ -4,6 +4,8 @@ import { createServerSupabaseClient, setSessionCookies, isValidSession } from '@
 import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
 import { cookies } from 'next/headers'
 
+export const dynamic = 'force-dynamic'
+
 const signinSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),

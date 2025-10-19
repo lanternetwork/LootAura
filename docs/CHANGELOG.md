@@ -1,6 +1,51 @@
 # LootAura Changelog
 
-**Last updated: 2025-10-17 — Stable Debounce Manager + CI All Green**
+**Last updated: 2025-10-19 — Release Hardening & Documentation**
+
+## [Unreleased] Release Hardening & Documentation
+
+### Added
+- **URL State Management**: Robust compression/decompression with legacy URL handling
+- **Console Guardrail**: Fail-on-error/warn system for test hygiene
+- RLS Policy Verification: Comprehensive privilege escalation testing
+- **Memory Stability**: Optimized test worker settings and heap management
+- **Release Documentation**: Comprehensive runbooks, monitoring, and rollback procedures
+
+### Changed
+- **URL State Compression**: Enhanced with `lz-string` for better compression ratios
+- **Console Discipline**: Stricter allowlist with test-specific annotations
+- **Test Memory**: Single-fork mode with constrained workers to prevent OOMs
+- **Environment Parity**: Complete env var matrix across dev/stage/prod
+
+### Fixed
+- **URL State Round-trip**: Proper handling of compressed vs JSON formats
+- **React Prop Warnings**: Eliminated unknown props on DOM elements
+- **Memory Leaks**: Prevented heap exhaustion during test runs
+- **Console Noise**: Reduced unexpected console output in tests
+
+### Security
+- **RLS Hardening**: Deny-by-default policies with minimal public exposure
+- **Secret Protection**: Verified service role keys are server-only
+- **PII Scrubbing**: Confirmed no sensitive data in client logs
+
+### Performance
+- **Bundle Monitoring**: CI job for size regression detection
+- **Memory Optimization**: Reduced test worker count and heap usage
+- **Cache Efficiency**: Improved offline caching and prefetch strategies
+
+### Testing
+- **Console Guardrail**: Automated detection of unexpected console output
+- **RLS Testing**: Comprehensive privilege escalation test coverage
+- **Memory Stability**: OOM prevention in CI test runs
+- **E2E Synthetics**: Headless API-first smoke tests
+
+### Upgrade Notes
+- **URL State**: Legacy URLs are automatically handled; no breaking changes
+- **Console Output**: Tests now fail on unexpected console.error/warn
+- **Memory Usage**: Test runs use less memory but may take slightly longer
+- **Environment**: New monitoring requires additional CI job configuration
+
+---
 
 ## [2025-10-17] Stable Debounce Manager + CI All Green
 

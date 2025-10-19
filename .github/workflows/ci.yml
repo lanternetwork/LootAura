@@ -172,13 +172,31 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
+          # Retry logic for network issues
+          for attempt in 1 2 3; do
+            echo "Install attempt $attempt/3..."
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Dependencies installed successfully"
+              break
+            else
+              echo "❌ Install attempt $attempt failed"
+              if [ $attempt -lt 3 ]; then
+                echo "Retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "All install attempts failed"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Build application
         run: npm run build

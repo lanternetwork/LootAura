@@ -92,31 +92,35 @@ describe('Map Clusters Flow', () => {
   })
 
   it('should render map with clustering enabled', async () => {
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
+        data-testid="map-container-1"
       />
     )
 
     // Wait for map to load (handle loading skeleton)
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container-1')).toBeInTheDocument()
     }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should handle cluster clicks and zoom to bounds', async () => {
     const onViewChange = vi.fn()
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
         onViewChange={onViewChange}
+        data-testid="map-container-2"
       />
     )
 
@@ -124,20 +128,23 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Load Map'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container-2')).toBeInTheDocument()
     }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should handle individual point clicks', async () => {
     const onSaleClick = vi.fn()
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
         onSaleClick={onSaleClick}
+        data-testid="map-container-3"
       />
     )
 
@@ -145,20 +152,23 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Load Map'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container-3')).toBeInTheDocument()
     }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should update clusters on viewport change', async () => {
     const onVisiblePinsChange = vi.fn()
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
         onVisiblePinsChange={onVisiblePinsChange}
+        data-testid="map-container-4"
       />
     )
 
@@ -169,20 +179,23 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Move End'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container-4')).toBeInTheDocument()
     }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should handle zoom changes', async () => {
     const onZoomEnd = vi.fn()
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
         onZoomEnd={onZoomEnd}
+        data-testid="map-container-5"
       />
     )
 
@@ -193,48 +206,56 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Zoom End'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container-5')).toBeInTheDocument()
     }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should fall back to individual markers when clustering disabled', async () => {
     process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'false'
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
+        data-testid="map-container-6"
       />
     )
 
     // Wait for map to load (handle loading skeleton)
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container-6')).toBeInTheDocument()
     }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should handle empty markers array', async () => {
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={[]}
         markers={[]}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
+        data-testid="map-container-7"
       />
     )
 
     // Wait for map to load (handle loading skeleton)
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container-7')).toBeInTheDocument()
     }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should maintain arbiter authority with clustering', async () => {
     const onVisiblePinsChange = vi.fn()
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
@@ -242,6 +263,7 @@ describe('Map Clusters Flow', () => {
         zoom={10}
         arbiterAuthority="MAP"
         onVisiblePinsChange={onVisiblePinsChange}
+        data-testid="map-container-8"
       />
     )
 
@@ -252,7 +274,9 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Move End'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
+      expect(screen.getByTestId('map-container-8')).toBeInTheDocument()
     }, { timeout: 5000 })
+    
+    unmount()
   })
 })

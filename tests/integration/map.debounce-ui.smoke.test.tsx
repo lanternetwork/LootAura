@@ -63,14 +63,17 @@ vi.mock('@/lib/telemetry/map', () => ({
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  default: ({ children, onLoad, onMoveEnd, onZoomEnd, ...props }: any) => {
+  default: ({ children, onLoad, onMoveEnd, onZoomEnd, ref, ...props }: any) => {
+    // Only pass safe DOM props to avoid React warnings
+    const { mapboxAccessToken, initialViewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
+    
     // Simulate map load
     setTimeout(() => {
       if (onLoad) onLoad()
     }, 0)
     
     return (
-      <div data-testid="map-container" {...props}>
+      <div data-testid="map-container" ref={ref} {...safeProps}>
         {children}
         <button 
           data-testid="trigger-move"

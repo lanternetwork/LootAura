@@ -5,14 +5,18 @@ import { Sale } from '@/lib/types'
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  default: ({ children, onLoad, onMoveEnd, onZoomEnd, ...props }: any) => (
-    <div data-testid="map-container" {...props}>
-      {children}
-      <button onClick={onLoad}>Load Map</button>
-      <button onClick={onMoveEnd}>Move End</button>
-      <button onClick={onZoomEnd}>Zoom End</button>
-    </div>
-  ),
+  default: ({ children, onLoad, onMoveEnd, onZoomEnd, ref, ...props }: any) => {
+    // Only pass safe DOM props to avoid React warnings
+    const { mapboxAccessToken, initialViewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
+    return (
+      <div data-testid="map-container" ref={ref} {...safeProps}>
+        {children}
+        <button onClick={onLoad}>Load Map</button>
+        <button onClick={onMoveEnd}>Move End</button>
+        <button onClick={onZoomEnd}>Zoom End</button>
+      </div>
+    )
+  },
   Marker: ({ children, ...props }: any) => <div data-testid="marker" {...props}>{children}</div>,
   Popup: ({ children, ...props }: any) => <div data-testid="popup" {...props}>{children}</div>
 }))

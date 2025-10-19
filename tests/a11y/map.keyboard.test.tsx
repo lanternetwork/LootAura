@@ -24,11 +24,15 @@ vi.mock('mapbox-gl', () => ({
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  default: ({ children, ...props }: any) => (
-    <div data-testid="map" {...props}>
-      {children}
-    </div>
-  ),
+  default: ({ children, ref, ...props }: any) => {
+    // Only pass safe DOM props to avoid React warnings
+    const { mapboxAccessToken, initialViewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
+    return (
+      <div data-testid="map" ref={ref} {...safeProps}>
+        {children}
+      </div>
+    )
+  },
   Marker: ({ children }: any) => <div data-testid="marker">{children}</div>,
   Popup: ({ children }: any) => <div data-testid="popup">{children}</div>
 }))

@@ -321,9 +321,37 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [viewportFetchManager])
 
+  // Update clusters when cluster index changes
+  useEffect(() => {
+    if (clusterIndex && _mapLoaded) {
+      const map = mapRef.current?.getMap?.()
+      if (map) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[CLUSTER] Cluster index changed, updating clusters for current viewport')
+        }
+        updateClusters(map)
+      }
+    }
+  }, [clusterIndex, _mapLoaded, updateClusters])
+
   // Update clusters when viewport changes
   const updateClusters = useCallback((map: any) => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[CLUSTER] updateClusters called:', { 
+        isClusteringEnabled: isClusteringEnabled(), 
+        hasClusterIndex: !!clusterIndex,
+        clusterIndexPoints: clusterIndex?.points?.length || 0
+      })
+    }
+    
     if (!isClusteringEnabled() || !clusterIndex) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[CLUSTER] Skipping cluster update:', { 
+          reason: !isClusteringEnabled() ? 'clustering disabled' : 'no cluster index',
+          isClusteringEnabled: isClusteringEnabled(),
+          hasClusterIndex: !!clusterIndex
+        })
+      }
       // Fall back to individual markers
       setClusters([])
       return
@@ -338,7 +366,23 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     ]
     const currentZoom = map.getZoom()
 
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[CLUSTER] Getting clusters for viewport:', { 
+        bbox, 
+        currentZoom,
+        clusterIndexPoints: clusterIndex.points?.length || 0
+      })
+    }
+
     const viewportClusters = getClustersForViewport(clusterIndex, bbox, currentZoom)
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[CLUSTER] Viewport clusters result:', { 
+        clustersCount: viewportClusters.length,
+        clusters: viewportClusters.slice(0, 3)
+      })
+    }
+    
     setClusters(viewportClusters)
 
     // Update visible pins for arbiter authority

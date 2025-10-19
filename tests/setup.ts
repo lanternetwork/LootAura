@@ -188,3 +188,43 @@ Object.defineProperty(globalThis, 'matchMedia', {
 // Ensure it's available on the global object as well
 ;(global as any).matchMedia = mockMatchMedia
 
+// Console noise guardrail - fail tests on unexpected console output
+const originalConsoleError = console.error
+const originalConsoleWarn = console.warn
+
+// Allowlist for known intentional console messages
+const ALLOWED_PATTERNS = [
+  /^\[MAP:DEBOUNCE\]/, // Debug logging from debounce manager
+  /^\[usage\]/, // Usage logging
+  /^\[CATEGORY CONTRACT\]/, // Category contract logging
+  /^\[CACHE\]/, // Cache logging
+  /^Share API error:/, // Expected API error logging
+  /^Failed to store shared state:/, // Expected error logging
+  /^Failed to retrieve shared state:/, // Expected error logging
+  /^Failed to get cached markers:/, // Expected cache error logging
+  /^Failed to store markers:/, // Expected cache error logging
+  /^Failed to prune cache:/, // Expected cache error logging
+  /^Failed to clear cache:/, // Expected cache error logging
+  /^Failed to get cache stats:/, // Expected cache error logging
+]
+
+const isAllowedMessage = (message: string): boolean => {
+  return ALLOWED_PATTERNS.some(pattern => pattern.test(message))
+}
+
+console.error = (...args: any[]) => {
+  const message = args.join(' ')
+  if (!isAllowedMessage(message)) {
+    throw new Error(`Unexpected console.error: ${message}`)
+  }
+  originalConsoleError(...args)
+}
+
+console.warn = (...args: any[]) => {
+  const message = args.join(' ')
+  if (!isAllowedMessage(message)) {
+    throw new Error(`Unexpected console.warn: ${message}`)
+  }
+  originalConsoleWarn(...args)
+}
+

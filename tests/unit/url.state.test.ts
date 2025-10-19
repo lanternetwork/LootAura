@@ -168,6 +168,32 @@ describe('URL State Management', () => {
       // For highly repetitive data, compression should be beneficial
       expect(compressed.length).toBeLessThan(serialized.length)
     })
+
+    it('should handle unrecognized prefix gracefully', () => {
+      // Test unrecognized prefix (x:) should return safe fallback
+      expect(() => decompressState('x:invalid')).toThrow('Invalid state format')
+    })
+
+    it('should handle corrupted JSON under j: prefix', () => {
+      // Test corrupted JSON should return safe fallback
+      expect(() => decompressState('j:{invalid json}')).toThrow('Invalid state format')
+    })
+
+    it('should handle corrupted payload under c: prefix', () => {
+      // Test corrupted compression should return safe fallback
+      expect(() => decompressState('c:corrupted')).toThrow('Decompression failed')
+    })
+
+    it('should handle empty/blank state param', () => {
+      // Test empty state should return defaults
+      expect(() => decompressState('')).toThrow('Empty state blob')
+    })
+
+    it('should handle non-string param type gracefully', () => {
+      // Test non-string input should be handled safely
+      expect(() => decompressState(null as any)).toThrow()
+      expect(() => decompressState(undefined as any)).toThrow()
+    })
   })
 
   describe('hasStateChanged', () => {

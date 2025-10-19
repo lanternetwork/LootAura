@@ -326,8 +326,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[CLUSTER] updateClusters called:', { 
         isClusteringEnabled: isClusteringEnabled(), 
-        hasClusterIndex: !!clusterIndex,
-        clusterIndexPoints: clusterIndex?.points?.length || 0
+        hasClusterIndex: !!clusterIndex
       })
     }
     
@@ -356,8 +355,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[CLUSTER] Getting clusters for viewport:', { 
         bbox, 
-        currentZoom,
-        clusterIndexPoints: clusterIndex.points?.length || 0
+        currentZoom
       })
     }
 

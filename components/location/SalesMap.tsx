@@ -255,34 +255,60 @@ export default function SalesMap({
     console.log('[MAP] fitBounds useEffect triggered:', { fitBounds, arbiterAuthority })
     if (!fitBounds) return
     
-    try {
-      const map = mapRef.current?.getMap?.()
-      if (!map) {
-        console.log('[MAP] fitBounds: map not ready')
-        return
+    const executeFitBounds = () => {
+      try {
+        const map = mapRef.current?.getMap?.()
+        if (!map) {
+          console.log('[MAP] fitBounds: map not ready')
+          return false
+        }
+        
+        // Check if map is fully loaded
+        if (!map.loaded || !map.loaded()) {
+          console.log('[MAP] fitBounds: map not loaded yet')
+          return false
+        }
+        
+        console.log('[MAP] fitBounds: checking authority', { arbiterAuthority, reason: fitBounds.reason })
+        // Allow fitBounds for ZIP searches even in MAP authority mode
+        if (arbiterAuthority === 'MAP' && fitBounds.reason !== 'zip') {
+          console.log('[BLOCK] fit bounds suppressed (map authoritative)')
+          return true
+        }
+        
+        console.log('[MAP] fitBounds executing:', fitBounds.reason || 'unknown')
+        const bounds = [
+          [fitBounds.west, fitBounds.south],
+          [fitBounds.east, fitBounds.north]
+        ]
+        
+        console.log('[MAP] fitBounds: calling map.fitBounds with bounds:', bounds)
+        map.fitBounds(bounds, { padding: 50, maxZoom: 15 })
+        
+        if (onFitBoundsComplete) {
+          onFitBoundsComplete()
+        }
+        return true
+      } catch (error) {
+        console.error('[MAP] fitBounds error:', error)
+        return false
       }
-      
-      console.log('[MAP] fitBounds: checking authority', { arbiterAuthority, reason: fitBounds.reason })
-      // Allow fitBounds for ZIP searches even in MAP authority mode
-      if (arbiterAuthority === 'MAP' && fitBounds.reason !== 'zip') {
-        console.log('[BLOCK] fit bounds suppressed (map authoritative)')
-        return
+    }
+    
+    // Try to execute immediately
+    if (executeFitBounds()) {
+      return
+    }
+    
+    // If map not ready, wait for it to load
+    const map = mapRef.current?.getMap?.()
+    if (map) {
+      const handleLoad = () => {
+        console.log('[MAP] fitBounds: map loaded, retrying fitBounds')
+        executeFitBounds()
+        map.off('load', handleLoad)
       }
-      
-      console.log('[MAP] fitBounds executing:', fitBounds.reason || 'unknown')
-      const bounds = [
-        [fitBounds.west, fitBounds.south],
-        [fitBounds.east, fitBounds.north]
-      ]
-      
-      console.log('[MAP] fitBounds: calling map.fitBounds with bounds:', bounds)
-      map.fitBounds(bounds, { padding: 50, maxZoom: 15 })
-      
-      if (onFitBoundsComplete) {
-        onFitBoundsComplete()
-      }
-    } catch (error) {
-      console.error('[MAP] fitBounds error:', error)
+      map.once('load', handleLoad)
     }
   }, [fitBounds, arbiterAuthority, onFitBoundsComplete])
 

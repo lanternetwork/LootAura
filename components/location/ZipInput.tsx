@@ -27,18 +27,23 @@ export default function ZipInput({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('[ZIP_INPUT] Form submitted with ZIP:', zip)
     
     if (!zip || !/^\d{5}$/.test(zip)) {
+      console.log('[ZIP_INPUT] Invalid ZIP code:', zip)
       onError('Please enter a valid 5-digit ZIP code')
       return
     }
 
+    console.log('[ZIP_INPUT] Starting ZIP lookup for:', zip)
     setLoading(true)
     onError('') // Clear previous errors
 
     try {
+      console.log('[ZIP_INPUT] Making API call to:', `/api/geocoding/zip?zip=${zip}`)
       const response = await fetch(`/api/geocoding/zip?zip=${zip}`)
       const data = await response.json()
+      console.log('[ZIP_INPUT] API response:', data)
 
       if (data.ok) {
         // Write location cookie with ZIP, city, state info
@@ -71,6 +76,12 @@ export default function ZipInput({
         type="text"
         value={zip}
         onChange={(e) => setZip(e.target.value.replace(/\D/g, '').slice(0, 5))}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            handleSubmit(e as any)
+          }
+        }}
         placeholder={placeholder}
         maxLength={5}
         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

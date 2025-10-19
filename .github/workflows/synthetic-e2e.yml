@@ -100,7 +100,7 @@ jobs:
           fi
           
           # Check if we have real database credentials (not placeholders)
-          if [[ "$NEXT_PUBLIC_SUPABASE_URL" == *"placeholder"* ]]; then
+          if [[ "$NEXT_PUBLIC_SUPABASE_URL" == *"placeholder"* ]] || [[ "$SUPABASE_SERVICE_ROLE" == *"placeholder"* ]]; then
             echo "⚠️ Using placeholder database credentials - checking API endpoint accessibility"
             # Check if the API returns a proper error (not a 500)
             SHARE_ERROR=$(echo $SHARE_RESPONSE | jq -r '.error' 2>/dev/null)
@@ -154,6 +154,10 @@ jobs:
             exit 1
           fi
           echo "✅ RLS working correctly (response code: $FAVORITES_RESPONSE)"
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key' }}
+          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE || 'placeholder-service-role' }}
           
       - name: Cleanup
         if: always()

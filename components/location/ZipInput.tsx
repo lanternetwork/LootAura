@@ -79,7 +79,13 @@ export default function ZipInput({
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault()
-            handleSubmit(e as any)
+            // Only submit if ZIP is valid (5 digits)
+            if (zip && zip.length === 5 && /^\d{5}$/.test(zip)) {
+              handleSubmit(e as any)
+            } else {
+              // Show error for invalid ZIP
+              onError('Please enter a valid 5-digit ZIP code')
+            }
           }
         }}
         placeholder={placeholder}

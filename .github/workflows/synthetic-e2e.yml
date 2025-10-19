@@ -101,8 +101,16 @@ jobs:
           
           # Check if we have real database credentials (not placeholders)
           if [[ "$NEXT_PUBLIC_SUPABASE_URL" == *"placeholder"* ]]; then
-            echo "⚠️ Using placeholder database credentials - skipping share tests"
-            echo "✅ Share API endpoint is accessible (but database not available)"
+            echo "⚠️ Using placeholder database credentials - checking API endpoint accessibility"
+            # Check if the API returns a proper error (not a 500)
+            SHARE_ERROR=$(echo $SHARE_RESPONSE | jq -r '.error' 2>/dev/null)
+            if [ "$SHARE_ERROR" != "null" ] && [ -n "$SHARE_ERROR" ]; then
+              echo "✅ Share API endpoint is accessible (returns expected error: $SHARE_ERROR)"
+            else
+              echo "❌ Share API endpoint not responding correctly"
+              echo "Response: $SHARE_RESPONSE"
+              exit 1
+            fi
           else
             SHARE_ID=$(echo $SHARE_RESPONSE | jq -r '.shortId' 2>/dev/null)
             if [ "$SHARE_ID" = "null" ] || [ -z "$SHARE_ID" ]; then

@@ -528,14 +528,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         onMove={onViewChange}
         interactiveLayerIds={[]}
         // Performance optimizations for faster loading
-        optimizeForTerrain={false}
         antialias={false}
         preserveDrawingBuffer={false}
         // Reduce initial load time
         attributionControl={false}
         logoPosition="bottom-right"
-        // Preload resources
-        preloadResources={true}
         // Accessibility attributes
         role="img"
         data-testid="map-container"

@@ -399,14 +399,11 @@ export default function SalesMap({
         onMove={handleViewChange}
         interactiveLayerIds={[]}
         // Performance optimizations
-        optimizeForTerrain={false}
         antialias={false}
         preserveDrawingBuffer={false}
         // Reduce initial load time
         attributionControl={false}
         logoPosition="bottom-right"
-        // Preload resources
-        preloadResources={true}
       >
         {markers.map(marker => (
           <Marker

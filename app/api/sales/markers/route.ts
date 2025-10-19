@@ -58,6 +58,27 @@ export async function GET(request: NextRequest) {
       .not('lat', 'is', null)
       .not('lng', 'is', null)
 
+    // Debug: Check if table exists and has data
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MARKERS API] Testing table access...')
+      const { data: testData, error: testError } = await sb
+        .from('sales_v2')
+        .select('id, title, lat, lng')
+        .limit(1)
+      
+      if (testError) {
+        console.error('[MARKERS API] Table access error:', testError)
+        return NextResponse.json({
+          error: 'Table access failed',
+          code: (testError as any)?.code,
+          details: (testError as any)?.message,
+          hint: 'Check if sales_v2 table exists and is accessible'
+        }, { status: 500 })
+      }
+      
+      console.log('[MARKERS API] Table test successful, sample data:', testData)
+    }
+
     // Apply category filtering by joining with items table
     if (Array.isArray(categories) && categories.length > 0) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

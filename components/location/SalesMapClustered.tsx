@@ -24,6 +24,7 @@ import { isOfflineCacheEnabled } from '@/lib/flags'
 import { logPrefetchStart, logPrefetchDone, logViewportSave, logViewportLoad } from '@/lib/telemetry/map'
 import ClusterMarker from './ClusterMarker'
 import OfflineBanner from '../OfflineBanner'
+import MapLoadingSkeleton from './MapLoadingSkeleton'
 
 interface SalesMapClusteredProps {
   sales: Sale[]
@@ -81,7 +82,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   const [_visiblePinCount, setVisiblePinCount] = useState(0)
   const [clusters, setClusters] = useState<ClusterResult[]>([])
   const [clusterIndex, setClusterIndex] = useState<ClusterIndex | null>(null)
-  const [_mapLoaded, setMapLoaded] = useState(false)
+  const [mapLoaded, setMapLoaded] = useState(false)
   
   // Offline state
   const [isOffline, setIsOffline] = useState(false)
@@ -494,6 +495,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     ))
   }, [clusters, markers, sales, onSaleClick, handleClusterClick, handlePointClick, handleClusterKeyDown])
 
+  // Show loading skeleton while map loads
+  if (!mapLoaded) {
+    return <MapLoadingSkeleton className={className} />
+  }
+
   return (
     <div 
       className={`w-full h-full ${className || ''}`}
@@ -521,6 +527,15 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         onZoomEnd={handleZoomEnd}
         onMove={onViewChange}
         interactiveLayerIds={[]}
+        // Performance optimizations for faster loading
+        optimizeForTerrain={false}
+        antialias={false}
+        preserveDrawingBuffer={false}
+        // Reduce initial load time
+        attributionControl={false}
+        logoPosition="bottom-right"
+        // Preload resources
+        preloadResources={true}
         // Accessibility attributes
         role="img"
         data-testid="map-container"

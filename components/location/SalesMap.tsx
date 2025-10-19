@@ -10,6 +10,7 @@ import { getMapboxToken } from '@/lib/maps/token'
 import { incMapLoad } from '@/lib/usageLogs'
 import { isClusteringEnabled } from '@/lib/clustering'
 import SalesMapClustered from './SalesMapClustered'
+import MapLoadingSkeleton from './MapLoadingSkeleton'
 
 interface SalesMapProps {
   sales: Sale[]
@@ -59,6 +60,7 @@ export default function SalesMap({
 
   // Call onMapReady when map loads (not onLoad bounds emission)
   const handleMapLoad = useCallback(() => {
+    setMapLoaded(true)
     if (onMapReady) {
       onMapReady()
     }
@@ -72,7 +74,7 @@ export default function SalesMap({
     latitude: center.lat,
     zoom: zoom
   })
-  const [_mapLoaded, _setMapLoaded] = useState(false)
+  const [mapLoaded, setMapLoaded] = useState(false)
   const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [visiblePinCount, setVisiblePinCount] = useState(0)
   const [_moved, _setMoved] = useState(false)
@@ -373,6 +375,11 @@ export default function SalesMap({
     )
   }
 
+  // Show loading skeleton while map loads
+  if (!mapLoaded) {
+    return <MapLoadingSkeleton />
+  }
+
   // Non-clustered map implementation
   return (
     <div className="w-full h-full">
@@ -391,6 +398,15 @@ export default function SalesMap({
         onZoomEnd={handleZoomEnd}
         onMove={handleViewChange}
         interactiveLayerIds={[]}
+        // Performance optimizations
+        optimizeForTerrain={false}
+        antialias={false}
+        preserveDrawingBuffer={false}
+        // Reduce initial load time
+        attributionControl={false}
+        logoPosition="bottom-right"
+        // Preload resources
+        preloadResources={true}
       >
         {markers.map(marker => (
           <Marker

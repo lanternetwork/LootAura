@@ -1211,12 +1211,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }, zoomOverride?: number) => {
     // Check if we need to fetch based on key change (use overrides when provided)
     const key = buildMarkersKey(centerOverride ? { center: centerOverride, zoom: zoomOverride } : undefined)
-    if (key === lastMarkersKeyRef.current) {
+    
+    // During user interactions, be more aggressive about fetching even if key is similar
+    const isUserInteraction = centerOverride !== undefined
+    if (!isUserInteraction && key === lastMarkersKeyRef.current) {
       console.log('[SKIP] same markers key')
       return
     }
     
-    console.log('[KEY] markers', key)
+    console.log('[KEY] markers', key, isUserInteraction ? '(user interaction)' : '')
     lastMarkersKeyRef.current = key
     
     // Delay the updating overlay slightly to avoid opacity flashes on quick interactions
@@ -1234,8 +1237,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         mapUpdatingMaxRef.current = window.setTimeout(() => {
           setMapUpdating(false)
           mapUpdatingMaxRef.current = null
-        }, 600)
-      }, 300)
+        }, 400)
+      }, 100)
     } else {
       setMapUpdating(true)
     }
@@ -1577,7 +1580,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Debounced markers fetch while user is moving the map (runs even in MAP authority)
   const moveMarkersDebounceRef = useRef<number | null>(null)
-  const debouncedFetchMarkersDuringMove = useCallback((center: { lat: number; lng: number }, delay = 150) => {
+  const debouncedFetchMarkersDuringMove = useCallback((center: { lat: number; lng: number }, delay = 50) => {
     if (moveMarkersDebounceRef.current) {
       clearTimeout(moveMarkersDebounceRef.current)
     }

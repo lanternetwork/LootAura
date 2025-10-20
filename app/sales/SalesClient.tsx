@@ -781,6 +781,19 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         authority: arbiter.authority,
         mode: arbiter.mode
       })
+      
+      // FALLBACK: For FILTERS authority without viewport bounds, use all sales directly
+      if (arbiter.authority === 'FILTERS' && sales.length > 0) {
+        console.log('[SALES LIST] FILTERS fallback - using all sales directly')
+        const rendered = sales.slice(0, 24)
+        console.log('[SALES LIST] FILTERS fallback setting:', {
+          visibleCount: sales.length,
+          renderedCount: rendered.length,
+          sampleSales: sales.slice(0, 3).map(s => ({ id: s.id, title: s.title }))
+        })
+        setVisibleSales(sales)
+        setRenderedSales(rendered)
+      }
     }
   }, [arbiter.authority, visiblePinIdsState, mapMarkers, sales, viewportBounds, cropSalesToViewport])
 

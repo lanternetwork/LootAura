@@ -1787,6 +1787,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     // Use stable keys instead of buildMarkersKey to prevent identity churn
     const stableKey = `${bboxHash}|${dateKey}|${arbiter.mode}`
     
+    // Debug category changes
+    if (DEBUG && filters.categories.length > 0) {
+      console.log(`[EFFECT] Categories changed:`, filters.categories)
+    }
+    
     // Early return if programmatic move guard is active and not in map mode
     if (arbiter.programmaticMoveGuard && arbiter.mode !== 'map') {
       console.log('[SKIP] programmatic move guard active, not in map mode')
@@ -1802,7 +1807,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[SALES] Stable inputs changed → key:', stableKey)
     lastMarkersKeyRef.current = stableKey
     triggerFetches()
-  }, [bboxHash, dateKey, arbiter.mode, arbiter.programmaticMoveGuard])
+  }, [bboxHash, dateKey, arbiter.mode, arbiter.programmaticMoveGuard, filters.categories, filters.city, filters.dateRange])
 
   // Keep visibleSales in sync with current sales and viewport
   useEffect(() => {

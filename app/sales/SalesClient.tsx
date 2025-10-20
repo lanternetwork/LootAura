@@ -1252,6 +1252,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const seq = ++markerSeqRef.current
     const startedEpoch = filtersEpochRef.current
     
+    // For cluster clicks, don't abort too aggressively to ensure sales data loads
+    const isClusterClick = centerOverride !== undefined
+    
     console.log('[NET] start markers', { seq, epoch: startedEpoch })
     
     const mode = arbiter?.mode || 'initial'
@@ -1388,6 +1391,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       // Check if this request was aborted
       if (markerSeqRef.current !== seq) {
         console.log('[NET] aborted markers', { seq })
+        // Even if markers were aborted, try to set sales data if we have it
+        if (salesData?.data && Array.isArray(salesData.data)) {
+          console.log('[MAP] Setting mapSales after abort:', salesData.data.length, 'sales')
+          _setMapSales(salesData.data)
+        }
         return
       }
       if (filtersEpochRef.current !== startedEpoch) {

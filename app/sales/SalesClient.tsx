@@ -282,6 +282,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [mapUpdating, setMapUpdating] = useState(false)
   // Delay showing the "updating map" overlay to avoid flashes during quick pans/zooms
   const mapUpdatingTimerRef = useRef<number | null>(null)
+  // Safety timeout to ensure overlay never lingers too long
+  const mapUpdatingMaxRef = useRef<number | null>(null)
   const [mapSales, _setMapSales] = useState<Sale[]>([])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
@@ -1224,7 +1226,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       }
       mapUpdatingTimerRef.current = window.setTimeout(() => {
         setMapUpdating(true)
-      }, 120)
+        // Start a max-duration timer to auto-clear overlay if fetch bounces
+        if (mapUpdatingMaxRef.current) {
+          window.clearTimeout(mapUpdatingMaxRef.current)
+        }
+        mapUpdatingMaxRef.current = window.setTimeout(() => {
+          setMapUpdating(false)
+          mapUpdatingMaxRef.current = null
+        }, 900)
+      }, 200)
     } else {
       setMapUpdating(true)
     }
@@ -1402,6 +1412,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           window.clearTimeout(mapUpdatingTimerRef.current)
           mapUpdatingTimerRef.current = null
         }
+        if (mapUpdatingMaxRef.current) {
+          window.clearTimeout(mapUpdatingMaxRef.current)
+          mapUpdatingMaxRef.current = null
+        }
         setMapUpdating(false) // Reset map updating state
         
         // Update markers hash for change detection
@@ -1421,6 +1435,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         if (mapUpdatingTimerRef.current) {
           window.clearTimeout(mapUpdatingTimerRef.current)
           mapUpdatingTimerRef.current = null
+        }
+        if (mapUpdatingMaxRef.current) {
+          window.clearTimeout(mapUpdatingMaxRef.current)
+          mapUpdatingMaxRef.current = null
         }
         setMapUpdating(false) // Reset map updating state
         
@@ -1448,6 +1466,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         window.clearTimeout(mapUpdatingTimerRef.current)
         mapUpdatingTimerRef.current = null
       }
+      if (mapUpdatingMaxRef.current) {
+        window.clearTimeout(mapUpdatingMaxRef.current)
+        mapUpdatingMaxRef.current = null
+      }
       setMapUpdating(false) // Reset map updating state
       
       // Update markers hash for change detection
@@ -1469,6 +1491,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (mapUpdatingTimerRef.current) {
         window.clearTimeout(mapUpdatingTimerRef.current)
         mapUpdatingTimerRef.current = null
+      }
+      if (mapUpdatingMaxRef.current) {
+        window.clearTimeout(mapUpdatingMaxRef.current)
+        mapUpdatingMaxRef.current = null
       }
       setMapUpdating(false)
     }

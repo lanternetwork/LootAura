@@ -126,10 +126,15 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
       params.delete('city')
     }
     
-    // Update URL without scrolling or adding history entries
+    // Update URL without navigation or scroll using History API
     const newUrl = `${window.location.pathname}?${params.toString()}`
-    console.log('[FILTERS] replace URL (no scroll):', newUrl)
-    router.replace(newUrl, { scroll: false })
+    console.log('[FILTERS] history.replaceState (no scroll):', newUrl)
+    try {
+      window.history.replaceState(null, '', newUrl)
+    } catch {
+      // Fallback to router.replace as a safety net
+      router.replace(newUrl, { scroll: false })
+    }
   }, [filters, searchParams, router])
 
   const clearFilters = useCallback(() => {

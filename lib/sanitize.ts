@@ -203,21 +203,43 @@ export function sanitizeSearchQuery(input: string): string {
   // Remove potentially dangerous characters
   sanitized = sanitized.replace(/[<>'"&]/g, '')
 
-  // Remove XSS patterns with safer, more specific patterns
-  // Remove script tags completely
-  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+  // Remove XSS patterns using string methods instead of complex regex
+  // Remove script tags by finding and removing them iteratively
+  let scriptStart = sanitized.indexOf('<script')
+  while (scriptStart !== -1) {
+    const scriptEnd = sanitized.indexOf('</script>', scriptStart)
+    if (scriptEnd !== -1) {
+      sanitized = sanitized.substring(0, scriptStart) + sanitized.substring(scriptEnd + 9)
+    } else {
+      sanitized = sanitized.substring(0, scriptStart)
+    }
+    scriptStart = sanitized.indexOf('<script')
+  }
   
-  // Remove javascript: protocols
-  sanitized = sanitized.replace(/javascript\s*:/gi, '')
+  // Remove javascript: protocols using simple string replacement
+  sanitized = sanitized.replace(/javascript:/gi, '')
   
-  // Remove event handlers (onclick, onload, etc.)
-  sanitized = sanitized.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
+  // Remove common event handlers using simple patterns
+  const eventHandlers = ['onclick', 'onload', 'onerror', 'onmouseover', 'onfocus', 'onblur']
+  for (const handler of eventHandlers) {
+    const regex = new RegExp(handler + '\\s*=\\s*["\'][^"\']*["\']', 'gi')
+    sanitized = sanitized.replace(regex, '')
+  }
   
-  // Remove alert() calls
-  sanitized = sanitized.replace(/\balert\s*\([^)]*\)/gi, '')
+  // Remove alert() calls using simple string replacement
+  sanitized = sanitized.replace(/alert\s*\(/gi, '')
   
-  // Remove HTML tags with a more specific approach
-  sanitized = sanitized.replace(/<\/?[a-zA-Z][^>]*>/g, '')
+  // Remove HTML tags using simple angle bracket removal
+  let tagStart = sanitized.indexOf('<')
+  while (tagStart !== -1) {
+    const tagEnd = sanitized.indexOf('>', tagStart)
+    if (tagEnd !== -1) {
+      sanitized = sanitized.substring(0, tagStart) + sanitized.substring(tagEnd + 1)
+    } else {
+      sanitized = sanitized.substring(0, tagStart)
+    }
+    tagStart = sanitized.indexOf('<')
+  }
 
   return sanitized.trim()
 }

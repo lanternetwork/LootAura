@@ -1253,7 +1253,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const startedEpoch = filtersEpochRef.current
     
     // For cluster clicks, don't abort too aggressively to ensure sales data loads
-    const isClusterClick = centerOverride !== undefined
+    const _isClusterClick = centerOverride !== undefined
     
     console.log('[NET] start markers', { seq, epoch: startedEpoch })
     

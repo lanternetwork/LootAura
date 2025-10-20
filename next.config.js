@@ -80,7 +80,21 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';",
+            value: "default-src 'self'; " +
+                   // Allow runtime scripts from self; keep eval for Next dev/runtime
+                   "script-src 'self' 'unsafe-eval' 'unsafe-inline'; " +
+                   // Allow Mapbox CSS
+                   "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
+                   // Some browsers use style-src-elem separately
+                   "style-src-elem 'self' 'unsafe-inline' https://api.mapbox.com; " +
+                   // Permit WebWorkers (Mapbox GL uses blob workers)
+                   "worker-src 'self' blob:; child-src blob:; " +
+                   // Images and fonts
+                   "img-src 'self' data: https:; font-src 'self' data:; " +
+                   // Network connections
+                   "connect-src 'self' https:; " +
+                   // Misc
+                   "frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';",
           },
         ],
       },

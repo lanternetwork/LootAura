@@ -1214,15 +1214,24 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     
     // During user interactions, be more aggressive about fetching even if key is similar
     const isUserInteraction = centerOverride !== undefined
+    
+    // For real-time map updates, only skip if it's NOT a user interaction and key is identical
     if (!isUserInteraction && key === lastMarkersKeyRef.current) {
-      console.log('[SKIP] same markers key')
+      console.log('[SKIP] same markers key (non-interaction)')
       return
+    }
+    
+    // During user interactions, allow more frequent updates even with similar keys
+    if (isUserInteraction) {
+      console.log('[MAP] Real-time update during user interaction', { key, lastKey: lastMarkersKeyRef.current })
     }
     
     console.log('[KEY] markers', key, isUserInteraction ? '(user interaction)' : '')
     lastMarkersKeyRef.current = key
     
-    // Delay the updating overlay slightly to avoid opacity flashes on quick interactions
+    // For real-time updates during user interactions, reduce delay
+    const updateDelay = isUserInteraction ? 50 : 100
+    
     if (typeof window !== 'undefined') {
       if (mapUpdatingTimerRef.current) {
         window.clearTimeout(mapUpdatingTimerRef.current)
@@ -1237,8 +1246,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         mapUpdatingMaxRef.current = window.setTimeout(() => {
           setMapUpdating(false)
           mapUpdatingMaxRef.current = null
-        }, 400)
-      }, 100)
+        }, isUserInteraction ? 300 : 400) // Shorter timeout for user interactions
+      }, updateDelay)
     } else {
       setMapUpdating(true)
     }
@@ -1580,9 +1589,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Immediate markers fetch while user is moving the map (no debouncing for real-time updates)
   const fetchMarkersDuringMove = useCallback((center: { lat: number; lng: number }) => {
-    // Fetch immediately for real-time updates
-    fetchMapSales(undefined, center)
-  }, [fetchMapSales])
+    // Fetch immediately for real-time updates with current zoom level
+    const currentZoom = mapView.zoom || 10
+    console.log('[MAP] Real-time markers fetch during move', { center, zoom: currentZoom })
+    fetchMapSales(undefined, center, currentZoom)
+  }, [fetchMapSales, mapView.zoom])
 
   // Reset pagination when mode/bbox changes
   const resetPagination = useCallback(() => {

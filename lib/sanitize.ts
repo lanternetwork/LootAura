@@ -203,20 +203,21 @@ export function sanitizeSearchQuery(input: string): string {
   // Remove potentially dangerous characters
   sanitized = sanitized.replace(/[<>'"&]/g, '')
 
-  // Remove XSS patterns - use safer approach
-  const xssPatterns = [
-    /<script[^>]*>.*?<\/script>/gi,
-    /javascript:/gi,
-    /on\w+\s*=/gi,
-    /alert\s*\([^)]*\)/gi
-  ]
+  // Remove XSS patterns with safer, more specific patterns
+  // Remove script tags completely
+  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
   
-  for (const pattern of xssPatterns) {
-    sanitized = sanitized.replace(pattern, '')
-  }
+  // Remove javascript: protocols
+  sanitized = sanitized.replace(/javascript\s*:/gi, '')
   
-  // Remove HTML tags with a safer approach
-  sanitized = sanitized.replace(/<[^>]*>/g, '')
+  // Remove event handlers (onclick, onload, etc.)
+  sanitized = sanitized.replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
+  
+  // Remove alert() calls
+  sanitized = sanitized.replace(/\balert\s*\([^)]*\)/gi, '')
+  
+  // Remove HTML tags with a more specific approach
+  sanitized = sanitized.replace(/<\/?[a-zA-Z][^>]*>/g, '')
 
   return sanitized.trim()
 }

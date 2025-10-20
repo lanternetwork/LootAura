@@ -235,13 +235,26 @@ export async function GET(request: NextRequest) {
                 city,
                 state
               }, { onConflict: 'zip' })
-            console.log(`[ZIP] input="${escapeForLogging(rawZip)}" normalized=${escapeForLogging(normalizedZip)} source=nominatim writeback=success`)
+            console.log('[ZIP] writeback=success', {
+              input: escapeForLogging(rawZip),
+              normalized: escapeForLogging(normalizedZip),
+              source: 'nominatim'
+            })
           } catch (writebackError) {
-            console.error(`[ZIP] input="${escapeForLogging(rawZip)}" normalized=${escapeForLogging(normalizedZip)} source=nominatim writeback=failed`, writebackError)
+            console.error('[ZIP] writeback=failed', {
+              input: escapeForLogging(rawZip),
+              normalized: escapeForLogging(normalizedZip),
+              source: 'nominatim',
+              error: writebackError
+            })
           }
         }
         
-        console.log(`[ZIP] input="${escapeForLogging(rawZip)}" normalized=${escapeForLogging(normalizedZip)} source=nominatim status=ok`)
+        console.log('[ZIP] status=ok', {
+          input: escapeForLogging(rawZip),
+          normalized: escapeForLogging(normalizedZip),
+          source: 'nominatim'
+        })
         return NextResponse.json({
           ok: true,
           zip: normalizedZip,
@@ -264,7 +277,12 @@ export async function GET(request: NextRequest) {
         }, { status: 404 })
       }
     } catch (nominatimError: any) {
-      console.error(`[ZIP] input="${escapeForLogging(rawZip)}" normalized=${escapeForLogging(normalizedZip)} source=nominatim status=error`, nominatimError.message)
+      console.error('[ZIP] status=error', {
+        input: escapeForLogging(rawZip),
+        normalized: escapeForLogging(normalizedZip),
+        source: 'nominatim',
+        error: nominatimError.message
+      })
       return NextResponse.json({ 
         ok: false, 
         error: 'Geocoding service unavailable' 

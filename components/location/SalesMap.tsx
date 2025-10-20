@@ -90,7 +90,7 @@ export default function SalesMap({
       center,
       zoom 
     })
-  }, [])
+  }, [sales.length, markers.length, center, zoom])
 
   const recomputeVisiblePins = useCallback((reason: string) => {
     try {

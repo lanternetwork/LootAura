@@ -1375,6 +1375,16 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       })
       const data = await res.json()
       
+      // Also fetch sales data for the sales list
+      console.log('[MAP] Fetching sales data for map view...')
+      const salesRes = await diagnosticFetch(`/api/sales?${params.toString()}`, { signal: controller.signal }, {
+        authority: arbiter.authority,
+        viewportSeq: viewportSeqRef.current,
+        requestSeq: seq,
+        params: Object.fromEntries(params.entries())
+      })
+      const salesData = await salesRes.json()
+      
       // Check if this request was aborted
       if (markerSeqRef.current !== seq) {
         console.log('[NET] aborted markers', { seq })
@@ -1412,6 +1422,16 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         const sample = uniqueMarkers.slice(0, 5).map((m: any) => m.id === m.saleId)
         console.log('[ASSERT] id parity ok? examples:', sample)
         setMapMarkers(uniqueMarkers)
+        
+        // Also set the sales data for the sales list
+        if (salesData?.data && Array.isArray(salesData.data)) {
+          console.log('[MAP] Setting mapSales to:', salesData.data.length, 'sales')
+          _setMapSales(salesData.data)
+        } else {
+          console.log('[MAP] No sales data received, setting mapSales to empty array')
+          _setMapSales([])
+        }
+        
         setMapError(null) // Clear any previous errors
         // Clear any pending timer and hide overlay immediately on success
         if (mapUpdatingTimerRef.current) {

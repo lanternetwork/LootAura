@@ -4,6 +4,7 @@ import { Providers } from './providers'
 import WebVitals from '@/components/WebVitals'
 import { Header } from './Header'
 import { PWAComponents } from './PWAComponents'
+import DebugToggle from '@/components/debug/DebugToggle'
 import { createHomepageStructuredData, createOrganizationStructuredData } from '@/lib/metadata'
 // Disable Mapbox telemetry at app startup
 import '@/lib/maps/telemetry'
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <WebVitals />
           {children}
           <PWAComponents />
+          <DebugToggle />
         </Providers>
       </body>
     </html>

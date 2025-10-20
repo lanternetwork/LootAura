@@ -260,7 +260,7 @@ export default function SalesMap({
       mapDebug.logMapLoad('SalesMap', 'error', error)
       mapDebug.error('Error in map load effect', error)
     }
-  }, [handleMapLoad, mapLoaded])
+  }, [handleMapLoad])
 
   // Handle center override
   useEffect(() => {
@@ -434,7 +434,21 @@ export default function SalesMap({
         onMove={handleViewChange}
         interactiveLayerIds={[]}
         // Performance optimizations
+        optimizeForTerrain={false}
+        antialias={false}
+        preserveDrawingBuffer={false}
+        attributionControl={false}
+        logoPosition="bottom-right"
+        preloadResources={true}
+        // Disable Mapbox events to prevent API failures
         // Reduce initial load time
+        // Disable telemetry completely
+        transformRequest={(url, resourceType) => {
+          if (resourceType === 'Source' && url.includes('events.mapbox.com')) {
+            return null; // Block telemetry requests
+          }
+          return { url };
+        }}
       >
         {markers.map(marker => (
           <Marker

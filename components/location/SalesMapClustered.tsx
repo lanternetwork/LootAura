@@ -491,7 +491,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }, 3000) // 3 second timeout
     
     return () => clearTimeout(fallbackTimeout)
-  }, [handleMapLoad, mapLoaded])
+  }, [handleMapLoad])
 
   // Render cluster markers
   const renderClusters = useMemo(() => {
@@ -565,7 +565,21 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         onMove={onViewChange}
         interactiveLayerIds={[]}
         // Performance optimizations for faster loading
+        optimizeForTerrain={false}
+        antialias={false}
+        preserveDrawingBuffer={false}
+        attributionControl={false}
+        logoPosition="bottom-right"
+        preloadResources={true}
+        // Disable Mapbox events to prevent API failures
         // Reduce initial load time
+        // Disable telemetry completely
+        transformRequest={(url, resourceType) => {
+          if (resourceType === 'Source' && url.includes('events.mapbox.com')) {
+            return null; // Block telemetry requests
+          }
+          return { url };
+        }}
         // Accessibility attributes
         role="img"
         data-testid="map-container"

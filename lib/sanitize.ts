@@ -226,8 +226,17 @@ export function sanitizeSearchQuery(input: string): string {
     sanitized = sanitized.replace(regex, '')
   }
   
-  // Remove alert() calls using simple string replacement
-  sanitized = sanitized.replace(/alert\s*\(/gi, '')
+  // Remove alert() calls using string methods
+  let alertIndex = sanitized.toLowerCase().indexOf('alert(')
+  while (alertIndex !== -1) {
+    const parenIndex = sanitized.indexOf(')', alertIndex)
+    if (parenIndex !== -1) {
+      sanitized = sanitized.substring(0, alertIndex) + sanitized.substring(parenIndex + 1)
+    } else {
+      sanitized = sanitized.substring(0, alertIndex)
+    }
+    alertIndex = sanitized.toLowerCase().indexOf('alert(')
+  }
   
   // Remove HTML tags using simple angle bracket removal
   let tagStart = sanitized.indexOf('<')

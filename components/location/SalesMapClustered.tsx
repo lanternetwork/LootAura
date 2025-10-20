@@ -26,6 +26,7 @@ import ClusterMarker from './ClusterMarker'
 import OfflineBanner from '../OfflineBanner'
 import MapLoadingIndicator from './MapLoadingIndicator'
 import mapDebug from '@/lib/debug/mapDebug'
+import clusterDebug from '@/lib/debug/clusterDebug'
 
 interface SalesMapClusteredProps {
   sales: Sale[]
@@ -309,11 +310,14 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   const updateClusters = useCallback((map: any) => {
     const startTime = Date.now()
     mapDebug.group('Cluster Update')
+    clusterDebug.group('Cluster Update')
     
     if (!isClusteringEnabled() || !clusterIndex) {
       mapDebug.log('Clustering disabled or no cluster index, falling back to individual markers')
+      clusterDebug.log('Clustering disabled or no cluster index, falling back to individual markers')
       setClusters([])
       mapDebug.groupEnd()
+      clusterDebug.groupEnd()
       return
     }
 
@@ -326,6 +330,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     ]
     const currentZoom = map.getZoom()
 
+    clusterDebug.logClusterIndex(clusterIndex, 'Getting clusters for viewport')
     const viewportClusters = getClustersForViewport(clusterIndex, bbox, currentZoom)
     setClusters(viewportClusters)
 
@@ -337,6 +342,8 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     setVisiblePinIds(visibleIds)
     setVisiblePinCount(visibleIds.length)
     
+    clusterDebug.logClusterState(viewportClusters, visibleIds, 'viewport update')
+    
     mapDebug.log('Clusters updated', { 
       totalClusters: viewportClusters.length,
       visiblePoints: visibleIds.length,
@@ -347,9 +354,12 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     })
     
     mapDebug.logPerformance('Cluster update', startTime)
+    clusterDebug.logClusterPerformance('Cluster Update', startTime)
     mapDebug.groupEnd()
+    clusterDebug.groupEnd()
     
     if (onVisiblePinsChange) {
+      clusterDebug.logVisiblePinsUpdate(visibleIds, visibleIds.length, 'viewport change')
       onVisiblePinsChange(visibleIds, visibleIds.length)
     }
 
@@ -390,41 +400,74 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Handle cluster click - zoom to cluster bounds
   const handleClusterClick = useCallback((cluster: ClusterResult) => {
-    if (!clusterIndex || cluster.type !== 'cluster') return
+    const startTime = Date.now()
+    clusterDebug.group('Cluster Click Handler')
+    
+    if (!clusterIndex || cluster.type !== 'cluster') {
+      clusterDebug.warn('Invalid cluster click - no index or wrong type', { 
+        hasIndex: !!clusterIndex, 
+        clusterType: cluster.type 
+      })
+      clusterDebug.groupEnd()
+      return
+    }
 
     const map = mapRef.current?.getMap?.()
-    if (!map) return
+    if (!map) {
+      clusterDebug.error('No map instance available')
+      clusterDebug.groupEnd()
+      return
+    }
 
     const clusterId = parseInt(cluster.id.replace('cluster-', ''))
     const expansionZoom = getClusterExpansionZoom(clusterIndex, clusterId)
+    const targetZoom = Math.min(expansionZoom, 16)
+    
+    clusterDebug.logClusterClick(cluster, { clusterId, expansionZoom, targetZoom })
+    clusterDebug.logClusterExpansion(clusterId, expansionZoom, targetZoom)
     
     // Mark this as a user interaction for the next view change
     // This ensures API calls are triggered when the zoom completes
     map._userInitiatedClusterClick = true
+    clusterDebug.log('Set user interaction flag for cluster click')
     
     // Clear the flag after the animation completes
     setTimeout(() => {
       if (map._userInitiatedClusterClick) {
         map._userInitiatedClusterClick = false
+        clusterDebug.log('Cleared user interaction flag after animation')
       }
     }, 600) // Slightly longer than the 500ms duration
     
     // Force update visible pins immediately for cluster click
     // This ensures the sales list updates with the new data
     if (onVisiblePinsChange) {
-      // Get the cluster's child points
-      const childPoints = clusterIndex.getChildren(clusterId)
-      console.log('[CLUSTER] Child points:', childPoints)
-      const visibleIds = childPoints.map(point => point.id)
-      console.log('[CLUSTER] Visible IDs:', visibleIds)
-      onVisiblePinsChange(visibleIds, visibleIds.length)
+      try {
+        // Get the cluster's child points
+        const childPoints = clusterIndex.getChildren(clusterId)
+        clusterDebug.logClusterChildren(clusterId, childPoints)
+        
+        const visibleIds = childPoints.map(point => point.id)
+        clusterDebug.logVisiblePinsUpdate(visibleIds, visibleIds.length, 'cluster click')
+        
+        onVisiblePinsChange(visibleIds, visibleIds.length)
+        clusterDebug.log('Called onVisiblePinsChange with child points')
+      } catch (error) {
+        clusterDebug.logClusterError(error as Error, 'getting cluster children')
+      }
+    } else {
+      clusterDebug.warn('onVisiblePinsChange callback not provided')
     }
     
+    clusterDebug.logClusterAnimation(cluster, 500)
     map.easeTo({
       center: [cluster.lon, cluster.lat],
-      zoom: Math.min(expansionZoom, 16),
+      zoom: targetZoom,
       duration: 500
     })
+    
+    clusterDebug.logClusterPerformance('Cluster Click', startTime)
+    clusterDebug.groupEnd()
   }, [clusterIndex, onVisiblePinsChange])
 
   // Handle cluster keyboard interaction

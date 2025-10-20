@@ -18,6 +18,7 @@ import { milesToKm } from '@/utils/geo'
 import LoadMoreButton from '@/components/LoadMoreButton'
 import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
+import salesListDebug from '@/lib/debug/salesListDebug'
 import { normalizeFilters, filtersEqual, createCategoriesKey } from '@/lib/shared/categoryNormalizer'
 import LayoutDiagnostic from '@/components/LayoutDiagnostic'
 import GridLayoutDiagnostic from '@/components/GridLayoutDiagnostic'
@@ -706,11 +707,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       for (const s of sales) byId[String(s.id)] = s
       const hydrated = minimal.map(s => byId[String(s.id)] ?? s)
       const rendered = hydrated.slice(0, 24)
-      console.log('[SALES LIST] Setting visible/rendered sales (MAP):', {
-        hydratedCount: hydrated.length,
+      salesListDebug.logVisibleRendered('MAP', {
+        visibleCount: hydrated.length,
         renderedCount: rendered.length,
-        sampleHydrated: hydrated.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title })),
-        authority: arbiter.authority
+        sampleVisible: hydrated.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title }))
       })
       setVisibleSales(hydrated)
       setRenderedSales(rendered)
@@ -735,11 +735,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     } else if (viewportBounds) {
       const inView = cropSalesToViewport(sales, viewportBounds)
       const rendered = inView.slice(0, 24)
-      console.log('[SALES LIST] Setting visible/rendered sales (FILTERS):', {
-        inViewCount: inView.length,
+      salesListDebug.logVisibleRendered('FILTERS', {
+        visibleCount: inView.length,
         renderedCount: rendered.length,
-        sampleInView: inView.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title })),
-        authority: arbiter.authority
+        sampleVisible: inView.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title }))
       })
       setVisibleSales(inView)
       setRenderedSales(rendered)
@@ -1054,7 +1053,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           return
         }
         // Debug sales data before setting
-        console.log('[SALES LIST] Setting sales data:', {
+        salesListDebug.logSalesData('Setting sales data', {
           salesCount: newSales.length,
           hasMore: newSales.length === 24,
           sampleSales: newSales.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title })),
@@ -2098,18 +2097,17 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
                             
                             // Debug sales list rendering
-                            console.log('[SALES LIST] MAP authority rendering:', {
+                            salesListDebug.logRendering('MAP', {
                               isUpdating,
                               staleSalesCount: staleSales.length,
                               renderedSalesCount: renderedSales.length,
                               visibleSalesCount: visibleSales.length,
                               itemsToRenderCount: itemsToRender.length,
-                              finalItemsToRenderCount: finalItemsToRender.length,
-                              authority: arbiter.authority
+                              finalItemsToRenderCount: finalItemsToRender.length
                             })
                             
                             return finalItemsToRender.map((item: any, _idx: number) => {
-                              console.log('[SALES LIST] Rendering sale:', { id: item.id, title: item.title })
+                              salesListDebug.logSaleRender({ id: item.id, title: item.title })
                               return <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
                             })
                           })()}
@@ -2145,19 +2143,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             const itemsToRender = isUpdating ? staleSales : renderedSales
                             
                             // Debug sales list rendering for non-MAP authority
-                            console.log('[SALES LIST] Non-MAP authority rendering:', {
+                            salesListDebug.logRendering('Non-MAP', {
                               isUpdating,
                               staleSalesCount: staleSales.length,
                               renderedSalesCount: renderedSales.length,
                               salesCount: sales.length,
                               itemsToRenderCount: itemsToRender.length,
-                              authority: arbiter.authority,
                               loading,
                               fetchedOnce
                             })
                             
                             return itemsToRender.map((item: any, _idx: number) => {
-                              console.log('[SALES LIST] Rendering sale:', { id: item.id, title: item.title })
+                              salesListDebug.logSaleRender({ id: item.id, title: item.title })
                               return <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
                             })
                           })()}

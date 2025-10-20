@@ -402,6 +402,13 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     // This ensures API calls are triggered when the zoom completes
     map._userInitiatedClusterClick = true
     
+    // Clear the flag after the animation completes
+    setTimeout(() => {
+      if (map._userInitiatedClusterClick) {
+        map._userInitiatedClusterClick = false
+      }
+    }, 600) // Slightly longer than the 500ms duration
+    
     map.easeTo({
       center: [cluster.lon, cluster.lat],
       zoom: Math.min(expansionZoom, 16),
@@ -482,10 +489,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const map = mapRef.current?.getMap?.()
     const isClusterClick = map?._userInitiatedClusterClick || false
     
-    // Clear the flag after checking
-    if (map?._userInitiatedClusterClick) {
-      map._userInitiatedClusterClick = false
-    }
+    // Don't clear the flag here - it's cleared by timeout in handleClusterClick
     
     // Precise user interaction detection - only detect actual user interactions
     const isUserInteraction = isClusterClick ||

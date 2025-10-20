@@ -1395,6 +1395,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         if (salesData?.data && Array.isArray(salesData.data)) {
           console.log('[MAP] Setting mapSales after abort:', salesData.data.length, 'sales')
           _setMapSales(salesData.data)
+          // Also update the main sales state so the sales list updates
+          setSales(salesData.data)
         }
         return
       }
@@ -1435,9 +1437,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         if (salesData?.data && Array.isArray(salesData.data)) {
           console.log('[MAP] Setting mapSales to:', salesData.data.length, 'sales')
           _setMapSales(salesData.data)
+          // Also update the main sales state so the sales list updates
+          setSales(salesData.data)
         } else {
           console.log('[MAP] No sales data received, setting mapSales to empty array')
           _setMapSales([])
+          setSales([])
         }
         
         setMapError(null) // Clear any previous errors

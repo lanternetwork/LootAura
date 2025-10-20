@@ -24,7 +24,6 @@ import { isOfflineCacheEnabled } from '@/lib/flags'
 import { logPrefetchStart, logPrefetchDone, logViewportSave, logViewportLoad } from '@/lib/telemetry/map'
 import ClusterMarker from './ClusterMarker'
 import OfflineBanner from '../OfflineBanner'
-import MapLoadingSkeleton from './MapLoadingSkeleton'
 import mapDebug from '@/lib/debug/mapDebug'
 
 interface SalesMapClusteredProps {
@@ -83,7 +82,6 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   const [_visiblePinCount, setVisiblePinCount] = useState(0)
   const [clusters, setClusters] = useState<ClusterResult[]>([])
   const [clusterIndex, setClusterIndex] = useState<ClusterIndex | null>(null)
-  const [mapLoaded, setMapLoaded] = useState(false)
   
   // Offline state
   const [isOffline, setIsOffline] = useState(false)
@@ -467,7 +465,6 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   const handleMapLoad = useCallback(() => {
     mapDebug.logMapLoad('SalesMapClustered', 'success', { onMapReady: !!onMapReady })
-    setMapLoaded(true)
     onMapReady?.()
     
     const map = mapRef.current?.getMap?.()
@@ -477,21 +474,10 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [updateClusters, onMapReady])
 
-  // Fallback timeout to ensure map loads even if onLoad doesn't fire
+  // Simple map load handling - no complex state management needed
   useEffect(() => {
-    const startTime = Date.now()
     mapDebug.logMapLoad('SalesMapClustered', 'start')
-    
-    const fallbackTimeout = setTimeout(() => {
-      if (!mapLoaded) {
-        mapDebug.logMapLoad('SalesMapClustered', 'timeout')
-        mapDebug.logPerformance('Map load (timeout)', startTime)
-        handleMapLoad()
-      }
-    }, 3000) // 3 second timeout
-    
-    return () => clearTimeout(fallbackTimeout)
-  }, [handleMapLoad])
+  }, [])
 
   // Render cluster markers
   const renderClusters = useMemo(() => {
@@ -530,12 +516,9 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     ))
   }, [clusters, markers, sales, onSaleClick, handleClusterClick, handlePointClick, handleClusterKeyDown])
 
-  // Show loading skeleton while map loads (but not in test environment)
-  if (!mapLoaded && process.env.NODE_ENV !== 'test') {
-    mapDebug.log('Clustered map not loaded yet, showing loading skeleton')
-    mapDebug.logTokenStatus(getMapboxToken())
-    return <MapLoadingSkeleton className={className} />
-  }
+  // Debug logging for map initialization
+  mapDebug.log('SalesMapClustered rendering')
+  mapDebug.logTokenStatus(getMapboxToken())
 
   return (
     <div 

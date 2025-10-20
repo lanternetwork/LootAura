@@ -10,7 +10,6 @@ import { getMapboxToken } from '@/lib/maps/token'
 import { incMapLoad } from '@/lib/usageLogs'
 import { isClusteringEnabled } from '@/lib/clustering'
 import SalesMapClustered from './SalesMapClustered'
-import MapLoadingSkeleton from './MapLoadingSkeleton'
 import mapDebug from '@/lib/debug/mapDebug'
 
 interface SalesMapProps {
@@ -62,7 +61,6 @@ export default function SalesMap({
   // Call onMapReady when map loads (not onLoad bounds emission)
   const handleMapLoad = useCallback(() => {
     mapDebug.logMapLoad('SalesMap', 'success', { onMapReady: !!onMapReady })
-    setMapLoaded(true)
     if (onMapReady) {
       onMapReady()
     }
@@ -76,7 +74,6 @@ export default function SalesMap({
     latitude: center.lat,
     zoom: zoom
   })
-  const [mapLoaded, setMapLoaded] = useState(false)
   const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [visiblePinCount, setVisiblePinCount] = useState(0)
   const [_moved, _setMoved] = useState(false)
@@ -219,48 +216,10 @@ export default function SalesMap({
     } catch {}
   }, [center.lat, center.lng, arbiterAuthority])
 
-  // Call onMapReady when map loads (no bounds emission on onLoad)
+  // Simple map load handling - no complex state management needed
   useEffect(() => {
-    const startTime = Date.now()
     mapDebug.logMapLoad('SalesMap', 'start')
-    
-    try {
-      const map = mapRef.current?.getMap?.()
-      if (!map) {
-        mapDebug.warn('Map ref not available')
-        return
-      }
-      
-      const handleLoad = () => {
-        mapDebug.logMapLoad('SalesMap', 'success')
-        mapDebug.logPerformance('Map load', startTime)
-        handleMapLoad()
-        // Don't emit bounds on onLoad - only on idle
-      }
-      
-      if (map.loaded?.()) {
-        mapDebug.log('Map already loaded, calling handleLoad immediately')
-        handleLoad()
-      } else {
-        mapDebug.log('Map not loaded yet, waiting for load event')
-        map.once?.('load', handleLoad)
-      }
-      
-      // Fallback timeout to ensure map loads even if onLoad doesn't fire
-      const fallbackTimeout = setTimeout(() => {
-        if (!mapLoaded) {
-          mapDebug.logMapLoad('SalesMap', 'timeout')
-          mapDebug.logPerformance('Map load (timeout)', startTime)
-          handleMapLoad()
-        }
-      }, 3000) // 3 second timeout
-      
-      return () => clearTimeout(fallbackTimeout)
-    } catch (error) {
-      mapDebug.logMapLoad('SalesMap', 'error', error)
-      mapDebug.error('Error in map load effect', error)
-    }
-  }, [handleMapLoad])
+  }, [])
 
   // Handle center override
   useEffect(() => {
@@ -408,12 +367,9 @@ export default function SalesMap({
     )
   }
 
-  // Show loading skeleton while map loads (but not in test environment)
-  if (!mapLoaded && process.env.NODE_ENV !== 'test') {
-    mapDebug.log('Map not loaded yet, showing loading skeleton')
-    mapDebug.logTokenStatus(getMapboxToken())
-    return <MapLoadingSkeleton />
-  }
+  // Debug logging for map initialization
+  mapDebug.log('SalesMap rendering')
+  mapDebug.logTokenStatus(getMapboxToken())
 
   // Non-clustered map implementation
   return (

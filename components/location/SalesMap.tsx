@@ -189,7 +189,7 @@ export default function SalesMap({
             map.fitBounds([
               [bounds.west, bounds.south],
               [bounds.east, bounds.north]
-            ], { padding: 50, maxZoom: 15 })
+            ], { padding: 0, maxZoom: 15, duration: 0 })
           }
         }
         
@@ -273,7 +273,7 @@ export default function SalesMap({
         mode: arbiterMode 
       })
       
-      map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 0 })
+      map.fitBounds(bounds, { padding: 0, maxZoom: 15, duration: 0 })
       
       if (onFitBoundsComplete) {
         onFitBoundsComplete()

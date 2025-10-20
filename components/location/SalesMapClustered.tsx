@@ -546,7 +546,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         mode: _arbiterMode 
       })
       
-      map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 0 })
+      map.fitBounds(bounds, { padding: 0, maxZoom: 15, duration: 0 })
       
       if (_onFitBoundsComplete) {
         _onFitBoundsComplete()

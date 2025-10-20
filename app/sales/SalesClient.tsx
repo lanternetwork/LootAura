@@ -1233,8 +1233,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         mapUpdatingMaxRef.current = window.setTimeout(() => {
           setMapUpdating(false)
           mapUpdatingMaxRef.current = null
-        }, 900)
-      }, 200)
+        }, 600)
+      }, 300)
     } else {
       setMapUpdating(true)
     }

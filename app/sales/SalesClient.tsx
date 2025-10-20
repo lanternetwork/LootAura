@@ -1070,6 +1070,17 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           append
         })
         
+        console.log('[SALES LIST] Setting sales data (detailed):', {
+          salesCount: newSales.length,
+          hasMore: newSales.length === 24,
+          sampleSales: newSales.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title })),
+          authority: arbiter.authority,
+          append,
+          currentSalesCount: sales.length,
+          currentRenderedCount: renderedSales.length,
+          currentVisibleCount: visibleSales.length
+        })
+        
         setSales(newSales)
         setIsUpdating(false)
         setDateWindow(data.dateWindow || null)
@@ -1078,6 +1089,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         setHasMore(pageHasMore)
         console.log(`[SALES] ${append ? 'Appended' : 'Set'} ${newSales.length} sales, hasMore: ${pageHasMore}`)
         console.debug('[SALES] got', sales.length)
+        
+        // Debug after setting sales
+        console.log('[SALES LIST] After setting sales:', {
+          newSalesCount: newSales.length,
+          currentSalesCount: sales.length,
+          renderedSalesCount: renderedSales.length,
+          visibleSalesCount: visibleSales.length,
+          authority: arbiter.authority
+        })
 
         // Prefetch next page in background for instant next click
         // Note: safe here because MAP authority already returned above
@@ -2181,7 +2201,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                               itemsToRenderCount: itemsToRender.length,
                               authority: arbiter.authority,
                               loading,
-                              fetchedOnce
+                              fetchedOnce,
+                              sampleSales: sales.slice(0, 3).map(s => ({ id: s.id, title: s.title })),
+                              sampleRendered: renderedSales.slice(0, 3).map(s => ({ id: s.id, title: s.title })),
+                              sampleStale: staleSales.slice(0, 3).map(s => ({ id: s.id, title: s.title }))
                             })
                             
                             return itemsToRender.map((item: any, _idx: number) => {

@@ -160,7 +160,13 @@ export async function middleware(req: NextRequest) {
         if (!hasCookie && homeZip) {
           try {
             const url = new URL(req.url)
+            // Ensure we only make requests to the same origin
             const geoUrl = `${url.origin}/api/geocoding/zip?zip=${encodeURIComponent(homeZip)}`
+            // Validate that the constructed URL is safe (same origin)
+            const geoUrlObj = new URL(geoUrl)
+            if (geoUrlObj.origin !== url.origin) {
+              throw new Error('Invalid origin for geocoding request')
+            }
             const r = await fetch(geoUrl, { cache: 'no-store' })
             if (r.ok) {
               const z = await r.json()

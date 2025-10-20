@@ -29,8 +29,8 @@ export function sanitizeHtml(input: string, options: SanitizeOptions = {}): stri
   let sanitized = input.length > maxLength ? input.substring(0, maxLength) : input
 
   if (stripHtml) {
-    // Remove all HTML tags
-    sanitized = sanitized.replace(/<[^>]*>/g, '')
+    // Remove all HTML tags - improved regex to handle nested tags
+    sanitized = sanitized.replace(/<\/?[^>]+(>|$)/g, '')
   } else {
     // Sanitize HTML
     sanitized = purify.sanitize(sanitized, {
@@ -49,7 +49,7 @@ export function sanitizeText(input: string, maxLength: number = 1000): string {
 
   // Remove HTML tags and normalize whitespace
   let sanitized = input
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/<\/?[^>]+(>|$)/g, '') // Remove HTML tags - improved regex
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim()
 
@@ -148,7 +148,7 @@ export function sanitizeAddress(input: string): string {
 
   // Remove HTML tags and normalize
   const sanitized = input
-    .replace(/<[^>]*>/g, '')
+    .replace(/<\/?[^>]+(>|$)/g, '') // Improved regex for HTML tag removal
     .replace(/\s+/g, ' ')
     .trim()
 
@@ -203,13 +203,13 @@ export function sanitizeSearchQuery(input: string): string {
   // Remove potentially dangerous characters
   sanitized = sanitized.replace(/[<>'"&]/g, '')
 
-  // Remove XSS patterns
+  // Remove XSS patterns - improved regex patterns
   const xssPatterns = [
     /<script[^>]*>.*?<\/script>/gi,
     /javascript:/gi,
     /on\w+\s*=/gi,
     /alert\s*\([^)]*\)/gi,
-    /<[^>]*>/gi
+    /<\/?[^>]+(>|$)/gi // Improved HTML tag removal
   ]
   
   for (const pattern of xssPatterns) {

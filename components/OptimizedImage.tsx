@@ -26,8 +26,15 @@ export default function OptimizedImage({
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
 
-  // Check if it's a Supabase storage URL
-  const isSupabaseUrl = src.includes('supabase') || src.includes('storage.googleapis.com')
+  // Check if it's a Supabase storage URL - validate URL properly
+  const isSupabaseUrl = (() => {
+    try {
+      const url = new URL(src)
+      return url.hostname.includes('supabase') || url.hostname.includes('storage.googleapis.com')
+    } catch {
+      return false
+    }
+  })()
   
   // Generate blur placeholder for Supabase URLs
   const blurDataURL = isSupabaseUrl 

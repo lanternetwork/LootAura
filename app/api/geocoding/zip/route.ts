@@ -223,13 +223,13 @@ export async function GET(request: NextRequest) {
                 city,
                 state
               }, { onConflict: 'zip' })
-            console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim writeback=success`)
+            console.log(`[ZIP] input="${(rawZip || '').replace(/"/g, '\\"')}" normalized=${normalizedZip.replace(/"/g, '\\"')} source=nominatim writeback=success`)
           } catch (writebackError) {
-            console.error(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim writeback=failed`, writebackError)
+            console.error(`[ZIP] input="${(rawZip || '').replace(/"/g, '\\"')}" normalized=${normalizedZip.replace(/"/g, '\\"')} source=nominatim writeback=failed`, writebackError)
           }
         }
         
-        console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim status=ok`)
+        console.log(`[ZIP] input="${(rawZip || '').replace(/"/g, '\\"')}" normalized=${normalizedZip.replace(/"/g, '\\"')} source=nominatim status=ok`)
         return NextResponse.json({
           ok: true,
           zip: normalizedZip,
@@ -252,7 +252,7 @@ export async function GET(request: NextRequest) {
         }, { status: 404 })
       }
     } catch (nominatimError: any) {
-      console.error(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim status=error`, nominatimError.message)
+      console.error(`[ZIP] input="${(rawZip || '').replace(/"/g, '\\"')}" normalized=${normalizedZip.replace(/"/g, '\\"')} source=nominatim status=error`, nominatimError.message)
       return NextResponse.json({ 
         ok: false, 
         error: 'Geocoding service unavailable' 

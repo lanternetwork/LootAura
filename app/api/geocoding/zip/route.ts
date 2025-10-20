@@ -80,7 +80,10 @@ export async function GET(request: NextRequest) {
     // Normalize ZIP code
     const normalizedZip = normalizeZip(rawZip || '')
     if (!normalizedZip) {
-      console.log(`[ZIP] input="${rawZip}" normalized=null status=invalid`)
+      console.log('[ZIP] status=invalid', {
+        input: escapeForLogging(rawZip),
+        normalized: null
+      })
       return NextResponse.json({ 
         ok: false, 
         error: 'Invalid ZIP format' 
@@ -90,7 +93,10 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseServerClient()
     
     // 1. Try local lookup first (exact TEXT match)
-    console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=local`)
+    console.log('[ZIP] source=local', {
+      input: escapeForLogging(rawZip),
+      normalized: escapeForLogging(normalizedZip)
+    })
     const { data: localData, error: localError } = await supabase
       .from('lootaura_v2.zipcodes')
       .select('zip, lat, lng, city, state')
@@ -98,7 +104,10 @@ export async function GET(request: NextRequest) {
       .single()
     
     if (!localError && localData) {
-      console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=local status=ok`)
+      console.log('[ZIP] source=local status=ok', {
+        input: escapeForLogging(rawZip),
+        normalized: escapeForLogging(normalizedZip)
+      })
       return NextResponse.json({
         ok: true,
         zip: localData.zip,
@@ -194,7 +203,10 @@ export async function GET(request: NextRequest) {
     
     if (hardcodedZips[normalizedZip]) {
       const data = hardcodedZips[normalizedZip]
-      console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=hardcoded status=ok`)
+      console.log('[ZIP] source=hardcoded status=ok', {
+        input: escapeForLogging(rawZip),
+        normalized: escapeForLogging(normalizedZip)
+      })
       return NextResponse.json({
         ok: true,
         zip: normalizedZip,
@@ -211,19 +223,28 @@ export async function GET(request: NextRequest) {
     }
 
     // 3. Fallback to Nominatim
-    console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim`)
+    console.log('[ZIP] source=nominatim', {
+      input: escapeForLogging(rawZip),
+      normalized: escapeForLogging(normalizedZip)
+    })
     try {
       const nominatimData = await lookupNominatim(normalizedZip)
       console.log(`[ZIP] Nominatim raw response:`, JSON.stringify(nominatimData, null, 2))
       
       if (nominatimData && nominatimData.length > 0) {
         const result = nominatimData[0]
-        console.log(`[ZIP] Nominatim result for ${normalizedZip}:`, JSON.stringify(result, null, 2))
+        console.log('[ZIP] Nominatim result:', {
+          normalized: escapeForLogging(normalizedZip),
+          result: JSON.stringify(result, null, 2)
+        })
         const lat = parseFloat(result.lat)
         const lng = parseFloat(result.lon)
         const city = result.address?.city || result.address?.town || result.address?.village || null
         const state = result.address?.state || null
-        console.log(`[ZIP] Parsed city/state: city=${city}, state=${state}`)
+        console.log('[ZIP] Parsed city/state:', {
+          city: escapeForLogging(city),
+          state: escapeForLogging(state)
+        })
         
         // Optional write-back to local table
         const enableWriteback = process.env.ENABLE_ZIP_WRITEBACK === 'true'
@@ -272,7 +293,11 @@ export async function GET(request: NextRequest) {
           }
         })
       } else {
-        console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim status=miss - no results from Nominatim`)
+        console.log('[ZIP] source=nominatim status=miss', {
+          input: escapeForLogging(rawZip),
+          normalized: escapeForLogging(normalizedZip),
+          reason: 'no results from Nominatim'
+        })
         console.log(`[ZIP] Nominatim response:`, JSON.stringify(nominatimData, null, 2))
         return NextResponse.json({ 
           ok: false, 

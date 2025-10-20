@@ -1438,6 +1438,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (markersAbortRef.current === controller) {
         markersAbortRef.current = null
       }
+      // Always reset map updating state
+      setMapUpdating(false)
     }
   }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, buildMarkersKey])
 
@@ -1731,7 +1733,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[SALES] Stable inputs changed → key:', stableKey)
     lastMarkersKeyRef.current = stableKey
     triggerFetches()
-  }, [bboxHash, dateKey, arbiter.mode, triggerFetches, arbiter.programmaticMoveGuard])
+  }, [bboxHash, dateKey, arbiter.mode, arbiter.programmaticMoveGuard])
 
   // Keep visibleSales in sync with current sales and viewport
   useEffect(() => {

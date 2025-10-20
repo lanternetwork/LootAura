@@ -444,7 +444,9 @@ export default function SalesMap({
               url.includes('api.mapbox.com/events') ||
               url.includes('events/v2') ||
               url.includes('telemetry') ||
-              url.includes('analytics')) {
+              url.includes('analytics') ||
+              url.includes('events.mapbox.com/events/v2') ||
+              url.includes('api.mapbox.com/events/v2')) {
             console.log('[MAP] Blocking request:', url);
             return null;
           }

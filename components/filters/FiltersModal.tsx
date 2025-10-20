@@ -248,8 +248,8 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
         </div>
       </div>
 
-      {/* Desktop/Tablet Sidebar - show from xs and up to avoid invisible gaps between breakpoints */}
-      <div className={`hidden xs:block sm:block ${className}`}>
+      {/* Desktop/Tablet Sidebar - show at sm and up (xs is not a Tailwind breakpoint) */}
+      <div className={`hidden sm:block ${className}`}>
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-900">Filters</h2>

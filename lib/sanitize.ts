@@ -216,8 +216,12 @@ export function sanitizeSearchQuery(input: string): string {
     scriptStart = sanitized.indexOf('<script')
   }
   
-  // Remove javascript: protocols using simple string replacement
-  sanitized = sanitized.replace(/javascript:/gi, '')
+  // Remove javascript: protocols using string methods
+  let jsIndex = sanitized.toLowerCase().indexOf('javascript:')
+  while (jsIndex !== -1) {
+    sanitized = sanitized.substring(0, jsIndex) + sanitized.substring(jsIndex + 11)
+    jsIndex = sanitized.toLowerCase().indexOf('javascript:')
+  }
   
   // Remove common event handlers using string methods
   const eventHandlers = ['onclick', 'onload', 'onerror', 'onmouseover', 'onfocus', 'onblur']

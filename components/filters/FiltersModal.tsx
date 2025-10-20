@@ -369,7 +369,7 @@ function FiltersContent({
                 className="h-4 w-4 min-h-4 min-w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
               />
               <span className="ml-2 text-sm font-medium flex-shrink-0">{category.icon}</span>
-              <span className="ml-2 text-sm font-medium text-left flex-1">{category.label}</span>
+              <span className="ml-2 text-sm font-medium text-left flex-1 min-w-0 break-words">{category.label}</span>
             </label>
           ))}
         </div>

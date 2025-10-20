@@ -1944,7 +1944,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       ? { lat: mapView.center.lat, lng: mapView.center.lng }
       : (filters.lat && filters.lng 
         ? { lat: filters.lat, lng: filters.lng }
-        : { lat: 38.2527, lng: -85.7585 })
+        : (() => {
+            console.error('CRITICAL: No location data available - this should not happen')
+            throw new Error('No location data available')
+          })())
     
     console.log('[DIST] center used for fetch: lat=' + currentCenter.lat + ', lng=' + currentCenter.lng + ' (from viewport)')
     console.log('[DIST] radius miles→km {miles:' + newDistance + ', km:' + milesToKm(newDistance) + '}')
@@ -2389,7 +2392,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                   markers={mapMarkers}
                   center={filters.lat && filters.lng ? { lat: filters.lat, lng: filters.lng } : 
                          initialCenter ? { lat: initialCenter.lat, lng: initialCenter.lng } : 
-                         { lat: 39.8283, lng: -98.5795 }}
+                         (() => {
+                           console.error('CRITICAL: No location data for map - this should not happen')
+                           throw new Error('No location data available for map')
+                         })()}
                   zoom={filters.lat && filters.lng ? 12 : 10}
                   centerOverride={mapCenterOverride}
                   fitBounds={fitBounds}

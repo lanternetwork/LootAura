@@ -37,7 +37,7 @@ interface SalesMapProps {
 export default function SalesMap({ 
   sales, 
   markers = [],
-  center = { lat: 38.2527, lng: -85.7585 }, 
+  center, 
   zoom = 10,
   onSaleClick,
   selectedSaleId,

@@ -56,7 +56,7 @@ interface SalesMapClusteredProps {
 const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({ 
   sales, 
   markers = [],
-  center = { lat: 38.2527, lng: -85.7585 }, 
+  center, 
   zoom = 10,
   onSaleClick,
   selectedSaleId,

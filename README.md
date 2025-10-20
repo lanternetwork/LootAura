@@ -231,4 +231,5 @@ LootAura uses advanced PostGIS distance calculations for accurate location-based
 - **Security**: RLS policies and privilege escalation testing
 - **Performance**: Bundle size monitoring and memory optimization#   F o r c e   r e d e p l o y   -   1 0 / 1 3 / 2 0 2 5   2 0 : 4 7 : 1 6 
  
+ #   F o r c e   r e d e p l o y  
  

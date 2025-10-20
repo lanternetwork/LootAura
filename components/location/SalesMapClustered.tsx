@@ -398,6 +398,10 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const clusterId = parseInt(cluster.id.replace('cluster-', ''))
     const expansionZoom = getClusterExpansionZoom(clusterIndex, clusterId)
     
+    // Mark this as a user interaction for the next view change
+    // This ensures API calls are triggered when the zoom completes
+    map._userInitiatedClusterClick = true
+    
     map.easeTo({
       center: [cluster.lon, cluster.lat],
       zoom: Math.min(expansionZoom, 16),
@@ -474,8 +478,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const newCenter = viewState.center || { lat: 0, lng: 0 }
     const newZoom = viewState.zoom || 10
     
+    // Check if this was triggered by a cluster click
+    const map = mapRef.current?.getMap?.()
+    const isClusterClick = map?._userInitiatedClusterClick || false
+    
+    // Clear the flag after checking
+    if (map?._userInitiatedClusterClick) {
+      map._userInitiatedClusterClick = false
+    }
+    
     // Precise user interaction detection - only detect actual user interactions
-    const isUserInteraction = evt.isDragging || 
+    const isUserInteraction = isClusterClick ||
+                              evt.isDragging || 
                               evt.isZooming || 
                               evt.originalEvent?.type === 'mousedown' || 
                               evt.originalEvent?.type === 'touchstart' ||
@@ -493,7 +507,8 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       isZooming: evt.isZooming,
       originalEventType: evt.originalEvent?.type,
       hasSource: !!evt.source,
-      hasPointerType: !!evt.originalEvent?.pointerType
+      hasPointerType: !!evt.originalEvent?.pointerType,
+      isClusterClick
     })
     
     onViewChange({

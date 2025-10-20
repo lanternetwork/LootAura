@@ -409,12 +409,21 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       }
     }, 600) // Slightly longer than the 500ms duration
     
+    // Force update visible pins immediately for cluster click
+    // This ensures the sales list updates with the new data
+    if (onVisiblePinsChange) {
+      // Get the cluster's child points
+      const childPoints = clusterIndex.getChildren(clusterId)
+      const visibleIds = childPoints.map(point => point.id)
+      onVisiblePinsChange(visibleIds, visibleIds.length)
+    }
+    
     map.easeTo({
       center: [cluster.lon, cluster.lat],
       zoom: Math.min(expansionZoom, 16),
       duration: 500
     })
-  }, [clusterIndex])
+  }, [clusterIndex, onVisiblePinsChange])
 
   // Handle cluster keyboard interaction
   const handleClusterKeyDown = useCallback((cluster: ClusterResult, event: React.KeyboardEvent) => {

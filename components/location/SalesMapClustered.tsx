@@ -465,6 +465,23 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     onZoomEnd?.()
   }, [updateClusters, onZoomEnd, currentFilters])
 
+  // Handle view changes
+  const handleViewChange = useCallback((evt: any) => {
+    if (!onViewChange) return
+    
+    const { center: newCenter, zoom: newZoom } = evt.viewState
+    
+    // Detect user interaction more reliably
+    // Mapbox GL JS doesn't always provide isDragging/isZooming, so we need to track it ourselves
+    const isUserInteraction = evt.isDragging || evt.isZooming || evt.originalEvent?.type === 'mousedown' || evt.originalEvent?.type === 'touchstart'
+    
+    onViewChange({
+      center: { lat: newCenter.lat, lng: newCenter.lng },
+      zoom: newZoom,
+      userInteraction: isUserInteraction
+    })
+  }, [onViewChange])
+
   const handleMapLoad = useCallback(() => {
     mapDebug.logMapLoad('SalesMapClustered', 'success', { onMapReady: !!onMapReady })
     setIsMapLoading(false) // Map is loaded, hide loading indicator
@@ -585,7 +602,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         onLoad={handleMapLoad}
         onMoveEnd={handleMoveEnd}
         onZoomEnd={handleZoomEnd}
-        onMove={onViewChange}
+        onMove={handleViewChange}
         interactiveLayerIds={[]}
         // Performance optimizations for faster loading
         optimizeForTerrain={false}

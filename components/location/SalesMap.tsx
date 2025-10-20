@@ -288,10 +288,15 @@ export default function SalesMap({
     if (!onViewChange) return
     
     const { center: newCenter, zoom: newZoom } = evt.viewState
+    
+    // Detect user interaction more reliably
+    // Mapbox GL JS doesn't always provide isDragging/isZooming, so we need to track it ourselves
+    const isUserInteraction = evt.isDragging || evt.isZooming || evt.originalEvent?.type === 'mousedown' || evt.originalEvent?.type === 'touchstart'
+    
     onViewChange({
       center: { lat: newCenter.lat, lng: newCenter.lng },
       zoom: newZoom,
-      userInteraction: evt.isDragging || evt.isZooming
+      userInteraction: isUserInteraction
     })
   }, [onViewChange])
 

@@ -443,7 +443,7 @@ export default function SalesMap({
         // Disable Mapbox events to prevent API failures
         // Reduce initial load time
         // Disable telemetry completely
-        transformRequest={(url, resourceType) => {
+        transformRequest={(url: string, resourceType: string) => {
           if (resourceType === 'Source' && url.includes('events.mapbox.com')) {
             return null; // Block telemetry requests
           }

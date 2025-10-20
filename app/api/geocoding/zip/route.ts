@@ -66,7 +66,7 @@ function escapeForLogging(input: string | null | undefined): string {
     .replace(/\n/g, '\\n')   // Escape newlines
     .replace(/\r/g, '\\r')   // Escape carriage returns
     .replace(/\t/g, '\\t')   // Escape tabs
-    .replace(/[\u0000-\u001F\u007F]/g, '') // Remove control characters
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
 }
 
 export async function GET(request: NextRequest) {

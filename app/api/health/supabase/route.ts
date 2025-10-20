@@ -37,7 +37,7 @@ export async function GET() {
     const schema = process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'
     let schemaTest = null
     if (schema === 'lootaura_v2') {
-      const { data: salesData, error: salesError } = await serviceClient
+      const { data: _salesData, error: salesError } = await serviceClient
         .from('sales')
         .select('count')
         .limit(1)

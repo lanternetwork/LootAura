@@ -110,7 +110,9 @@ export async function middleware(req: NextRequest) {
     
     // For pages, redirect to signin
     const loginUrl = new URL('/auth/signin', req.url)
-    loginUrl.searchParams.set('redirectTo', req.nextUrl.pathname)
+    // Only allow same-origin relative paths for redirectTo
+    const redirectTo = req.nextUrl.pathname.startsWith('/') ? req.nextUrl.pathname : '/'
+    loginUrl.searchParams.set('redirectTo', redirectTo)
     return NextResponse.redirect(loginUrl)
   }
 
@@ -128,7 +130,9 @@ export async function middleware(req: NextRequest) {
     
     // For pages, redirect to signin
     const loginUrl = new URL('/auth/signin', req.url)
-    loginUrl.searchParams.set('redirectTo', req.nextUrl.pathname)
+    // Only allow same-origin relative paths for redirectTo
+    const redirectTo = req.nextUrl.pathname.startsWith('/') ? req.nextUrl.pathname : '/'
+    loginUrl.searchParams.set('redirectTo', redirectTo)
     return NextResponse.redirect(loginUrl)
   }
 
@@ -179,9 +183,9 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all app routes except static assets
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|robots.txt|sitemap.xml|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/).*)',
-    // Match API routes
-    '/api/:path*'
+    // Match all app routes except static assets and health endpoints
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|robots.txt|sitemap.xml|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/|api/health/).*)',
+    // Match API routes except health endpoints
+    '/api/((?!health/).)*'
   ],
 }

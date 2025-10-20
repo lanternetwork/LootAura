@@ -140,49 +140,8 @@ export async function middleware(req: NextRequest) {
     console.log('[MIDDLEWARE] Session valid', { event: 'auth-mw', path: pathname, authenticated: true })
   }
 
-  // If user is authenticated, auto-upsert profile on first request
-  if (session?.user) {
-    try {
-      // Create a server client for profile operations
-      const { createServerSupabaseClient } = await import('@/lib/auth/server-session')
-      const supabase = createServerSupabaseClient(cookieStore)
-      
-      if (supabase && supabase.from) {
-        const { data: profile } = await supabase
-          .from('profiles_v2')
-          .select('home_zip')
-          .eq('id', session.user.id)
-          .maybeSingle()
-
-        // Best-effort: if la_loc cookie missing and profile has home_zip, set a placeholder
-        // Note: We avoid making HTTP requests in middleware to prevent SSRF
-        const hasCookie = !!cookieStore.get('la_loc')?.value
-        const homeZip = profile?.home_zip as string | undefined
-        if (!hasCookie && homeZip) {
-          // Set a placeholder cookie that will be resolved on the client side
-          const placeholderPayload = JSON.stringify({ 
-            zip: homeZip, 
-            city: '', 
-            state: '', 
-            lat: 0, 
-            lng: 0,
-            placeholder: true 
-          })
-          cookieStore.set({ 
-            name: 'la_loc', 
-            value: placeholderPayload, 
-            httpOnly: false, 
-            maxAge: 60 * 60 * 24, 
-            sameSite: 'lax', 
-            path: '/' 
-          })
-        }
-      }
-    } catch (error) {
-      console.error('Error upserting profile:', error)
-      // Don't block the request if profile creation fails
-    }
-  }
+  // Note: Profile operations removed from middleware to avoid Edge Runtime issues
+  // Profile creation will be handled in the app components instead
 
   return NextResponse.next()
 }

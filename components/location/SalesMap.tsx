@@ -16,7 +16,7 @@ import mapDebug from '@/lib/debug/mapDebug'
 interface SalesMapProps {
   sales: Sale[]
   markers?: {id: string; title: string; lat: number; lng: number}[]
-  center?: { lat: number; lng: number }
+  center: { lat: number; lng: number }
   zoom?: number
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string

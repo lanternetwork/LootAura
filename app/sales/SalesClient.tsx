@@ -1825,6 +1825,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log(`[ZIP] submit -> ${zip} -> lat=${lat}, lng=${lng}`)
     console.log('[CONTROL] mode=zip (zip submit)')
     updateControlMode('zip', 'ZIP lookup asserted control')
+    setAuthority('FILTERS', 'ZIP search takes control') // Set authority to FILTERS for ZIP searches
     console.log('[CONTROL] programmaticMoveGuard=true (zip fit)')
     setProgrammaticMoveGuard(true, 'ZIP fit (programmatic)')
     pendingFitReasonRef.current = 'zip'

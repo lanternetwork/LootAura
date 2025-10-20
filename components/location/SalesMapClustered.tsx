@@ -482,6 +482,42 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     mapDebug.logMapLoad('SalesMapClustered', 'start')
   }, [])
 
+  // Handle fit bounds
+  useEffect(() => {
+    if (!_fitBounds) return
+    
+    try {
+      const map = mapRef.current?.getMap?.()
+      if (!map) return
+      
+      // Allow fitBounds for ZIP searches and other programmatic moves
+      // Only block if it's a MAP authority mode AND not a ZIP search
+      if (_arbiterAuthority === 'MAP' && _arbiterMode !== 'zip') {
+        console.log('[BLOCK] fit bounds suppressed (map authoritative, not ZIP)')
+        return
+      }
+      
+      const bounds = [
+        [_fitBounds.west, _fitBounds.south],
+        [_fitBounds.east, _fitBounds.north]
+      ]
+      
+      console.log('[MAP] fitBounds executing (clustered)', { 
+        reason: _fitBounds.reason, 
+        authority: _arbiterAuthority, 
+        mode: _arbiterMode 
+      })
+      
+      map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 0 })
+      
+      if (_onFitBoundsComplete) {
+        _onFitBoundsComplete()
+      }
+    } catch (error) {
+      console.error('[MAP] fitBounds error (clustered):', error)
+    }
+  }, [_fitBounds, _arbiterAuthority, _arbiterMode, _onFitBoundsComplete])
+
   // Render cluster markers
   const renderClusters = useMemo(() => {
     if (!isClusteringEnabled()) {
@@ -562,8 +598,8 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         // Reduce initial load time
         // Disable telemetry completely
         transformRequest={(url: string, resourceType: string) => {
-          if (resourceType === 'Source' && url.includes('events.mapbox.com')) {
-            return null; // Block telemetry requests
+          if (url.includes('events.mapbox.com')) {
+            return null; // Block all telemetry requests
           }
           return { url };
         }}

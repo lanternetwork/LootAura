@@ -255,9 +255,10 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (!map) return
       
-      // Block programmatic movement in MAP authority mode
-      if (arbiterAuthority === 'MAP') {
-        console.log('[BLOCK] fit bounds suppressed (map authoritative)')
+      // Allow fitBounds for ZIP searches and other programmatic moves
+      // Only block if it's a MAP authority mode AND not a ZIP search
+      if (arbiterAuthority === 'MAP' && arbiterMode !== 'zip') {
+        console.log('[BLOCK] fit bounds suppressed (map authoritative, not ZIP)')
         return
       }
       
@@ -266,13 +267,21 @@ export default function SalesMap({
         [fitBounds.east, fitBounds.north]
       ]
       
-      map.fitBounds(bounds, { padding: 50, maxZoom: 15 })
+      console.log('[MAP] fitBounds executing', { 
+        reason: fitBounds.reason, 
+        authority: arbiterAuthority, 
+        mode: arbiterMode 
+      })
+      
+      map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 0 })
       
       if (onFitBoundsComplete) {
         onFitBoundsComplete()
       }
-    } catch {}
-  }, [fitBounds, arbiterAuthority, onFitBoundsComplete])
+    } catch (error) {
+      console.error('[MAP] fitBounds error:', error)
+    }
+  }, [fitBounds, arbiterAuthority, arbiterMode, onFitBoundsComplete])
 
   // Handle view changes
   const handleViewChange = useCallback((evt: any) => {
@@ -404,8 +413,8 @@ export default function SalesMap({
         // Reduce initial load time
         // Disable telemetry completely
         transformRequest={(url: string, resourceType: string) => {
-          if (resourceType === 'Source' && url.includes('events.mapbox.com')) {
-            return null; // Block telemetry requests
+          if (url.includes('events.mapbox.com')) {
+            return null; // Block all telemetry requests
           }
           return { url };
         }}

@@ -625,8 +625,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const crossesAntimeridian = east < west
     const EPS = 0.0005 // Small epsilon for inclusive cropping
     
-    // Add small padding to prevent edge flickering
-    const padding = 0.05 // ~5% padding
+    // Remove padding to avoid an invisible margin where pins disappear at edges
+    const padding = 0 // previously 0.05 (~5%)
     const latRange = north - south
     const lngRange = crossesAntimeridian ? (180 - west) + (east + 180) : east - west
     const paddedNorth = north + (latRange * padding)

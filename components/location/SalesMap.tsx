@@ -413,8 +413,9 @@ export default function SalesMap({
         // Reduce initial load time
         // Disable telemetry completely
         transformRequest={(url: string, _resourceType: string) => {
-          if (url.includes('events.mapbox.com')) {
-            return null; // Block all telemetry requests
+          // Block all Mapbox telemetry and events requests
+          if (url.includes('events.mapbox.com') || url.includes('api.mapbox.com/events')) {
+            return null;
           }
           return { url };
         }}

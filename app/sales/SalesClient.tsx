@@ -2203,7 +2203,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     pendingFitReasonRef.current = null
                     
                     console.log(`[CONTROL] fit completion for ${reason}`)
-                    // Guard stays true until next user interaction
+                    
+                    // Clear programmatic move guard after ZIP search completion
+                    if (reason === 'zip') {
+                      console.log('[CONTROL] clearing programmatic move guard after ZIP search')
+                      setProgrammaticMoveGuard(false, 'ZIP search completed')
+                    }
+                    
                     // Trigger fetches once after fit completes with current coordinates
                     debouncedTrigger(() => {
                       if (filters.lat && filters.lng) {

@@ -706,6 +706,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       for (const s of sales) byId[String(s.id)] = s
       const hydrated = minimal.map(s => byId[String(s.id)] ?? s)
       const rendered = hydrated.slice(0, 24)
+      console.log('[SALES LIST] Setting visible/rendered sales (MAP):', {
+        hydratedCount: hydrated.length,
+        renderedCount: rendered.length,
+        sampleHydrated: hydrated.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title })),
+        authority: arbiter.authority
+      })
       setVisibleSales(hydrated)
       setRenderedSales(rendered)
       
@@ -729,6 +735,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     } else if (viewportBounds) {
       const inView = cropSalesToViewport(sales, viewportBounds)
       const rendered = inView.slice(0, 24)
+      console.log('[SALES LIST] Setting visible/rendered sales (FILTERS):', {
+        inViewCount: inView.length,
+        renderedCount: rendered.length,
+        sampleInView: inView.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title })),
+        authority: arbiter.authority
+      })
       setVisibleSales(inView)
       setRenderedSales(rendered)
       
@@ -1041,6 +1053,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           console.log('[DROP] stale/wide response (MAP authority active)')
           return
         }
+        // Debug sales data before setting
+        console.log('[SALES LIST] Setting sales data:', {
+          salesCount: newSales.length,
+          hasMore: newSales.length === 24,
+          sampleSales: newSales.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title })),
+          authority: arbiter.authority,
+          append
+        })
+        
         setSales(newSales)
         setIsUpdating(false)
         setDateWindow(data.dateWindow || null)
@@ -2076,9 +2097,21 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
                             const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
                             
-                            return finalItemsToRender.map((item: any, _idx: number) => (
-                              <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
-                            ))
+                            // Debug sales list rendering
+                            console.log('[SALES LIST] MAP authority rendering:', {
+                              isUpdating,
+                              staleSalesCount: staleSales.length,
+                              renderedSalesCount: renderedSales.length,
+                              visibleSalesCount: visibleSales.length,
+                              itemsToRenderCount: itemsToRender.length,
+                              finalItemsToRenderCount: finalItemsToRender.length,
+                              authority: arbiter.authority
+                            })
+                            
+                            return finalItemsToRender.map((item: any, _idx: number) => {
+                              console.log('[SALES LIST] Rendering sale:', { id: item.id, title: item.title })
+                              return <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                            })
                           })()}
                         </>
                       )}
@@ -2108,12 +2141,26 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                           {visibleSales.length > 24 && (
                             <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
                           )}
-                          {(isUpdating ? staleSales : renderedSales).map((item: any, _idx: number) => {
-                            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                              console.log('[DOM] list item rendered id=', item.id)
-                            }
-                            return <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
-                          })}
+                          {(() => {
+                            const itemsToRender = isUpdating ? staleSales : renderedSales
+                            
+                            // Debug sales list rendering for non-MAP authority
+                            console.log('[SALES LIST] Non-MAP authority rendering:', {
+                              isUpdating,
+                              staleSalesCount: staleSales.length,
+                              renderedSalesCount: renderedSales.length,
+                              salesCount: sales.length,
+                              itemsToRenderCount: itemsToRender.length,
+                              authority: arbiter.authority,
+                              loading,
+                              fetchedOnce
+                            })
+                            
+                            return itemsToRender.map((item: any, _idx: number) => {
+                              console.log('[SALES LIST] Rendering sale:', { id: item.id, title: item.title })
+                              return <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
+                            })
+                          })()}
                         </>
                       )}
                     </>

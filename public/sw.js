@@ -76,8 +76,9 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Skip external resources
-  if (url.hostname.includes('googleapis.com')) {
+  // Skip external resources - validate hostname properly
+  const allowedExternalHosts = ['googleapis.com', 'fonts.googleapis.com', 'fonts.gstatic.com']
+  if (allowedExternalHosts.some(host => url.hostname === host || url.hostname.endsWith('.' + host))) {
     return
   }
 

@@ -57,6 +57,18 @@ async function lookupNominatim(zip: string): Promise<any> {
   return data
 }
 
+// Helper function to safely escape strings for logging
+function escapeForLogging(input: string | null | undefined): string {
+  if (!input) return ''
+  return String(input)
+    .replace(/\\/g, '\\\\')  // Escape backslashes first
+    .replace(/"/g, '\\"')    // Escape quotes
+    .replace(/\n/g, '\\n')   // Escape newlines
+    .replace(/\r/g, '\\r')   // Escape carriage returns
+    .replace(/\t/g, '\\t')   // Escape tabs
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -223,13 +235,26 @@ export async function GET(request: NextRequest) {
                 city,
                 state
               }, { onConflict: 'zip' })
-            console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim writeback=success`)
+            console.log('[ZIP] writeback=success', {
+              input: escapeForLogging(rawZip),
+              normalized: escapeForLogging(normalizedZip),
+              source: 'nominatim'
+            })
           } catch (writebackError) {
-            console.error(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim writeback=failed`, writebackError)
+            console.error('[ZIP] writeback=failed', {
+              input: escapeForLogging(rawZip),
+              normalized: escapeForLogging(normalizedZip),
+              source: 'nominatim',
+              error: writebackError
+            })
           }
         }
         
-        console.log(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim status=ok`)
+        console.log('[ZIP] status=ok', {
+          input: escapeForLogging(rawZip),
+          normalized: escapeForLogging(normalizedZip),
+          source: 'nominatim'
+        })
         return NextResponse.json({
           ok: true,
           zip: normalizedZip,
@@ -252,7 +277,12 @@ export async function GET(request: NextRequest) {
         }, { status: 404 })
       }
     } catch (nominatimError: any) {
-      console.error(`[ZIP] input="${rawZip}" normalized=${normalizedZip} source=nominatim status=error`, nominatimError.message)
+      console.error('[ZIP] status=error', {
+        input: escapeForLogging(rawZip),
+        normalized: escapeForLogging(normalizedZip),
+        source: 'nominatim',
+        error: nominatimError.message
+      })
       return NextResponse.json({ 
         ok: false, 
         error: 'Geocoding service unavailable' 

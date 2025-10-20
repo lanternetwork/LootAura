@@ -154,22 +154,28 @@ export async function middleware(req: NextRequest) {
           .eq('id', session.user.id)
           .maybeSingle()
 
-        // Best-effort: if la_loc cookie missing and profile has home_zip, resolve coordinates and set la_loc
+        // Best-effort: if la_loc cookie missing and profile has home_zip, set a placeholder
+        // Note: We avoid making HTTP requests in middleware to prevent SSRF
         const hasCookie = !!cookieStore.get('la_loc')?.value
         const homeZip = profile?.home_zip as string | undefined
         if (!hasCookie && homeZip) {
-          try {
-            const url = new URL(req.url)
-            const geoUrl = `${url.origin}/api/geocoding/zip?zip=${encodeURIComponent(homeZip)}`
-            const r = await fetch(geoUrl, { cache: 'no-store' })
-            if (r.ok) {
-              const z = await r.json()
-              if (z?.ok && z.lat && z.lng) {
-                const payload = JSON.stringify({ lat: z.lat, lng: z.lng, zip: z.zip, city: z.city, state: z.state })
-                cookieStore.set({ name: 'la_loc', value: payload, httpOnly: false, maxAge: 60 * 60 * 24, sameSite: 'lax', path: '/' })
-              }
-            }
-          } catch {}
+          // Set a placeholder cookie that will be resolved on the client side
+          const placeholderPayload = JSON.stringify({ 
+            zip: homeZip, 
+            city: '', 
+            state: '', 
+            lat: 0, 
+            lng: 0,
+            placeholder: true 
+          })
+          cookieStore.set({ 
+            name: 'la_loc', 
+            value: placeholderPayload, 
+            httpOnly: false, 
+            maxAge: 60 * 60 * 24, 
+            sameSite: 'lax', 
+            path: '/' 
+          })
         }
       }
     } catch (error) {

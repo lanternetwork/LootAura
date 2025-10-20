@@ -356,7 +356,7 @@ function FiltersContent({
           {CATEGORY_OPTIONS.map((category) => (
             <label
               key={category.value}
-              className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors min-h-[48px] w-full ${
+              className={`flex items-start p-2 rounded-lg border cursor-pointer transition-colors min-h-[44px] w-full overflow-hidden ${
                 filters.categories.includes(category.value)
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -366,10 +366,12 @@ function FiltersContent({
                 type="checkbox"
                 checked={filters.categories.includes(category.value)}
                 onChange={() => onCategoryToggle(category.value)}
-                className="h-4 w-4 min-h-4 min-w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
+                className="h-4 w-4 min-h-4 min-w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0 mt-0.5"
               />
-              <span className="ml-2 text-sm font-medium flex-shrink-0">{category.icon}</span>
-              <span className="ml-2 text-sm font-medium text-left flex-1 min-w-0 break-words">{category.label}</span>
+              <div className="ml-2 flex-1 min-w-0">
+                <div className="text-sm font-medium flex-shrink-0 mb-1">{category.icon}</div>
+                <div className="text-xs font-medium text-left break-words leading-tight">{category.label}</div>
+              </div>
             </label>
           ))}
         </div>

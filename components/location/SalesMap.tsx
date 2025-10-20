@@ -10,6 +10,7 @@ import { getMapboxToken } from '@/lib/maps/token'
 import { incMapLoad } from '@/lib/usageLogs'
 import { isClusteringEnabled } from '@/lib/clustering'
 import SalesMapClustered from './SalesMapClustered'
+import MapLoadingIndicator from './MapLoadingIndicator'
 import mapDebug from '@/lib/debug/mapDebug'
 
 interface SalesMapProps {
@@ -61,6 +62,7 @@ export default function SalesMap({
   // Call onMapReady when map loads (not onLoad bounds emission)
   const handleMapLoad = useCallback(() => {
     mapDebug.logMapLoad('SalesMap', 'success', { onMapReady: !!onMapReady })
+    setIsMapLoading(false) // Map is loaded, hide loading indicator
     if (onMapReady) {
       onMapReady()
     }
@@ -78,6 +80,7 @@ export default function SalesMap({
   const [visiblePinCount, setVisiblePinCount] = useState(0)
   const [_moved, _setMoved] = useState(false)
   const autoFitAttemptedRef = useRef(false)
+  const [isMapLoading, setIsMapLoading] = useState(true)
   
   // All remaining hooks must be called unconditionally
   useEffect(() => {
@@ -373,7 +376,8 @@ export default function SalesMap({
 
   // Non-clustered map implementation
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
+      {isMapLoading && <MapLoadingIndicator />}
       <Map
         ref={mapRef}
         mapboxAccessToken={getMapboxToken()}

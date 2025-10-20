@@ -24,6 +24,7 @@ import { isOfflineCacheEnabled } from '@/lib/flags'
 import { logPrefetchStart, logPrefetchDone, logViewportSave, logViewportLoad } from '@/lib/telemetry/map'
 import ClusterMarker from './ClusterMarker'
 import OfflineBanner from '../OfflineBanner'
+import MapLoadingIndicator from './MapLoadingIndicator'
 import mapDebug from '@/lib/debug/mapDebug'
 
 interface SalesMapClusteredProps {
@@ -82,6 +83,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   const [_visiblePinCount, setVisiblePinCount] = useState(0)
   const [clusters, setClusters] = useState<ClusterResult[]>([])
   const [clusterIndex, setClusterIndex] = useState<ClusterIndex | null>(null)
+  const [isMapLoading, setIsMapLoading] = useState(true)
   
   // Offline state
   const [isOffline, setIsOffline] = useState(false)
@@ -465,6 +467,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   const handleMapLoad = useCallback(() => {
     mapDebug.logMapLoad('SalesMapClustered', 'success', { onMapReady: !!onMapReady })
+    setIsMapLoading(false) // Map is loaded, hide loading indicator
     onMapReady?.()
     
     const map = mapRef.current?.getMap?.()
@@ -522,11 +525,12 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   return (
     <div 
-      className={`w-full h-full ${className || ''}`}
+      className={`w-full h-full relative ${className || ''}`}
       style={style}
       id={id}
       data-testid={dataTestId}
     >
+      {isMapLoading && <MapLoadingIndicator />}
       <OfflineBanner 
         isVisible={showOfflineBanner}
         isOffline={isOffline}

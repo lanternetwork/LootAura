@@ -219,11 +219,29 @@ export function sanitizeSearchQuery(input: string): string {
   // Remove javascript: protocols using simple string replacement
   sanitized = sanitized.replace(/javascript:/gi, '')
   
-  // Remove common event handlers using simple patterns
+  // Remove common event handlers using string methods
   const eventHandlers = ['onclick', 'onload', 'onerror', 'onmouseover', 'onfocus', 'onblur']
   for (const handler of eventHandlers) {
-    const regex = new RegExp(handler + '\\s*=\\s*["\'][^"\']*["\']', 'gi')
-    sanitized = sanitized.replace(regex, '')
+    let handlerIndex = sanitized.toLowerCase().indexOf(handler + '=')
+    while (handlerIndex !== -1) {
+      // Find the end of the attribute value
+      const quoteStart = sanitized.indexOf('"', handlerIndex)
+      const singleQuoteStart = sanitized.indexOf("'", handlerIndex)
+      let quoteEnd = -1
+      
+      if (quoteStart !== -1 && (singleQuoteStart === -1 || quoteStart < singleQuoteStart)) {
+        quoteEnd = sanitized.indexOf('"', quoteStart + 1)
+      } else if (singleQuoteStart !== -1) {
+        quoteEnd = sanitized.indexOf("'", singleQuoteStart + 1)
+      }
+      
+      if (quoteEnd !== -1) {
+        sanitized = sanitized.substring(0, handlerIndex) + sanitized.substring(quoteEnd + 1)
+      } else {
+        sanitized = sanitized.substring(0, handlerIndex)
+      }
+      handlerIndex = sanitized.toLowerCase().indexOf(handler + '=')
+    }
   }
   
   // Remove alert() calls using string methods

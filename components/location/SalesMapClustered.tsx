@@ -474,8 +474,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const newCenter = viewState.center || { lat: 0, lng: 0 }
     const newZoom = viewState.zoom || 10
     
-    // Much more aggressive user interaction detection
-    // Check for any mouse/touch events or map movement that isn't programmatic
+    // Precise user interaction detection - only detect actual user interactions
     const isUserInteraction = evt.isDragging || 
                               evt.isZooming || 
                               evt.originalEvent?.type === 'mousedown' || 
@@ -487,15 +486,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
                               evt.originalEvent?.type === 'wheel' ||
                               evt.originalEvent?.type === 'pointerdown' ||
                               evt.originalEvent?.type === 'pointerup' ||
-                              evt.originalEvent?.type === 'pointermove' ||
-                              // If we have a pointer event, it's likely user interaction
-                              evt.originalEvent?.pointerType ||
-                              // If the event has a source, it's likely user interaction
-                              evt.source ||
-                              // If we have any originalEvent at all, assume user interaction
-                              !!evt.originalEvent ||
-                              // If the event has any of these properties, assume user interaction
-                              !!evt.isDragging || !!evt.isZooming
+                              evt.originalEvent?.type === 'pointermove'
     
     console.log('[MAP] handleViewChange - userInteraction:', isUserInteraction, {
       isDragging: evt.isDragging,

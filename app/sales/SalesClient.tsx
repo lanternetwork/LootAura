@@ -270,13 +270,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [arbiter.authority, filters, mapView])
 
 
-  // Debug logging
-  console.log('[SALES] SalesClient render:', {
-    initialCenter,
-    filters,
-    searchParams: Object.fromEntries(searchParams.entries())
-  })
-
   const [sales, setSales] = useState<Sale[]>(initialSales)
   const [loading, setLoading] = useState(false)
   const [fetchedOnce, setFetchedOnce] = useState(false)
@@ -354,6 +347,22 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Map stability and idle tracking
   const [_mapReady, _setMapReady] = useState<boolean>(false)
   const _firstStableViewportTsRef = useRef<number>(0)
+  
+  // Debug logging
+  console.log('[SALES] SalesClient render:', {
+    initialCenter,
+    filters,
+    searchParams: Object.fromEntries(searchParams.entries()),
+    salesCount: sales.length,
+    markersCount: mapMarkers.length,
+    authority: arbiter.authority,
+    mode: arbiter.mode,
+    loading,
+    hasMore,
+    visibleSalesCount: visibleSales.length,
+    renderedSalesCount: renderedSales.length,
+    staleSalesCount: staleSales.length
+  })
   const lastViewportEmitTsRef = useRef<number>(0)
   const boundsCoalesceKeyRef = useRef<string>('')
   const boundsDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -2106,8 +2115,19 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                               finalItemsToRenderCount: finalItemsToRender.length
                             })
                             
+                            console.log('[SALES LIST] MAP authority rendering:', {
+                              isUpdating,
+                              staleSalesCount: staleSales.length,
+                              renderedSalesCount: renderedSales.length,
+                              visibleSalesCount: visibleSales.length,
+                              itemsToRenderCount: itemsToRender.length,
+                              finalItemsToRenderCount: finalItemsToRender.length,
+                              authority: arbiter.authority
+                            })
+                            
                             return finalItemsToRender.map((item: any, _idx: number) => {
                               salesListDebug.logSaleRender({ id: item.id, title: item.title })
+                              console.log('[SALES LIST] Rendering sale (MAP):', { id: item.id, title: item.title })
                               return <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
                             })
                           })()}
@@ -2153,8 +2173,20 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                               fetchedOnce
                             })
                             
+                            console.log('[SALES LIST] Non-MAP authority rendering:', {
+                              isUpdating,
+                              staleSalesCount: staleSales.length,
+                              renderedSalesCount: renderedSales.length,
+                              salesCount: sales.length,
+                              itemsToRenderCount: itemsToRender.length,
+                              authority: arbiter.authority,
+                              loading,
+                              fetchedOnce
+                            })
+                            
                             return itemsToRender.map((item: any, _idx: number) => {
                               salesListDebug.logSaleRender({ id: item.id, title: item.title })
+                              console.log('[SALES LIST] Rendering sale (Non-MAP):', { id: item.id, title: item.title })
                               return <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
                             })
                           })()}

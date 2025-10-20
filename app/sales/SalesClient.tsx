@@ -1578,16 +1578,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     }, delay)
   }, [arbiter.authority])
 
-  // Debounced markers fetch while user is moving the map (runs even in MAP authority)
-  const moveMarkersDebounceRef = useRef<number | null>(null)
-  const debouncedFetchMarkersDuringMove = useCallback((center: { lat: number; lng: number }, delay = 50) => {
-    if (moveMarkersDebounceRef.current) {
-      clearTimeout(moveMarkersDebounceRef.current)
-    }
-    moveMarkersDebounceRef.current = window.setTimeout(() => {
-      fetchMapSales(undefined, center)
-      moveMarkersDebounceRef.current = null
-    }, delay)
+  // Immediate markers fetch while user is moving the map (no debouncing for real-time updates)
+  const fetchMarkersDuringMove = useCallback((center: { lat: number; lng: number }) => {
+    // Fetch immediately for real-time updates
+    fetchMapSales(undefined, center)
   }, [fetchMapSales])
 
   // Reset pagination when mode/bbox changes
@@ -2495,8 +2489,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       // Lock mode='map' for 600ms minimum to prevent thrashing
                       mapAuthorityUntilRef.current = Date.now() + 600
 
-                      // Live-update markers during movement (debounced)
-                      debouncedFetchMarkersDuringMove(center)
+                      // Live-update markers during movement (immediate)
+                      fetchMarkersDuringMove(center)
                       
                       if (arbiter.programmaticMoveGuard) {
                         console.log('[CONTROL] user pan -> mode: zip → map; guard=false')

@@ -1287,16 +1287,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[FILTER DEBUG] response.count =', data.count || data.data?.length || 0)
       }
-      if (data?.ok && Array.isArray(data.data)) {
+      // Handle both direct array response and wrapped response
+      const markersData = data?.data || data
+      if (Array.isArray(markersData)) {
         // Normalize id to a stable value (prefer saleId if present), then deduplicate
-        const normalized = data.data.map((m: any) => {
+        const normalized = markersData.map((m: any) => {
           const stableId = m.id ?? m.saleId
           return { id: String(stableId), saleId: String(stableId), title: m.title, lat: m.lat, lng: m.lng }
         })
         const uniqueMarkers = normalized.filter((marker: any, index: number, self: any[]) => 
           index === self.findIndex((m: any) => m.id === marker.id)
         )
-        console.log('[MAP] Setting mapMarkers to:', uniqueMarkers.length, 'markers (deduplicated from', data.data.length, ')')
+        console.log('[MAP] Setting mapMarkers to:', uniqueMarkers.length, 'markers (deduplicated from', markersData.length, ')')
         const sample = uniqueMarkers.slice(0, 5).map((m: any) => m.id === m.saleId)
         console.log('[ASSERT] id parity ok? examples:', sample)
         setMapMarkers(uniqueMarkers)

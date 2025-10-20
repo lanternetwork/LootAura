@@ -152,9 +152,9 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
         params.delete('cat')
       }
       
-      // Update URL
+      // Update URL without scrolling to top or adding history entries
       const newUrl = `${window.location.pathname}?${params.toString()}`
-      router.push(newUrl)
+      router.replace(newUrl, { scroll: false })
       
       return updatedFilters
     })
@@ -352,7 +352,7 @@ function FiltersContent({
           <span className="text-gray-500 mr-2"></span>
           <label className="text-sm font-medium text-gray-700">Categories</label>
         </div>
-        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-2">
           {CATEGORY_OPTIONS.map((category) => (
             <label
               key={category.value}

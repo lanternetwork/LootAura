@@ -2171,7 +2171,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       position: 'relative',
                       zIndex: 3,
                       minHeight: 240
-                    } : {})
+                    } : {}),
+                    // Prevent scroll anchoring jumps when content reflows
+                    overflowAnchor: 'none'
                   }}
                   data-testid="sales-grid"
                   data-panel="list"
@@ -2363,7 +2365,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                   </span>
                 )}
               </h2>
-              <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'} relative`} style={{ zIndex: 1 }}>
+              <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'} relative`} style={{ zIndex: 1, overflowAnchor: 'none' }}>
                 {/* Error toast */}
                 {mapError && (
                   <div className="absolute top-2 right-2 z-10 bg-red-500 text-white px-3 py-2 rounded-md text-sm shadow-lg">

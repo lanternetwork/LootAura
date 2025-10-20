@@ -28,22 +28,34 @@ export default function ClusterMarker({
     }
   }, [cluster, onKeyDown])
 
-  // Size-based styling
+  // Size-based styling - much smaller for better clustering
   const sizeClasses = {
-    small: 'w-8 h-8 text-xs',
-    medium: 'w-10 h-10 text-sm',
-    large: 'w-12 h-12 text-base'
+    small: 'w-4 h-4 text-xs',
+    medium: 'w-5 h-5 text-xs',
+    large: 'w-6 h-6 text-sm'
   }
 
   const sizeStyles = {
-    small: { minWidth: '32px', minHeight: '32px' },
-    medium: { minWidth: '40px', minHeight: '40px' },
-    large: { minWidth: '48px', minHeight: '48px' }
+    small: { minWidth: '16px', minHeight: '16px' },
+    medium: { minWidth: '20px', minHeight: '20px' },
+    large: { minWidth: '24px', minHeight: '24px' }
   }
 
   if (cluster.type === 'point') {
-    // Individual point marker - render as before
-    return null
+    // Individual point marker - render as small dot
+    return (
+      <Marker
+        longitude={cluster.lon}
+        latitude={cluster.lat}
+        anchor="center"
+      >
+        <button
+          className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500"
+          onClick={handleClick}
+          aria-label={`Sale at this location`}
+        />
+      </Marker>
+    )
   }
 
   return (
@@ -71,7 +83,7 @@ export default function ClusterMarker({
         aria-label={`Cluster of ${cluster.count} sales. Press Enter to zoom in.`}
         title={`Cluster of ${cluster.count} sales`}
       >
-        {cluster.count}
+        <span className="text-white font-bold">+</span>
       </button>
     </Marker>
   )

@@ -280,6 +280,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapUpdating, setMapUpdating] = useState(false)
+  // Delay showing the "updating map" overlay to avoid flashes during quick pans/zooms
+  const mapUpdatingTimerRef = useRef<number | null>(null)
   const [mapSales, _setMapSales] = useState<Sale[]>([])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
@@ -1214,8 +1216,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[KEY] markers', key)
     lastMarkersKeyRef.current = key
     
-    // Set map updating state to prevent flashing
-    setMapUpdating(true)
+    // Delay the updating overlay slightly to avoid opacity flashes on quick interactions
+    if (typeof window !== 'undefined') {
+      if (mapUpdatingTimerRef.current) {
+        window.clearTimeout(mapUpdatingTimerRef.current)
+        mapUpdatingTimerRef.current = null
+      }
+      mapUpdatingTimerRef.current = window.setTimeout(() => {
+        setMapUpdating(true)
+      }, 120)
+    } else {
+      setMapUpdating(true)
+    }
     
     // Abort previous markers request
     abortPrevious('markers')
@@ -1385,6 +1397,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.log('[ASSERT] id parity ok? examples:', sample)
         setMapMarkers(uniqueMarkers)
         setMapError(null) // Clear any previous errors
+        // Clear any pending timer and hide overlay immediately on success
+        if (mapUpdatingTimerRef.current) {
+          window.clearTimeout(mapUpdatingTimerRef.current)
+          mapUpdatingTimerRef.current = null
+        }
         setMapUpdating(false) // Reset map updating state
         
         // Update markers hash for change detection
@@ -1400,6 +1417,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       } else {
         console.log('[MAP] Setting mapMarkers to empty array')
         setMapMarkers([])
+        // Clear any pending timer and hide overlay on empty
+        if (mapUpdatingTimerRef.current) {
+          window.clearTimeout(mapUpdatingTimerRef.current)
+          mapUpdatingTimerRef.current = null
+        }
         setMapUpdating(false) // Reset map updating state
         
         // Update markers hash for change detection
@@ -1421,6 +1443,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       console.error('[MAP] Error fetching markers:', error)
       setMapMarkers([])
       setMapError('Failed to load map markers')
+      // Clear any pending timer and hide overlay on error
+      if (mapUpdatingTimerRef.current) {
+        window.clearTimeout(mapUpdatingTimerRef.current)
+        mapUpdatingTimerRef.current = null
+      }
       setMapUpdating(false) // Reset map updating state
       
       // Update markers hash for change detection
@@ -1438,7 +1465,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (markersAbortRef.current === controller) {
         markersAbortRef.current = null
       }
-      // Always reset map updating state
+      // Always reset map updating state and clear any pending timer
+      if (mapUpdatingTimerRef.current) {
+        window.clearTimeout(mapUpdatingTimerRef.current)
+        mapUpdatingTimerRef.current = null
+      }
       setMapUpdating(false)
     }
   }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, buildMarkersKey])

@@ -8,7 +8,25 @@ import { Sale } from '@/lib/types'
 vi.mock('react-map-gl', () => ({
   default: React.forwardRef<any, any>(({ children, onLoad, onMoveEnd, onZoomEnd, ...props }, ref) => {
     // Only pass safe DOM props to avoid React warnings
-    const { mapboxAccessToken, initialViewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
+    const { 
+      mapboxAccessToken, 
+      initialViewState, 
+      mapStyle, 
+      interactiveLayerIds, 
+      onMove, 
+      role, 
+      'data-testid': dataTestId, 
+      tabIndex, 
+      'aria-label': ariaLabel,
+      optimizeForTerrain,
+      antialias,
+      preserveDrawingBuffer,
+      attributionControl,
+      logoPosition,
+      preloadResources,
+      transformRequest,
+      ...safeProps 
+    } = props
     
     // Auto-trigger onLoad to simulate map loading
     React.useEffect(() => {

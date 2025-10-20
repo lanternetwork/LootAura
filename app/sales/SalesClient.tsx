@@ -2383,6 +2383,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                   onViewChange={({ center, zoom, userInteraction }) => {
                     setMapView({ center, zoom })
                     
+                    console.log('[MAP] onViewChange called:', {
+                      userInteraction,
+                      programmaticMoveGuard: arbiter.programmaticMoveGuard,
+                      authority: arbiter.authority,
+                      mode: arbiter.mode
+                    })
+                    
                     // If programmatic move guard is active, ignore all changes except user interactions
                     if (arbiter.programmaticMoveGuard && !userInteraction) {
                       console.log('[ARB] map move ignored due to guard (programmatic)')
@@ -2391,6 +2398,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     
                     // Only handle user interactions
                     if (userInteraction) {
+                      console.log('[MAP] User interaction detected - switching to MAP authority')
                       // Set guard immediately on user interaction
                       setGuardMapMove(true, 'User panned/zoomed')
                       console.log('[MAP] userMove=true (guard active)')
@@ -2406,6 +2414,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                         console.log('[CONTROL] user pan detected -> switching to map mode')
                         switchToMapIfUserGesture('User panned/zoomed')
                       }
+                    } else {
+                      console.log('[MAP] No user interaction detected - staying in FILTERS authority')
                     }
                     
                     try {

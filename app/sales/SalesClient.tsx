@@ -742,6 +742,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.log(`[LIST] update (map) seq=${seq} markers=${ids.length} inView=${hydrated.length} rendered=${rendered.length}`)
       }
     } else if (viewportBounds) {
+      console.log('[SALES LIST] FILTERS authority with viewportBounds:', {
+        viewportBounds,
+        salesCount: sales.length,
+        authority: arbiter.authority
+      })
       const inView = cropSalesToViewport(sales, viewportBounds)
       const rendered = inView.slice(0, 24)
       salesListDebug.logVisibleRendered('FILTERS', {
@@ -769,6 +774,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log(`[LIST] update (filters) seq=${seq} inView=${inView.length} rendered=${rendered.length}`)
       }
+    } else {
+      console.log('[SALES LIST] No viewportBounds for FILTERS authority:', {
+        viewportBounds,
+        salesCount: sales.length,
+        authority: arbiter.authority,
+        mode: arbiter.mode
+      })
     }
   }, [arbiter.authority, visiblePinIdsState, mapMarkers, sales, viewportBounds, cropSalesToViewport])
 
@@ -1070,16 +1082,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           append
         })
         
-        console.log('[SALES LIST] Setting sales data (detailed):', {
-          salesCount: newSales.length,
-          hasMore: newSales.length === 24,
-          sampleSales: newSales.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title })),
-          authority: arbiter.authority,
-          append,
-          currentSalesCount: sales.length,
-          currentRenderedCount: renderedSales.length,
-          currentVisibleCount: visibleSales.length
-        })
+        console.log('[SALES LIST] Setting sales data (detailed):')
+        console.log('  - salesCount:', newSales.length)
+        console.log('  - hasMore:', newSales.length === 24)
+        console.log('  - sampleSales:', newSales.slice(0, 3).map((s: any) => ({ id: s.id, title: s.title })))
+        console.log('  - authority:', arbiter.authority)
+        console.log('  - append:', append)
+        console.log('  - currentSalesCount:', sales.length)
+        console.log('  - currentRenderedCount:', renderedSales.length)
+        console.log('  - currentVisibleCount:', visibleSales.length)
         
         setSales(newSales)
         setIsUpdating(false)
@@ -1091,13 +1102,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.debug('[SALES] got', sales.length)
         
         // Debug after setting sales
-        console.log('[SALES LIST] After setting sales:', {
-          newSalesCount: newSales.length,
-          currentSalesCount: sales.length,
-          renderedSalesCount: renderedSales.length,
-          visibleSalesCount: visibleSales.length,
-          authority: arbiter.authority
-        })
+        console.log('[SALES LIST] After setting sales:')
+        console.log('  - newSalesCount:', newSales.length)
+        console.log('  - currentSalesCount:', sales.length)
+        console.log('  - renderedSalesCount:', renderedSales.length)
+        console.log('  - visibleSalesCount:', visibleSales.length)
+        console.log('  - authority:', arbiter.authority)
 
         // Prefetch next page in background for instant next click
         // Note: safe here because MAP authority already returned above
@@ -2193,19 +2203,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                               fetchedOnce
                             })
                             
-                            console.log('[SALES LIST] Non-MAP authority rendering:', {
-                              isUpdating,
-                              staleSalesCount: staleSales.length,
-                              renderedSalesCount: renderedSales.length,
-                              salesCount: sales.length,
-                              itemsToRenderCount: itemsToRender.length,
-                              authority: arbiter.authority,
-                              loading,
-                              fetchedOnce,
-                              sampleSales: sales.slice(0, 3).map(s => ({ id: s.id, title: s.title })),
-                              sampleRendered: renderedSales.slice(0, 3).map(s => ({ id: s.id, title: s.title })),
-                              sampleStale: staleSales.slice(0, 3).map(s => ({ id: s.id, title: s.title }))
-                            })
+                            console.log('[SALES LIST] Non-MAP authority rendering:')
+                            console.log('  - isUpdating:', isUpdating)
+                            console.log('  - staleSalesCount:', staleSales.length)
+                            console.log('  - renderedSalesCount:', renderedSales.length)
+                            console.log('  - salesCount:', sales.length)
+                            console.log('  - itemsToRenderCount:', itemsToRender.length)
+                            console.log('  - authority:', arbiter.authority)
+                            console.log('  - loading:', loading)
+                            console.log('  - fetchedOnce:', fetchedOnce)
+                            console.log('  - sampleSales:', sales.slice(0, 3).map(s => ({ id: s.id, title: s.title })))
+                            console.log('  - sampleRendered:', renderedSales.slice(0, 3).map(s => ({ id: s.id, title: s.title })))
+                            console.log('  - sampleStale:', staleSales.slice(0, 3).map(s => ({ id: s.id, title: s.title })))
                             
                             return itemsToRender.map((item: any, _idx: number) => {
                               salesListDebug.logSaleRender({ id: item.id, title: item.title })

@@ -414,7 +414,9 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     if (onVisiblePinsChange) {
       // Get the cluster's child points
       const childPoints = clusterIndex.getChildren(clusterId)
+      console.log('[CLUSTER] Child points:', childPoints)
       const visibleIds = childPoints.map(point => point.id)
+      console.log('[CLUSTER] Visible IDs:', visibleIds)
       onVisiblePinsChange(visibleIds, visibleIds.length)
     }
     

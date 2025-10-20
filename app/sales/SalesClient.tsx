@@ -875,14 +875,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     }
   }, [])
 
-  // Build stable request key for markers
-  const buildMarkersKey = useCallback(() => {
+  // Build stable request key for markers (optionally using override center/zoom during active moves)
+  const buildMarkersKey = useCallback((override?: { center?: { lat: number; lng: number }; zoom?: number }) => {
     const mode = arbiter?.mode || 'initial'
     let key = `mode:${mode}`
     
     if (mode === 'map' && mapView.center && mapView.zoom) {
-      const center = mapView.center
-      const radius = approximateRadiusKmFromZoom(mapView.zoom)
+      const center = override?.center ?? mapView.center
+      const zoomForRadius = override?.zoom ?? mapView.zoom
+      const radius = approximateRadiusKmFromZoom(zoomForRadius)
       key += `|center:${center.lat.toFixed(6)},${center.lng.toFixed(6)}|radius:${radius?.toFixed(2) || 'null'}`
     } else {
       key += `|lat:${filters.lat?.toFixed(6) || 'null'}|lng:${filters.lng?.toFixed(6) || 'null'}|dist:${filters.distance}`
@@ -1207,9 +1208,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Client-side geolocation removed; handlers not used
 
   // Fetch markers for map pins using dedicated markers endpoint
-  const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }) => {
-    // Check if we need to fetch based on key change
-    const key = buildMarkersKey()
+  const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }, zoomOverride?: number) => {
+    // Check if we need to fetch based on key change (use overrides when provided)
+    const key = buildMarkersKey(centerOverride ? { center: centerOverride, zoom: zoomOverride } : undefined)
     if (key === lastMarkersKeyRef.current) {
       console.log('[SKIP] same markers key')
       return
@@ -1256,9 +1257,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     let distanceKmForRequest: number | null = null
 
     if (mode === 'map' && mapView.center && mapView.zoom) {
-      useLat = mapView.center.lat
-      useLng = mapView.center.lng
-      const radiusKm = approximateRadiusKmFromZoom(mapView.zoom)
+      const center = centerOverride ?? mapView.center
+      const zoomForRadius = zoomOverride ?? mapView.zoom
+      useLat = center.lat
+      useLng = center.lng
+      const radiusKm = approximateRadiusKmFromZoom(zoomForRadius)
       distanceKmForRequest = radiusKm
       console.log('[DIST] MAP mode radius miles→km', { 
         miles: radiusKm ? radiusKm / 1.60934 : null, 
@@ -2502,6 +2505,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       }
                     } else {
                       console.log('[MAP] No user interaction detected - staying in FILTERS authority')
+                    }
+
+                    // Regardless of authority, keep markers fresh while moving (debounced and key-aware)
+                    if (userInteraction) {
+                      fetchMapSales(undefined, center, zoom)
                     }
                     
                     try {

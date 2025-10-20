@@ -58,6 +58,7 @@ async function lookupNominatim(zip: string): Promise<any> {
 }
 
 // Helper function to safely escape strings for logging
+// Updated to fix ESLint control character regex issue
 function escapeForLogging(input: string | null | undefined): string {
   if (!input) return ''
   return String(input)
@@ -66,8 +67,10 @@ function escapeForLogging(input: string | null | undefined): string {
     .replace(/\n/g, '\\n')   // Escape newlines
     .replace(/\r/g, '\\r')   // Escape carriage returns
     .replace(/\t/g, '\\t')   // Escape tabs
-    .replace(/[\u0000-\u001F\u007F]/g, '') // Remove control characters
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0001-\u001F\u007F]/g, '') // Remove control characters (excluding null char)
 }
+
 
 export async function GET(request: NextRequest) {
   try {

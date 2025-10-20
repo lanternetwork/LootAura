@@ -23,7 +23,7 @@
     "verify:migration": "node scripts/verify-migration.js"
   },
   "dependencies": {
-    "next": "14.2.4",
+    "next": "^14.2.15",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "@supabase/supabase-js": "^2.45.4",
@@ -57,7 +57,7 @@
     "react-toastify": "^10.0.5"
   },
   "devDependencies": {
-    "eslint-config-next": "14.2.4",
+    "eslint-config-next": "^14.2.15",
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.0",
     "autoprefixer": "^10.4.19",

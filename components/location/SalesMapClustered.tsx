@@ -480,14 +480,26 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   const handleViewChange = useCallback((evt: any) => {
     if (!onViewChange) return
     
-    // Safely extract viewState with fallbacks
-    const viewState = evt.viewState || evt
-    const newCenter = viewState.center || { lat: 0, lng: 0 }
-    const newZoom = viewState.zoom || 10
-    
     // Check if this was triggered by a cluster click
     const map = mapRef.current?.getMap?.()
     const isClusterClick = map?._userInitiatedClusterClick || false
+    
+    // Safely extract viewState with fallbacks
+    const viewState = evt.viewState || evt
+    let newCenter = viewState.center || { lat: 0, lng: 0 }
+    let newZoom = viewState.zoom || 10
+    
+    // If this is a cluster click and we don't have proper coordinates, get them from the map
+    if (isClusterClick && (newCenter.lat === 0 && newCenter.lng === 0)) {
+      try {
+        const mapCenter = map.getCenter()
+        newCenter = { lat: mapCenter.lat, lng: mapCenter.lng }
+        newZoom = map.getZoom()
+        console.log('[MAP] Using map center for cluster click:', newCenter, 'zoom:', newZoom)
+      } catch (error) {
+        console.warn('[MAP] Failed to get map center:', error)
+      }
+    }
     
     // Don't clear the flag here - it's cleared by timeout in handleClusterClick
     

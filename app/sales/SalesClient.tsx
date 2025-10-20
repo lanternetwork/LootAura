@@ -2096,7 +2096,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                 isOpen={showFiltersModal}
                 onToggle={() => setShowFiltersModal(!showFiltersModal)}
                 activeFiltersCount={hasActiveFilters ? 1 : 0}
-                className="sm:hidden"
+                className="md:hidden"
               />
             </div>
           </div>

@@ -152,9 +152,13 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
         params.delete('cat')
       }
       
-      // Update URL without scrolling to top or adding history entries
+      // Update URL without navigation or scroll (History API)
       const newUrl = `${window.location.pathname}?${params.toString()}`
-      router.replace(newUrl, { scroll: false })
+      try {
+        window.history.replaceState(null, '', newUrl)
+      } catch {
+        router.replace(newUrl, { scroll: false })
+      }
       
       return updatedFilters
     })

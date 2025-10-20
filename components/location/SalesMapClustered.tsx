@@ -469,7 +469,10 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   const handleViewChange = useCallback((evt: any) => {
     if (!onViewChange) return
     
-    const { center: newCenter, zoom: newZoom } = evt.viewState
+    // Safely extract viewState with fallbacks
+    const viewState = evt.viewState || evt
+    const newCenter = viewState.center || { lat: 0, lng: 0 }
+    const newZoom = viewState.zoom || 10
     
     // Detect user interaction more reliably
     // Mapbox GL JS doesn't always provide isDragging/isZooming, so we need to track it ourselves
@@ -615,8 +618,13 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         // Reduce initial load time
         // Disable telemetry completely
         transformRequest={(url: string, _resourceType: string) => {
-          // Block all Mapbox telemetry and events requests
-          if (url.includes('events.mapbox.com') || url.includes('api.mapbox.com/events')) {
+          // Block all Mapbox telemetry and events requests more aggressively
+          if (url.includes('events.mapbox.com') || 
+              url.includes('api.mapbox.com/events') ||
+              url.includes('events/v2') ||
+              url.includes('telemetry') ||
+              url.includes('analytics')) {
+            console.log('[MAP] Blocking request:', url);
             return null;
           }
           return { url };

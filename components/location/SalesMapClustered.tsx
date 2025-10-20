@@ -474,9 +474,28 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const newCenter = viewState.center || { lat: 0, lng: 0 }
     const newZoom = viewState.zoom || 10
     
-    // Detect user interaction more reliably
-    // Mapbox GL JS doesn't always provide isDragging/isZooming, so we need to track it ourselves
-    const isUserInteraction = evt.isDragging || evt.isZooming || evt.originalEvent?.type === 'mousedown' || evt.originalEvent?.type === 'touchstart'
+    // More aggressive user interaction detection
+    // Check for any mouse/touch events or map movement that isn't programmatic
+    const isUserInteraction = evt.isDragging || 
+                              evt.isZooming || 
+                              evt.originalEvent?.type === 'mousedown' || 
+                              evt.originalEvent?.type === 'touchstart' ||
+                              evt.originalEvent?.type === 'mouseup' ||
+                              evt.originalEvent?.type === 'touchend' ||
+                              evt.originalEvent?.type === 'mousemove' ||
+                              evt.originalEvent?.type === 'touchmove' ||
+                              // If we have a pointer event, it's likely user interaction
+                              evt.originalEvent?.pointerType ||
+                              // If the event has a source, it's likely user interaction
+                              evt.source
+    
+    console.log('[MAP] handleViewChange - userInteraction:', isUserInteraction, {
+      isDragging: evt.isDragging,
+      isZooming: evt.isZooming,
+      originalEventType: evt.originalEvent?.type,
+      hasSource: !!evt.source,
+      hasPointerType: !!evt.originalEvent?.pointerType
+    })
     
     onViewChange({
       center: { lat: newCenter.lat, lng: newCenter.lng },

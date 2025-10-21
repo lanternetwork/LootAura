@@ -469,20 +469,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       clusterDebug.warn('onVisiblePinsChange callback not provided')
     }
     
-    // Also trigger a direct sales data fetch for this cluster
-    // This ensures the sales list gets updated with the correct data
+    // Get the cluster's leaves (actual sales) and trigger onClusterClick
     if (onClusterClick) {
       try {
-        const childPoints = clusterIndex.getChildren(clusterId)
-        console.log('[CLUSTER] Child points:', childPoints)
+        const leaves = clusterIndex.getLeaves(clusterId)
+        console.log('[CLUSTER_CLICK] id=', clusterId, 'leaves=', leaves.length, 'lock=true')
         console.log('[CLUSTER] Available sales:', sales.length, 'sales')
-        console.log('[CLUSTER] Sales IDs:', sales.map(s => s.id))
-        console.log('[CLUSTER] Child point IDs:', childPoints.map(p => p.id))
+        console.log('[CLUSTER] Leaf IDs:', leaves.map(l => l.properties?.id))
         
-        const clusterSales = childPoints.map(point => {
+        const clusterSales = leaves.map(leaf => {
           // Find the corresponding sale data
-          const sale = sales.find(s => s.id === point.id)
-          console.log('[CLUSTER] Looking for sale with ID:', point.id, 'Found:', !!sale)
+          const sale = sales.find(s => s.id === leaf.properties?.id)
+          console.log('[CLUSTER] Looking for sale with ID:', leaf.properties?.id, 'Found:', !!sale)
           return sale
         }).filter((sale): sale is Sale => sale !== undefined)
         

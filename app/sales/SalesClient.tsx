@@ -287,6 +287,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [mapSales, _setMapSales] = useState<Sale[]>([])
   const mapSalesRef = useRef<Sale[]>([])
   
+  // Cluster lock state to prevent list flicker during cluster click animation
+  const [clusterLock, setClusterLock] = useState(false)
+
   // Update both state and ref when mapSales changes
   const setMapSales = useCallback((sales: Sale[]) => {
     _setMapSales(sales)
@@ -901,6 +904,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [arbiter.mode, mapView.center, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.dateRange, filters.categories, approximateRadiusKmFromZoom])
 
   const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }) => {
+    // Skip fetch during cluster lock to prevent list flicker
+    if (clusterLock) {
+      console.log('[FETCH] skipped during lock when a fetch would have replaced the list')
+      return
+    }
+    
     // Abort previous sales request
     abortPrevious('sales')
     
@@ -1210,12 +1219,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       }
       setLoading(false)
     }
-  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious])
+  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, clusterLock])
 
   // Client-side geolocation removed; handlers not used
 
   // Fetch markers for map pins using dedicated markers endpoint
   const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }, zoomOverride?: number) => {
+    // Skip fetch during cluster lock to prevent list flicker
+    if (clusterLock) {
+      console.log('[FETCH] skipped during lock when a fetch would have replaced the list')
+      return
+    }
+    
     // Check if we need to fetch based on key change (use overrides when provided)
     const key = buildMarkersKey(centerOverride ? { center: centerOverride, zoom: zoomOverride } : undefined)
     
@@ -1549,7 +1564,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       }
       setMapUpdating(false)
     }
-  }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, buildMarkersKey])
+  }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, buildMarkersKey, clusterLock])
 
   const loadMore = useCallback(async () => {
     // Use prefetched next page if available for instant UI
@@ -2536,11 +2551,14 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     setVisiblePinIdsState(newVisibleIds)
                   }}
                   onClusterClick={(clusterSales) => {
-                    console.log('[CLUSTER] Cluster clicked with sales:', clusterSales.length, 'sales')
-                    console.log('[CLUSTER] Cluster sales IDs:', clusterSales.map(s => s.id))
-                    console.log('[CLUSTER] Cluster sales titles:', clusterSales.map(s => s.title))
-                    console.log('[CLUSTER] Before setMapSales - mapSalesRef.current:', mapSalesRef.current.length)
-                    console.log('[CLUSTER] Before setSales - sales.length:', sales.length)
+                    console.log('[CLUSTER_CLICK] id=cluster, leaves=', clusterSales.length, 'lock=true')
+                    console.log('[AUTHORITY] set=MAP reason=cluster-click')
+                    
+                    // Set cluster lock to prevent list flicker during animation
+                    setClusterLock(true)
+                    
+                    // Set authority to MAP for cluster clicks
+                    setAuthority('MAP', 'cluster-click')
                     
                     // Update the mapSales directly with the cluster sales data
                     setMapSales(clusterSales)
@@ -2621,6 +2639,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     if (arbiter.guardMapMove) {
                       setGuardMapMove(false, 'Move completed')
                       console.log('[MAP] move completed - guard cleared')
+                    }
+                    
+                    // Clear cluster lock after map animation completes
+                    if (clusterLock) {
+                      setClusterLock(false)
+                      console.log('[LOCK] cleared on idle')
                     }
                   }}
                   onZoomEnd={() => {

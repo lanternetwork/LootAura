@@ -195,80 +195,81 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Render
   return (
-    <div className="flex flex-col lg:flex-row">
-      {/* Main Content */}
-      <div className="flex-1 lg:w-2/3">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">Yard Sales</h1>
-            <FilterTrigger 
-              isOpen={false} 
-              onToggle={() => {}} 
-              activeFiltersCount={0} 
-            />
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Main Content - Sales List */}
+          <div className="flex-1 lg:w-2/3">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold">Yard Sales</h1>
+                <FilterTrigger 
+                  isOpen={false} 
+                  onToggle={() => {}} 
+                  activeFiltersCount={0} 
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {listData.map((sale) => (
+                  <SaleCard key={sale.id} sale={sale} />
+                ))}
+              </div>
+            </div>
           </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {listData.map((sale) => (
-              <SaleCard key={sale.id} sale={sale} />
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {/* Desktop Filters Sidebar */}
-      <div className="hidden lg:block lg:w-1/3">
-        <div className="sticky top-4 space-y-6">
-          {/* Map */}
-          <div className="bg-white rounded-lg shadow-sm border p-4">
-            <h2 className="text-xl font-semibold mb-4">
-              Map View
-              {listData.length > 0 && (
-                <span className="ml-2 text-sm font-normal text-gray-600">
-                  ({listData.length} in view)
-                </span>
-              )}
-            </h2>
-            <div className="h-[400px] rounded-lg overflow-hidden">
-              <SalesMap
-                sales={mapSales.data || []}
-                markers={mapMarkers}
-                center={mapView.center || { lat: 39.8283, lng: -98.5795 }}
-                zoom={mapView.zoom || 10}
-                onViewChange={({ center, zoom, userInteraction }) => {
-                  setMapView({ center, zoom })
-                  
-                  // Handle move start for intent system
-                  if (INTENT_ENABLED && userInteraction) {
-                    // Don't change intent if we're in ClusterDrilldown - let it complete
-                    const currentIntent = intentRef.current
-                    if (currentIntent.kind !== 'ClusterDrilldown') {
-                      bumpSeq({ kind: 'UserPan' })
-                    } else {
-                      console.log('[MAP] Ignoring user interaction during cluster drilldown')
+          {/* Map Sidebar */}
+          <div className="lg:w-1/3">
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <h2 className="text-xl font-semibold mb-4">
+                Map View
+                {listData.length > 0 && (
+                  <span className="ml-2 text-sm font-normal text-gray-600">
+                    ({listData.length} in view)
+                  </span>
+                )}
+              </h2>
+              <div className="h-[400px] rounded-lg overflow-hidden">
+                <SalesMap
+                  sales={mapSales.data || []}
+                  markers={mapMarkers}
+                  center={mapView.center || { lat: 39.8283, lng: -98.5795 }}
+                  zoom={mapView.zoom || 10}
+                  onViewChange={({ center, zoom, userInteraction }) => {
+                    setMapView({ center, zoom })
+                    
+                    // Handle move start for intent system
+                    if (INTENT_ENABLED && userInteraction) {
+                      // Don't change intent if we're in ClusterDrilldown - let it complete
+                      const currentIntent = intentRef.current
+                      if (currentIntent.kind !== 'ClusterDrilldown') {
+                        bumpSeq({ kind: 'UserPan' })
+                      } else {
+                        console.log('[MAP] Ignoring user interaction during cluster drilldown')
+                      }
                     }
-                  }
-                }}
-                onClusterClick={async (clusterSales) => {
-                  if (!INTENT_ENABLED) return
+                  }}
+                  onClusterClick={async (clusterSales) => {
+                    if (!INTENT_ENABLED) return
 
-                  bumpSeq({ kind: 'ClusterDrilldown' })
-                  const mySeq = seqRef.current
+                    bumpSeq({ kind: 'ClusterDrilldown' })
+                    const mySeq = seqRef.current
 
-                  // Resolve leaves (actual sales, not child clusters)
-                  const unique = deduplicateSales(clusterSales)
+                    // Resolve leaves (actual sales, not child clusters)
+                    const unique = deduplicateSales(clusterSales)
 
-                  // Set map sales immediately for snappy UI using intent system
-                  applySalesResult({ data: unique, seq: mySeq, cause: 'ClusterDrilldown' }, 'map')
-                  console.debug('[CLUSTER] leaves', { count: unique.length, seq: mySeq })
+                    // Set map sales immediately for snappy UI using intent system
+                    applySalesResult({ data: unique, seq: mySeq, cause: 'ClusterDrilldown' }, 'map')
+                    console.debug('[CLUSTER] leaves', { count: unique.length, seq: mySeq })
 
-                  // Cluster drilldown is complete - no need to fetch additional data
-                  console.log('[CLUSTER] Drilldown complete with', unique.length, 'sales')
-                }}
-                onVisiblePinsChange={() => {
-                  // Legacy callback - no longer needed with intent system
-                }}
-              />
+                    // Cluster drilldown is complete - no need to fetch additional data
+                    console.log('[CLUSTER] Drilldown complete with', unique.length, 'sales')
+                  }}
+                  onVisiblePinsChange={() => {
+                    // Legacy callback - no longer needed with intent system
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>

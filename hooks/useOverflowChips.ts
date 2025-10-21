@@ -9,7 +9,7 @@ export function useOverflowChips<T extends { id: string; priority?: number }>(
   const [visible, setVisible] = useState<T[]>(items);
   const [overflow, setOverflow] = useState<T[]>([]);
   const [reservedOverflowTriggerWidth, setReservedOverflowTriggerWidth] = useState(opts?.reservedOverflowTriggerWidth ?? 0);
-  const [widthCache, setWidthCache] = useState<Record<string, number>>({});
+  const [_widthCache, setWidthCache] = useState<Record<string, number>>({});
   const [hysteresisState, setHysteresisState] = useState<{ count: number; lastResult: { visible: T[]; overflow: T[] } }>({ count: 0, lastResult: { visible: [], overflow: [] } });
 
   const ordered = useMemo(() => {

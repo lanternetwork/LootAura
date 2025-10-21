@@ -63,7 +63,7 @@ export default function FiltersBar({
   const [reservedMoreW, setReservedMoreW] = useState(0)
 
   // Overflow management for category chips
-  const { railRef, measureRef, visible, overflow, setReservedOverflowTriggerWidth } = useOverflowChips(CATEGORY_DATA, { 
+  const { railRef, measureRef, visible, overflow, setReservedOverflowTriggerWidth: _setReservedOverflowTriggerWidth } = useOverflowChips(CATEGORY_DATA, { 
     reservedOverflowTriggerWidth: reservedMoreW 
   })
 

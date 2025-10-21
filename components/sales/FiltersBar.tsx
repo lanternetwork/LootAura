@@ -94,8 +94,8 @@ export default function FiltersBar({
           </select>
         </div>
 
-        {/* Category Chips - Compact */}
-        <div className="flex items-center gap-2 flex-1">
+        {/* Category Chips - Compact with proper spacing */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <CategoryChips
             selectedCategories={categories}
             onCategoriesChange={onCategoriesChange}

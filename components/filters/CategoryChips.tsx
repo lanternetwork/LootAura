@@ -35,7 +35,7 @@ export function CategoryChips({
   }
 
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-1 overflow-hidden">
       {availableCategories.map((category) => {
         const isSelected = selectedCategories.includes(category)
         return (
@@ -43,7 +43,7 @@ export function CategoryChips({
             key={category}
             onClick={() => handleCategoryToggle(category)}
             className={`
-              inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors
+              inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap
               ${isSelected 
                 ? 'bg-blue-100 text-blue-800 border border-blue-200' 
                 : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'

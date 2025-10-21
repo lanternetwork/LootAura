@@ -181,7 +181,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.debug('[FETCH] map', { ...ctx, params })
     
     try {
-      const result = await fetchMapSales(params.centerOverride, params.zoomOverride, ctx)
+      const result = await fetchMapSales(undefined, params.centerOverride, params.zoomOverride, ctx)
       if (result) {
         applySalesResult({ data: result.data, seq: result.ctx.seq, cause: result.ctx.cause }, 'map')
       }
@@ -248,11 +248,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">Yard Sales</h1>
-            <FilterTrigger 
-              isOpen={false} 
-              onToggle={() => {}} 
-              activeFiltersCount={0} 
-            />
+            <FilterTrigger hasActiveFilters={hasActiveFilters} />
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -309,11 +305,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       <FiltersModal
         isOpen={false}
         onClose={() => {}}
-        filters={{
-          distance: filters.distance,
-          dateRange: filters.dateRange as any,
-          categories: filters.categories
-        }}
+        filters={filters}
         onFiltersChange={handleFiltersChange}
       />
     </div>

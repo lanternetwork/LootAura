@@ -43,11 +43,7 @@ interface FiltersModalProps {
     dateRange: DateRange
     categories: string[]
   }) => void
-  arbiter?: {
-    mode: 'initial' | 'map' | 'zip' | 'distance'
-    programmaticMoveGuard: boolean
-    lastChangedAt: number
-  }
+ - using intent system only
 }
 
 interface FilterState {
@@ -71,7 +67,7 @@ const CATEGORY_OPTIONS = [
   { value: 'misc', label: 'Miscellaneous', icon: '📦' }
 ]
 
-export default function FiltersModal({ isOpen, onClose, className = '', filters: externalFilters, onFiltersChange, arbiter }: FiltersModalProps) {
+export default function FiltersModal({ isOpen, onClose, className = '', filters: externalFilters, onFiltersChange }: FiltersModalProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -247,7 +243,6 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
             onCategoryToggle={handleCategoryToggle}
             onClearFilters={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
-            arbiter={arbiter}
           />
         </div>
       </div>
@@ -274,7 +269,6 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
             onCategoryToggle={handleCategoryToggle}
             onClearFilters={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
-            arbiter={arbiter}
           />
         </div>
       </div>
@@ -289,11 +283,6 @@ interface FiltersContentProps {
   onCategoryToggle: (category: string) => void
   onClearFilters: () => void
   hasActiveFilters: boolean
-  arbiter?: {
-    mode: 'initial' | 'map' | 'zip' | 'distance'
-    programmaticMoveGuard: boolean
-    lastChangedAt: number
-  }
 }
 
 function FiltersContent({
@@ -303,7 +292,6 @@ function FiltersContent({
   onCategoryToggle,
   onClearFilters: _onClearFilters,
   hasActiveFilters,
-  arbiter
 }: FiltersContentProps) {
   return (
     <div className="space-y-6">

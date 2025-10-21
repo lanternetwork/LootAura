@@ -2,27 +2,25 @@ import Link from 'next/link'
 import FavoriteButton from './FavoriteButton'
 import { Sale } from '@/lib/types'
 
-export default function SaleCard({ sale, authority }: { sale: Sale; authority?: 'MAP' | 'FILTERS' }) {
+export default function SaleCard({ sale }: { sale: Sale }) {
   console.log('[DOM] item mounts id=', sale?.id)
-  const isMap = authority === 'MAP'
 
-  // Never early-return null in MAP authority; render a minimal stub instead
-  if (!sale && !isMap) return null
+  if (!sale) return null
 
   return (
     <article 
       className="sale-row rounded-xl border p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow" 
       data-testid="sale-card" 
-      data-debug={`auth:${authority}`} 
+      data-debug={`sale:${sale.id}`} 
       data-sale-id={String(sale?.id || '')}
       data-card="sale"
       data-kind="sale-row"
-      style={isMap ? { 
+      style={{ 
         minHeight: '200px'
-      } : undefined}
+      }}
     >
       <div className="flex justify-between">
-        <h3 className="text-xl font-semibold line-clamp-1">{sale?.title || (isMap ? `Sale ${sale?.id}` : '')}</h3>
+        <h3 className="text-xl font-semibold line-clamp-1">{sale?.title || `Sale ${sale?.id}`}</h3>
         {sale?.id && <FavoriteButton saleId={sale.id} initial={false} />}
       </div>
       

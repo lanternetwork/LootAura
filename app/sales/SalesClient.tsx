@@ -1378,9 +1378,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       })
       const data = await res.json()
       
-      // Also fetch sales data for the sales list
+      // Also fetch sales data for the sales list (with separate abort controller)
       console.log('[MAP] Fetching sales data for map view...')
-      const salesRes = await diagnosticFetch(`/api/sales?${params.toString()}`, { signal: controller.signal }, {
+      const salesController = new AbortController()
+      const salesRes = await diagnosticFetch(`/api/sales?${params.toString()}`, { signal: salesController.signal }, {
         authority: arbiter.authority,
         viewportSeq: viewportSeqRef.current,
         requestSeq: seq,

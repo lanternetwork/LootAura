@@ -217,7 +217,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       </div>
 
       {/* Map */}
-      <div className="flex-1 lg:w-1/2 h-96 lg:h-full">
+      <div className="flex-1 lg:w-1/2 h-96 lg:h-96">
         <SalesMap
           sales={mapSales.data || []}
           markers={mapMarkers}

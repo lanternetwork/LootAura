@@ -4,8 +4,6 @@ import { useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
 import SaleCard from '@/components/SaleCard'
-import FiltersModal from '@/components/filters/FiltersModal'
-import FilterTrigger from '@/components/filters/FilterTrigger'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 // Removed unused imports after arbiter system removal
@@ -16,7 +14,6 @@ import SalesTwoPane from '@/components/layout/SalesTwoPane'
 import SalesTabbed from '@/components/layout/SalesTabbed'
 import FiltersBar from '@/components/sales/FiltersBar'
 import SalesMap from '@/components/location/SalesMap'
-import SalesList from '@/components/SalesList'
 
 // Legacy arbiter types removed - using intent system only
 
@@ -167,7 +164,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Event handlers
 
-  const handleFiltersChange = useCallback((nextFilters: any) => {
+  const _handleFiltersChange = useCallback((nextFilters: any) => {
     if (INTENT_ENABLED) {
       const seq = ++seqRef.current
       intentRef.current = { kind: 'Filters' }

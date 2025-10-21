@@ -74,15 +74,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // UI state
   const [_loading, _setLoading] = useState(false)
   // Legacy state variables removed - using intent system only
-  const [visibleSales, setVisibleSales] = useState<Sale[]>([])
-  const [renderedSales, setRenderedSales] = useState<Sale[]>([])
-  const [staleSales, setStaleSales] = useState<Sale[]>([])
-  const [visiblePinIdsState, setVisiblePinIdsState] = useState<string[]>([])
-  const [viewportBounds, setViewportBounds] = useState<{ north: number; south: number; east: number; west: number } | null>(null)
-
-  // Diagnostic overlay state
-  const [showDiagnostics, setShowDiagnostics] = useState(false)
-  const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === '1'
 
   // Intent system helpers
   const bumpSeq = useCallback((newIntent: Intent) => {
@@ -152,19 +143,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [])
 
   // Wrapper functions for intent-based fetching
-  const runMapFetch = useCallback(async (params: any, ctx: FetchContext) => {
-    console.debug('[FETCH] map', { ...ctx, params })
-    
-    try {
-      const result = await fetchMapSales(params.centerOverride, params.zoomOverride, ctx)
-      if (result) {
-        applySalesResult({ data: result.data, seq: result.ctx.seq, cause: result.ctx.cause }, 'map')
-      }
-    } catch (error) {
-      console.error('[FETCH] Map fetch error:', error)
-      applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'map')
-    }
-  }, [applySalesResult, fetchMapSales])
 
   const runFilteredFetch = useCallback(async (params: any, ctx: FetchContext) => {
     console.debug('[FETCH] filtered', { ...ctx, params })
@@ -181,23 +159,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [applySalesResult, fetchSales])
 
   // Event handlers
-  const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string) => {
-    console.log(`[ZIP] submit -> ${zip} -> lat=${lat}, lng=${lng}`)
-    
-    if (INTENT_ENABLED) {
-      const seq = ++seqRef.current
-      intentRef.current = { kind: 'Filters' }
-      console.log('[INTENT] set Filters for ZIP search', { seq })
-      
-      const params = { 
-        lat, 
-        lng, 
-        distance: filters.distance,
-        centerOverride: { lat, lng }
-      }
-      runFilteredFetch(params, { cause: 'Filters', seq })
-    }
-  }
 
   const handleFiltersChange = useCallback((nextFilters: any) => {
     if (INTENT_ENABLED) {
@@ -274,8 +235,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
             // Cluster drilldown is complete - no need to fetch additional data
             console.log('[CLUSTER] Drilldown complete with', unique.length, 'sales')
           }}
-          onVisiblePinsChange={(visibleIds, count) => {
-            setVisiblePinIdsState(visibleIds)
+          onVisiblePinsChange={() => {
+            // Legacy callback - no longer needed with intent system
           }}
         />
       </div>

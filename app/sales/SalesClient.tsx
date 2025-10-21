@@ -1190,13 +1190,19 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         setDateWindow(data.dateWindow || null)
         setDegraded(data.degraded || false)
         
-        // Update intent system with the new sales data
-        if (_ctx) {
-          console.log('[INTENT] Applying sales result to filteredSales:', { data: newSales.length, seq: _ctx.seq, cause: _ctx.cause })
-          applySalesResult({ data: newSales, seq: _ctx.seq, cause: _ctx.cause }, 'filtered')
-        } else {
-          console.log('[INTENT] No context provided to fetchSales, skipping applySalesResult')
-        }
+      // Update intent system with the new sales data
+      if (_ctx) {
+        console.log('[INTENT] Applying sales result to filteredSales:', { data: newSales.length, seq: _ctx.seq, cause: _ctx.cause })
+        applySalesResult({ data: newSales, seq: _ctx.seq, cause: _ctx.cause }, 'filtered')
+      } else if (INTENT_ENABLED) {
+        // If intent system is enabled but no context provided, create a default context
+        const seq = ++seqRef.current
+        intentRef.current = { kind: 'Filters' }
+        console.log('[INTENT] No context provided, creating default Filters context:', { seq })
+        applySalesResult({ data: newSales, seq, cause: 'Filters' }, 'filtered')
+      } else {
+        console.log('[INTENT] No context provided to fetchSales, skipping applySalesResult')
+      }
         const pageHasMore = newSales.length === 24
         setHasMore(pageHasMore)
         console.log(`[SALES] ${append ? 'Appended' : 'Set'} ${newSales.length} sales, hasMore: ${pageHasMore}`)
@@ -1483,6 +1489,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
             if (_ctx) {
               console.log('[INTENT] Applying sales result to mapSales:', { data: deduplicatedSales.length, seq: _ctx.seq, cause: _ctx.cause })
               applySalesResult({ data: deduplicatedSales, seq: _ctx.seq, cause: _ctx.cause }, 'map')
+            } else if (INTENT_ENABLED) {
+              // If intent system is enabled but no context provided, create a default context
+              const seq = ++seqRef.current
+              intentRef.current = { kind: 'UserPan' }
+              console.log('[INTENT] No context provided, creating default UserPan context:', { seq })
+              applySalesResult({ data: deduplicatedSales, seq, cause: 'UserPan' }, 'map')
             } else {
               console.log('[INTENT] No context provided to fetchMapSales, skipping applySalesResult')
             }
@@ -1536,6 +1548,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
             if (_ctx) {
               console.log('[INTENT] Applying sales result to mapSales:', { data: deduplicatedSales.length, seq: _ctx.seq, cause: _ctx.cause })
               applySalesResult({ data: deduplicatedSales, seq: _ctx.seq, cause: _ctx.cause }, 'map')
+            } else if (INTENT_ENABLED) {
+              // If intent system is enabled but no context provided, create a default context
+              const seq = ++seqRef.current
+              intentRef.current = { kind: 'UserPan' }
+              console.log('[INTENT] No context provided, creating default UserPan context:', { seq })
+              applySalesResult({ data: deduplicatedSales, seq, cause: 'UserPan' }, 'map')
             } else {
               console.log('[INTENT] No context provided to fetchMapSales, skipping applySalesResult')
             }
@@ -2166,11 +2184,25 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       lng: currentCenter.lng
     }, false)
     
-    // Trigger debounced fetches
-    debouncedTrigger(() => {
-      fetchSales()
-      fetchMapSales()
-    })
+    // Trigger debounced fetches with intent system
+    if (INTENT_ENABLED) {
+      const seq = ++seqRef.current
+      intentRef.current = { kind: 'Filters' }
+      console.log('[INTENT] set Filters for distance change', { seq })
+      
+      const params = { 
+        lat: filters.lat, 
+        lng: filters.lng, 
+        distance: filters.distance,
+        centerOverride: { lat: filters.lat, lng: filters.lng }
+      }
+      runFilteredFetch(params, { cause: 'Filters', seq })
+    } else {
+      debouncedTrigger(() => {
+        fetchSales()
+        fetchMapSales()
+      })
+    }
   }, [filters.lat, filters.lng, mapView.center, updateControlMode, setProgrammaticMoveGuard, computeBboxForRadius, updateFilters, resetPagination, debouncedTrigger, fetchSales, fetchMapSales])
 
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string) => {
@@ -2651,14 +2683,28 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     }
                     
                     // Trigger fetches once after fit completes with current coordinates
-                    debouncedTrigger(() => {
-                      if (filters.lat && filters.lng) {
-                        fetchSales(false, { lat: filters.lat, lng: filters.lng })
-                      } else {
-                        fetchSales()
+                    if (INTENT_ENABLED) {
+                      const seq = ++seqRef.current
+                      intentRef.current = { kind: 'Filters' }
+                      console.log('[INTENT] set Filters for fitBounds complete', { seq })
+                      
+                      const params = { 
+                        lat: filters.lat, 
+                        lng: filters.lng, 
+                        distance: filters.distance,
+                        centerOverride: { lat: filters.lat, lng: filters.lng }
                       }
-                      fetchMapSales()
-                    })
+                      runFilteredFetch(params, { cause: 'Filters', seq })
+                    } else {
+                      debouncedTrigger(() => {
+                        if (filters.lat && filters.lng) {
+                          fetchSales(false, { lat: filters.lat, lng: filters.lng })
+                        } else {
+                          fetchSales()
+                        }
+                        fetchMapSales()
+                      })
+                    }
                   }}
                   onBoundsChange={onBoundsChange}
                   onMapReady={onMapReady}
@@ -2693,8 +2739,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     // Resolve leaves (actual sales, not child clusters)
                     const unique = deduplicateSales(clusterSales)
 
-                    // Set map sales immediately for snappy UI
-                    setMapSales({ data: unique, seq: mySeq, source: 'ClusterDrilldown' })
+                    // Set map sales immediately for snappy UI using intent system
+                    applySalesResult({ data: unique, seq: mySeq, cause: 'ClusterDrilldown' }, 'map')
                     console.debug('[CLUSTER] leaves', { count: unique.length, seq: mySeq })
 
                     // Animate in (programmatic)

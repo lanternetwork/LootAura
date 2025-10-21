@@ -285,6 +285,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Safety timeout to ensure overlay never lingers too long
   const mapUpdatingMaxRef = useRef<number | null>(null)
   const [mapSales, _setMapSales] = useState<Sale[]>([])
+  const mapSalesRef = useRef<Sale[]>([])
+  
+  // Update both state and ref when mapSales changes
+  const setMapSales = useCallback((sales: Sale[]) => {
+    _setMapSales(sales)
+    mapSalesRef.current = sales
+  }, [])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
   const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
@@ -1395,7 +1402,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         // Even if markers were aborted, try to set sales data if we have it
         if (salesData?.data && Array.isArray(salesData.data)) {
           console.log('[MAP] Setting mapSales after abort:', salesData.data.length, 'sales')
-          _setMapSales(salesData.data)
+          setMapSales(salesData.data)
           // Also update the main sales state so the sales list updates
           setSales(salesData.data)
           
@@ -1439,14 +1446,14 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         // Also set the sales data for the sales list
         if (salesData?.data && Array.isArray(salesData.data)) {
           console.log('[MAP] Setting mapSales to:', salesData.data.length, 'sales')
-          _setMapSales(salesData.data)
+          setMapSales(salesData.data)
           // Also update the main sales state so the sales list updates
           setSales(salesData.data)
           
           // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
         } else {
           console.log('[MAP] No sales data received, setting mapSales to empty array')
-          _setMapSales([])
+          setMapSales([])
           setSales([])
         }
         
@@ -2127,7 +2134,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   useEffect(() => {
     if (sales.length > 0 && arbiter.authority === 'MAP') {
       console.log('[MAP] Force updating mapSales with new sales data:', sales.length, 'sales')
-      _setMapSales(sales)
+      setMapSales(sales)
     }
   }, [sales, arbiter.authority])
 
@@ -2296,11 +2303,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             
                             // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
                             // CLUSTER CLICK FIX: If mapSales has data (cluster click), use it directly
-                            const finalItemsToRender = mapSales.length > 0 ? mapSales : (itemsToRender.length > 0 ? itemsToRender : visibleSales)
+                            const finalItemsToRender = mapSalesRef.current.length > 0 ? mapSalesRef.current : (itemsToRender.length > 0 ? itemsToRender : visibleSales)
                             
                             // Debug cluster click rendering
                             console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'itemsToRender:', itemsToRender.length, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.length)
-                            console.log('[SALES LIST] DEBUG: mapSales.length > 0?', mapSales.length > 0, 'mapSales:', mapSales.length, 'finalItemsToRender === mapSales?', finalItemsToRender === mapSales)
+                            console.log('[SALES LIST] DEBUG: mapSalesRef.current.length > 0?', mapSalesRef.current.length > 0, 'mapSalesRef.current:', mapSalesRef.current.length, 'finalItemsToRender === mapSalesRef.current?', finalItemsToRender === mapSalesRef.current)
                             
                             // Debug sales list rendering
                             salesListDebug.logRendering('MAP', {

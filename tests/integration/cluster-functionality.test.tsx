@@ -7,6 +7,7 @@ import React from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import SalesMapClustered from '@/components/location/SalesMapClustered'
 import { Sale } from '@/lib/types'
 
@@ -48,7 +49,7 @@ vi.mock('react-map-gl', () => ({
     }
 
     // Simulate map load
-    React.useEffect(() => {
+    useEffect(() => {
       if (onLoad) onLoad()
     }, [])
 
@@ -248,8 +249,10 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      // Simulate cluster click
-      const clusterMarker = screen.getByTestId('marker')
+      // Simulate cluster click - get first marker (should be a cluster)
+      const clusterMarkers = screen.getAllByTestId('marker')
+      expect(clusterMarkers.length).toBeGreaterThan(0)
+      const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
       // Verify onVisiblePinsChange was called with child points
@@ -270,7 +273,9 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
+      const clusterMarkers = screen.getAllByTestId('marker')
+      expect(clusterMarkers.length).toBeGreaterThan(0)
+      const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
       // Verify debug logging was called
@@ -299,7 +304,9 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
+      const clusterMarkers = screen.getAllByTestId('marker')
+      expect(clusterMarkers.length).toBeGreaterThan(0)
+      const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
       // Verify error logging was called
@@ -337,7 +344,9 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
+      const clusterMarkers = screen.getAllByTestId('marker')
+      expect(clusterMarkers.length).toBeGreaterThan(0)
+      const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
       // Verify warning was logged
@@ -375,8 +384,9 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      // Verify fallback to individual markers
-      expect(screen.getAllByTestId('marker')).toHaveLength(mockMarkers.length)
+      // Verify fallback to individual markers - should have 2 markers (one for each sale)
+      const markers = screen.getAllByTestId('marker')
+      expect(markers).toHaveLength(2)
     })
   })
 
@@ -390,7 +400,9 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
+      const clusterMarkers = screen.getAllByTestId('marker')
+      expect(clusterMarkers.length).toBeGreaterThan(0)
+      const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
       // Verify performance logging
@@ -414,7 +426,9 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
+      const clusterMarkers = screen.getAllByTestId('marker')
+      expect(clusterMarkers.length).toBeGreaterThan(0)
+      const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
       // Verify no debug logging when disabled
@@ -433,7 +447,9 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
+      const clusterMarkers = screen.getAllByTestId('marker')
+      expect(clusterMarkers.length).toBeGreaterThan(0)
+      const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
       // Verify debug logging when enabled

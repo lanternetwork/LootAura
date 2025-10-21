@@ -204,17 +204,17 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       <SalesShell
         Filters={
           <FiltersBar
-            onZipLocationFound={(location) => {
+            onZipLocationFound={(lat, lng, city) => {
               // Intent system: 1) Own the list with Filters intent
               bumpSeq({ kind: 'Filters' })
               const mySeq = seqRef.current
 
               // 2) Kick filtered fetch immediately
               const params = { 
-                lat: location.lat, 
-                lng: location.lng, 
+                lat, 
+                lng, 
                 distance: filters.distance,
-                centerOverride: { lat: location.lat, lng: location.lng }
+                centerOverride: { lat, lng }
               }
               runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
             }}

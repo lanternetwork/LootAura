@@ -10,7 +10,7 @@ import { Filter } from 'lucide-react'
 
 type FiltersBarProps = {
   // ZIP Search
-  onZipLocationFound: (location: { lat: number; lng: number; city?: string }) => void
+  onZipLocationFound: (lat: number, lng: number, city?: string, state?: string, zip?: string) => void
   onZipError: (error: string) => void
   zipError?: string
   
@@ -65,8 +65,8 @@ export default function FiltersBar({
 
         {/* Date Selector */}
         <DateSelector
-          value={dateRange}
-          onChange={onDateRangeChange}
+          value={{ type: dateRange as any }}
+          onChange={(dateRangeObj) => onDateRangeChange(dateRangeObj.type)}
         />
 
         {/* Category Chips */}
@@ -135,8 +135,8 @@ export default function FiltersBar({
                 <div>
                   <label className="block text-sm font-medium mb-2">Date Range</label>
                   <DateSelector
-                    value={dateRange}
-                    onChange={onDateRangeChange}
+                    value={{ type: dateRange as any }}
+                    onChange={(dateRangeObj) => onDateRangeChange(dateRangeObj.type)}
                   />
                 </div>
 

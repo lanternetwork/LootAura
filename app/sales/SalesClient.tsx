@@ -301,10 +301,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Deterministic list derivation
   const listData: Sale[] = useMemo(() => {
     const intent = intentRef.current
-    if (intent.kind === 'ClusterDrilldown') return mapSales.data   // leaves or the viewport results for this seq
-    if (intent.kind === 'UserPan') return mapSales.data
-    if (intent.kind === 'Filters') return filteredSales.data
-    return filteredSales.data.length ? filteredSales.data : mapSales.data
+    if (intent.kind === 'ClusterDrilldown') return mapSales.data || []   // leaves or the viewport results for this seq
+    if (intent.kind === 'UserPan') return mapSales.data || []
+    if (intent.kind === 'Filters') return filteredSales.data || []
+    return (filteredSales.data && filteredSales.data.length) ? filteredSales.data : (mapSales.data || [])
   }, [mapSales.data, filteredSales.data])
 
   // Unified "apply results" helper
@@ -2186,7 +2186,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Update visibleSales when mapSales changes (for cluster clicks)
   useEffect(() => {
-    if (mapSales.data.length > 0) {
+    if (mapSales.data && mapSales.data.length > 0) {
       console.log('[MAP] Updating visibleSales from mapSales:', mapSales.data.length, 'sales')
       console.log('[MAP] DEBUG: Before update - visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length)
       console.log('[MAP] DEBUG: mapSales IDs:', mapSales.data.map(s => s.id))
@@ -2371,8 +2371,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             const finalItemsToRender = listData
                             
                             // Debug cluster click rendering
-                            console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.data.length)
-                            console.log('[SALES LIST] DEBUG: mapSales.data.length > 0?', mapSales.data.length > 0, 'mapSales.data:', mapSales.data.length, 'finalItemsToRender === mapSales.data?', finalItemsToRender === mapSales.data)
+                            console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.data?.length || 0)
+                            console.log('[SALES LIST] DEBUG: mapSales.data.length > 0?', (mapSales.data?.length || 0) > 0, 'mapSales.data:', mapSales.data?.length || 0, 'finalItemsToRender === mapSales.data?', finalItemsToRender === mapSales.data)
                             console.log('[SALES LIST] DEBUG: finalItemsToRender IDs:', finalItemsToRender.map(s => s.id))
                             console.log('[SALES LIST] DEBUG: finalItemsToRender titles:', finalItemsToRender.map(s => s.title))
                             
@@ -2530,7 +2530,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                   </div>
                 )}
                 <SalesMap
-                  sales={mapSales.data}
+                  sales={mapSales.data || []}
                   markers={mapMarkers}
                   center={filters.lat && filters.lng ? { lat: filters.lat, lng: filters.lng } : 
                          initialCenter ? { lat: initialCenter.lat, lng: initialCenter.lng } : 

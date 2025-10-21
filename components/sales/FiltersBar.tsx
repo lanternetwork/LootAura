@@ -49,11 +49,22 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
   const [overflow, setOverflow] = useState<typeof CATEGORY_DATA>([])
   const [widthCache, setWidthCache] = useState<Record<string, number>>({})
   const [hysteresis, setHysteresis] = useState<{ count: number; lastResult: { visible: typeof CATEGORY_DATA; overflow: typeof CATEGORY_DATA } }>({ count: 0, lastResult: { visible: [], overflow: [] } })
+  const isMountedRef = useRef(true)
 
   const measure = useCallback(() => {
-    if (!centerEl || !measureEl) return
+    if (!centerEl || !measureEl || !isMountedRef.current) return
 
-    const available = centerEl.clientWidth - 8 // paddingSafety = 8
+    const centerWidth = centerEl.clientWidth
+    if (centerWidth <= 0) {
+      // SSR/hydration case - put all chips in overflow
+      if (isMountedRef.current) {
+        setVisible([])
+        setOverflow(allChips)
+      }
+      return
+    }
+
+    const available = centerWidth - 8 // paddingSafety = 8
     const gap = 8 // gap-2 in Tailwind
 
     // Measure individual chip widths from offscreen measurer
@@ -91,6 +102,8 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
       currentResult.visible.length === hysteresis.lastResult.visible.length &&
       currentResult.overflow.length === hysteresis.lastResult.overflow.length
 
+    if (!isMountedRef.current) return
+
     if (isSameResult) {
       setHysteresis({ count: 0, lastResult: currentResult })
       setVisible(nextVisible)
@@ -108,21 +121,37 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
 
     // Debug logging
     if (process.env.NEXT_PUBLIC_DEBUG) {
-      console.log(`[OVERFLOW] centerWidth=${centerEl.clientWidth} visible=${nextVisible.length} overflow=${nextOverflow.length} sum=${used} available=${available}`)
+      console.log(`[OVERFLOW] centerWidth=${centerWidth} visible=${nextVisible.length} overflow=${nextOverflow.length} sum=${used} available=${available}`)
     }
   }, [allChips, centerEl, measureEl, hysteresis])
 
   useEffect(() => {
     if (!centerEl) return
 
-    const ro = new ResizeObserver(() => measure())
+    let timeoutId: NodeJS.Timeout
+    const debouncedMeasure = () => {
+      clearTimeout(timeoutId)
+      timeoutId = setTimeout(measure, 16) // ~60fps
+    }
+
+    const ro = new ResizeObserver(debouncedMeasure)
     ro.observe(centerEl)
     
     // Initial measurement
     requestAnimationFrame(measure)
     
-    return () => ro.disconnect()
+    return () => {
+      clearTimeout(timeoutId)
+      ro.disconnect()
+    }
   }, [measure])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   return { visible, overflow }
 }

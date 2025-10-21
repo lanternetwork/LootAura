@@ -374,8 +374,6 @@ export default function SalesMap({
         onMoveEnd={onMoveEnd}
         onZoomEnd={onZoomEnd}
         onMapReady={onMapReady}
-        arbiterMode={arbiterMode}
-        arbiterAuthority={arbiterAuthority}
       />
     )
   }

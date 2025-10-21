@@ -299,8 +299,8 @@ function FiltersContent({
         <div className="flex items-center mb-3">
           <MapMarkerIcon />
           <span className="text-gray-500 mr-2"></span>
-          <label className={`text-sm font-medium ${arbiter?.mode === 'map' ? 'text-gray-600' : 'text-gray-700'}`}>
-            {arbiter?.mode === 'map' ? 'Distance (Select)' : 'Distance'}
+          <label className="text-sm font-medium text-gray-700">
+            Distance
           </label>
         </div>
         <select
@@ -312,11 +312,6 @@ function FiltersContent({
             <option key={miles} value={miles}>{miles} miles</option>
           ))}
         </select>
-        {arbiter?.mode === 'map' && (
-          <p className="text-xs text-gray-500 mt-1">
-            Currently using map view
-          </p>
-        )}
       </div>
 
       {/* Date Range Filter */}

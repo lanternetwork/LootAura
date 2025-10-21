@@ -3,11 +3,10 @@
  * Tests cluster click behavior, visible pins updates, and sales list rendering
  */
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect } from 'react'
 import SalesMapClustered from '@/components/location/SalesMapClustered'
 import { Sale } from '@/lib/types'
 
@@ -48,10 +47,10 @@ vi.mock('react-map-gl', () => ({
       getCenter: () => ({ lat: 38.25, lng: -85.75 })
     }
 
-    // Simulate map load
-    useEffect(() => {
-      if (onLoad) onLoad()
-    }, [])
+    // Simulate map load immediately
+    if (onLoad) {
+      setTimeout(() => onLoad(), 0)
+    }
 
     return (
       <div data-testid="map-container">
@@ -161,7 +160,6 @@ const mockSales: Sale[] = [
     address: '123 Test St',
     city: 'Test City',
     state: 'KY',
-    zip: '40201',
     start_date: '2025-01-01',
     end_date: '2025-01-02',
     start_time: '09:00',
@@ -180,7 +178,6 @@ const mockSales: Sale[] = [
     address: '456 Test Ave',
     city: 'Test City',
     state: 'KY',
-    zip: '40202',
     start_date: '2025-01-01',
     end_date: '2025-01-02',
     start_time: '10:00',
@@ -195,8 +192,8 @@ const mockSales: Sale[] = [
 const mockMarkers = mockSales.map(sale => ({
   id: sale.id,
   title: sale.title,
-  lat: sale.lat,
-  lng: sale.lng
+  lat: sale.lat!,
+  lng: sale.lng!
 }))
 
 describe('Cluster Functionality Integration Tests', () => {
@@ -249,9 +246,14 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
+      // Wait for markers to be rendered
+      await waitFor(() => {
+        const markers = screen.getAllByTestId('marker')
+        expect(markers.length).toBeGreaterThan(0)
+      })
+
       // Simulate cluster click - get first marker (should be a cluster)
       const clusterMarkers = screen.getAllByTestId('marker')
-      expect(clusterMarkers.length).toBeGreaterThan(0)
       const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
@@ -273,8 +275,13 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
+      // Wait for markers to be rendered
+      await waitFor(() => {
+        const markers = screen.getAllByTestId('marker')
+        expect(markers.length).toBeGreaterThan(0)
+      })
+
       const clusterMarkers = screen.getAllByTestId('marker')
-      expect(clusterMarkers.length).toBeGreaterThan(0)
       const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
@@ -304,8 +311,13 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
+      // Wait for markers to be rendered
+      await waitFor(() => {
+        const markers = screen.getAllByTestId('marker')
+        expect(markers.length).toBeGreaterThan(0)
+      })
+
       const clusterMarkers = screen.getAllByTestId('marker')
-      expect(clusterMarkers.length).toBeGreaterThan(0)
       const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
@@ -344,8 +356,13 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
+      // Wait for markers to be rendered
+      await waitFor(() => {
+        const markers = screen.getAllByTestId('marker')
+        expect(markers.length).toBeGreaterThan(0)
+      })
+
       const clusterMarkers = screen.getAllByTestId('marker')
-      expect(clusterMarkers.length).toBeGreaterThan(0)
       const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
@@ -400,8 +417,13 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
+      // Wait for markers to be rendered
+      await waitFor(() => {
+        const markers = screen.getAllByTestId('marker')
+        expect(markers.length).toBeGreaterThan(0)
+      })
+
       const clusterMarkers = screen.getAllByTestId('marker')
-      expect(clusterMarkers.length).toBeGreaterThan(0)
       const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
@@ -426,8 +448,13 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
+      // Wait for markers to be rendered
+      await waitFor(() => {
+        const markers = screen.getAllByTestId('marker')
+        expect(markers.length).toBeGreaterThan(0)
+      })
+
       const clusterMarkers = screen.getAllByTestId('marker')
-      expect(clusterMarkers.length).toBeGreaterThan(0)
       const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 
@@ -447,8 +474,13 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
+      // Wait for markers to be rendered
+      await waitFor(() => {
+        const markers = screen.getAllByTestId('marker')
+        expect(markers.length).toBeGreaterThan(0)
+      })
+
       const clusterMarkers = screen.getAllByTestId('marker')
-      expect(clusterMarkers.length).toBeGreaterThan(0)
       const clusterMarker = clusterMarkers[0]
       fireEvent.click(clusterMarker)
 

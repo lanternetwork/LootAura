@@ -73,11 +73,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // UI state
   const [_loading, _setLoading] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [hasMore, setHasMore] = useState(false)
-  const [fetchedOnce, setFetchedOnce] = useState(false)
-  const [dateWindow, setDateWindow] = useState<{ from: string; to: string } | null>(null)
-  const [degraded, setDegraded] = useState(false)
+  // Legacy state variables removed - using intent system only
   const [visibleSales, setVisibleSales] = useState<Sale[]>([])
   const [renderedSales, setRenderedSales] = useState<Sale[]>([])
   const [staleSales, setStaleSales] = useState<Sale[]>([])

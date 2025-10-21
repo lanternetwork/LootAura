@@ -1679,12 +1679,19 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     try {
       // Call the actual fetchMapSales function
       await fetchMapSales(undefined, params.centerOverride, params.zoomOverride, ctx)
+      
+      // The fetchMapSales function should have updated the sales state
+      // We need to wait for the state to update and then apply it to the intent system
+      // Use a timeout to allow the state to update
+      setTimeout(() => {
+        applySalesResult({ data: sales, seq: ctx.seq, cause: ctx.cause }, 'map')
+      }, 100)
     } catch (error) {
       console.error('[FETCH] Map fetch error:', error)
       // Apply empty result on error
       applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'map')
     }
-  }, [applySalesResult, fetchMapSales])
+  }, [applySalesResult, fetchMapSales, sales])
 
   const runFilteredFetch = useCallback(async (params: any, ctx: FetchContext) => {
     console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
@@ -1695,12 +1702,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         fetchSales(false, params.centerOverride, ctx),
         fetchMapSales(undefined, params.centerOverride, params.zoomOverride, ctx)
       ])
+      
+      // The fetchSales function should have updated the sales state
+      // We need to wait for the state to update and then apply it to the intent system
+      setTimeout(() => {
+        applySalesResult({ data: sales, seq: ctx.seq, cause: ctx.cause }, 'filtered')
+      }, 100)
     } catch (error) {
       console.error('[FETCH] Filtered fetch error:', error)
       // Apply empty result on error
       applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'filtered')
     }
-  }, [applySalesResult, fetchSales, fetchMapSales])
+  }, [applySalesResult, fetchSales, fetchMapSales, sales])
 
   // Filters change handler
   const _onFiltersChange = useCallback((nextFilters: any) => {
@@ -2398,8 +2411,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{listData.length}</strong> in view</div>
                           )}
                           {(() => {
-                            // Use deterministic listData from intent system
-                            const finalItemsToRender = listData
+                            // Use original sales list rendering logic instead of intent system
+                            const itemsToRender = isUpdating ? staleSales : renderedSales
+                            
+                            // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
+                            // CLUSTER CLICK FIX: If mapSales has data (cluster click), use it directly
+                            const finalItemsToRender = mapSales.data?.length > 0 ? mapSales.data : (itemsToRender.length > 0 ? itemsToRender : visibleSales)
                             
                             // Debug cluster click rendering
                             console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.data?.length || 0)
@@ -2461,8 +2478,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{listData.length}</strong> in view</div>
                           )}
                           {(() => {
-                            // Use deterministic listData from intent system
-                            const finalItemsToRender = listData
+                            // Use original sales list rendering logic instead of intent system
+                            const itemsToRender = isUpdating ? staleSales : renderedSales
+                            
+                            // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
+                            const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
                             
                             // Debug sales list rendering for non-MAP authority
                             salesListDebug.logRendering('Non-MAP', {

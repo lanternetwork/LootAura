@@ -290,11 +290,31 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Cluster lock state to prevent list flicker during cluster click animation
   const [clusterLock, setClusterLock] = useState(false)
 
+  // Deduplicate sales by canonical sale ID
+  const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
+    const seen = new Set<string>()
+    const unique = sales.filter(sale => {
+      const canonicalId = sale.id
+      if (seen.has(canonicalId)) {
+        return false
+      }
+      seen.add(canonicalId)
+      return true
+    })
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && unique.length !== sales.length) {
+      console.log('[DEDUPE] input=', sales.length, 'output=unique=', unique.length, 'keys=[', unique.slice(0, 3).map(s => s.id), '...]')
+    }
+    
+    return unique
+  }, [])
+
   // Update both state and ref when mapSales changes
   const setMapSales = useCallback((sales: Sale[]) => {
-    _setMapSales(sales)
-    mapSalesRef.current = sales
-  }, [])
+    const deduplicated = deduplicateSales(sales)
+    _setMapSales(deduplicated)
+    mapSalesRef.current = deduplicated
+  }, [deduplicateSales])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
   const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
@@ -749,7 +769,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log(`[LIST][DIFF] seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}... prevSeq=${listStoreSeqRef.current - 1} changed=${idsChanged}`)
-        console.log(`[LIST] apply visible count=${hydrated.length} seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}...`)
+        console.log(`[VISIBLE] count=${hydrated.length} (unique sales) seq=${listStoreSeqRef.current} idsHash=${currentIdsHash.slice(0, 20)}...`)
       }
       
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -1418,8 +1438,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         if (salesData?.data && Array.isArray(salesData.data)) {
           console.log('[MAP] Setting mapSales after abort:', salesData.data.length, 'sales')
           setMapSales(salesData.data)
-          // Also update the main sales state so the sales list updates
-          setSales(salesData.data)
+          // Also update the main sales state so the sales list updates (with deduplication)
+          const deduplicatedSales = deduplicateSales(salesData.data)
+          setSales(deduplicatedSales)
           
           // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
         }
@@ -1462,8 +1483,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         if (salesData?.data && Array.isArray(salesData.data)) {
           console.log('[MAP] Setting mapSales to:', salesData.data.length, 'sales')
           setMapSales(salesData.data)
-          // Also update the main sales state so the sales list updates
-          setSales(salesData.data)
+          // Also update the main sales state so the sales list updates (with deduplication)
+          const deduplicatedSales = deduplicateSales(salesData.data)
+          setSales(deduplicatedSales)
           
           // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
         } else {
@@ -2560,10 +2582,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     // Set authority to MAP for cluster clicks
                     setAuthority('MAP', 'cluster-click')
                     
-                    // Update the mapSales directly with the cluster sales data
+                    // Update the mapSales directly with the cluster sales data (already deduplicated)
                     setMapSales(clusterSales)
-                    // Also update the main sales state
-                    setSales(clusterSales)
+                    // Also update the main sales state (with deduplication)
+                    const deduplicatedClusterSales = deduplicateSales(clusterSales)
+                    setSales(deduplicatedClusterSales)
                     
                     console.log('[CLUSTER] After setMapSales - mapSalesRef.current:', mapSalesRef.current.length)
                     console.log('[CLUSTER] After setSales - sales.length:', sales.length)

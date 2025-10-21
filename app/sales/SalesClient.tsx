@@ -2755,15 +2755,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       console.log('[CLUSTER] Would animate to bounds:', targetBounds)
                     }
 
-                    // Optionally fetch viewport to confirm; still cause=ClusterDrilldown but will be compatible
-                    const params = { 
-                      lat: filters.lat, 
-                      lng: filters.lng, 
-                      distance: filters.distance,
-                      centerOverride: { lat: filters.lat, lng: filters.lng },
-                      zoomOverride: mapView.zoom
-                    }
-                    runMapFetch(params, { cause: 'ClusterDrilldown', seq: mySeq })
+                    // Cluster drilldown is complete - no need to fetch additional data
+                    console.log('[CLUSTER] Drilldown complete with', unique.length, 'sales')
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly
@@ -2783,7 +2776,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     
                     // Handle move start for intent system
                     if (INTENT_ENABLED && userInteraction) {
-                      bumpSeq({ kind: 'UserPan' })
+                      // Don't change intent if we're in ClusterDrilldown - let it complete
+                      const currentIntent = intentRef.current
+                      if (currentIntent.kind !== 'ClusterDrilldown') {
+                        bumpSeq({ kind: 'UserPan' })
+                      } else {
+                        console.log('[MAP] Ignoring user interaction during cluster drilldown')
+                      }
                     }
                     
                     console.log('[MAP] onViewChange called:', {

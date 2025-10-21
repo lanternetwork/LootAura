@@ -2122,6 +2122,14 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     }
   }, [mapSales])
 
+  // Force mapSales to be updated when new sales data is fetched
+  useEffect(() => {
+    if (sales.length > 0 && arbiter.mode === 'MAP') {
+      console.log('[MAP] Force updating mapSales with new sales data:', sales.length, 'sales')
+      _setMapSales(sales)
+    }
+  }, [sales, arbiter.mode])
+
   const handleIncreaseDistanceAndRetry = () => {
     const nextMiles = Math.min(100, filters.distance + 10)
     updateFilters({ distance: nextMiles }, true) // Skip URL update

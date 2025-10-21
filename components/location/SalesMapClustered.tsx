@@ -405,6 +405,13 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const startTime = Date.now()
     clusterDebug.group('Cluster Click Handler')
     
+    console.log('[CLUSTER] Cluster clicked!', { 
+      clusterId: cluster.id, 
+      hasOnClusterClick: !!onClusterClick,
+      hasClusterIndex: !!clusterIndex,
+      clusterType: cluster.type 
+    })
+    
     if (!clusterIndex || cluster.type !== 'cluster') {
       clusterDebug.warn('Invalid cluster click - no index or wrong type', { 
         hasIndex: !!clusterIndex, 

@@ -1,15 +1,21 @@
 import { deduplicateSales } from '@/lib/sales/dedupe';
 
-test('deduplicateSales uses canonical sale id', () => {
-  const input = [{id:'A'}, {id:'A'}, {id:'B'}] as any;
-  expect(deduplicateSales(input).map(x=>x.id)).toEqual(['A','B']);
-});
+describe('Deduplication', () => {
+  it('deduplicates by canonical sale id', () => {
+    const input = [{id:'A'}, {id:'A'}, {id:'B'}] as any;
+    const result = deduplicateSales(input);
+    expect(result.map(x => x.id)).toEqual(['A', 'B']);
+  });
 
-test('deduplicateSales handles empty array', () => {
-  expect(deduplicateSales([])).toEqual([]);
-});
+  it('handles empty arrays', () => {
+    const input = [] as any;
+    const result = deduplicateSales(input);
+    expect(result).toEqual([]);
+  });
 
-test('deduplicateSales handles single item', () => {
-  const input = [{id:'A'}] as any;
-  expect(deduplicateSales(input)).toEqual(input);
+  it('handles single items', () => {
+    const input = [{id:'A'}] as any;
+    const result = deduplicateSales(input);
+    expect(result.map(x => x.id)).toEqual(['A']);
+  });
 });

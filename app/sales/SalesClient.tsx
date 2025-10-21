@@ -26,6 +26,7 @@ import GridDebugOverlay from '@/components/GridDebugOverlay'
 import { resolveDatePreset } from '@/lib/shared/resolveDatePreset'
 import { Intent, FetchContext, isCauseCompatibleWithIntent } from '@/lib/sales/intent'
 import { deduplicateSales } from '@/lib/sales/dedupe'
+import { INTENT_ENABLED } from '@/lib/config'
 
 // Intent Arbiter types
 type ControlMode = 'initial' | 'map' | 'zip' | 'distance'
@@ -287,53 +288,65 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Safety timeout to ensure overlay never lingers too long
   const mapUpdatingMaxRef = useRef<number | null>(null)
   // Intent-based arbiter system
-  const intentRef = useRef<Intent>({ kind: 'Idle' })
+  const intentRef = useRef<Intent>({ kind: 'Filters' })
   const seqRef = useRef(0)
+
+  // Increment sequence whenever intent changes
+  const bumpSeq = useCallback((newIntent: Intent) => {
+    seqRef.current += 1
+    intentRef.current = newIntent
+    console.debug('[INTENT] set', { intent: newIntent.kind, seq: seqRef.current })
+  }, [])
 
   // Intent-scoped sales state
   const [mapSales, setMapSales] = useState<{ data: Sale[]; seq: number; source: FetchContext['cause'] }>({
-    data: [], seq: -1, source: 'Idle' as any
+    data: [], seq: -1, source: 'Filters' as any
   })
   const [filteredSales, setFilteredSales] = useState<{ data: Sale[]; seq: number; source: FetchContext['cause'] }>({
-    data: [], seq: -1, source: 'Idle' as any
+    data: [], seq: -1, source: 'Filters' as any
   })
 
-  // Deterministic list derivation
+  // Single source of truth for the list
   const listData: Sale[] = useMemo(() => {
-    const intent = intentRef.current
-    if (intent.kind === 'ClusterDrilldown') return mapSales.data || []   // leaves or the viewport results for this seq
-    if (intent.kind === 'UserPan') return mapSales.data || []
-    if (intent.kind === 'Filters') return filteredSales.data || []
-    return (filteredSales.data && filteredSales.data.length) ? filteredSales.data : (mapSales.data || [])
-  }, [mapSales.data, filteredSales.data])
+    if (!INTENT_ENABLED) return sales
+
+    const i = intentRef.current
+    if (i.kind === 'Filters')          return filteredSales.data || []
+    if (i.kind === 'ClusterDrilldown') return mapSales.data || []
+    if (i.kind === 'UserPan')          return mapSales.data || []
+
+    // fallback: prefer filtered if present
+    const result = filteredSales.data.length ? filteredSales.data : (mapSales.data || [])
+    console.debug('[LIST]', { count: result.length, intent: (i as any).kind })
+    return result
+  }, [filteredSales.data, mapSales.data, sales])
 
   // Unified "apply results" helper
   const applySalesResult = useCallback((
     incoming: { data: Sale[]; seq: number; cause: FetchContext['cause'] },
     target: 'map' | 'filtered'
   ) => {
-    console.log('[APPLY] applySalesResult called:', { target, data: incoming.data.length, seq: incoming.seq, cause: incoming.cause })
+    if (!INTENT_ENABLED) return
+
     const currentSeq = seqRef.current
     const currentIntent = intentRef.current
-    console.log('[APPLY] current state:', { currentSeq, currentIntent })
-    
+
     if (incoming.seq !== currentSeq) {
-      console.log('[APPLY] drop (stale seq)', { incomingSeq: incoming.seq, currentSeq })
+      console.debug('[APPLY] drop stale', { incomingSeq: incoming.seq, currentSeq })
       return
     }
     if (!isCauseCompatibleWithIntent(incoming.cause, currentIntent)) {
-      console.log('[APPLY] drop (incompatible with intent)', { cause: incoming.cause, intent: currentIntent })
+      console.debug('[APPLY] drop incompatible', { cause: incoming.cause, intent: currentIntent.kind })
       return
     }
-    const data = deduplicateSales(incoming.data)
+
+    const deduped = deduplicateSales(incoming.data)
     if (target === 'map') {
-      console.log('[APPLY] setting mapSales:', { data: data.length, seq: incoming.seq, source: incoming.cause })
-      setMapSales({ data, seq: incoming.seq, source: incoming.cause })
+      setMapSales({ data: deduped, seq: incoming.seq, source: incoming.cause })
     } else {
-      console.log('[APPLY] setting filteredSales:', { data: data.length, seq: incoming.seq, source: incoming.cause })
-      setFilteredSales({ data, seq: incoming.seq, source: incoming.cause })
+      setFilteredSales({ data: deduped, seq: incoming.seq, source: incoming.cause })
     }
-    console.log('[APPLY] ok', { target, count: data.length, seq: incoming.seq, cause: incoming.cause, intent: currentIntent })
+    console.debug('[APPLY] ok', { target, count: deduped.length, seq: incoming.seq, cause: incoming.cause })
   }, [])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
@@ -1246,16 +1259,20 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         setHasMore(false)
       }
       setFetchedOnce(true)
+      
+      return { data: data.data || [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
     } catch (error: any) {
       if (error.name === 'AbortError') {
         console.log('[NET] aborted sales', { seq })
-        return
+        return { data: [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
       }
       console.error('Error fetching sales:', error)
       // Don't clear sales immediately to prevent flickering
       // setSales([])
       setIsUpdating(false)
       setFetchedOnce(true)
+      
+      return { data: [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
     } finally {
       // Clear controller if this is still the active one
       if (salesAbortRef.current === controller) {
@@ -1526,7 +1543,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
             // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
         } else {
           console.log('[MAP] No sales data received, setting mapSales to empty array')
-          setMapSales({ data: [], seq: seqRef.current, source: 'Idle' })
+          setMapSales({ data: [], seq: seqRef.current, source: 'Filters' })
           setSales([])
           
           // Update intent system with empty data
@@ -1557,6 +1574,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         }
         
         console.debug('[MARKERS] got', uniqueMarkers.length)
+        
+        return { data: salesData?.data || [], ctx: _ctx || { cause: 'UserPan', seq: 0 } }
       } else {
         console.log('[MAP] Setting mapMarkers to empty array')
         setMapMarkers([])
@@ -1581,11 +1600,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         }
         
         console.debug('[MARKERS] got', 0)
+        
+        return { data: [], ctx: _ctx || { cause: 'UserPan', seq: 0 } }
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
         console.log('[NET] aborted markers', { seq })
-        return
+        return { data: [], ctx: _ctx || { cause: 'UserPan', seq: 0 } }
       }
       console.error('[MAP] Error fetching markers:', error)
       setMapMarkers([])
@@ -1611,6 +1632,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       }
       // Clear error after 3 seconds
       setTimeout(() => setMapError(null), 3000)
+      
+      return { data: [], ctx: _ctx || { cause: 'UserPan', seq: 0 } }
     } finally {
       // Clear controller if this is still the active one
       if (markersAbortRef.current === controller) {
@@ -1709,36 +1732,32 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Wrapper functions for intent-based fetching
   const runMapFetch = useCallback(async (params: any, ctx: FetchContext) => {
-    console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
+    console.debug('[FETCH] map', { ...ctx, params })
     
     try {
-      // Call the actual fetchMapSales function - it will now call applySalesResult internally
-      await fetchMapSales(undefined, params.centerOverride, params.zoomOverride, ctx)
+      const result = await fetchMapSales(undefined, params.centerOverride, params.zoomOverride, ctx)
+      if (result) {
+        applySalesResult({ data: result.data, seq: result.ctx.seq, cause: result.ctx.cause }, 'map')
+      }
     } catch (error) {
       console.error('[FETCH] Map fetch error:', error)
-      // Apply empty result on error
       applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'map')
     }
   }, [applySalesResult, fetchMapSales])
 
   const runFilteredFetch = useCallback(async (params: any, ctx: FetchContext) => {
-    console.log('[FETCH] runFilteredFetch called with context:', { cause: ctx.cause, seq: ctx.seq, params })
+    console.debug('[FETCH] filtered', { ...ctx, params })
     
     try {
-      // Call both fetchSales and fetchMapSales for comprehensive data
-      // Both functions will now call applySalesResult internally
-      console.log('[FETCH] About to call fetchSales and fetchMapSales with context:', ctx)
-      await Promise.all([
-        fetchSales(false, params.centerOverride, ctx),
-        fetchMapSales(undefined, params.centerOverride, params.zoomOverride, ctx)
-      ])
-      console.log('[FETCH] fetchSales and fetchMapSales completed')
+      const result = await fetchSales(false, params.centerOverride, ctx)
+      if (result) {
+        applySalesResult({ data: result.data, seq: result.ctx.seq, cause: result.ctx.cause }, 'filtered')
+      }
     } catch (error) {
       console.error('[FETCH] Filtered fetch error:', error)
-      // Apply empty result on error
       applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'filtered')
     }
-  }, [applySalesResult, fetchSales, fetchMapSales])
+  }, [applySalesResult, fetchSales])
 
   // Filters change handler
   const _onFiltersChange = useCallback((nextFilters: any) => {
@@ -2188,20 +2207,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[ZIP] computed bbox for dist=${filters.distance} -> n=${bbox.north},s=${bbox.south},e=${bbox.east},w=${bbox.west}')
     console.log('[MAP] fitBounds(zip) north=${bbox.north}, south=${bbox.south}, east=${bbox.east}, west=${bbox.west}')
     
-    // Trigger debounced fetches with the new coordinates using intent system
-    debouncedTrigger(() => {
-      const seq = ++seqRef.current
-      intentRef.current = { kind: 'Filters' }
-      console.log('[INTENT] set Filters for ZIP search', { seq })
-      
-      const params = { 
-        lat, 
-        lng, 
-        distance: filters.distance,
-        centerOverride: { lat, lng }
-      }
-      runFilteredFetch(params, { cause: 'Filters', seq })
-    })
+    // Intent system: 1) Own the list with Filters intent
+    bumpSeq({ kind: 'Filters' })
+    const mySeq = seqRef.current
+
+    // 2) Kick filtered fetch immediately
+    const params = { 
+      lat, 
+      lng, 
+      distance: filters.distance,
+      centerOverride: { lat, lng }
+    }
+    runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
     
     // Persist to session/local storage
     try {
@@ -2668,31 +2685,31 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     setVisiblePinIdsState(newVisibleIds)
                   }}
                   onClusterClick={async (clusterSales) => {
-                    // 1) new sequence for this user intent
-                    const seq = ++seqRef.current
-                    console.log('[INTENT] set ClusterDrilldown', { seq })
-                    console.log('[SEQ] ++', { seq })
+                    if (!INTENT_ENABLED) return
 
-                    // 2) set intent to ClusterDrilldown
+                    bumpSeq({ kind: 'ClusterDrilldown' })
+                    const mySeq = seqRef.current
+
+                    // Resolve leaves (actual sales, not child clusters)
+                    const unique = deduplicateSales(clusterSales)
+
+                    // Set map sales immediately for snappy UI
+                    setMapSales({ data: unique, seq: mySeq, source: 'ClusterDrilldown' })
+                    console.debug('[CLUSTER] leaves', { count: unique.length, seq: mySeq })
+
+                    // Animate in (programmatic)
                     const targetBounds = clusterSales.length > 0 ? {
                       north: Math.max(...clusterSales.map(s => s.lat || 0)),
                       south: Math.min(...clusterSales.map(s => s.lat || 0)),
                       east: Math.max(...clusterSales.map(s => s.lng || 0)),
                       west: Math.min(...clusterSales.map(s => s.lng || 0))
                     } : null
-                    const leafIds = clusterSales.map(s => s.id)
-                    intentRef.current = { kind: 'ClusterDrilldown', targetBounds, leafIds }
-
-                    // 3) optimistic render: show those leaves immediately in the list
-                    applySalesResult({ data: clusterSales, seq, cause: 'ClusterDrilldown' }, 'map')
-
-                    // 4) animate to bounds (programmatic move)
+                    
                     if (targetBounds) {
-                      // TODO: Implement animateToBounds
                       console.log('[CLUSTER] Would animate to bounds:', targetBounds)
                     }
 
-                    // 5) when map settles, run ONE viewport fetch with same seq
+                    // Optionally fetch viewport to confirm; still cause=ClusterDrilldown but will be compatible
                     const params = { 
                       lat: filters.lat, 
                       lng: filters.lng, 
@@ -2700,7 +2717,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       centerOverride: { lat: filters.lat, lng: filters.lng },
                       zoomOverride: mapView.zoom
                     }
-                    runMapFetch(params, { cause: 'ClusterDrilldown', seq })
+                    runMapFetch(params, { cause: 'ClusterDrilldown', seq: mySeq })
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly
@@ -2717,6 +2734,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                   }}
                   onViewChange={({ center, zoom, userInteraction }) => {
                     setMapView({ center, zoom })
+                    
+                    // Handle move start for intent system
+                    if (INTENT_ENABLED && userInteraction) {
+                      bumpSeq({ kind: 'UserPan' })
+                    }
                     
                     console.log('[MAP] onViewChange called:', {
                       userInteraction,

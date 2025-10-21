@@ -1,12 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import ZipInput from '@/components/location/ZipInput'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Filter } from 'lucide-react'
 import { useOverflowChips } from '@/hooks/useOverflowChips'
-import MoreChipsMenu from '@/components/filters/MoreChipsMenu'
 
 type FiltersBarProps = {
   // ZIP Search
@@ -59,9 +58,22 @@ export default function FiltersBar({
   hasActiveFilters
 }: FiltersBarProps) {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false)
+  const rightMoreBtnRef = useRef<HTMLButtonElement|null>(null)
+  const [reservedMoreW, setReservedMoreW] = useState(0)
 
   // Overflow management for category chips
-  const { railRef, visible, overflow } = useOverflowChips(CATEGORY_DATA)
+  const { railRef, measureRef, visible, overflow, setReservedOverflowTriggerWidth } = useOverflowChips(CATEGORY_DATA, { 
+    reservedOverflowTriggerWidth: reservedMoreW 
+  })
+
+  // Measure right button width once
+  useEffect(() => {
+    if (!rightMoreBtnRef.current) return
+    const w = Math.ceil(rightMoreBtnRef.current.getBoundingClientRect().width)
+    // Add padding so count changes don't jitter text width
+    if (w && w !== reservedMoreW) setReservedMoreW(w + 12)
+  }, [rightMoreBtnRef.current, reservedMoreW])
 
   const handleCategoryToggle = (categoryId: string) => {
     if (categories.includes(categoryId)) {
@@ -70,6 +82,39 @@ export default function FiltersBar({
       onCategoriesChange([...categories, categoryId])
     }
   }
+
+  const toggleOverflowMenu = () => {
+    if (overflow.length > 0) {
+      setShowOverflowMenu(!showOverflowMenu)
+    } else {
+      onAdvancedFiltersOpen()
+    }
+  }
+
+  // Close overflow menu on outside click or escape
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showOverflowMenu && !(event.target as Element).closest('[data-overflow-menu]')) {
+        setShowOverflowMenu(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showOverflowMenu) {
+        setShowOverflowMenu(false)
+      }
+    }
+
+    if (showOverflowMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleEscape)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showOverflowMenu])
 
   return (
     <div className="border-b bg-white">
@@ -89,8 +134,9 @@ export default function FiltersBar({
         </div>
 
         {/* Center Group - Category Chips with Overflow Management */}
-        <div className="flex-1 min-w-[240px]">
+        <div className="flex-1 min-w-0">
           <div className="relative overflow-hidden">
+            {/* Visible chips rail */}
             <div ref={railRef} className="flex items-center gap-2 whitespace-nowrap">
               {visible.map((category) => {
                 const isSelected = categories.includes(category.id)
@@ -100,7 +146,7 @@ export default function FiltersBar({
                     data-role="chip"
                     onClick={() => handleCategoryToggle(category.id)}
                     className={`
-                      inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap
+                      shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
                       ${isSelected 
                         ? 'bg-blue-100 text-blue-800 border border-blue-200' 
                         : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
@@ -114,14 +160,25 @@ export default function FiltersBar({
                   </button>
                 )
               })}
-              {overflow.length > 0 && (
-                <MoreChipsMenu 
-                  count={overflow.length}
-                  items={overflow}
-                  selectedCategories={categories}
-                  onToggle={handleCategoryToggle}
-                />
-              )}
+            </div>
+
+            {/* Offscreen measurement container */}
+            <div 
+              ref={measureRef}
+              aria-hidden="true"
+              className="absolute -left-[9999px] top-0 invisible"
+            >
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                {CATEGORY_DATA.map((category) => (
+                  <button 
+                    key={category.id} 
+                    data-role="chip-measure" 
+                    className="shrink-0 px-3 py-1.5 border rounded-full text-sm"
+                  >
+                    {category.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -144,16 +201,48 @@ export default function FiltersBar({
             </select>
           </div>
 
-          {/* More Filters Button */}
-          <Button
-            variant="outline"
-            onClick={onAdvancedFiltersOpen}
-            className="flex items-center gap-1 px-3 py-1 text-sm"
-          >
-            <Filter className="h-4 w-4" />
-            More
-            {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
-          </Button>
+          {/* More Filters Button - now serves as overflow host */}
+          <div className="relative">
+            <Button
+              ref={rightMoreBtnRef}
+              variant="outline"
+              onClick={toggleOverflowMenu}
+              className="flex items-center gap-1 px-3 py-1 text-sm"
+            >
+              <Filter className="h-4 w-4" />
+              {overflow.length > 0 ? `More (${overflow.length})` : 'More Filters'}
+              {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+            </Button>
+
+            {/* Overflow menu popover */}
+            {showOverflowMenu && overflow.length > 0 && (
+              <div data-overflow-menu className="absolute right-0 top-full mt-2 w-64 rounded-lg border bg-white shadow-lg z-50">
+                <div className="p-2 flex flex-wrap gap-2">
+                  {overflow.map((category) => {
+                    const isSelected = categories.includes(category.id)
+                    return (
+                      <button
+                        key={category.id}
+                        onClick={() => handleCategoryToggle(category.id)}
+                        className={`
+                          shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
+                          ${isSelected 
+                            ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                            : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                          }
+                        `}
+                      >
+                        {category.label}
+                        {isSelected && (
+                          <span className="ml-1 text-blue-600">×</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -235,7 +324,7 @@ export default function FiltersBar({
                           key={category.id}
                           onClick={() => handleCategoryToggle(category.id)}
                           className={`
-                            inline-flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium transition-colors
+                            shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
                             ${isSelected 
                               ? 'bg-blue-100 text-blue-800 border border-blue-200' 
                               : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'

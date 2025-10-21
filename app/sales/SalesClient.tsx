@@ -2114,9 +2114,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   useEffect(() => {
     if (mapSales.length > 0) {
       console.log('[MAP] Updating visibleSales from mapSales:', mapSales.length, 'sales')
+      console.log('[MAP] DEBUG: Before update - visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length)
       setVisibleSales(mapSales)
       setRenderedSales(mapSales)
       setStaleSales(mapSales) // Also update staleSales to ensure it shows even if isUpdating is true
+      console.log('[MAP] DEBUG: After update - visibleSales:', mapSales.length, 'renderedSales:', mapSales.length, 'staleSales:', mapSales.length)
     }
   }, [mapSales])
 
@@ -2285,6 +2287,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             
                             // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
                             const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
+                            
+                            // Debug cluster click rendering
+                            if (mapSales.length > 0) {
+                              console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'itemsToRender:', itemsToRender.length, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length)
+                            }
                             
                             // Debug sales list rendering
                             salesListDebug.logRendering('MAP', {

@@ -50,7 +50,7 @@ describe('SalesGrid', () => {
     expect(screen.queryByText('No sales found.')).not.toBeInTheDocument()
   })
 
-  it('renders skeletons when loading and not in MAP authority', () => {
+  it('renders skeletons when loading', () => {
     renderWithProviders(
       <SalesGrid
         sales={[]}
@@ -77,18 +77,16 @@ describe('SalesGrid', () => {
     expect(screen.queryByTestId('sale-card-skeleton')).not.toBeInTheDocument()
   })
 
-  it('does not render skeletons when in MAP authority, even if loading', () => {
+  it('renders skeletons when loading', () => {
     renderWithProviders(
       <SalesGrid
         sales={[]}
         loading={true}
-        authority="MAP"
         emptyStateMessage={emptyState}
         skeletonCount={3}
       />
     )
-    expect(screen.queryByTestId('sale-card-skeleton')).not.toBeInTheDocument()
-    expect(screen.getByText('No sales found.')).toBeInTheDocument() // Should show empty state if no sales
+    expect(screen.getAllByTestId('sale-card-skeleton')).toHaveLength(3)
   })
 
   it('observes resize events and updates columns', async () => {
@@ -182,12 +180,11 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={mockSales}
         loading={false}
-        authority="MAP"
         emptyStateMessage={emptyState}
       />
     )
     const gridElement = screen.getByTestId('sales-grid')
-    expect(gridElement).toHaveAttribute('data-authority', 'MAP')
+    expect(gridElement).toHaveAttribute('data-grid', 'sales')
     expect(gridElement).toHaveAttribute('data-hydrated', 'true')
   })
 })

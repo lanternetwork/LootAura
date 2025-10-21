@@ -1398,15 +1398,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           // Also update the main sales state so the sales list updates
           setSales(salesData.data)
           
-          // Trigger onVisiblePinsChange with the new sales data to update the sales list
-          console.log('[MAP] DEBUG: onVisiblePinsChange callback exists? (abort case)', !!onVisiblePinsChange)
-          if (onVisiblePinsChange) {
-            const visibleIds = salesData.data.map(sale => sale.id)
-            console.log('[MAP] Triggering onVisiblePinsChange after abort with new sales data:', visibleIds.length, 'sales')
-            onVisiblePinsChange(visibleIds, visibleIds.length)
-          } else {
-            console.log('[MAP] ERROR: onVisiblePinsChange callback is not available! (abort case)')
-          }
+          // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
         }
         return
       }
@@ -1450,15 +1442,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           // Also update the main sales state so the sales list updates
           setSales(salesData.data)
           
-          // Trigger onVisiblePinsChange with the new sales data to update the sales list
-          console.log('[MAP] DEBUG: onVisiblePinsChange callback exists?', !!onVisiblePinsChange)
-          if (onVisiblePinsChange) {
-            const visibleIds = salesData.data.map(sale => sale.id)
-            console.log('[MAP] Triggering onVisiblePinsChange with new sales data:', visibleIds.length, 'sales')
-            onVisiblePinsChange(visibleIds, visibleIds.length)
-          } else {
-            console.log('[MAP] ERROR: onVisiblePinsChange callback is not available!')
-          }
+          // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
         } else {
           console.log('[MAP] No sales data received, setting mapSales to empty array')
           _setMapSales([])
@@ -2125,6 +2109,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       }
     }
   }, [sales, bannerShown])
+
+  // Trigger onVisiblePinsChange when mapSales changes (for cluster clicks)
+  useEffect(() => {
+    if (mapSales.length > 0 && onVisiblePinsChange) {
+      const visibleIds = mapSales.map(sale => sale.id)
+      console.log('[MAP] Triggering onVisiblePinsChange from useEffect:', visibleIds.length, 'sales')
+      onVisiblePinsChange(visibleIds, visibleIds.length)
+    }
+  }, [mapSales, onVisiblePinsChange])
 
   const handleIncreaseDistanceAndRetry = () => {
     const nextMiles = Math.min(100, filters.distance + 10)

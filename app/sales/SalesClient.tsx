@@ -312,23 +312,28 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     incoming: { data: Sale[]; seq: number; cause: FetchContext['cause'] },
     target: 'map' | 'filtered'
   ) => {
+    console.log('[APPLY] applySalesResult called:', { target, data: incoming.data.length, seq: incoming.seq, cause: incoming.cause })
     const currentSeq = seqRef.current
     const currentIntent = intentRef.current
+    console.log('[APPLY] current state:', { currentSeq, currentIntent })
+    
     if (incoming.seq !== currentSeq) {
-      console.debug('[APPLY] drop (stale seq)', { incomingSeq: incoming.seq, currentSeq })
+      console.log('[APPLY] drop (stale seq)', { incomingSeq: incoming.seq, currentSeq })
       return
     }
     if (!isCauseCompatibleWithIntent(incoming.cause, currentIntent)) {
-      console.debug('[APPLY] drop (incompatible with intent)', { cause: incoming.cause, intent: currentIntent })
+      console.log('[APPLY] drop (incompatible with intent)', { cause: incoming.cause, intent: currentIntent })
       return
     }
     const data = deduplicateSales(incoming.data)
     if (target === 'map') {
+      console.log('[APPLY] setting mapSales:', { data: data.length, seq: incoming.seq, source: incoming.cause })
       setMapSales({ data, seq: incoming.seq, source: incoming.cause })
     } else {
+      console.log('[APPLY] setting filteredSales:', { data: data.length, seq: incoming.seq, source: incoming.cause })
       setFilteredSales({ data, seq: incoming.seq, source: incoming.cause })
     }
-    console.debug('[APPLY] ok', { target, count: data.length, seq: incoming.seq, cause: incoming.cause, intent: currentIntent })
+    console.log('[APPLY] ok', { target, count: data.length, seq: incoming.seq, cause: incoming.cause, intent: currentIntent })
   }, [])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
@@ -939,6 +944,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [arbiter.mode, mapView.center, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.dateRange, filters.categories, approximateRadiusKmFromZoom])
 
   const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }, _ctx?: FetchContext) => {
+    console.log('[FETCH] fetchSales called with context:', { _ctx, append, centerOverride })
     
     // Abort previous sales request
     abortPrevious('sales')
@@ -1170,6 +1176,14 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         setIsUpdating(false)
         setDateWindow(data.dateWindow || null)
         setDegraded(data.degraded || false)
+        
+        // Update intent system with the new sales data
+        if (_ctx) {
+          console.log('[INTENT] Applying sales result to filteredSales:', { data: newSales.length, seq: _ctx.seq, cause: _ctx.cause })
+          applySalesResult({ data: newSales, seq: _ctx.seq, cause: _ctx.cause }, 'filtered')
+        } else {
+          console.log('[INTENT] No context provided to fetchSales, skipping applySalesResult')
+        }
         const pageHasMore = newSales.length === 24
         setHasMore(pageHasMore)
         console.log(`[SALES] ${append ? 'Appended' : 'Set'} ${newSales.length} sales, hasMore: ${pageHasMore}`)
@@ -1446,9 +1460,17 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           setMapSales(salesData.data)
           // Also update the main sales state so the sales list updates (with deduplication)
           const deduplicatedSales = deduplicateSales(salesData.data)
-          setSales(deduplicatedSales)
-          
-          // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
+            setSales(deduplicatedSales)
+            
+            // Update intent system with the new sales data
+            if (_ctx) {
+              console.log('[INTENT] Applying sales result to mapSales:', { data: deduplicatedSales.length, seq: _ctx.seq, cause: _ctx.cause })
+              applySalesResult({ data: deduplicatedSales, seq: _ctx.seq, cause: _ctx.cause }, 'map')
+            } else {
+              console.log('[INTENT] No context provided to fetchMapSales, skipping applySalesResult')
+            }
+            
+            // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
         }
         return
       }
@@ -1491,13 +1513,26 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           setMapSales(salesData.data)
           // Also update the main sales state so the sales list updates (with deduplication)
           const deduplicatedSales = deduplicateSales(salesData.data)
-          setSales(deduplicatedSales)
-          
-          // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
+            setSales(deduplicatedSales)
+            
+            // Update intent system with the new sales data
+            if (_ctx) {
+              console.log('[INTENT] Applying sales result to mapSales:', { data: deduplicatedSales.length, seq: _ctx.seq, cause: _ctx.cause })
+              applySalesResult({ data: deduplicatedSales, seq: _ctx.seq, cause: _ctx.cause }, 'map')
+            } else {
+              console.log('[INTENT] No context provided to fetchMapSales, skipping applySalesResult')
+            }
+            
+            // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
         } else {
           console.log('[MAP] No sales data received, setting mapSales to empty array')
           setMapSales({ data: [], seq: seqRef.current, source: 'Idle' })
           setSales([])
+          
+          // Update intent system with empty data
+          if (_ctx) {
+            applySalesResult({ data: [], seq: _ctx.seq, cause: _ctx.cause }, 'map')
+          }
         }
         
         setMapError(null) // Clear any previous errors
@@ -1677,43 +1712,33 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
     
     try {
-      // Call the actual fetchMapSales function
+      // Call the actual fetchMapSales function - it will now call applySalesResult internally
       await fetchMapSales(undefined, params.centerOverride, params.zoomOverride, ctx)
-      
-      // The fetchMapSales function should have updated the sales state
-      // We need to wait for the state to update and then apply it to the intent system
-      // Use a timeout to allow the state to update
-      setTimeout(() => {
-        applySalesResult({ data: sales, seq: ctx.seq, cause: ctx.cause }, 'map')
-      }, 100)
     } catch (error) {
       console.error('[FETCH] Map fetch error:', error)
       // Apply empty result on error
       applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'map')
     }
-  }, [applySalesResult, fetchMapSales, sales])
+  }, [applySalesResult, fetchMapSales])
 
   const runFilteredFetch = useCallback(async (params: any, ctx: FetchContext) => {
-    console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
+    console.log('[FETCH] runFilteredFetch called with context:', { cause: ctx.cause, seq: ctx.seq, params })
     
     try {
       // Call both fetchSales and fetchMapSales for comprehensive data
+      // Both functions will now call applySalesResult internally
+      console.log('[FETCH] About to call fetchSales and fetchMapSales with context:', ctx)
       await Promise.all([
         fetchSales(false, params.centerOverride, ctx),
         fetchMapSales(undefined, params.centerOverride, params.zoomOverride, ctx)
       ])
-      
-      // The fetchSales function should have updated the sales state
-      // We need to wait for the state to update and then apply it to the intent system
-      setTimeout(() => {
-        applySalesResult({ data: sales, seq: ctx.seq, cause: ctx.cause }, 'filtered')
-      }, 100)
+      console.log('[FETCH] fetchSales and fetchMapSales completed')
     } catch (error) {
       console.error('[FETCH] Filtered fetch error:', error)
       // Apply empty result on error
       applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'filtered')
     }
-  }, [applySalesResult, fetchSales, fetchMapSales, sales])
+  }, [applySalesResult, fetchSales, fetchMapSales])
 
   // Filters change handler
   const _onFiltersChange = useCallback((nextFilters: any) => {

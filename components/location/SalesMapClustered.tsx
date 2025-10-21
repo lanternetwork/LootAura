@@ -42,6 +42,7 @@ interface SalesMapClusteredProps {
   onFitBoundsComplete?: () => void
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number; ts: number } | undefined) => void
   onVisiblePinsChange?: (visibleIds: string[], count: number) => void
+  onClusterClick?: (sales: Sale[]) => void
   onMoveEnd?: () => void
   onZoomEnd?: () => void
   onMapReady?: () => void
@@ -68,6 +69,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   onFitBoundsComplete: _onFitBoundsComplete,
   onBoundsChange: _onBoundsChange,
   onVisiblePinsChange,
+  onClusterClick,
   onMoveEnd,
   onZoomEnd,
   onMapReady,
@@ -459,6 +461,24 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       clusterDebug.warn('onVisiblePinsChange callback not provided')
     }
     
+    // Also trigger a direct sales data fetch for this cluster
+    // This ensures the sales list gets updated with the correct data
+    if (onClusterClick) {
+      try {
+        const childPoints = clusterIndex.getChildren(clusterId)
+        const clusterSales = childPoints.map(point => {
+          // Find the corresponding sale data
+          const sale = sales.find(s => s.id === point.id)
+          return sale
+        }).filter(Boolean)
+        
+        clusterDebug.log('Triggering onClusterClick with sales data:', clusterSales.length, 'sales')
+        onClusterClick(clusterSales)
+      } catch (error) {
+        clusterDebug.logClusterError(error as Error, 'getting cluster sales data')
+      }
+    }
+    
     clusterDebug.logClusterAnimation(cluster, 500)
     map.easeTo({
       center: [cluster.lon, cluster.lat],
@@ -468,7 +488,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     
     clusterDebug.logClusterPerformance('Cluster Click', startTime)
     clusterDebug.groupEnd()
-  }, [clusterIndex, onVisiblePinsChange])
+  }, [clusterIndex, onVisiblePinsChange, onClusterClick, sales])
 
   // Handle cluster keyboard interaction
   const handleClusterKeyDown = useCallback((cluster: ClusterResult, event: React.KeyboardEvent) => {

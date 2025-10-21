@@ -2531,6 +2531,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     
                     setVisiblePinIdsState(newVisibleIds)
                   }}
+                  onClusterClick={(clusterSales) => {
+                    console.log('[CLUSTER] Cluster clicked with sales:', clusterSales.length, 'sales')
+                    // Update the mapSales directly with the cluster sales data
+                    setMapSales(clusterSales)
+                    // Also update the main sales state
+                    setSales(clusterSales)
+                  }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly
                     if (arbiter.mode === 'map' && !arbiter.programmaticMoveGuard) {

@@ -27,6 +27,7 @@ interface SalesMapProps {
   onFitBoundsComplete?: () => void
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number; ts: number } | undefined) => void
   onVisiblePinsChange?: (visibleIds: string[], count: number) => void
+  onClusterClick?: (sales: Sale[]) => void
   onMoveEnd?: () => void
   onZoomEnd?: () => void
   onMapReady?: () => void
@@ -48,6 +49,7 @@ export default function SalesMap({
   onFitBoundsComplete,
   onBoundsChange,
   onVisiblePinsChange,
+  onClusterClick,
   onMoveEnd,
   onZoomEnd,
   onMapReady,
@@ -396,6 +398,7 @@ export default function SalesMap({
         onFitBoundsComplete={onFitBoundsComplete}
         onBoundsChange={onBoundsChange}
         onVisiblePinsChange={onVisiblePinsChange}
+        onClusterClick={onClusterClick}
         onMoveEnd={onMoveEnd}
         onZoomEnd={onZoomEnd}
         onMapReady={onMapReady}

@@ -31,7 +31,7 @@ export default function SaleCard({ sale }: { sale: Sale }) {
       <div className="text-sm text-neutral-700">
         {sale?.address && <div>{sale.address}</div>}
         {sale?.city && sale?.state && <div>{sale.city}, {sale.state}</div>}
-        {isMap && (!sale?.address || !sale?.city) && (
+        {(!sale?.address || !sale?.city) && (
           <div className="text-neutral-500">id:{String(sale?.id)}{sale?.lat && sale?.lng ? ` @ ${sale.lat.toFixed?.(3)},${sale.lng.toFixed?.(3)}` : ''}</div>
         )}
       </div>

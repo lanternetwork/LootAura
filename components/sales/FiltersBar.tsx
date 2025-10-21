@@ -108,9 +108,9 @@ export default function FiltersBar({
   return (
     <div className="border-b bg-white">
       {/* Desktop/Tablet Layout - CSS Grid Single Row */}
-      <div className="hidden md:grid grid-cols-[auto_1fr_auto] items-center gap-3 px-3 py-3">
-        {/* Left Cell - ZIP Search (shrink-0) */}
-        <div className="flex items-center gap-2 shrink-0">
+      <div className="hidden md:grid items-center gap-3 px-3 py-3" style={{ gridTemplateColumns: 'auto 1fr auto' }}>
+        {/* Left Cell - ZIP Search (fixed width) */}
+        <div className="flex items-center gap-2 w-32">
           <ZipInput
             onLocationFound={onZipLocationFound}
             onError={onZipError}
@@ -122,8 +122,8 @@ export default function FiltersBar({
           )}
         </div>
 
-        {/* Center Cell - Category Chips Rail (min-w-0, overflow-hidden) */}
-        <div ref={centerRef} className="min-w-0 overflow-hidden relative">
+        {/* Center Cell - Category Chips Rail (constrained, overflow-hidden) */}
+        <div ref={centerRef} className="min-w-0 overflow-hidden relative" style={{ maxWidth: '100%' }}>
           <div className="flex items-center gap-2 whitespace-nowrap">
             {visible.map((category) => {
               const isSelected = categories.includes(category.id)
@@ -169,8 +169,8 @@ export default function FiltersBar({
           </div>
         </div>
 
-        {/* Right Cell - Distance + More Filters (shrink-0) */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right Cell - Distance + More Filters (fixed width) */}
+        <div className="flex items-center gap-2 w-fit">
           {/* Distance Filter */}
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium whitespace-nowrap">Distance:</label>

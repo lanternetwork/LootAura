@@ -754,6 +754,8 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
           // Only log if it's not a marker click
           if (!evt.originalEvent?.target?.closest('[data-cluster-marker]')) {
             console.log('[MAP] Map onClick event (not marker):', evt)
+          } else {
+            console.log('[MAP] Map onClick event (marker click detected):', evt)
           }
         }}
         interactiveLayerIds={[]}

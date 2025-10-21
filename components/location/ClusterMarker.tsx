@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { Marker } from 'react-map-gl'
 import { ClusterResult } from '@/lib/clustering'
 
@@ -17,6 +17,8 @@ export default function ClusterMarker({
   onKeyDown,
   size = 'medium' 
 }: ClusterMarkerProps) {
+  const clickHandledRef = useRef(false)
+  
   console.log('[CLUSTER MARKER] Component rendered!', { 
     clusterId: cluster.id, 
     clusterType: cluster.type,
@@ -24,6 +26,11 @@ export default function ClusterMarker({
     hasOnClick: !!onClick 
   })
   const handleClick = useCallback((event: React.MouseEvent) => {
+    if (clickHandledRef.current) {
+      console.log('[CLUSTER MARKER] Click already handled, ignoring')
+      return
+    }
+    
     console.log('[CLUSTER MARKER] Click detected!', { 
       clusterId: cluster.id, 
       clusterType: cluster.type,
@@ -41,12 +48,19 @@ export default function ClusterMarker({
     // Prevent default and stop propagation immediately
     event.preventDefault()
     event.stopPropagation()
-    // Note: stopImmediatePropagation is not available on React MouseEvent
-    // The stopPropagation() should be sufficient for our use case
     
-    console.log('[CLUSTER MARKER] About to call onClick with cluster:', cluster)
-    onClick?.(cluster)
-    console.log('[CLUSTER MARKER] onClick called successfully')
+    clickHandledRef.current = true
+    
+    // Use setTimeout to ensure the click handler runs after map events
+    setTimeout(() => {
+      console.log('[CLUSTER MARKER] About to call onClick with cluster:', cluster)
+      onClick?.(cluster)
+      console.log('[CLUSTER MARKER] onClick called successfully')
+      // Reset the flag after a short delay
+      setTimeout(() => {
+        clickHandledRef.current = false
+      }, 100)
+    }, 0)
   }, [cluster, onClick])
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -83,9 +97,26 @@ export default function ClusterMarker({
           data-cluster-id={cluster.id}
           onClick={handleClick}
           onMouseDown={(e) => {
+            if (clickHandledRef.current) {
+              console.log('[CLUSTER MARKER] Point MouseDown already handled, ignoring')
+              return
+            }
+            
             console.log('[CLUSTER MARKER] Point MouseDown detected!', { clusterId: cluster.id })
             e.preventDefault()
             e.stopPropagation()
+            
+            clickHandledRef.current = true
+            
+            // Also trigger the click handler on mouse down for more reliable event handling
+            if (onClick) {
+              console.log('[CLUSTER MARKER] Point MouseDown triggering onClick:', cluster.id)
+              onClick(cluster)
+              // Reset the flag after a short delay
+              setTimeout(() => {
+                clickHandledRef.current = false
+              }, 100)
+            }
           }}
           onMouseUp={(e) => {
             console.log('[CLUSTER MARKER] Point MouseUp detected!', { clusterId: cluster.id })
@@ -121,9 +152,26 @@ export default function ClusterMarker({
         data-cluster-id={cluster.id}
         onClick={handleClick}
         onMouseDown={(e) => {
+          if (clickHandledRef.current) {
+            console.log('[CLUSTER MARKER] MouseDown already handled, ignoring')
+            return
+          }
+          
           console.log('[CLUSTER MARKER] MouseDown detected!', { clusterId: cluster.id })
           e.preventDefault()
           e.stopPropagation()
+          
+          clickHandledRef.current = true
+          
+          // Also trigger the click handler on mouse down for more reliable event handling
+          if (onClick) {
+            console.log('[CLUSTER MARKER] MouseDown triggering onClick:', cluster.id)
+            onClick(cluster)
+            // Reset the flag after a short delay
+            setTimeout(() => {
+              clickHandledRef.current = false
+            }, 100)
+          }
         }}
         onMouseUp={(e) => {
           console.log('[CLUSTER MARKER] MouseUp detected!', { clusterId: cluster.id })

@@ -24,6 +24,8 @@ import LayoutDiagnostic from '@/components/LayoutDiagnostic'
 import GridLayoutDiagnostic from '@/components/GridLayoutDiagnostic'
 import GridDebugOverlay from '@/components/GridDebugOverlay'
 import { resolveDatePreset } from '@/lib/shared/resolveDatePreset'
+import { Intent, FetchContext, isCauseCompatibleWithIntent } from '@/lib/sales/intent'
+import { deduplicateSales } from '@/lib/sales/dedupe'
 
 // Intent Arbiter types
 type ControlMode = 'initial' | 'map' | 'zip' | 'distance'
@@ -284,37 +286,50 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const mapUpdatingTimerRef = useRef<number | null>(null)
   // Safety timeout to ensure overlay never lingers too long
   const mapUpdatingMaxRef = useRef<number | null>(null)
-  const [mapSales, _setMapSales] = useState<Sale[]>([])
-  const mapSalesRef = useRef<Sale[]>([])
-  
-  // Cluster lock state to prevent list flicker during cluster click animation
-  const [clusterLock, setClusterLock] = useState(false)
+  // Intent-based arbiter system
+  const intentRef = useRef<Intent>({ kind: 'Idle' })
+  const seqRef = useRef(0)
 
-  // Deduplicate sales by canonical sale ID
-  const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
-    const seen = new Set<string>()
-    const unique = sales.filter(sale => {
-      const canonicalId = sale.id
-      if (seen.has(canonicalId)) {
-        return false
-      }
-      seen.add(canonicalId)
-      return true
-    })
-    
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && unique.length !== sales.length) {
-      console.log('[DEDUPE] input=', sales.length, 'output=unique=', unique.length, 'keys=[', unique.slice(0, 3).map(s => s.id), '...]')
+  // Intent-scoped sales state
+  const [mapSales, setMapSales] = useState<{ data: Sale[]; seq: number; source: FetchContext['cause'] }>({
+    data: [], seq: -1, source: 'Idle' as any
+  })
+  const [filteredSales, setFilteredSales] = useState<{ data: Sale[]; seq: number; source: FetchContext['cause'] }>({
+    data: [], seq: -1, source: 'Idle' as any
+  })
+
+  // Deterministic list derivation
+  const listData: Sale[] = useMemo(() => {
+    const intent = intentRef.current
+    if (intent.kind === 'ClusterDrilldown') return mapSales.data   // leaves or the viewport results for this seq
+    if (intent.kind === 'UserPan') return mapSales.data
+    if (intent.kind === 'Filters') return filteredSales.data
+    return filteredSales.data.length ? filteredSales.data : mapSales.data
+  }, [mapSales.data, filteredSales.data])
+
+  // Unified "apply results" helper
+  const applySalesResult = useCallback((
+    incoming: { data: Sale[]; seq: number; cause: FetchContext['cause'] },
+    target: 'map' | 'filtered'
+  ) => {
+    const currentSeq = seqRef.current
+    const currentIntent = intentRef.current
+    if (incoming.seq !== currentSeq) {
+      console.debug('[APPLY] drop (stale seq)', { incomingSeq: incoming.seq, currentSeq })
+      return
     }
-    
-    return unique
+    if (!isCauseCompatibleWithIntent(incoming.cause, currentIntent)) {
+      console.debug('[APPLY] drop (incompatible with intent)', { cause: incoming.cause, intent: currentIntent })
+      return
+    }
+    const data = deduplicateSales(incoming.data)
+    if (target === 'map') {
+      setMapSales({ data, seq: incoming.seq, source: incoming.cause })
+    } else {
+      setFilteredSales({ data, seq: incoming.seq, source: incoming.cause })
+    }
+    console.debug('[APPLY] ok', { target, count: data.length, seq: incoming.seq, cause: incoming.cause, intent: currentIntent })
   }, [])
-
-  // Update both state and ref when mapSales changes
-  const setMapSales = useCallback((sales: Sale[]) => {
-    const deduplicated = deduplicateSales(sales)
-    _setMapSales(deduplicated)
-    mapSalesRef.current = deduplicated
-  }, [deduplicateSales])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
   const [mapFadeIn, setMapFadeIn] = useState<boolean>(true)
@@ -923,12 +938,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     return key
   }, [arbiter.mode, mapView.center, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.dateRange, filters.categories, approximateRadiusKmFromZoom])
 
-  const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }) => {
-    // Skip fetch during cluster lock to prevent list flicker
-    if (clusterLock) {
-      console.log('[FETCH] skipped during lock when a fetch would have replaced the list')
-      return
-    }
+  const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }, ctx?: FetchContext) => {
     
     // Abort previous sales request
     abortPrevious('sales')
@@ -1239,17 +1249,36 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       }
       setLoading(false)
     }
-  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, clusterLock])
+  }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious])
+
+  // Wrapper functions for intent-based fetching
+  const runMapFetch = useCallback(async (params: any, ctx: FetchContext) => {
+    // TODO: Implement proper fetchMapSales with context
+    console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
+    // For now, just apply empty result
+    applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'map')
+  }, [applySalesResult])
+
+  const runFilteredFetch = useCallback(async (params: any, ctx: FetchContext) => {
+    // TODO: Implement proper fetchSales with context
+    console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
+    // For now, just apply empty result
+    applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'filtered')
+  }, [applySalesResult])
+
+  // Filters change handler
+  const onFiltersChange = useCallback((nextFilters: any) => {
+    const seq = ++seqRef.current
+    intentRef.current = { kind: 'Filters' }
+    console.log('[INTENT] set Filters', { seq })
+    console.log('[SEQ] ++', { seq })
+    runFilteredFetch(nextFilters, { cause: 'Filters', seq })
+  }, [runFilteredFetch])
 
   // Client-side geolocation removed; handlers not used
 
   // Fetch markers for map pins using dedicated markers endpoint
-  const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }, zoomOverride?: number) => {
-    // Skip fetch during cluster lock to prevent list flicker
-    if (clusterLock) {
-      console.log('[FETCH] skipped during lock when a fetch would have replaced the list')
-      return
-    }
+  const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }, zoomOverride?: number, ctx?: FetchContext) => {
     
     // Check if we need to fetch based on key change (use overrides when provided)
     const key = buildMarkersKey(centerOverride ? { center: centerOverride, zoom: zoomOverride } : undefined)
@@ -1490,7 +1519,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           // Note: onVisiblePinsChange will be triggered by useEffect when mapSales changes
         } else {
           console.log('[MAP] No sales data received, setting mapSales to empty array')
-          setMapSales([])
+          setMapSales({ data: [], seq: seqRef.current, source: 'Idle' })
           setSales([])
         }
         
@@ -1586,7 +1615,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       }
       setMapUpdating(false)
     }
-  }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, buildMarkersKey, clusterLock])
+  }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, buildMarkersKey])
 
   const loadMore = useCallback(async () => {
     // Use prefetched next page if available for instant UI
@@ -2157,15 +2186,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Update visibleSales when mapSales changes (for cluster clicks)
   useEffect(() => {
-    if (mapSales.length > 0) {
-      console.log('[MAP] Updating visibleSales from mapSales:', mapSales.length, 'sales')
+    if (mapSales.data.length > 0) {
+      console.log('[MAP] Updating visibleSales from mapSales:', mapSales.data.length, 'sales')
       console.log('[MAP] DEBUG: Before update - visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length)
-      console.log('[MAP] DEBUG: mapSales IDs:', mapSales.map(s => s.id))
-      console.log('[MAP] DEBUG: mapSales titles:', mapSales.map(s => s.title))
-      setVisibleSales(mapSales)
-      setRenderedSales(mapSales)
-      setStaleSales(mapSales) // Also update staleSales to ensure it shows even if isUpdating is true
-      console.log('[MAP] DEBUG: After update - visibleSales:', mapSales.length, 'renderedSales:', mapSales.length, 'staleSales:', mapSales.length)
+      console.log('[MAP] DEBUG: mapSales IDs:', mapSales.data.map(s => s.id))
+      console.log('[MAP] DEBUG: mapSales titles:', mapSales.data.map(s => s.title))
+      setVisibleSales(mapSales.data)
+      setRenderedSales(mapSales.data)
+      setStaleSales(mapSales.data) // Also update staleSales to ensure it shows even if isUpdating is true
+      console.log('[MAP] DEBUG: After update - visibleSales:', mapSales.data.length, 'renderedSales:', mapSales.data.length, 'staleSales:', mapSales.data.length)
     }
   }, [mapSales])
 
@@ -2173,7 +2202,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   useEffect(() => {
     if (sales.length > 0 && arbiter.authority === 'MAP') {
       console.log('[MAP] Force updating mapSales with new sales data:', sales.length, 'sales')
-      setMapSales(sales)
+      setMapSales({ data: sales, seq: seqRef.current, source: 'UserPan' })
     }
   }, [sales, arbiter.authority])
 
@@ -2334,19 +2363,16 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       ) : (
                         // Show visible pins - render from markers immediately, hydrate from sales cache
                         <>
-                          {visibleSales.length > 24 && (
-                            <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
+                          {listData.length > 24 && (
+                            <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{listData.length}</strong> in view</div>
                           )}
                           {(() => {
-                            const itemsToRender = isUpdating ? staleSales : renderedSales
-                            
-                            // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
-                            // CLUSTER CLICK FIX: If mapSales has data (cluster click), use it directly
-                            const finalItemsToRender = mapSalesRef.current.length > 0 ? mapSalesRef.current : (itemsToRender.length > 0 ? itemsToRender : visibleSales)
+                            // Use deterministic listData from intent system
+                            const finalItemsToRender = listData
                             
                             // Debug cluster click rendering
-                            console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'itemsToRender:', itemsToRender.length, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.length)
-                            console.log('[SALES LIST] DEBUG: mapSalesRef.current.length > 0?', mapSalesRef.current.length > 0, 'mapSalesRef.current:', mapSalesRef.current.length, 'finalItemsToRender === mapSalesRef.current?', finalItemsToRender === mapSalesRef.current)
+                            console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.data.length)
+                            console.log('[SALES LIST] DEBUG: mapSales.data.length > 0?', mapSales.data.length > 0, 'mapSales.data:', mapSales.data.length, 'finalItemsToRender === mapSales.data?', finalItemsToRender === mapSales.data)
                             console.log('[SALES LIST] DEBUG: finalItemsToRender IDs:', finalItemsToRender.map(s => s.id))
                             console.log('[SALES LIST] DEBUG: finalItemsToRender titles:', finalItemsToRender.map(s => s.title))
                             
@@ -2356,7 +2382,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                               staleSalesCount: staleSales.length,
                               renderedSalesCount: renderedSales.length,
                               visibleSalesCount: visibleSales.length,
-                              itemsToRenderCount: itemsToRender.length,
+                              itemsToRenderCount: finalItemsToRender.length,
                               finalItemsToRenderCount: finalItemsToRender.length
                             })
                             
@@ -2365,7 +2391,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                               staleSalesCount: staleSales.length,
                               renderedSalesCount: renderedSales.length,
                               visibleSalesCount: visibleSales.length,
-                              itemsToRenderCount: itemsToRender.length,
                               finalItemsToRenderCount: finalItemsToRender.length,
                               authority: arbiter.authority
                             })
@@ -2401,11 +2426,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       ) : (
                         // Show actual sales
                         <>
-                          {visibleSales.length > 24 && (
-                            <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{visibleSales.length}</strong> in view</div>
+                          {listData.length > 24 && (
+                            <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{listData.length}</strong> in view</div>
                           )}
                           {(() => {
-                            const itemsToRender = isUpdating ? staleSales : renderedSales
+                            // Use deterministic listData from intent system
+                            const finalItemsToRender = listData
                             
                             // Debug sales list rendering for non-MAP authority
                             salesListDebug.logRendering('Non-MAP', {
@@ -2413,7 +2439,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                               staleSalesCount: staleSales.length,
                               renderedSalesCount: renderedSales.length,
                               salesCount: sales.length,
-                              itemsToRenderCount: itemsToRender.length,
+                              itemsToRenderCount: finalItemsToRender.length,
                               loading,
                               fetchedOnce
                             })
@@ -2423,7 +2449,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             console.log('  - staleSalesCount:', staleSales.length)
                             console.log('  - renderedSalesCount:', renderedSales.length)
                             console.log('  - salesCount:', sales.length)
-                            console.log('  - itemsToRenderCount:', itemsToRender.length)
+                            console.log('  - itemsToRenderCount:', finalItemsToRender.length)
                             console.log('  - authority:', arbiter.authority)
                             console.log('  - loading:', loading)
                             console.log('  - fetchedOnce:', fetchedOnce)
@@ -2431,7 +2457,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             console.log('  - sampleRendered:', renderedSales.slice(0, 3).map(s => ({ id: s.id, title: s.title })))
                             console.log('  - sampleStale:', staleSales.slice(0, 3).map(s => ({ id: s.id, title: s.title })))
                             
-                            return itemsToRender.map((item: any, _idx: number) => {
+                            return finalItemsToRender.map((item: any, _idx: number) => {
                               salesListDebug.logSaleRender({ id: item.id, title: item.title })
                               console.log('[SALES LIST] Rendering sale (Non-MAP):', { id: item.id, title: item.title })
                               return <SaleCard key={item.id} sale={item} authority={arbiter.authority} />
@@ -2485,9 +2511,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
             <div className="bg-white rounded-lg shadow-sm border p-4">
               <h2 className="text-xl font-semibold mb-4">
                 Map View
-                {renderedSales.length > 0 && (
+                {listData.length > 0 && (
                   <span className="ml-2 text-sm font-normal text-gray-600">
-                    ({renderedSales.length} in view)
+                    ({listData.length} in view)
                   </span>
                 )}
                 {isUpdating && (
@@ -2504,7 +2530,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                   </div>
                 )}
                 <SalesMap
-                  sales={mapSales}
+                  sales={mapSales.data}
                   markers={mapMarkers}
                   center={filters.lat && filters.lng ? { lat: filters.lat, lng: filters.lng } : 
                          initialCenter ? { lat: initialCenter.lat, lng: initialCenter.lng } : 
@@ -2572,24 +2598,34 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     
                     setVisiblePinIdsState(newVisibleIds)
                   }}
-                  onClusterClick={(clusterSales) => {
-                    console.log('[CLUSTER_CLICK] id=cluster, leaves=', clusterSales.length, 'lock=true')
-                    console.log('[AUTHORITY] set=MAP reason=cluster-click')
-                    
-                    // Set cluster lock to prevent list flicker during animation
-                    setClusterLock(true)
-                    
-                    // Set authority to MAP for cluster clicks
-                    setAuthority('MAP', 'cluster-click')
-                    
-                    // Update the mapSales directly with the cluster sales data (already deduplicated)
-                    setMapSales(clusterSales)
-                    // Also update the main sales state (with deduplication)
-                    const deduplicatedClusterSales = deduplicateSales(clusterSales)
-                    setSales(deduplicatedClusterSales)
-                    
-                    console.log('[CLUSTER] After setMapSales - mapSalesRef.current:', mapSalesRef.current.length)
-                    console.log('[CLUSTER] After setSales - sales.length:', sales.length)
+                  onClusterClick={async (clusterSales) => {
+                    // 1) new sequence for this user intent
+                    const seq = ++seqRef.current
+                    console.log('[INTENT] set ClusterDrilldown', { seq })
+                    console.log('[SEQ] ++', { seq })
+
+                    // 2) set intent to ClusterDrilldown
+                    const targetBounds = clusterSales.length > 0 ? {
+                      north: Math.max(...clusterSales.map(s => s.lat || 0)),
+                      south: Math.min(...clusterSales.map(s => s.lat || 0)),
+                      east: Math.max(...clusterSales.map(s => s.lng || 0)),
+                      west: Math.min(...clusterSales.map(s => s.lng || 0))
+                    } : null
+                    const leafIds = clusterSales.map(s => s.id)
+                    intentRef.current = { kind: 'ClusterDrilldown', targetBounds, leafIds }
+
+                    // 3) optimistic render: show those leaves immediately in the list
+                    applySalesResult({ data: clusterSales, seq, cause: 'ClusterDrilldown' }, 'map')
+
+                    // 4) animate to bounds (programmatic move)
+                    if (targetBounds) {
+                      // TODO: Implement animateToBounds
+                      console.log('[CLUSTER] Would animate to bounds:', targetBounds)
+                    }
+
+                    // 5) when map settles, run ONE viewport fetch with same seq
+                    const params = { lat: filters.lat, lng: filters.lng, distance: filters.distance }
+                    runMapFetch(params, { cause: 'ClusterDrilldown', seq })
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly
@@ -2658,16 +2694,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     }
                   }}
                   onMoveEnd={() => {
-                    // Clear guard after user interaction completes
-                    if (arbiter.guardMapMove) {
-                      setGuardMapMove(false, 'Move completed')
-                      console.log('[MAP] move completed - guard cleared')
-                    }
-                    
-                    // Clear cluster lock after map animation completes
-                    if (clusterLock) {
-                      setClusterLock(false)
-                      console.log('[LOCK] cleared on idle')
+                    const seq = seqRef.current
+                    const intent = intentRef.current
+
+                    // Only fetch for interactions that expect a map dataset.
+                    if (intent.kind === 'UserPan' || intent.kind === 'ClusterDrilldown') {
+                      const params = { lat: filters.lat, lng: filters.lng, distance: filters.distance }
+                      runMapFetch(params, { cause: intent.kind, seq })
+                    } else {
+                      console.debug('[MOVEEND] no map fetch for intent', intent)
                     }
                   }}
                   onZoomEnd={() => {
@@ -2693,7 +2728,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       <strong>Searching within {filters.distance} miles</strong> of your location
                     </p>
                     <p className="text-xs text-blue-600 mt-1">
-                      Showing {renderedSales.length} sales
+                      Showing {listData.length} sales
                     </p>
                   </div>
                 </div>

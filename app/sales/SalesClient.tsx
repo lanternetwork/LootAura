@@ -2286,11 +2286,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             const itemsToRender = isUpdating ? staleSales : renderedSales
                             
                             // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
-                            const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
+                            // CLUSTER CLICK FIX: If mapSales has data (cluster click), use it directly
+                            const finalItemsToRender = mapSales.length > 0 ? mapSales : (itemsToRender.length > 0 ? itemsToRender : visibleSales)
                             
                             // Debug cluster click rendering
                             if (mapSales.length > 0) {
-                              console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'itemsToRender:', itemsToRender.length, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length)
+                              console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'itemsToRender:', itemsToRender.length, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.length)
                             }
                             
                             // Debug sales list rendering

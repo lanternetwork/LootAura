@@ -751,11 +751,27 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         onZoomEnd={handleZoomEnd}
         onMove={handleViewChange}
         onClick={(evt: any) => {
-          // Only log if it's not a marker click
-          if (!evt.originalEvent?.target?.closest('[data-cluster-marker]')) {
-            console.log('[MAP] Map onClick event (not marker):', evt)
-          } else {
+          // Check if this is a cluster marker click
+          const target = evt.originalEvent?.target
+          if (target?.closest('[data-cluster-marker]')) {
             console.log('[MAP] Map onClick event (marker click detected):', evt)
+            
+            // Get the cluster ID from the clicked element
+            const clusterElement = target.closest('[data-cluster-marker]')
+            const clusterId = clusterElement?.getAttribute('data-cluster-id')
+            
+            if (clusterId && clusterIndex) {
+              console.log('[MAP] Direct cluster click detected:', clusterId)
+              
+              // Find the cluster in the clusters array
+              const cluster = clusters.find(c => c.id === clusterId)
+              if (cluster && cluster.type === 'cluster') {
+                console.log('[MAP] Triggering direct cluster click handler:', cluster)
+                handleClusterClick(cluster)
+              }
+            }
+          } else {
+            console.log('[MAP] Map onClick event (not marker):', evt)
           }
         }}
         interactiveLayerIds={[]}

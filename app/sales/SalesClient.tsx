@@ -65,13 +65,20 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   })
 
   // Sales data state
-  const [sales, _setSales] = useState<Sale[]>(initialSales)
-  const [_mapMarkers, _setMapMarkers] = useState<{ id: string; title: string; lat: number; lng: number }[]>([])
+  const [sales, setSales] = useState<Sale[]>(initialSales)
+  const [mapMarkers, setMapMarkers] = useState<{ id: string; title: string; lat: number; lng: number }[]>(
+    initialSales.map(sale => ({
+      id: sale.id,
+      title: sale.title,
+      lat: sale.lat || 0,
+      lng: sale.lng || 0
+    }))
+  )
   const [mapSales, setMapSales] = useState<{ data: Sale[]; seq: number; source: FetchContext['cause'] }>({
-    data: [], seq: -1, source: 'Filters' as any
+    data: initialSales, seq: 0, source: 'Filters' as any
   })
   const [filteredSales, setFilteredSales] = useState<{ data: Sale[]; seq: number; source: FetchContext['cause'] }>({
-    data: [], seq: -1, source: 'Filters' as any
+    data: initialSales, seq: 0, source: 'Filters' as any
   })
 
   // UI state
@@ -173,10 +180,17 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [runFilteredFetch])
 
   // Debug logging
+  const mapCenter = mapView.center || { lat: 39.8283, lng: -98.5795 }
+  const mapZoom = mapView.zoom || 10
+  const salesCount = mapSales.data?.length || 0
+  
   console.log('[DEBUG] Map props:', { 
-    center: mapView.center || { lat: 39.8283, lng: -98.5795 }, 
-    zoom: mapView.zoom || 10,
-    salesCount: mapSales.data?.length || 0
+    center: mapCenter, 
+    zoom: mapZoom,
+    salesCount,
+    mapView,
+    mapSales,
+    filteredSales
   })
 
   // Render
@@ -206,6 +220,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       <div className="flex-1 lg:w-1/2 h-96 lg:h-full">
         <SalesMap
           sales={mapSales.data || []}
+          markers={mapMarkers}
           center={mapView.center || { lat: 39.8283, lng: -98.5795 }}
           zoom={mapView.zoom || 10}
           onViewChange={({ center, zoom, userInteraction }) => {

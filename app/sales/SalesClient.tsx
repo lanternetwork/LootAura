@@ -2116,6 +2116,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       console.log('[MAP] Updating visibleSales from mapSales:', mapSales.length, 'sales')
       setVisibleSales(mapSales)
       setRenderedSales(mapSales)
+      setStaleSales(mapSales) // Also update staleSales to ensure it shows even if isUpdating is true
     }
   }, [mapSales])
 

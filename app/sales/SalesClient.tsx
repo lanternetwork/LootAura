@@ -204,7 +204,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       <SalesShell
         Filters={
           <FiltersBar
-            onZipLocationFound={(lat, lng, city) => {
+            onZipLocationFound={(lat, lng, _city) => {
               // Intent system: 1) Own the list with Filters intent
               bumpSeq({ kind: 'Filters' })
               const mySeq = seqRef.current

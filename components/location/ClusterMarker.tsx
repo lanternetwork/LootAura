@@ -37,8 +37,12 @@ export default function ClusterMarker({
       clientX: event.clientX,
       clientY: event.clientY
     })
+    
+    // Prevent default and stop propagation immediately
     event.preventDefault()
     event.stopPropagation()
+    event.stopImmediatePropagation()
+    
     console.log('[CLUSTER MARKER] About to call onClick with cluster:', cluster)
     onClick?.(cluster)
     console.log('[CLUSTER MARKER] onClick called successfully')
@@ -74,7 +78,19 @@ export default function ClusterMarker({
       >
         <button
           className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500"
+          data-cluster-marker="true"
+          data-cluster-id={cluster.id}
           onClick={handleClick}
+          onMouseDown={(e) => {
+            console.log('[CLUSTER MARKER] Point MouseDown detected!', { clusterId: cluster.id })
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+          onMouseUp={(e) => {
+            console.log('[CLUSTER MARKER] Point MouseUp detected!', { clusterId: cluster.id })
+            e.preventDefault()
+            e.stopPropagation()
+          }}
           aria-label={`Sale at this location`}
         />
       </Marker>
@@ -100,7 +116,19 @@ export default function ClusterMarker({
           cursor-pointer
         `}
         style={sizeStyles[size]}
+        data-cluster-marker="true"
+        data-cluster-id={cluster.id}
         onClick={handleClick}
+        onMouseDown={(e) => {
+          console.log('[CLUSTER MARKER] MouseDown detected!', { clusterId: cluster.id })
+          e.preventDefault()
+          e.stopPropagation()
+        }}
+        onMouseUp={(e) => {
+          console.log('[CLUSTER MARKER] MouseUp detected!', { clusterId: cluster.id })
+          e.preventDefault()
+          e.stopPropagation()
+        }}
         onKeyDown={handleKeyDown}
         tabIndex={0}
         aria-label={`Cluster of ${cluster.count} sales. Press Enter to zoom in.`}

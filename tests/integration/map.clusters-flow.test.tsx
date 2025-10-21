@@ -274,7 +274,6 @@ describe('Map Clusters Flow', () => {
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
-        arbiterAuthority="MAP"
         onVisiblePinsChange={onVisiblePinsChange}
         data-testid="map-container-8"
       />

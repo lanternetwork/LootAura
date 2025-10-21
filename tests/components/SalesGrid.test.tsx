@@ -42,7 +42,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={mockSales}
         loading={false}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
       />
     )
@@ -56,7 +55,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={[]}
         loading={true}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
         skeletonCount={3}
       />
@@ -71,7 +69,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={[]}
         loading={false}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
       />
     )
@@ -99,7 +96,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={mockSales}
         loading={false}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
       />
     )
@@ -158,7 +154,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={mockSales}
         loading={false}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
       />
     )
@@ -174,7 +169,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={mockSales}
         loading={false}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
         className="custom-class"
       />

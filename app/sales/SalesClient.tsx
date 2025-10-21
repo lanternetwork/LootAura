@@ -134,13 +134,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     return { data: [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
   }, [])
 
-  const fetchMapSales = useCallback(async (centerOverride?: { lat: number; lng: number }, zoomOverride?: number, _ctx?: FetchContext) => {
-    console.log('[FETCH] fetchMapSales called with context:', { _ctx, centerOverride, zoomOverride })
-    
-    // Implementation details would go here...
-    // For now, return empty data
-    return { data: [], ctx: _ctx || { cause: 'UserPan', seq: 0 } }
-  }, [])
 
   // Wrapper functions for intent-based fetching
 

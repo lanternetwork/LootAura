@@ -2123,6 +2123,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     if (mapSales.length > 0) {
       console.log('[MAP] Updating visibleSales from mapSales:', mapSales.length, 'sales')
       console.log('[MAP] DEBUG: Before update - visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length)
+      console.log('[MAP] DEBUG: mapSales IDs:', mapSales.map(s => s.id))
+      console.log('[MAP] DEBUG: mapSales titles:', mapSales.map(s => s.title))
       setVisibleSales(mapSales)
       setRenderedSales(mapSales)
       setStaleSales(mapSales) // Also update staleSales to ensure it shows even if isUpdating is true
@@ -2308,6 +2310,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             // Debug cluster click rendering
                             console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'itemsToRender:', itemsToRender.length, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.length)
                             console.log('[SALES LIST] DEBUG: mapSalesRef.current.length > 0?', mapSalesRef.current.length > 0, 'mapSalesRef.current:', mapSalesRef.current.length, 'finalItemsToRender === mapSalesRef.current?', finalItemsToRender === mapSalesRef.current)
+                            console.log('[SALES LIST] DEBUG: finalItemsToRender IDs:', finalItemsToRender.map(s => s.id))
+                            console.log('[SALES LIST] DEBUG: finalItemsToRender titles:', finalItemsToRender.map(s => s.title))
                             
                             // Debug sales list rendering
                             salesListDebug.logRendering('MAP', {
@@ -2533,10 +2537,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                   }}
                   onClusterClick={(clusterSales) => {
                     console.log('[CLUSTER] Cluster clicked with sales:', clusterSales.length, 'sales')
+                    console.log('[CLUSTER] Cluster sales IDs:', clusterSales.map(s => s.id))
+                    console.log('[CLUSTER] Cluster sales titles:', clusterSales.map(s => s.title))
+                    console.log('[CLUSTER] Before setMapSales - mapSalesRef.current:', mapSalesRef.current.length)
+                    console.log('[CLUSTER] Before setSales - sales.length:', sales.length)
+                    
                     // Update the mapSales directly with the cluster sales data
                     setMapSales(clusterSales)
                     // Also update the main sales state
                     setSales(clusterSales)
+                    
+                    console.log('[CLUSTER] After setMapSales - mapSalesRef.current:', mapSalesRef.current.length)
+                    console.log('[CLUSTER] After setSales - sales.length:', sales.length)
                   }}
                   onSearchArea={({ center }) => {
                     // Only update filters if we're in map mode and center changed significantly

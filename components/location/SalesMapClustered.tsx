@@ -485,6 +485,10 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
           return sale
         }).filter((sale): sale is Sale => sale !== undefined)
         
+        console.log('[CLUSTER] Final cluster sales:', clusterSales.length, 'sales')
+        console.log('[CLUSTER] Cluster sales IDs:', clusterSales.map(s => s.id))
+        console.log('[CLUSTER] Cluster sales titles:', clusterSales.map(s => s.title))
+        
         clusterDebug.log('Triggering onClusterClick with sales data:', clusterSales.length, 'sales')
         onClusterClick(clusterSales)
       } catch (error) {

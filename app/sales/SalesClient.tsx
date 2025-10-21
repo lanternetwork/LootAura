@@ -196,7 +196,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       </div>
 
       {/* Map */}
-      <div className="flex-1 lg:w-1/2">
+      <div className="flex-1 lg:w-1/2 h-96 lg:h-full">
+        {console.log('[DEBUG] Map props:', { 
+          center: mapView.center || { lat: 39.8283, lng: -98.5795 }, 
+          zoom: mapView.zoom || 10,
+          salesCount: mapSales.data?.length || 0
+        })}
         <SalesMap
           sales={mapSales.data || []}
           center={mapView.center || { lat: 39.8283, lng: -98.5795 }}

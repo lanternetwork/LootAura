@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 export function useOverflowChips<T extends { id: string; priority?: number }>(
-  items: T[],
-  opts?: { reservedOverflowTriggerWidth?: number }
+  items: T[]
 ) {
-  const railRef = useRef<HTMLDivElement|null>(null);
+  const centerRef = useRef<HTMLDivElement|null>(null);
   const measureRef = useRef<HTMLDivElement|null>(null);
   const [visible, setVisible] = useState<T[]>(items);
   const [overflow, setOverflow] = useState<T[]>([]);
-  const [reservedOverflowTriggerWidth, setReservedOverflowTriggerWidth] = useState(opts?.reservedOverflowTriggerWidth ?? 0);
   const [_widthCache, setWidthCache] = useState<Record<string, number>>({});
   const [hysteresisState, setHysteresisState] = useState<{ count: number; lastResult: { visible: T[]; overflow: T[] } }>({ count: 0, lastResult: { visible: [], overflow: [] } });
 
@@ -18,11 +16,11 @@ export function useOverflowChips<T extends { id: string; priority?: number }>(
   }, [items]);
 
   const measure = useCallback(() => {
-    const rail = railRef.current;
+    const center = centerRef.current;
     const measure = measureRef.current;
-    if (!rail || !measure) return;
+    if (!center || !measure) return;
 
-    const available = rail.clientWidth - 16 - reservedOverflowTriggerWidth; // safety + reserved width
+    const availableWidth = center.getBoundingClientRect().width - 4; // 4px safety margin
     const gap = 8; // must match gap-2 in Tailwind
     
     // Get widths from offscreen measurement container
@@ -48,7 +46,7 @@ export function useOverflowChips<T extends { id: string; priority?: number }>(
       const width = newWidthCache[item.id] ?? 0;
       const widthWithGap = nextVisible.length === 0 ? width : width + gap;
       
-      if (used + widthWithGap <= available) {
+      if (used + widthWithGap <= availableWidth) {
         nextVisible.push(item);
         used += widthWithGap;
       } else {
@@ -78,8 +76,10 @@ export function useOverflowChips<T extends { id: string; priority?: number }>(
       }
     }
 
-    console.log(`[OVERFLOW] available=${available} reserved=${reservedOverflowTriggerWidth} visible=${nextVisible.length} overflow=${nextOverflow.length}`);
-  }, [ordered, reservedOverflowTriggerWidth, hysteresisState]);
+    const visibleIds = nextVisible.map(item => item.id);
+    const overflowIds = nextOverflow.map(item => item.id);
+    console.log('[OVERFLOW]', { available: availableWidth, visible: visibleIds.length, overflow: overflowIds.length });
+  }, [ordered, hysteresisState]);
 
   useLayoutEffect(() => { 
     setVisible(ordered); 
@@ -88,25 +88,30 @@ export function useOverflowChips<T extends { id: string; priority?: number }>(
   }, [ordered]);
 
   useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
+    const center = centerRef.current;
+    if (!center) return;
     
     const ro = new ResizeObserver(() => measure());
-    ro.observe(rail.parentElement || rail);
+    ro.observe(center);
     
     // Initial measurement after mount
     requestAnimationFrame(measure);
+    
+    // Recompute on font load
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        requestAnimationFrame(measure);
+      });
+    }
     
     return () => ro.disconnect();
   }, [measure]);
 
   return { 
-    railRef, 
+    centerRef, 
     measureRef, 
     visible, 
     overflow, 
-    reservedOverflowTriggerWidth, 
-    setReservedOverflowTriggerWidth, 
     recompute: measure 
   };
 }

@@ -156,11 +156,9 @@ export default function FiltersBar({
 
           {/* More Filters Button */}
           <Sheet open={showMobileFilters} onOpenChange={setShowMobileFilters}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="flex items-center gap-1 px-2">
-                <Filter className="h-4 w-4" />
-                {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
-              </Button>
+            <SheetTrigger className="flex items-center gap-1 px-2 py-1 border border-gray-300 bg-white hover:bg-gray-50 rounded text-sm">
+              <Filter className="h-4 w-4" />
+              {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
             </SheetTrigger>
             <SheetContent side="bottom" className="h-[80vh]">
               <SheetHeader>

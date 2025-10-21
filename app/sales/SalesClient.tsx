@@ -58,8 +58,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const intentRef = useRef<Intent>({ kind: 'Filters' })
   const seqRef = useRef(0)
 
-  // Map view state
-  const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
+  // Map view state - initialize with proper center
+  const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ 
+    center: initialCenter || { lat: 39.8283, lng: -98.5795 }, 
+    zoom: 10 
+  })
 
   // Sales data state
   const [sales, _setSales] = useState<Sale[]>(initialSales)
@@ -196,7 +199,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       <div className="flex-1 lg:w-1/2">
         <SalesMap
           sales={mapSales.data || []}
-          center={mapView.center || { lat: filters.lat || 0, lng: filters.lng || 0 }}
+          center={mapView.center || { lat: 39.8283, lng: -98.5795 }}
           zoom={mapView.zoom || 10}
           onViewChange={({ center, zoom, userInteraction }) => {
             setMapView({ center, zoom })

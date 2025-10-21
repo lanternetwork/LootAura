@@ -1690,14 +1690,17 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
     
     try {
-      // Call the actual fetchSales function
-      await fetchSales(false, params.centerOverride, ctx)
+      // Call both fetchSales and fetchMapSales for comprehensive data
+      await Promise.all([
+        fetchSales(false, params.centerOverride, ctx),
+        fetchMapSales(undefined, params.centerOverride, params.zoomOverride, ctx)
+      ])
     } catch (error) {
       console.error('[FETCH] Filtered fetch error:', error)
       // Apply empty result on error
       applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'filtered')
     }
-  }, [applySalesResult, fetchSales])
+  }, [applySalesResult, fetchSales, fetchMapSales])
 
   // Filters change handler
   const _onFiltersChange = useCallback((nextFilters: any) => {
@@ -2147,10 +2150,19 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[ZIP] computed bbox for dist=${filters.distance} -> n=${bbox.north},s=${bbox.south},e=${bbox.east},w=${bbox.west}')
     console.log('[MAP] fitBounds(zip) north=${bbox.north}, south=${bbox.south}, east=${bbox.east}, west=${bbox.west}')
     
-    // Trigger debounced fetches with the new coordinates
+    // Trigger debounced fetches with the new coordinates using intent system
     debouncedTrigger(() => {
-      fetchSales(false, { lat, lng })
-      fetchMapSales(undefined, { lat, lng })
+      const seq = ++seqRef.current
+      intentRef.current = { kind: 'Filters' }
+      console.log('[INTENT] set Filters for ZIP search', { seq })
+      
+      const params = { 
+        lat, 
+        lng, 
+        distance: filters.distance,
+        centerOverride: { lat, lng }
+      }
+      runFilteredFetch(params, { cause: 'Filters', seq })
     })
     
     // Persist to session/local storage

@@ -3,12 +3,12 @@
  * Tests cluster click behavior, visible pins updates, and sales list rendering
  */
 
-import React from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SalesMapClustered from '@/components/location/SalesMapClustered'
 import { Sale } from '@/lib/types'
+import React from 'react'
 
 // Mock the debug system
 vi.mock('@/lib/debug/clusterDebug', () => ({
@@ -47,8 +47,10 @@ vi.mock('react-map-gl', () => ({
       getCenter: () => ({ lat: 38.25, lng: -85.75 })
     }
 
-    // Simulate map load immediately
-    if (onLoad) onLoad()
+    // Simulate map load
+    React.useEffect(() => {
+      if (onLoad) onLoad()
+    }, [])
 
     return (
       <div data-testid="map-container">
@@ -89,7 +91,7 @@ vi.mock('react-map-gl', () => ({
 
 // Mock clustering
 vi.mock('@/lib/clustering', () => ({
-  isClusteringEnabled: () => false,
+  isClusteringEnabled: vi.fn(() => true),
   buildClusterIndex: vi.fn(() => ({
     getClusters: vi.fn(() => []),
     getChildren: vi.fn((clusterId: number) => [
@@ -158,14 +160,15 @@ const mockSales: Sale[] = [
     address: '123 Test St',
     city: 'Test City',
     state: 'KY',
-    start_date: '2025-01-01',
-    end_date: '2025-01-02',
-    start_time: '09:00',
-    end_time: '17:00',
+    zip: '40201',
+    startDate: '2025-01-01',
+    endDate: '2025-01-02',
+    startTime: '09:00',
+    endTime: '17:00',
     categories: ['electronics'],
-    created_at: '2025-01-01T00:00:00Z',
-    updated_at: '2025-01-01T00:00:00Z',
-    user_id: 'user-1'
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z',
+    userId: 'user-1'
   },
   {
     id: 'sale-2',
@@ -176,14 +179,15 @@ const mockSales: Sale[] = [
     address: '456 Test Ave',
     city: 'Test City',
     state: 'KY',
-    start_date: '2025-01-01',
-    end_date: '2025-01-02',
-    start_time: '10:00',
-    end_time: '18:00',
+    zip: '40202',
+    startDate: '2025-01-01',
+    endDate: '2025-01-02',
+    startTime: '10:00',
+    endTime: '18:00',
     categories: ['furniture'],
-    created_at: '2025-01-01T00:00:00Z',
-    updated_at: '2025-01-01T00:00:00Z',
-    user_id: 'user-2'
+    createdAt: '2025-01-01T00:00:00Z',
+    updatedAt: '2025-01-01T00:00:00Z',
+    userId: 'user-2'
   }
 ]
 
@@ -196,8 +200,8 @@ const mockMarkers = mockSales.map(sale => ({
 
 describe('Cluster Functionality Integration Tests', () => {
   let queryClient: QueryClient
-  let onVisiblePinsChange: vi.Mock
-  let onViewChange: vi.Mock
+  let onVisiblePinsChange: ReturnType<typeof vi.fn>
+  let onViewChange: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     queryClient = new QueryClient({
@@ -244,9 +248,9 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      // Simulate cluster click
-      const clusterMarker = screen.getByTestId('marker')
-      fireEvent.click(clusterMarker)
+      // Simulate cluster click - use getAllByTestId to handle multiple markers
+      const clusterMarkers = screen.getAllByTestId('marker')
+      fireEvent.click(clusterMarkers[0])
 
       // Verify onVisiblePinsChange was called with child points
       await waitFor(() => {
@@ -266,8 +270,8 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
-      fireEvent.click(clusterMarker)
+      const clusterMarkers = screen.getAllByTestId('marker')
+      fireEvent.click(clusterMarkers[0])
 
       // Verify debug logging was called
       expect(clusterDebug.default.logClusterClick).toHaveBeenCalled()
@@ -287,7 +291,7 @@ describe('Cluster Functionality Integration Tests', () => {
         getClusterExpansionZoom: vi.fn(() => 15),
         getTile: vi.fn()
       }
-      ;(buildClusterIndex as any).mockReturnValue(mockIndex)
+      vi.mocked(buildClusterIndex).mockReturnValue(mockIndex as any)
 
       renderClusterMap()
 
@@ -295,8 +299,8 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
-      fireEvent.click(clusterMarker)
+      const clusterMarkers = screen.getAllByTestId('marker')
+      fireEvent.click(clusterMarkers[0])
 
       // Verify error logging was called
       expect(clusterDebug.default.logClusterError).toHaveBeenCalledWith(
@@ -333,8 +337,8 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
-      fireEvent.click(clusterMarker)
+      const clusterMarkers = screen.getAllByTestId('marker')
+      fireEvent.click(clusterMarkers[0])
 
       // Verify warning was logged
       expect(clusterDebug.default.warn).toHaveBeenCalledWith(
@@ -362,6 +366,9 @@ describe('Cluster Functionality Integration Tests', () => {
     })
 
     it('should handle clustering disabled state', async () => {
+      const { isClusteringEnabled } = await import('@/lib/clustering')
+      vi.mocked(isClusteringEnabled).mockReturnValue(false)
+
       renderClusterMap()
 
       await waitFor(() => {
@@ -370,21 +377,6 @@ describe('Cluster Functionality Integration Tests', () => {
 
       // Verify fallback to individual markers
       expect(screen.getAllByTestId('marker')).toHaveLength(mockMarkers.length)
-    })
-
-    it('should handle clustering enabled state', async () => {
-      const { isClusteringEnabled } = await import('@/lib/clustering')
-      ;(isClusteringEnabled as any).mockReturnValue(true)
-
-      renderClusterMap()
-
-      await waitFor(() => {
-        expect(screen.getByTestId('map-container')).toBeInTheDocument()
-      })
-
-      // When clustering is enabled, we should have cluster markers instead of individual markers
-      // The exact number depends on the clustering algorithm
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
     })
   })
 
@@ -398,8 +390,8 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
-      fireEvent.click(clusterMarker)
+      const clusterMarkers = screen.getAllByTestId('marker')
+      fireEvent.click(clusterMarkers[0])
 
       // Verify performance logging
       expect(clusterDebug.default.logClusterPerformance).toHaveBeenCalledWith(
@@ -422,8 +414,8 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
-      fireEvent.click(clusterMarker)
+      const clusterMarkers = screen.getAllByTestId('marker')
+      fireEvent.click(clusterMarkers[0])
 
       // Verify no debug logging when disabled
       expect(clusterDebug.default.logClusterClick).not.toHaveBeenCalled()
@@ -441,8 +433,8 @@ describe('Cluster Functionality Integration Tests', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument()
       })
 
-      const clusterMarker = screen.getByTestId('marker')
-      fireEvent.click(clusterMarker)
+      const clusterMarkers = screen.getAllByTestId('marker')
+      fireEvent.click(clusterMarkers[0])
 
       // Verify debug logging when enabled
       expect(clusterDebug.default.logClusterClick).toHaveBeenCalled()

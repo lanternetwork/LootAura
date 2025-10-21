@@ -100,11 +100,14 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
     const currentResult = { visible: nextVisible, overflow: nextOverflow }
     const isSameResult = 
       currentResult.visible.length === hysteresis.lastResult.visible.length &&
-      currentResult.overflow.length === hysteresis.lastResult.overflow.length
+      currentResult.overflow.length === hysteresis.lastResult.overflow.length &&
+      currentResult.visible.every((item, index) => item.id === hysteresis.lastResult.visible[index]?.id) &&
+      currentResult.overflow.every((item, index) => item.id === hysteresis.lastResult.overflow[index]?.id)
 
     if (!isMountedRef.current) return
 
     if (isSameResult) {
+      // Same result - reset counter and apply immediately
       setHysteresis({ count: 0, lastResult: currentResult })
       setVisible(nextVisible)
       setOverflow(nextOverflow)
@@ -119,8 +122,8 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
       }
     }
 
-    // Debug logging
-    if (process.env.NEXT_PUBLIC_DEBUG) {
+    // Debug logging - only log when result actually changes
+    if (process.env.NEXT_PUBLIC_DEBUG && !isSameResult) {
       console.log(`[OVERFLOW] centerWidth=${centerWidth} visible=${nextVisible.length} overflow=${nextOverflow.length} sum=${used} available=${available}`)
     }
   }, [allChips, centerEl, measureEl, hysteresis])
@@ -131,7 +134,7 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
     let timeoutId: NodeJS.Timeout
     const debouncedMeasure = () => {
       clearTimeout(timeoutId)
-      timeoutId = setTimeout(measure, 16) // ~60fps
+      timeoutId = setTimeout(measure, 50) // 20fps - more reasonable for overflow calculations
     }
 
     const ro = new ResizeObserver(debouncedMeasure)

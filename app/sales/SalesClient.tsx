@@ -1397,6 +1397,16 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           _setMapSales(salesData.data)
           // Also update the main sales state so the sales list updates
           setSales(salesData.data)
+          
+          // Trigger onVisiblePinsChange with the new sales data to update the sales list
+          console.log('[MAP] DEBUG: onVisiblePinsChange callback exists? (abort case)', !!onVisiblePinsChange)
+          if (onVisiblePinsChange) {
+            const visibleIds = salesData.data.map(sale => sale.id)
+            console.log('[MAP] Triggering onVisiblePinsChange after abort with new sales data:', visibleIds.length, 'sales')
+            onVisiblePinsChange(visibleIds, visibleIds.length)
+          } else {
+            console.log('[MAP] ERROR: onVisiblePinsChange callback is not available! (abort case)')
+          }
         }
         return
       }
@@ -1439,6 +1449,16 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           _setMapSales(salesData.data)
           // Also update the main sales state so the sales list updates
           setSales(salesData.data)
+          
+          // Trigger onVisiblePinsChange with the new sales data to update the sales list
+          console.log('[MAP] DEBUG: onVisiblePinsChange callback exists?', !!onVisiblePinsChange)
+          if (onVisiblePinsChange) {
+            const visibleIds = salesData.data.map(sale => sale.id)
+            console.log('[MAP] Triggering onVisiblePinsChange with new sales data:', visibleIds.length, 'sales')
+            onVisiblePinsChange(visibleIds, visibleIds.length)
+          } else {
+            console.log('[MAP] ERROR: onVisiblePinsChange callback is not available!')
+          }
         } else {
           console.log('[MAP] No sales data received, setting mapSales to empty array')
           _setMapSales([])

@@ -195,32 +195,33 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Render
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Main Content - Sales List */}
-          <div className="flex-1 lg:w-2/3">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold">Yard Sales</h1>
-                <FilterTrigger 
-                  isOpen={false} 
-                  onToggle={() => {}} 
-                  activeFiltersCount={0} 
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {listData.map((sale) => (
-                  <SaleCard key={sale.id} sale={sale} />
-                ))}
-              </div>
+    <div className="container mx-auto px-4 py-6">
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Main Content */}
+        <div className="flex-1 lg:w-2/3">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-bold">Yard Sales</h1>
+              <FilterTrigger 
+                isOpen={false} 
+                onToggle={() => {}} 
+                activeFiltersCount={0} 
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {listData.map((sale) => (
+                <SaleCard key={sale.id} sale={sale} />
+              ))}
             </div>
           </div>
+        </div>
 
-          {/* Map Sidebar */}
-          <div className="lg:w-1/3">
-            <div className="bg-white rounded-lg shadow-sm p-4">
+        {/* Desktop Filters Sidebar */}
+        <div className="hidden lg:block lg:w-1/3">
+          <div className="sticky top-4 space-y-6">
+            {/* Map */}
+            <div className="bg-white rounded-lg shadow-sm border p-4">
               <h2 className="text-xl font-semibold mb-4">
                 Map View
                 {listData.length > 0 && (

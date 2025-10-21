@@ -1,7 +1,34 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, waitFor } from '@testing-library/react'
+import React from 'react'
 import SalesMapClustered from '@/components/location/SalesMapClustered'
 import { Sale } from '@/lib/types'
+
+// Mock react-map-gl
+vi.mock('react-map-gl', () => ({
+  default: React.forwardRef<any, any>(({ children, onLoad, onMoveEnd, onZoomEnd, ...props }, ref) => {
+    // Only pass safe DOM props to avoid React warnings
+    const { mapboxAccessToken, initialViewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
+    
+    // Auto-trigger onLoad to simulate map loading
+    React.useEffect(() => {
+      if (onLoad) {
+        onLoad()
+      }
+    }, [onLoad])
+    
+    return (
+      <div data-testid="map-container" ref={ref} {...safeProps}>
+        {children}
+        <button onClick={onLoad}>Load Map</button>
+        <button onClick={onMoveEnd}>Move End</button>
+        <button onClick={onZoomEnd}>Zoom End</button>
+      </div>
+    )
+  }),
+  Marker: ({ children, ...props }: any) => <div data-testid="marker" {...props}>{children}</div>,
+  Popup: ({ children, ...props }: any) => <div data-testid="popup" {...props}>{children}</div>
+}))
 
 // Mock mapbox token
 vi.mock('@/lib/maps/token', () => ({
@@ -128,14 +155,14 @@ describe('Map Debounce UI Smoke Test', () => {
   ]
 
   beforeEach(() => {
-    // Clean up any previous renders
-    cleanup()
+    // Clear mocks before each test
     vi.clearAllMocks()
   })
 
   afterEach(() => {
-    // Ensure clean state between tests
+    // Clean up mocks and reset state
     cleanup()
+    vi.clearAllMocks()
   })
 
   it('should render map with clustering disabled', async () => {
@@ -151,7 +178,7 @@ describe('Map Debounce UI Smoke Test', () => {
     // Wait for component to render
     await new Promise(resolve => setTimeout(resolve, 10))
 
-    expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    expect(screen.getAllByTestId('map-container')).toHaveLength(1)
   })
 
   it('should handle viewport changes without errors', async () => {
@@ -167,11 +194,10 @@ describe('Map Debounce UI Smoke Test', () => {
       />
     )
 
-    // Wait for map to load
-    await new Promise(resolve => setTimeout(resolve, 10))
-
-    // Component should render without throwing errors
-    expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
+      expect(screen.getAllByTestId('map-container')).toHaveLength(1)
+    }, { timeout: 5000 })
     
     // Optional: try to find and click buttons if they exist (smoke test only)
     const moveButton = screen.queryByText('Move End')
@@ -194,7 +220,7 @@ describe('Map Debounce UI Smoke Test', () => {
     await new Promise(resolve => setTimeout(resolve, 10))
 
     // Should render map container - this is a smoke test
-    expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    expect(screen.getAllByTestId('map-container')).toHaveLength(1)
   })
 
   it('should handle sale clicks', () => {
@@ -211,6 +237,6 @@ describe('Map Debounce UI Smoke Test', () => {
     )
 
     // Component should be ready to handle sale clicks
-    expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    expect(screen.getAllByTestId('map-container')).toHaveLength(1)
   })
 })

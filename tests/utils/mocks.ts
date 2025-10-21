@@ -36,10 +36,11 @@ export function mockNominatimFetch() {
       throw new Error('Invalid URL')
     }
     
-    // Check for allowed external service with proper validation
+    // Check for allowed external service with proper hostname validation
     const allowedExternalServices = ['nominatim.openstreetmap.org']
+    const urlObj = new URL(urlString)
     const isAllowedService = allowedExternalServices.some(service => 
-      urlString.includes(service)
+      urlObj.hostname === service || urlObj.hostname.endsWith('.' + service)
     )
     
     if (isAllowedService) {

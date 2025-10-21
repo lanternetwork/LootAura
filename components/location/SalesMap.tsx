@@ -10,11 +10,13 @@ import { getMapboxToken } from '@/lib/maps/token'
 import { incMapLoad } from '@/lib/usageLogs'
 import { isClusteringEnabled } from '@/lib/clustering'
 import SalesMapClustered from './SalesMapClustered'
+import MapLoadingIndicator from './MapLoadingIndicator'
+import mapDebug from '@/lib/debug/mapDebug'
 
 interface SalesMapProps {
   sales: Sale[]
   markers?: {id: string; title: string; lat: number; lng: number}[]
-  center?: { lat: number; lng: number }
+  center: { lat: number; lng: number }
   zoom?: number
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string
@@ -25,6 +27,7 @@ interface SalesMapProps {
   onFitBoundsComplete?: () => void
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number; ts: number } | undefined) => void
   onVisiblePinsChange?: (visibleIds: string[], count: number) => void
+  onClusterClick?: (sales: Sale[]) => void
   onMoveEnd?: () => void
   onZoomEnd?: () => void
   onMapReady?: () => void
@@ -35,7 +38,7 @@ interface SalesMapProps {
 export default function SalesMap({ 
   sales, 
   markers = [],
-  center = { lat: 38.2527, lng: -85.7585 }, 
+  center, 
   zoom = 10,
   onSaleClick,
   selectedSaleId,
@@ -46,6 +49,7 @@ export default function SalesMap({
   onFitBoundsComplete,
   onBoundsChange,
   onVisiblePinsChange,
+  onClusterClick,
   onMoveEnd,
   onZoomEnd,
   onMapReady,
@@ -59,6 +63,8 @@ export default function SalesMap({
 
   // Call onMapReady when map loads (not onLoad bounds emission)
   const handleMapLoad = useCallback(() => {
+    mapDebug.logMapLoad('SalesMap', 'success', { onMapReady: !!onMapReady })
+    setIsMapLoading(false) // Map is loaded, hide loading indicator
     if (onMapReady) {
       onMapReady()
     }
@@ -72,16 +78,21 @@ export default function SalesMap({
     latitude: center.lat,
     zoom: zoom
   })
-  const [_mapLoaded, _setMapLoaded] = useState(false)
   const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [visiblePinCount, setVisiblePinCount] = useState(0)
   const [_moved, _setMoved] = useState(false)
   const autoFitAttemptedRef = useRef(false)
+  const [isMapLoading, setIsMapLoading] = useState(true)
   
   // All remaining hooks must be called unconditionally
   useEffect(() => {
-    console.log('[MAP] initialized with', sales.length, 'sales')
-  }, [])
+    mapDebug.logMapState('SalesMap', { 
+      salesCount: sales.length, 
+      markersCount: markers.length,
+      center,
+      zoom 
+    })
+  }, [sales.length, markers.length, center, zoom])
 
   const recomputeVisiblePins = useCallback((reason: string) => {
     try {
@@ -137,7 +148,7 @@ export default function SalesMap({
 
   // Recompute visible pins when markers change
   useEffect(() => {
-    console.log('[MARKERS] set:', markers.length)
+    mapDebug.log('Markers updated', { count: markers.length })
     // Recompute immediately when markers change
     recomputeVisiblePins('markers-updated')
     
@@ -180,7 +191,7 @@ export default function SalesMap({
             map.fitBounds([
               [bounds.west, bounds.south],
               [bounds.east, bounds.north]
-            ], { padding: 50, maxZoom: 15 })
+            ], { padding: 0, maxZoom: 15, duration: 0 })
           }
         }
         
@@ -210,22 +221,10 @@ export default function SalesMap({
     } catch {}
   }, [center.lat, center.lng, arbiterAuthority])
 
-  // Call onMapReady when map loads (no bounds emission on onLoad)
+  // Simple map load handling - no complex state management needed
   useEffect(() => {
-    try {
-      const map = mapRef.current?.getMap?.()
-      if (!map) return
-      const handleLoad = () => {
-        handleMapLoad()
-        // Don't emit bounds on onLoad - only on idle
-      }
-      if (map.loaded?.()) {
-        handleLoad()
-      } else {
-        map.once?.('load', handleLoad)
-      }
-    } catch {}
-  }, [handleMapLoad])
+    mapDebug.logMapLoad('SalesMap', 'start')
+  }, [])
 
   // Handle center override
   useEffect(() => {
@@ -258,9 +257,10 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (!map) return
       
-      // Block programmatic movement in MAP authority mode
-      if (arbiterAuthority === 'MAP') {
-        console.log('[BLOCK] fit bounds suppressed (map authoritative)')
+      // Allow fitBounds for ZIP searches and other programmatic moves
+      // Only block if it's a MAP authority mode AND not a ZIP search
+      if (arbiterAuthority === 'MAP' && arbiterMode !== 'zip') {
+        console.log('[BLOCK] fit bounds suppressed (map authoritative, not ZIP)')
         return
       }
       
@@ -269,23 +269,57 @@ export default function SalesMap({
         [fitBounds.east, fitBounds.north]
       ]
       
-      map.fitBounds(bounds, { padding: 50, maxZoom: 15 })
+      console.log('[MAP] fitBounds executing', { 
+        reason: fitBounds.reason, 
+        authority: arbiterAuthority, 
+        mode: arbiterMode 
+      })
+      
+      map.fitBounds(bounds, { padding: 0, maxZoom: 15, duration: 0 })
       
       if (onFitBoundsComplete) {
         onFitBoundsComplete()
       }
-    } catch {}
-  }, [fitBounds, arbiterAuthority, onFitBoundsComplete])
+    } catch (error) {
+      console.error('[MAP] fitBounds error:', error)
+    }
+  }, [fitBounds, arbiterAuthority, arbiterMode, onFitBoundsComplete])
 
   // Handle view changes
   const handleViewChange = useCallback((evt: any) => {
     if (!onViewChange) return
     
-    const { center: newCenter, zoom: newZoom } = evt.viewState
+    // Safely extract viewState with fallbacks
+    const viewState = evt.viewState || evt
+    const newCenter = viewState.center || { lat: 0, lng: 0 }
+    const newZoom = viewState.zoom || 10
+    
+    // Precise user interaction detection - only detect actual user interactions
+    const isUserInteraction = evt.isDragging || 
+                              evt.isZooming || 
+                              evt.originalEvent?.type === 'mousedown' || 
+                              evt.originalEvent?.type === 'touchstart' ||
+                              evt.originalEvent?.type === 'mouseup' ||
+                              evt.originalEvent?.type === 'touchend' ||
+                              evt.originalEvent?.type === 'mousemove' ||
+                              evt.originalEvent?.type === 'touchmove' ||
+                              evt.originalEvent?.type === 'wheel' ||
+                              evt.originalEvent?.type === 'pointerdown' ||
+                              evt.originalEvent?.type === 'pointerup' ||
+                              evt.originalEvent?.type === 'pointermove'
+    
+    console.log('[MAP] handleViewChange - userInteraction:', isUserInteraction, {
+      isDragging: evt.isDragging,
+      isZooming: evt.isZooming,
+      originalEventType: evt.originalEvent?.type,
+      hasSource: !!evt.source,
+      hasPointerType: !!evt.originalEvent?.pointerType
+    })
+    
     onViewChange({
       center: { lat: newCenter.lat, lng: newCenter.lng },
       zoom: newZoom,
-      userInteraction: evt.isDragging || evt.isZooming
+      userInteraction: isUserInteraction
     })
   }, [onViewChange])
 
@@ -364,6 +398,7 @@ export default function SalesMap({
         onFitBoundsComplete={onFitBoundsComplete}
         onBoundsChange={onBoundsChange}
         onVisiblePinsChange={onVisiblePinsChange}
+        onClusterClick={onClusterClick}
         onMoveEnd={onMoveEnd}
         onZoomEnd={onZoomEnd}
         onMapReady={onMapReady}
@@ -373,9 +408,14 @@ export default function SalesMap({
     )
   }
 
+  // Debug logging for map initialization
+  mapDebug.log('SalesMap rendering')
+  mapDebug.logTokenStatus(getMapboxToken())
+
   // Non-clustered map implementation
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
+      {isMapLoading && <MapLoadingIndicator />}
       <Map
         ref={mapRef}
         mapboxAccessToken={getMapboxToken()}
@@ -391,6 +431,38 @@ export default function SalesMap({
         onZoomEnd={handleZoomEnd}
         onMove={handleViewChange}
         interactiveLayerIds={[]}
+        // Performance optimizations
+        optimizeForTerrain={false}
+        antialias={false}
+        preserveDrawingBuffer={false}
+        attributionControl={false}
+        logoPosition="bottom-right"
+        preloadResources={true}
+        // Disable Mapbox events to prevent API failures
+        // Reduce initial load time
+        // Disable telemetry completely
+        transformRequest={(url: string, _resourceType: string) => {
+          // Block Mapbox telemetry/events using strict URL parsing (no substring checks)
+          try {
+            const u = new URL(url)
+            const host = u.hostname.toLowerCase()
+            const path = u.pathname.toLowerCase()
+
+            const blockedHosts = new Set(['events.mapbox.com'])
+            const isBlockedHost = blockedHosts.has(host)
+            const isApiEvents = host === 'api.mapbox.com' && (path.startsWith('/events') || path.includes('/events/v2'))
+            const isTelemetryOrAnalytics = (host.endsWith('.mapbox.com') || host === 'mapbox.com') && (path.includes('/telemetry') || path.includes('/analytics'))
+
+            if (isBlockedHost || isApiEvents || isTelemetryOrAnalytics) {
+              console.log('[MAP] Blocking request:', url)
+              return null
+            }
+            return { url: u.toString() }
+          } catch {
+            // If URL parsing fails, pass through unchanged
+            return { url }
+          }
+        }}
       >
         {markers.map(marker => (
           <Marker
@@ -400,7 +472,7 @@ export default function SalesMap({
             anchor="center"
           >
             <button
-              className="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500"
               onClick={() => {
                 const sale = sales.find(s => s.id === marker.id)
                 if (sale && onSaleClick) {

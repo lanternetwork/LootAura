@@ -1,13 +1,35 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import React from 'react'
 import SalesMapClustered from '@/components/location/SalesMapClustered'
 import { Sale } from '@/lib/types'
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  default: ({ children, onLoad, onMoveEnd, onZoomEnd, ref, ...props }: any) => {
+  default: React.forwardRef<any, any>(({ children, onLoad, onMoveEnd, onZoomEnd, ...props }, ref) => {
     // Only pass safe DOM props to avoid React warnings
-    const { mapboxAccessToken, initialViewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
+    const { 
+      mapboxAccessToken, 
+      initialViewState, 
+      mapStyle, 
+      interactiveLayerIds, 
+      onMove, 
+      role, 
+      'data-testid': dataTestId, 
+      tabIndex, 
+      'aria-label': ariaLabel,
+      optimizeForTerrain,
+      antialias,
+      preserveDrawingBuffer,
+      attributionControl,
+      logoPosition,
+      preloadResources,
+      transformRequest,
+      ...safeProps 
+    } = props
+    
+    // Don't auto-trigger onLoad - let tests control it
+    
     return (
       <div data-testid="map-container" ref={ref} {...safeProps}>
         {children}
@@ -16,7 +38,7 @@ vi.mock('react-map-gl', () => ({
         <button onClick={onZoomEnd}>Zoom End</button>
       </div>
     )
-  },
+  }),
   Marker: ({ children, ...props }: any) => <div data-testid="marker" {...props}>{children}</div>,
   Popup: ({ children, ...props }: any) => <div data-testid="popup" {...props}>{children}</div>
 }))
@@ -32,6 +54,10 @@ vi.mock('@/lib/usageLogs', () => ({
 }))
 
 describe('Map Clusters Flow', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
   const mockSales: Sale[] = [
     {
       id: '1',
@@ -78,29 +104,36 @@ describe('Map Clusters Flow', () => {
     process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'true'
   })
 
-  it('should render map with clustering enabled', () => {
-    render(
+  it('should render map with clustering enabled', async () => {
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
+        data-testid="map-container-1"
       />
     )
 
-    expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
+      expect(screen.getByTestId('map-container-1')).toBeInTheDocument()
+    }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should handle cluster clicks and zoom to bounds', async () => {
     const onViewChange = vi.fn()
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
         onViewChange={onViewChange}
+        data-testid="map-container-2"
       />
     )
 
@@ -108,20 +141,23 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Load Map'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
-    })
+      expect(screen.getByTestId('map-container-2')).toBeInTheDocument()
+    }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should handle individual point clicks', async () => {
     const onSaleClick = vi.fn()
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
         onSaleClick={onSaleClick}
+        data-testid="map-container-3"
       />
     )
 
@@ -129,20 +165,23 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Load Map'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
-    })
+      expect(screen.getByTestId('map-container-3')).toBeInTheDocument()
+    }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should update clusters on viewport change', async () => {
     const onVisiblePinsChange = vi.fn()
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
         onVisiblePinsChange={onVisiblePinsChange}
+        data-testid="map-container-4"
       />
     )
 
@@ -153,20 +192,23 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Move End'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
-    })
+      expect(screen.getByTestId('map-container-4')).toBeInTheDocument()
+    }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should handle zoom changes', async () => {
     const onZoomEnd = vi.fn()
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
         onZoomEnd={onZoomEnd}
+        data-testid="map-container-5"
       />
     )
 
@@ -177,42 +219,56 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Zoom End'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
-    })
+      expect(screen.getByTestId('map-container-5')).toBeInTheDocument()
+    }, { timeout: 5000 })
+    
+    unmount()
   })
 
-  it('should fall back to individual markers when clustering disabled', () => {
+  it('should fall back to individual markers when clustering disabled', async () => {
     process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'false'
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
+        data-testid="map-container-6"
       />
     )
 
-    expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
+      expect(screen.getByTestId('map-container-6')).toBeInTheDocument()
+    }, { timeout: 5000 })
+    
+    unmount()
   })
 
-  it('should handle empty markers array', () => {
-    render(
+  it('should handle empty markers array', async () => {
+    const { unmount } = render(
       <SalesMapClustered
         sales={[]}
         markers={[]}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
+        data-testid="map-container-7"
       />
     )
 
-    expect(screen.getByTestId('map-container')).toBeInTheDocument()
+    // Wait for map to load (handle loading skeleton)
+    await waitFor(() => {
+      expect(screen.getByTestId('map-container-7')).toBeInTheDocument()
+    }, { timeout: 5000 })
+    
+    unmount()
   })
 
   it('should maintain arbiter authority with clustering', async () => {
     const onVisiblePinsChange = vi.fn()
     
-    render(
+    const { unmount } = render(
       <SalesMapClustered
         sales={mockSales}
         markers={mockMarkers}
@@ -220,6 +276,7 @@ describe('Map Clusters Flow', () => {
         zoom={10}
         arbiterAuthority="MAP"
         onVisiblePinsChange={onVisiblePinsChange}
+        data-testid="map-container-8"
       />
     )
 
@@ -230,7 +287,9 @@ describe('Map Clusters Flow', () => {
     fireEvent.click(screen.getByText('Move End'))
     
     await waitFor(() => {
-      expect(screen.getByTestId('map-container')).toBeInTheDocument()
-    })
+      expect(screen.getByTestId('map-container-8')).toBeInTheDocument()
+    }, { timeout: 5000 })
+    
+    unmount()
   })
 })

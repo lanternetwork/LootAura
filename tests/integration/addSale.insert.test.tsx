@@ -62,8 +62,6 @@ describe('Add Sale Integration', () => {
   let queryClient: QueryClient
 
   beforeEach(() => {
-    // Clean up any previous renders
-    cleanup()
     mockSupabase = createMockSupabaseClient()
     queryClient = new QueryClient({
       defaultOptions: {
@@ -76,8 +74,9 @@ describe('Add Sale Integration', () => {
   })
 
   afterEach(() => {
-    // Ensure clean state between tests
+    // Clean up mocks and reset state
     cleanup()
+    vi.clearAllMocks()
   })
 
   it('should insert sale with geocoded coordinates', async () => {

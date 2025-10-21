@@ -9,9 +9,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write  # Allow repository dispatch events
   security-events: write
   actions: read
+  # Fixed permissions for notify-completion job
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

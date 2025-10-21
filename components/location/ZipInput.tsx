@@ -27,8 +27,21 @@ export default function ZipInput({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+    console.log('[ZIP_INPUT] Form submitted with zip:', zip)
+    await performZipLookup()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      console.log('[ZIP_INPUT] Enter key pressed with zip:', zip)
+      performZipLookup()
+    }
+  }
+
+  const performZipLookup = async () => {
     if (!zip || !/^\d{5}$/.test(zip)) {
+      console.log('[ZIP_INPUT] Invalid zip format:', zip)
       onError('Please enter a valid 5-digit ZIP code')
       return
     }
@@ -71,6 +84,7 @@ export default function ZipInput({
         type="text"
         value={zip}
         onChange={(e) => setZip(e.target.value.replace(/\D/g, '').slice(0, 5))}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         maxLength={5}
         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"

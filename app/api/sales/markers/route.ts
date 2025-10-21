@@ -159,6 +159,32 @@ export async function GET(request: NextRequest) {
         starts_at: s.starts_at
       }))
     })
+    
+    // If no date filtering is applied, return all sales
+    if (!dateWindow) {
+      console.log('[MARKERS API] No date filtering applied, returning all sales')
+      const markers = data?.map((sale: any) => {
+        const R = 6371
+        const dLat = (sale.lat - originLat) * Math.PI / 180
+        const dLng = (sale.lng - originLng) * Math.PI / 180
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(originLat * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
+          Math.sin(dLng / 2) * Math.sin(dLng / 2)
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        const distance = R * c
+
+        return {
+          id: sale.id,
+          title: sale.title,
+          description: sale.description,
+          lat: sale.lat,
+          lng: sale.lng,
+          distance: Math.round(distance * 100) / 100
+        }
+      }) || []
+
+      return NextResponse.json(markers)
+    }
 
     const filtered = (data || [])
       .map((sale: any) => {

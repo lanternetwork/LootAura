@@ -36,7 +36,6 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const core = require('@actions/core')
             const context = github.context
             let prNumber = core.getInput('pr_number') || ''
             let branch = core.getInput('branch') || 'milestone/auth-profile'

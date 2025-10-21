@@ -39,7 +39,8 @@ describe('list.dom', () => {
   })
   
   afterEach(() => {
-    cleanup()
+    // Clean up mocks and reset state
+    vi.clearAllMocks()
   })
   
   it('should render list panel with correct data attribute', () => {

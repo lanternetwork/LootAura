@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/auth/server-session'
 import { cookies } from 'next/headers'
 
+export const dynamic = 'force-dynamic'
+
 const resendSchema = z.object({
   email: z.string().email('Invalid email address'),
 })

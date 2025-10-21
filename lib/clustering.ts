@@ -41,10 +41,10 @@ export interface ClusterIndex {
   getTile(z: number, x: number, y: number): any
 }
 
-// Default clustering options optimized for performance
+// Default clustering options optimized for preventing pin overlap
 const DEFAULT_OPTIONS: Required<ClusterOptions> = {
-  radius: 50, // 50px radius for clustering
-  maxZoom: 16, // Don't cluster above zoom 16
+  radius: 0.5, // 0.5px radius - only cluster when pins are literally indistinguishable
+  maxZoom: 20, // Allow clustering at all zoom levels - let algorithm decide when to break
   minPoints: 2, // Minimum 2 points to form a cluster
   extent: 512, // Tile extent
   nodeSize: 64 // Node size for tree structure

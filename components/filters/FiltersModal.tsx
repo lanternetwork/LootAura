@@ -152,9 +152,13 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
         params.delete('cat')
       }
       
-      // Update URL
+      // Update URL without navigation or scroll (History API)
       const newUrl = `${window.location.pathname}?${params.toString()}`
-      router.push(newUrl)
+      try {
+        window.history.replaceState(null, '', newUrl)
+      } catch {
+        router.replace(newUrl, { scroll: false })
+      }
       
       return updatedFilters
     })
@@ -215,13 +219,13 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
       {/* Mobile Modal Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={onClose}
         />
       )}
 
       {/* Mobile Modal */}
-      <div className={`md:hidden fixed inset-x-0 bottom-0 bg-white rounded-t-xl shadow-2xl z-50 transform transition-transform duration-300 ${
+      <div className={`lg:hidden fixed inset-x-0 bottom-0 bg-white rounded-t-xl shadow-2xl z-50 transform transition-transform duration-300 ${
         isOpen ? 'translate-y-0' : 'translate-y-full'
       }`}>
         <div className="p-6">
@@ -248,7 +252,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
         </div>
       </div>
 
-      {/* Desktop Sidebar */}
+      {/* Desktop/Tablet Sidebar - show at md and up; mobile uses modal */}
       <div className={`hidden md:block ${className}`}>
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center justify-between mb-6">
@@ -352,11 +356,11 @@ function FiltersContent({
           <span className="text-gray-500 mr-2"></span>
           <label className="text-sm font-medium text-gray-700">Categories</label>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-3 2xl:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {CATEGORY_OPTIONS.map((category) => (
             <label
               key={category.value}
-              className={`flex items-center p-2 rounded-lg border cursor-pointer transition-colors min-h-[44px] ${
+              className={`flex items-start p-2 rounded-lg border cursor-pointer transition-colors min-h-[44px] w-full overflow-hidden ${
                 filters.categories.includes(category.value)
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -366,10 +370,12 @@ function FiltersContent({
                 type="checkbox"
                 checked={filters.categories.includes(category.value)}
                 onChange={() => onCategoryToggle(category.value)}
-                className="h-4 w-4 min-h-4 min-w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
+                className="h-4 w-4 min-h-4 min-w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0 mt-0.5"
               />
-              <span className="ml-2 text-sm font-medium flex-shrink-0">{category.icon}</span>
-              <span className="ml-1 text-sm flex-1 min-w-0">{category.label}</span>
+              <div className="ml-2 flex-1 min-w-0">
+                <div className="text-sm font-medium flex-shrink-0 mb-1">{category.icon}</div>
+                <div className="text-xs font-medium text-left break-words leading-tight">{category.label}</div>
+              </div>
             </label>
           ))}
         </div>

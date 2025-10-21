@@ -21,14 +21,14 @@ export async function GET() {
 
     // Test anonymous client
     const anonClient = createClient(supabaseUrl, anonKey)
-    const { data: anonData, error: anonError } = await anonClient
+    const { error: anonError } = await anonClient
       .from('profiles')
       .select('count')
       .limit(1)
 
     // Test service role client
     const serviceClient = createClient(supabaseUrl, serviceRoleKey)
-    const { data: serviceData, error: serviceError } = await serviceClient
+    const { error: serviceError } = await serviceClient
       .from('profiles')
       .select('count')
       .limit(1)
@@ -37,7 +37,7 @@ export async function GET() {
     const schema = process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'
     let schemaTest = null
     if (schema === 'lootaura_v2') {
-      const { data: salesData, error: salesError } = await serviceClient
+      const { data: _salesData, error: salesError } = await serviceClient
         .from('sales')
         .select('count')
         .limit(1)

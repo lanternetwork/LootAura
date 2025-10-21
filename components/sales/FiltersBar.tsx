@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { FilterTrigger } from '@/components/filters/FilterTrigger'
-import { ZipInput } from '@/components/location/ZipInput'
-import { DateSelector } from '@/components/filters/DateSelector'
+import ZipInput from '@/components/location/ZipInput'
+import DateSelector from '@/components/filters/DateSelector'
 import { CategoryChips } from '@/components/filters/CategoryChips'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -121,7 +120,7 @@ export default function FiltersBar({
 
           {/* More Filters Button */}
           <Sheet open={showMobileFilters} onOpenChange={setShowMobileFilters}>
-            <SheetTrigger asChild>
+            <SheetTrigger>
               <Button variant="outline" size="sm" className="flex items-center gap-1">
                 <Filter className="h-4 w-4" />
                 {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}

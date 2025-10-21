@@ -18,6 +18,11 @@ export default function ClusterMarker({
   size = 'medium' 
 }: ClusterMarkerProps) {
   const handleClick = useCallback((event: React.MouseEvent) => {
+    console.log('[CLUSTER MARKER] Click detected!', { 
+      clusterId: cluster.id, 
+      clusterType: cluster.type,
+      hasOnClick: !!onClick 
+    })
     event.preventDefault()
     event.stopPropagation()
     onClick?.(cluster)

@@ -2065,7 +2065,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     // Trigger debounced fetches with the new coordinates
     debouncedTrigger(() => {
       fetchSales(false, { lat, lng })
-      fetchMapSales()
+      fetchMapSales(undefined, { lat, lng })
     })
     
     // Persist to session/local storage

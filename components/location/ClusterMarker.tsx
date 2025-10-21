@@ -17,6 +17,12 @@ export default function ClusterMarker({
   onKeyDown,
   size = 'medium' 
 }: ClusterMarkerProps) {
+  console.log('[CLUSTER MARKER] Component rendered!', { 
+    clusterId: cluster.id, 
+    clusterType: cluster.type,
+    clusterCount: cluster.count,
+    hasOnClick: !!onClick 
+  })
   const handleClick = useCallback((event: React.MouseEvent) => {
     console.log('[CLUSTER MARKER] Click detected!', { 
       clusterId: cluster.id, 

@@ -2110,14 +2110,14 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     }
   }, [sales, bannerShown])
 
-  // Trigger onVisiblePinsChange when mapSales changes (for cluster clicks)
+  // Update visibleSales when mapSales changes (for cluster clicks)
   useEffect(() => {
-    if (mapSales.length > 0 && onVisiblePinsChange) {
-      const visibleIds = mapSales.map(sale => sale.id)
-      console.log('[MAP] Triggering onVisiblePinsChange from useEffect:', visibleIds.length, 'sales')
-      onVisiblePinsChange(visibleIds, visibleIds.length)
+    if (mapSales.length > 0) {
+      console.log('[MAP] Updating visibleSales from mapSales:', mapSales.length, 'sales')
+      setVisibleSales(mapSales)
+      setRenderedSales(mapSales)
     }
-  }, [mapSales, onVisiblePinsChange])
+  }, [mapSales])
 
   const handleIncreaseDistanceAndRetry = () => {
     const nextMiles = Math.min(100, filters.distance + 10)

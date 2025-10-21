@@ -140,10 +140,36 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }, _ctx?: FetchContext) => {
     console.log('[FETCH] fetchSales called with context:', { _ctx, append, centerOverride })
     
-    // Implementation details would go here...
-    // For now, return empty data
-    return { data: [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
-  }, [])
+    try {
+      const params = new URLSearchParams()
+      if (centerOverride) {
+        params.set('lat', centerOverride.lat.toString())
+        params.set('lng', centerOverride.lng.toString())
+      }
+      if (filters.distance) {
+        params.set('distance', filters.distance.toString())
+      }
+      if (filters.dateRange) {
+        params.set('dateRange', filters.dateRange)
+      }
+      if (filters.categories && filters.categories.length > 0) {
+        params.set('categories', filters.categories.join(','))
+      }
+
+      const response = await fetch(`/api/sales?${params.toString()}`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      console.log('[FETCH] fetchSales response:', { count: data.length, ctx: _ctx })
+      
+      return { data: data || [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
+    } catch (error) {
+      console.error('[FETCH] fetchSales error:', error)
+      return { data: [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
+    }
+  }, [filters.distance, filters.dateRange, filters.categories])
 
 
   // Wrapper functions for intent-based fetching
@@ -211,7 +237,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         }
         runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
       }}
-      onZipError={(error) => console.error('ZIP search error:', error)}
+      onZipError={(error) => {
+        console.error('ZIP search error:', error)
+        console.error('ZIP search error details:', error instanceof Error ? error.message : String(error))
+      }}
       zipError=""
       dateRange={filters.dateRange}
       onDateRangeChange={(dateRange) => _updateFilters({ dateRange: dateRange as 'today' | 'weekend' | 'next_weekend' | 'any' })}

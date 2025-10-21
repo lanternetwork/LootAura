@@ -43,7 +43,6 @@ interface FiltersModalProps {
     dateRange: DateRange
     categories: string[]
   }) => void
- - using intent system only
 }
 
 interface FilterState {

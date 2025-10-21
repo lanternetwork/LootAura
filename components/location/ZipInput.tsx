@@ -50,8 +50,11 @@ export default function ZipInput({
     onError('') // Clear previous errors
 
     try {
+      console.log(`[ZIP_INPUT] Making request to /api/geocoding/zip?zip=${zip}`)
       const response = await fetch(`/api/geocoding/zip?zip=${zip}`)
+      console.log(`[ZIP_INPUT] Response status:`, response.status)
       const data = await response.json()
+      console.log(`[ZIP_INPUT] Response data:`, data)
 
       if (data.ok) {
         // Write location cookie with ZIP, city, state info
@@ -72,6 +75,7 @@ export default function ZipInput({
       }
     } catch (error) {
       console.error('ZIP lookup error:', error)
+      console.error('ZIP search error:', error instanceof Error ? error.message : String(error))
       onError('Failed to lookup ZIP code')
     } finally {
       setLoading(false)

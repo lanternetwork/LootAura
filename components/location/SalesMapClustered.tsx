@@ -411,6 +411,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       hasClusterIndex: !!clusterIndex,
       clusterType: cluster.type 
     })
+    console.log('[CLUSTER] handleClusterClick called with cluster:', cluster)
     
     if (!clusterIndex || cluster.type !== 'cluster') {
       clusterDebug.warn('Invalid cluster click - no index or wrong type', { 
@@ -704,6 +705,9 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       ))
     }
 
+    console.log('[CLUSTER] Rendering clusters:', clusters.length, 'clusters')
+    console.log('[CLUSTER] Cluster types:', clusters.map(c => ({ id: c.id, type: c.type, count: c.count })))
+    
     return clusters.map(cluster => (
       <ClusterMarker
         key={cluster.id}

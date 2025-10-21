@@ -29,9 +29,19 @@ export default function ClusterMarker({
       clusterType: cluster.type,
       hasOnClick: !!onClick 
     })
+    console.log('[CLUSTER MARKER] Event details:', {
+      type: event.type,
+      target: event.target,
+      currentTarget: event.currentTarget,
+      button: event.button,
+      clientX: event.clientX,
+      clientY: event.clientY
+    })
     event.preventDefault()
     event.stopPropagation()
+    console.log('[CLUSTER MARKER] About to call onClick with cluster:', cluster)
     onClick?.(cluster)
+    console.log('[CLUSTER MARKER] onClick called successfully')
   }, [cluster, onClick])
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {

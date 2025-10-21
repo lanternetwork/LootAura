@@ -470,7 +470,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
           // Find the corresponding sale data
           const sale = sales.find(s => s.id === point.id)
           return sale
-        }).filter(Boolean)
+        }).filter((sale): sale is Sale => sale !== undefined)
         
         clusterDebug.log('Triggering onClusterClick with sales data:', clusterSales.length, 'sales')
         onClusterClick(clusterSales)

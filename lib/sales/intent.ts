@@ -2,7 +2,7 @@
 export type Intent = 
   | { kind: 'Filters' }
   | { kind: 'UserPan' }
-  | { kind: 'ClusterDrilldown' };
+  | { kind: 'ClusterDrilldown'; targetBounds?: any; leafIds?: string[] };
 
 export type FetchCause = 'Filters' | 'UserPan' | 'ClusterDrilldown';
 

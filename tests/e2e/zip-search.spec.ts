@@ -18,7 +18,8 @@ test.describe('ZIP Search', () => {
     
     // Verify that sales are displayed
     const saleCards = page.locator('[data-testid="sale-card"]');
-    await expect(saleCards).toHaveCount.greaterThan(0);
+    const count = await saleCards.count();
+    expect(count).toBeGreaterThan(0);
     
     // Verify that the list shows sales (intent should be Filters)
     const salesList = page.locator('[data-testid="sales-list"]');
@@ -35,6 +36,7 @@ test.describe('ZIP Search', () => {
     await page.waitForTimeout(1000);
     
     // Verify that sales are still displayed after panning
-    await expect(saleCards).toHaveCount.greaterThan(0);
+    const countAfter = await saleCards.count();
+    expect(countAfter).toBeGreaterThan(0);
   });
 });

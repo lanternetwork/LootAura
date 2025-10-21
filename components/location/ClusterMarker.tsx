@@ -41,7 +41,8 @@ export default function ClusterMarker({
     // Prevent default and stop propagation immediately
     event.preventDefault()
     event.stopPropagation()
-    event.stopImmediatePropagation()
+    // Note: stopImmediatePropagation is not available on React MouseEvent
+    // The stopPropagation() should be sufficient for our use case
     
     console.log('[CLUSTER MARKER] About to call onClick with cluster:', cluster)
     onClick?.(cluster)

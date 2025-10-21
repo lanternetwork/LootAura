@@ -1251,29 +1251,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     }
   }, [filters.lat, filters.lng, filters.distance, filters.city, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious])
 
-  // Wrapper functions for intent-based fetching
-  const runMapFetch = useCallback(async (params: any, ctx: FetchContext) => {
-    // TODO: Implement proper fetchMapSales with context
-    console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
-    // For now, just apply empty result
-    applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'map')
-  }, [applySalesResult])
-
-  const runFilteredFetch = useCallback(async (params: any, ctx: FetchContext) => {
-    // TODO: Implement proper fetchSales with context
-    console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
-    // For now, just apply empty result
-    applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'filtered')
-  }, [applySalesResult])
-
-  // Filters change handler
-  const _onFiltersChange = useCallback((nextFilters: any) => {
-    const seq = ++seqRef.current
-    intentRef.current = { kind: 'Filters' }
-    console.log('[INTENT] set Filters', { seq })
-    console.log('[SEQ] ++', { seq })
-    runFilteredFetch(nextFilters, { cause: 'Filters', seq })
-  }, [runFilteredFetch])
 
   // Client-side geolocation removed; handlers not used
 
@@ -1694,6 +1671,48 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     // Fetch immediately for real-time updates
     fetchMapSales(undefined, center)
   }, [fetchMapSales])
+
+  // Wrapper functions for intent-based fetching
+  const runMapFetch = useCallback(async (params: any, ctx: FetchContext) => {
+    console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
+    
+    try {
+      // Call the actual fetchMapSales function
+      await fetchMapSales(undefined, params.centerOverride, params.zoomOverride, ctx)
+    } catch (error) {
+      console.error('[FETCH] Map fetch error:', error)
+      // Apply empty result on error
+      applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'map')
+    }
+  }, [applySalesResult, fetchMapSales])
+
+  const runFilteredFetch = useCallback(async (params: any, ctx: FetchContext) => {
+    console.log('[FETCH] cause, seq, url', { cause: ctx.cause, seq: ctx.seq, params })
+    
+    try {
+      // Call the actual fetchSales function
+      await fetchSales(false, params.centerOverride, ctx)
+    } catch (error) {
+      console.error('[FETCH] Filtered fetch error:', error)
+      // Apply empty result on error
+      applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'filtered')
+    }
+  }, [applySalesResult, fetchSales])
+
+  // Filters change handler
+  const _onFiltersChange = useCallback((nextFilters: any) => {
+    const seq = ++seqRef.current
+    intentRef.current = { kind: 'Filters' }
+    console.log('[INTENT] set Filters', { seq })
+    console.log('[SEQ] ++', { seq })
+    const params = { 
+      lat: nextFilters.lat, 
+      lng: nextFilters.lng, 
+      distance: nextFilters.distance,
+      centerOverride: { lat: nextFilters.lat, lng: nextFilters.lng }
+    }
+    runFilteredFetch(params, { cause: 'Filters', seq })
+  }, [runFilteredFetch])
 
   // Reset pagination when mode/bbox changes
   const resetPagination = useCallback(() => {
@@ -2624,7 +2643,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                     }
 
                     // 5) when map settles, run ONE viewport fetch with same seq
-                    const params = { lat: filters.lat, lng: filters.lng, distance: filters.distance }
+                    const params = { 
+                      lat: filters.lat, 
+                      lng: filters.lng, 
+                      distance: filters.distance,
+                      centerOverride: { lat: filters.lat, lng: filters.lng },
+                      zoomOverride: mapView.zoom
+                    }
                     runMapFetch(params, { cause: 'ClusterDrilldown', seq })
                   }}
                   onSearchArea={({ center }) => {
@@ -2699,7 +2724,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
                     // Only fetch for interactions that expect a map dataset.
                     if (intent.kind === 'UserPan' || intent.kind === 'ClusterDrilldown') {
-                      const params = { lat: filters.lat, lng: filters.lng, distance: filters.distance }
+                      const params = { 
+                        lat: filters.lat, 
+                        lng: filters.lng, 
+                        distance: filters.distance,
+                        centerOverride: { lat: filters.lat, lng: filters.lng },
+                        zoomOverride: mapView.zoom
+                      }
                       runMapFetch(params, { cause: intent.kind, seq })
                     } else {
                       console.debug('[MOVEEND] no map fetch for intent', intent)

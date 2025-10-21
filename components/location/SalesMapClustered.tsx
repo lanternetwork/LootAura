@@ -473,9 +473,15 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     if (onClusterClick) {
       try {
         const childPoints = clusterIndex.getChildren(clusterId)
+        console.log('[CLUSTER] Child points:', childPoints)
+        console.log('[CLUSTER] Available sales:', sales.length, 'sales')
+        console.log('[CLUSTER] Sales IDs:', sales.map(s => s.id))
+        console.log('[CLUSTER] Child point IDs:', childPoints.map(p => p.id))
+        
         const clusterSales = childPoints.map(point => {
           // Find the corresponding sale data
           const sale = sales.find(s => s.id === point.id)
+          console.log('[CLUSTER] Looking for sale with ID:', point.id, 'Found:', !!sale)
           return sale
         }).filter((sale): sale is Sale => sale !== undefined)
         

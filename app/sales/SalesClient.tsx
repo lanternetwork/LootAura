@@ -25,12 +25,12 @@ interface _MapViewState {
   radiusKm: number
 }
 
-// Helper functions
-function createShapeHash(lat: number, lng: number, radiusKm: number, dateRange: string, categories: string[]): string {
+// Helper functions (currently unused but kept for potential future use)
+function _createShapeHash(lat: number, lng: number, radiusKm: number, dateRange: string, categories: string[]): string {
   return `${lat.toFixed(4)},${lng.toFixed(4)},${radiusKm.toFixed(2)},${dateRange},${categories.sort().join(',')}`
 }
 
-function computeRadiusFromZoom(zoom: number): number {
+function _computeRadiusFromZoom(zoom: number): number {
   // Approximate radius in km from zoom level
   const earthCircumference = 40075 // km
   const tileSize = 256
@@ -48,9 +48,9 @@ interface SalesClientProps {
 }
 
 export default function SalesClient({ initialSales, initialSearchParams: _initialSearchParams, initialCenter, user: _user }: SalesClientProps) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { filters, updateFilters, hasActiveFilters } = useFilters(
+  const _router = useRouter()
+  const _searchParams = useSearchParams()
+  const { filters, updateFilters: _updateFilters, hasActiveFilters: _hasActiveFilters } = useFilters(
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
   )
 
@@ -62,8 +62,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ center: null, zoom: null })
 
   // Sales data state
-  const [sales, setSales] = useState<Sale[]>(initialSales)
-  const [mapMarkers, setMapMarkers] = useState<{ id: string; title: string; lat: number; lng: number }[]>([])
+  const [sales, _setSales] = useState<Sale[]>(initialSales)
+  const [_mapMarkers, _setMapMarkers] = useState<{ id: string; title: string; lat: number; lng: number }[]>([])
   const [mapSales, setMapSales] = useState<{ data: Sale[]; seq: number; source: FetchContext['cause'] }>({
     data: [], seq: -1, source: 'Filters' as any
   })
@@ -72,7 +72,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   })
 
   // UI state
-  const [loading, setLoading] = useState(false)
+  const [_loading, _setLoading] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [fetchedOnce, setFetchedOnce] = useState(false)

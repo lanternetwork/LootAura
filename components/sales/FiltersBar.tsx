@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import ZipInput from '@/components/location/ZipInput'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Filter } from 'lucide-react'
-import { useOverflowChips } from '@/hooks/useOverflowChips'
 
 type FiltersBarProps = {
   // ZIP Search
@@ -44,6 +43,90 @@ const CATEGORY_DATA = [
   { id: 'Collectibles', label: 'Collectibles', priority: 1 }
 ]
 
+// Chip overflow hook
+function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement | null, measureEl: HTMLElement | null) {
+  const [visible, setVisible] = useState<typeof CATEGORY_DATA>([])
+  const [overflow, setOverflow] = useState<typeof CATEGORY_DATA>([])
+  const [widthCache, setWidthCache] = useState<Record<string, number>>({})
+  const [hysteresis, setHysteresis] = useState<{ count: number; lastResult: { visible: typeof CATEGORY_DATA; overflow: typeof CATEGORY_DATA } }>({ count: 0, lastResult: { visible: [], overflow: [] } })
+
+  const measure = useCallback(() => {
+    if (!centerEl || !measureEl) return
+
+    const available = centerEl.clientWidth - 8 // paddingSafety = 8
+    const gap = 8 // gap-2 in Tailwind
+
+    // Measure individual chip widths from offscreen measurer
+    const measureChips = measureEl.querySelectorAll('li[data-chip]')
+    const newWidthCache: Record<string, number> = {}
+    
+    measureChips.forEach((chipEl, idx) => {
+      const chip = allChips[idx]
+      if (chip) {
+        newWidthCache[chip.id] = Math.ceil(chipEl.getBoundingClientRect().width)
+      }
+    })
+    setWidthCache(newWidthCache)
+
+    // Greedily accumulate chips until sum exceeds available
+    let used = 0
+    const nextVisible: typeof CATEGORY_DATA = []
+    const nextOverflow: typeof CATEGORY_DATA = []
+
+    allChips.forEach((chip) => {
+      const width = newWidthCache[chip.id] ?? 0
+      const widthWithGap = nextVisible.length === 0 ? width : width + gap
+      
+      if (used + widthWithGap <= available) {
+        nextVisible.push(chip)
+        used += widthWithGap
+      } else {
+        nextOverflow.push(chip)
+      }
+    })
+
+    // Hysteresis: require 2 consecutive identical computations
+    const currentResult = { visible: nextVisible, overflow: nextOverflow }
+    const isSameResult = 
+      currentResult.visible.length === hysteresis.lastResult.visible.length &&
+      currentResult.overflow.length === hysteresis.lastResult.overflow.length
+
+    if (isSameResult) {
+      setHysteresis({ count: 0, lastResult: currentResult })
+      setVisible(nextVisible)
+      setOverflow(nextOverflow)
+    } else {
+      const newCount = hysteresis.count + 1
+      setHysteresis({ count: newCount, lastResult: currentResult })
+      
+      if (newCount >= 2) {
+        setVisible(nextVisible)
+        setOverflow(nextOverflow)
+        setHysteresis({ count: 0, lastResult: currentResult })
+      }
+    }
+
+    // Debug logging
+    if (process.env.NEXT_PUBLIC_DEBUG) {
+      console.log(`[OVERFLOW] centerWidth=${centerEl.clientWidth} visible=${nextVisible.length} overflow=${nextOverflow.length} sum=${used} available=${available}`)
+    }
+  }, [allChips, centerEl, measureEl, hysteresis])
+
+  useEffect(() => {
+    if (!centerEl) return
+
+    const ro = new ResizeObserver(() => measure())
+    ro.observe(centerEl)
+    
+    // Initial measurement
+    requestAnimationFrame(measure)
+    
+    return () => ro.disconnect()
+  }, [measure])
+
+  return { visible, overflow }
+}
+
 export default function FiltersBar({
   onZipLocationFound,
   onZipError,
@@ -59,10 +142,16 @@ export default function FiltersBar({
 }: FiltersBarProps) {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [showOverflowMenu, setShowOverflowMenu] = useState(false)
-  const rightMoreBtnRef = useRef<HTMLButtonElement|null>(null)
+  
+  // Refs for the 3-column layout
+  const zipRef = useRef<HTMLDivElement>(null)
+  const centerRef = useRef<HTMLDivElement>(null)
+  const chipsRailRef = useRef<HTMLUListElement>(null)
+  const measureRef = useRef<HTMLUListElement>(null)
+  const rightRef = useRef<HTMLDivElement>(null)
 
-  // Overflow management for category chips
-  const { centerRef, measureRef, visible, overflow } = useOverflowChips(CATEGORY_DATA)
+  // Chip overflow management
+  const { visible, overflow } = useChipOverflow(CATEGORY_DATA, centerRef.current, measureRef.current)
 
   const handleCategoryToggle = (categoryId: string) => {
     if (categories.includes(categoryId)) {
@@ -107,71 +196,67 @@ export default function FiltersBar({
 
   return (
     <div className="border-b bg-white">
-      {/* Desktop/Tablet Layout - CSS Grid Single Row */}
-      <div className="hidden md:grid items-center gap-3 px-3 py-3" style={{ gridTemplateColumns: 'auto 1fr auto' }}>
-        {/* Left Cell - ZIP Search (fixed width) */}
-        <div className="flex items-center gap-2 w-32">
+      {/* Desktop/Tablet Layout - 3 Column Grid */}
+      <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3 px-2 h-12 hidden md:grid">
+        {/* Left: ZIP */}
+        <div ref={zipRef} className="shrink-0 flex items-center gap-2 w-[260px] md:w-[320px]">
           <ZipInput
             onLocationFound={onZipLocationFound}
             onError={onZipError}
             placeholder="ZIP code"
-            className="w-24"
+            className="flex-1"
           />
           {zipError && (
             <span className="text-red-500 text-xs">{zipError}</span>
           )}
         </div>
 
-        {/* Center Cell - Category Chips Rail (constrained, overflow-hidden) */}
-        <div ref={centerRef} className="min-w-0 overflow-hidden relative" style={{ maxWidth: '100%' }}>
-          <div className="flex items-center gap-2 whitespace-nowrap">
+        {/* Center: category chips (fluid) */}
+        <div ref={centerRef} className="min-w-0 overflow-hidden">
+          <ul ref={chipsRailRef} className="flex items-center gap-2">
             {visible.map((category) => {
               const isSelected = categories.includes(category.id)
               return (
-                <button
-                  key={category.id}
-                  data-role="chip"
-                  onClick={() => handleCategoryToggle(category.id)}
-                  className={`
-                    shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
-                    ${isSelected 
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200' 
-                      : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
-                    }
-                  `}
-                >
-                  {category.label}
-                  {isSelected && (
-                    <span className="ml-1 text-blue-600">×</span>
-                  )}
-                </button>
+                <li key={category.id} data-chip={category.id}>
+                  <button
+                    onClick={() => handleCategoryToggle(category.id)}
+                    className={`
+                      shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
+                      ${isSelected 
+                        ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                        : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                      }
+                    `}
+                  >
+                    {category.label}
+                    {isSelected && (
+                      <span className="ml-1 text-blue-600">×</span>
+                    )}
+                  </button>
+                </li>
               )
             })}
-          </div>
-
-          {/* Offscreen measurement container */}
-          <div 
+          </ul>
+          
+          {/* Offscreen measurer for all chips */}
+          <ul
             ref={measureRef}
-            aria-hidden="true"
-            className="absolute -left-[9999px] top-0 invisible"
+            className="absolute left-[-9999px] top-0 invisible flex items-center gap-2"
+            aria-hidden
           >
-            <div className="flex items-center gap-2 whitespace-nowrap">
-              {CATEGORY_DATA.map((category) => (
-                <button 
-                  key={category.id} 
-                  data-role="chip-measure" 
-                  className="shrink-0 px-3 py-1.5 border rounded-full text-sm"
-                >
+            {CATEGORY_DATA.map((category) => (
+              <li key={category.id} data-chip={category.id}>
+                <button className="shrink-0 px-3 py-1.5 border rounded-full text-sm">
                   {category.label}
                 </button>
-              ))}
-            </div>
-          </div>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* Right Cell - Distance + More Filters (fixed width) */}
-        <div className="flex items-center gap-2 w-fit">
-          {/* Distance Filter */}
+        {/* Right: Distance + More */}
+        <div ref={rightRef} className="shrink-0 flex items-center gap-3 ml-auto">
+          {/* Distance select */}
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium whitespace-nowrap">Distance:</label>
             <select
@@ -187,10 +272,9 @@ export default function FiltersBar({
             </select>
           </div>
 
-          {/* More Filters Button - overflow host */}
+          {/* More Filters button (existing) - overflow host */}
           <div className="relative">
             <Button
-              ref={rightMoreBtnRef}
               variant="outline"
               onClick={toggleOverflowMenu}
               className="flex items-center gap-1 px-3 py-1 text-sm"

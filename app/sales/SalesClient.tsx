@@ -938,7 +938,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     return key
   }, [arbiter.mode, mapView.center, mapView.zoom, filters.lat, filters.lng, filters.distance, filters.dateRange, filters.categories, approximateRadiusKmFromZoom])
 
-  const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }, ctx?: FetchContext) => {
+  const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }, _ctx?: FetchContext) => {
     
     // Abort previous sales request
     abortPrevious('sales')
@@ -1267,7 +1267,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [applySalesResult])
 
   // Filters change handler
-  const onFiltersChange = useCallback((nextFilters: any) => {
+  const _onFiltersChange = useCallback((nextFilters: any) => {
     const seq = ++seqRef.current
     intentRef.current = { kind: 'Filters' }
     console.log('[INTENT] set Filters', { seq })
@@ -1278,7 +1278,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Client-side geolocation removed; handlers not used
 
   // Fetch markers for map pins using dedicated markers endpoint
-  const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }, zoomOverride?: number, ctx?: FetchContext) => {
+  const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }, zoomOverride?: number, _ctx?: FetchContext) => {
     
     // Check if we need to fetch based on key change (use overrides when provided)
     const key = buildMarkersKey(centerOverride ? { center: centerOverride, zoom: zoomOverride } : undefined)

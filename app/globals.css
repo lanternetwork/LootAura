@@ -12,6 +12,15 @@ body { min-height: 100vh; }
   display: none;
 }
 
+/* No scrollbar utility for overflow management */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Enterprise-grade responsive grid system */
 .sales-grid {
   display: grid;

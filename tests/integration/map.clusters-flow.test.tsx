@@ -28,12 +28,7 @@ vi.mock('react-map-gl', () => ({
       ...safeProps 
     } = props
     
-    // Auto-trigger onLoad to simulate map loading
-    React.useEffect(() => {
-      if (onLoad) {
-        onLoad()
-      }
-    }, [onLoad])
+    // Don't auto-trigger onLoad - let tests control it
     
     return (
       <div data-testid="map-container" ref={ref} {...safeProps}>

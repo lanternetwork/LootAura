@@ -16,7 +16,7 @@ import mapDebug from '@/lib/debug/mapDebug'
 interface SalesMapProps {
   sales: Sale[]
   markers?: {id: string; title: string; lat: number; lng: number}[]
-  center?: { lat: number; lng: number }
+  center: { lat: number; lng: number }
   zoom?: number
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string
@@ -37,7 +37,7 @@ interface SalesMapProps {
 export default function SalesMap({ 
   sales, 
   markers = [],
-  center = { lat: 38.2527, lng: -85.7585 }, 
+  center, 
   zoom = 10,
   onSaleClick,
   selectedSaleId,
@@ -189,7 +189,7 @@ export default function SalesMap({
             map.fitBounds([
               [bounds.west, bounds.south],
               [bounds.east, bounds.north]
-            ], { padding: 50, maxZoom: 15 })
+            ], { padding: 0, maxZoom: 15, duration: 0 })
           }
         }
         
@@ -273,7 +273,7 @@ export default function SalesMap({
         mode: arbiterMode 
       })
       
-      map.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 0 })
+      map.fitBounds(bounds, { padding: 0, maxZoom: 15, duration: 0 })
       
       if (onFitBoundsComplete) {
         onFitBoundsComplete()
@@ -439,18 +439,26 @@ export default function SalesMap({
         // Reduce initial load time
         // Disable telemetry completely
         transformRequest={(url: string, _resourceType: string) => {
-          // Block all Mapbox telemetry and events requests more aggressively
-          if (url.includes('events.mapbox.com') || 
-              url.includes('api.mapbox.com/events') ||
-              url.includes('events/v2') ||
-              url.includes('telemetry') ||
-              url.includes('analytics') ||
-              url.includes('events.mapbox.com/events/v2') ||
-              url.includes('api.mapbox.com/events/v2')) {
-            console.log('[MAP] Blocking request:', url);
-            return null;
+          // Block Mapbox telemetry/events using strict URL parsing (no substring checks)
+          try {
+            const u = new URL(url)
+            const host = u.hostname.toLowerCase()
+            const path = u.pathname.toLowerCase()
+
+            const blockedHosts = new Set(['events.mapbox.com'])
+            const isBlockedHost = blockedHosts.has(host)
+            const isApiEvents = host === 'api.mapbox.com' && (path.startsWith('/events') || path.includes('/events/v2'))
+            const isTelemetryOrAnalytics = (host.endsWith('.mapbox.com') || host === 'mapbox.com') && (path.includes('/telemetry') || path.includes('/analytics'))
+
+            if (isBlockedHost || isApiEvents || isTelemetryOrAnalytics) {
+              console.log('[MAP] Blocking request:', url)
+              return null
+            }
+            return { url: u.toString() }
+          } catch {
+            // If URL parsing fails, pass through unchanged
+            return { url }
           }
-          return { url };
         }}
       >
         {markers.map(marker => (

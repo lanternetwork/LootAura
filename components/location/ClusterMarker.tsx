@@ -17,7 +17,9 @@ export default function ClusterMarker({
   onKeyDown,
   size = 'medium' 
 }: ClusterMarkerProps) {
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
     onClick?.(cluster)
   }, [cluster, onClick])
 

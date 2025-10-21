@@ -20,7 +20,8 @@
     "update:status": "tsx scripts/update-status.ts",
     "smoke:sales": "tsx scripts/smoke-sales.ts",
     "check:css": "node scripts/check-css-tokens.js",
-    "verify:migration": "node scripts/verify-migration.js"
+    "verify:migration": "node scripts/verify-migration.js",
+    "test:cluster-debug": "node scripts/test-cluster-debug.js"
   },
   "dependencies": {
     "next": "^14.2.15",

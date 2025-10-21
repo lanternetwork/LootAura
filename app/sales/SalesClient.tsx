@@ -280,6 +280,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [mapUpdating, setMapUpdating] = useState(false)
+  // Delay showing the "updating map" overlay to avoid flashes during quick pans/zooms
+  const mapUpdatingTimerRef = useRef<number | null>(null)
+  // Safety timeout to ensure overlay never lingers too long
+  const mapUpdatingMaxRef = useRef<number | null>(null)
   const [mapSales, _setMapSales] = useState<Sale[]>([])
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [mapError, setMapError] = useState<string | null>(null)
@@ -621,8 +625,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const crossesAntimeridian = east < west
     const EPS = 0.0005 // Small epsilon for inclusive cropping
     
-    // Add small padding to prevent edge flickering
-    const padding = 0.05 // ~5% padding
+    // Remove padding to avoid an invisible margin where pins disappear at edges
+    const padding = 0 // previously 0.05 (~5%)
     const latRange = north - south
     const lngRange = crossesAntimeridian ? (180 - west) + (east + 180) : east - west
     const paddedNorth = north + (latRange * padding)
@@ -871,14 +875,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     }
   }, [])
 
-  // Build stable request key for markers
-  const buildMarkersKey = useCallback(() => {
+  // Build stable request key for markers (optionally using override center/zoom during active moves)
+  const buildMarkersKey = useCallback((override?: { center?: { lat: number; lng: number }; zoom?: number }) => {
     const mode = arbiter?.mode || 'initial'
     let key = `mode:${mode}`
     
     if (mode === 'map' && mapView.center && mapView.zoom) {
-      const center = mapView.center
-      const radius = approximateRadiusKmFromZoom(mapView.zoom)
+      const center = override?.center ?? mapView.center
+      const zoomForRadius = override?.zoom ?? mapView.zoom
+      const radius = approximateRadiusKmFromZoom(zoomForRadius)
       key += `|center:${center.lat.toFixed(6)},${center.lng.toFixed(6)}|radius:${radius?.toFixed(2) || 'null'}`
     } else {
       key += `|lat:${filters.lat?.toFixed(6) || 'null'}|lng:${filters.lng?.toFixed(6) || 'null'}|dist:${filters.distance}`
@@ -1203,19 +1208,40 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Client-side geolocation removed; handlers not used
 
   // Fetch markers for map pins using dedicated markers endpoint
-  const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }) => {
-    // Check if we need to fetch based on key change
-    const key = buildMarkersKey()
-    if (key === lastMarkersKeyRef.current) {
+  const fetchMapSales = useCallback(async (startEpoch?: number, centerOverride?: { lat: number; lng: number }, zoomOverride?: number) => {
+    // Check if we need to fetch based on key change (use overrides when provided)
+    const key = buildMarkersKey(centerOverride ? { center: centerOverride, zoom: zoomOverride } : undefined)
+    
+    // During user interactions, be more aggressive about fetching even if key is similar
+    const isUserInteraction = centerOverride !== undefined
+    if (!isUserInteraction && key === lastMarkersKeyRef.current) {
       console.log('[SKIP] same markers key')
       return
     }
     
-    console.log('[KEY] markers', key)
+    console.log('[KEY] markers', key, isUserInteraction ? '(user interaction)' : '')
     lastMarkersKeyRef.current = key
     
-    // Set map updating state to prevent flashing
-    setMapUpdating(true)
+    // Delay the updating overlay slightly to avoid opacity flashes on quick interactions
+    if (typeof window !== 'undefined') {
+      if (mapUpdatingTimerRef.current) {
+        window.clearTimeout(mapUpdatingTimerRef.current)
+        mapUpdatingTimerRef.current = null
+      }
+      mapUpdatingTimerRef.current = window.setTimeout(() => {
+        setMapUpdating(true)
+        // Start a max-duration timer to auto-clear overlay if fetch bounces
+        if (mapUpdatingMaxRef.current) {
+          window.clearTimeout(mapUpdatingMaxRef.current)
+        }
+        mapUpdatingMaxRef.current = window.setTimeout(() => {
+          setMapUpdating(false)
+          mapUpdatingMaxRef.current = null
+        }, 400)
+      }, 100)
+    } else {
+      setMapUpdating(true)
+    }
     
     // Abort previous markers request
     abortPrevious('markers')
@@ -1226,6 +1252,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const seq = ++markerSeqRef.current
     const startedEpoch = filtersEpochRef.current
     
+    // For cluster clicks, don't abort too aggressively to ensure sales data loads
+    const _isClusterClick = centerOverride !== undefined
+    
     console.log('[NET] start markers', { seq, epoch: startedEpoch })
     
     const mode = arbiter?.mode || 'initial'
@@ -1234,9 +1263,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     let distanceKmForRequest: number | null = null
 
     if (mode === 'map' && mapView.center && mapView.zoom) {
-      useLat = mapView.center.lat
-      useLng = mapView.center.lng
-      const radiusKm = approximateRadiusKmFromZoom(mapView.zoom)
+      const center = centerOverride ?? mapView.center
+      const zoomForRadius = zoomOverride ?? mapView.zoom
+      useLat = center.lat
+      useLng = center.lng
+      const radiusKm = approximateRadiusKmFromZoom(zoomForRadius)
       distanceKmForRequest = radiusKm
       console.log('[DIST] MAP mode radius miles→km', { 
         miles: radiusKm ? radiusKm / 1.60934 : null, 
@@ -1347,9 +1378,26 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       })
       const data = await res.json()
       
+      // Also fetch sales data for the sales list
+      console.log('[MAP] Fetching sales data for map view...')
+      const salesRes = await diagnosticFetch(`/api/sales?${params.toString()}`, { signal: controller.signal }, {
+        authority: arbiter.authority,
+        viewportSeq: viewportSeqRef.current,
+        requestSeq: seq,
+        params: Object.fromEntries(params.entries())
+      })
+      const salesData = await salesRes.json()
+      
       // Check if this request was aborted
       if (markerSeqRef.current !== seq) {
         console.log('[NET] aborted markers', { seq })
+        // Even if markers were aborted, try to set sales data if we have it
+        if (salesData?.data && Array.isArray(salesData.data)) {
+          console.log('[MAP] Setting mapSales after abort:', salesData.data.length, 'sales')
+          _setMapSales(salesData.data)
+          // Also update the main sales state so the sales list updates
+          setSales(salesData.data)
+        }
         return
       }
       if (filtersEpochRef.current !== startedEpoch) {
@@ -1384,7 +1432,29 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         const sample = uniqueMarkers.slice(0, 5).map((m: any) => m.id === m.saleId)
         console.log('[ASSERT] id parity ok? examples:', sample)
         setMapMarkers(uniqueMarkers)
+        
+        // Also set the sales data for the sales list
+        if (salesData?.data && Array.isArray(salesData.data)) {
+          console.log('[MAP] Setting mapSales to:', salesData.data.length, 'sales')
+          _setMapSales(salesData.data)
+          // Also update the main sales state so the sales list updates
+          setSales(salesData.data)
+        } else {
+          console.log('[MAP] No sales data received, setting mapSales to empty array')
+          _setMapSales([])
+          setSales([])
+        }
+        
         setMapError(null) // Clear any previous errors
+        // Clear any pending timer and hide overlay immediately on success
+        if (mapUpdatingTimerRef.current) {
+          window.clearTimeout(mapUpdatingTimerRef.current)
+          mapUpdatingTimerRef.current = null
+        }
+        if (mapUpdatingMaxRef.current) {
+          window.clearTimeout(mapUpdatingMaxRef.current)
+          mapUpdatingMaxRef.current = null
+        }
         setMapUpdating(false) // Reset map updating state
         
         // Update markers hash for change detection
@@ -1400,6 +1470,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       } else {
         console.log('[MAP] Setting mapMarkers to empty array')
         setMapMarkers([])
+        // Clear any pending timer and hide overlay on empty
+        if (mapUpdatingTimerRef.current) {
+          window.clearTimeout(mapUpdatingTimerRef.current)
+          mapUpdatingTimerRef.current = null
+        }
+        if (mapUpdatingMaxRef.current) {
+          window.clearTimeout(mapUpdatingMaxRef.current)
+          mapUpdatingMaxRef.current = null
+        }
         setMapUpdating(false) // Reset map updating state
         
         // Update markers hash for change detection
@@ -1421,6 +1500,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       console.error('[MAP] Error fetching markers:', error)
       setMapMarkers([])
       setMapError('Failed to load map markers')
+      // Clear any pending timer and hide overlay on error
+      if (mapUpdatingTimerRef.current) {
+        window.clearTimeout(mapUpdatingTimerRef.current)
+        mapUpdatingTimerRef.current = null
+      }
+      if (mapUpdatingMaxRef.current) {
+        window.clearTimeout(mapUpdatingMaxRef.current)
+        mapUpdatingMaxRef.current = null
+      }
       setMapUpdating(false) // Reset map updating state
       
       // Update markers hash for change detection
@@ -1438,7 +1526,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (markersAbortRef.current === controller) {
         markersAbortRef.current = null
       }
-      // Always reset map updating state
+      // Always reset map updating state and clear any pending timer
+      if (mapUpdatingTimerRef.current) {
+        window.clearTimeout(mapUpdatingTimerRef.current)
+        mapUpdatingTimerRef.current = null
+      }
+      if (mapUpdatingMaxRef.current) {
+        window.clearTimeout(mapUpdatingMaxRef.current)
+        mapUpdatingMaxRef.current = null
+      }
       setMapUpdating(false)
     }
   }, [filters.lat, filters.lng, filters.distance, filters.categories, filters.dateRange, arbiter.mode, mapView.center, mapView.zoom, approximateRadiusKmFromZoom, abortPrevious, buildMarkersKey])
@@ -1514,6 +1610,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       debounceRef.current = null
     }, delay)
   }, [arbiter.authority])
+
+  // Immediate markers fetch while user is moving the map (no debouncing for real-time updates)
+  const fetchMarkersDuringMove = useCallback((center: { lat: number; lng: number }) => {
+    // Fetch immediately for real-time updates
+    fetchMapSales(undefined, center)
+  }, [fetchMapSales])
 
   // Reset pagination when mode/bbox changes
   const resetPagination = useCallback(() => {
@@ -1718,6 +1820,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     // Use stable keys instead of buildMarkersKey to prevent identity churn
     const stableKey = `${bboxHash}|${dateKey}|${arbiter.mode}`
     
+    // Debug category changes
+    if (DEBUG && filters.categories.length > 0) {
+      console.log(`[EFFECT] Categories changed:`, filters.categories)
+    }
+    
     // Early return if programmatic move guard is active and not in map mode
     if (arbiter.programmaticMoveGuard && arbiter.mode !== 'map') {
       console.log('[SKIP] programmatic move guard active, not in map mode')
@@ -1733,7 +1840,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[SALES] Stable inputs changed → key:', stableKey)
     lastMarkersKeyRef.current = stableKey
     triggerFetches()
-  }, [bboxHash, dateKey, arbiter.mode, arbiter.programmaticMoveGuard])
+  }, [bboxHash, dateKey, arbiter.mode, arbiter.programmaticMoveGuard, filters.categories, filters.city, filters.dateRange])
 
   // Keep visibleSales in sync with current sales and viewport
   useEffect(() => {
@@ -1875,7 +1982,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       ? { lat: mapView.center.lat, lng: mapView.center.lng }
       : (filters.lat && filters.lng 
         ? { lat: filters.lat, lng: filters.lng }
-        : { lat: 38.2527, lng: -85.7585 })
+        : (() => {
+            console.error('CRITICAL: No location data available - this should not happen')
+            throw new Error('No location data available')
+          })())
     
     console.log('[DIST] center used for fetch: lat=' + currentCenter.lat + ', lng=' + currentCenter.lng + ' (from viewport)')
     console.log('[DIST] radius miles→km {miles:' + newDistance + ', km:' + milesToKm(newDistance) + '}')
@@ -2039,7 +2149,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                 isOpen={showFiltersModal}
                 onToggle={() => setShowFiltersModal(!showFiltersModal)}
                 activeFiltersCount={hasActiveFilters ? 1 : 0}
-                className="sm:hidden"
+                className="md:hidden"
               />
             </div>
           </div>
@@ -2114,7 +2224,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       position: 'relative',
                       zIndex: 3,
                       minHeight: 240
-                    } : {})
+                    } : {}),
+                    // Prevent scroll anchoring jumps when content reflows
+                    overflowAnchor: 'none'
                   }}
                   data-testid="sales-grid"
                   data-panel="list"
@@ -2306,7 +2418,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                   </span>
                 )}
               </h2>
-              <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'} relative`} style={{ zIndex: 1 }}>
+              <div className={`h-[400px] rounded-lg overflow-hidden transition-opacity duration-300 ${mapFadeIn ? 'opacity-100' : 'opacity-0'} relative`} style={{ zIndex: 1, overflowAnchor: 'none' }}>
                 {/* Error toast */}
                 {mapError && (
                   <div className="absolute top-2 right-2 z-10 bg-red-500 text-white px-3 py-2 rounded-md text-sm shadow-lg">
@@ -2318,7 +2430,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                   markers={mapMarkers}
                   center={filters.lat && filters.lng ? { lat: filters.lat, lng: filters.lng } : 
                          initialCenter ? { lat: initialCenter.lat, lng: initialCenter.lng } : 
-                         { lat: 39.8283, lng: -98.5795 }}
+                         (() => {
+                           console.error('CRITICAL: No location data for map - this should not happen')
+                           throw new Error('No location data available for map')
+                         })()}
                   zoom={filters.lat && filters.lng ? 12 : 10}
                   centerOverride={mapCenterOverride}
                   fitBounds={fitBounds}
@@ -2417,6 +2532,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       
                       // Lock mode='map' for 600ms minimum to prevent thrashing
                       mapAuthorityUntilRef.current = Date.now() + 600
+
+                      // Live-update markers during movement (immediate)
+                      fetchMarkersDuringMove(center)
                       
                       if (arbiter.programmaticMoveGuard) {
                         console.log('[CONTROL] user pan -> mode: zip → map; guard=false')
@@ -2428,6 +2546,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                       }
                     } else {
                       console.log('[MAP] No user interaction detected - staying in FILTERS authority')
+                    }
+
+                    // Regardless of authority, keep markers fresh while moving (debounced and key-aware)
+                    if (userInteraction) {
+                      fetchMapSales(undefined, center, zoom)
                     }
                     
                     try {

@@ -2290,9 +2290,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             const finalItemsToRender = mapSales.length > 0 ? mapSales : (itemsToRender.length > 0 ? itemsToRender : visibleSales)
                             
                             // Debug cluster click rendering
-                            if (mapSales.length > 0) {
-                              console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'itemsToRender:', itemsToRender.length, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.length)
-                            }
+                            console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'itemsToRender:', itemsToRender.length, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.length)
+                            console.log('[SALES LIST] DEBUG: mapSales.length > 0?', mapSales.length > 0, 'mapSales:', mapSales.length, 'finalItemsToRender === mapSales?', finalItemsToRender === mapSales)
                             
                             // Debug sales list rendering
                             salesListDebug.logRendering('MAP', {

@@ -2436,12 +2436,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{listData.length}</strong> in view</div>
                           )}
                           {(() => {
-                            // Use original sales list rendering logic instead of intent system
-                            const itemsToRender = isUpdating ? staleSales : renderedSales
-                            
-                            // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
-                            // CLUSTER CLICK FIX: If mapSales has data (cluster click), use it directly
-                            const finalItemsToRender = mapSales.data?.length > 0 ? mapSales.data : (itemsToRender.length > 0 ? itemsToRender : visibleSales)
+                            // Use deterministic listData from intent system
+                            const finalItemsToRender = listData
                             
                             // Debug cluster click rendering
                             console.log('[SALES LIST] DEBUG: Cluster click rendering - isUpdating:', isUpdating, 'finalItemsToRender:', finalItemsToRender.length, 'visibleSales:', visibleSales.length, 'renderedSales:', renderedSales.length, 'staleSales:', staleSales.length, 'mapSales:', mapSales.data?.length || 0)
@@ -2503,11 +2499,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                             <div className="col-span-full text-xs text-gray-600 mb-2">Showing first <strong>24</strong> of <strong>{listData.length}</strong> in view</div>
                           )}
                           {(() => {
-                            // Use original sales list rendering logic instead of intent system
-                            const itemsToRender = isUpdating ? staleSales : renderedSales
-                            
-                            // FALLBACK: If itemsToRender is empty but visibleSales has items, use visibleSales
-                            const finalItemsToRender = itemsToRender.length > 0 ? itemsToRender : visibleSales
+                            // Use deterministic listData from intent system
+                            const finalItemsToRender = listData
                             
                             // Debug sales list rendering for non-MAP authority
                             salesListDebug.logRendering('Non-MAP', {

@@ -9,27 +9,14 @@ import FiltersModal from '@/components/filters/FiltersModal'
 import FilterTrigger from '@/components/filters/FilterTrigger'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
-import { emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
-import salesListDebug from '@/lib/debug/salesListDebug'
-import { normalizeFilters, filtersEqual, createCategoriesKey } from '@/lib/shared/categoryNormalizer'
-import LayoutDiagnostic from '@/components/LayoutDiagnostic'
-import GridLayoutDiagnostic from '@/components/GridLayoutDiagnostic'
-import GridDebugOverlay from '@/components/GridDebugOverlay'
-import { resolveDatePreset } from '@/lib/shared/resolveDatePreset'
+// Removed unused imports after arbiter system removal
 import { Intent, FetchContext, isCauseCompatibleWithIntent } from '@/lib/sales/intent'
 import { deduplicateSales } from '@/lib/sales/dedupe'
 import { INTENT_ENABLED } from '@/lib/config'
 
 // Legacy arbiter types removed - using intent system only
 
-interface QueryShape {
-  lat: number
-  lng: number
-  radiusKm: number
-  dateRange: string
-  categories: string[]
-  shapeHash: string
-}
+// QueryShape interface removed - no longer needed after arbiter system removal
 
 interface _MapViewState {
   center: { lat: number; lng: number }

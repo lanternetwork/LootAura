@@ -35,7 +35,7 @@ export function CategoryChips({
   }
 
   return (
-    <div className="flex flex-wrap gap-1 overflow-hidden">
+    <div className="flex flex-wrap gap-1 overflow-x-auto scrollbar-hide">
       {availableCategories.map((category) => {
         const isSelected = selectedCategories.includes(category)
         return (

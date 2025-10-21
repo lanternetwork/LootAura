@@ -49,68 +49,73 @@ export default function FiltersBar({
   return (
     <div className="p-3 border-b bg-white">
       {/* Desktop/Tablet Layout - Single Row */}
-      <div className="hidden md:flex items-center gap-3">
-        {/* ZIP Search */}
-        <div className="flex items-center gap-2">
-          <ZipInput
-            onLocationFound={onZipLocationFound}
-            onError={onZipError}
-            placeholder="ZIP code"
-            className="w-24"
-          />
-          {zipError && (
-            <span className="text-red-500 text-xs">{zipError}</span>
-          )}
+      <div className="hidden md:flex items-center gap-4">
+        {/* Left Section - Controls */}
+        <div className="flex items-center gap-4 flex-shrink-0">
+          {/* ZIP Search */}
+          <div className="flex items-center gap-2">
+            <ZipInput
+              onLocationFound={onZipLocationFound}
+              onError={onZipError}
+              placeholder="ZIP code"
+              className="w-24"
+            />
+            {zipError && (
+              <span className="text-red-500 text-xs">{zipError}</span>
+            )}
+          </div>
+
+          {/* Date Range Dropdown */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium whitespace-nowrap">Date:</label>
+            <select
+              value={dateRange}
+              onChange={(e) => onDateRangeChange(e.target.value)}
+              className="px-2 py-1 border rounded text-sm min-w-[120px]"
+            >
+              <option value="any">Any Date</option>
+              <option value="today">Today</option>
+              <option value="weekend">This Weekend</option>
+              <option value="next_weekend">Next Weekend</option>
+            </select>
+          </div>
+
+          {/* Distance Filter */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium whitespace-nowrap">Distance:</label>
+            <select
+              value={distance}
+              onChange={(e) => onDistanceChange(Number(e.target.value))}
+              className="px-2 py-1 border rounded text-sm min-w-[80px]"
+            >
+              <option value={5}>5 mi</option>
+              <option value={10}>10 mi</option>
+              <option value={25}>25 mi</option>
+              <option value={50}>50 mi</option>
+              <option value={100}>100 mi</option>
+            </select>
+          </div>
         </div>
 
-        {/* Date Range Dropdown */}
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium whitespace-nowrap">Date:</label>
-          <select
-            value={dateRange}
-            onChange={(e) => onDateRangeChange(e.target.value)}
-            className="px-2 py-1 border rounded text-sm min-w-[120px]"
-          >
-            <option value="any">Any Date</option>
-            <option value="today">Today</option>
-            <option value="weekend">This Weekend</option>
-            <option value="next_weekend">Next Weekend</option>
-          </select>
-        </div>
-
-        {/* Distance Filter */}
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium whitespace-nowrap">Distance:</label>
-          <select
-            value={distance}
-            onChange={(e) => onDistanceChange(Number(e.target.value))}
-            className="px-2 py-1 border rounded text-sm min-w-[80px]"
-          >
-            <option value={5}>5 mi</option>
-            <option value={10}>10 mi</option>
-            <option value={25}>25 mi</option>
-            <option value={50}>50 mi</option>
-            <option value={100}>100 mi</option>
-          </select>
-        </div>
-
-        {/* Category Chips - Compact with proper spacing */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        {/* Middle Section - Category Chips with proper constraints */}
+        <div className="flex items-center gap-2 flex-1 min-w-0 max-w-2xl">
           <CategoryChips
             selectedCategories={categories}
             onCategoriesChange={onCategoriesChange}
           />
         </div>
 
-        {/* Advanced Filters */}
-        <Button
-          variant="outline"
-          onClick={onAdvancedFiltersOpen}
-          className="flex items-center gap-1 px-3 py-1 text-sm"
-        >
-          <Filter className="h-4 w-4" />
-          More
-        </Button>
+        {/* Right Section - Advanced Filters */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button
+            variant="outline"
+            onClick={onAdvancedFiltersOpen}
+            className="flex items-center gap-1 px-3 py-1 text-sm"
+          >
+            <Filter className="h-4 w-4" />
+            More
+          </Button>
+        </div>
       </div>
 
       {/* Mobile Layout */}

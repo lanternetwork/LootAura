@@ -65,8 +65,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   })
 
   // Sales data state
-  const [sales, setSales] = useState<Sale[]>(initialSales)
-  const [mapMarkers, setMapMarkers] = useState<{ id: string; title: string; lat: number; lng: number }[]>(
+  const [sales, _setSales] = useState<Sale[]>(initialSales)
+  const [mapMarkers, _setMapMarkers] = useState<{ id: string; title: string; lat: number; lng: number }[]>(
     initialSales.map(sale => ({
       id: sale.id,
       title: sale.title,

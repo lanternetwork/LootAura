@@ -77,7 +77,7 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
         newWidthCache[chip.id] = Math.ceil(chipEl.getBoundingClientRect().width)
       }
     })
-    setWidthCache(newWidthCache)
+    _setWidthCache(newWidthCache)
 
     // Greedily accumulate chips until sum exceeds available
     let used = 0

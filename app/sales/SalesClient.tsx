@@ -203,12 +203,24 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         params.set('categories', filters.categories.join(','))
       }
 
-      const response = await fetch(`/api/sales?${params.toString()}`)
+      const url = `/api/sales?${params.toString()}`
+      if (DEBUG_ENABLED) {
+        console.log('[FETCH] Making request to:', url)
+        console.log('[FETCH] Request params:', Object.fromEntries(params.entries()))
+      }
+      
+      const response = await fetch(url)
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[FETCH] API error:', response.status, response.statusText, errorText)
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       
       const json = await response.json()
+      if (DEBUG_ENABLED) {
+        console.log('[FETCH] Raw API response:', json)
+      }
+      
       const normalized = normalizeSalesJson(json)
       const parsed = SalesResponseSchema.safeParse(normalized)
       const sales = parsed.success ? parsed.data.sales : []
@@ -216,6 +228,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       
       if (DEBUG_ENABLED) {
         console.log('[FETCH] fetchSales response:', { count: sales.length, ctx: _ctx, meta })
+        console.log('[FETCH] Sales sample:', sales.slice(0, 2))
       }
       
       return { data: sales, ctx: _ctx || { cause: 'Filters', seq: 0 } }
@@ -308,6 +321,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           distance: filters.distance,
           centerOverride: { lat, lng }
         }
+        
+        if (DEBUG_ENABLED) {
+          console.log('[SALES_CLIENT] ZIP search triggering fetch with params:', params)
+        }
+        
         runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
 
         // Programmatically recenter map without triggering UserPan intent

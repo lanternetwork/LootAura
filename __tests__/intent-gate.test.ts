@@ -4,7 +4,7 @@ import { deduplicateSales } from '@/lib/sales/dedupe'
 
 // Mock the intent system
 const mockSeqRef = { current: 0 }
-const mockIntentRef = { current: { kind: 'Filters' as const } }
+const mockIntentRef = { current: { kind: 'Filters' as const } as any }
 
 // Mock applySalesResult function
 const createMockApplySalesResult = () => {

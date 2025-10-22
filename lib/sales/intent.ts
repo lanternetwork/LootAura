@@ -1,8 +1,8 @@
 // lib/sales/intent.ts
 export type Intent = 
-  | { kind: 'Filters' }
-  | { kind: 'UserPan' }
-  | { kind: 'ClusterDrilldown'; targetBounds?: any; leafIds?: string[] };
+  | { kind: 'Filters'; reason?: string }
+  | { kind: 'UserPan'; reason?: string }
+  | { kind: 'ClusterDrilldown'; targetBounds?: any; leafIds?: string[]; reason?: string };
 
 export type FetchCause = 'Filters' | 'UserPan' | 'ClusterDrilldown';
 

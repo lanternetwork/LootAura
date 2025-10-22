@@ -7,10 +7,10 @@ test.describe('ZIP Search E2E', () => {
     // Wait for the page to load
     await expect(page.getByTestId('sales-root')).toBeVisible()
     
-    // Fill ZIP input
-    const zipInput = page.getByTestId('zip-input')
-    await zipInput.fill('40204')
-    await zipInput.press('Enter')
+    // Fill ZIP input (use first one)
+    const zipInputs = page.getByTestId('zip-input')
+    await zipInputs.first().fill('40204')
+    await zipInputs.first().press('Enter')
     
     // Wait for intent to change
     await expect(page.getByTestId('sales-root')).toHaveAttribute('data-debug-intent', /Filters:Zip/)
@@ -26,10 +26,10 @@ test.describe('ZIP Search E2E', () => {
     // Wait for the page to load
     await expect(page.getByTestId('sales-root')).toBeVisible()
     
-    // Fill ZIP input
-    const zipInput = page.getByTestId('zip-input')
-    await zipInput.fill('40204')
-    await zipInput.press('Enter')
+    // Fill ZIP input (use first one)
+    const zipInputs = page.getByTestId('zip-input')
+    await zipInputs.first().fill('40204')
+    await zipInputs.first().press('Enter')
     
     // Wait for intent to change
     await expect(page.getByTestId('sales-root')).toHaveAttribute('data-debug-intent', /Filters:Zip/)

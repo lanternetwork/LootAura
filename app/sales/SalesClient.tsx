@@ -312,7 +312,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[SALES_CLIENT] ZIP resolved:', { zip, center, name })
     
     // Set intent to Filters with source Zip
-    bumpSeq({ kind: 'Filters' })
+    bumpSeq({ kind: 'Filters', reason: 'Zip' })
     const mySeq = seqRef.current
     
     // Set programmatic move flag
@@ -527,11 +527,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Render with new Zillow-style layout
   return (
-    <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`}>
+    <>
       {/* Mobile/Tablet tabbed version */}
-      <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
+      <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`}>
+        <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
+      </div>
       {/* Desktop two-pane version */}
-      <SalesTwoPane filters={filtersComponent} map={mapComponent} list={listComponent} />
-    </div>
+      <div data-testid="sales-root-desktop" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`}>
+        <SalesTwoPane filters={filtersComponent} map={mapComponent} list={listComponent} />
+      </div>
+    </>
   )
 }

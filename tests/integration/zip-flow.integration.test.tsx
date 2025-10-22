@@ -31,7 +31,10 @@ describe('ZIP Flow Integration', () => {
     // Mock successful geocode response
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockGeocodeResponse)
+      json: () => Promise.resolve({
+        ok: true,
+        ...mockGeocodeResponse
+      })
     } as Response)
   })
 
@@ -48,7 +51,7 @@ describe('ZIP Flow Integration', () => {
     )
     
     expect(screen.getByTestId('sales-root')).toBeInTheDocument()
-    expect(screen.getByTestId('zip-input')).toBeInTheDocument()
+    expect(screen.getAllByTestId('zip-input')).toHaveLength(2) // Mobile and desktop versions
   })
 
   it('simulates entering 40204 and pressing Enter', async () => {

@@ -30,7 +30,10 @@ describe('Intent Pan vs Programmatic', () => {
     // Mock successful geocode response
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockGeocodeResponse)
+      json: () => Promise.resolve({
+        ok: true,
+        ...mockGeocodeResponse
+      })
     } as Response)
   })
 

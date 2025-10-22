@@ -49,19 +49,24 @@ describe('Intent Pan vs Programmatic', () => {
       </QueryClientProvider>
     )
     
-    const zipInputs = screen.getAllByTestId('zip-input')
-    const zipInput = zipInputs[0] // Use the first one (desktop version)
+    const zipInput = screen.getByTestId('zip-input')
     fireEvent.change(zipInput, { target: { value: '40204' } })
+    
+    // Wait for the input to be enabled
+    await waitFor(() => {
+      expect(zipInput).not.toBeDisabled()
+    })
+    
     fireEvent.keyDown(zipInput, { key: 'Enter' })
     
     await waitFor(() => {
-      const salesRoot = screen.getByTestId('sales-root')
+      const salesRoot = screen.getAllByTestId('sales-root')[0]
       expect(salesRoot).toHaveAttribute('data-debug-intent', 'Filters:Zip')
     })
     
     // Verify it stays as Filters:Zip even after the programmatic move
     await waitFor(() => {
-      const salesRoot = screen.getByTestId('sales-root')
+      const salesRoot = screen.getAllByTestId('sales-root')[0]
       expect(salesRoot).toHaveAttribute('data-debug-intent', 'Filters:Zip')
     })
   })
@@ -89,7 +94,7 @@ describe('Intent Pan vs Programmatic', () => {
     fireEvent.mouseUp(mapContainer)
     
     await waitFor(() => {
-      const salesRoot = screen.getByTestId('sales-root')
+      const salesRoot = screen.getAllByTestId('sales-root')[0]
       expect(salesRoot).toHaveAttribute('data-debug-intent', /UserPan/)
     })
   })

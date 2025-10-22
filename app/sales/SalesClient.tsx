@@ -339,12 +339,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Create reusable components for the new layout
   const filtersComponent = (
     <FiltersBar
-      onZipLocationFound={(lat, lng, _city) => {
-        console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city })
+      onZipLocationFound={(lat, lng, _city, _state, _zip) => {
+        console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city, _state, _zip })
         
         // Convert to onZipResolved format
         onZipResolved({ 
-          zip: _city || '', 
+          zip: _zip || '', 
           center: [lng, lat], 
           name: _city || '' 
         })
@@ -527,11 +527,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   return (
     <>
       {/* Mobile/Tablet tabbed version */}
-      <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`}>
+      <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`} className="lg:hidden">
         <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
       </div>
       {/* Desktop two-pane version */}
-      <div data-testid="sales-root-desktop" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`}>
+      <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`} className="hidden lg:block">
         <SalesTwoPane filters={filtersComponent} map={mapComponent} list={listComponent} />
       </div>
     </>

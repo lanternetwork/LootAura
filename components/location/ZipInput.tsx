@@ -32,8 +32,10 @@ export default function ZipInput({
   const [zip, setZip] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Auto-submit for dev
+  // Auto-submit for dev (skip in test environment)
   useEffect(() => {
+    if (process.env.NODE_ENV === 'test') return
+    
     const urlParams = new URLSearchParams(window.location.search)
     const urlZip = urlParams.get('zip')
     const devZip = process.env.NEXT_PUBLIC_DEV_ZIP

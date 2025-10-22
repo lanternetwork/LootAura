@@ -202,11 +202,14 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         const normalized = extractSales(result.data)
         const unique = deduplicateSales(normalized)
         console.log('[FETCH] filtered: in=%d out=%d', normalized.length, unique.length)
+        // Update both filtered and map data for ZIP search
         applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'filtered')
+        applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'map')
       }
     } catch (error) {
       console.error('[FETCH] Filtered fetch error:', error)
       applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'filtered')
+      applySalesResult({ data: [], seq: ctx.seq, cause: ctx.cause }, 'map')
     }
   }, [applySalesResult, fetchSales])
 

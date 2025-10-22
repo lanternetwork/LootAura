@@ -826,7 +826,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         mapStyle="mapbox://styles/mapbox/streets-v12"
         onLoad={handleMapLoad}
         onMoveEnd={(evt: any) => {
-          handleMoveEnd(evt)
+          handleMoveEnd()
           handleViewChange(evt)
         }}
         onZoomEnd={handleZoomEnd}

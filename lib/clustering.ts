@@ -81,14 +81,14 @@ export function buildClusterIndex(
   
   // Load points into the index
   const features = points.map(point => ({
-    type: 'Feature',
+    type: 'Feature' as const,
     properties: {
       category: point.category,
       ...point
     },
     geometry: {
-      type: 'Point',
-      coordinates: [point.lon, point.lat]
+      type: 'Point' as const,
+      coordinates: [point.lon, point.lat] as [number, number]
     }
   }))
   

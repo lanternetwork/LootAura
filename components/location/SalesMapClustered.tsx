@@ -89,8 +89,8 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   
   // Offline state
   const [isOffline, setIsOffline] = useState(false)
-  const [showOfflineBanner, setShowOfflineBanner] = useState(false)
-  const [cachedMarkerCount, setCachedMarkerCount] = useState(0)
+  const [showOfflineBanner, _setShowOfflineBanner] = useState(false)
+  const [cachedMarkerCount, _setCachedMarkerCount] = useState(0)
   
   // Current filter state for persistence and caching
   const [currentFilters, setCurrentFilters] = useState<FilterStateType>({

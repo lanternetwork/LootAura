@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SaleSchema } from "./sales"; // reuse existing SaleSchema
+import { SaleSchema } from "./sale-schema"; // reuse existing SaleSchema
 
 export const SalesResponseSchema = z.object({
   sales: z.array(SaleSchema),

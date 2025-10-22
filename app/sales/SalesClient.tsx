@@ -9,7 +9,6 @@ import { User } from '@supabase/supabase-js'
 // Removed unused imports after arbiter system removal
 import { Intent, FetchContext, isCauseCompatibleWithIntent } from '@/lib/sales/intent'
 import { deduplicateSales } from '@/lib/sales/dedupe'
-import { extractSales } from '@/app/sales/lib/extractSales'
 import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
 import { INTENT_ENABLED, DEBUG_ENABLED } from '@/lib/config'
 import SalesTwoPane from '@/components/layout/SalesTwoPane'
@@ -254,9 +253,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     try {
       const result = await fetchSales(false, params.centerOverride, ctx)
       if (result) {
-        const normalized = extractSales(result.data)
-        const unique = deduplicateSales(normalized)
-        console.log('[FETCH] filtered: in=%d out=%d', normalized.length, unique.length)
+        const unique = deduplicateSales(result.data)
+        console.log('[FETCH] filtered: in=%d out=%d', result.data.length, unique.length)
         // Update both filtered and map data for ZIP search
         applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'filtered')
         applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'map')

@@ -16,10 +16,11 @@ export const SaleSchema = z.object({
   date_end: z.string().optional(),
   time_end: z.string().optional(),
   status: z.string(),
+  privacy_mode: z.string().default('exact'),
+  is_featured: z.boolean().default(false),
   created_at: z.string(),
   updated_at: z.string().optional(),
-  owner_id: z.string().optional(),
-  is_featured: z.boolean().optional()
+  owner_id: z.string().optional()
 })
 
 // Sales response schema

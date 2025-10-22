@@ -6,7 +6,7 @@ import { Sale } from '@/lib/types'
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  default: React.forwardRef<any, any>(({ children, onLoad, onMoveEnd, onZoomEnd, onMove, onClick, ...props }, ref) => {
+  default: React.forwardRef<any, any>(({ children, onLoad, onMoveEnd, onZoomEnd, onMove, onClick, onZoom, onMoveStart, onZoomStart, ...props }, ref) => {
     // Only pass safe DOM props to avoid React warnings
     const { mapboxAccessToken, initialViewState, viewState, mapStyle, interactiveLayerIds, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
     

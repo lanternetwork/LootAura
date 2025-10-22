@@ -527,11 +527,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   return (
     <>
       {/* Mobile/Tablet tabbed version */}
-      <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`} className="lg:hidden">
+      <div data-testid="sales-root-mobile" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`} className="lg:hidden">
         <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
       </div>
       {/* Desktop two-pane version */}
-      <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`} className="hidden lg:block">
+      <div data-testid="sales-root-desktop" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`} className="hidden lg:block">
         <SalesTwoPane filters={filtersComponent} map={mapComponent} list={listComponent} />
       </div>
     </>

@@ -147,7 +147,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                       </svg>
                       <div>
                         <div className="font-medium">{formatDate(sale.date_start)}</div>
-                        <div className="text-sm text-gray-600">{formatTime(sale.time_start)}</div>
+                        <div className="text-sm text-gray-600">{sale.time_start ? formatTime(sale.time_start) : 'Time not specified'}</div>
                       </div>
                     </div>
                     

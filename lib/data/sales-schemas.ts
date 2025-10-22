@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { Sale } from '@/lib/types'
 
 // Individual sale schema
 export const SaleSchema = z.object({
@@ -32,8 +33,7 @@ export const SalesResponseSchema = z.object({
   }).optional()
 })
 
-// Type exports
-export type Sale = z.infer<typeof SaleSchema>
+// Type exports - use the existing Sale type from lib/types.ts
 export type SalesResponse = z.infer<typeof SalesResponseSchema>
 
 // Normalize function to handle various API response formats

@@ -231,7 +231,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       
       const normalized = normalizeSalesJson(json)
       const parsed = SalesResponseSchema.safeParse(normalized)
-      const sales = parsed.success ? parsed.data.sales : []
+      const sales: Sale[] = parsed.success ? parsed.data.sales as Sale[] : []
       const meta = parsed.success ? parsed.data.meta : { parse: "failed" }
       
       console.log('[FETCH] fetchSales response:', { count: sales.length, ctx: _ctx, meta })

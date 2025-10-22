@@ -5,6 +5,7 @@ import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
+import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
@@ -478,19 +479,19 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
     
-    // 4. Return normalized response
-    const response: any = {
-      ok: true,
-      data: results,
+    // 4. Return normalized response using contract
+    const raw = {
+      sales: results,
       center: { lat: latitude, lng: longitude },
       distanceKm,
       count: results.length,
-      durationMs: Date.now() - startedAt
+      durationMs: Date.now() - startedAt,
+      ...(degraded && { degraded: true })
     }
     
-    if (degraded) {
-      response.degraded = true
-    }
+    const normalized = normalizeSalesJson(raw)
+    const parsed = SalesResponseSchema.safeParse(normalized)
+    const response = parsed.success ? parsed.data : { sales: [], meta: { parse: "failed" } }
     
     console.log(`[SALES] Final result: ${results.length} sales, degraded=${degraded}, duration=${Date.now() - startedAt}ms`)
     

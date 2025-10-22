@@ -5,8 +5,8 @@ import OfflineIndicator from '@/components/OfflineIndicator'
 
 export function PWAComponents() {
   useEffect(() => {
-    // Register service worker
-    if ('serviceWorker' in navigator) {
+    // Register service worker only if PWA is enabled
+    if (process.env.NEXT_PUBLIC_ENABLE_PWA === "1" && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((registration) => {
           console.log('Service Worker registered:', registration)

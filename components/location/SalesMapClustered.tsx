@@ -16,6 +16,8 @@ import {
   type ClusterPoint
 } from '@/lib/clustering'
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
+import { getMapBBox, bboxToQuery } from '@/lib/map/viewport'
+import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
 import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
 import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
 import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'
@@ -255,34 +257,33 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     return createViewportFetchManager({
       debounceMs: 300,
       fetcher: async (viewport: Viewport, filters: Filters, signal: AbortSignal) => {
-        const tileId = getCurrentTileId(viewport, filters.zoom || 10)
-        const filterHash = hashFilters(currentFilters)
+        // Convert viewport to bbox
+        const bbox = {
+          minLng: viewport.sw[0],
+          minLat: viewport.sw[1],
+          maxLng: viewport.ne[0],
+          maxLat: viewport.ne[1]
+        }
         
-        if (isOfflineCacheEnabled()) {
-          const result = await fetchWithCache(
-            `${tileId}:${filterHash}`,
-            async () => {
-              // Simulate network fetch
-              await new Promise(resolve => setTimeout(resolve, 100))
-              if (signal.aborted) throw new Error('Request aborted')
-              return { markers: markers, success: true }
-            },
-            { tileId, filterHash, ttlMs: 7 * 24 * 60 * 60 * 1000 }
-          )
-          
-          if (result.fromCache) {
-            setShowOfflineBanner(true)
-            setCachedMarkerCount(result.data?.markers?.length || 0)
-          } else {
-            setShowOfflineBanner(false)
+        const qs = bboxToQuery(bbox)
+        const url = `/api/sales/viewport?${qs}&limit=1000`
+        
+        try {
+          const response = await fetch(url, { signal })
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
           }
           
-          return result.data || { success: false }
-        } else {
-          // Fallback to simple fetch without cache
-          await new Promise(resolve => setTimeout(resolve, 100))
-          if (signal.aborted) throw new Error('Request aborted')
-          return { success: true }
+          const json = await response.json()
+          const normalized = normalizeSalesJson(json)
+          const parsed = SalesResponseSchema.safeParse(normalized)
+          const sales = parsed.success ? parsed.data.sales : []
+          
+          return { sales, success: true }
+        } catch (error) {
+          if (signal.aborted) throw error
+          console.error('[VIEWPORT] Fetch error:', error)
+          return { sales: [], success: false }
         }
       },
       onStart: () => {

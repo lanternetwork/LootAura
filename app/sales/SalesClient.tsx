@@ -10,6 +10,7 @@ import { User } from '@supabase/supabase-js'
 import { Intent, FetchContext, isCauseCompatibleWithIntent } from '@/lib/sales/intent'
 import { deduplicateSales } from '@/lib/sales/dedupe'
 import { extractSales } from '@/app/sales/lib/extractSales'
+import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
 import { INTENT_ENABLED, DEBUG_ENABLED } from '@/lib/config'
 import SalesTwoPane from '@/components/layout/SalesTwoPane'
 import SalesTabbed from '@/components/layout/SalesTabbed'
@@ -145,10 +146,20 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   ) => {
     if (!INTENT_ENABLED) return
 
+    // Parse OK? (we did above in fetchSales)
+    if (!Array.isArray(incoming.data)) {
+      console.debug('[APPLY] drop invalid', { reason: 'not array', data: typeof incoming.data })
+      return
+    }
+
+    // Deduplicate before gate
+    const unique = deduplicateSales(incoming.data)
+
+    // Gate: apply only if res.seq >= seqRef.current and compatible
     const currentSeq = seqRef.current
     const currentIntent = intentRef.current
 
-    if (incoming.seq !== currentSeq) {
+    if (incoming.seq < currentSeq) {
       console.debug('[APPLY] drop stale', { incomingSeq: incoming.seq, currentSeq })
       return
     }
@@ -157,13 +168,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       return
     }
 
-    const deduped = deduplicateSales(incoming.data)
+    // Apply the result
     if (target === 'map') {
-      setMapSales({ data: deduped, seq: incoming.seq, source: incoming.cause })
+      setMapSales({ data: unique, seq: incoming.seq, source: incoming.cause })
     } else {
-      setFilteredSales({ data: deduped, seq: incoming.seq, source: incoming.cause })
+      setFilteredSales({ data: unique, seq: incoming.seq, source: incoming.cause })
     }
-    console.debug('[APPLY] ok', { target, count: deduped.length, seq: incoming.seq, cause: incoming.cause })
+    console.debug('[APPLY] ok', { target, count: unique.length, seq: incoming.seq, cause: incoming.cause })
   }, [])
 
   // Fetch functions
@@ -193,12 +204,17 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       
-      const data = await response.json()
+      const json = await response.json()
+      const normalized = normalizeSalesJson(json)
+      const parsed = SalesResponseSchema.safeParse(normalized)
+      const sales = parsed.success ? parsed.data.sales : []
+      const meta = parsed.success ? parsed.data.meta : { parse: "failed" }
+      
       if (DEBUG_ENABLED) {
-        console.log('[FETCH] fetchSales response:', { count: data.length, ctx: _ctx })
+        console.log('[FETCH] fetchSales response:', { count: sales.length, ctx: _ctx, meta })
       }
       
-      return { data: data || [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
+      return { data: sales, ctx: _ctx || { cause: 'Filters', seq: 0 } }
     } catch (error) {
       console.error('[FETCH] fetchSales error:', error)
       return { data: [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
@@ -277,11 +293,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city })
         }
         
-        // Intent system: 1) Own the list with Filters intent
+        // ZIP flow: set Intent.Filters({ source: "Zip" }), bump seq, center map programmatically
         bumpSeq({ kind: 'Filters' })
         const mySeq = seqRef.current
 
-        // 2) Kick filtered fetch immediately
+        // Kick filtered fetch using normalized+parsed flow
         const params = { 
           lat, 
           lng, 
@@ -290,7 +306,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         }
         runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
 
-        // 3) Programmatically recenter map without triggering UserPan intent
+        // Programmatically recenter map without triggering UserPan intent
         programmaticMoveRef.current = true
         if (DEBUG_ENABLED) {
           console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })

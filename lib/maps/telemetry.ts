@@ -1,7 +1,7 @@
-// Disable Mapbox telemetry as early as possible to prevent events.mapbox.com requests
+// Disable Mapbox telemetry in dev only to prevent events.mapbox.com noise
 // This must run before any Mapbox instances are created
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   // Method 1: Set all known global flags that Mapbox checks
   (window as any).__MAPBOX_TELEMETRY__ = false;
   (window as any).__MAPBOX_DISABLE_TELEMETRY__ = true;

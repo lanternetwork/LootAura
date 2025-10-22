@@ -1,7 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { T } from '@/lib/supabase/tables'
 import { z } from 'zod'
-import { SaleSchema } from './sale-schema'
 import { Sale } from '@/lib/types'
 
 const SaleInputSchema = z.object({

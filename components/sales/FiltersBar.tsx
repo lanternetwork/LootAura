@@ -47,7 +47,7 @@ const CATEGORY_DATA = [
 function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement | null, measureEl: HTMLElement | null) {
   const [visible, setVisible] = useState<typeof CATEGORY_DATA>([])
   const [overflow, setOverflow] = useState<typeof CATEGORY_DATA>([])
-  const [widthCache, setWidthCache] = useState<Record<string, number>>({})
+  const [_widthCache, _setWidthCache] = useState<Record<string, number>>({})
   const [hysteresis, setHysteresis] = useState<{ count: number; lastResult: { visible: typeof CATEGORY_DATA; overflow: typeof CATEGORY_DATA } }>({ count: 0, lastResult: { visible: [], overflow: [] } })
   const isMountedRef = useRef(true)
 

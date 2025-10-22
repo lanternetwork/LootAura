@@ -69,6 +69,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     zoom: 10 
   })
 
+  // Debug logging for center initialization
+  console.log('[SALES_CLIENT] Initial center:', initialCenter)
+  console.log('[SALES_CLIENT] Map view center:', mapView.center)
+
   // Sales data state
   const [sales, _setSales] = useState<Sale[]>(initialSales)
   const [mapMarkers, setMapMarkers] = useState<{ id: string; title: string; lat: number; lng: number }[]>(

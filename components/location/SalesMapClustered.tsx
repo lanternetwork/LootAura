@@ -792,6 +792,8 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   // Debug logging for map initialization
   mapDebug.log('SalesMapClustered rendering')
   mapDebug.logTokenStatus(getMapboxToken())
+  console.log('[SALES_MAP_CLUSTERED] Center prop:', center)
+  console.log('[SALES_MAP_CLUSTERED] Zoom prop:', zoom)
 
   return (
     <div 
@@ -806,6 +808,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         isOffline={isOffline}
         cachedCount={cachedMarkerCount}
       />
+      {console.log('[SALES_MAP_CLUSTERED] Map viewState:', {
+        longitude: center.lng,
+        latitude: center.lat,
+        zoom: zoom
+      })}
       <Map
         ref={ref || mapRef}
         mapboxAccessToken={getMapboxToken()}

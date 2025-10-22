@@ -50,7 +50,7 @@ describe('ZIP Flow Integration', () => {
       </QueryClientProvider>
     )
     
-    expect(screen.getAllByTestId('sales-root')[0]).toBeInTheDocument()
+    expect(screen.getByTestId('sales-root')).toBeInTheDocument()
     expect(screen.getByTestId('zip-input-desktop')).toBeInTheDocument()
   })
 
@@ -66,7 +66,7 @@ describe('ZIP Flow Integration', () => {
       </QueryClientProvider>
     )
     
-    const zipInput = screen.getByTestId('zip-input-desktop')
+    const zipInput = screen.getAllByTestId('zip-input-desktop')[0]
     fireEvent.change(zipInput, { target: { value: '40204' } })
     
     // Wait for the input to be enabled
@@ -93,7 +93,7 @@ describe('ZIP Flow Integration', () => {
       </QueryClientProvider>
     )
     
-    const zipInput = screen.getByTestId('zip-input-desktop')
+    const zipInput = screen.getAllByTestId('zip-input-desktop')[0]
     fireEvent.change(zipInput, { target: { value: '40204' } })
     
     // Wait for the input to be enabled
@@ -104,7 +104,7 @@ describe('ZIP Flow Integration', () => {
     fireEvent.keyDown(zipInput, { key: 'Enter' })
     
     await waitFor(() => {
-      const salesRoot = screen.getAllByTestId('sales-root')[0]
+      const salesRoot = screen.getByTestId('sales-root')
       expect(salesRoot).toHaveAttribute('data-debug-intent', 'Filters:Zip')
     })
   })

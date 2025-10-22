@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { Sale } from '@/lib/types'
 
 // Individual sale schema
 export const SaleSchema = z.object({

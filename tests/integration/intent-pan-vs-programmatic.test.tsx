@@ -49,7 +49,7 @@ describe('Intent Pan vs Programmatic', () => {
       </QueryClientProvider>
     )
     
-    const zipInput = screen.getByTestId('zip-input-desktop')
+    const zipInput = screen.getAllByTestId('zip-input-desktop')[0]
     fireEvent.change(zipInput, { target: { value: '40204' } })
     
     // Wait for the input to be enabled
@@ -60,13 +60,13 @@ describe('Intent Pan vs Programmatic', () => {
     fireEvent.keyDown(zipInput, { key: 'Enter' })
     
     await waitFor(() => {
-      const salesRoot = screen.getAllByTestId('sales-root')[0]
+      const salesRoot = screen.getByTestId('sales-root')
       expect(salesRoot).toHaveAttribute('data-debug-intent', 'Filters:Zip')
     })
     
     // Verify it stays as Filters:Zip even after the programmatic move
     await waitFor(() => {
-      const salesRoot = screen.getAllByTestId('sales-root')[0]
+      const salesRoot = screen.getByTestId('sales-root')
       expect(salesRoot).toHaveAttribute('data-debug-intent', 'Filters:Zip')
     })
   })
@@ -84,7 +84,7 @@ describe('Intent Pan vs Programmatic', () => {
     )
     
     // Check that the initial intent is set correctly
-    const salesRoot = screen.getAllByTestId('sales-root')[0]
+    const salesRoot = screen.getByTestId('sales-root')
     expect(salesRoot).toHaveAttribute('data-debug-intent', 'Filters:')
   })
 })

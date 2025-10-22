@@ -15,6 +15,8 @@ import SalesTwoPane from '@/components/layout/SalesTwoPane'
 import SalesTabbed from '@/components/layout/SalesTabbed'
 import FiltersBar from '@/components/sales/FiltersBar'
 import SalesMap from '@/components/location/SalesMap'
+import SalesMapClustered from '@/components/location/SalesMapClustered'
+import { isClusteringEnabled } from '@/lib/clustering'
 
 // Legacy arbiter types removed - using intent system only
 
@@ -288,7 +290,52 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     />
   )
 
-  const mapComponent = (
+  const mapComponent = isClusteringEnabled() ? (
+    <SalesMapClustered
+      sales={mapSales.data || []}
+      markers={mapMarkers}
+      center={mapView.center || { lat: 39.8283, lng: -98.5795 }}
+      zoom={mapView.zoom || 10}
+      onViewChange={({ center, zoom, userInteraction }) => {
+        setMapView({ center, zoom })
+        
+        // Ignore programmatic moves
+        if (programmaticMoveRef.current) {
+          return
+        }
+        
+        // Handle move start for intent system
+        if (INTENT_ENABLED && userInteraction) {
+          // Don't change intent if we're in ClusterDrilldown - let it complete
+          const currentIntent = intentRef.current
+          if (currentIntent.kind !== 'ClusterDrilldown') {
+            bumpSeq({ kind: 'UserPan' })
+          } else {
+            console.log('[MAP] Ignoring user interaction during cluster drilldown')
+          }
+        }
+      }}
+      onClusterClick={async (clusterSales) => {
+        if (!INTENT_ENABLED) return
+
+        bumpSeq({ kind: 'ClusterDrilldown' })
+        const mySeq = seqRef.current
+
+        // Resolve leaves (actual sales, not child clusters)
+        const unique = deduplicateSales(clusterSales)
+
+        // Set map sales immediately for snappy UI using intent system
+        applySalesResult({ data: unique, seq: mySeq, cause: 'ClusterDrilldown' }, 'map')
+        console.debug('[CLUSTER] leaves', { count: unique.length, seq: mySeq })
+
+        // Cluster drilldown is complete - no need to fetch additional data
+        console.log('[CLUSTER] Drilldown complete with', unique.length, 'sales')
+      }}
+      onVisiblePinsChange={() => {
+        // Legacy callback - no longer needed with intent system
+      }}
+    />
+  ) : (
     <SalesMap
       sales={mapSales.data || []}
       markers={mapMarkers}

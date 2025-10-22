@@ -10,7 +10,7 @@ import { User } from '@supabase/supabase-js'
 import { Intent, FetchContext, isCauseCompatibleWithIntent } from '@/lib/sales/intent'
 import { deduplicateSales } from '@/lib/sales/dedupe'
 import { extractSales } from '@/app/sales/lib/extractSales'
-import { INTENT_ENABLED } from '@/lib/config'
+import { INTENT_ENABLED, DEBUG_ENABLED } from '@/lib/config'
 import SalesTwoPane from '@/components/layout/SalesTwoPane'
 import SalesTabbed from '@/components/layout/SalesTabbed'
 import FiltersBar from '@/components/sales/FiltersBar'
@@ -70,9 +70,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   })
 
   // Debug logging for center initialization
-  console.log('[SALES_CLIENT] Initial center:', initialCenter)
-  console.log('[SALES_CLIENT] Map view center:', mapView.center)
-  console.log('[SALES_CLIENT] Map view center details:', JSON.stringify(mapView.center, null, 2))
+  if (DEBUG_ENABLED) {
+    console.log('[SALES_CLIENT] Initial center:', initialCenter)
+    console.log('[SALES_CLIENT] Map view center:', mapView.center)
+    console.log('[SALES_CLIENT] Map view center details:', JSON.stringify(mapView.center, null, 2))
+  }
 
   // Sales data state
   const [sales, _setSales] = useState<Sale[]>(initialSales)
@@ -112,11 +114,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       lng: sale.lng || 0
     }))
     setMapMarkers(newMarkers)
-    console.log('[MARKERS] Updated markers:', { 
-      count: newMarkers.length,
-      sample: newMarkers.slice(0, 3),
-      salesCount: currentSales.length
-    })
+    if (DEBUG_ENABLED) {
+      console.log('[MARKERS] Updated markers:', { 
+        count: newMarkers.length,
+        sample: newMarkers.slice(0, 3),
+        salesCount: currentSales.length
+      })
+    }
   }, [mapSales.data])
 
   // Single source of truth for the list
@@ -164,7 +168,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Fetch functions
   const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }, _ctx?: FetchContext) => {
-    console.log('[FETCH] fetchSales called with context:', { _ctx, append, centerOverride })
+    if (DEBUG_ENABLED) {
+      console.log('[FETCH] fetchSales called with context:', { _ctx, append, centerOverride })
+    }
     
     try {
       const params = new URLSearchParams()
@@ -188,7 +194,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       }
       
       const data = await response.json()
-      console.log('[FETCH] fetchSales response:', { count: data.length, ctx: _ctx })
+      if (DEBUG_ENABLED) {
+        console.log('[FETCH] fetchSales response:', { count: data.length, ctx: _ctx })
+      }
       
       return { data: data || [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
     } catch (error) {
@@ -208,7 +216,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (result) {
         const normalized = extractSales(result.data)
         const unique = deduplicateSales(normalized)
-        console.log('[FETCH] filtered: in=%d out=%d', normalized.length, unique.length)
+        if (DEBUG_ENABLED) {
+          console.log('[FETCH] filtered: in=%d out=%d', normalized.length, unique.length)
+        }
         // Update both filtered and map data for ZIP search
         applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'filtered')
         applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'map')
@@ -226,7 +236,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     if (INTENT_ENABLED) {
       const seq = ++seqRef.current
       intentRef.current = { kind: 'Filters' }
-      console.log('[INTENT] set Filters', { seq })
+      if (DEBUG_ENABLED) {
+        console.log('[INTENT] set Filters', { seq })
+      }
       
       const params = { 
         lat: nextFilters.lat, 
@@ -261,7 +273,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const filtersComponent = (
     <FiltersBar
       onZipLocationFound={(lat, lng, _city) => {
-        console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city })
+        if (DEBUG_ENABLED) {
+          console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city })
+        }
         
         // Intent system: 1) Own the list with Filters intent
         bumpSeq({ kind: 'Filters' })
@@ -278,7 +292,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
         // 3) Programmatically recenter map without triggering UserPan intent
         programmaticMoveRef.current = true
-        console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
+        if (DEBUG_ENABLED) {
+          console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
+        }
         setMapView({ center: { lat, lng }, zoom: 12 })
         setTimeout(() => { programmaticMoveRef.current = false }, 0)
       }}
@@ -305,17 +321,23 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       center={mapView.center || { lat: 39.8283, lng: -98.5795 }}
       zoom={mapView.zoom || 10}
       onViewChange={({ center, zoom, userInteraction }) => {
-        console.log('[SALES_CLIENT] onViewChange called with:', { center, zoom, userInteraction })
+        if (DEBUG_ENABLED) {
+          console.log('[SALES_CLIENT] onViewChange called with:', { center, zoom, userInteraction })
+        }
         
         // Ignore programmatic moves
         if (programmaticMoveRef.current) {
-          console.log('[SALES_CLIENT] Ignoring programmatic move')
+          if (DEBUG_ENABLED) {
+            console.log('[SALES_CLIENT] Ignoring programmatic move')
+          }
           return
         }
         
         // Don't update center if it's (0,0) - this indicates the map hasn't properly initialized
         if (center.lat === 0 && center.lng === 0) {
-          console.log('[SALES_CLIENT] Ignoring (0,0) center from map')
+          if (DEBUG_ENABLED) {
+            console.log('[SALES_CLIENT] Ignoring (0,0) center from map')
+          }
           return
         }
         
@@ -328,7 +350,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           if (currentIntent.kind !== 'ClusterDrilldown') {
             bumpSeq({ kind: 'UserPan' })
           } else {
-            console.log('[MAP] Ignoring user interaction during cluster drilldown')
+            if (DEBUG_ENABLED) {
+              if (DEBUG_ENABLED) {
+              console.log('[MAP] Ignoring user interaction during cluster drilldown')
+            }
+            }
           }
         }
       }}
@@ -346,7 +372,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.debug('[CLUSTER] leaves', { count: unique.length, seq: mySeq })
 
         // Cluster drilldown is complete - no need to fetch additional data
-        console.log('[CLUSTER] Drilldown complete with', unique.length, 'sales')
+        if (DEBUG_ENABLED) {
+          console.log('[CLUSTER] Drilldown complete with', unique.length, 'sales')
+        }
       }}
       onVisiblePinsChange={() => {
         // Legacy callback - no longer needed with intent system
@@ -373,7 +401,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           if (currentIntent.kind !== 'ClusterDrilldown') {
             bumpSeq({ kind: 'UserPan' })
           } else {
-            console.log('[MAP] Ignoring user interaction during cluster drilldown')
+            if (DEBUG_ENABLED) {
+              console.log('[MAP] Ignoring user interaction during cluster drilldown')
+            }
           }
         }
       }}
@@ -391,7 +421,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.debug('[CLUSTER] leaves', { count: unique.length, seq: mySeq })
 
         // Cluster drilldown is complete - no need to fetch additional data
-        console.log('[CLUSTER] Drilldown complete with', unique.length, 'sales')
+        if (DEBUG_ENABLED) {
+          console.log('[CLUSTER] Drilldown complete with', unique.length, 'sales')
+        }
       }}
       onVisiblePinsChange={() => {
         // Legacy callback - no longer needed with intent system

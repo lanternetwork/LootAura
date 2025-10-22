@@ -248,7 +248,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     return () => {
       resizeObserver.disconnect()
     }
-  }, [mapLoaded])
+  }, [isMapLoading])
 
   // Create viewport fetch manager for debounced viewport-based data fetching
   const viewportFetchManager = useMemo(() => {

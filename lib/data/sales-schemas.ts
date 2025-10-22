@@ -1,18 +1,66 @@
-import { z } from "zod";
-import { SaleSchema } from "./sale-schema"; // reuse existing SaleSchema
+import { z } from 'zod'
 
+// Individual sale schema
+export const SaleSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  address: z.string(),
+  city: z.string(),
+  state: z.string(),
+  zip_code: z.string(),
+  lat: z.number(),
+  lng: z.number(),
+  date_start: z.string(),
+  time_start: z.string().optional(),
+  date_end: z.string().optional(),
+  time_end: z.string().optional(),
+  status: z.string(),
+  created_at: z.string(),
+  updated_at: z.string().optional(),
+  owner_id: z.string().optional(),
+  is_featured: z.boolean().optional()
+})
+
+// Sales response schema
 export const SalesResponseSchema = z.object({
   sales: z.array(SaleSchema),
-  meta: z.record(z.any()).optional(),
-});
-export type SalesResponse = z.infer<typeof SalesResponseSchema>;
+  meta: z.object({
+    total: z.number().optional(),
+    parse: z.string().optional()
+  }).optional()
+})
 
-// Safe normalizer that accepts either array or object and returns the contract
-export function normalizeSalesJson(json: unknown): { sales: unknown[]; meta?: Record<string, unknown> } {
-  if (Array.isArray(json)) return { sales: json, meta: { shape: "array" } };
-  if (json && typeof json === "object" && Array.isArray((json as any).sales)) {
-    const { sales, ...rest } = json as any;
-    return { sales, meta: { shape: "object", ...rest } };
+// Type exports
+export type Sale = z.infer<typeof SaleSchema>
+export type SalesResponse = z.infer<typeof SalesResponseSchema>
+
+// Normalize function to handle various API response formats
+export function normalizeSalesJson(json: any): any {
+  // If json is already an array, wrap it in the expected format
+  if (Array.isArray(json)) {
+    return {
+      sales: json,
+      meta: { total: json.length }
+    }
   }
-  return { sales: [], meta: { shape: "invalid" } };
+  
+  // If json has a sales property, use it
+  if (json && typeof json === 'object' && 'sales' in json) {
+    return json
+  }
+  
+  // If json has a data property with sales, use it
+  if (json && typeof json === 'object' && 'data' in json && Array.isArray(json.data)) {
+    return {
+      sales: json.data,
+      meta: { total: json.data.length }
+    }
+  }
+  
+  // Default fallback
+  return {
+    sales: [],
+    meta: { total: 0, parse: "failed" }
+  }
 }

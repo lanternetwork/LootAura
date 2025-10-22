@@ -174,7 +174,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     } else {
       setFilteredSales({ data: unique, seq: incoming.seq, source: incoming.cause })
     }
-    console.debug('[APPLY] ok', { target, count: unique.length, seq: incoming.seq, cause: incoming.cause })
+    console.log('[APPLY] ok', { intent: currentIntent.kind, seq: incoming.seq, count: unique.length })
   }, [])
 
   // Fetch functions
@@ -293,33 +293,49 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[DEBUG] Markers details:', mapMarkers.slice(0, 3)) // Show first 3 markers
   }
 
+  // ZIP resolved handler
+  const onZipResolved = useCallback(({ zip, center, name }: { zip: string; center: [number, number]; name: string }) => {
+    console.log('[SALES_CLIENT] ZIP resolved:', { zip, center, name })
+    
+    // Set intent to Filters with source Zip
+    bumpSeq({ kind: 'Filters' })
+    const mySeq = seqRef.current
+    
+    // Set programmatic move flag
+    programmaticMoveRef.current = true
+    
+    // Center map programmatically
+    const [lng, lat] = center
+    console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
+    setMapView({ center: { lat, lng }, zoom: 12 })
+    
+    // Run filtered fetch with ZIP parameters
+    const params = { 
+      lat, 
+      lng, 
+      distance: filters.distance,
+      centerOverride: { lat, lng }
+    }
+    
+    console.log('[SALES_CLIENT] ZIP search triggering fetch with params:', params)
+    runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
+    
+    // Clear programmatic move flag after a brief delay
+    setTimeout(() => { programmaticMoveRef.current = false }, 0)
+  }, [bumpSeq, runFilteredFetch, filters.distance])
+
   // Create reusable components for the new layout
   const filtersComponent = (
     <FiltersBar
       onZipLocationFound={(lat, lng, _city) => {
         console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city })
         
-        // ZIP flow: set Intent.Filters({ source: "Zip" }), bump seq, center map programmatically
-        bumpSeq({ kind: 'Filters' })
-        const mySeq = seqRef.current
-
-        // Kick filtered fetch using normalized+parsed flow
-        const params = { 
-          lat, 
-          lng, 
-          distance: filters.distance,
-          centerOverride: { lat, lng }
-        }
-        
-        console.log('[SALES_CLIENT] ZIP search triggering fetch with params:', params)
-        
-        runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
-
-        // Programmatically recenter map without triggering UserPan intent
-        programmaticMoveRef.current = true
-        console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
-        setMapView({ center: { lat, lng }, zoom: 12 })
-        setTimeout(() => { programmaticMoveRef.current = false }, 0)
+        // Convert to onZipResolved format
+        onZipResolved({ 
+          zip: _city || '', 
+          center: [lng, lat], 
+          name: _city || '' 
+        })
       }}
       onZipError={(error: any) => {
         console.error('ZIP search error:', error)

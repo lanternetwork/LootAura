@@ -1,12 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface ZipInputProps {
   onLocationFound: (lat: number, lng: number, city?: string, state?: string, zip?: string) => void
   onError: (error: string) => void
   placeholder?: string
   className?: string
+}
+
+interface ZipResolved {
+  zip: string
+  center: [number, number] // [lng, lat]
+  name: string
 }
 
 // Cookie utility functions
@@ -25,23 +31,30 @@ export default function ZipInput({
   const [zip, setZip] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Auto-submit for dev
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlZip = urlParams.get('zip')
+    const devZip = process.env.NEXT_PUBLIC_DEV_ZIP
+    
+    const autoZip = urlZip || devZip
+    if (autoZip) {
+      console.log(`[ZIP_INPUT] dev auto-run zip=${autoZip}`)
+      setZip(autoZip)
+      performZipLookup(autoZip)
+    }
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('[ZIP_INPUT] Form submitted with zip:', zip)
+    console.log('[ZIP_INPUT] submit')
     await performZipLookup()
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      console.log('[ZIP_INPUT] Enter key pressed with zip:', zip)
-      performZipLookup()
-    }
-  }
-
-  const performZipLookup = async () => {
-    if (!zip || !/^\d{5}$/.test(zip)) {
-      console.log('[ZIP_INPUT] Invalid zip format:', zip)
+  const performZipLookup = async (zipToUse?: string) => {
+    const targetZip = zipToUse || zip
+    if (!targetZip || !/^\d{5}$/.test(targetZip)) {
+      console.log('[ZIP_INPUT] Invalid zip format:', targetZip)
       onError('Please enter a valid 5-digit ZIP code')
       return
     }
@@ -50,13 +63,13 @@ export default function ZipInput({
     onError('') // Clear previous errors
 
     try {
-      console.log(`[ZIP_INPUT] Making request to /api/geocoding/zip?zip=${zip}`)
-      const response = await fetch(`/api/geocoding/zip?zip=${zip}`)
+      console.log(`[ZIP_INPUT] Making request to /api/geocoding/zip?zip=${targetZip}`)
+      const response = await fetch(`/api/geocoding/zip?zip=${targetZip}`)
       console.log(`[ZIP_INPUT] Response status:`, response.status)
       const data = await response.json()
       console.log(`[ZIP_INPUT] Response data:`, data)
 
-      if (data.ok) {
+      if (data.ok && typeof data.lat === 'number' && typeof data.lng === 'number') {
         // Write location cookie with ZIP, city, state info
         const locationData = {
           zip: data.zip,
@@ -69,7 +82,7 @@ export default function ZipInput({
         setCookie('la_loc', JSON.stringify(locationData), 1) // 24 hours
         
         onLocationFound(data.lat, data.lng, data.city, data.state, data.zip)
-        console.log(`[ZIP_INPUT] Found location for ${zip}: ${data.city}, ${data.state} (${data.source})`)
+        console.log(`[ZIP_INPUT] Found location for ${targetZip}: ${data.city}, ${data.state} (${data.source})`)
       } else {
         onError(data.error || 'ZIP code not found')
       }

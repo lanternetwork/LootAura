@@ -826,18 +826,12 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         onLoad={handleMapLoad}
-        onMoveStart={(evt: any) => {
-          console.log('[MAP] Move start:', evt)
-        }}
         onMove={(evt: any) => {
           handleViewChange(evt)
         }}
         onMoveEnd={(evt: any) => {
           handleMoveEnd()
           handleViewChange(evt)
-        }}
-        onZoomStart={(evt: any) => {
-          console.log('[MAP] Zoom start:', evt)
         }}
         onZoom={(evt: any) => {
           handleViewChange(evt)

@@ -10,7 +10,8 @@ vi.mock('react-map-gl', () => ({
     // Only pass safe DOM props to avoid React warnings
     const { 
       mapboxAccessToken, 
-      initialViewState, 
+      initialViewState,
+      viewState,
       mapStyle, 
       interactiveLayerIds, 
       onMove, 

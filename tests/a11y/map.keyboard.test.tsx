@@ -26,7 +26,7 @@ vi.mock('mapbox-gl', () => ({
 vi.mock('react-map-gl', () => ({
   default: ({ children, ref, ...props }: any) => {
     // Only pass safe DOM props to avoid React warnings
-    const { mapboxAccessToken, initialViewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
+    const { mapboxAccessToken, initialViewState, viewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
     return (
       <div data-testid="map" ref={ref} {...safeProps}>
         {children}

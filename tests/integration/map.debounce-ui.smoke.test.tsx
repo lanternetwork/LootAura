@@ -6,9 +6,9 @@ import { Sale } from '@/lib/types'
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  default: React.forwardRef<any, any>(({ children, onLoad, onMoveEnd, onZoomEnd, ...props }, ref) => {
+  default: React.forwardRef<any, any>(({ children, onLoad, onMoveEnd, onZoomEnd, onMove, onClick, ...props }, ref) => {
     // Only pass safe DOM props to avoid React warnings
-    const { mapboxAccessToken, initialViewState, viewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
+    const { mapboxAccessToken, initialViewState, viewState, mapStyle, interactiveLayerIds, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
     
     // Auto-trigger onLoad to simulate map loading
     React.useEffect(() => {
@@ -104,42 +104,6 @@ vi.mock('@/lib/telemetry/map', () => ({
   logViewportLoad: vi.fn()
 }))
 
-// Mock react-map-gl
-vi.mock('react-map-gl', () => ({
-  default: ({ children, onLoad, onMoveEnd, onZoomEnd, ref, ...props }: any) => {
-    // Only pass safe DOM props to avoid React warnings
-    const { mapboxAccessToken, initialViewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
-    
-    // Simulate map load
-    setTimeout(() => {
-      if (onLoad) onLoad()
-    }, 0)
-    
-    return (
-      <div data-testid="map-container" ref={ref} {...safeProps}>
-        {children}
-        <button 
-          data-testid="trigger-move"
-          onClick={() => onMoveEnd && onMoveEnd()}
-        >
-          Move End
-        </button>
-        <button 
-          data-testid="trigger-zoom"
-          onClick={() => onZoomEnd && onZoomEnd()}
-        >
-          Zoom End
-        </button>
-      </div>
-    )
-  },
-  Marker: ({ children, ...props }: any) => (
-    <div data-testid="marker" {...props}>
-      {children}
-    </div>
-  ),
-  Popup: ({ children }: any) => <div data-testid="popup">{children}</div>
-}))
 
 // Mock usage logs
 vi.mock('@/lib/usageLogs', () => ({

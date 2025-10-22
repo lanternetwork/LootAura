@@ -72,6 +72,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Debug logging for center initialization
   console.log('[SALES_CLIENT] Initial center:', initialCenter)
   console.log('[SALES_CLIENT] Map view center:', mapView.center)
+  console.log('[SALES_CLIENT] Map view center details:', JSON.stringify(mapView.center, null, 2))
 
   // Sales data state
   const [sales, _setSales] = useState<Sale[]>(initialSales)
@@ -260,6 +261,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const filtersComponent = (
     <FiltersBar
       onZipLocationFound={(lat, lng, _city) => {
+        console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city })
+        
         // Intent system: 1) Own the list with Filters intent
         bumpSeq({ kind: 'Filters' })
         const mySeq = seqRef.current
@@ -275,6 +278,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
         // 3) Programmatically recenter map without triggering UserPan intent
         programmaticMoveRef.current = true
+        console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
         setMapView({ center: { lat, lng }, zoom: 12 })
         setTimeout(() => { programmaticMoveRef.current = false }, 0)
       }}
@@ -301,10 +305,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       center={mapView.center || { lat: 39.8283, lng: -98.5795 }}
       zoom={mapView.zoom || 10}
       onViewChange={({ center, zoom, userInteraction }) => {
+        console.log('[SALES_CLIENT] onViewChange called with:', { center, zoom, userInteraction })
         setMapView({ center, zoom })
         
         // Ignore programmatic moves
         if (programmaticMoveRef.current) {
+          console.log('[SALES_CLIENT] Ignoring programmatic move')
           return
         }
         

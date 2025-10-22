@@ -827,9 +827,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         mapStyle="mapbox://styles/mapbox/streets-v12"
         onLoad={handleMapLoad}
         onMoveStart={(evt: any) => {
-          if (DEBUG_ENABLED) {
-            console.log('[MAP] Move start:', evt)
-          }
+          console.log('[MAP] Move start:', evt)
         }}
         onMove={(evt: any) => {
           handleViewChange(evt)
@@ -839,9 +837,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
           handleViewChange(evt)
         }}
         onZoomStart={(evt: any) => {
-          if (DEBUG_ENABLED) {
-            console.log('[MAP] Zoom start:', evt)
-          }
+          console.log('[MAP] Zoom start:', evt)
         }}
         onZoom={(evt: any) => {
           handleViewChange(evt)

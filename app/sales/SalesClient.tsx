@@ -179,9 +179,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Fetch functions
   const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }, _ctx?: FetchContext) => {
-    if (DEBUG_ENABLED) {
-      console.log('[FETCH] fetchSales called with context:', { _ctx, append, centerOverride })
-    }
+    console.log('[FETCH] fetchSales called with context:', { _ctx, append, centerOverride })
     
     try {
       const params = new URLSearchParams()
@@ -204,10 +202,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       }
 
       const url = `/api/sales?${params.toString()}`
-      if (DEBUG_ENABLED) {
-        console.log('[FETCH] Making request to:', url)
-        console.log('[FETCH] Request params:', Object.fromEntries(params.entries()))
-      }
+      console.log('[FETCH] Making request to:', url)
+      console.log('[FETCH] Request params:', Object.fromEntries(params.entries()))
       
       const response = await fetch(url)
       if (!response.ok) {
@@ -217,19 +213,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       }
       
       const json = await response.json()
-      if (DEBUG_ENABLED) {
-        console.log('[FETCH] Raw API response:', json)
-      }
+      console.log('[FETCH] Raw API response:', json)
       
       const normalized = normalizeSalesJson(json)
       const parsed = SalesResponseSchema.safeParse(normalized)
       const sales = parsed.success ? parsed.data.sales : []
       const meta = parsed.success ? parsed.data.meta : { parse: "failed" }
       
-      if (DEBUG_ENABLED) {
-        console.log('[FETCH] fetchSales response:', { count: sales.length, ctx: _ctx, meta })
-        console.log('[FETCH] Sales sample:', sales.slice(0, 2))
-      }
+      console.log('[FETCH] fetchSales response:', { count: sales.length, ctx: _ctx, meta })
+      console.log('[FETCH] Sales sample:', sales.slice(0, 2))
       
       return { data: sales, ctx: _ctx || { cause: 'Filters', seq: 0 } }
     } catch (error) {
@@ -249,9 +241,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (result) {
         const normalized = extractSales(result.data)
         const unique = deduplicateSales(normalized)
-        if (DEBUG_ENABLED) {
-          console.log('[FETCH] filtered: in=%d out=%d', normalized.length, unique.length)
-        }
+        console.log('[FETCH] filtered: in=%d out=%d', normalized.length, unique.length)
         // Update both filtered and map data for ZIP search
         applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'filtered')
         applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'map')
@@ -306,9 +296,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const filtersComponent = (
     <FiltersBar
       onZipLocationFound={(lat, lng, _city) => {
-        if (DEBUG_ENABLED) {
-          console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city })
-        }
+        console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city })
         
         // ZIP flow: set Intent.Filters({ source: "Zip" }), bump seq, center map programmatically
         bumpSeq({ kind: 'Filters' })
@@ -322,25 +310,19 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           centerOverride: { lat, lng }
         }
         
-        if (DEBUG_ENABLED) {
-          console.log('[SALES_CLIENT] ZIP search triggering fetch with params:', params)
-        }
+        console.log('[SALES_CLIENT] ZIP search triggering fetch with params:', params)
         
         runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
 
         // Programmatically recenter map without triggering UserPan intent
         programmaticMoveRef.current = true
-        if (DEBUG_ENABLED) {
-          console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
-        }
+        console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
         setMapView({ center: { lat, lng }, zoom: 12 })
         setTimeout(() => { programmaticMoveRef.current = false }, 0)
       }}
       onZipError={(error: any) => {
-        if (DEBUG_ENABLED) {
-          console.error('ZIP search error:', error)
-          console.error('ZIP search error details:', error instanceof Error ? error.message : String(error))
-        }
+        console.error('ZIP search error:', error)
+        console.error('ZIP search error details:', error instanceof Error ? error.message : String(error))
       }}
       zipError=""
       dateRange={filters.dateRange}

@@ -332,6 +332,20 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
 
     const bounds = map.getBounds()
+    const center = map.getCenter()
+    const zoom = map.getZoom()
+    
+    console.log('[CLUSTER] Map state debug:', JSON.stringify({
+      center: { lng: center.lng, lat: center.lat },
+      zoom: zoom,
+      bounds: {
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth()
+      }
+    }, null, 2))
+    
     const bbox: [number, number, number, number] = [
       bounds.getWest(),
       bounds.getSouth(),

@@ -12,7 +12,7 @@ test.describe('Cluster Drilldown Integration', () => {
     await page.waitForSelector('[data-testid="cluster-marker"]', { timeout: 10000 })
     
     // Get initial sales count
-    const initialSalesCount = await page.locator('[data-testid="sales-list"] [data-testid="sale-item"]').count()
+    const _initialSalesCount = await page.locator('[data-testid="sales-list"] [data-testid="sale-item"]').count()
     
     // Click on a cluster
     const clusterMarker = page.locator('[data-testid="cluster-marker"]').first()

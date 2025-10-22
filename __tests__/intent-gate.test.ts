@@ -4,7 +4,7 @@ import { deduplicateSales } from '@/lib/sales/dedupe'
 
 // Mock the intent system
 const mockSeqRef = { current: 0 }
-const mockIntentRef = { current: { kind: 'Idle' as const } }
+const mockIntentRef = { current: { kind: 'Filters' as const } }
 
 // Mock applySalesResult function
 const createMockApplySalesResult = () => {
@@ -56,7 +56,7 @@ describe('Intent Gate Test', () => {
   beforeEach(() => {
     mockApply = createMockApplySalesResult()
     mockSeqRef.current = 0
-    mockIntentRef.current = { kind: 'Idle' }
+    mockIntentRef.current = { kind: 'Filters' }
   })
 
   it('should drop older sequence results', () => {

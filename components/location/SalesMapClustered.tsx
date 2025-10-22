@@ -16,12 +16,12 @@ import {
   type ClusterPoint
 } from '@/lib/clustering'
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
-import { getMapBBox, bboxToQuery } from '@/lib/map/viewport'
+import { bboxToQuery } from '@/lib/map/viewport'
 import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
 import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
 import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
 import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'
-import { fetchWithCache } from '@/lib/cache/offline'
+// import { fetchWithCache } from '@/lib/cache/offline'
 import { isOfflineCacheEnabled } from '@/lib/flags'
 import { logPrefetchStart, logPrefetchDone, logViewportSave, logViewportLoad } from '@/lib/telemetry/map'
 import ClusterMarker from './ClusterMarker'
@@ -89,8 +89,6 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   
   // Offline state
   const [isOffline, setIsOffline] = useState(false)
-  const [showOfflineBanner, setShowOfflineBanner] = useState(false)
-  const [cachedMarkerCount, setCachedMarkerCount] = useState(0)
   
   // Current filter state for persistence and caching
   const [currentFilters, setCurrentFilters] = useState<FilterStateType>({

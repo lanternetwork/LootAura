@@ -237,7 +237,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         }
         runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
       }}
-      onZipError={(error) => {
+      onZipError={(error: any) => {
         console.error('ZIP search error:', error)
         console.error('ZIP search error details:', error instanceof Error ? error.message : String(error))
       }}

@@ -82,7 +82,9 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: "default-src 'self'; " +
                    // Allow runtime scripts from self; keep eval for Next dev/runtime
-                   "script-src 'self' 'unsafe-eval' 'unsafe-inline'; " +
+                   // Allow Vercel Live Feedback in development only
+                   "script-src 'self' 'unsafe-eval' 'unsafe-inline'" + 
+                   (process.env.NODE_ENV === 'development' ? " https://vercel.live" : "") + "; " +
                    // Allow Mapbox CSS
                    "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Some browsers use style-src-elem separately

@@ -302,7 +302,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         }
       }
     })
-  }, [markers, currentFilters])
+  }, [markers])
 
   // Convert markers to cluster points
   const clusterPoints = useMemo((): ClusterPoint[] => {
@@ -478,7 +478,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         }, 100)
       })
     }
-  }, [clusterIndex, onVisiblePinsChange, viewportFetchManager, currentFilters])
+  }, [clusterIndex, onVisiblePinsChange, viewportFetchManager])
 
   // Handle cluster click - zoom to cluster bounds
   const handleClusterClick = useCallback((cluster: ClusterResult) => {
@@ -623,7 +623,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     logViewportSave(viewport)
     
     onMoveEnd?.()
-  }, [updateClusters, onMoveEnd, currentFilters])
+  }, [updateClusters, onMoveEnd])
 
   const handleZoomEnd = useCallback(() => {
     const map = mapRef.current?.getMap?.()
@@ -644,7 +644,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     logViewportSave(viewport)
     
     onZoomEnd?.()
-  }, [updateClusters, onZoomEnd, currentFilters])
+  }, [updateClusters, onZoomEnd])
 
   // Handle view changes
   const handleViewChange = useCallback((evt: any) => {
@@ -825,9 +825,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         onLoad={handleMapLoad}
-        onMoveEnd={handleMoveEnd}
+        onMoveEnd={(evt) => {
+          handleMoveEnd(evt)
+          handleViewChange(evt)
+        }}
         onZoomEnd={handleZoomEnd}
-        onMove={handleViewChange}
         onClick={(evt: any) => {
           // Check if this is a cluster marker click
           const target = evt.originalEvent?.target

@@ -32,7 +32,23 @@ vi.mock('react-map-gl', () => ({
     // Don't auto-trigger onLoad - let tests control it
     
     return (
-      <div data-testid="map-container" ref={ref} {...safeProps}>
+      <div 
+        data-testid="map-container" 
+        ref={(node) => {
+          if (ref) {
+            if (typeof ref === 'function') {
+              ref(node)
+            } else {
+              ref.current = node
+            }
+          }
+          // Add getContainer method for ResizeObserver
+          if (node) {
+            (node as any).getContainer = () => node
+          }
+        }} 
+        {...safeProps}
+      >
         {children}
         <button onClick={onLoad}>Load Map</button>
         <button onClick={onMoveEnd}>Move End</button>
@@ -55,8 +71,11 @@ vi.mock('@/lib/usageLogs', () => ({
 }))
 
 describe('Map Clusters Flow', () => {
-  afterEach(() => {
-    cleanup()
+  afterEach(async () => {
+    // React Testing Library automatically cleans up - no manual cleanup needed
+    vi.clearAllMocks()
+    // Small delay to prevent race conditions between tests
+    await new Promise(resolve => setTimeout(resolve, 10))
   })
 
   const mockSales: Sale[] = [
@@ -103,6 +122,9 @@ describe('Map Clusters Flow', () => {
     vi.clearAllMocks()
     // Enable clustering for tests
     process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'true'
+    // Reset environment variables to prevent test interference
+    process.env.NEXT_PUBLIC_DEBUG = 'false'
+    process.env.NEXT_PUBLIC_INTENT_ENABLED = 'true'
   })
 
   it('should render map with clustering enabled', async () => {

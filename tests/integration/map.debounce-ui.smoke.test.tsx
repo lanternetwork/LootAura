@@ -18,7 +18,23 @@ vi.mock('react-map-gl', () => ({
     }, [onLoad])
     
     return (
-      <div data-testid="map-container" ref={ref} {...safeProps}>
+      <div 
+        data-testid="map-container" 
+        ref={(node) => {
+          if (ref) {
+            if (typeof ref === 'function') {
+              ref(node)
+            } else {
+              ref.current = node
+            }
+          }
+          // Add getContainer method for ResizeObserver
+          if (node) {
+            (node as any).getContainer = () => node
+          }
+        }} 
+        {...safeProps}
+      >
         {children}
         <button onClick={onLoad}>Load Map</button>
         <button onClick={onMoveEnd}>Move End</button>

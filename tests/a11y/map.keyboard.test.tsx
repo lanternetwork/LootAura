@@ -28,7 +28,23 @@ vi.mock('react-map-gl', () => ({
     // Only pass safe DOM props to avoid React warnings
     const { mapboxAccessToken, initialViewState, viewState, mapStyle, interactiveLayerIds, onMove, role, 'data-testid': dataTestId, tabIndex, 'aria-label': ariaLabel, ...safeProps } = props
     return (
-      <div data-testid="map" ref={ref} {...safeProps}>
+      <div 
+        data-testid="map" 
+        ref={(node) => {
+          if (ref) {
+            if (typeof ref === 'function') {
+              ref(node)
+            } else {
+              ref.current = node
+            }
+          }
+          // Add getContainer method for ResizeObserver
+          if (node) {
+            (node as any).getContainer = () => node
+          }
+        }} 
+        {...safeProps}
+      >
         {children}
       </div>
     )

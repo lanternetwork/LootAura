@@ -14,8 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - run: npm run lint
 
   unit:
@@ -28,8 +27,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - run: npm run test:unit
 
   integration:
@@ -42,8 +40,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - run: npm run test:integration
 
   e2e:
@@ -56,8 +53,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-      - run: npm ci
+      - run: npm install
       - run: npm run build
       - run: npm start &
       - run: npx wait-on http://localhost:3000

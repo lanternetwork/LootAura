@@ -12,6 +12,8 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "NODE_OPTIONS='--max-old-space-size=8192 --expose-gc' vitest run --pool=forks --poolOptions.forks.singleFork=true",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
     "test:ui": "vitest",
     "test:e2e": "playwright test",
     "format": "prettier -w .",

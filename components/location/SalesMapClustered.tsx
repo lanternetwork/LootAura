@@ -18,7 +18,6 @@ import {
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
 import { bboxToQuery } from '@/lib/map/viewport'
 import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
-import { DEBUG_ENABLED } from '@/lib/config'
 import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
 import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
 import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'

@@ -275,7 +275,22 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Build cluster index when points change
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[CLUSTER] Building index check:', {
+        clusteringEnabled: isClusteringEnabled(),
+        clusterPointsLength: clusterPoints.length,
+        markersLength: markers.length,
+        clusterPointsSample: clusterPoints.slice(0, 3)
+      })
+    }
+    
     if (!isClusteringEnabled() || clusterPoints.length === 0) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[CLUSTER] Skipping index build:', {
+          clusteringEnabled: isClusteringEnabled(),
+          clusterPointsLength: clusterPoints.length
+        })
+      }
       setClusterIndex(null)
       setClusters([])
       return

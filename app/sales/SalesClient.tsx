@@ -242,6 +242,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       markersCount: mapMarkers.length,
       clusteringEnabled: process.env.NEXT_PUBLIC_FEATURE_CLUSTERING
     })
+    console.log('[DEBUG] Markers details:', mapMarkers.slice(0, 3)) // Show first 3 markers
   }
 
   // Create reusable components for the new layout

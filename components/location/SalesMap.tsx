@@ -344,6 +344,7 @@ export default function SalesMap({
       salesCount: sales.length,
       markersCount: markers.length
     })
+    console.log('[MAP] Markers sample:', markers.slice(0, 3)) // Show first 3 markers
   }
   
   if (clusteringEnabled) {

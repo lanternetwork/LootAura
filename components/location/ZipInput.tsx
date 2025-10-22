@@ -27,21 +27,27 @@ export default function ZipInput({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('[ZIP_INPUT] Form submitted with zip:', zip)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ZIP_INPUT] Form submitted with zip:', zip)
+    }
     await performZipLookup()
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      console.log('[ZIP_INPUT] Enter key pressed with zip:', zip)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[ZIP_INPUT] Enter key pressed with zip:', zip)
+      }
       performZipLookup()
     }
   }
 
   const performZipLookup = async () => {
     if (!zip || !/^\d{5}$/.test(zip)) {
-      console.log('[ZIP_INPUT] Invalid zip format:', zip)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[ZIP_INPUT] Invalid zip format:', zip)
+      }
       onError('Please enter a valid 5-digit ZIP code')
       return
     }
@@ -50,11 +56,17 @@ export default function ZipInput({
     onError('') // Clear previous errors
 
     try {
-      console.log(`[ZIP_INPUT] Making request to /api/geocoding/zip?zip=${zip}`)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[ZIP_INPUT] Making request to /api/geocoding/zip?zip=${zip}`)
+      }
       const response = await fetch(`/api/geocoding/zip?zip=${zip}`)
-      console.log(`[ZIP_INPUT] Response status:`, response.status)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[ZIP_INPUT] Response status:`, response.status)
+      }
       const data = await response.json()
-      console.log(`[ZIP_INPUT] Response data:`, data)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[ZIP_INPUT] Response data:`, data)
+      }
 
       if (data.ok) {
         // Write location cookie with ZIP, city, state info
@@ -69,13 +81,17 @@ export default function ZipInput({
         setCookie('la_loc', JSON.stringify(locationData), 1) // 24 hours
         
         onLocationFound(data.lat, data.lng, data.city, data.state, data.zip)
-        console.log(`[ZIP_INPUT] Found location for ${zip}: ${data.city}, ${data.state} (${data.source})`)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[ZIP_INPUT] Found location for ${zip}: ${data.city}, ${data.state} (${data.source})`)
+        }
       } else {
         onError(data.error || 'ZIP code not found')
       }
     } catch (error) {
       console.error('ZIP lookup error:', error)
-      console.error('ZIP search error:', error instanceof Error ? error.message : String(error))
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('ZIP search error:', error instanceof Error ? error.message : String(error))
+      }
       onError('Failed to lookup ZIP code')
     } finally {
       setLoading(false)

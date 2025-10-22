@@ -105,7 +105,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       lng: sale.lng || 0
     }))
     setMapMarkers(newMarkers)
-    console.log('[MARKERS] Updated markers:', { count: newMarkers.length })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MARKERS] Updated markers:', { count: newMarkers.length })
+    }
   }, [mapSales.data])
 
   // Single source of truth for the list
@@ -229,16 +231,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const mapZoom = mapView.zoom || 10
   const salesCount = mapSales.data?.length || 0
   
-  console.log('[DEBUG] Map props:', { 
-    center: mapCenter, 
-    zoom: mapZoom,
-    salesCount,
-    mapView,
-    mapSales,
-    filteredSales,
-    markersCount: mapMarkers.length,
-    clusteringEnabled: process.env.NEXT_PUBLIC_FEATURE_CLUSTERING
-  })
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[DEBUG] Map props:', { 
+      center: mapCenter, 
+      zoom: mapZoom,
+      salesCount,
+      mapView,
+      mapSales,
+      filteredSales,
+      markersCount: mapMarkers.length,
+      clusteringEnabled: process.env.NEXT_PUBLIC_FEATURE_CLUSTERING
+    })
+  }
 
   // Create reusable components for the new layout
   const filtersComponent = (

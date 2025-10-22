@@ -129,6 +129,9 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    // Debug: Log date filtering decision
+    console.log(`[SALES] Date filtering decision: dateRange=${dateRange}, startDateParam=${startDateParam}, endDateParam=${endDateParam}`)
+    
     console.log(`[SALES] Query params: lat=${latitude}, lng=${longitude}, km=${distanceKm}, start=${startDateParam}, end=${endDateParam}, categories=[${categories.join(',')}], q=${q}, limit=${limit}, offset=${offset}`)
     
     let results: PublicSale[] = []
@@ -231,6 +234,20 @@ export async function GET(request: NextRequest) {
         sampleData: salesData?.slice(0, 2)
       })
       
+      // Debug: Log all sales data to see what we're getting
+      if (salesData && salesData.length > 0) {
+        console.log('[SALES] Raw sales data sample:', salesData.slice(0, 3).map(s => ({
+          id: s.id,
+          title: s.title,
+          date_start: s.date_start,
+          time_start: s.time_start,
+          lat: s.lat,
+          lng: s.lng
+        })))
+      } else {
+        console.log('[SALES] No sales data returned from database')
+      }
+      
       if (salesError) {
         console.error('Sales query error:', salesError)
         return NextResponse.json({
@@ -248,6 +265,7 @@ export async function GET(request: NextRequest) {
       const windowStart = startDateParam ? toUtcDateOnly(startDateParam) : null
       const windowEnd = endDateParam ? new Date((toUtcDateOnly(endDateParam)).getTime() + 86399999) : null
       console.log('[SALES] Date filtering:', { startDateParam, endDateParam, windowStart, windowEnd })
+      console.log('[SALES] Will apply date filtering:', !!(windowStart || windowEnd))
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
         .map((sale: Sale) => {

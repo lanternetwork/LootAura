@@ -306,13 +306,20 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       zoom={mapView.zoom || 10}
       onViewChange={({ center, zoom, userInteraction }) => {
         console.log('[SALES_CLIENT] onViewChange called with:', { center, zoom, userInteraction })
-        setMapView({ center, zoom })
         
         // Ignore programmatic moves
         if (programmaticMoveRef.current) {
           console.log('[SALES_CLIENT] Ignoring programmatic move')
           return
         }
+        
+        // Don't update center if it's (0,0) - this indicates the map hasn't properly initialized
+        if (center.lat === 0 && center.lng === 0) {
+          console.log('[SALES_CLIENT] Ignoring (0,0) center from map')
+          return
+        }
+        
+        setMapView({ center, zoom })
         
         // Handle move start for intent system
         if (INTENT_ENABLED && userInteraction) {

@@ -287,7 +287,7 @@ describe('Map Clusters Flow', () => {
     unmount()
   })
 
-  it('should maintain arbiter authority with clustering', async () => {
+  it('should maintain intent system with clustering', async () => {
     const onVisiblePinsChange = vi.fn()
     
     const { unmount } = render(

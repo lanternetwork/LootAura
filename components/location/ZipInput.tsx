@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { normalizeGeocode } from '@/lib/contracts/geocode'
 
 interface ZipInputProps {
   onLocationFound: (lat: number, lng: number, city?: string, state?: string, zip?: string) => void
@@ -51,6 +52,14 @@ export default function ZipInput({
     await performZipLookup()
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      console.log('[ZIP_INPUT] Enter key pressed with zip:', zip)
+      performZipLookup()
+    }
+  }
+
   const performZipLookup = async (zipToUse?: string) => {
     const targetZip = zipToUse || zip
     if (!targetZip || !/^\d{5}$/.test(targetZip)) {
@@ -69,20 +78,24 @@ export default function ZipInput({
       const data = await response.json()
       console.log(`[ZIP_INPUT] Response data:`, data)
 
-      if (data.ok && typeof data.lat === 'number' && typeof data.lng === 'number') {
+      if (data.ok) {
+        // Normalize the geocode response
+        const normalized = normalizeGeocode(data)
+        console.log(`[ZIP_INPUT] Normalized data:`, normalized)
+        
         // Write location cookie with ZIP, city, state info
         const locationData = {
-          zip: data.zip,
-          city: data.city,
-          state: data.state,
-          lat: data.lat,
-          lng: data.lng,
-          source: data.source
+          zip: normalized.zip,
+          city: normalized.city,
+          state: normalized.state,
+          lat: normalized.lat,
+          lng: normalized.lng,
+          source: normalized.source
         }
         setCookie('la_loc', JSON.stringify(locationData), 1) // 24 hours
         
-        onLocationFound(data.lat, data.lng, data.city, data.state, data.zip)
-        console.log(`[ZIP_INPUT] Found location for ${targetZip}: ${data.city}, ${data.state} (${data.source})`)
+        onLocationFound(normalized.lat, normalized.lng, normalized.city, normalized.state, normalized.zip)
+        console.log(`[ZIP_INPUT] Found location for ${targetZip}: ${normalized.city}, ${normalized.state} (${normalized.source})`)
       } else {
         onError(data.error || 'ZIP code not found')
       }
@@ -104,6 +117,7 @@ export default function ZipInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         maxLength={5}
+        data-testid="zip-input"
         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         disabled={loading}
       />

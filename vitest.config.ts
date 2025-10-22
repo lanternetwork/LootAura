@@ -41,5 +41,7 @@ export default defineConfig({
   define: {
     // Ensure proper environment for tests
     'process.env.NODE_ENV': '"test"',
+    // Disable Mapbox telemetry in tests
+    'process.env.MAPBOX_ACCESS_TOKEN': '"test-token"',
   },
 })

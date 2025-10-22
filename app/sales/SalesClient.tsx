@@ -64,6 +64,14 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const seqRef = useRef(0)
   const programmaticMoveRef = useRef(false)
 
+  // Update debug intent attribute when intent changes
+  useEffect(() => {
+    const salesRoot = document.querySelector('[data-testid="sales-root"]')
+    if (salesRoot) {
+      salesRoot.setAttribute('data-debug-intent', `${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`)
+    }
+  }, [intentRef.current])
+
   // Map view state - initialize with proper center
   const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ 
     center: initialCenter || { lat: 39.8283, lng: -98.5795 }, 
@@ -103,6 +111,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     seqRef.current += 1
     intentRef.current = newIntent
     console.debug('[INTENT] set', { intent: newIntent.kind, seq: seqRef.current })
+    
+    // Update debug intent attribute
+    const salesRoot = document.querySelector('[data-testid="sales-root"]')
+    if (salesRoot) {
+      salesRoot.setAttribute('data-debug-intent', `${newIntent.kind}:${(newIntent as any).reason ?? ''}`)
+    }
   }, [])
 
   // Update markers when sales data changes
@@ -513,11 +527,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Render with new Zillow-style layout
   return (
-    <>
+    <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`}>
       {/* Mobile/Tablet tabbed version */}
       <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
       {/* Desktop two-pane version */}
       <SalesTwoPane filters={filtersComponent} map={mapComponent} list={listComponent} />
-    </>
+    </div>
   )
 }

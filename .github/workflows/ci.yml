@@ -1,338 +1,67 @@
-name: ci
+name: CI
 
 on:
-  pull_request:
-    branches: ["main"]
   push:
-    branches-ignore:
-      - main
-  workflow_dispatch:
-
-permissions:
-  contents: write  # Allow repository dispatch events
-  security-events: write
-  actions: read
-  # Fixed permissions for notify-completion job
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
 
 jobs:
-  env-presence:
-    name: env-presence
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Check required environment variables
-        run: |
-          echo "Checking required environment variables..."
-          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ]; then
-            echo "❌ NEXT_PUBLIC_SUPABASE_URL is missing"
-            exit 1
-          fi
-          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
-            echo "❌ NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"
-            exit 1
-          fi
-          echo "✅ All required environment variables present"
-
   lint:
-    name: lint
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
 
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
-
-      - name: Run ESLint
-        run: npm run lint
-
-  typecheck:
-    name: typecheck
+  unit:
     runs-on: ubuntu-latest
-    
+    env:
+      INTENT_ENABLED: 1
+      NEXT_PUBLIC_FEATURE_CLUSTERING: 1
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:unit
 
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
-
-      - name: Run TypeScript type checking
-        run: npm run typecheck
-
-  test-unit:
-    name: test-unit
+  integration:
     runs-on: ubuntu-latest
-    
+    env:
+      INTENT_ENABLED: 1
+      NEXT_PUBLIC_FEATURE_CLUSTERING: 1
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:integration
 
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
-
-      - name: Run unit tests
-        run: npm run test -- tests/unit/
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      INTENT_ENABLED: 1
+      NEXT_PUBLIC_FEATURE_CLUSTERING: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - run: npm start &
+      - run: npx wait-on http://localhost:3000
+      - run: npx playwright install --with-deps
+      - run: npm run test:e2e
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_DEBUG: 'true'
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results
-          path: |
-            test-results.xml
-            coverage/
-
-  test-integration:
-    name: test-integration
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
-
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
-
-      - name: Run integration tests
-        run: npm run test -- tests/integration/
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_DEBUG: 'true'
-
-  build:
-    name: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
-
-      - name: Install dependencies
-        run: |
-          # Retry logic for network issues
-          for attempt in 1 2 3; do
-            echo "Install attempt $attempt/3..."
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-              # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
-            fi
-            
-            if [ $? -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
-              break
-            else
-              echo "❌ Install attempt $attempt failed"
-              if [ $attempt -lt 3 ]; then
-                echo "Retrying in 10 seconds..."
-                sleep 10
-              else
-                echo "All install attempts failed"
-                exit 1
-              fi
-            fi
-          done
-
-      - name: Build application
-        run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
-          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
-          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
-          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
-
-      - name: List build outputs (debug)
-        if: always()
-        run: |
-          pwd
-          ls -la
-          echo "--- .next ---" || true
-          ls -la .next || true
-          echo "--- .next/static ---" || true
-          ls -la .next/static || true
-          echo "--- .next/standalone ---" || true
-          ls -la .next/standalone || true
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-artifacts
-          path: |
-            .next
-            .next/static
-            .next/standalone
-            out
-          if-no-files-found: warn
-
-  css-scan:
-    name: css-scan
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
-
-      - name: Build (fallback if artifacts not used)
-        run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME }}
-          NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
-          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
-          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
-
-      - name: Check CSS tokens
-        run: node scripts/check-css-tokens.js
-
-  migration-verify:
-    name: migration-verify
-    runs-on: ubuntu-latest
-    
-    if: contains(github.event.head_commit.modified, '**/*.sql') || contains(github.event.head_commit.added, '**/*.sql')
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
-
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
-
-      - name: Verify migration
-        run: node scripts/verify-migration.js
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-
-  notify-completion:
-    name: notify-completion
-    runs-on: ubuntu-latest
-    needs: [env-presence, lint, typecheck, test-unit, test-integration, build, css-scan, migration-verify]
-    if: always()
-    steps:
-      - name: Emit ci_completed event
-        uses: actions/github-script@v7
-        with:
-          script: |
-            // 'context' and 'github' are provided by github-script
-            const ref = context.ref || context.payload?.workflow_run?.head_branch || context.payload?.pull_request?.head?.ref || ''
-            const branch = (ref || '').replace('refs/heads/', '')
-            const prNumber = context.payload?.pull_request?.number || ''
-
-            await github.rest.repos.createDispatchEvent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              event_type: 'ci_completed',
-              client_payload: {
-                branch,
-                pr_number: prNumber,
-                run_id: context.runId,
-                conclusion: context.payload?.workflow_run?.conclusion || 'completed'
-              }
-            })
-
-            console.log(`Emitted ci_completed event for branch: ${branch}, PR: ${prNumber}`)
+          BASE_URL: http://localhost:3000

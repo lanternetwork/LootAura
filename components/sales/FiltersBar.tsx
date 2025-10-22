@@ -244,7 +244,7 @@ export default function FiltersBar({
         </div>
 
         {/* Center: category chips (fluid) */}
-        <div ref={centerRef} className="min-w-0 overflow-hidden">
+        <div ref={centerRef} data-testid="filters-center" className="min-w-0 overflow-hidden">
           <ul ref={chipsRailRef} className="flex items-center gap-2">
             {visible.map((category) => {
               const isSelected = categories.includes(category.id)
@@ -309,6 +309,7 @@ export default function FiltersBar({
             <Button
               variant="outline"
               onClick={toggleOverflowMenu}
+              data-testid="filters-more"
               className="flex items-center gap-1 px-3 py-1 text-sm"
             >
               <Filter className="h-4 w-4" />

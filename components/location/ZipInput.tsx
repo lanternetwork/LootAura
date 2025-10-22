@@ -8,6 +8,7 @@ interface ZipInputProps {
   onError: (error: string) => void
   placeholder?: string
   className?: string
+  'data-testid'?: string
 }
 
 interface _ZipResolved {
@@ -27,7 +28,8 @@ export default function ZipInput({
   onLocationFound, 
   onError, 
   placeholder = "Enter ZIP code",
-  className = ""
+  className = "",
+  'data-testid': dataTestId = "zip-input"
 }: ZipInputProps) {
   const [zip, setZip] = useState('')
   const [loading, setLoading] = useState(false)
@@ -119,7 +121,7 @@ export default function ZipInput({
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         maxLength={5}
-        data-testid="zip-input"
+        data-testid={dataTestId}
         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         disabled={loading}
       />

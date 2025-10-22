@@ -237,6 +237,7 @@ export default function FiltersBar({
             onError={onZipError}
             placeholder="ZIP code"
             className="flex-1"
+            data-testid="zip-input-desktop"
           />
           {zipError && (
             <span className="text-red-500 text-xs">{zipError}</span>
@@ -359,6 +360,7 @@ export default function FiltersBar({
               onError={onZipError}
               placeholder="ZIP"
               className="w-full"
+              data-testid="zip-input-mobile"
             />
             {zipError && (
               <span className="text-red-500 text-xs">{zipError}</span>

@@ -46,7 +46,8 @@ describe('Intent Pan vs Programmatic', () => {
       </QueryClientProvider>
     )
     
-    const zipInput = screen.getByTestId('zip-input')
+    const zipInputs = screen.getAllByTestId('zip-input')
+    const zipInput = zipInputs[0] // Use the first one (desktop version)
     fireEvent.change(zipInput, { target: { value: '40204' } })
     fireEvent.keyDown(zipInput, { key: 'Enter' })
     
@@ -76,7 +77,8 @@ describe('Intent Pan vs Programmatic', () => {
     
     // Simulate a user drag gesture by triggering map move events
     // This would need to be adapted based on your map component's event handling
-    const mapContainer = screen.getByTestId('map-container')
+    const mapContainers = screen.getAllByTestId('map-container')
+    const mapContainer = mapContainers[0] // Use the first one
     
     // Simulate user interaction that would trigger UserPan intent
     fireEvent.mouseDown(mapContainer, { clientX: 100, clientY: 100 })

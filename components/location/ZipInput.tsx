@@ -10,7 +10,7 @@ interface ZipInputProps {
   className?: string
 }
 
-interface ZipResolved {
+interface _ZipResolved {
   zip: string
   center: [number, number] // [lng, lat]
   name: string

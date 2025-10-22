@@ -214,6 +214,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       
       const json = await response.json()
       console.log('[FETCH] Raw API response:', json)
+      console.log('[FETCH] Raw API response details:', JSON.stringify(json, null, 2))
       
       const normalized = normalizeSalesJson(json)
       const parsed = SalesResponseSchema.safeParse(normalized)

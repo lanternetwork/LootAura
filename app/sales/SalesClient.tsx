@@ -235,7 +235,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     salesCount,
     mapView,
     mapSales,
-    filteredSales
+    filteredSales,
+    markersCount: mapMarkers.length,
+    clusteringEnabled: process.env.NEXT_PUBLIC_FEATURE_CLUSTERING
   })
 
   // Create reusable components for the new layout

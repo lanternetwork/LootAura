@@ -3,4 +3,8 @@ export function getMapboxToken(): string {
   return t || ''
 }
 
+export function hasMapboxToken(): boolean {
+  return !!getMapboxToken()
+}
+
 

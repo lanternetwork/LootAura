@@ -336,7 +336,15 @@ export default function SalesMap({
   }, [onSearchArea])
 
   // Use clustering if enabled, otherwise fall back to individual markers
-  if (isClusteringEnabled()) {
+  const clusteringEnabled = isClusteringEnabled()
+  console.log('[MAP] Clustering decision:', { 
+    enabled: clusteringEnabled, 
+    envVar: process.env.NEXT_PUBLIC_FEATURE_CLUSTERING,
+    salesCount: sales.length,
+    markersCount: markers.length
+  })
+  
+  if (clusteringEnabled) {
     return (
       <SalesMapClustered
         sales={sales}

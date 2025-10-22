@@ -275,18 +275,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Build cluster index when points change
   useEffect(() => {
-    console.log('[CLUSTER] Building index check:', {
+    console.log('[CLUSTER] Building index check:', JSON.stringify({
       clusteringEnabled: isClusteringEnabled(),
       clusterPointsLength: clusterPoints.length,
       markersLength: markers.length,
       clusterPointsSample: clusterPoints.slice(0, 3)
-    })
+    }, null, 2))
     
     if (!isClusteringEnabled() || clusterPoints.length === 0) {
-      console.log('[CLUSTER] Skipping index build:', {
+      console.log('[CLUSTER] Skipping index build:', JSON.stringify({
         clusteringEnabled: isClusteringEnabled(),
         clusterPointsLength: clusterPoints.length
-      })
+      }, null, 2))
       setClusterIndex(null)
       setClusters([])
       return
@@ -340,7 +340,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     ]
     const currentZoom = map.getZoom()
 
-    console.log('[CLUSTER] updateClusters debug:', {
+    console.log('[CLUSTER] updateClusters debug:', JSON.stringify({
       bounds: {
         west: bounds.getWest(),
         south: bounds.getSouth(),
@@ -351,14 +351,14 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       currentZoom,
       clusterIndexExists: !!clusterIndex,
       clusterPointsLength: clusterPoints.length
-    })
+    }, null, 2))
 
     clusterDebug.logClusterIndex(clusterIndex, 'Getting clusters for viewport')
     const viewportClusters = getClustersForViewport(clusterIndex, bbox, currentZoom)
-    console.log('[CLUSTER] getClustersForViewport result:', {
+    console.log('[CLUSTER] getClustersForViewport result:', JSON.stringify({
       viewportClustersLength: viewportClusters.length,
       viewportClusters: viewportClusters.slice(0, 3) // Show first 3 clusters
-    })
+    }, null, 2))
     setClusters(viewportClusters)
 
     // Update visible pins

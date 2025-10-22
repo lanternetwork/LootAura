@@ -106,19 +106,19 @@ export function getClustersForViewport(
 ): ClusterResult[] {
   const startTime = performance.now()
   
-  console.log('[CLUSTER] getClustersForViewport called:', {
+  console.log('[CLUSTER] getClustersForViewport called:', JSON.stringify({
     bbox,
     zoom,
     floorZoom: Math.floor(zoom),
     indexExists: !!index
-  })
+  }, null, 2))
   
   const clusters = index.getClusters(bbox, Math.floor(zoom))
   
-  console.log('[CLUSTER] supercluster.getClusters result:', {
+  console.log('[CLUSTER] supercluster.getClusters result:', JSON.stringify({
     clustersLength: clusters.length,
     clusters: clusters.slice(0, 3) // Show first 3 raw clusters
-  })
+  }, null, 2))
   
   const results: ClusterResult[] = clusters.map(cluster => {
     if (cluster.properties?.cluster) {
@@ -147,11 +147,11 @@ export function getClustersForViewport(
   
   const viewportTime = performance.now() - startTime
   
-  console.log('[CLUSTER] getClustersForViewport final result:', {
+  console.log('[CLUSTER] getClustersForViewport final result:', JSON.stringify({
     resultsLength: results.length,
     results: results.slice(0, 3), // Show first 3 processed results
     ms: Math.round(viewportTime)
-  })
+  }, null, 2))
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[CLUSTER] Viewport query', {

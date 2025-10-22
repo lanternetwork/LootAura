@@ -59,7 +59,15 @@ export function buildClusterIndex(
 ): ClusterIndex {
   const startTime = performance.now()
   
+  console.log('[CLUSTER] buildClusterIndex called:', JSON.stringify({
+    pointsLength: points.length,
+    pointsSample: points.slice(0, 3),
+    options
+  }, null, 2))
+  
   const config = { ...DEFAULT_OPTIONS, ...options }
+  
+  console.log('[CLUSTER] Supercluster config:', JSON.stringify(config, null, 2))
   
   const index = new Supercluster({
     radius: config.radius,
@@ -69,8 +77,10 @@ export function buildClusterIndex(
     nodeSize: config.nodeSize
   })
   
+  console.log('[CLUSTER] Supercluster instance created')
+  
   // Load points into the index
-  index.load(points.map(point => ({
+  const features = points.map(point => ({
     type: 'Feature',
     properties: {
       category: point.category,
@@ -80,15 +90,35 @@ export function buildClusterIndex(
       type: 'Point',
       coordinates: [point.lon, point.lat]
     }
-  })))
+  }))
+  
+  console.log('[CLUSTER] Features to load:', JSON.stringify({
+    featuresLength: features.length,
+    featuresSample: features.slice(0, 2)
+  }, null, 2))
+  
+  index.load(features)
+  
+  console.log('[CLUSTER] Features loaded into index')
   
   const buildTime = performance.now() - startTime
+  
+  // Test the index by getting clusters
+  const testClusters = index.getClusters([-180, -90, 180, 90], 0)
+  
+  console.log('[CLUSTER] Index built successfully:', JSON.stringify({
+    event: 'cluster-build',
+    points: points.length,
+    features: features.length,
+    testClusters: testClusters.length,
+    ms: Math.round(buildTime)
+  }, null, 2))
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[CLUSTER] Index built', {
       event: 'cluster-build',
       points: points.length,
-      clusters: index.getClusters([-180, -90, 180, 90], 0).length,
+      clusters: testClusters.length,
       ms: Math.round(buildTime)
     })
   }

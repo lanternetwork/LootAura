@@ -27,6 +27,11 @@ type FiltersBarProps = {
   // Advanced Filters
   onAdvancedFiltersOpen: () => void
   hasActiveFilters: boolean
+  
+  // Test IDs for different layouts
+  zipInputTestId?: string
+  filtersCenterTestId?: string
+  filtersMoreTestId?: string
 }
 
 // Category data with priority for overflow management
@@ -170,7 +175,10 @@ export default function FiltersBar({
   distance,
   onDistanceChange,
   onAdvancedFiltersOpen,
-  hasActiveFilters
+  hasActiveFilters,
+  zipInputTestId = "zip-input",
+  filtersCenterTestId = "filters-center",
+  filtersMoreTestId = "filters-more"
 }: FiltersBarProps) {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [showOverflowMenu, setShowOverflowMenu] = useState(false)
@@ -237,7 +245,7 @@ export default function FiltersBar({
             onError={onZipError}
             placeholder="ZIP code"
             className="flex-1"
-            data-testid="zip-input-desktop"
+            data-testid={zipInputTestId}
           />
           {zipError && (
             <span className="text-red-500 text-xs">{zipError}</span>
@@ -245,7 +253,7 @@ export default function FiltersBar({
         </div>
 
         {/* Center: category chips (fluid) */}
-        <div ref={centerRef} data-testid="filters-center" className="min-w-0 overflow-hidden">
+        <div ref={centerRef} data-testid={filtersCenterTestId} className="min-w-0 overflow-hidden">
           <ul ref={chipsRailRef} className="flex items-center gap-2">
             {visible.map((category) => {
               const isSelected = categories.includes(category.id)
@@ -310,7 +318,7 @@ export default function FiltersBar({
             <Button
               variant="outline"
               onClick={toggleOverflowMenu}
-              data-testid="filters-more"
+              data-testid={filtersMoreTestId}
               className="flex items-center gap-1 px-3 py-1 text-sm"
             >
               <Filter className="h-4 w-4" />

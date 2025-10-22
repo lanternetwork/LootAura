@@ -9,7 +9,6 @@ import { User } from '@supabase/supabase-js'
 // Removed unused imports after arbiter system removal
 import { Intent, FetchContext, isCauseCompatibleWithIntent } from '@/lib/sales/intent'
 import { deduplicateSales } from '@/lib/sales/dedupe'
-import { extractSales } from '@/app/sales/lib/extractSales'
 import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
 import { INTENT_ENABLED, DEBUG_ENABLED } from '@/lib/config'
 import SalesTwoPane from '@/components/layout/SalesTwoPane'
@@ -363,6 +362,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       onDistanceChange={(distance) => _updateFilters({ distance })}
       onAdvancedFiltersOpen={() => {}}
       hasActiveFilters={_hasActiveFilters}
+      zipInputTestId="zip-input"
+      filtersCenterTestId="filters-center"
+      filtersMoreTestId="filters-more"
     />
   )
 

@@ -727,7 +727,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       <Map
         ref={ref || mapRef}
         mapboxAccessToken={getMapboxToken()}
-        initialViewState={{
+        viewState={{
           longitude: center.lng,
           latitude: center.lat,
           zoom: zoom

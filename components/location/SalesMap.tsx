@@ -188,20 +188,9 @@ export default function SalesMap({
     }
   }, [markers, recomputeVisiblePins, visiblePinCount])
 
-  // Update view state when center changes (animate transitions)
+  // Update view state when center changes (handled by viewState prop)
   useEffect(() => {
     setViewState(prev => ({ ...prev, latitude: center.lat, longitude: center.lng }))
-    // Smoothly ease to the new center without remounting or routing
-    try {
-      const map = mapRef.current?.getMap?.()
-      if (map) {
-        // Programmatic movement allowed - no authority checks needed
-        
-        const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : (zoom || 11)
-        // Do not force a minimum zoom during programmatic recenters; respect current zoom
-        map.easeTo({ center: [center.lng, center.lat], zoom: currentZoom, duration: 600 })
-      }
-    } catch {}
   }, [center.lat, center.lng])
 
   // Simple map load handling - no complex state management needed
@@ -209,23 +198,16 @@ export default function SalesMap({
     mapDebug.logMapLoad('SalesMap', 'start')
   }, [])
 
-  // Handle center override
+  // Handle center override (handled by viewState prop)
   useEffect(() => {
-    if (!centerOverride) return
-    
-    try {
-      const map = mapRef.current?.getMap?.()
-      if (!map) return
-      
-      // Center override allowed - no authority checks needed
-      
-      const targetZoom = centerOverride.zoom || zoom
-      map.easeTo({ 
-        center: [centerOverride.lng, centerOverride.lat], 
-        zoom: targetZoom, 
-        duration: 600 
-      })
-    } catch {}
+    if (centerOverride) {
+      setViewState(prev => ({ 
+        ...prev, 
+        latitude: centerOverride.lat, 
+        longitude: centerOverride.lng,
+        zoom: centerOverride.zoom || zoom
+      }))
+    }
   }, [centerOverride, zoom])
 
   // Handle fit bounds
@@ -389,7 +371,7 @@ export default function SalesMap({
       <Map
         ref={mapRef}
         mapboxAccessToken={getMapboxToken()}
-        initialViewState={{
+        viewState={{
           longitude: center.lng,
           latitude: center.lat,
           zoom: zoom

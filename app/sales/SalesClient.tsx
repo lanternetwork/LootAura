@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
 import SaleCard from '@/components/SaleCard'
@@ -69,7 +69,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Sales data state
   const [sales, _setSales] = useState<Sale[]>(initialSales)
-  const [mapMarkers, _setMapMarkers] = useState<{ id: string; title: string; lat: number; lng: number }[]>(
+  const [mapMarkers, setMapMarkers] = useState<{ id: string; title: string; lat: number; lng: number }[]>(
     initialSales.map(sale => ({
       id: sale.id,
       title: sale.title,
@@ -94,6 +94,19 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     intentRef.current = newIntent
     console.debug('[INTENT] set', { intent: newIntent.kind, seq: seqRef.current })
   }, [])
+
+  // Update markers when sales data changes
+  useEffect(() => {
+    const currentSales = mapSales.data || []
+    const newMarkers = currentSales.map(sale => ({
+      id: sale.id,
+      title: sale.title,
+      lat: sale.lat || 0,
+      lng: sale.lng || 0
+    }))
+    setMapMarkers(newMarkers)
+    console.log('[MARKERS] Updated markers:', { count: newMarkers.length })
+  }, [mapSales.data])
 
   // Single source of truth for the list
   const listData: Sale[] = useMemo(() => {

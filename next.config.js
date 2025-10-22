@@ -82,9 +82,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: "default-src 'self'; " +
                    // Allow runtime scripts from self; keep eval for Next dev/runtime
-                   // Allow Vercel Live Feedback in development only
-                   "script-src 'self' 'unsafe-eval' 'unsafe-inline'" + 
-                   (process.env.NODE_ENV === 'development' ? " https://vercel.live" : "") + "; " +
+                   "script-src 'self' 'unsafe-eval' 'unsafe-inline'; " +
                    // Allow Mapbox CSS
                    "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Some browsers use style-src-elem separately
@@ -127,6 +125,10 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '1mb', // Limit Server Actions body size
     },
+  },
+  // Disable Vercel Live Feedback to prevent CSP violations
+  env: {
+    VERCEL_LIVE_FEEDBACK_DISABLED: '1',
   },
   webpack: (config) => {
     config.resolve.alias = {

@@ -9,6 +9,7 @@ import { User } from '@supabase/supabase-js'
 // Removed unused imports after arbiter system removal
 import { Intent, FetchContext, isCauseCompatibleWithIntent } from '@/lib/sales/intent'
 import { deduplicateSales } from '@/lib/sales/dedupe'
+import { extractSales } from '@/app/sales/lib/extractSales'
 import { INTENT_ENABLED } from '@/lib/config'
 import SalesTwoPane from '@/components/layout/SalesTwoPane'
 import SalesTabbed from '@/components/layout/SalesTabbed'
@@ -58,6 +59,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Intent-based system state
   const intentRef = useRef<Intent>({ kind: 'Filters' })
   const seqRef = useRef(0)
+  const programmaticMoveRef = useRef(false)
 
   // Map view state - initialize with proper center
   const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ 
@@ -180,7 +182,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     try {
       const result = await fetchSales(false, params.centerOverride, ctx)
       if (result) {
-        applySalesResult({ data: result.data, seq: result.ctx.seq, cause: result.ctx.cause }, 'filtered')
+        const normalized = extractSales(result.data)
+        const unique = deduplicateSales(normalized)
+        console.log('[FETCH] filtered: in=%d out=%d', normalized.length, unique.length)
+        applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'filtered')
       }
     } catch (error) {
       console.error('[FETCH] Filtered fetch error:', error)
@@ -236,6 +241,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           centerOverride: { lat, lng }
         }
         runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
+
+        // 3) Programmatically recenter map without triggering UserPan intent
+        programmaticMoveRef.current = true
+        setMapView({ center: { lat, lng }, zoom: 12 })
+        setTimeout(() => { programmaticMoveRef.current = false }, 0)
       }}
       onZipError={(error: any) => {
         console.error('ZIP search error:', error)
@@ -261,6 +271,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       zoom={mapView.zoom || 10}
       onViewChange={({ center, zoom, userInteraction }) => {
         setMapView({ center, zoom })
+        
+        // Ignore programmatic moves
+        if (programmaticMoveRef.current) {
+          return
+        }
         
         // Handle move start for intent system
         if (INTENT_ENABLED && userInteraction) {

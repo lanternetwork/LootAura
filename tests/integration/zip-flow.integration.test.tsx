@@ -66,7 +66,7 @@ describe('ZIP Flow Integration', () => {
       </QueryClientProvider>
     )
     
-    const zipInput = screen.getAllByTestId('zip-input-desktop')[0]
+    const zipInput = screen.getByTestId('zip-input-desktop')
     fireEvent.change(zipInput, { target: { value: '40204' } })
     
     // Wait for the input to be enabled
@@ -93,7 +93,7 @@ describe('ZIP Flow Integration', () => {
       </QueryClientProvider>
     )
     
-    const zipInput = screen.getAllByTestId('zip-input-desktop')[0]
+    const zipInput = screen.getByTestId('zip-input-desktop')
     fireEvent.change(zipInput, { target: { value: '40204' } })
     
     // Wait for the input to be enabled

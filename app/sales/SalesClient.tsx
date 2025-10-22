@@ -105,9 +105,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       lng: sale.lng || 0
     }))
     setMapMarkers(newMarkers)
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[MARKERS] Updated markers:', { count: newMarkers.length })
-    }
+    console.log('[MARKERS] Updated markers:', { 
+      count: newMarkers.length,
+      sample: newMarkers.slice(0, 3),
+      salesCount: currentSales.length
+    })
   }, [mapSales.data])
 
   // Single source of truth for the list

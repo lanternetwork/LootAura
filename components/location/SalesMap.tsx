@@ -337,15 +337,13 @@ export default function SalesMap({
 
   // Use clustering if enabled, otherwise fall back to individual markers
   const clusteringEnabled = isClusteringEnabled()
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[MAP] Clustering decision:', { 
-      enabled: clusteringEnabled, 
-      envVar: process.env.NEXT_PUBLIC_FEATURE_CLUSTERING,
-      salesCount: sales.length,
-      markersCount: markers.length
-    })
-    console.log('[MAP] Markers sample:', markers.slice(0, 3)) // Show first 3 markers
-  }
+  console.log('[MAP] Clustering decision:', { 
+    enabled: clusteringEnabled, 
+    envVar: process.env.NEXT_PUBLIC_FEATURE_CLUSTERING,
+    salesCount: sales.length,
+    markersCount: markers.length
+  })
+  console.log('[MAP] Markers sample:', markers.slice(0, 3)) // Show first 3 markers
   
   if (clusteringEnabled) {
     return (

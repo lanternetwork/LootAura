@@ -188,9 +188,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       if (centerOverride) {
         params.set('lat', centerOverride.lat.toString())
         params.set('lng', centerOverride.lng.toString())
+      } else if (mapView.center) {
+        // Use current map center if no override provided
+        params.set('lat', mapView.center.lat.toString())
+        params.set('lng', mapView.center.lng.toString())
       }
       if (filters.distance) {
-        params.set('distance', filters.distance.toString())
+        params.set('distanceKm', filters.distance.toString())
       }
       if (filters.dateRange) {
         params.set('dateRange', filters.dateRange)
@@ -219,7 +223,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       console.error('[FETCH] fetchSales error:', error)
       return { data: [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
     }
-  }, [filters.distance, filters.dateRange, filters.categories])
+  }, [filters.distance, filters.dateRange, filters.categories, mapView.center])
 
 
   // Wrapper functions for intent-based fetching
@@ -315,8 +319,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         setTimeout(() => { programmaticMoveRef.current = false }, 0)
       }}
       onZipError={(error: any) => {
-        console.error('ZIP search error:', error)
-        console.error('ZIP search error details:', error instanceof Error ? error.message : String(error))
+        if (DEBUG_ENABLED) {
+          console.error('ZIP search error:', error)
+          console.error('ZIP search error details:', error instanceof Error ? error.message : String(error))
+        }
       }}
       zipError=""
       dateRange={filters.dateRange}

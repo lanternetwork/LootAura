@@ -340,8 +340,25 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     ]
     const currentZoom = map.getZoom()
 
+    console.log('[CLUSTER] updateClusters debug:', {
+      bounds: {
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth()
+      },
+      bbox,
+      currentZoom,
+      clusterIndexExists: !!clusterIndex,
+      clusterPointsLength: clusterPoints.length
+    })
+
     clusterDebug.logClusterIndex(clusterIndex, 'Getting clusters for viewport')
     const viewportClusters = getClustersForViewport(clusterIndex, bbox, currentZoom)
+    console.log('[CLUSTER] getClustersForViewport result:', {
+      viewportClustersLength: viewportClusters.length,
+      viewportClusters: viewportClusters.slice(0, 3) // Show first 3 clusters
+    })
     setClusters(viewportClusters)
 
     // Update visible pins

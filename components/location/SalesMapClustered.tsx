@@ -833,9 +833,6 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
           handleMoveEnd()
           handleViewChange(evt)
         }}
-        onZoom={(evt: any) => {
-          handleViewChange(evt)
-        }}
         onZoomEnd={handleZoomEnd}
         onClick={(evt: any) => {
           // Check if this is a cluster marker click

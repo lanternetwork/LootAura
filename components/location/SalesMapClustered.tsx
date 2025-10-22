@@ -210,6 +210,46 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [])
 
+  // Handle map resize when container size changes
+  useEffect(() => {
+    const handleResize = () => {
+      if (mapRef.current) {
+        // Small delay to ensure DOM has updated
+        setTimeout(() => {
+          mapRef.current?.resize()
+        }, 100)
+      }
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', handleResize)
+    
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  // Set up ResizeObserver after map is loaded
+  useEffect(() => {
+    if (!mapRef.current) return
+
+    const handleResize = () => {
+      if (mapRef.current) {
+        setTimeout(() => {
+          mapRef.current?.resize()
+        }, 100)
+      }
+    }
+
+    const container = mapRef.current.getContainer()
+    const resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(container)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [mapLoaded])
+
   // Create viewport fetch manager for debounced viewport-based data fetching
   const viewportFetchManager = useMemo(() => {
     return createViewportFetchManager({

@@ -405,7 +405,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     
     // Validate bounds to prevent incorrect bounds from ZIP search
     const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
-    if (boundsSpan > 1.0) { // If bounds span more than ~111km, something is wrong
+    if (boundsSpan > 5.0) { // If bounds span more than ~555km, something is wrong
       console.log('[SALES_MAP_CLUSTERED] Invalid bounds detected, skipping cluster update:', {
         bounds: {
           west: bounds.getWest(),
@@ -694,6 +694,20 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     let newCenter = viewState.center || { lat: 0, lng: 0 }
     let newZoom = viewState.zoom || 10
     
+    // Validate bounds to prevent corrupted bounds from being processed
+    if (map) {
+      try {
+        const bounds = map.getBounds()
+        const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
+        if (boundsSpan > 5.0) {
+          console.log('[MAP] Invalid bounds detected in handleViewChange, skipping:', { span: boundsSpan })
+          return
+        }
+      } catch (error) {
+        console.warn('[MAP] Failed to get bounds in handleViewChange:', error)
+      }
+    }
+    
     // If this is a cluster click and we don't have proper coordinates, get them from the map
     if (isClusterClick && (newCenter.lat === 0 && newCenter.lng === 0)) {
       try {
@@ -856,10 +870,22 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     
     console.log('[SALES_MAP_CLUSTERED] Sales data changed, updating clusters:', { salesCount: sales.length })
     
-    // Add a small delay to ensure map bounds are stable after ZIP search
+    // Add a longer delay to ensure map bounds are stable after ZIP search
     const timeoutId = setTimeout(() => {
-      updateClusters(map)
-    }, 100)
+      // Check if map bounds are reasonable before updating clusters
+      const bounds = map.getBounds()
+      const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
+      
+      if (boundsSpan > 5.0) {
+        console.log('[SALES_MAP_CLUSTERED] Map bounds still invalid, waiting longer...', { span: boundsSpan })
+        // Try again after another delay
+        setTimeout(() => {
+          updateClusters(map)
+        }, 200)
+      } else {
+        updateClusters(map)
+      }
+    }, 300)
     
     return () => clearTimeout(timeoutId)
   }, [sales.length, updateClusters])

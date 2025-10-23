@@ -246,8 +246,9 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
         </div>
       </div>
 
-      {/* Desktop/Tablet Sidebar - show at md and up; mobile uses modal */}
-      <div className={`hidden md:block ${className}`}>
+      {/* Desktop/Tablet Sidebar - show at md and up only when open; mobile uses modal */}
+      {isOpen && (
+        <div className={`hidden md:block ${className}`}>
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
@@ -271,6 +272,7 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
           />
         </div>
       </div>
+      )}
     </>
   )
 }

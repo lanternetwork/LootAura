@@ -88,7 +88,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   const [cachedMarkerCount, _setCachedMarkerCount] = useState(0)
   
   // Current filter state for persistence and caching
-  const [currentFilters, setCurrentFilters] = useState<FilterStateType>({
+  const [currentFilters, setCurrentFilters] = useState<FilterState>({
     dateRange: 'any',
     categories: [],
     radius: 25

@@ -18,38 +18,15 @@ interface MapViewState {
   zoom: number
 }
 
-// Cookie utility functions
-function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; ${name}=`)
-  if (parts.length === 2) return parts.pop()?.split(';').shift() || null
-  return null
-}
-
-function setCookie(name: string, value: string, days: number = 1) {
-  const expires = new Date()
-  expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000))
-  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`
-}
 
 interface SalesClientProps {
   initialSales: Sale[]
-  initialSearchParams: {
-    lat?: string
-    lng?: string
-    distanceKm?: string
-    city?: string
-    dateRange?: string
-    categories?: string
-  }
   initialCenter: { lat: number; lng: number } | null
   user: User | null
 }
 
 export default function SalesClient({ 
   initialSales, 
-  initialSearchParams, 
   initialCenter, 
   user 
 }: SalesClientProps) {
@@ -69,6 +46,8 @@ export default function SalesClient({
   // Sales data state - map is source of truth
   const [mapSales, setMapSales] = useState<Sale[]>(initialSales)
   const [loading, setLoading] = useState(false)
+  const [mapUpdating, setMapUpdating] = useState(false)
+  const [mapError, setMapError] = useState<string | null>(null)
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [zipError, setZipError] = useState<string | null>(null)
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
@@ -385,7 +364,11 @@ export default function SalesClient({
       <FiltersModal
         isOpen={showFiltersModal}
         onClose={() => setShowFiltersModal(false)}
-        filters={filters}
+        filters={{
+          distance: filters.distance,
+          dateRange: filters.dateRange as any,
+          categories: filters.categories
+        }}
         onFiltersChange={handleFiltersChange}
       />
 

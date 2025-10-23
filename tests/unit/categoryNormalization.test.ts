@@ -151,7 +151,7 @@ describe('Filter Decision Logic', () => {
     const prevFilters = { categories: ['furniture'], city: 'Louisville' }
     const nextFilters = { categories: ['furniture'], city: 'Louisville' }
     
-    const decision = evaluateArbiterDecision(prevFilters, nextFilters, true, true)
+    const decision = evaluateFilterDecision(prevFilters, nextFilters, true, true)
     
     expect(decision.shouldSkipNetwork).toBe(true)
     expect(decision.shouldUpdateUI).toBe(false)
@@ -161,7 +161,7 @@ describe('Filter Decision Logic', () => {
     const prevFilters = { categories: ['furniture'], city: 'Louisville' }
     const nextFilters = { categories: ['tools'], city: 'Louisville' }
     
-    const decision = evaluateArbiterDecision(prevFilters, nextFilters, true, true)
+    const decision = evaluateFilterDecision(prevFilters, nextFilters, true, true)
     
     expect(decision.shouldSkipNetwork).toBe(false)
     expect(decision.shouldUpdateUI).toBe(true)
@@ -171,7 +171,7 @@ describe('Filter Decision Logic', () => {
     const prevFilters = { categories: ['furniture'], city: 'Louisville' }
     const nextFilters = { categories: ['furniture'], city: 'Louisville' }
     
-    const decision = evaluateArbiterDecision(prevFilters, nextFilters, true, false)
+    const decision = evaluateFilterDecision(prevFilters, nextFilters, true, false)
     
     expect(decision.shouldSkipNetwork).toBe(false)
     expect(decision.shouldUpdateUI).toBe(false)
@@ -181,7 +181,7 @@ describe('Filter Decision Logic', () => {
     const prevFilters = { categories: ['furniture'], city: 'Louisville' }
     const nextFilters = { categories: ['tools'], city: 'Louisville' }
     
-    const decision = evaluateArbiterDecision(prevFilters, nextFilters, true, true)
+    const decision = evaluateFilterDecision(prevFilters, nextFilters, true, true)
     
     expect(decision.shouldSkipNetwork).toBe(false)
     expect(decision.shouldUpdateUI).toBe(true)
@@ -191,7 +191,7 @@ describe('Filter Decision Logic', () => {
     const prevFilters = { categories: ['furniture', 'tools'], city: 'Louisville' }
     const nextFilters = { categories: ['tools', 'furniture'], city: 'Louisville' }
     
-    const decision = evaluateArbiterDecision(prevFilters, nextFilters, true, true)
+    const decision = evaluateFilterDecision(prevFilters, nextFilters, true, true)
     
     expect(decision.shouldSkipNetwork).toBe(true)
     expect(decision.shouldUpdateUI).toBe(false)

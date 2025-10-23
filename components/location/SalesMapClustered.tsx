@@ -405,7 +405,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     
     // Validate bounds to prevent incorrect bounds from ZIP search
     const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
-    if (boundsSpan > 5.0) { // If bounds span more than ~555km, something is wrong
+    if (boundsSpan > 10.0) { // If bounds span more than ~1110km, something is wrong
       console.log('[SALES_MAP_CLUSTERED] Invalid bounds detected, skipping cluster update:', {
         bounds: {
           west: bounds.getWest(),
@@ -699,7 +699,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       try {
         const bounds = map.getBounds()
         const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
-        if (boundsSpan > 5.0) {
+        if (boundsSpan > 10.0) {
           console.log('[MAP] Invalid bounds detected in handleViewChange, skipping:', { span: boundsSpan })
           return
         }
@@ -876,7 +876,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       const bounds = map.getBounds()
       const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
       
-      if (boundsSpan > 5.0) {
+      if (boundsSpan > 10.0) {
         console.log('[SALES_MAP_CLUSTERED] Map bounds still invalid, waiting longer...', { span: boundsSpan })
         // Try again after another delay
         setTimeout(() => {

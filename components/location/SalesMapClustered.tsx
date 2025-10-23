@@ -407,7 +407,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     // Validate bounds to prevent incorrect bounds from ZIP search
     const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
     if (boundsSpan > 10.0) { // If bounds span more than ~1110km, something is wrong
-      console.log('[SALES_MAP_CLUSTERED] Invalid bounds detected, skipping cluster update:', {
+      console.log('[SALES_MAP_CLUSTERED] Invalid bounds detected, resetting map:', {
         bounds: {
           west: bounds.getWest(),
           south: bounds.getSouth(),
@@ -416,6 +416,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         },
         span: boundsSpan
       })
+      
+      // Reset the map to a reasonable view
+      map.jumpTo({
+        center: [center.lng, center.lat],
+        zoom: zoom
+      })
+      
+      // Force resize and retry after a delay
+      setTimeout(() => {
+        map.resize()
+        updateClusters(map)
+      }, 200)
       return
     }
 
@@ -861,6 +873,12 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         center: [center.lng, center.lat],
         zoom: zoom
       })
+      
+      // Force a resize to fix any stretching issues
+      setTimeout(() => {
+        map.resize()
+        console.log('[SALES_MAP_CLUSTERED] Map resized after jumpTo')
+      }, 100)
     }
   }, [center.lat, center.lng, zoom])
 
@@ -907,6 +925,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
+  }, [updateClusters])
+
+  // Force map resize on mount to fix initial stretching
+  useEffect(() => {
+    const map = mapRef.current?.getMap?.()
+    if (map) {
+      console.log('[SALES_MAP_CLUSTERED] Forcing initial map resize')
+      setTimeout(() => {
+        map.resize()
+        updateClusters(map)
+      }, 500)
+    }
   }, [updateClusters])
 
   // Debug logging for map initialization

@@ -43,8 +43,32 @@ NEXT_PUBLIC_DEBUG=true
 - **Map Viewport**: Understand how map changes drive data fetching
 - **DOM Structure**: Verify grid layout and card counting
 - **ID Parity**: Check marker-list consistency
+- **Admin Tools**: Access comprehensive debugging tools at `/admin/tools`
 
 See [docs/DEBUG_GUIDE.md](docs/DEBUG_GUIDE.md) for complete debug guide.
+
+## 🔧 Admin Tools
+
+LootAura includes comprehensive admin and debugging tools accessible at `/admin/tools`:
+
+### Available Tools
+- **Debug Controls**: Toggle debug mode and view real-time diagnostics
+- **Review Key Lookup**: Look up sale information and review keys by sale ID
+- **System Information**: View environment variables and configuration status
+- **Health Checks**: Quick access to system health endpoints
+- **Diagnostic Overlay**: Real-time monitoring of fetch events and system behavior
+
+### Access
+- **URL**: `/admin/tools`
+- **Authentication**: None required (publicly accessible)
+- **API Endpoint**: `/api/lookup-sale` (also publicly accessible)
+
+### Features
+- **Sale Lookup**: Enter any sale ID to get comprehensive sale information
+- **Multi-table Support**: Searches across `sales_v2`, `sales`, and `yard_sales` tables
+- **Real-time Diagnostics**: Monitor fetch events, timing, and system behavior
+- **Health Monitoring**: Direct links to health check endpoints
+- **Environment Status**: View current configuration and feature flags
 
 ## Features
 
@@ -53,6 +77,7 @@ See [docs/DEBUG_GUIDE.md](docs/DEBUG_GUIDE.md) for complete debug guide.
 - **User Authentication**: Sign up and manage your account
 - **Favorites**: Save sales you're interested in
 - **CSV Import/Export**: Import and export sales data
+- **Admin Tools**: Comprehensive debugging and development tools
 - **Responsive Design**: Works on desktop and mobile devices
 
 ## Data Sources

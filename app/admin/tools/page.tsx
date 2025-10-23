@@ -3,6 +3,8 @@
 import AdminTools from '@/components/AdminTools'
 import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import DebugToggle from '@/components/debug/DebugToggle'
+import ZipLookupTester from '@/components/ZipLookupTester'
+import ZipLookupDiagnostics from '@/components/ZipLookupDiagnostics'
 import { useState } from 'react'
 
 export default function AdminToolsPage() {
@@ -39,6 +41,12 @@ export default function AdminToolsPage() {
               </div>
             </div>
           </div>
+
+          {/* ZIP Lookup Testing */}
+          <ZipLookupTester />
+
+          {/* ZIP Lookup Diagnostics */}
+          <ZipLookupDiagnostics />
 
           {/* Review Key Lookup */}
           <AdminTools />

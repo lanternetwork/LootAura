@@ -335,6 +335,11 @@ export default function SalesMap({
     })
     
     const map = mapRef.current?.getMap?.()
+    console.log('[MAP] Center effect - map check:', { 
+      mapRefExists: !!mapRef.current, 
+      getMapExists: !!mapRef.current?.getMap, 
+      mapExists: !!map 
+    })
     if (!map) {
       console.log('[MAP] Center effect - no map, will retry when map loads')
       // Store the pending center change to apply when map is ready
@@ -343,6 +348,12 @@ export default function SalesMap({
       // Fallback: check periodically if map becomes ready
       const checkInterval = setInterval(() => {
         const retryMap = mapRef.current?.getMap?.()
+        console.log('[MAP] Fallback check:', { 
+          mapRefExists: !!mapRef.current, 
+          getMapExists: !!mapRef.current?.getMap, 
+          mapExists: !!retryMap,
+          pendingChange: !!pendingCenterChangeRef.current 
+        })
         if (retryMap && pendingCenterChangeRef.current) {
           console.log('[MAP] Fallback: Map became ready, applying pending center change')
           handleCenterChange(retryMap)

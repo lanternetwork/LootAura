@@ -1,6 +1,6 @@
 export type Sale = {
   id: string
-  owner_id: string
+  owner_id?: string
   title: string
   description?: string
   address?: string
@@ -10,7 +10,7 @@ export type Sale = {
   lat?: number
   lng?: number
   date_start: string
-  time_start: string
+  time_start?: string
   date_end?: string
   time_end?: string
   price?: number

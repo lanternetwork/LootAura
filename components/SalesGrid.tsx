@@ -8,7 +8,7 @@ import { Sale } from '@/lib/types'
 interface SalesGridProps {
   sales: Sale[]
   loading: boolean
-  authority: 'MAP' | 'FILTERS'
+  // Legacy authority prop removed - using intent system only
   emptyStateMessage: React.ReactNode
   skeletonCount?: number
   className?: string
@@ -17,7 +17,6 @@ interface SalesGridProps {
 const SalesGrid: React.FC<SalesGridProps> = ({
   sales,
   loading,
-  authority,
   emptyStateMessage,
   skeletonCount = 6,
   className = ''
@@ -76,7 +75,7 @@ const SalesGrid: React.FC<SalesGridProps> = ({
     
     return items.map(sale => (
       <div key={sale.id} className="sales-grid-item">
-        <SaleCard sale={sale} authority={authority} />
+        <SaleCard sale={sale} />
       </div>
     ))
   }
@@ -91,7 +90,7 @@ const SalesGrid: React.FC<SalesGridProps> = ({
   }
 
   // Determine what to render
-  const shouldShowSkeletons = loading && authority !== 'MAP'
+  const shouldShowSkeletons = loading
   const hasSales = sales.length > 0
 
   return (
@@ -104,7 +103,7 @@ const SalesGrid: React.FC<SalesGridProps> = ({
       } as React.CSSProperties}
       data-columns={columns}
       data-container-width={containerWidth}
-      data-authority={authority}
+      data-grid="sales"
       data-hydrated={isHydrated}
       data-testid="sales-grid"
     >

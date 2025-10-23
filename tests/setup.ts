@@ -216,6 +216,10 @@ const ALLOWED_PATTERNS = [
   // Expected shortlink test errors (app/s/[id]/page.tsx)
   /^Shortlink resolution error:/, // Expected shortlink test errors - tests/integration/share.redirect.test.tsx
   
+  // Expected ZIP search errors (components/location/ZipInput.tsx)
+  /^ZIP search error:/, // Expected ZIP search errors - tests/integration/zip-flow.integration.test.tsx
+  /^ZIP search error details:/, // Expected ZIP search error details - tests/integration/zip-flow.integration.test.tsx
+  
   // React forwardRef warnings (components/location/SalesMapClustered.tsx)
   /^Warning: Function components cannot be given refs/, // React forwardRef warnings - tests/integration/map.clusters-flow.test.tsx
   /^Warning: .*: `ref` is not a prop/, // React ref prop warnings - tests/integration/map.clusters-flow.test.tsx

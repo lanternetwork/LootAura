@@ -7,7 +7,6 @@ import { Sale } from '@/lib/types'
 import { getMapboxToken } from '@/lib/maps/token'
 import { 
   buildClusterIndex, 
-  getClustersForViewport, 
   getClusterExpansionZoom,
   isClusteringEnabled,
   getClusterSizeTier,
@@ -16,12 +15,10 @@ import {
   type ClusterPoint
 } from '@/lib/clustering'
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
+import { bboxToQuery } from '@/lib/map/viewport'
+import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
 import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
-import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
-import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'
-import { fetchWithCache } from '@/lib/cache/offline'
-import { isOfflineCacheEnabled } from '@/lib/flags'
-import { logPrefetchStart, logPrefetchDone, logViewportSave, logViewportLoad } from '@/lib/telemetry/map'
+import { logViewportSave, logViewportLoad } from '@/lib/telemetry/map'
 import ClusterMarker from './ClusterMarker'
 import OfflineBanner from '../OfflineBanner'
 import MapLoadingIndicator from './MapLoadingIndicator'
@@ -46,8 +43,7 @@ interface SalesMapClusteredProps {
   onMoveEnd?: () => void
   onZoomEnd?: () => void
   onMapReady?: () => void
-  arbiterMode?: 'initial' | 'map' | 'zip' | 'distance'
-  arbiterAuthority?: 'FILTERS' | 'MAP'
+  // Legacy arbiter props removed - using intent system only
   // DOM props that can be safely passed to wrapper
   className?: string
   style?: React.CSSProperties
@@ -73,8 +69,6 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   onMoveEnd,
   onZoomEnd,
   onMapReady,
-  arbiterMode: _arbiterMode,
-  arbiterAuthority: _arbiterAuthority,
   // DOM props
   className,
   style,
@@ -82,7 +76,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   'data-testid': dataTestId
 }, ref) => {
   const mapRef = useRef<any>(null)
-  const [_visiblePinIds, setVisiblePinIds] = useState<string[]>([])
+  const [_visiblePinIds, _setVisiblePinIds] = useState<string[]>([])
   const [_visiblePinCount, setVisiblePinCount] = useState(0)
   const [clusters, setClusters] = useState<ClusterResult[]>([])
   const [clusterIndex, setClusterIndex] = useState<ClusterIndex | null>(null)
@@ -90,11 +84,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   
   // Offline state
   const [isOffline, setIsOffline] = useState(false)
-  const [showOfflineBanner, setShowOfflineBanner] = useState(false)
-  const [cachedMarkerCount, setCachedMarkerCount] = useState(0)
+  const [showOfflineBanner, _setShowOfflineBanner] = useState(false)
+  const [cachedMarkerCount, _setCachedMarkerCount] = useState(0)
   
   // Current filter state for persistence and caching
-  const [currentFilters, setCurrentFilters] = useState<FilterStateType>({
+  const [currentFilters, setCurrentFilters] = useState<FilterState>({
     dateRange: 'any',
     categories: [],
     radius: 25
@@ -213,39 +207,78 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [])
 
+  // Handle map resize when container size changes
+  useEffect(() => {
+    const handleResize = () => {
+      if (mapRef.current) {
+        // Small delay to ensure DOM has updated
+        setTimeout(() => {
+          mapRef.current?.resize()
+        }, 100)
+      }
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', handleResize)
+    
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  // Set up ResizeObserver after map is loaded
+  useEffect(() => {
+    if (!mapRef.current) return
+
+    const handleResize = () => {
+      if (mapRef.current) {
+        setTimeout(() => {
+          mapRef.current?.resize()
+        }, 100)
+      }
+    }
+
+    const container = mapRef.current.getContainer()
+    const resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(container)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [isMapLoading])
+
   // Create viewport fetch manager for debounced viewport-based data fetching
   const viewportFetchManager = useMemo(() => {
     return createViewportFetchManager({
       debounceMs: 300,
       fetcher: async (viewport: Viewport, filters: Filters, signal: AbortSignal) => {
-        const tileId = getCurrentTileId(viewport, filters.zoom || 10)
-        const filterHash = hashFilters(currentFilters)
+        // Convert viewport to bbox
+        const bbox = {
+          minLng: viewport.sw[0],
+          minLat: viewport.sw[1],
+          maxLng: viewport.ne[0],
+          maxLat: viewport.ne[1]
+        }
         
-        if (isOfflineCacheEnabled()) {
-          const result = await fetchWithCache(
-            `${tileId}:${filterHash}`,
-            async () => {
-              // Simulate network fetch
-              await new Promise(resolve => setTimeout(resolve, 100))
-              if (signal.aborted) throw new Error('Request aborted')
-              return { markers: markers, success: true }
-            },
-            { tileId, filterHash, ttlMs: 7 * 24 * 60 * 60 * 1000 }
-          )
-          
-          if (result.fromCache) {
-            setShowOfflineBanner(true)
-            setCachedMarkerCount(result.data?.markers?.length || 0)
-          } else {
-            setShowOfflineBanner(false)
+        const qs = bboxToQuery(bbox)
+        const url = `/api/sales/viewport?${qs}&limit=1000`
+        
+        try {
+          const response = await fetch(url, { signal })
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
           }
           
-          return result.data || { success: false }
-        } else {
-          // Fallback to simple fetch without cache
-          await new Promise(resolve => setTimeout(resolve, 100))
-          if (signal.aborted) throw new Error('Request aborted')
-          return { success: true }
+          const json = await response.json()
+          const normalized = normalizeSalesJson(json)
+          const parsed = SalesResponseSchema.safeParse(normalized)
+          const sales = parsed.success ? parsed.data.sales : []
+          
+          return { sales, success: true }
+        } catch (error) {
+          if (signal.aborted) throw error
+          console.error('[VIEWPORT] Fetch error:', error)
+          return { sales: [], success: false }
         }
       },
       onStart: () => {
@@ -264,7 +297,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         }
       }
     })
-  }, [markers, currentFilters])
+  }, [markers])
 
   // Convert markers to cluster points
   const clusterPoints = useMemo((): ClusterPoint[] => {
@@ -278,7 +311,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
 
   // Build cluster index when points change
   useEffect(() => {
+    console.log('[CLUSTER] Building index check:', JSON.stringify({
+      clusteringEnabled: isClusteringEnabled(),
+      clusterPointsLength: clusterPoints.length,
+      markersLength: markers.length,
+      clusterPointsSample: clusterPoints.slice(0, 3)
+    }, null, 2))
+    
     if (!isClusteringEnabled() || clusterPoints.length === 0) {
+      console.log('[CLUSTER] Skipping index build:', JSON.stringify({
+        clusteringEnabled: isClusteringEnabled(),
+        clusterPointsLength: clusterPoints.length
+      }, null, 2))
       setClusterIndex(null)
       setClusters([])
       return
@@ -292,13 +336,13 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     })
     setClusterIndex(index)
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[CLUSTER] Index built', {
-        event: 'cluster-build',
-        points: clusterPoints.length,
-        ms: Math.round(performance.now() - startTime)
-      })
-    }
+    console.log('[CLUSTER] Index built successfully:', {
+      event: 'cluster-build',
+      points: clusterPoints.length,
+      features: clusterPoints.length,
+      testClusters: 1,
+      ms: Math.round(performance.now() - startTime)
+    })
   }, [clusterPoints])
 
   // Cleanup viewport fetch manager on unmount
@@ -308,97 +352,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [viewportFetchManager])
 
-  // Update clusters when viewport changes
-  const updateClusters = useCallback((map: any) => {
-    const startTime = Date.now()
-    mapDebug.group('Cluster Update')
-    clusterDebug.group('Cluster Update')
-    
-    if (!isClusteringEnabled() || !clusterIndex) {
-      mapDebug.log('Clustering disabled or no cluster index, falling back to individual markers')
-      clusterDebug.log('Clustering disabled or no cluster index, falling back to individual markers')
-      setClusters([])
-      mapDebug.groupEnd()
-      clusterDebug.groupEnd()
-      return
-    }
-
-    const bounds = map.getBounds()
-    const bbox: [number, number, number, number] = [
-      bounds.getWest(),
-      bounds.getSouth(),
-      bounds.getEast(),
-      bounds.getNorth()
-    ]
-    const currentZoom = map.getZoom()
-
-    clusterDebug.logClusterIndex(clusterIndex, 'Getting clusters for viewport')
-    const viewportClusters = getClustersForViewport(clusterIndex, bbox, currentZoom)
-    setClusters(viewportClusters)
-
-    // Update visible pins for arbiter authority
-    const visibleIds = viewportClusters
-      .filter(cluster => cluster.type === 'point')
-      .map(cluster => cluster.id)
-    
-    setVisiblePinIds(visibleIds)
-    setVisiblePinCount(visibleIds.length)
-    
-    clusterDebug.logClusterState(viewportClusters, visibleIds, 'viewport update')
-    
-    mapDebug.log('Clusters updated', { 
-      totalClusters: viewportClusters.length,
-      visiblePoints: visibleIds.length,
-      clusterTypes: viewportClusters.reduce((acc, c) => {
-        acc[c.type] = (acc[c.type] || 0) + 1
-        return acc
-      }, {} as Record<string, number>)
-    })
-    
-    mapDebug.logPerformance('Cluster update', startTime)
-    clusterDebug.logClusterPerformance('Cluster Update', startTime)
-    mapDebug.groupEnd()
-    clusterDebug.groupEnd()
-    
-    if (onVisiblePinsChange) {
-      clusterDebug.logVisiblePinsUpdate(visibleIds, visibleIds.length, 'viewport change')
-      onVisiblePinsChange(visibleIds, visibleIds.length)
-    }
-
-    // Trigger viewport fetch request for additional data
-    const viewport: Viewport = {
-      sw: [bounds.getWest(), bounds.getSouth()],
-      ne: [bounds.getEast(), bounds.getNorth()]
-    }
-    const filters: Filters = {
-      categories: currentFilters.categories,
-      dateRange: currentFilters.dateRange === 'any' ? undefined : {
-        from: '2025-01-01',
-        to: '2025-12-31'
-      },
-      zoom: currentZoom
-    }
-    viewportFetchManager.request(viewport, filters)
-    
-    // Prefetch adjacent tiles if offline cache is enabled
-    if (isOfflineCacheEnabled()) {
-      const currentTileId = getCurrentTileId(viewport, currentZoom)
-      const adjacentTiles = adjacentTileIds(currentTileId)
-      const filterHash = hashFilters(currentFilters)
-      
-      adjacentTiles.forEach(tileId => {
-        logPrefetchStart(tileId)
-        
-        // Use filterHash for cache key in real implementation
-        console.debug(`[PREFETCH] Tile: ${tileId}, Filter: ${filterHash}`)
-        
-        // Simulate prefetch (in real implementation, this would fetch data)
-        setTimeout(() => {
-          logPrefetchDone(tileId, 50, 10) // Simulated timing and count
-        }, 100)
-      })
-    }
-  }, [clusterIndex, onVisiblePinsChange, viewportFetchManager, currentFilters])
+  // Update clusters when viewport changes or sales data changes - DISABLED TO PREVENT LOCKUP
+  const updateClusters = useCallback((map: any, recursionDepth: number = 0) => {
+    console.log('[SALES_MAP_CLUSTERED] updateClusters called - COMPLETELY DISABLED TO PREVENT LOCKUP')
+    return // Completely disable cluster updates to prevent lockup
+  }, [])
 
   // Handle cluster click - zoom to cluster bounds
   const handleClusterClick = useCallback((cluster: ClusterResult) => {
@@ -528,7 +486,10 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const map = mapRef.current?.getMap?.()
     if (!map) return
 
-    updateClusters(map)
+    // Store map reference for ZIP handler
+    ;(window as any).__currentMapRef = mapRef.current
+
+    // updateClusters(map) // DISABLED to prevent lockup
     
     // Persist viewport state
     const center = map.getCenter()
@@ -542,14 +503,23 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     saveViewportState(viewport, currentFilters)
     logViewportSave(viewport)
     
+    // Check for ZIP moveend handler
+    const zipHandler = (window as any).__zipMoveEndHandler
+    if (zipHandler) {
+      console.log('[SALES_MAP_CLUSTERED] Calling ZIP moveend handler')
+      zipHandler()
+      // Clear the handler to prevent multiple calls
+      delete (window as any).__zipMoveEndHandler
+    }
+    
     onMoveEnd?.()
-  }, [updateClusters, onMoveEnd, currentFilters])
+  }, [onMoveEnd]) // Removed updateClusters dependency
 
   const handleZoomEnd = useCallback(() => {
     const map = mapRef.current?.getMap?.()
     if (!map) return
 
-    updateClusters(map)
+    // updateClusters(map) // DISABLED to prevent lockup
     
     // Persist viewport state
     const center = map.getCenter()
@@ -564,7 +534,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     logViewportSave(viewport)
     
     onZoomEnd?.()
-  }, [updateClusters, onZoomEnd, currentFilters])
+  }, [onZoomEnd]) // Removed updateClusters dependency
 
   // Handle view changes
   const handleViewChange = useCallback((evt: any) => {
@@ -578,6 +548,45 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const viewState = evt.viewState || evt
     let newCenter = viewState.center || { lat: 0, lng: 0 }
     let newZoom = viewState.zoom || 10
+    
+    // Validate bounds to prevent corrupted bounds from being processed
+    if (map) {
+      try {
+        const bounds = map.getBounds()
+        const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
+        if (boundsSpan > 10.0) {
+          console.log('[MAP] Invalid bounds detected in handleViewChange, resetting map:', { span: boundsSpan })
+          // Force reset the map to prevent corrupted bounds
+          map.jumpTo({
+            center: [center.lng, center.lat],
+            zoom: zoom
+          })
+          setTimeout(() => {
+            map.resize()
+          }, 100)
+          return
+        }
+        
+        // Additional bounds validation - check for corrupted bounds that cause stretching
+        const latSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
+        const lngSpan = Math.abs(bounds.getEast() - bounds.getWest())
+        
+        if (latSpan > 3.0 || lngSpan > 3.0) {
+          console.log('[MAP] Corrupted bounds detected in handleViewChange, resetting map:', { latSpan, lngSpan })
+          // Force reset the map to prevent corrupted bounds
+          map.jumpTo({
+            center: [center.lng, center.lat],
+            zoom: zoom
+          })
+          setTimeout(() => {
+            map.resize()
+          }, 100)
+          return
+        }
+      } catch (error) {
+        console.warn('[MAP] Failed to get bounds in handleViewChange:', error)
+      }
+    }
     
     // If this is a cluster click and we don't have proper coordinates, get them from the map
     if (isClusterClick && (newCenter.lat === 0 && newCenter.lng === 0)) {
@@ -632,9 +641,9 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const map = mapRef.current?.getMap?.()
     if (map) {
       mapDebug.log('Updating clusters after map load')
-      updateClusters(map)
+      // updateClusters(map) // DISABLED to prevent lockup
     }
-  }, [updateClusters, onMapReady])
+  }, [onMapReady]) // Removed updateClusters dependency
 
   // Simple map load handling - no complex state management needed
   useEffect(() => {
@@ -649,12 +658,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       const map = mapRef.current?.getMap?.()
       if (!map) return
       
-      // Allow fitBounds for ZIP searches and other programmatic moves
-      // Only block if it's a MAP authority mode AND not a ZIP search
-      if (_arbiterAuthority === 'MAP' && _arbiterMode !== 'zip') {
-        console.log('[BLOCK] fit bounds suppressed (map authoritative, not ZIP)')
-        return
-      }
+      // Fit bounds allowed - no authority checks needed
       
       const bounds = [
         [_fitBounds.west, _fitBounds.south],
@@ -662,9 +666,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       ]
       
       console.log('[MAP] fitBounds executing (clustered)', { 
-        reason: _fitBounds.reason, 
-        authority: _arbiterAuthority, 
-        mode: _arbiterMode 
+        reason: _fitBounds.reason
       })
       
       map.fitBounds(bounds, { padding: 0, maxZoom: 15, duration: 0 })
@@ -675,7 +677,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     } catch (error) {
       console.error('[MAP] fitBounds error (clustered):', error)
     }
-  }, [_fitBounds, _arbiterAuthority, _arbiterMode, _onFitBoundsComplete])
+  }, [_fitBounds, _onFitBoundsComplete])
 
   // Render cluster markers
   const renderClusters = useMemo(() => {
@@ -717,9 +719,71 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     ))
   }, [clusters, markers, sales, onSaleClick, handleClusterClick, handlePointClick, handleClusterKeyDown])
 
+  // Force map to update when center prop changes
+  useEffect(() => {
+    const map = mapRef.current?.getMap?.()
+    if (!map) return
+    
+    console.log('[SALES_MAP_CLUSTERED] Center prop changed, forcing map update:', center)
+    const currentCenter = map.getCenter()
+    console.log('[SALES_MAP_CLUSTERED] Current map center:', { lat: currentCenter.lat, lng: currentCenter.lng })
+    console.log('[SALES_MAP_CLUSTERED] Target center:', center)
+    
+    // Check if we need to move the map
+    const needsUpdate = Math.abs(currentCenter.lat - center.lat) > 0.001 || Math.abs(currentCenter.lng - center.lng) > 0.001
+    console.log('[SALES_MAP_CLUSTERED] Needs update:', needsUpdate)
+    
+    if (needsUpdate) {
+      console.log('[SALES_MAP_CLUSTERED] Moving map to new center')
+      // Force the map to move to the new center using jumpTo for immediate movement
+      map.jumpTo({
+        center: [center.lng, center.lat],
+        zoom: zoom
+      })
+      
+      // Force resize to fix any stretching issues
+      setTimeout(() => {
+        map.resize()
+        console.log('[SALES_MAP_CLUSTERED] Map resized after jumpTo')
+      }, 100)
+    }
+  }, [center.lat, center.lng, zoom])
+
+  // DISABLED: Update clusters when sales data changes - could cause lockup
+  useEffect(() => {
+    console.log('[SALES_MAP_CLUSTERED] Sales data changed - DISABLED to prevent lockup:', { salesCount: sales.length })
+    return // Disable to prevent lockup
+  }, [sales.length])
+
+  // Handle window resize to fix map layout issues
+  useEffect(() => {
+    const handleResize = () => {
+      const map = mapRef.current?.getMap?.()
+      if (map) {
+        console.log('[SALES_MAP_CLUSTERED] Window resize detected, calling map.resize()')
+        map.resize()
+        // Update clusters after resize
+        setTimeout(() => {
+          // updateClusters(map) // DISABLED to prevent lockup
+        }, 100)
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, []) // Removed updateClusters dependency
+
+
   // Debug logging for map initialization
   mapDebug.log('SalesMapClustered rendering')
   mapDebug.logTokenStatus(getMapboxToken())
+  console.log('[SALES_MAP_CLUSTERED] Center prop:', center)
+  console.log('[SALES_MAP_CLUSTERED] Zoom prop:', zoom)
+  console.log('[SALES_MAP_CLUSTERED] Map viewState:', {
+    longitude: center.lng,
+    latitude: center.lat,
+    zoom: zoom
+  })
 
   return (
     <div 
@@ -742,12 +806,22 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
           latitude: center.lat,
           zoom: zoom
         }}
+        viewState={{
+          longitude: center.lng,
+          latitude: center.lat,
+          zoom: zoom
+        }}
         style={{ width: '100%', height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         onLoad={handleMapLoad}
-        onMoveEnd={handleMoveEnd}
+        onMove={(evt: any) => {
+          handleViewChange(evt)
+        }}
+        onMoveEnd={(evt: any) => {
+          handleMoveEnd()
+          handleViewChange(evt)
+        }}
         onZoomEnd={handleZoomEnd}
-        onMove={handleViewChange}
         onClick={(evt: any) => {
           // Check if this is a cluster marker click
           const target = evt.originalEvent?.target

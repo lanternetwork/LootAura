@@ -1,4 +1,4 @@
-// Disable Mapbox telemetry as early as possible to prevent events.mapbox.com requests
+// Disable Mapbox telemetry completely to prevent events.mapbox.com requests
 // This must run before any Mapbox instances are created
 
 if (typeof window !== 'undefined') {

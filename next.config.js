@@ -126,6 +126,10 @@ const nextConfig = {
       bodySizeLimit: '1mb', // Limit Server Actions body size
     },
   },
+  // Disable Vercel Live Feedback to prevent CSP violations
+  env: {
+    VERCEL_LIVE_FEEDBACK_DISABLED: '1',
+  },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,

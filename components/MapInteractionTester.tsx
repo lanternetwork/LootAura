@@ -79,9 +79,28 @@ export default function MapInteractionTester() {
         console.log('[MAP_INTERACTION] Map element found:', !!mapElement)
         if (mapElement) {
           console.log('[MAP_INTERACTION] Map element classes:', mapElement.className)
+          
+          // Try different ways to access the map instance
           mapInstance = (mapElement as any)._mapboxgl_map || 
                        (mapElement as any).__mapboxgl_map ||
-                       (mapElement as any).getMap?.()
+                       (mapElement as any).getMap?.() ||
+                       (window as any).mapboxgl?.Map?.getMap?.()
+          
+          // If we still don't have the instance, try to find it through the Map component's ref
+          if (!mapInstance) {
+            // Look for any Map component instances in the DOM
+            const mapComponents = document.querySelectorAll('[class*="mapboxgl"]')
+            for (const comp of mapComponents) {
+              const instance = (comp as any)._mapboxgl_map || 
+                             (comp as any).__mapboxgl_map ||
+                             (comp as any).getMap?.()
+              if (instance) {
+                mapInstance = instance
+                break
+              }
+            }
+          }
+          
           console.log('[MAP_INTERACTION] Map instance found:', !!mapInstance)
         }
       } catch (e) {

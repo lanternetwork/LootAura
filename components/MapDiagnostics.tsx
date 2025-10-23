@@ -89,10 +89,29 @@ export default function MapDiagnostics() {
           console.log('[MAP_DIAGNOSTIC] Map element properties:', Object.keys(mapElement))
           
           // Try different ways to access the map instance
+          // For react-map-gl, the map instance is usually stored differently
           mapInstance = (mapElement as any)._mapboxgl_map || 
                        (mapElement as any).__mapboxgl_map ||
                        (mapElement as any).getMap?.() ||
-                       (window as any).mapboxgl?.Map?.getMap?.()
+                       (window as any).mapboxgl?.Map?.getMap?.() ||
+                       // Try accessing through react-map-gl's internal structure
+                       (mapElement as any).__reactInternalInstance ||
+                       (mapElement as any)._reactInternalFiber
+          
+          // If we still don't have the instance, try to find it through the Map component's ref
+          if (!mapInstance) {
+            // Look for any Map component instances in the DOM
+            const mapComponents = document.querySelectorAll('[class*="mapboxgl"]')
+            for (const comp of mapComponents) {
+              const instance = (comp as any)._mapboxgl_map || 
+                             (comp as any).__mapboxgl_map ||
+                             (comp as any).getMap?.()
+              if (instance) {
+                mapInstance = instance
+                break
+              }
+            }
+          }
           
           console.log('[MAP_DIAGNOSTIC] Map instance found:', !!mapInstance)
           if (mapInstance) {

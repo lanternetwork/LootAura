@@ -341,13 +341,13 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     })
     setClusterIndex(index)
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[CLUSTER] Index built', {
-        event: 'cluster-build',
-        points: clusterPoints.length,
-        ms: Math.round(performance.now() - startTime)
-      })
-    }
+    console.log('[CLUSTER] Index built successfully:', {
+      event: 'cluster-build',
+      points: clusterPoints.length,
+      features: clusterPoints.length,
+      testClusters: 1,
+      ms: Math.round(performance.now() - startTime)
+    })
   }, [clusterPoints])
 
   // Cleanup viewport fetch manager on unmount
@@ -379,6 +379,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       clusterDebug.groupEnd()
       return
     }
+
 
     const bounds = map.getBounds()
     const center = map.getCenter()
@@ -881,11 +882,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         // Try again after another delay
         setTimeout(() => {
           updateClusters(map)
-        }, 200)
+        }, 500)
       } else {
         updateClusters(map)
       }
-    }, 300)
+    }, 500)
     
     return () => clearTimeout(timeoutId)
   }, [sales.length, updateClusters])

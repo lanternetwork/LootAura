@@ -363,10 +363,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     mapDebug.group('Cluster Update')
     clusterDebug.group('Cluster Update')
     
-    if (!isClusteringEnabled() || !clusterIndex) {
-      mapDebug.log('Clustering disabled or no cluster index, falling back to individual markers')
-      clusterDebug.log('Clustering disabled or no cluster index, falling back to individual markers')
+    if (!isClusteringEnabled()) {
+      mapDebug.log('Clustering disabled, falling back to individual markers')
+      clusterDebug.log('Clustering disabled, falling back to individual markers')
       setClusters([])
+      mapDebug.groupEnd()
+      clusterDebug.groupEnd()
+      return
+    }
+
+    if (!clusterIndex) {
+      mapDebug.log('No cluster index yet, skipping update')
+      clusterDebug.log('No cluster index yet, skipping update')
       mapDebug.groupEnd()
       clusterDebug.groupEnd()
       return

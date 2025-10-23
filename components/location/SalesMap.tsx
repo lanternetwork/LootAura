@@ -315,6 +315,30 @@ export default function SalesMap({
     } catch {}
   }, [centerOverride, zoom])
 
+  // Handle center changes (for ZIP search)
+  useEffect(() => {
+    const map = mapRef.current?.getMap?.()
+    if (!map) return
+    
+    // Only move if center has actually changed
+    const currentCenter = map.getCenter()
+    const currentLat = currentCenter.lat
+    const currentLng = currentCenter.lng
+    
+    const latDiff = Math.abs(currentLat - center.lat)
+    const lngDiff = Math.abs(currentLng - center.lng)
+    
+    // If center has changed significantly, move the map
+    if (latDiff > 0.001 || lngDiff > 0.001) {
+      console.log('[MAP] Center changed, moving map to:', center)
+      map.easeTo({ 
+        center: [center.lng, center.lat], 
+        zoom: zoom, 
+        duration: 600 
+      })
+    }
+  }, [center.lat, center.lng, zoom])
+
   // Handle fit bounds
   useEffect(() => {
     if (!fitBounds) return

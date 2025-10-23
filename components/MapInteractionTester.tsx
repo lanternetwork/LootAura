@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 
 interface MapInteractionTest {
   testName: string
@@ -162,7 +162,7 @@ export default function MapInteractionTester() {
         markersFound: markersCount > 0,
         markerTypes: Array.from(markers).map(m => ({
           className: m.className,
-          hasClick: m.addEventListener ? true : false
+          hasClick: typeof m.addEventListener === 'function'
         }))
       }, markersInteractive ? undefined : 'No markers found', 'markers')
 
@@ -175,7 +175,7 @@ export default function MapInteractionTester() {
         clustersFound: clustersCount > 0,
         clusterTypes: Array.from(clusters).map(c => ({
           className: c.className,
-          hasClick: c.addEventListener ? true : false
+          hasClick: typeof c.addEventListener === 'function'
         }))
       }, clustersInteractive ? undefined : 'No clusters found', 'clusters')
 
@@ -477,7 +477,7 @@ export default function MapInteractionTester() {
           <p className="text-gray-500 text-sm">No test results yet. Run a test to see detailed map interaction diagnostics here.</p>
         ) : (
           <div className="space-y-4 max-h-96 overflow-y-auto">
-            {results.map((result, index) => (
+            {results.map((result, _index) => (
               <div
                 key={`${result.testId}-${result.timestamp}`}
                 className={`p-4 rounded-lg border ${

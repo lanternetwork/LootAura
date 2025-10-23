@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 
 interface MapDiagnosticStep {
   step: string
@@ -30,8 +30,6 @@ export default function MapDiagnostics() {
   const [isRunning, setIsRunning] = useState(false)
   const [results, setResults] = useState<MapDiagnosticResult[]>([])
   const [currentTest, setCurrentTest] = useState<string>('')
-  const mapContainerRef = useRef<HTMLDivElement>(null)
-  const [testMapContainer, setTestMapContainer] = useState(false)
 
   const runMapDiagnostic = async (testId: string) => {
     const startTime = Date.now()
@@ -425,7 +423,7 @@ export default function MapDiagnostics() {
           <p className="text-gray-500 text-sm">No diagnostic results yet. Run a test to see detailed map diagnostics here.</p>
         ) : (
           <div className="space-y-4 max-h-96 overflow-y-auto">
-            {results.map((result, index) => (
+            {results.map((result, _index) => (
               <div
                 key={`${result.testId}-${result.timestamp}`}
                 className={`p-4 rounded-lg border ${

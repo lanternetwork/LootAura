@@ -302,8 +302,9 @@ export default function SalesClient({
       {/* Main Content - Zillow Style */}
       <div className="flex-1 flex overflow-hidden">
         {/* Map - Left Side (Dominant) */}
-        <div className="flex-1 min-h-0">
-          <SalesMap
+        <div className="flex-1 min-h-0 bg-gray-100">
+          <div className="w-full h-full">
+            <SalesMap
             sales={mapSales}
             markers={mapMarkers}
             center={mapCenter}
@@ -315,7 +316,8 @@ export default function SalesClient({
             }}
             fitBounds={fitBounds}
             onFitBoundsComplete={() => setFitBounds(null)}
-          />
+            />
+          </div>
         </div>
 
         {/* Sales List - Right Panel */}

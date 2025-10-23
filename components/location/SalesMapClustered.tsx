@@ -407,7 +407,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     // Validate bounds to prevent incorrect bounds from ZIP search
     const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
     if (boundsSpan > 10.0) { // If bounds span more than ~1110km, something is wrong
-      console.log('[SALES_MAP_CLUSTERED] Invalid bounds detected, skipping cluster update:', {
+      console.log('[SALES_MAP_CLUSTERED] Invalid bounds detected, resetting map:', {
         bounds: {
           west: bounds.getWest(),
           south: bounds.getSouth(),
@@ -416,6 +416,21 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         },
         span: boundsSpan
       })
+      
+      // Force reset the map to the current center and zoom
+      map.jumpTo({
+        center: [center.lng, center.lat],
+        zoom: zoom
+      })
+      
+      // Force resize to fix stretching
+      setTimeout(() => {
+        map.resize()
+        // Retry cluster update after reset
+        setTimeout(() => {
+          updateClusters(map)
+        }, 100)
+      }, 100)
       return
     }
 
@@ -701,7 +716,15 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         const bounds = map.getBounds()
         const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
         if (boundsSpan > 10.0) {
-          console.log('[MAP] Invalid bounds detected in handleViewChange, skipping:', { span: boundsSpan })
+          console.log('[MAP] Invalid bounds detected in handleViewChange, resetting map:', { span: boundsSpan })
+          // Force reset the map to prevent corrupted bounds
+          map.jumpTo({
+            center: [center.lng, center.lat],
+            zoom: zoom
+          })
+          setTimeout(() => {
+            map.resize()
+          }, 100)
           return
         }
       } catch (error) {
@@ -861,6 +884,12 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         center: [center.lng, center.lat],
         zoom: zoom
       })
+      
+      // Force resize to fix any stretching issues
+      setTimeout(() => {
+        map.resize()
+        console.log('[SALES_MAP_CLUSTERED] Map resized after jumpTo')
+      }, 100)
     }
   }, [center.lat, center.lng, zoom])
 

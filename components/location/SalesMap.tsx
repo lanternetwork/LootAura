@@ -87,6 +87,13 @@ export default function SalesMap({
       }
     }
     
+    // Handle any pending center changes that were queued before map was ready
+    if (pendingCenterChangeRef.current) {
+      console.log('[MAP] Map loaded, applying pending center change:', pendingCenterChangeRef.current)
+      handleCenterChange(map)
+      pendingCenterChangeRef.current = null
+    }
+    
     if (onMapReady) {
       onMapReady()
     }
@@ -114,6 +121,7 @@ export default function SalesMap({
   })
   const containerRef = useRef<HTMLDivElement>(null)
   const autoFitAttemptedRef = useRef(false)
+  const pendingCenterChangeRef = useRef<{ center: { lat: number; lng: number }; zoom: number } | null>(null)
   const [isMapLoading, setIsMapLoading] = useState(true)
   
   // ResizeObserver for map container sizing
@@ -325,20 +333,10 @@ export default function SalesMap({
     
     const map = mapRef.current?.getMap?.()
     if (!map) {
-      console.log('[MAP] Center effect - no map, retrying in 100ms')
-      // Retry after a short delay if map isn't ready
-      const timeoutId = setTimeout(() => {
-        const retryMap = mapRef.current?.getMap?.()
-        if (retryMap) {
-          console.log('[MAP] Center effect - map ready on retry, proceeding')
-          // Recursively call the effect logic
-          handleCenterChange(retryMap)
-        } else {
-          console.log('[MAP] Center effect - map still not ready after retry')
-        }
-      }, 100)
-      
-      return () => clearTimeout(timeoutId)
+      console.log('[MAP] Center effect - no map, will retry when map loads')
+      // Store the pending center change to apply when map is ready
+      pendingCenterChangeRef.current = { center, zoom }
+      return
     }
     
     console.log('[MAP] Center effect - map exists, continuing')

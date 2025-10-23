@@ -9,7 +9,7 @@ type Props = {
 export default function SalesTabbed({ filters, map, list }: Props) {
   const [tab, setTab] = React.useState<"map" | "list">("map");
   return (
-    <div className="lg:hidden min-h-screen flex flex-col">
+    <div className="lg:hidden min-h-screen flex flex-col" data-testid="sales-root-mobile" data-debug-intent="Filters:">
       <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b">{filters}</div>
 
       <div className="px-3 py-2 border-b bg-white">

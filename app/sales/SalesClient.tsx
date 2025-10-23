@@ -65,9 +65,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Update debug intent attribute when intent changes
   useEffect(() => {
-    const salesRoot = document.querySelector('[data-testid="sales-root"]')
-    if (salesRoot) {
-      salesRoot.setAttribute('data-debug-intent', `${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`)
+    const salesRootMobile = document.querySelector('[data-testid="sales-root-mobile"]')
+    const salesRootDesktop = document.querySelector('[data-testid="sales-root-desktop"]')
+    const debugIntent = `${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`
+    
+    if (salesRootMobile) {
+      salesRootMobile.setAttribute('data-debug-intent', debugIntent)
+    }
+    if (salesRootDesktop) {
+      salesRootDesktop.setAttribute('data-debug-intent', debugIntent)
     }
   }, [intentRef.current])
 
@@ -112,9 +118,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.debug('[INTENT] set', { intent: newIntent.kind, seq: seqRef.current })
     
     // Update debug intent attribute
-    const salesRoot = document.querySelector('[data-testid="sales-root"]')
-    if (salesRoot) {
-      salesRoot.setAttribute('data-debug-intent', `${newIntent.kind}:${(newIntent as any).reason ?? ''}`)
+    const salesRootMobile = document.querySelector('[data-testid="sales-root-mobile"]')
+    const salesRootDesktop = document.querySelector('[data-testid="sales-root-desktop"]')
+    const debugIntent = `${newIntent.kind}:${(newIntent as any).reason ?? ''}`
+    
+    if (salesRootMobile) {
+      salesRootMobile.setAttribute('data-debug-intent', debugIntent)
+    }
+    if (salesRootDesktop) {
+      salesRootDesktop.setAttribute('data-debug-intent', debugIntent)
     }
   }, [])
 
@@ -362,9 +374,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       onDistanceChange={(distance) => _updateFilters({ distance })}
       onAdvancedFiltersOpen={() => {}}
       hasActiveFilters={_hasActiveFilters}
-      zipInputTestId="zip-input"
-      filtersCenterTestId="filters-center"
-      filtersMoreTestId="filters-more"
     />
   )
 
@@ -530,13 +539,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   return (
     <>
       {/* Mobile/Tablet tabbed version */}
-      <div data-testid="sales-root-mobile" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`} className="lg:hidden">
-        <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
-      </div>
+      <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
       {/* Desktop two-pane version */}
-      <div data-testid="sales-root-desktop" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`} className="hidden lg:block">
-        <SalesTwoPane filters={filtersComponent} map={mapComponent} list={listComponent} />
-      </div>
+      <SalesTwoPane filters={filtersComponent} map={mapComponent} list={listComponent} />
     </>
   )
 }

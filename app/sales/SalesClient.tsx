@@ -263,7 +263,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.log('[FETCH] Sales sample (viewport):', sales.slice(0, 2))
         console.log('[FETCH] filtered', { cause: _ctx?.cause || 'Filters', seq: _ctx?.seq || 0 })
         
-        return { data: sales, ctx: _ctx || { cause: 'Filters', seq: 0 } }
+        return { data: sales, ctx: _ctx || { cause: 'Filters', seq: 0, intent: intentRef.current } }
       } else {
         // Fallback to distance-based fetching
         if (centerOverride) {
@@ -309,10 +309,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       console.log('[FETCH] fetchSales response:', { count: sales.length, ctx: _ctx, meta })
       console.log('[FETCH] Sales sample:', sales.slice(0, 2))
       
-      return { data: sales, ctx: _ctx || { cause: 'Filters', seq: 0 } }
+        return { data: sales, ctx: _ctx || { cause: 'Filters', seq: 0, intent: intentRef.current } }
     } catch (error) {
       console.error('[FETCH] fetchSales error:', error)
-      return { data: [], ctx: _ctx || { cause: 'Filters', seq: 0 } }
+      return { data: [], ctx: _ctx || { cause: 'Filters', seq: 0, intent: intentRef.current } }
     }
   }, [filters.distance, filters.dateRange, filters.categories, mapView.center])
 
@@ -354,7 +354,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         distance: nextFilters.distance,
         centerOverride: { lat: nextFilters.lat, lng: nextFilters.lng }
       }
-      runFilteredFetch(params, { cause: 'Filters', seq })
+      runFilteredFetch(params, { cause: 'Filters', seq, intent: intentRef.current })
     }
   }, [runFilteredFetch])
 

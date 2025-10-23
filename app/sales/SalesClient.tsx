@@ -8,21 +8,8 @@ import ZipInput from '@/components/location/ZipInput'
 import SaleCard from '@/components/SaleCard'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import FiltersModal from '@/components/filters/FiltersModal'
-import FilterTrigger from '@/components/filters/FilterTrigger'
-import DateWindowLabel from '@/components/filters/DateWindowLabel'
-import DegradedBanner from '@/components/DegradedBanner'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
-import { milesToKm } from '@/utils/geo'
-import LoadMoreButton from '@/components/LoadMoreButton'
-import DiagnosticOverlay from '@/components/DiagnosticOverlay'
-import { diagnosticFetch, emitSuppressedFetch } from '@/lib/diagnostics/fetchWrapper'
-import salesListDebug from '@/lib/debug/salesListDebug'
-import { normalizeFilters, filtersEqual, createCategoriesKey } from '@/lib/shared/categoryNormalizer'
-import LayoutDiagnostic from '@/components/LayoutDiagnostic'
-import GridLayoutDiagnostic from '@/components/GridLayoutDiagnostic'
-import GridDebugOverlay from '@/components/GridDebugOverlay'
-import { resolveDatePreset } from '@/lib/shared/resolveDatePreset'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -82,21 +69,10 @@ export default function SalesClient({
   // Sales data state - map is source of truth
   const [mapSales, setMapSales] = useState<Sale[]>(initialSales)
   const [loading, setLoading] = useState(false)
-  const [fetchedOnce, setFetchedOnce] = useState(false)
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [zipError, setZipError] = useState<string | null>(null)
-  const [dateWindow, setDateWindow] = useState<any>(null)
-  const [degraded, setDegraded] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [mapUpdating, setMapUpdating] = useState(false)
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
-  const [mapError, setMapError] = useState<string | null>(null)
   const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number; reason?: string } | null>(null)
-
-  // Diagnostic overlay state
-  const [showDiagnostics, setShowDiagnostics] = useState(false)
-  const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === '1'
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
@@ -164,12 +140,14 @@ export default function SalesClient({
         const deduplicated = deduplicateSales(data.data)
         console.log('[FETCH] Applied deduplication:', { input: data.data.length, output: deduplicated.length })
         setMapSales(deduplicated)
-        setMapMarkers(deduplicated.map(sale => ({
-          id: sale.id,
-          title: sale.title,
-          lat: sale.lat,
-          lng: sale.lng
-        })))
+        setMapMarkers(deduplicated
+          .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
+          .map(sale => ({
+            id: sale.id,
+            title: sale.title,
+            lat: sale.lat!,
+            lng: sale.lng!
+          })))
       } else {
         console.log('[FETCH] No data in response:', data)
         setMapSales([])
@@ -284,10 +262,12 @@ export default function SalesClient({
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-gray-900">Yard Sales</h1>
           <div className="flex items-center space-x-4">
-            <FilterTrigger 
-              onOpen={() => setShowFiltersModal(true)}
-              hasActiveFilters={hasActiveFilters}
-            />
+            <button
+              onClick={() => setShowFiltersModal(true)}
+              className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+            >
+              Filters {hasActiveFilters && '(Active)'}
+            </button>
             {user && (
               <div className="text-sm text-gray-600">
                 Welcome, {user.email}
@@ -313,7 +293,7 @@ export default function SalesClient({
           {/* Center: Filter Chips */}
           <div className="flex-1 flex items-center justify-center min-w-0 px-4">
             <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <DateWindowLabel dateRange={filters.dateRange} />
+              <span>{filters.dateRange}</span>
               <span>•</span>
               <span>{filters.distance} miles</span>
               {filters.categories.length > 0 && (
@@ -409,16 +389,6 @@ export default function SalesClient({
         onFiltersChange={handleFiltersChange}
       />
 
-      {/* Diagnostic Overlay */}
-      {showDiagnostics && (
-        <DiagnosticOverlay
-          sales={visibleSales}
-          loading={loading}
-          mapCenter={mapCenter}
-          mapZoom={mapZoom}
-          onClose={() => setShowDiagnostics(false)}
-        />
-      )}
     </div>
   )
 }

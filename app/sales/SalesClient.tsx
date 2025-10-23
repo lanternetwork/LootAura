@@ -52,6 +52,36 @@ interface SalesClientProps {
   user: User | null
 }
 
+// Error boundary component
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    console.error('[ERROR_BOUNDARY] Caught error:', error)
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[ERROR_BOUNDARY] Error details:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          <h2 className="font-bold">Something went wrong with the ZIP search.</h2>
+          <p>Please refresh the page and try again.</p>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
 export default function SalesClient({ initialSales, initialSearchParams: _initialSearchParams, initialCenter, user: _user }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -108,6 +138,31 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   useEffect(() => {
     restoreZipFromUrl()
   }, [restoreZipFromUrl])
+
+  // Global error handler for debugging
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error('[GLOBAL_ERROR] Unhandled error:', event.error)
+      console.error('[GLOBAL_ERROR] Error details:', {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno
+      })
+    }
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('[GLOBAL_ERROR] Unhandled promise rejection:', event.reason)
+    }
+
+    window.addEventListener('error', handleError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
+
+    return () => {
+      window.removeEventListener('error', handleError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
+  }, [])
 
   // Map view state - initialize with proper center
   const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null; bbox?: [number, number, number, number] }>({ 
@@ -394,6 +449,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // ZIP resolved handler
   const onZipResolved = useCallback(({ zip, center, name, bbox }: { zip: string; center: [number, number]; name: string; bbox?: [number, number, number, number] }) => {
+    console.log('[SALES_CLIENT] ZIP resolved handler called:', { zip, center, name, bbox })
+    
     try {
       console.log('[SALES_CLIENT] ZIP resolved:', { zip, center, name })
       console.log('[SALES_CLIENT] ZIP center array:', center)
@@ -753,11 +810,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Render with new Zillow-style layout
   return (
-    <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`}>
-      {/* Mobile/Tablet tabbed version */}
-      <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
-      {/* Desktop two-pane version */}
-      <SalesTwoPane filters={filtersComponent} map={mapComponent} list={listComponent} />
-    </div>
+    <ErrorBoundary>
+      <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`}>
+        {/* Mobile/Tablet tabbed version */}
+        <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
+        {/* Desktop two-pane version */}
+        <SalesTwoPane filters={filtersComponent} map={mapComponent} list={listComponent} />
+      </div>
+    </ErrorBoundary>
   )
 }

@@ -7,7 +7,6 @@ import { Sale } from '@/lib/types'
 import { getMapboxToken } from '@/lib/maps/token'
 import { 
   buildClusterIndex, 
-  getClustersForViewport, 
   getClusterExpansionZoom,
   isClusteringEnabled,
   getClusterSizeTier,
@@ -19,11 +18,7 @@ import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/m
 import { bboxToQuery } from '@/lib/map/viewport'
 import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
 import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
-import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
-import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'
-// import { fetchWithCache } from '@/lib/cache/offline'
-import { isOfflineCacheEnabled } from '@/lib/flags'
-import { logPrefetchStart, logPrefetchDone, logViewportSave, logViewportLoad } from '@/lib/telemetry/map'
+import { logViewportSave, logViewportLoad } from '@/lib/telemetry/map'
 import ClusterMarker from './ClusterMarker'
 import OfflineBanner from '../OfflineBanner'
 import MapLoadingIndicator from './MapLoadingIndicator'
@@ -81,7 +76,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   'data-testid': dataTestId
 }, ref) => {
   const mapRef = useRef<any>(null)
-  const [_visiblePinIds, setVisiblePinIds] = useState<string[]>([])
+  const [_visiblePinIds, _setVisiblePinIds] = useState<string[]>([])
   const [_visiblePinCount, setVisiblePinCount] = useState(0)
   const [clusters, setClusters] = useState<ClusterResult[]>([])
   const [clusterIndex, setClusterIndex] = useState<ClusterIndex | null>(null)

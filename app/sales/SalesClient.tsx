@@ -103,12 +103,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     // Update debug intent attribute
     const salesRoot = document.querySelector('[data-testid="sales-root"]')
     if (salesRoot) {
-      salesRoot.setAttribute('data-debug-intent', `${newIntent.kind}:${(newIntent as any).reason ?? ''}`)
+      const sub = (newIntent as any).sub || ''
+      salesRoot.setAttribute('data-debug-intent', `${newIntent.kind}:${sub}`)
     }
   }, [])
 
   // URL handling functions
-  const updateUrlWithZip = useCallback((zip: string) => {
+  const _updateUrlWithZip = useCallback((zip: string) => {
     const currentParams = new URLSearchParams(searchParams.toString())
     currentParams.set('zip', zip)
     router.replace(`/sales?${currentParams.toString()}`, { scroll: false })
@@ -448,7 +449,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }
 
   // ZIP resolved handler - SIMPLIFIED VERSION
-  const onZipResolved = useCallback(({ zip, center, name, bbox }: { zip: string; center: [number, number]; name: string; bbox?: [number, number, number, number] }) => {
+  const onZipResolved = useCallback(({ zip, center, name: _name, bbox }: { zip: string; center: [number, number]; name: string; bbox?: [number, number, number, number] }) => {
     console.log('[SALES_CLIENT] ZIP resolved handler called - SIMPLIFIED VERSION')
     
     try {
@@ -734,7 +735,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Render with new Zillow-style layout
   return (
     <ErrorBoundary>
-      <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`}>
+      <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).sub || ''}`}>
         {/* Mobile/Tablet tabbed version */}
         <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
         {/* Desktop two-pane version */}

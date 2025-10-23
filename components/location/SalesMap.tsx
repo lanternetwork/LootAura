@@ -57,12 +57,16 @@ export default function SalesMap({
   }, [])
 
   // Call onMapReady when map loads (not onLoad bounds emission)
-  const handleMapLoad = useCallback(() => {
-    console.log('[MAP] handleMapLoad called - map is ready!')
+  const handleMapLoad = useCallback((event: any) => {
+    console.log('[MAP] handleMapLoad called - map is ready!', { event })
     mapDebug.logMapLoad('SalesMap', 'success', { onMapReady: !!onMapReady })
     setIsMapLoading(false) // Map is loaded, hide loading indicator
     
-    const map = mapRef.current?.getMap?.()
+    // Store the map instance directly from the event
+    const map = event.target
+    mapInstanceRef.current = map
+    console.log('[MAP] Stored map instance:', { mapExists: !!map, mapType: typeof map })
+    
     if (map && typeof map.resize === 'function') {
       // Resize immediately on load
       map.resize()
@@ -103,6 +107,7 @@ export default function SalesMap({
   }, [onMapReady])
   const [_selectedSale, _setSelectedSale] = useState<Sale | null>(null)
   const mapRef = useRef<any>(null)
+  const mapInstanceRef = useRef<any>(null) // Direct reference to the Mapbox map instance
   const _fitTokenRef = useRef<string | null>(null)
   const _suppressEmitsRef = useRef(false)
   const [_viewState, setViewState] = useState({
@@ -343,25 +348,25 @@ export default function SalesMap({
       mapExists: !!mapRef.current?.getMap?.()
     })
     
-    const map = mapRef.current?.getMap?.()
+    const map = mapInstanceRef.current
     console.log('[MAP] Center effect - map check:', { 
       mapRefExists: !!mapRef.current, 
-      getMapExists: !!mapRef.current?.getMap, 
+      mapInstanceExists: !!mapInstanceRef.current,
       mapExists: !!map,
       mapRefType: typeof mapRef.current,
-      mapRefKeys: mapRef.current ? Object.keys(mapRef.current) : 'null'
+      mapInstanceType: typeof mapInstanceRef.current
     })
     if (!map) {
-      console.log('[MAP] Center effect - no map, will retry when map loads')
+      console.log('[MAP] Center effect - no map instance, will retry when map loads')
       // Store the pending center change to apply when map is ready
       pendingCenterChangeRef.current = { center, zoom }
       
       // Fallback: check periodically if map becomes ready
       const checkInterval = setInterval(() => {
-        const retryMap = mapRef.current?.getMap?.()
+        const retryMap = mapInstanceRef.current
         console.log('[MAP] Fallback check:', { 
           mapRefExists: !!mapRef.current, 
-          getMapExists: !!mapRef.current?.getMap, 
+          mapInstanceExists: !!mapInstanceRef.current,
           mapExists: !!retryMap,
           pendingChange: !!pendingCenterChangeRef.current 
         })

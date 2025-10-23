@@ -208,8 +208,8 @@ export default function SalesClient({
     }
   }, [fetchMapSales])
 
-  // Handle ZIP search
-  const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string) => {
+  // Handle ZIP search with bbox support
+  const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => {
     setZipError(null)
     
     // Update map center
@@ -219,10 +219,25 @@ export default function SalesClient({
       zoom: 12
     }))
 
-    // Update URL
+    // Update URL with ZIP parameter
     const currentParams = new URLSearchParams(searchParams.toString())
-    currentParams.set('zip', zip || '')
+    if (zip) {
+      currentParams.set('zip', zip)
+    } else {
+      currentParams.delete('zip')
+    }
     router.replace(`/sales?${currentParams.toString()}`, { scroll: false })
+
+    // If bbox is available, use fitBounds; otherwise use center/zoom
+    if (bbox) {
+      setFitBounds({
+        west: bbox[0],
+        south: bbox[1], 
+        east: bbox[2],
+        north: bbox[3],
+        reason: 'ZIP search'
+      })
+    }
 
     // Fetch sales for new location
     fetchMapSales({ lat, lng })
@@ -238,6 +253,17 @@ export default function SalesClient({
     // Trigger refetch with new filters
     fetchMapSales()
   }
+
+  // Restore ZIP from URL on page load
+  useEffect(() => {
+    const zipFromUrl = searchParams.get('zip')
+    if (zipFromUrl) {
+      // Trigger ZIP lookup from URL
+      console.log('[ZIP] Restoring from URL:', zipFromUrl)
+      // This would need to be implemented with a ZIP lookup service
+      // For now, we'll just log it
+    }
+  }, [searchParams])
 
   // Memoized visible sales - always derived from mapSales
   const visibleSales = useMemo(() => {

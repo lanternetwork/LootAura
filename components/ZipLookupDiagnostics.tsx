@@ -289,7 +289,7 @@ export default function ZipLookupDiagnostics() {
           <p className="text-gray-500 text-sm">No diagnostic results yet. Run a diagnostic to see detailed results here.</p>
         ) : (
           <div className="space-y-4 max-h-96 overflow-y-auto">
-            {results.map((result, index) => (
+            {results.map((result, _index) => (
               <div
                 key={`${result.zip}-${result.timestamp}`}
                 className={`p-4 rounded-lg border ${

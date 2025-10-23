@@ -21,11 +21,11 @@ export default function ZipLookupTester({ className = '' }: ZipLookupTesterProps
   const [testZip, setTestZip] = useState('')
   const [isRunning, setIsRunning] = useState(false)
   const [results, setResults] = useState<ZipTestResult[]>([])
-  const [selectedZip, setSelectedZip] = useState('')
+  const [_selectedZip, _setSelectedZip] = useState('')
 
   const testZipLookup = async (zip: string) => {
     const startTime = Date.now()
-    const timestamp = new Date().toISOString()
+    const _timestamp = new Date().toISOString()
     
     try {
       console.log(`[ZIP_TEST] Starting test for ZIP: ${zip}`)
@@ -214,7 +214,7 @@ export default function ZipLookupTester({ className = '' }: ZipLookupTesterProps
           <p className="text-gray-500 text-sm">No test results yet. Run a test to see results here.</p>
         ) : (
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {results.map((result, index) => (
+            {results.map((result, _index) => (
               <div
                 key={`${result.zip}-${result.timestamp}`}
                 className={`p-3 rounded-lg border ${

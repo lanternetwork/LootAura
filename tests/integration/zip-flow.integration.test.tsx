@@ -50,7 +50,7 @@ describe('ZIP Flow Integration', () => {
       </QueryClientProvider>
     )
     
-    expect(screen.getAllByTestId('sales-root')).toHaveLength(2) // One for mobile, one for desktop
+    expect(screen.getAllByTestId('sales-root')).toHaveLength(1) // Single wrapper
     // Use getAllByTestId to get all zip inputs
     expect(screen.getAllByTestId('zip-input')).toHaveLength(2) // One for mobile, one for desktop
   })

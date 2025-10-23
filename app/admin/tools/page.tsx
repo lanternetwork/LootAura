@@ -7,6 +7,7 @@ import ZipLookupTester from '@/components/ZipLookupTester'
 import ZipLookupDiagnostics from '@/components/ZipLookupDiagnostics'
 import MapDiagnostics from '@/components/MapDiagnostics'
 import MapInteractionTester from '@/components/MapInteractionTester'
+import SalesMap from '@/components/location/SalesMap'
 import { useState } from 'react'
 
 export default function AdminToolsPage() {
@@ -49,6 +50,27 @@ export default function AdminToolsPage() {
 
           {/* ZIP Lookup Diagnostics */}
           <ZipLookupDiagnostics />
+
+          {/* Test Map for Diagnostics */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold mb-4">Test Map for Diagnostics</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This map is used by the diagnostic tools below to test map functionality.
+            </p>
+            <div 
+              data-testid="map-container" 
+              className="w-full h-96 bg-gray-100 rounded-lg overflow-hidden"
+            >
+              <SalesMap
+                sales={[]}
+                markers={[]}
+                center={{ lat: 38.2527, lng: -85.7585 }}
+                zoom={10}
+                onViewChange={() => {}}
+                onMoveEnd={() => {}}
+              />
+            </div>
+          </div>
 
           {/* Map Functionality Diagnostics */}
           <MapDiagnostics />

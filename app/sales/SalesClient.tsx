@@ -117,7 +117,7 @@ export default function SalesClient({
     return unique
   }, [])
 
-  // Fetch sales based on map viewport bounds
+  // Fetch sales based on map viewport bounds (bbox-based only)
   const fetchMapSales = useCallback(async (centerOverride?: { lat: number; lng: number }) => {
     const center = centerOverride || mapView.center
     if (!center) return
@@ -139,14 +139,30 @@ export default function SalesClient({
         params.set('categories', filters.categories.join(','))
       }
 
+      console.log('[FETCH] Viewport fetch with bbox:', {
+        minLng: mapView.bounds.west,
+        minLat: mapView.bounds.south,
+        maxLng: mapView.bounds.east,
+        maxLat: mapView.bounds.north
+      })
+
       const response = await fetch(`/api/sales/markers?${params.toString()}`)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
       const data = await response.json()
-      if (data.ok && data.data) {
+      
+      // Validate API response shape before processing
+      if (!data || typeof data !== 'object') {
+        console.error('[FETCH] Invalid response shape:', data)
+        setMapError('Invalid response from server')
+        return
+      }
+
+      if (data.ok && Array.isArray(data.data)) {
         const deduplicated = deduplicateSales(data.data)
+        console.log('[FETCH] Applied deduplication:', { input: data.data.length, output: deduplicated.length })
         setMapSales(deduplicated)
         setMapMarkers(deduplicated.map(sale => ({
           id: sale.id,
@@ -154,6 +170,10 @@ export default function SalesClient({
           lat: sale.lat,
           lng: sale.lng
         })))
+      } else {
+        console.log('[FETCH] No data in response:', data)
+        setMapSales([])
+        setMapMarkers([])
       }
     } catch (error) {
       console.error('[FETCH] Map sales error:', error)
@@ -164,7 +184,10 @@ export default function SalesClient({
     }
   }, [mapView.bounds, filters.dateRange, filters.categories, deduplicateSales])
 
-  // Handle map view changes
+  // Debounce timer for viewport changes
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Handle map view changes with debouncing
   const handleMapViewChange = useCallback(({ center, zoom, userInteraction }: { center: { lat: number; lng: number }, zoom: number, userInteraction: boolean }) => {
     setMapView(prev => ({
       ...prev,
@@ -173,8 +196,15 @@ export default function SalesClient({
     }))
 
     if (userInteraction) {
-      // Trigger fetch when user interacts with map
-      fetchMapSales(center)
+      // Clear existing timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+      
+      // Debounce fetch by 75ms to prevent rapid successive calls
+      debounceTimerRef.current = setTimeout(() => {
+        fetchMapSales(center)
+      }, 75)
     }
   }, [fetchMapSales])
 

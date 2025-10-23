@@ -108,12 +108,12 @@ export default function ZipInput({
         
         // Write location cookie with ZIP, city, state info
         const locationData = {
-          zip: normalized.zip,
+          zip: trimmedZip,
           city: normalized.city,
           state: normalized.state,
           lat: normalized.lat,
           lng: normalized.lng,
-          source: normalized.source
+          source: 'geocode'
         }
         setCookie('la_loc', JSON.stringify(locationData), 1) // 24 hours
         
@@ -122,10 +122,10 @@ export default function ZipInput({
           lng: normalized.lng, 
           city: normalized.city, 
           state: normalized.state, 
-          zip: normalized.zip 
+          zip: trimmedZip 
         })
-        onLocationFound(normalized.lat, normalized.lng, normalized.city, normalized.state, normalized.zip, normalized.bbox)
-        console.log(`[ZIP_INPUT] Found location for ${trimmedZip}: ${normalized.city}, ${normalized.state} (${normalized.source})`)
+        onLocationFound(normalized.lat, normalized.lng, normalized.city, normalized.state, trimmedZip, normalized.bbox)
+        console.log(`[ZIP_INPUT] Found location for ${trimmedZip}: ${normalized.city}, ${normalized.state}`)
         console.log('[ZIP] request success')
       } else {
         console.log('[ZIP] request fail')

@@ -796,15 +796,22 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     if (!map) return
     
     console.log('[SALES_MAP_CLUSTERED] Center prop changed, forcing map update:', center)
-    console.log('[SALES_MAP_CLUSTERED] Current map center:', map.getCenter())
+    const currentCenter = map.getCenter()
+    console.log('[SALES_MAP_CLUSTERED] Current map center:', { lat: currentCenter.lat, lng: currentCenter.lng })
     console.log('[SALES_MAP_CLUSTERED] Target center:', center)
     
-    // Force the map to move to the new center
-    map.easeTo({
-      center: [center.lng, center.lat],
-      zoom: zoom,
-      duration: 0 // Instant move
-    })
+    // Check if we need to move the map
+    const needsUpdate = Math.abs(currentCenter.lat - center.lat) > 0.001 || Math.abs(currentCenter.lng - center.lng) > 0.001
+    console.log('[SALES_MAP_CLUSTERED] Needs update:', needsUpdate)
+    
+    if (needsUpdate) {
+      console.log('[SALES_MAP_CLUSTERED] Moving map to new center')
+      // Force the map to move to the new center using jumpTo for immediate movement
+      map.jumpTo({
+        center: [center.lng, center.lat],
+        zoom: zoom
+      })
+    }
   }, [center.lat, center.lng, zoom])
 
   // Debug logging for map initialization
@@ -834,6 +841,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       <Map
         ref={ref || mapRef}
         mapboxAccessToken={getMapboxToken()}
+        initialViewState={{
+          longitude: center.lng,
+          latitude: center.lat,
+          zoom: zoom
+        }}
         viewState={{
           longitude: center.lng,
           latitude: center.lat,

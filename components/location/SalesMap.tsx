@@ -66,14 +66,14 @@ export default function SalesMap({
     if (map && typeof map.resize === 'function') {
       map.resize()
       if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
-        console.log(`[MAP_RESIZE] invoked reason=load size=${debugInfo.containerWidth}x${debugInfo.containerHeight}`)
+        console.log(`[MAP_RESIZE] invoked reason=load`)
       }
     }
     
     if (onMapReady) {
       onMapReady()
     }
-  }, [onMapReady, debugInfo.containerWidth, debugInfo.containerHeight])
+  }, [onMapReady])
   const [_selectedSale, _setSelectedSale] = useState<Sale | null>(null)
   const mapRef = useRef<any>(null)
   const _fitTokenRef = useRef<string | null>(null)

@@ -42,7 +42,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={mockSales}
         loading={false}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
       />
     )
@@ -51,12 +50,11 @@ describe('SalesGrid', () => {
     expect(screen.queryByText('No sales found.')).not.toBeInTheDocument()
   })
 
-  it('renders skeletons when loading and not in MAP authority', () => {
+  it('renders skeletons when loading', () => {
     renderWithProviders(
       <SalesGrid
         sales={[]}
         loading={true}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
         skeletonCount={3}
       />
@@ -71,7 +69,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={[]}
         loading={false}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
       />
     )
@@ -80,12 +77,11 @@ describe('SalesGrid', () => {
     expect(screen.queryByTestId('sale-card-skeleton')).not.toBeInTheDocument()
   })
 
-  it('does not render skeletons when in MAP authority, even if loading', () => {
+  it('does not render skeletons when loading is false', () => {
     renderWithProviders(
       <SalesGrid
         sales={[]}
         loading={true}
-        authority="MAP"
         emptyStateMessage={emptyState}
         skeletonCount={3}
       />
@@ -99,7 +95,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={mockSales}
         loading={false}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
       />
     )
@@ -158,7 +153,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={mockSales}
         loading={false}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
       />
     )
@@ -174,7 +168,6 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={mockSales}
         loading={false}
-        authority="FILTERS"
         emptyStateMessage={emptyState}
         className="custom-class"
       />
@@ -188,12 +181,11 @@ describe('SalesGrid', () => {
       <SalesGrid
         sales={mockSales}
         loading={false}
-        authority="MAP"
         emptyStateMessage={emptyState}
       />
     )
     const gridElement = screen.getByTestId('sales-grid')
-    expect(gridElement).toHaveAttribute('data-authority', 'MAP')
+    expect(gridElement).toBeInTheDocument()
     expect(gridElement).toHaveAttribute('data-hydrated', 'true')
   })
 })

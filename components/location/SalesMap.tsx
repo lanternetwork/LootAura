@@ -141,6 +141,14 @@ export default function SalesMap({
     })
   }, [mapRef.current])
   
+  // Debug: Monitor map instance changes
+  useEffect(() => {
+    console.log('[MAP] mapInstanceRef changed:', { 
+      mapInstanceExists: !!mapInstanceRef.current, 
+      mapInstanceType: typeof mapInstanceRef.current
+    })
+  }, [mapInstanceRef.current])
+  
   // ResizeObserver for map container sizing
   useEffect(() => {
     if (!containerRef.current) return
@@ -610,6 +618,9 @@ export default function SalesMap({
         onMoveEnd={handleMoveEnd}
         onZoomEnd={handleZoomEnd}
         onMove={handleViewChange}
+        onError={(error) => console.log('[MAP] Map error:', error)}
+        onStyleLoad={() => console.log('[MAP] Style loaded')}
+        onStyleData={() => console.log('[MAP] Style data loaded')}
         interactiveLayerIds={[]}
         // Performance optimizations
         optimizeForTerrain={false}

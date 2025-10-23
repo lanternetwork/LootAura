@@ -672,7 +672,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     // Store map reference for ZIP handler
     ;(window as any).__currentMapRef = mapRef.current
 
-    updateClusters(map)
+    // updateClusters(map) // DISABLED to prevent lockup
     
     // Persist viewport state
     const center = map.getCenter()
@@ -696,13 +696,13 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
     
     onMoveEnd?.()
-  }, [updateClusters, onMoveEnd])
+  }, [onMoveEnd]) // Removed updateClusters dependency
 
   const handleZoomEnd = useCallback(() => {
     const map = mapRef.current?.getMap?.()
     if (!map) return
 
-    updateClusters(map)
+    // updateClusters(map) // DISABLED to prevent lockup
     
     // Persist viewport state
     const center = map.getCenter()
@@ -717,7 +717,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     logViewportSave(viewport)
     
     onZoomEnd?.()
-  }, [updateClusters, onZoomEnd])
+  }, [onZoomEnd]) // Removed updateClusters dependency
 
   // Handle view changes
   const handleViewChange = useCallback((evt: any) => {
@@ -824,9 +824,9 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const map = mapRef.current?.getMap?.()
     if (map) {
       mapDebug.log('Updating clusters after map load')
-      updateClusters(map)
+      // updateClusters(map) // DISABLED to prevent lockup
     }
-  }, [updateClusters, onMapReady])
+  }, [onMapReady]) // Removed updateClusters dependency
 
   // Simple map load handling - no complex state management needed
   useEffect(() => {
@@ -947,14 +947,14 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         map.resize()
         // Update clusters after resize
         setTimeout(() => {
-          updateClusters(map)
+          // updateClusters(map) // DISABLED to prevent lockup
         }, 100)
       }
     }
 
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [updateClusters])
+  }, []) // Removed updateClusters dependency
 
 
   // Debug logging for map initialization

@@ -56,10 +56,5 @@ jobs:
         with:
           node-version: '18'
       - run: npm install
-      - run: npm run build
-      - run: npm start &
-      - run: npx wait-on http://localhost:3000
       - run: npx playwright install --with-deps
       - run: npm run test:e2e
-        env:
-          BASE_URL: http://localhost:3000

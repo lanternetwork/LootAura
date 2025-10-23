@@ -51,26 +51,32 @@ export default function AdminToolsPage() {
           {/* ZIP Lookup Diagnostics */}
           <ZipLookupDiagnostics />
 
-          {/* Test Map for Diagnostics */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold mb-4">Test Map for Diagnostics</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              This map is used by the diagnostic tools below to test map functionality.
-            </p>
-            <div 
-              data-testid="map-container" 
-              className="w-full h-96 bg-gray-100 rounded-lg overflow-hidden"
-            >
-              <SalesMap
-                sales={[]}
-                markers={[]}
-                center={{ lat: 38.2527, lng: -85.7585 }}
-                zoom={10}
-                onViewChange={() => {}}
-                onMoveEnd={() => {}}
-              />
-            </div>
-          </div>
+           {/* Test Map for Diagnostics */}
+           <div className="bg-white rounded-lg shadow-md p-6">
+             <h3 className="text-lg font-semibold mb-4">Test Map for Diagnostics</h3>
+             <p className="text-sm text-gray-600 mb-4">
+               This map is used by the diagnostic tools below to test map functionality.
+             </p>
+             <div
+               data-testid="map-container"
+               className="w-full h-96 bg-gray-100 rounded-lg overflow-hidden relative"
+             >
+               <SalesMap
+                 sales={[]}
+                 markers={[]}
+                 center={{ lat: 38.2527, lng: -85.7585 }}
+                 zoom={10}
+                 onViewChange={() => {}}
+                 onMoveEnd={() => {}}
+               />
+               {/* Debug info overlay */}
+               <div className="absolute top-2 left-2 z-50 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
+                 <div>Container: {typeof window !== 'undefined' ? document.querySelector('[data-testid="map-container"]')?.getBoundingClientRect().width : 'N/A'}×{typeof window !== 'undefined' ? document.querySelector('[data-testid="map-container"]')?.getBoundingClientRect().height : 'N/A'}</div>
+                 <div>Map Element: {typeof window !== 'undefined' ? document.querySelector('.mapboxgl-map') ? 'Found' : 'Not Found' : 'N/A'}</div>
+                 <div>Map Instance: {typeof window !== 'undefined' ? document.querySelector('.mapboxgl-map') ? 'Available' : 'Not Available' : 'N/A'}</div>
+               </div>
+             </div>
+           </div>
 
           {/* Map Functionality Diagnostics */}
           <MapDiagnostics />

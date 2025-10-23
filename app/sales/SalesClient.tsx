@@ -65,15 +65,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Update debug intent attribute when intent changes
   useEffect(() => {
-    const salesRootMobile = document.querySelector('[data-testid="sales-root-mobile"]')
-    const salesRootDesktop = document.querySelector('[data-testid="sales-root-desktop"]')
-    const debugIntent = `${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`
-    
-    if (salesRootMobile) {
-      salesRootMobile.setAttribute('data-debug-intent', debugIntent)
-    }
-    if (salesRootDesktop) {
-      salesRootDesktop.setAttribute('data-debug-intent', debugIntent)
+    const salesRoot = document.querySelector('[data-testid="sales-root"]')
+    if (salesRoot) {
+      salesRoot.setAttribute('data-debug-intent', `${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`)
     }
   }, [intentRef.current])
 
@@ -118,15 +112,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.debug('[INTENT] set', { intent: newIntent.kind, seq: seqRef.current })
     
     // Update debug intent attribute
-    const salesRootMobile = document.querySelector('[data-testid="sales-root-mobile"]')
-    const salesRootDesktop = document.querySelector('[data-testid="sales-root-desktop"]')
-    const debugIntent = `${newIntent.kind}:${(newIntent as any).reason ?? ''}`
-    
-    if (salesRootMobile) {
-      salesRootMobile.setAttribute('data-debug-intent', debugIntent)
-    }
-    if (salesRootDesktop) {
-      salesRootDesktop.setAttribute('data-debug-intent', debugIntent)
+    const salesRoot = document.querySelector('[data-testid="sales-root"]')
+    if (salesRoot) {
+      salesRoot.setAttribute('data-debug-intent', `${newIntent.kind}:${(newIntent as any).reason ?? ''}`)
     }
   }, [])
 
@@ -537,11 +525,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // Render with new Zillow-style layout
   return (
-    <>
+    <div data-testid="sales-root" data-debug-intent={`${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`}>
       {/* Mobile/Tablet tabbed version */}
       <SalesTabbed filters={filtersComponent} map={mapComponent} list={listComponent} />
       {/* Desktop two-pane version */}
       <SalesTwoPane filters={filtersComponent} map={mapComponent} list={listComponent} />
-    </>
+    </div>
   )
 }

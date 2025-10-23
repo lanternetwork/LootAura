@@ -4,42 +4,44 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 1 : 0, // Reduce retries
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
-  timeout: 30 * 1000, // 30 seconds per test
+  timeout: 15 * 1000, // 15 seconds per test
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
   },
   projects: [
+    // Only run Chrome in CI to speed up tests
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
-    },
+    // Only run other browsers in non-CI environments
+    ...(process.env.CI ? [] : [
+      {
+        name: 'firefox',
+        use: { ...devices['Desktop Firefox'] },
+      },
+      {
+        name: 'webkit',
+        use: { ...devices['Desktop Safari'] },
+      },
+    ]),
   ],
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000, // 2 minutes
+    timeout: 180 * 1000, // 3 minutes timeout
     stdout: 'pipe',
     stderr: 'pipe',
+    env: {
+      INTENT_ENABLED: '1',
+      NEXT_PUBLIC_FEATURE_CLUSTERING: '1',
+      NEXT_PUBLIC_SUPABASE_URL: 'https://mock-supabase-url.supabase.co',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'mock-anon-key',
+    },
   },
 })

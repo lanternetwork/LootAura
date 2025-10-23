@@ -389,9 +389,17 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
 
 
-    const bounds = map.getBounds()
-    const center = map.getCenter()
-    const zoom = map.getZoom()
+    let bounds, center, zoom
+    try {
+      bounds = map.getBounds()
+      center = map.getCenter()
+      zoom = map.getZoom()
+    } catch (error) {
+      console.error('[SALES_MAP_CLUSTERED] Error getting map state:', error)
+      mapDebug.groupEnd()
+      clusterDebug.groupEnd()
+      return
+    }
     
     console.log('[CLUSTER] Map state debug:', JSON.stringify({
       center: { lng: center.lng, lat: center.lat },
@@ -404,16 +412,34 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       }
     }, null, 2))
     
-    const bbox: [number, number, number, number] = [
-      bounds.getWest(),
-      bounds.getSouth(),
-      bounds.getEast(),
-      bounds.getNorth()
-    ]
-    const currentZoom = map.getZoom()
+    let bbox: [number, number, number, number]
+    let currentZoom
+    try {
+      bbox = [
+        bounds.getWest(),
+        bounds.getSouth(),
+        bounds.getEast(),
+        bounds.getNorth()
+      ]
+      currentZoom = map.getZoom()
+    } catch (error) {
+      console.error('[SALES_MAP_CLUSTERED] Error creating bbox or getting zoom:', error)
+      mapDebug.groupEnd()
+      clusterDebug.groupEnd()
+      return
+    }
     
     // Validate bounds to prevent incorrect bounds from ZIP search
-    const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
+    let boundsSpan
+    try {
+      boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
+    } catch (error) {
+      console.error('[SALES_MAP_CLUSTERED] Error calculating bounds span:', error)
+      mapDebug.groupEnd()
+      clusterDebug.groupEnd()
+      return
+    }
+    
     if (boundsSpan > 10.0) { // If bounds span more than ~1110km, something is wrong
       console.log('[SALES_MAP_CLUSTERED] Invalid bounds detected, resetting map:', {
         bounds: {
@@ -453,8 +479,16 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
 
     // Additional bounds validation - check for corrupted bounds that cause stretching
-    const latSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
-    const lngSpan = Math.abs(bounds.getEast() - bounds.getWest())
+    let latSpan, lngSpan
+    try {
+      latSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
+      lngSpan = Math.abs(bounds.getEast() - bounds.getWest())
+    } catch (error) {
+      console.error('[SALES_MAP_CLUSTERED] Error calculating lat/lng spans:', error)
+      mapDebug.groupEnd()
+      clusterDebug.groupEnd()
+      return
+    }
     
     if (latSpan > 3.0 || lngSpan > 3.0) { // If bounds span more than ~3 degrees, something is wrong
       console.log('[SALES_MAP_CLUSTERED] Corrupted bounds detected, resetting map:', {
@@ -510,12 +544,33 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }, null, 2))
 
     clusterDebug.logClusterIndex(clusterIndex, 'Getting clusters for viewport')
-    const viewportClusters = getClustersForViewport(clusterIndex, bbox, currentZoom)
-    console.log('[CLUSTER] getClustersForViewport result:', JSON.stringify({
-      viewportClustersLength: viewportClusters.length,
-      viewportClusters: viewportClusters.slice(0, 3) // Show first 3 clusters
-    }, null, 2))
-    setClusters(viewportClusters)
+    
+    // Safety check for getClustersForViewport parameters
+    if (!clusterIndex || !bbox || typeof currentZoom !== 'number') {
+      console.warn('[SALES_MAP_CLUSTERED] Invalid parameters for getClustersForViewport:', {
+        clusterIndex: !!clusterIndex,
+        bbox,
+        currentZoom
+      })
+      mapDebug.groupEnd()
+      clusterDebug.groupEnd()
+      return
+    }
+    
+    let viewportClusters
+    try {
+      viewportClusters = getClustersForViewport(clusterIndex, bbox, currentZoom)
+      console.log('[CLUSTER] getClustersForViewport result:', JSON.stringify({
+        viewportClustersLength: viewportClusters.length,
+        viewportClusters: viewportClusters.slice(0, 3) // Show first 3 clusters
+      }, null, 2))
+      setClusters(viewportClusters)
+    } catch (error) {
+      console.error('[SALES_MAP_CLUSTERED] Error in getClustersForViewport:', error)
+      mapDebug.groupEnd()
+      clusterDebug.groupEnd()
+      return
+    }
 
     // Update visible pins
     const visibleIds = viewportClusters

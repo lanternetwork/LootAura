@@ -1,33 +1,47 @@
 import { z } from 'zod'
 
+// Bbox schema for [minLng, minLat, maxLng, maxLat]
+const BboxSchema = z.tuple([z.number(), z.number(), z.number(), z.number()])
+
 // Geocode response schema that handles both direct and wrapped formats
 export const ZipGeocodeResponse = z.union([
-  // Direct format: { lat, lng, city?, state? }
+  // Direct format: { lat, lng, city?, state?, bbox? }
   z.object({
     lat: z.number(),
     lng: z.number(),
     city: z.string().optional(),
     state: z.string().optional(),
     zip: z.string().optional(),
-    source: z.string().optional()
+    source: z.string().optional(),
+    bbox: BboxSchema.optional()
   }),
-  // Wrapped format: { data: { lat, lng } }
+  // Wrapped format: { result: { latitude, longitude, city, state, bbox? } }
   z.object({
-    data: z.object({
-      lat: z.number(),
-      lng: z.number(),
+    result: z.object({
+      latitude: z.number(),
+      longitude: z.number(),
       city: z.string().optional(),
       state: z.string().optional(),
       zip: z.string().optional(),
-      source: z.string().optional()
+      source: z.string().optional(),
+      bbox: BboxSchema.optional()
     })
   })
 ])
 
 export type ZipGeocodeResponseType = z.infer<typeof ZipGeocodeResponse>
 
-// Normalizer that always returns { lat, lng } format
-export function normalizeGeocode(json: any): { lat: number; lng: number; city?: string; state?: string; zip?: string; source?: string } {
+// Normalized ZIP geocode result
+export type ZipGeo = {
+  lat: number
+  lng: number
+  city: string
+  state: string
+  bbox?: [number, number, number, number] // [minLng, minLat, maxLng, maxLat]
+}
+
+// Normalizer that always returns ZipGeo format
+export function normalizeGeocode(json: any): ZipGeo {
   const parsed = ZipGeocodeResponse.safeParse(json)
   
   if (!parsed.success) {
@@ -37,14 +51,13 @@ export function normalizeGeocode(json: any): { lat: number; lng: number; city?: 
   const data = parsed.data
   
   // Handle wrapped format
-  if ('data' in data) {
+  if ('result' in data) {
     return {
-      lat: data.data.lat,
-      lng: data.data.lng,
-      city: data.data.city,
-      state: data.data.state,
-      zip: data.data.zip,
-      source: data.data.source
+      lat: data.result.latitude,
+      lng: data.result.longitude,
+      city: data.result.city || '',
+      state: data.result.state || '',
+      bbox: data.result.bbox
     }
   }
   
@@ -52,9 +65,8 @@ export function normalizeGeocode(json: any): { lat: number; lng: number; city?: 
   return {
     lat: data.lat,
     lng: data.lng,
-    city: data.city,
-    state: data.state,
-    zip: data.zip,
-    source: data.source
+    city: data.city || '',
+    state: data.state || '',
+    bbox: data.bbox
   }
 }

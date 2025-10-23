@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
 import SaleCard from '@/components/SaleCard'
+import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 // Removed unused imports after arbiter system removal
@@ -52,11 +53,28 @@ interface SalesClientProps {
 }
 
 export default function SalesClient({ initialSales, initialSearchParams: _initialSearchParams, initialCenter, user: _user }: SalesClientProps) {
-  const _router = useRouter()
-  const _searchParams = useSearchParams()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { filters, updateFilters: _updateFilters, hasActiveFilters: _hasActiveFilters } = useFilters(
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
   )
+  
+  // URL handling functions
+  const updateUrlWithZip = useCallback((zip: string) => {
+    const currentParams = new URLSearchParams(searchParams.toString())
+    currentParams.set('zip', zip)
+    router.replace(`/sales?${currentParams.toString()}`, { scroll: false })
+  }, [router, searchParams])
+  
+  const restoreZipFromUrl = useCallback(() => {
+    const zipParam = searchParams.get('zip')
+    if (zipParam) {
+      console.log('[SALES_CLIENT] Restoring ZIP from URL:', zipParam)
+      // Set intent to Filters with sub Zip
+      bumpSeq({ kind: 'Filters', sub: 'Zip', zip: zipParam, reason: 'Zip' })
+      // Trigger ZIP flow (this will be handled by the ZipInput component)
+    }
+  }, [searchParams, bumpSeq])
 
   // Intent-based system state
   const intentRef = useRef<Intent>({ kind: 'Filters' })
@@ -67,12 +85,19 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   useEffect(() => {
     const salesRoot = document.querySelector('[data-testid="sales-root"]')
     if (salesRoot) {
-      salesRoot.setAttribute('data-debug-intent', `${intentRef.current.kind}:${(intentRef.current as any).reason ?? ''}`)
+      const intent = intentRef.current
+      const sub = (intent as any).sub || ''
+      salesRoot.setAttribute('data-debug-intent', `${intent.kind}:${sub}`)
     }
   }, [intentRef.current])
+  
+  // Restore ZIP from URL on page load
+  useEffect(() => {
+    restoreZipFromUrl()
+  }, [restoreZipFromUrl])
 
   // Map view state - initialize with proper center
-  const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null }>({ 
+  const [mapView, setMapView] = useState<{ center: { lat: number; lng: number } | null; zoom: number | null; bbox?: [number, number, number, number] }>({ 
     center: initialCenter || { lat: 39.8283, lng: -98.5795 }, 
     zoom: 10 
   })
@@ -103,6 +128,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // UI state
   const [_loading, _setLoading] = useState(false)
+  const [isZipLoading, setIsZipLoading] = useState(false)
   // Legacy state variables removed - using intent system only
 
   // Intent system helpers
@@ -173,11 +199,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const currentIntent = intentRef.current
 
     if (incoming.seq < currentSeq) {
-      console.debug('[APPLY] drop stale', { incomingSeq: incoming.seq, currentSeq })
+      console.log('[APPLY] drop', { seq: incoming.seq, intent: currentIntent.kind, count: unique.length, reason: 'stale' })
       return
     }
     if (!isCauseCompatibleWithIntent(incoming.cause, currentIntent)) {
-      console.debug('[APPLY] drop incompatible', { cause: incoming.cause, intent: currentIntent.kind })
+      console.log('[APPLY] drop', { seq: incoming.seq, intent: currentIntent.kind, count: unique.length, reason: 'incompatible' })
       return
     }
 
@@ -235,6 +261,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         
         console.log('[FETCH] fetchSales response (viewport):', { count: sales.length, ctx: _ctx, meta })
         console.log('[FETCH] Sales sample (viewport):', sales.slice(0, 2))
+        console.log('[FETCH] filtered', { cause: _ctx?.cause || 'Filters', seq: _ctx?.seq || 0 })
         
         return { data: sales, ctx: _ctx || { cause: 'Filters', seq: 0 } }
       } else {
@@ -351,7 +378,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }
 
   // ZIP resolved handler
-  const onZipResolved = useCallback(({ zip, center, name }: { zip: string; center: [number, number]; name: string }) => {
+  const onZipResolved = useCallback(({ zip, center, name, bbox }: { zip: string; center: [number, number]; name: string; bbox?: [number, number, number, number] }) => {
     console.log('[SALES_CLIENT] ZIP resolved:', { zip, center, name })
     console.log('[SALES_CLIENT] ZIP center array:', center)
     console.log('[SALES_CLIENT] ZIP center type check:', { 
@@ -365,8 +392,11 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       console.log(`[ZIP_FLOW] arbiter.intent=Filters ts=${Date.now()}`)
     }
     
-    // Set intent to Filters with source Zip
-    bumpSeq({ kind: 'Filters', reason: 'Zip' })
+    // Set loading state
+    setIsZipLoading(true)
+    
+    // Set intent to Filters with sub Zip and zip parameter
+    bumpSeq({ kind: 'Filters', sub: 'Zip', zip: zip, reason: 'Zip' })
     const mySeq = seqRef.current
     
     // Set programmatic move flag
@@ -381,7 +411,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       console.log(`[ZIP_FLOW] map.move.start reason=zip`)
     }
     
-    setMapView({ center: { lat, lng }, zoom: 12 })
+    if (bbox) {
+      // Use fitBounds with bbox: [minLng, minLat, maxLng, maxLat]
+      console.log('[SALES_CLIENT] Using bbox for map centering:', bbox)
+      // Store bbox for the map component to use
+      setMapView({ center: { lat, lng }, zoom: 12, bbox: bbox })
+    } else {
+      // Use center and zoom
+      setMapView({ center: { lat, lng }, zoom: 12 })
+    }
     
     // Store ZIP parameters for later use in moveend handler
     const zipParams = { 
@@ -412,7 +450,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         console.log('[SALES_CLIENT] ZIP moveend - triggering bounds-based fetch:', viewportBounds)
         
         // Use bounds-based fetching
-        fetchSales(false, undefined, { cause: 'Filters', seq: mySeq }, viewportBounds)
+        fetchSales(false, undefined, { cause: 'Filters', seq: mySeq, intent: intentRef.current }, viewportBounds)
           .then(result => {
             if (result) {
               const unique = deduplicateSales(result.data)
@@ -424,16 +462,29 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
                 console.log(`[ZIP_FLOW] fetchSales.end count=${unique.length}`)
                 console.log(`[ZIP_FLOW] visibleSales.set count=${unique.length} src=fetchSales`)
               }
+              
+              // Update URL with ZIP parameter
+              updateUrlWithZip(zip)
             }
+            
+            // Clear loading state
+            setIsZipLoading(false)
           })
           .catch(error => {
             console.error('[FETCH] ZIP bounds fetch error:', error)
             applySalesResult({ data: [], seq: mySeq, cause: 'Filters' }, 'filtered')
             applySalesResult({ data: [], seq: mySeq, cause: 'Filters' }, 'map')
+            
+            // Clear loading state on error
+            setIsZipLoading(false)
           })
       } else {
         console.log('[SALES_CLIENT] ZIP moveend - no map ref, falling back to distance-based fetch')
-        runFilteredFetch(zipParams, { cause: 'Filters', seq: mySeq })
+        runFilteredFetch(zipParams, { cause: 'Filters', seq: mySeq, intent: intentRef.current })
+          .finally(() => {
+            // Clear loading state
+            setIsZipLoading(false)
+          })
       }
       
       // Clear programmatic move flag
@@ -447,14 +498,15 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // Create reusable components for the new layout
   const filtersComponent = (
     <FiltersBar
-      onZipLocationFound={(lat, lng, _city, _state, _zip) => {
-        console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city, _state, _zip })
+      onZipLocationFound={(lat, lng, _city, _state, _zip, bbox) => {
+        console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city, _state, _zip, bbox })
         
         // Convert to onZipResolved format - center should be [lng, lat] for mapbox
         onZipResolved({ 
           zip: _zip || '', 
           center: [lng, lat], 
-          name: _city || '' 
+          name: _city || '',
+          bbox: bbox
         })
       }}
       onZipError={(error: any) => {
@@ -624,9 +676,45 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         </h2>
       </div>
       <div className="space-y-4">
-        {listData.map((sale) => (
-          <SaleCard key={sale.id} sale={sale} />
-        ))}
+        {isZipLoading ? (
+          // Show skeleton rows while ZIP is loading
+          Array.from({ length: 6 }).map((_, i) => (
+            <SaleCardSkeleton key={`skeleton-${i}`} />
+          ))
+        ) : listData.length > 0 ? (
+          listData.map((sale) => (
+            <SaleCard key={sale.id} sale={sale} />
+          ))
+        ) : (
+          // Empty state
+          <div className="text-center py-8">
+            <div className="text-gray-500 mb-4">
+              No sales match your filters in {intentRef.current.kind === 'Filters' && (intentRef.current as any).zip ? (intentRef.current as any).zip : 'this area'}.
+            </div>
+            <div className="space-x-2">
+              <button 
+                onClick={() => {
+                  // Increase distance
+                  const newDistance = Math.min(filters.distance + 10, 100)
+                  // This would need to be implemented with the filters system
+                  console.log('Increase distance to', newDistance)
+                }}
+                className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+              >
+                Increase Distance
+              </button>
+              <button 
+                onClick={() => {
+                  // Set date range to any
+                  console.log('Set date range to any')
+                }}
+                className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
+              >
+                Any Date
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 // lib/sales/intent.ts
 export type Intent = 
-  | { kind: 'Filters'; reason?: string }
+  | { kind: 'Filters'; sub?: 'Zip'; zip?: string; reason?: string }
   | { kind: 'UserPan'; reason?: string }
   | { kind: 'ClusterDrilldown'; targetBounds?: any; leafIds?: string[]; reason?: string };
 
@@ -9,6 +9,7 @@ export type FetchCause = 'Filters' | 'UserPan' | 'ClusterDrilldown';
 export type FetchContext = {
   cause: FetchCause;
   seq: number;
+  intent: Intent;
 };
 
 // Helper: determines if a result from `cause` can still apply given current intent.

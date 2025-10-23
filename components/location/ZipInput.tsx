@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { normalizeGeocode } from '@/lib/contracts/geocode'
 
 interface ZipInputProps {
-  onLocationFound: (lat: number, lng: number, city?: string, state?: string, zip?: string) => void
+  onLocationFound: (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => void
   onError: (error: string) => void
   placeholder?: string
   className?: string
@@ -33,6 +33,7 @@ export default function ZipInput({
 }: ZipInputProps) {
   const [zip, setZip] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   // Auto-submit for dev (skip in test environment)
   useEffect(() => {
@@ -66,23 +67,32 @@ export default function ZipInput({
 
   const performZipLookup = async (zipToUse?: string) => {
     const targetZip = zipToUse || zip
-    if (!targetZip || !/^\d{5}$/.test(targetZip)) {
-      console.log('[ZIP_INPUT] Invalid zip format:', targetZip)
-      onError('Please enter a valid 5-digit ZIP code')
+    const trimmedZip = targetZip?.trim()
+    
+    // Validate ZIP format: ^\d{5}(-\d{4})?$
+    if (!trimmedZip || !/^\d{5}(-\d{4})?$/.test(trimmedZip)) {
+      console.log('[ZIP_INPUT] Invalid zip format:', trimmedZip)
+      const errorMsg = 'Enter a valid US ZIP (e.g., 40204 or 40204-1234).'
+      setError(errorMsg)
+      onError(errorMsg)
       return
     }
 
     setLoading(true)
+    setError('') // Clear inline error
     onError('') // Clear previous errors
 
     try {
+      console.log('[ZIP] submit', { zip: trimmedZip, seq: Date.now() })
+      console.log('[ZIP] request start')
+      
       if (process.env.NEXT_PUBLIC_DEBUG) {
         console.log(`[ZIP_FLOW] input=${targetZip}`)
         console.log(`[ZIP_FLOW] geocode.start`)
       }
       
-      console.log(`[ZIP_INPUT] Making request to /api/geocoding/zip?zip=${targetZip}`)
-      const response = await fetch(`/api/geocoding/zip?zip=${targetZip}`)
+      console.log(`[ZIP_INPUT] Making request to /api/geocoding/zip?zip=${trimmedZip}`)
+      const response = await fetch(`/api/geocoding/zip?zip=${trimmedZip}`)
       console.log(`[ZIP_INPUT] Response status:`, response.status)
       const data = await response.json()
       console.log(`[ZIP_INPUT] Response data:`, data)
@@ -114,46 +124,75 @@ export default function ZipInput({
           state: normalized.state, 
           zip: normalized.zip 
         })
-        onLocationFound(normalized.lat, normalized.lng, normalized.city, normalized.state, normalized.zip)
-        console.log(`[ZIP_INPUT] Found location for ${targetZip}: ${normalized.city}, ${normalized.state} (${normalized.source})`)
+        onLocationFound(normalized.lat, normalized.lng, normalized.city, normalized.state, normalized.zip, normalized.bbox)
+        console.log(`[ZIP_INPUT] Found location for ${trimmedZip}: ${normalized.city}, ${normalized.state} (${normalized.source})`)
+        console.log('[ZIP] request success')
       } else {
+        console.log('[ZIP] request fail')
         if (process.env.NEXT_PUBLIC_DEBUG) {
           console.log(`[ZIP_FLOW] geocode.invalid`)
         }
-        onError(data.error || 'ZIP code not found')
+        const errorMsg = data.error || 'ZIP code not found'
+        setError(errorMsg)
+        onError(errorMsg)
       }
     } catch (error) {
+      console.log('[ZIP] request fail')
       console.error('ZIP lookup error:', error)
       if (process.env.NEXT_PUBLIC_DEBUG) {
         console.log(`[ZIP_FLOW] geocode.invalid`)
       }
       console.error('ZIP search error:', error instanceof Error ? error.message : String(error))
-      onError('Failed to lookup ZIP code')
+      const errorMsg = 'Failed to lookup ZIP code'
+      setError(errorMsg)
+      onError(errorMsg)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className={`flex gap-2 ${className}`}>
-      <input
-        type="text"
-        value={zip}
-        onChange={(e) => setZip(e.target.value.replace(/\D/g, '').slice(0, 5))}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        maxLength={5}
-        data-testid={dataTestId}
-        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        disabled={loading}
-      />
-      <button
-        type="submit"
-        disabled={loading || !zip || zip.length !== 5}
-        className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? 'Looking up...' : 'Set'}
-      </button>
-    </form>
+    <div className={className}>
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            value={zip}
+            onChange={(e) => {
+              // Allow digits and hyphens, limit to ZIP+4 format
+              const value = e.target.value.replace(/[^\d-]/g, '')
+              if (value.length <= 10) { // 5 digits + hyphen + 4 digits
+                setZip(value)
+              }
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            maxLength={10}
+            data-testid={dataTestId}
+            className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              error ? 'border-red-500' : 'border-gray-300'
+            }`}
+            disabled={loading}
+          />
+          {loading && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+            </div>
+          )}
+        </div>
+        <button
+          type="submit"
+          disabled={loading || !zip || !/^\d{5}(-\d{4})?$/.test(zip.trim())}
+          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Looking up...' : 'Set'}
+        </button>
+      </form>
+      {error && (
+        <div className="mt-1 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+    </div>
   )
 }

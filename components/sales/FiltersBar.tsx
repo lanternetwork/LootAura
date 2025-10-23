@@ -8,7 +8,7 @@ import { Filter } from 'lucide-react'
 
 type FiltersBarProps = {
   // ZIP Search
-  onZipLocationFound: (lat: number, lng: number, _city?: string, _state?: string, _zip?: string) => void
+  onZipLocationFound: (lat: number, lng: number, _city?: string, _state?: string, _zip?: string, bbox?: [number, number, number, number]) => void
   onZipError: (error: string) => void
   zipError?: string
   

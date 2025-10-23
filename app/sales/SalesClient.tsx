@@ -233,6 +233,7 @@ export default function SalesClient({
 
   // Memoized map center
   const mapCenter = useMemo(() => {
+    console.log('[SALES] mapCenter memo triggered:', mapView.center)
     return mapView.center
   }, [mapView.center])
 
@@ -319,7 +320,10 @@ export default function SalesClient({
             <SalesMap
               sales={mapSales}
               markers={mapMarkers}
-              center={mapCenter}
+              center={(() => {
+                console.log('[SALES] Passing center to SalesMap:', mapCenter)
+                return mapCenter
+              })()}
               zoom={mapZoom}
               onViewChange={handleMapViewChange}
               onMoveEnd={() => {

@@ -308,20 +308,22 @@ export default function SalesClient({
         style={{ height: MAIN_CONTENT_HEIGHT }}
       >
         {/* Map - Left Side (Dominant) */}
-        <div className="relative min-h-0 min-w-0 bg-gray-100">
-          <SalesMap
-            sales={mapSales}
-            markers={mapMarkers}
-            center={mapCenter}
-            zoom={mapZoom}
-            onViewChange={handleMapViewChange}
-            onMoveEnd={() => {
-              // Trigger fetch after map movement completes
-              fetchMapSales()
-            }}
-            fitBounds={fitBounds}
-            onFitBoundsComplete={() => setFitBounds(null)}
-          />
+        <div className="relative min-h-0 min-w-0 bg-gray-100" style={{ height: '100%' }}>
+          <div className="w-full h-full">
+            <SalesMap
+              sales={mapSales}
+              markers={mapMarkers}
+              center={mapCenter}
+              zoom={mapZoom}
+              onViewChange={handleMapViewChange}
+              onMoveEnd={() => {
+                // Trigger fetch after map movement completes
+                fetchMapSales()
+              }}
+              fitBounds={fitBounds}
+              onFitBoundsComplete={() => setFitBounds(null)}
+            />
+          </div>
         </div>
 
         {/* Sales List - Right Panel */}

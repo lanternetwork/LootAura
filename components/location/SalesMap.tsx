@@ -61,10 +61,27 @@ export default function SalesMap({
     mapDebug.logMapLoad('SalesMap', 'success', { onMapReady: !!onMapReady })
     setIsMapLoading(false) // Map is loaded, hide loading indicator
     
-    // Call map.resize() on first load
     const map = mapRef.current?.getMap?.()
     if (map && typeof map.resize === 'function') {
+      // Resize immediately on load
       map.resize()
+      
+      // Also resize after style loads (important for proper rendering)
+      map.on('style.load', () => {
+        map.resize()
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
+          console.log(`[MAP_RESIZE] invoked reason=style.load`)
+        }
+      })
+      
+      // One-shot resize after first frame
+      requestAnimationFrame(() => {
+        map.resize()
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
+          console.log(`[MAP_RESIZE] invoked reason=requestAnimationFrame`)
+        }
+      })
+      
       if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
         console.log(`[MAP_RESIZE] invoked reason=load`)
       }
@@ -129,6 +146,17 @@ export default function SalesMap({
         const map = mapRef.current?.getMap?.()
         if (map && typeof map.resize === 'function') {
           map.resize()
+          
+          // One-shot resize after first observer event
+          if (newDebugInfo.containerHeight > 0 && !autoFitAttemptedRef.current) {
+            autoFitAttemptedRef.current = true
+            requestAnimationFrame(() => {
+              map.resize()
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
+                console.log(`[MAP_RESIZE] invoked reason=first-observer-frame`)
+              }
+            })
+          }
         }
       }
     })

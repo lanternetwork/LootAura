@@ -253,11 +253,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         const json = await response.json()
         console.log('[FETCH] Viewport API response:', json)
         
-        // Normalize and validate the response
-        const normalized = normalizeSalesJson(json)
-        const parsed = SalesResponseSchema.safeParse(normalized)
-        const sales: Sale[] = parsed.success ? parsed.data.sales as Sale[] : []
-        const meta = parsed.success ? parsed.data.meta : { parse: "failed" }
+        // Normalize and validate the response with error handling
+        let normalized, parsed, sales: Sale[], meta
+        try {
+          normalized = normalizeSalesJson(json)
+          parsed = SalesResponseSchema.safeParse(normalized)
+          sales = parsed.success ? parsed.data.sales as Sale[] : []
+          meta = parsed.success ? parsed.data.meta : { parse: "failed" }
+        } catch (error) {
+          console.error('[FETCH] Error normalizing/parsing viewport response:', error)
+          sales = []
+          meta = { parse: "error", error: error.message }
+        }
         
         console.log('[FETCH] fetchSales response (viewport):', { count: sales.length, ctx: _ctx, meta })
         console.log('[FETCH] Sales sample (viewport):', sales.slice(0, 2))
@@ -301,10 +308,18 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       console.log('[FETCH] Raw API response:', json)
       console.log('[FETCH] Raw API response details:', JSON.stringify(json, null, 2))
       
-      const normalized = normalizeSalesJson(json)
-      const parsed = SalesResponseSchema.safeParse(normalized)
-      const sales: Sale[] = parsed.success ? parsed.data.sales as Sale[] : []
-      const meta = parsed.success ? parsed.data.meta : { parse: "failed" }
+      // Normalize and validate the response with error handling
+      let normalized, parsed, sales: Sale[], meta
+      try {
+        normalized = normalizeSalesJson(json)
+        parsed = SalesResponseSchema.safeParse(normalized)
+        sales = parsed.success ? parsed.data.sales as Sale[] : []
+        meta = parsed.success ? parsed.data.meta : { parse: "failed" }
+      } catch (error) {
+        console.error('[FETCH] Error normalizing/parsing regular response:', error)
+        sales = []
+        meta = { parse: "error", error: error.message }
+      }
       
       console.log('[FETCH] fetchSales response:', { count: sales.length, ctx: _ctx, meta })
       console.log('[FETCH] Sales sample:', sales.slice(0, 2))
@@ -379,33 +394,42 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
 
   // ZIP resolved handler
   const onZipResolved = useCallback(({ zip, center, name, bbox }: { zip: string; center: [number, number]; name: string; bbox?: [number, number, number, number] }) => {
-    console.log('[SALES_CLIENT] ZIP resolved:', { zip, center, name })
-    console.log('[SALES_CLIENT] ZIP center array:', center)
-    console.log('[SALES_CLIENT] ZIP center type check:', { 
-      isArray: Array.isArray(center), 
-      length: center.length, 
-      first: center[0], 
-      second: center[1] 
-    })
-    
-    if (process.env.NEXT_PUBLIC_DEBUG) {
-      console.log(`[ZIP_FLOW] arbiter.intent=Filters ts=${Date.now()}`)
-    }
-    
-    // Set loading state
-    setIsZipLoading(true)
-    
-    // Set intent to Filters with sub Zip and zip parameter
-    bumpSeq({ kind: 'Filters', sub: 'Zip', zip: zip, reason: 'Zip' })
-    const mySeq = seqRef.current
-    
-    // Set programmatic move flag
-    programmaticMoveRef.current = true
-    
-    // Center map programmatically
-    const [lng, lat] = center
-    console.log('[SALES_CLIENT] Destructured coordinates:', { lng, lat })
-    console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
+    try {
+      console.log('[SALES_CLIENT] ZIP resolved:', { zip, center, name })
+      console.log('[SALES_CLIENT] ZIP center array:', center)
+      console.log('[SALES_CLIENT] ZIP center type check:', { 
+        isArray: Array.isArray(center), 
+        length: center.length, 
+        first: center[0], 
+        second: center[1] 
+      })
+      
+      if (process.env.NEXT_PUBLIC_DEBUG) {
+        console.log(`[ZIP_FLOW] arbiter.intent=Filters ts=${Date.now()}`)
+      }
+      
+      // Set loading state
+      setIsZipLoading(true)
+      
+      // Set intent to Filters with sub Zip and zip parameter
+      bumpSeq({ kind: 'Filters', sub: 'Zip', zip: zip, reason: 'Zip' })
+      const mySeq = seqRef.current
+      
+      // Set programmatic move flag
+      programmaticMoveRef.current = true
+      
+      // Center map programmatically with validation
+      if (!Array.isArray(center) || center.length !== 2) {
+        throw new Error(`Invalid center array: ${JSON.stringify(center)}`)
+      }
+      
+      const [lng, lat] = center
+      if (typeof lng !== 'number' || typeof lat !== 'number' || isNaN(lng) || isNaN(lat)) {
+        throw new Error(`Invalid coordinates: lng=${lng}, lat=${lat}`)
+      }
+      
+      console.log('[SALES_CLIENT] Destructured coordinates:', { lng, lat })
+      console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
     
     if (process.env.NEXT_PUBLIC_DEBUG) {
       console.log(`[ZIP_FLOW] map.move.start reason=zip`)
@@ -487,6 +511,12 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
           })
       }
       
+      // Clear programmatic move flag
+      programmaticMoveRef.current = false
+    } catch (error) {
+      console.error('[SALES_CLIENT] Error in onZipResolved:', error)
+      // Clear loading state on error
+      setIsZipLoading(false)
       // Clear programmatic move flag
       programmaticMoveRef.current = false
     }

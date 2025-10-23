@@ -127,6 +127,15 @@ export default function SalesMap({
   const pendingCenterChangeRef = useRef<{ center: { lat: number; lng: number }; zoom: number } | null>(null)
   const [isMapLoading, setIsMapLoading] = useState(true)
   
+  // Debug: Monitor mapRef changes
+  useEffect(() => {
+    console.log('[MAP] mapRef changed:', { 
+      mapRefExists: !!mapRef.current, 
+      mapRefType: typeof mapRef.current,
+      mapRefKeys: mapRef.current ? Object.keys(mapRef.current) : 'null'
+    })
+  }, [mapRef.current])
+  
   // ResizeObserver for map container sizing
   useEffect(() => {
     if (!containerRef.current) return
@@ -338,7 +347,9 @@ export default function SalesMap({
     console.log('[MAP] Center effect - map check:', { 
       mapRefExists: !!mapRef.current, 
       getMapExists: !!mapRef.current?.getMap, 
-      mapExists: !!map 
+      mapExists: !!map,
+      mapRefType: typeof mapRef.current,
+      mapRefKeys: mapRef.current ? Object.keys(mapRef.current) : 'null'
     })
     if (!map) {
       console.log('[MAP] Center effect - no map, will retry when map loads')

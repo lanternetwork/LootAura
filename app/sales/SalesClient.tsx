@@ -59,6 +59,24 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
   )
   
+  // Intent-based system state
+  const intentRef = useRef<Intent>({ kind: 'Filters' })
+  const seqRef = useRef(0)
+  const programmaticMoveRef = useRef(false)
+
+  // Intent system helpers
+  const bumpSeq = useCallback((newIntent: Intent) => {
+    seqRef.current += 1
+    intentRef.current = newIntent
+    console.debug('[INTENT] set', { intent: newIntent.kind, seq: seqRef.current })
+    
+    // Update debug intent attribute
+    const salesRoot = document.querySelector('[data-testid="sales-root"]')
+    if (salesRoot) {
+      salesRoot.setAttribute('data-debug-intent', `${newIntent.kind}:${(newIntent as any).reason ?? ''}`)
+    }
+  }, [])
+
   // URL handling functions
   const updateUrlWithZip = useCallback((zip: string) => {
     const currentParams = new URLSearchParams(searchParams.toString())
@@ -75,11 +93,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       // Trigger ZIP flow (this will be handled by the ZipInput component)
     }
   }, [searchParams, bumpSeq])
-
-  // Intent-based system state
-  const intentRef = useRef<Intent>({ kind: 'Filters' })
-  const seqRef = useRef(0)
-  const programmaticMoveRef = useRef(false)
 
   // Update debug intent attribute when intent changes
   useEffect(() => {
@@ -130,19 +143,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   const [_loading, _setLoading] = useState(false)
   const [isZipLoading, setIsZipLoading] = useState(false)
   // Legacy state variables removed - using intent system only
-
-  // Intent system helpers
-  const bumpSeq = useCallback((newIntent: Intent) => {
-    seqRef.current += 1
-    intentRef.current = newIntent
-    console.debug('[INTENT] set', { intent: newIntent.kind, seq: seqRef.current })
-    
-    // Update debug intent attribute
-    const salesRoot = document.querySelector('[data-testid="sales-root"]')
-    if (salesRoot) {
-      salesRoot.setAttribute('data-debug-intent', `${newIntent.kind}:${(newIntent as any).reason ?? ''}`)
-    }
-  }, [])
 
   // Update markers when sales data changes
   useEffect(() => {

@@ -64,9 +64,9 @@ describe.skip('Grid Container Snapshot', () => {
     expect(gridContainer).toMatchSnapshot()
   })
 
-  it('should have consistent classes for different authority modes', () => {
-    // Test MAP authority
-    const { container: mapContainer } = render(
+  it('should have consistent classes for map-only data flow', () => {
+    // Test map-only data flow
+    const { container } = render(
       <SalesClient
         initialSales={mockSales}
         initialSearchParams={{}}
@@ -75,21 +75,8 @@ describe.skip('Grid Container Snapshot', () => {
       />
     )
 
-    const mapGrid = mapContainer.querySelector('[data-testid="sales-grid"]')
-    expect(mapGrid?.className).toMatchSnapshot('map-authority-grid')
-
-    // Test FILTERS authority (simulated)
-    const { container: filtersContainer } = render(
-      <SalesClient
-        initialSales={mockSales}
-        initialSearchParams={{}}
-        initialCenter={{ lat: 38.1405, lng: -85.6936 }}
-        user={null}
-      />
-    )
-
-    const filtersGrid = filtersContainer.querySelector('[data-testid="sales-grid"]')
-    expect(filtersGrid?.className).toMatchSnapshot('filters-authority-grid')
+    const grid = container.querySelector('[data-testid="sales-grid"]')
+    expect(grid?.className).toMatchSnapshot('map-only-grid')
   })
 
   it('should maintain consistent structure with different sale counts', () => {

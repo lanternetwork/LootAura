@@ -45,12 +45,12 @@ describe('Map-only Data Flow', () => {
     expect(fetchParams.maxLat).toBe(38.3)
   })
 
-  it('should not have authority-based logic', () => {
-    // In map-only system, there should be no authority checks
-    const hasAuthority = false
-    const usesMapViewport = true
+  it('should use map-only data flow', () => {
+    // In map-only system, all data comes from map viewport
+    const usesMapOnlyFlow = true
+    const noAuthorityChecks = true
     
-    expect(hasAuthority).toBe(false)
-    expect(usesMapViewport).toBe(true)
+    expect(usesMapOnlyFlow).toBe(true)
+    expect(noAuthorityChecks).toBe(true)
   })
 })

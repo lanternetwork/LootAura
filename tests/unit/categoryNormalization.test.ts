@@ -130,9 +130,9 @@ describe('Category Normalization', () => {
   })
 })
 
-describe('Arbiter Decision Logic', () => {
-  // Pure function that returns arbiter decision
-  function evaluateArbiterDecision(
+describe('Filter Decision Logic', () => {
+  // Pure function that returns filter decision
+  function evaluateFilterDecision(
     prevFilters: any,
     nextFilters: any,
     mapAuthority: boolean,

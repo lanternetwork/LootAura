@@ -332,7 +332,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const viewportClusters = getClustersForViewport(clusterIndex, bbox, currentZoom)
     setClusters(viewportClusters)
 
-    // Update visible pins for arbiter authority
+    // Update visible pins for map viewport
     const visibleIds = viewportClusters
       .filter(cluster => cluster.type === 'point')
       .map(cluster => cluster.id)

@@ -4,7 +4,6 @@ interface FetchEvent {
   id: string
   endpoint: string
   params: Record<string, string>
-  authority: string
   viewportSeq: number
   requestSeq: number
   status: 'pending' | 'success' | 'error'
@@ -34,7 +33,6 @@ export async function diagnosticFetch(
   url: string,
   options: RequestInit = {},
   context: {
-    authority: string
     viewportSeq: number
     requestSeq: number
     params?: Record<string, string>
@@ -53,7 +51,6 @@ export async function diagnosticFetch(
   emitFetchEvent({
     endpoint: urlObj.pathname,
     params,
-    authority: context.authority,
     viewportSeq: context.viewportSeq,
     requestSeq: context.requestSeq,
     status: 'pending'
@@ -71,7 +68,6 @@ export async function diagnosticFetch(
     emitFetchEvent({
       endpoint: urlObj.pathname,
       params,
-      authority: context.authority,
       viewportSeq: context.viewportSeq,
       requestSeq: context.requestSeq,
       status: 'success',
@@ -87,7 +83,6 @@ export async function diagnosticFetch(
     emitFetchEvent({
       endpoint: urlObj.pathname,
       params,
-      authority: context.authority,
       viewportSeq: context.viewportSeq,
       requestSeq: context.requestSeq,
       status: 'error',
@@ -110,7 +105,6 @@ export function emitSuppressedFetch(
   emitFetchEvent({
     endpoint,
     params,
-    authority: context.authority,
     viewportSeq: context.viewportSeq,
     requestSeq: context.requestSeq,
     status: 'error',

@@ -265,7 +265,7 @@ describe('Map Clusters Flow', () => {
     unmount()
   })
 
-  it('should handle clustering without arbiter authority', async () => {
+  it('should handle clustering with map-only data flow', async () => {
     const onVisiblePinsChange = vi.fn()
     
     const { unmount } = render(

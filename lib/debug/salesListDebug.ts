@@ -41,7 +41,6 @@ export const salesListDebug = {
     salesCount: number
     hasMore?: boolean
     sampleSales?: Array<{ id: string; title: string }>
-    authority?: string
     append?: boolean
   }) => {
     if (isDebugEnabled()) {
@@ -49,19 +48,18 @@ export const salesListDebug = {
         count: data.salesCount,
         hasMore: data.hasMore,
         sample: data.sampleSales,
-        authority: data.authority,
         append: data.append
       })
     }
   },
   
-  logVisibleRendered: (authority: 'MAP' | 'FILTERS', data: {
+  logVisibleRendered: (data: {
     visibleCount: number
     renderedCount: number
     sampleVisible?: Array<{ id: string; title: string }>
   }) => {
     if (isDebugEnabled()) {
-      console.log(`👁️ [VISIBLE/RENDERED] ${authority}:`, {
+      console.log(`👁️ [VISIBLE/RENDERED]:`, {
         visible: data.visibleCount,
         rendered: data.renderedCount,
         sample: data.sampleVisible
@@ -69,7 +67,7 @@ export const salesListDebug = {
     }
   },
   
-  logRendering: (authority: string, data: {
+  logRendering: (data: {
     isUpdating: boolean
     staleSalesCount: number
     renderedSalesCount: number
@@ -81,7 +79,7 @@ export const salesListDebug = {
     fetchedOnce?: boolean
   }) => {
     if (isDebugEnabled()) {
-      console.log(`🎨 [RENDERING] ${authority}:`, {
+      console.log(`🎨 [RENDERING]:`, {
         updating: data.isUpdating,
         stale: data.staleSalesCount,
         rendered: data.renderedSalesCount,

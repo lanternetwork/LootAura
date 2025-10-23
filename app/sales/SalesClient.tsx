@@ -297,20 +297,42 @@ export default function SalesClient({
         </div>
       </div>
 
-      {/* Filters Bar */}
+      {/* Single-row Filters Bar */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center space-x-4">
-          <ZipInput
-            onLocationFound={handleZipLocationFound}
-            onError={handleZipError}
-            placeholder="Enter ZIP code"
-            className="w-48"
-          />
-          <div className="flex items-center space-x-2">
-            <DateWindowLabel dateRange={filters.dateRange} />
-            <span className="text-sm text-gray-600">
-              {filters.distance} miles
-            </span>
+        <div className="flex items-center justify-between">
+          {/* Left: ZIP Input */}
+          <div className="flex-shrink-0">
+            <ZipInput
+              onLocationFound={handleZipLocationFound}
+              onError={handleZipError}
+              placeholder="Enter ZIP code"
+              className="w-48"
+            />
+          </div>
+
+          {/* Center: Filter Chips */}
+          <div className="flex-1 flex items-center justify-center min-w-0 px-4">
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <DateWindowLabel dateRange={filters.dateRange} />
+              <span>•</span>
+              <span>{filters.distance} miles</span>
+              {filters.categories.length > 0 && (
+                <>
+                  <span>•</span>
+                  <span>{filters.categories.length} categories</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Right: More Filters */}
+          <div className="flex-shrink-0">
+            <button
+              onClick={() => setShowFiltersModal(true)}
+              className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+            >
+              More Filters
+            </button>
           </div>
         </div>
         {zipError && (
@@ -318,10 +340,10 @@ export default function SalesClient({
         )}
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - Zillow Style */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Map */}
-        <div className="flex-1">
+        {/* Map - Left Side (Dominant) */}
+        <div className="flex-1 min-h-0">
           <SalesMap
             sales={mapSales}
             markers={mapMarkers}
@@ -337,13 +359,15 @@ export default function SalesClient({
           />
         </div>
 
-        {/* Sales List */}
-        <div className="w-96 bg-white border-l border-gray-200 overflow-y-auto">
-          <div className="p-4">
-            <h2 className="text-lg font-semibold mb-4">
+        {/* Sales List - Right Panel */}
+        <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
+          <div className="flex-shrink-0 p-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold">
               Sales ({visibleSales.length})
             </h2>
-            
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4">
             {loading && (
               <div className="space-y-4">
                 {Array.from({ length: 6 }).map((_, i) => (

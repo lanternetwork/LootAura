@@ -58,6 +58,7 @@ export default function SalesMap({
 
   // Call onMapReady when map loads (not onLoad bounds emission)
   const handleMapLoad = useCallback(() => {
+    console.log('[MAP] handleMapLoad called - map is ready!')
     mapDebug.logMapLoad('SalesMap', 'success', { onMapReady: !!onMapReady })
     setIsMapLoading(false) // Map is loaded, hide loading indicator
     
@@ -92,6 +93,8 @@ export default function SalesMap({
       console.log('[MAP] Map loaded, applying pending center change:', pendingCenterChangeRef.current)
       handleCenterChange(map)
       pendingCenterChangeRef.current = null
+    } else {
+      console.log('[MAP] Map loaded, no pending center changes')
     }
     
     if (onMapReady) {
@@ -336,7 +339,28 @@ export default function SalesMap({
       console.log('[MAP] Center effect - no map, will retry when map loads')
       // Store the pending center change to apply when map is ready
       pendingCenterChangeRef.current = { center, zoom }
-      return
+      
+      // Fallback: check periodically if map becomes ready
+      const checkInterval = setInterval(() => {
+        const retryMap = mapRef.current?.getMap?.()
+        if (retryMap && pendingCenterChangeRef.current) {
+          console.log('[MAP] Fallback: Map became ready, applying pending center change')
+          handleCenterChange(retryMap)
+          pendingCenterChangeRef.current = null
+          clearInterval(checkInterval)
+        }
+      }, 200)
+      
+      // Clean up interval after 5 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval)
+        if (pendingCenterChangeRef.current) {
+          console.log('[MAP] Fallback: Timeout reached, clearing pending center change')
+          pendingCenterChangeRef.current = null
+        }
+      }, 5000)
+      
+      return () => clearInterval(checkInterval)
     }
     
     console.log('[MAP] Center effect - map exists, continuing')

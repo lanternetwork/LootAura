@@ -76,6 +76,11 @@ export default function ZipInput({
     onError('') // Clear previous errors
 
     try {
+      if (process.env.NEXT_PUBLIC_DEBUG) {
+        console.log(`[ZIP_FLOW] input=${targetZip}`)
+        console.log(`[ZIP_FLOW] geocode.start`)
+      }
+      
       console.log(`[ZIP_INPUT] Making request to /api/geocoding/zip?zip=${targetZip}`)
       const response = await fetch(`/api/geocoding/zip?zip=${targetZip}`)
       console.log(`[ZIP_INPUT] Response status:`, response.status)
@@ -86,6 +91,10 @@ export default function ZipInput({
         // Normalize the geocode response
         const normalized = normalizeGeocode(data)
         console.log(`[ZIP_INPUT] Normalized data:`, normalized)
+        
+        if (process.env.NEXT_PUBLIC_DEBUG) {
+          console.log(`[ZIP_FLOW] geocode.result {type=postcode, name=${normalized.city}, center=[${normalized.lng},${normalized.lat}]}`)
+        }
         
         // Write location cookie with ZIP, city, state info
         const locationData = {
@@ -108,10 +117,16 @@ export default function ZipInput({
         onLocationFound(normalized.lat, normalized.lng, normalized.city, normalized.state, normalized.zip)
         console.log(`[ZIP_INPUT] Found location for ${targetZip}: ${normalized.city}, ${normalized.state} (${normalized.source})`)
       } else {
+        if (process.env.NEXT_PUBLIC_DEBUG) {
+          console.log(`[ZIP_FLOW] geocode.invalid`)
+        }
         onError(data.error || 'ZIP code not found')
       }
     } catch (error) {
       console.error('ZIP lookup error:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG) {
+        console.log(`[ZIP_FLOW] geocode.invalid`)
+      }
       console.error('ZIP search error:', error instanceof Error ? error.message : String(error))
       onError('Failed to lookup ZIP code')
     } finally {

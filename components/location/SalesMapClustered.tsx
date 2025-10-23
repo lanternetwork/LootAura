@@ -608,6 +608,9 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const map = mapRef.current?.getMap?.()
     if (!map) return
 
+    // Store map reference for ZIP handler
+    ;(window as any).__currentMapRef = mapRef.current
+
     updateClusters(map)
     
     // Persist viewport state
@@ -621,6 +624,15 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     
     saveViewportState(viewport, currentFilters)
     logViewportSave(viewport)
+    
+    // Check for ZIP moveend handler
+    const zipHandler = (window as any).__zipMoveEndHandler
+    if (zipHandler) {
+      console.log('[SALES_MAP_CLUSTERED] Calling ZIP moveend handler')
+      zipHandler()
+      // Clear the handler to prevent multiple calls
+      delete (window as any).__zipMoveEndHandler
+    }
     
     onMoveEnd?.()
   }, [updateClusters, onMoveEnd])

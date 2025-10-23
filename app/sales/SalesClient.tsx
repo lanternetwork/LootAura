@@ -191,22 +191,67 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   }, [])
 
   // Fetch functions
-  const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }, _ctx?: FetchContext) => {
-    console.log('[FETCH] fetchSales called with context:', { _ctx, append, centerOverride })
+  const fetchSales = useCallback(async (append: boolean = false, centerOverride?: { lat: number; lng: number }, _ctx?: FetchContext, bounds?: { north: number; south: number; east: number; west: number }) => {
+    console.log('[FETCH] fetchSales called with context:', { _ctx, append, centerOverride, bounds })
     
     try {
       const params = new URLSearchParams()
-      if (centerOverride) {
-        params.set('lat', centerOverride.lat.toString())
-        params.set('lng', centerOverride.lng.toString())
-      } else if (mapView.center) {
-        // Use current map center if no override provided
-        params.set('lat', mapView.center.lat.toString())
-        params.set('lng', mapView.center.lng.toString())
+      
+      // Use bounds-based fetching if bounds are provided (for ZIP search)
+      if (bounds) {
+        console.log('[FETCH] Using bounds-based fetch:', bounds)
+        // Use the viewport API for bounds-based fetching
+        const viewportParams = new URLSearchParams()
+        viewportParams.set('minLng', bounds.west.toString())
+        viewportParams.set('minLat', bounds.south.toString())
+        viewportParams.set('maxLng', bounds.east.toString())
+        viewportParams.set('maxLat', bounds.north.toString())
+        if (filters.dateRange) {
+          viewportParams.set('dateRange', filters.dateRange)
+        }
+        if (filters.categories && filters.categories.length > 0) {
+          viewportParams.set('categories', filters.categories.join(','))
+        }
+        
+        const viewportUrl = `/api/sales/viewport?${viewportParams.toString()}`
+        console.log('[FETCH] Making viewport request to:', viewportUrl)
+        console.log('[FETCH] Viewport params:', Object.fromEntries(viewportParams.entries()))
+        
+        const response = await fetch(viewportUrl)
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('[FETCH] Viewport API error:', response.status, response.statusText, errorText)
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        
+        const json = await response.json()
+        console.log('[FETCH] Viewport API response:', json)
+        
+        // Normalize and validate the response
+        const normalized = normalizeSalesJson(json)
+        const parsed = SalesResponseSchema.safeParse(normalized)
+        const sales: Sale[] = parsed.success ? parsed.data.sales as Sale[] : []
+        const meta = parsed.success ? parsed.data.meta : { parse: "failed" }
+        
+        console.log('[FETCH] fetchSales response (viewport):', { count: sales.length, ctx: _ctx, meta })
+        console.log('[FETCH] Sales sample (viewport):', sales.slice(0, 2))
+        
+        return { data: sales, ctx: _ctx || { cause: 'Filters', seq: 0 } }
+      } else {
+        // Fallback to distance-based fetching
+        if (centerOverride) {
+          params.set('lat', centerOverride.lat.toString())
+          params.set('lng', centerOverride.lng.toString())
+        } else if (mapView.center) {
+          // Use current map center if no override provided
+          params.set('lat', mapView.center.lat.toString())
+          params.set('lng', mapView.center.lng.toString())
+        }
+        if (filters.distance) {
+          params.set('distanceKm', filters.distance.toString())
+        }
       }
-      if (filters.distance) {
-        params.set('distanceKm', filters.distance.toString())
-      }
+      
       if (filters.dateRange) {
         params.set('dateRange', filters.dateRange)
       }
@@ -316,6 +361,10 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       second: center[1] 
     })
     
+    if (process.env.NEXT_PUBLIC_DEBUG) {
+      console.log(`[ZIP_FLOW] arbiter.intent=Filters ts=${Date.now()}`)
+    }
+    
     // Set intent to Filters with source Zip
     bumpSeq({ kind: 'Filters', reason: 'Zip' })
     const mySeq = seqRef.current
@@ -327,21 +376,72 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     const [lng, lat] = center
     console.log('[SALES_CLIENT] Destructured coordinates:', { lng, lat })
     console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
+    
+    if (process.env.NEXT_PUBLIC_DEBUG) {
+      console.log(`[ZIP_FLOW] map.move.start reason=zip`)
+    }
+    
     setMapView({ center: { lat, lng }, zoom: 12 })
     
-    // Run filtered fetch with ZIP parameters
-    const params = { 
+    // Store ZIP parameters for later use in moveend handler
+    const zipParams = { 
       lat, 
       lng, 
       distance: filters.distance,
       centerOverride: { lat, lng }
     }
     
-    console.log('[SALES_CLIENT] ZIP search triggering fetch with params:', params)
-    runFilteredFetch(params, { cause: 'Filters', seq: mySeq })
+    // Store the ZIP parameters and sequence for the moveend handler
+    const handleZipMoveEnd = () => {
+      if (process.env.NEXT_PUBLIC_DEBUG) {
+        console.log(`[ZIP_FLOW] map.move.end`)
+        console.log(`[ZIP_FLOW] fetchSales.start bounds=<viewport>`)
+      }
+      
+      // Get current map bounds for bounds-based fetching
+      const map = (window as any).__currentMapRef?.getMap?.()
+      if (map) {
+        const bounds = map.getBounds()
+        const viewportBounds = {
+          north: bounds.getNorth(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          west: bounds.getWest()
+        }
+        
+        console.log('[SALES_CLIENT] ZIP moveend - triggering bounds-based fetch:', viewportBounds)
+        
+        // Use bounds-based fetching
+        fetchSales(false, undefined, { cause: 'Filters', seq: mySeq }, viewportBounds)
+          .then(result => {
+            if (result) {
+              const unique = deduplicateSales(result.data)
+              console.log('[FETCH] ZIP bounds fetch: in=%d out=%d', result.data.length, unique.length)
+              applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'filtered')
+              applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'map')
+              
+              if (process.env.NEXT_PUBLIC_DEBUG) {
+                console.log(`[ZIP_FLOW] fetchSales.end count=${unique.length}`)
+                console.log(`[ZIP_FLOW] visibleSales.set count=${unique.length} src=fetchSales`)
+              }
+            }
+          })
+          .catch(error => {
+            console.error('[FETCH] ZIP bounds fetch error:', error)
+            applySalesResult({ data: [], seq: mySeq, cause: 'Filters' }, 'filtered')
+            applySalesResult({ data: [], seq: mySeq, cause: 'Filters' }, 'map')
+          })
+      } else {
+        console.log('[SALES_CLIENT] ZIP moveend - no map ref, falling back to distance-based fetch')
+        runFilteredFetch(zipParams, { cause: 'Filters', seq: mySeq })
+      }
+      
+      // Clear programmatic move flag
+      programmaticMoveRef.current = false
+    }
     
-    // Clear programmatic move flag after a brief delay
-    setTimeout(() => { programmaticMoveRef.current = false }, 0)
+    // Store the handler for the map moveend event
+    ;(window as any).__zipMoveEndHandler = handleZipMoveEnd
   }, [bumpSeq, runFilteredFetch, filters.distance])
 
   // Create reusable components for the new layout

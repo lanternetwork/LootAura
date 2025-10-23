@@ -9,7 +9,8 @@ export async function middleware(req: NextRequest) {
   const isPublicPage = 
     pathname === '/' ||
     pathname === '/sales' ||
-    pathname === '/sell/new';
+    pathname === '/sell/new' ||
+    pathname === '/admin/tools';
   
   if (isPublicPage) {
     console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
@@ -44,7 +45,8 @@ export async function middleware(req: NextRequest) {
     (pathname === '/api/sales' && req.method === 'GET') ||
     (pathname === '/api/sales/markers' && req.method === 'GET') ||
     pathname.startsWith('/api/geocoding/') ||
-    pathname === '/api/location';
+    pathname === '/api/location' ||
+    pathname === '/api/lookup-sale';
   
   if (isPublicAPI) {
     console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);

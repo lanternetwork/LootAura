@@ -357,7 +357,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [viewportFetchManager])
 
-  // Update clusters when viewport changes
+  // Update clusters when viewport changes or sales data changes
   const updateClusters = useCallback((map: any) => {
     const startTime = Date.now()
     mapDebug.group('Cluster Update')
@@ -825,6 +825,33 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       })
     }
   }, [center.lat, center.lng, zoom])
+
+  // Update clusters when sales data changes
+  useEffect(() => {
+    const map = mapRef.current?.getMap?.()
+    if (!map || !isClusteringEnabled()) return
+    
+    console.log('[SALES_MAP_CLUSTERED] Sales data changed, updating clusters:', { salesCount: sales.length })
+    updateClusters(map)
+  }, [sales.length, updateClusters])
+
+  // Handle window resize to fix map layout issues
+  useEffect(() => {
+    const handleResize = () => {
+      const map = mapRef.current?.getMap?.()
+      if (map) {
+        console.log('[SALES_MAP_CLUSTERED] Window resize detected, calling map.resize()')
+        map.resize()
+        // Update clusters after resize
+        setTimeout(() => {
+          updateClusters(map)
+        }, 100)
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [updateClusters])
 
   // Debug logging for map initialization
   mapDebug.log('SalesMapClustered rendering')

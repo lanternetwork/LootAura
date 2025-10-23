@@ -337,7 +337,35 @@ export default function SalesMap({
     } catch {}
   }, [centerOverride, zoom])
 
-  // Simple approach: Map component will remount when center changes due to key prop
+  // Handle center changes
+  useEffect(() => {
+    console.log('[MAP] Center effect triggered', { center })
+    
+    if (!mapRef.current?.getMap?.()) {
+      console.log('[MAP] Center effect - no map, returning')
+      return
+    }
+
+    const map = mapRef.current.getMap()
+    const currentCenter = map.getCenter()
+    const newCenter = { lat: center.lat, lng: center.lng }
+    
+    console.log('[MAP] Current center:', currentCenter, 'New center:', newCenter)
+    
+    // Check if center has changed significantly
+    const latDiff = Math.abs(currentCenter.lat - newCenter.lat)
+    const lngDiff = Math.abs(currentCenter.lng - newCenter.lng)
+    
+    if (latDiff > 0.001 || lngDiff > 0.001) {
+      console.log('[MAP] Moving map to new center:', newCenter)
+      map.easeTo({
+        center: [newCenter.lng, newCenter.lat],
+        duration: 1000
+      })
+    } else {
+      console.log('[MAP] Center unchanged, no movement needed')
+    }
+  }, [center.lat, center.lng])
 
   // Handle fit bounds
   useEffect(() => {

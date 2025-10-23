@@ -167,12 +167,18 @@ export default function SalesClient({
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => {
     setZipError(null)
     
+    console.log('[ZIP] Updating map center to:', { lat, lng, zip })
+    
     // Update map center
-    setMapView(prev => ({
-      ...prev,
-      center: { lat, lng },
-      zoom: 12
-    }))
+    setMapView(prev => {
+      const newView = {
+        ...prev,
+        center: { lat, lng },
+        zoom: 12
+      }
+      console.log('[ZIP] New map view:', newView)
+      return newView
+    })
 
     // Update URL with ZIP parameter
     const currentParams = new URLSearchParams(searchParams.toString())

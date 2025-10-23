@@ -320,13 +320,29 @@ export default function SalesMap({
     const map = mapRef.current?.getMap?.()
     if (!map) return
     
+    console.log('[MAP] Center effect triggered:', { 
+      newCenter: center, 
+      zoom 
+    })
+    
     // Only move if center has actually changed
     const currentCenter = map.getCenter()
     const currentLat = currentCenter.lat
     const currentLng = currentCenter.lng
     
+    console.log('[MAP] Current map center:', { 
+      currentLat, 
+      currentLng 
+    })
+    
     const latDiff = Math.abs(currentLat - center.lat)
     const lngDiff = Math.abs(currentLng - center.lng)
+    
+    console.log('[MAP] Center difference:', { 
+      latDiff, 
+      lngDiff, 
+      shouldMove: latDiff > 0.001 || lngDiff > 0.001 
+    })
     
     // If center has changed significantly, move the map
     if (latDiff > 0.001 || lngDiff > 0.001) {
@@ -336,6 +352,8 @@ export default function SalesMap({
         zoom: zoom, 
         duration: 600 
       })
+    } else {
+      console.log('[MAP] Center unchanged, no movement needed')
     }
   }, [center.lat, center.lng, zoom])
 

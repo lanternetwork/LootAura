@@ -52,7 +52,24 @@ export default function MapDiagnostics() {
       setCurrentTest(testId)
       
       // Wait a bit for map to load
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Try to wait for map to be fully loaded
+      let retries = 0
+      while (retries < 5) {
+        const mapElement = document.querySelector('.mapboxgl-map')
+        if (mapElement) {
+          const mapInstance = (mapElement as any)._mapboxgl_map || 
+                             (mapElement as any).__mapboxgl_map ||
+                             (mapElement as any).getMap?.()
+          if (mapInstance) {
+            console.log('[MAP_DIAGNOSTIC] Map instance found after retry', retries)
+            break
+          }
+        }
+        await new Promise(resolve => setTimeout(resolve, 500))
+        retries++
+      }
       
       // Step 1: Check Mapbox Access Token
       const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
@@ -109,6 +126,25 @@ export default function MapDiagnostics() {
               if (instance) {
                 mapInstance = instance
                 break
+              }
+            }
+          }
+          
+          // If still no instance, try accessing through the Map component's internal structure
+          if (!mapInstance) {
+            // Look for the Map component's internal map instance
+            const mapContainer = document.querySelector('[data-testid="map-container"]')
+            if (mapContainer) {
+              // Try to find the map instance through the container's children
+              const mapElements = mapContainer.querySelectorAll('.mapboxgl-map')
+              for (const elem of mapElements) {
+                const instance = (elem as any)._mapboxgl_map || 
+                               (elem as any).__mapboxgl_map ||
+                               (elem as any).getMap?.()
+                if (instance) {
+                  mapInstance = instance
+                  break
+                }
               }
             }
           }

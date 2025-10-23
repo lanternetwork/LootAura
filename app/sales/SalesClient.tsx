@@ -46,8 +46,6 @@ export default function SalesClient({
   // Sales data state - map is source of truth
   const [mapSales, setMapSales] = useState<Sale[]>(initialSales)
   const [loading, setLoading] = useState(false)
-  const [_mapUpdating, setMapUpdating] = useState(false)
-  const [_mapError, setMapError] = useState<string | null>(null)
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [zipError, setZipError] = useState<string | null>(null)
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
@@ -110,7 +108,7 @@ export default function SalesClient({
       // Validate API response shape before processing
       if (!data || typeof data !== 'object') {
         console.error('[FETCH] Invalid response shape:', data)
-        setMapError('Invalid response from server')
+        console.error('[FETCH] Invalid response from server')
         return
       }
 
@@ -133,10 +131,8 @@ export default function SalesClient({
       }
     } catch (error) {
       console.error('[FETCH] Map sales error:', error)
-      setMapError('Failed to load sales')
     } finally {
       setLoading(false)
-      setMapUpdating(false)
     }
   }, [mapView.center, filters.dateRange, filters.categories, deduplicateSales])
 

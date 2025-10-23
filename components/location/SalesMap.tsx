@@ -132,22 +132,8 @@ export default function SalesMap({
   const pendingCenterChangeRef = useRef<{ center: { lat: number; lng: number }; zoom: number } | null>(null)
   const [isMapLoading, setIsMapLoading] = useState(true)
   
-  // Debug: Monitor mapRef changes
-  useEffect(() => {
-    console.log('[MAP] mapRef changed:', { 
-      mapRefExists: !!mapRef.current, 
-      mapRefType: typeof mapRef.current,
-      mapRefKeys: mapRef.current ? Object.keys(mapRef.current) : 'null'
-    })
-  }, [mapRef.current])
-  
-  // Debug: Monitor map instance changes
-  useEffect(() => {
-    console.log('[MAP] mapInstanceRef changed:', { 
-      mapInstanceExists: !!mapInstanceRef.current, 
-      mapInstanceType: typeof mapInstanceRef.current
-    })
-  }, [mapInstanceRef.current])
+  // Map refs for component lifecycle
+  const mapInstanceRef = useRef<any>(null) // Direct reference to the Mapbox map instance
   
   // ResizeObserver for map container sizing
   useEffect(() => {

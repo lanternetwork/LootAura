@@ -358,10 +358,18 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   }, [viewportFetchManager])
 
   // Update clusters when viewport changes or sales data changes
-  const updateClusters = useCallback((map: any) => {
+  const updateClusters = useCallback((map: any, recursionDepth: number = 0) => {
     const startTime = Date.now()
     mapDebug.group('Cluster Update')
     clusterDebug.group('Cluster Update')
+    
+    // Prevent infinite recursion
+    if (recursionDepth > 3) {
+      console.warn('[SALES_MAP_CLUSTERED] Maximum recursion depth reached, skipping cluster update')
+      mapDebug.groupEnd()
+      clusterDebug.groupEnd()
+      return
+    }
     
     if (!isClusteringEnabled()) {
       mapDebug.log('Clustering disabled, falling back to individual markers')
@@ -426,9 +434,19 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       // Force resize to fix stretching
       setTimeout(() => {
         map.resize()
-        // Retry cluster update after reset
+        // Retry cluster update after reset (with safety check)
         setTimeout(() => {
-          updateClusters(map)
+          try {
+            const newBounds = map.getBounds()
+            const newBoundsSpan = Math.abs(newBounds.getNorth() - newBounds.getSouth())
+            if (newBoundsSpan <= 10.0) {
+              updateClusters(map, recursionDepth + 1)
+            } else {
+              console.log('[SALES_MAP_CLUSTERED] Bounds still invalid after reset, skipping cluster update')
+            }
+          } catch (error) {
+            console.warn('[SALES_MAP_CLUSTERED] Error checking bounds after reset:', error)
+          }
         }, 100)
       }, 100)
       return
@@ -459,9 +477,20 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       // Force resize to fix stretching
       setTimeout(() => {
         map.resize()
-        // Retry cluster update after reset
+        // Retry cluster update after reset (with safety check)
         setTimeout(() => {
-          updateClusters(map)
+          try {
+            const newBounds = map.getBounds()
+            const newLatSpan = Math.abs(newBounds.getNorth() - newBounds.getSouth())
+            const newLngSpan = Math.abs(newBounds.getEast() - newBounds.getWest())
+            if (newLatSpan <= 3.0 && newLngSpan <= 3.0) {
+              updateClusters(map, recursionDepth + 1)
+            } else {
+              console.log('[SALES_MAP_CLUSTERED] Bounds still corrupted after reset, skipping cluster update')
+            }
+          } catch (error) {
+            console.warn('[SALES_MAP_CLUSTERED] Error checking bounds after reset:', error)
+          }
         }, 100)
       }, 100)
       return

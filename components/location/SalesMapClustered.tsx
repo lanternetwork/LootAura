@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useRef, useCallback, useMemo, forwardRef } from 'react'
 import Map, { Marker, Popup } from 'react-map-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
 import { Sale } from '@/lib/types'
 import { getMapboxToken } from '@/lib/maps/token'
 import { 

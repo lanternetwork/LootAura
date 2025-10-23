@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Map, { Marker, Popup } from 'react-map-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
 // import mapboxgl from 'mapbox-gl'
 import { Sale } from '@/lib/types'
 // import { formatLocation } from '@/lib/location/client'
@@ -61,10 +60,20 @@ export default function SalesMap({
   const handleMapLoad = useCallback(() => {
     mapDebug.logMapLoad('SalesMap', 'success', { onMapReady: !!onMapReady })
     setIsMapLoading(false) // Map is loaded, hide loading indicator
+    
+    // Call map.resize() on first load
+    const map = mapRef.current?.getMap?.()
+    if (map && typeof map.resize === 'function') {
+      map.resize()
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
+        console.log(`[MAP_RESIZE] invoked reason=load size=${debugInfo.containerWidth}x${debugInfo.containerHeight}`)
+      }
+    }
+    
     if (onMapReady) {
       onMapReady()
     }
-  }, [onMapReady])
+  }, [onMapReady, debugInfo.containerWidth, debugInfo.containerHeight])
   const [_selectedSale, _setSelectedSale] = useState<Sale | null>(null)
   const mapRef = useRef<any>(null)
   const _fitTokenRef = useRef<string | null>(null)
@@ -77,9 +86,60 @@ export default function SalesMap({
   const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [visiblePinCount, setVisiblePinCount] = useState(0)
   const [_moved, _setMoved] = useState(false)
+  
+  // Debug state for container sizing
+  const [debugInfo, setDebugInfo] = useState({
+    containerWidth: 0,
+    containerHeight: 0,
+    parentWidth: 0,
+    parentHeight: 0,
+    lastResize: 0
+  })
+  const containerRef = useRef<HTMLDivElement>(null)
   const autoFitAttemptedRef = useRef(false)
   const [isMapLoading, setIsMapLoading] = useState(true)
   
+  // ResizeObserver for map container sizing
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect
+        const parent = entry.target.parentElement
+        const parentRect = parent?.getBoundingClientRect()
+        
+        const newDebugInfo = {
+          containerWidth: Math.round(width),
+          containerHeight: Math.round(height),
+          parentWidth: parentRect ? Math.round(parentRect.width) : 0,
+          parentHeight: parentRect ? Math.round(parentRect.height) : 0,
+          lastResize: Date.now()
+        }
+        
+        setDebugInfo(newDebugInfo)
+        
+        // Log resize event
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
+          console.log(`[MAP_RESIZE] invoked reason=observer size=${newDebugInfo.containerWidth}x${newDebugInfo.containerHeight}`)
+          console.log(`[MAP_VIS] container=${newDebugInfo.containerWidth}x${newDebugInfo.containerHeight} parent=${newDebugInfo.parentWidth}x${newDebugInfo.parentHeight}`)
+        }
+        
+        // Call map.resize() if map is available
+        const map = mapRef.current?.getMap?.()
+        if (map && typeof map.resize === 'function') {
+          map.resize()
+        }
+      }
+    })
+
+    resizeObserver.observe(containerRef.current)
+    
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [])
+
   // All remaining hooks must be called unconditionally
   useEffect(() => {
     mapDebug.logMapState('SalesMap', { 
@@ -383,8 +443,18 @@ export default function SalesMap({
 
   // Non-clustered map implementation
   return (
-    <div className="w-full h-full relative">
+    <div ref={containerRef} className="relative min-h-0 min-w-0 w-full h-full">
       {isMapLoading && <MapLoadingIndicator />}
+      
+      {/* Debug overlay */}
+      {(process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) && (
+        <div className="absolute top-2 left-2 z-50 bg-black bg-opacity-75 text-white text-xs p-2 rounded pointer-events-none">
+          <div>Container: {debugInfo.containerWidth}×{debugInfo.containerHeight}</div>
+          <div>Parent: {debugInfo.parentWidth}×{debugInfo.parentHeight}</div>
+          <div>Last resize: {new Date(debugInfo.lastResize).toLocaleTimeString()}</div>
+        </div>
+      )}
+      
       <Map
         ref={mapRef}
         mapboxAccessToken={getMapboxToken()}
@@ -393,7 +463,7 @@ export default function SalesMap({
           latitude: center.lat,
           zoom: zoom
         }}
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         onLoad={handleMapLoad}
         onMoveEnd={handleMoveEnd}

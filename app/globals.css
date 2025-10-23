@@ -1,6 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Mapbox GL CSS - imported once globally */
+@import 'mapbox-gl/dist/mapbox-gl.css';
 body { min-height: 100vh; }
 
 /* Enterprise-grade responsive grid system */

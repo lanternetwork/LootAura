@@ -234,6 +234,11 @@ export default function SalesClient({
 
   const mapZoom = mapView.zoom
 
+  // Constants for layout calculations
+  const HEADER_HEIGHT = 64 // px - header height
+  const FILTERS_HEIGHT = 56 // px - filters bar height
+  const MAIN_CONTENT_HEIGHT = `calc(100vh - ${HEADER_HEIGHT + FILTERS_HEIGHT}px)`
+
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
@@ -300,11 +305,13 @@ export default function SalesClient({
       </div>
 
       {/* Main Content - Zillow Style */}
-      <div className="flex-1 flex overflow-hidden">
+      <div 
+        className="grid grid-cols-[minmax(0,1fr)_420px] gap-0 min-h-0 min-w-0 overflow-hidden"
+        style={{ height: MAIN_CONTENT_HEIGHT }}
+      >
         {/* Map - Left Side (Dominant) */}
-        <div className="flex-1 min-h-0 bg-gray-100">
-          <div className="w-full h-full">
-            <SalesMap
+        <div className="relative min-h-0 min-w-0 bg-gray-100">
+          <SalesMap
             sales={mapSales}
             markers={mapMarkers}
             center={mapCenter}
@@ -316,12 +323,11 @@ export default function SalesClient({
             }}
             fitBounds={fitBounds}
             onFitBoundsComplete={() => setFitBounds(null)}
-            />
-          </div>
+          />
         </div>
 
         {/* Sales List - Right Panel */}
-        <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
+        <div className="bg-white border-l border-gray-200 flex flex-col min-h-0 min-w-0">
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold">
               Sales ({visibleSales.length})

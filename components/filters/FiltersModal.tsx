@@ -43,11 +43,6 @@ interface FiltersModalProps {
     dateRange: DateRange
     categories: string[]
   }) => void
-  arbiter?: {
-    mode: 'initial' | 'map' | 'zip' | 'distance'
-    programmaticMoveGuard: boolean
-    lastChangedAt: number
-  }
 }
 
 interface FilterState {
@@ -71,7 +66,7 @@ const CATEGORY_OPTIONS = [
   { value: 'misc', label: 'Miscellaneous', icon: '📦' }
 ]
 
-export default function FiltersModal({ isOpen, onClose, className = '', filters: externalFilters, onFiltersChange, arbiter }: FiltersModalProps) {
+export default function FiltersModal({ isOpen, onClose, className = '', filters: externalFilters, onFiltersChange }: FiltersModalProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -247,7 +242,6 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
             onCategoryToggle={handleCategoryToggle}
             onClearFilters={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
-            arbiter={arbiter}
           />
         </div>
       </div>
@@ -274,7 +268,6 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
             onCategoryToggle={handleCategoryToggle}
             onClearFilters={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
-            arbiter={arbiter}
           />
         </div>
       </div>
@@ -289,11 +282,6 @@ interface FiltersContentProps {
   onCategoryToggle: (category: string) => void
   onClearFilters: () => void
   hasActiveFilters: boolean
-  arbiter?: {
-    mode: 'initial' | 'map' | 'zip' | 'distance'
-    programmaticMoveGuard: boolean
-    lastChangedAt: number
-  }
 }
 
 function FiltersContent({
@@ -303,7 +291,6 @@ function FiltersContent({
   onCategoryToggle,
   onClearFilters: _onClearFilters,
   hasActiveFilters,
-  arbiter
 }: FiltersContentProps) {
   return (
     <div className="space-y-6">
@@ -312,8 +299,8 @@ function FiltersContent({
         <div className="flex items-center mb-3">
           <MapMarkerIcon />
           <span className="text-gray-500 mr-2"></span>
-          <label className={`text-sm font-medium ${arbiter?.mode === 'map' ? 'text-gray-600' : 'text-gray-700'}`}>
-            {arbiter?.mode === 'map' ? 'Distance (Select)' : 'Distance'}
+          <label className="text-sm font-medium text-gray-700">
+            Distance
           </label>
         </div>
         <select
@@ -325,7 +312,7 @@ function FiltersContent({
             <option key={miles} value={miles}>{miles} miles</option>
           ))}
         </select>
-        {arbiter?.mode === 'map' && (
+        {false && (
           <p className="text-xs text-gray-500 mt-1">
             Currently using map view
           </p>

@@ -46,8 +46,6 @@ interface SalesMapClusteredProps {
   onMoveEnd?: () => void
   onZoomEnd?: () => void
   onMapReady?: () => void
-  arbiterMode?: 'initial' | 'map' | 'zip' | 'distance'
-  arbiterAuthority?: 'FILTERS' | 'MAP'
   // DOM props that can be safely passed to wrapper
   className?: string
   style?: React.CSSProperties
@@ -73,8 +71,6 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   onMoveEnd,
   onZoomEnd,
   onMapReady,
-  arbiterMode: _arbiterMode,
-  arbiterAuthority: _arbiterAuthority,
   // DOM props
   className,
   style,
@@ -650,11 +646,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       if (!map) return
       
       // Allow fitBounds for ZIP searches and other programmatic moves
-      // Only block if it's a MAP authority mode AND not a ZIP search
-      if (_arbiterAuthority === 'MAP' && _arbiterMode !== 'zip') {
-        console.log('[BLOCK] fit bounds suppressed (map authoritative, not ZIP)')
-        return
-      }
+      // Allow fitBounds for all cases
       
       const bounds = [
         [_fitBounds.west, _fitBounds.south],
@@ -662,9 +654,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       ]
       
       console.log('[MAP] fitBounds executing (clustered)', { 
-        reason: _fitBounds.reason, 
-        authority: _arbiterAuthority, 
-        mode: _arbiterMode 
+        reason: _fitBounds.reason
       })
       
       map.fitBounds(bounds, { padding: 0, maxZoom: 15, duration: 0 })
@@ -675,7 +665,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     } catch (error) {
       console.error('[MAP] fitBounds error (clustered):', error)
     }
-  }, [_fitBounds, _arbiterAuthority, _arbiterMode, _onFitBoundsComplete])
+  }, [_fitBounds, _onFitBoundsComplete])
 
   // Render cluster markers
   const renderClusters = useMemo(() => {

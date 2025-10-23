@@ -31,8 +31,6 @@ interface SalesMapProps {
   onMoveEnd?: () => void
   onZoomEnd?: () => void
   onMapReady?: () => void
-  arbiterMode?: 'initial' | 'map' | 'zip' | 'distance'
-  arbiterAuthority?: 'FILTERS' | 'MAP'
 }
 
 export default function SalesMap({ 
@@ -53,8 +51,6 @@ export default function SalesMap({
   onMoveEnd,
   onZoomEnd,
   onMapReady,
-  arbiterMode,
-  arbiterAuthority
 }: SalesMapProps) {
   // All hooks must be called unconditionally at the top
   useEffect(() => {
@@ -160,17 +156,7 @@ export default function SalesMap({
         
         // Auto-fit if no pins are visible but markers exist (only once per session)
         if (markers.length > 0 && visiblePinCount === 0 && !autoFitAttemptedRef.current) {
-          // Block AUTO-FIT in MAP authority mode
-          if (arbiterAuthority === 'MAP') {
-            console.log('[BLOCK] AUTO-FIT suppressed (mode=map)')
-            return
-          }
-          
-          // Block AUTO-FIT in FILTERS authority mode (not distance change)
-          if (arbiterAuthority === 'FILTERS' && arbiterMode !== 'distance') {
-            console.log('[BLOCK] AUTO-FIT suppressed (filters authoritative, not distance)')
-            return
-          }
+          // Allow AUTO-FIT for all cases
           
           console.log('[AUTO-FIT] No visible pins but markers exist, fitting to bounds')
           autoFitAttemptedRef.current = true
@@ -208,18 +194,14 @@ export default function SalesMap({
     try {
       const map = mapRef.current?.getMap?.()
       if (map) {
-        // Block programmatic movement in MAP authority mode
-        if (arbiterAuthority === 'MAP') {
-          console.log('[BLOCK] programmatic move suppressed (map authoritative)')
-          return
-        }
+        // Allow programmatic movement
         
         const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : (zoom || 11)
         // Do not force a minimum zoom during programmatic recenters; respect current zoom
         map.easeTo({ center: [center.lng, center.lat], zoom: currentZoom, duration: 600 })
       }
     } catch {}
-  }, [center.lat, center.lng, arbiterAuthority])
+  }, [center.lat, center.lng])
 
   // Simple map load handling - no complex state management needed
   useEffect(() => {
@@ -234,11 +216,7 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (!map) return
       
-      // Block programmatic movement in MAP authority mode
-      if (arbiterAuthority === 'MAP') {
-        console.log('[BLOCK] center override suppressed (map authoritative)')
-        return
-      }
+      // Allow programmatic movement
       
       const targetZoom = centerOverride.zoom || zoom
       map.easeTo({ 
@@ -247,7 +225,7 @@ export default function SalesMap({
         duration: 600 
       })
     } catch {}
-  }, [centerOverride, arbiterAuthority, zoom])
+  }, [centerOverride, zoom])
 
   // Handle fit bounds
   useEffect(() => {
@@ -257,12 +235,7 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (!map) return
       
-      // Allow fitBounds for ZIP searches and other programmatic moves
-      // Only block if it's a MAP authority mode AND not a ZIP search
-      if (arbiterAuthority === 'MAP' && arbiterMode !== 'zip') {
-        console.log('[BLOCK] fit bounds suppressed (map authoritative, not ZIP)')
-        return
-      }
+      // Allow fitBounds for all cases
       
       const bounds = [
         [fitBounds.west, fitBounds.south],
@@ -270,9 +243,7 @@ export default function SalesMap({
       ]
       
       console.log('[MAP] fitBounds executing', { 
-        reason: fitBounds.reason, 
-        authority: arbiterAuthority, 
-        mode: arbiterMode 
+        reason: fitBounds.reason
       })
       
       map.fitBounds(bounds, { padding: 0, maxZoom: 15, duration: 0 })
@@ -283,7 +254,7 @@ export default function SalesMap({
     } catch (error) {
       console.error('[MAP] fitBounds error:', error)
     }
-  }, [fitBounds, arbiterAuthority, arbiterMode, onFitBoundsComplete])
+  }, [fitBounds, onFitBoundsComplete])
 
   // Handle view changes
   const handleViewChange = useCallback((evt: any) => {
@@ -402,8 +373,6 @@ export default function SalesMap({
         onMoveEnd={onMoveEnd}
         onZoomEnd={onZoomEnd}
         onMapReady={onMapReady}
-        arbiterMode={arbiterMode}
-        arbiterAuthority={arbiterAuthority}
       />
     )
   }

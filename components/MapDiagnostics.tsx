@@ -51,6 +51,9 @@ export default function MapDiagnostics() {
       console.log(`[MAP_DIAGNOSTIC] Starting comprehensive map diagnostic: ${testId}`)
       setCurrentTest(testId)
       
+      // Wait a bit for map to load
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
       // Step 1: Check Mapbox Access Token
       const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
       const hasToken = !!mapboxToken && mapboxToken.length > 0
@@ -80,13 +83,24 @@ export default function MapDiagnostics() {
       try {
         // Try to find map instance in various ways
         const mapElement = document.querySelector('.mapboxgl-map')
+        console.log('[MAP_DIAGNOSTIC] Map element found:', !!mapElement)
         if (mapElement) {
+          console.log('[MAP_DIAGNOSTIC] Map element classes:', mapElement.className)
+          console.log('[MAP_DIAGNOSTIC] Map element properties:', Object.keys(mapElement))
+          
+          // Try different ways to access the map instance
           mapInstance = (mapElement as any)._mapboxgl_map || 
                        (mapElement as any).__mapboxgl_map ||
+                       (mapElement as any).getMap?.() ||
                        (window as any).mapboxgl?.Map?.getMap?.()
+          
+          console.log('[MAP_DIAGNOSTIC] Map instance found:', !!mapInstance)
+          if (mapInstance) {
+            console.log('[MAP_DIAGNOSTIC] Map instance methods:', Object.getOwnPropertyNames(mapInstance))
+          }
         }
       } catch (e) {
-        console.log('Could not access map instance directly')
+        console.log('Could not access map instance directly:', e)
       }
       
       const mapInstanceExists = !!mapInstance

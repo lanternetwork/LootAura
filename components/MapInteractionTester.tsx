@@ -57,6 +57,9 @@ export default function MapInteractionTester() {
     try {
       console.log(`[MAP_INTERACTION_TEST] Starting map interaction test: ${testId}`)
       setCurrentTest(testId)
+      
+      // Wait a bit for map to load
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
       // Test 1: Check if map container exists and is visible
       const mapContainer = document.querySelector('[data-testid="map-container"]') || 
@@ -73,12 +76,16 @@ export default function MapInteractionTester() {
       let mapInstance: any = null
       try {
         const mapElement = document.querySelector('.mapboxgl-map')
+        console.log('[MAP_INTERACTION] Map element found:', !!mapElement)
         if (mapElement) {
+          console.log('[MAP_INTERACTION] Map element classes:', mapElement.className)
           mapInstance = (mapElement as any)._mapboxgl_map || 
-                       (mapElement as any).__mapboxgl_map
+                       (mapElement as any).__mapboxgl_map ||
+                       (mapElement as any).getMap?.()
+          console.log('[MAP_INTERACTION] Map instance found:', !!mapInstance)
         }
       } catch (e) {
-        console.log('Could not access map instance')
+        console.log('Could not access map instance:', e)
       }
       
       const mapInstanceWorking = !!mapInstance && typeof mapInstance.getCenter === 'function'

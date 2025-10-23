@@ -153,7 +153,6 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       <Suspense fallback={<div data-debug="sales-list-fallback" className="p-2 text-xs bg-yellow-100 text-yellow-800">Loading sales…</div>}>
         <SalesClient 
           initialSales={initialSales}
-          initialSearchParams={searchParams}
           initialCenter={initialCenter}
           user={user}
         />

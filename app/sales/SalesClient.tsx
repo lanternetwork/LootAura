@@ -21,14 +21,12 @@ interface MapViewState {
 
 interface SalesClientProps {
   initialSales: Sale[]
-  initialSearchParams: { [key: string]: string | string[] | undefined }
   initialCenter: { lat: number; lng: number } | null
   user: User | null
 }
 
 export default function SalesClient({ 
   initialSales, 
-  initialSearchParams,
   initialCenter, 
   user 
 }: SalesClientProps) {

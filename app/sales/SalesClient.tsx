@@ -513,6 +513,8 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       
       // Clear programmatic move flag
       programmaticMoveRef.current = false
+    }
+    
     } catch (error) {
       console.error('[SALES_CLIENT] Error in onZipResolved:', error)
       // Clear loading state on error

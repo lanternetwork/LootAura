@@ -434,6 +434,39 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       return
     }
 
+    // Additional bounds validation - check for corrupted bounds that cause stretching
+    const latSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
+    const lngSpan = Math.abs(bounds.getEast() - bounds.getWest())
+    
+    if (latSpan > 3.0 || lngSpan > 3.0) { // If bounds span more than ~3 degrees, something is wrong
+      console.log('[SALES_MAP_CLUSTERED] Corrupted bounds detected, resetting map:', {
+        latSpan,
+        lngSpan,
+        bounds: {
+          west: bounds.getWest(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          north: bounds.getNorth()
+        }
+      })
+      
+      // Force reset the map to the current center and zoom
+      map.jumpTo({
+        center: [center.lng, center.lat],
+        zoom: zoom
+      })
+      
+      // Force resize to fix stretching
+      setTimeout(() => {
+        map.resize()
+        // Retry cluster update after reset
+        setTimeout(() => {
+          updateClusters(map)
+        }, 100)
+      }, 100)
+      return
+    }
+
     console.log('[CLUSTER] updateClusters debug:', JSON.stringify({
       bounds: {
         west: bounds.getWest(),
@@ -717,6 +750,23 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
         const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
         if (boundsSpan > 10.0) {
           console.log('[MAP] Invalid bounds detected in handleViewChange, resetting map:', { span: boundsSpan })
+          // Force reset the map to prevent corrupted bounds
+          map.jumpTo({
+            center: [center.lng, center.lat],
+            zoom: zoom
+          })
+          setTimeout(() => {
+            map.resize()
+          }, 100)
+          return
+        }
+        
+        // Additional bounds validation - check for corrupted bounds that cause stretching
+        const latSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
+        const lngSpan = Math.abs(bounds.getEast() - bounds.getWest())
+        
+        if (latSpan > 3.0 || lngSpan > 3.0) {
+          console.log('[MAP] Corrupted bounds detected in handleViewChange, resetting map:', { latSpan, lngSpan })
           // Force reset the map to prevent corrupted bounds
           map.jumpTo({
             center: [center.lng, center.lat],

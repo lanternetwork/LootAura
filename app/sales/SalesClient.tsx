@@ -263,7 +263,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
         } catch (error) {
           console.error('[FETCH] Error normalizing/parsing viewport response:', error)
           sales = []
-          meta = { parse: "error", error: error.message }
+          meta = { parse: "error", error: error instanceof Error ? error.message : String(error) }
         }
         
         console.log('[FETCH] fetchSales response (viewport):', { count: sales.length, ctx: _ctx, meta })
@@ -318,7 +318,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       } catch (error) {
         console.error('[FETCH] Error normalizing/parsing regular response:', error)
         sales = []
-        meta = { parse: "error", error: error.message }
+        meta = { parse: "error", error: error instanceof Error ? error.message : String(error) }
       }
       
       console.log('[FETCH] fetchSales response:', { count: sales.length, ctx: _ctx, meta })

@@ -16,9 +16,11 @@ test.describe('ZIP Search E2E', () => {
       await expect(salesRoot).toBeVisible()
     }
     
-    // Look for ZIP input with fallback
+    // Look for ZIP input with fallback - wait for it to be visible
     const zipInput = page.getByTestId('zip-input').first()
     if (await zipInput.count() > 0) {
+      // Wait for the input to be visible and enabled before interacting
+      await zipInput.waitFor({ state: 'visible', timeout: 10000 })
       await zipInput.fill('40204')
       await zipInput.press('Enter')
       

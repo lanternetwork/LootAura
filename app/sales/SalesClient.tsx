@@ -308,6 +308,13 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
   // ZIP resolved handler
   const onZipResolved = useCallback(({ zip, center, name }: { zip: string; center: [number, number]; name: string }) => {
     console.log('[SALES_CLIENT] ZIP resolved:', { zip, center, name })
+    console.log('[SALES_CLIENT] ZIP center array:', center)
+    console.log('[SALES_CLIENT] ZIP center type check:', { 
+      isArray: Array.isArray(center), 
+      length: center.length, 
+      first: center[0], 
+      second: center[1] 
+    })
     
     // Set intent to Filters with source Zip
     bumpSeq({ kind: 'Filters', reason: 'Zip' })
@@ -318,6 +325,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     
     // Center map programmatically
     const [lng, lat] = center
+    console.log('[SALES_CLIENT] Destructured coordinates:', { lng, lat })
     console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
     setMapView({ center: { lat, lng }, zoom: 12 })
     
@@ -342,7 +350,7 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       onZipLocationFound={(lat, lng, _city, _state, _zip) => {
         console.log('[SALES_CLIENT] ZIP location found:', { lat, lng, _city, _state, _zip })
         
-        // Convert to onZipResolved format
+        // Convert to onZipResolved format - center should be [lng, lat] for mapbox
         onZipResolved({ 
           zip: _zip || '', 
           center: [lng, lat], 

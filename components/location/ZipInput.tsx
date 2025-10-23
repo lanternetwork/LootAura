@@ -98,6 +98,13 @@ export default function ZipInput({
         }
         setCookie('la_loc', JSON.stringify(locationData), 1) // 24 hours
         
+        console.log(`[ZIP_INPUT] Calling onLocationFound with:`, { 
+          lat: normalized.lat, 
+          lng: normalized.lng, 
+          city: normalized.city, 
+          state: normalized.state, 
+          zip: normalized.zip 
+        })
         onLocationFound(normalized.lat, normalized.lng, normalized.city, normalized.state, normalized.zip)
         console.log(`[ZIP_INPUT] Found location for ${targetZip}: ${normalized.city}, ${normalized.state} (${normalized.source})`)
       } else {

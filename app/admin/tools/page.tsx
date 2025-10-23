@@ -73,7 +73,22 @@ export default function AdminToolsPage() {
                <div className="absolute top-2 left-2 z-50 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
                  <div>Container: {typeof window !== 'undefined' ? document.querySelector('[data-testid="map-container"]')?.getBoundingClientRect().width : 'N/A'}×{typeof window !== 'undefined' ? document.querySelector('[data-testid="map-container"]')?.getBoundingClientRect().height : 'N/A'}</div>
                  <div>Map Element: {typeof window !== 'undefined' ? document.querySelector('.mapboxgl-map') ? 'Found' : 'Not Found' : 'N/A'}</div>
-                 <div>Map Instance: {typeof window !== 'undefined' ? document.querySelector('.mapboxgl-map') ? 'Available' : 'Not Available' : 'N/A'}</div>
+                 <div>Map Instance: {typeof window !== 'undefined' ? (() => {
+                   const mapElement = document.querySelector('.mapboxgl-map')
+                   if (!mapElement) return 'No Element'
+                   const instance = (mapElement as any)._mapboxgl_map || 
+                                   (mapElement as any).__mapboxgl_map ||
+                                   (mapElement as any).getMap?.()
+                   return instance ? 'Available' : 'Not Available'
+                 })() : 'N/A'}</div>
+                 <div>Map Methods: {typeof window !== 'undefined' ? (() => {
+                   const mapElement = document.querySelector('.mapboxgl-map')
+                   if (!mapElement) return 'No Element'
+                   const instance = (mapElement as any)._mapboxgl_map || 
+                                   (mapElement as any).__mapboxgl_map ||
+                                   (mapElement as any).getMap?.()
+                   return instance ? Object.getOwnPropertyNames(instance).slice(0, 5).join(', ') : 'No Instance'
+                 })() : 'N/A'}</div>
                </div>
              </div>
            </div>

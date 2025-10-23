@@ -317,13 +317,19 @@ export default function SalesMap({
 
   // Handle center changes (for ZIP search)
   useEffect(() => {
-    const map = mapRef.current?.getMap?.()
-    if (!map) return
-    
-    console.log('[MAP] Center effect triggered:', { 
+    console.log('[MAP] Center effect triggered - START:', { 
       newCenter: center, 
-      zoom 
+      zoom,
+      mapExists: !!mapRef.current?.getMap?.()
     })
+    
+    const map = mapRef.current?.getMap?.()
+    if (!map) {
+      console.log('[MAP] Center effect - no map, returning')
+      return
+    }
+    
+    console.log('[MAP] Center effect - map exists, continuing')
     
     // Only move if center has actually changed
     const currentCenter = map.getCenter()

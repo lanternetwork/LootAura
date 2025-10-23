@@ -52,6 +52,7 @@ export default function SalesClient({
   const [zipError, setZipError] = useState<string | null>(null)
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number; reason?: string } | null>(null)
+  const [isZipSearching, setIsZipSearching] = useState(false)
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
@@ -144,6 +145,12 @@ export default function SalesClient({
 
   // Handle map view changes with debouncing
   const handleMapViewChange = useCallback(({ center, zoom, userInteraction }: { center: { lat: number; lng: number }, zoom: number, userInteraction: boolean }) => {
+    // Don't update map view during ZIP search to prevent overriding the search result
+    if (isZipSearching) {
+      console.log('[MAP] Ignoring view change during ZIP search')
+      return
+    }
+    
     setMapView(prev => ({
       ...prev,
       center,
@@ -166,6 +173,7 @@ export default function SalesClient({
   // Handle ZIP search with bbox support
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => {
     setZipError(null)
+    setIsZipSearching(true) // Prevent map view changes from overriding ZIP search
     
     console.log('[ZIP] Updating map center to:', { lat, lng, zip })
     
@@ -202,6 +210,12 @@ export default function SalesClient({
 
     // Fetch sales for new location
     fetchMapSales({ lat, lng })
+    
+    // Clear the ZIP search flag after a delay to allow map to settle
+    setTimeout(() => {
+      setIsZipSearching(false)
+      console.log('[ZIP] Search completed, allowing map view changes')
+    }, 1000)
   }
 
   const handleZipError = (error: string) => {

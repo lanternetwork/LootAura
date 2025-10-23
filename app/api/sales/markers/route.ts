@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
+import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -280,15 +281,20 @@ export async function GET(request: NextRequest) {
       }))
     })
 
-    // Return structured response matching /api/sales format
-    return NextResponse.json({
-      ok: true,
-      data: markers,
+    // Return normalized response using contract
+    const raw = {
+      sales: markers,
       center: { lat: originLat, lng: originLng },
       distanceKm,
       count: markers.length,
       durationMs: Date.now() - startedAt
-    }, {
+    }
+    
+    const normalized = normalizeSalesJson(raw)
+    const parsed = SalesResponseSchema.safeParse(normalized)
+    const response = parsed.success ? parsed.data : { sales: [], meta: { parse: "failed" } }
+    
+    return NextResponse.json(response, {
       headers: {
         'Cache-Control': 'public, max-age=120, s-maxage=600', // 2 min client, 10 min CDN
         'CDN-Cache-Control': 'public, max-age=600',

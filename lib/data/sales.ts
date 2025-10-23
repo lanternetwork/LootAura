@@ -3,7 +3,6 @@ import { T } from '@/lib/supabase/tables'
 import { z } from 'zod'
 import { Sale } from '@/lib/types'
 
-// Zod schemas for validation
 const SaleInputSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),

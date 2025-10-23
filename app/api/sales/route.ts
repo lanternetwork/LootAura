@@ -5,6 +5,7 @@ import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
+import { SalesResponseSchema, normalizeSalesJson } from '@/lib/data/sales-schemas'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
@@ -128,6 +129,9 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    // Debug: Log date filtering decision
+    console.log(`[SALES] Date filtering decision: dateRange=${dateRange}, startDateParam=${startDateParam}, endDateParam=${endDateParam}`)
+    
     console.log(`[SALES] Query params: lat=${latitude}, lng=${longitude}, km=${distanceKm}, start=${startDateParam}, end=${endDateParam}, categories=[${categories.join(',')}], q=${q}, limit=${limit}, offset=${offset}`)
     
     let results: PublicSale[] = []
@@ -230,6 +234,20 @@ export async function GET(request: NextRequest) {
         sampleData: salesData?.slice(0, 2)
       })
       
+      // Debug: Log all sales data to see what we're getting
+      if (salesData && salesData.length > 0) {
+        console.log('[SALES] Raw sales data sample:', salesData.slice(0, 3).map(s => ({
+          id: s.id,
+          title: s.title,
+          date_start: s.date_start,
+          time_start: s.time_start,
+          lat: s.lat,
+          lng: s.lng
+        })))
+      } else {
+        console.log('[SALES] No sales data returned from database')
+      }
+      
       if (salesError) {
         console.error('Sales query error:', salesError)
         return NextResponse.json({
@@ -247,6 +265,7 @@ export async function GET(request: NextRequest) {
       const windowStart = startDateParam ? toUtcDateOnly(startDateParam) : null
       const windowEnd = endDateParam ? new Date((toUtcDateOnly(endDateParam)).getTime() + 86399999) : null
       console.log('[SALES] Date filtering:', { startDateParam, endDateParam, windowStart, windowEnd })
+      console.log('[SALES] Will apply date filtering:', !!(windowStart || windowEnd))
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
         .map((sale: Sale) => {
@@ -478,19 +497,19 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
     
-    // 4. Return normalized response
-    const response: any = {
-      ok: true,
-      data: results,
+    // 4. Return normalized response using contract
+    const raw = {
+      sales: results,
       center: { lat: latitude, lng: longitude },
       distanceKm,
       count: results.length,
-      durationMs: Date.now() - startedAt
+      durationMs: Date.now() - startedAt,
+      ...(degraded && { degraded: true })
     }
     
-    if (degraded) {
-      response.degraded = true
-    }
+    const normalized = normalizeSalesJson(raw)
+    const parsed = SalesResponseSchema.safeParse(normalized)
+    const response = parsed.success ? parsed.data : { sales: [], meta: { parse: "failed" } }
     
     console.log(`[SALES] Final result: ${results.length} sales, degraded=${degraded}, duration=${Date.now() - startedAt}ms`)
     

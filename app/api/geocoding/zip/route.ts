@@ -17,11 +17,13 @@ function normalizeZip(rawZip: string): string | null {
   // Strip non-digits
   const digits = rawZip.replace(/\D/g, '')
   
-  // If length > 5, take last 5
-  const lastFive = digits.length > 5 ? digits.slice(-5) : digits
+  // Reject ZIP+4 and non-5-digit strings
+  if (digits.length !== 5) {
+    return null
+  }
   
-  // Left-pad with '0' to length 5
-  const normalized = lastFive.padStart(5, '0')
+  // Left-pad with '0' to length 5 (preserve leading zeros)
+  const normalized = digits.padStart(5, '0')
   
   // Validate final against /^\d{5}$/
   if (!/^\d{5}$/.test(normalized)) {
@@ -237,6 +239,30 @@ export async function GET(request: NextRequest) {
           normalized: escapeForLogging(normalizedZip),
           result: JSON.stringify(result, null, 2)
         })
+        
+        // Validate that this is actually a postcode result
+        const isPostcode = result.type === 'postcode' || 
+                          result.class === 'place' && result.type === 'postcode' ||
+                          result.address?.postcode === normalizedZip
+        console.log('[ZIP] Postcode validation:', {
+          isPostcode,
+          type: result.type,
+          class: result.class,
+          addressPostcode: result.address?.postcode
+        })
+        
+        if (!isPostcode) {
+          console.log('[ZIP] source=nominatim status=invalid', {
+            input: escapeForLogging(rawZip),
+            normalized: escapeForLogging(normalizedZip),
+            reason: 'not a postcode result'
+          })
+          return NextResponse.json({ 
+            ok: false, 
+            error: 'ZIP not found' 
+          }, { status: 404 })
+        }
+        
         const lat = parseFloat(result.lat)
         const lng = parseFloat(result.lon)
         const city = result.address?.city || result.address?.town || result.address?.village || null

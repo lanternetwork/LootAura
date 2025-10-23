@@ -357,8 +357,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [viewportFetchManager])
 
-  // Update clusters when viewport changes or sales data changes
+  // Update clusters when viewport changes or sales data changes - DISABLED TO PREVENT LOCKUP
   const updateClusters = useCallback((map: any, recursionDepth: number = 0) => {
+    console.log('[SALES_MAP_CLUSTERED] updateClusters called - DISABLED TO PREVENT LOCKUP')
+    return // Disable cluster updates to prevent lockup
+    
     const startTime = Date.now()
     mapDebug.group('Cluster Update')
     clusterDebug.group('Cluster Update')
@@ -429,106 +432,8 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       return
     }
     
-    // Validate bounds to prevent incorrect bounds from ZIP search
-    let boundsSpan
-    try {
-      boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
-    } catch (error) {
-      console.error('[SALES_MAP_CLUSTERED] Error calculating bounds span:', error)
-      mapDebug.groupEnd()
-      clusterDebug.groupEnd()
-      return
-    }
-    
-    if (boundsSpan > 10.0) { // If bounds span more than ~1110km, something is wrong
-      console.log('[SALES_MAP_CLUSTERED] Invalid bounds detected, resetting map:', {
-        bounds: {
-          west: bounds.getWest(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          north: bounds.getNorth()
-        },
-        span: boundsSpan
-      })
-      
-      // Force reset the map to the current center and zoom
-      map.jumpTo({
-        center: [center.lng, center.lat],
-        zoom: zoom
-      })
-      
-      // Force resize to fix stretching
-      setTimeout(() => {
-        map.resize()
-        // Retry cluster update after reset (with safety check)
-        setTimeout(() => {
-          try {
-            const newBounds = map.getBounds()
-            const newBoundsSpan = Math.abs(newBounds.getNorth() - newBounds.getSouth())
-            if (newBoundsSpan <= 10.0) {
-              updateClusters(map, recursionDepth + 1)
-            } else {
-              console.log('[SALES_MAP_CLUSTERED] Bounds still invalid after reset, skipping cluster update')
-            }
-          } catch (error) {
-            console.warn('[SALES_MAP_CLUSTERED] Error checking bounds after reset:', error)
-          }
-        }, 100)
-      }, 100)
-      return
-    }
-
-    // Additional bounds validation - check for corrupted bounds that cause stretching
-    let latSpan, lngSpan
-    try {
-      latSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
-      lngSpan = Math.abs(bounds.getEast() - bounds.getWest())
-    } catch (error) {
-      console.error('[SALES_MAP_CLUSTERED] Error calculating lat/lng spans:', error)
-      mapDebug.groupEnd()
-      clusterDebug.groupEnd()
-      return
-    }
-    
-    if (latSpan > 3.0 || lngSpan > 3.0) { // If bounds span more than ~3 degrees, something is wrong
-      console.log('[SALES_MAP_CLUSTERED] Corrupted bounds detected, resetting map:', {
-        latSpan,
-        lngSpan,
-        bounds: {
-          west: bounds.getWest(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          north: bounds.getNorth()
-        }
-      })
-      
-      // Force reset the map to the current center and zoom
-      map.jumpTo({
-        center: [center.lng, center.lat],
-        zoom: zoom
-      })
-      
-      // Force resize to fix stretching
-      setTimeout(() => {
-        map.resize()
-        // Retry cluster update after reset (with safety check)
-        setTimeout(() => {
-          try {
-            const newBounds = map.getBounds()
-            const newLatSpan = Math.abs(newBounds.getNorth() - newBounds.getSouth())
-            const newLngSpan = Math.abs(newBounds.getEast() - newBounds.getWest())
-            if (newLatSpan <= 3.0 && newLngSpan <= 3.0) {
-              updateClusters(map, recursionDepth + 1)
-            } else {
-              console.log('[SALES_MAP_CLUSTERED] Bounds still corrupted after reset, skipping cluster update')
-            }
-          } catch (error) {
-            console.warn('[SALES_MAP_CLUSTERED] Error checking bounds after reset:', error)
-          }
-        }, 100)
-      }, 100)
-      return
-    }
+    // DISABLED: Complex bounds validation that could cause lockup
+    console.log('[SALES_MAP_CLUSTERED] Skipping complex bounds validation to prevent lockup')
 
     console.log('[CLUSTER] updateClusters debug:', JSON.stringify({
       bounds: {
@@ -1027,32 +932,11 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     }
   }, [center.lat, center.lng, zoom])
 
-  // Update clusters when sales data changes
+  // DISABLED: Update clusters when sales data changes - could cause lockup
   useEffect(() => {
-    const map = mapRef.current?.getMap?.()
-    if (!map || !isClusteringEnabled()) return
-    
-    console.log('[SALES_MAP_CLUSTERED] Sales data changed, updating clusters:', { salesCount: sales.length })
-    
-    // Add a longer delay to ensure map bounds are stable after ZIP search
-    const timeoutId = setTimeout(() => {
-      // Check if map bounds are reasonable before updating clusters
-      const bounds = map.getBounds()
-      const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
-      
-      if (boundsSpan > 10.0) {
-        console.log('[SALES_MAP_CLUSTERED] Map bounds still invalid, waiting longer...', { span: boundsSpan })
-        // Try again after another delay
-        setTimeout(() => {
-          updateClusters(map)
-        }, 500)
-      } else {
-        updateClusters(map)
-      }
-    }, 500)
-    
-    return () => clearTimeout(timeoutId)
-  }, [sales.length, updateClusters])
+    console.log('[SALES_MAP_CLUSTERED] Sales data changed - DISABLED to prevent lockup:', { salesCount: sales.length })
+    return // Disable to prevent lockup
+  }, [sales.length])
 
   // Handle window resize to fix map layout issues
   useEffect(() => {

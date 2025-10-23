@@ -447,142 +447,65 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
     console.log('[DEBUG] Markers details:', mapMarkers.slice(0, 3)) // Show first 3 markers
   }
 
-  // ZIP resolved handler
+  // ZIP resolved handler - SIMPLIFIED VERSION
   const onZipResolved = useCallback(({ zip, center, name, bbox }: { zip: string; center: [number, number]; name: string; bbox?: [number, number, number, number] }) => {
-    console.log('[SALES_CLIENT] ZIP resolved handler called:', { zip, center, name, bbox })
+    console.log('[SALES_CLIENT] ZIP resolved handler called - SIMPLIFIED VERSION')
     
     try {
-      console.log('[SALES_CLIENT] ZIP resolved:', { zip, center, name })
-      console.log('[SALES_CLIENT] ZIP center array:', center)
-      console.log('[SALES_CLIENT] ZIP center type check:', { 
-        isArray: Array.isArray(center), 
-        length: center.length, 
-        first: center[0], 
-        second: center[1] 
-      })
+      console.log('[SALES_CLIENT] Basic validation starting...')
       
-      if (process.env.NEXT_PUBLIC_DEBUG) {
-        console.log(`[ZIP_FLOW] arbiter.intent=Filters ts=${Date.now()}`)
-      }
-      
-      // Set loading state
-      setIsZipLoading(true)
-      
-      // Set intent to Filters with sub Zip and zip parameter
-      bumpSeq({ kind: 'Filters', sub: 'Zip', zip: zip, reason: 'Zip' })
-      const mySeq = seqRef.current
-      
-      // Set programmatic move flag
-      programmaticMoveRef.current = true
-      
-      // Center map programmatically with validation
-      if (!Array.isArray(center) || center.length !== 2) {
-        throw new Error(`Invalid center array: ${JSON.stringify(center)}`)
+      // Basic validation only
+      if (!zip || !center || !Array.isArray(center) || center.length !== 2) {
+        console.error('[SALES_CLIENT] Invalid ZIP parameters:', { zip, center })
+        return
       }
       
       const [lng, lat] = center
       if (typeof lng !== 'number' || typeof lat !== 'number' || isNaN(lng) || isNaN(lat)) {
-        throw new Error(`Invalid coordinates: lng=${lng}, lat=${lat}`)
+        console.error('[SALES_CLIENT] Invalid coordinates:', { lng, lat })
+        return
       }
       
-      console.log('[SALES_CLIENT] Destructured coordinates:', { lng, lat })
-      console.log('[SALES_CLIENT] Setting map view to:', { center: { lat, lng }, zoom: 12 })
-    
-    if (process.env.NEXT_PUBLIC_DEBUG) {
-      console.log(`[ZIP_FLOW] map.move.start reason=zip`)
-    }
-    
-    if (bbox) {
-      // Use fitBounds with bbox: [minLng, minLat, maxLng, maxLat]
-      console.log('[SALES_CLIENT] Using bbox for map centering:', bbox)
-      // Store bbox for the map component to use
-      setMapView({ center: { lat, lng }, zoom: 12, bbox: bbox })
-    } else {
-      // Use center and zoom
-      setMapView({ center: { lat, lng }, zoom: 12 })
-    }
-    
-    // Store ZIP parameters for later use in moveend handler
-    const zipParams = { 
-      lat, 
-      lng, 
-      distance: filters.distance,
-      centerOverride: { lat, lng }
-    }
-    
-    // Store the ZIP parameters and sequence for the moveend handler
-    const handleZipMoveEnd = () => {
-      if (process.env.NEXT_PUBLIC_DEBUG) {
-        console.log(`[ZIP_FLOW] map.move.end`)
-        console.log(`[ZIP_FLOW] fetchSales.start bounds=<viewport>`)
-      }
+      console.log('[SALES_CLIENT] Basic validation passed, setting loading state...')
       
-      // Get current map bounds for bounds-based fetching
-      const map = (window as any).__currentMapRef?.getMap?.()
-      if (map) {
-        const bounds = map.getBounds()
-        const viewportBounds = {
-          north: bounds.getNorth(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          west: bounds.getWest()
-        }
-        
-        console.log('[SALES_CLIENT] ZIP moveend - triggering bounds-based fetch:', viewportBounds)
-        
-        // Use bounds-based fetching
-        fetchSales(false, undefined, { cause: 'Filters', seq: mySeq, intent: intentRef.current }, viewportBounds)
-          .then(result => {
-            if (result) {
-              const unique = deduplicateSales(result.data)
-              console.log('[FETCH] ZIP bounds fetch: in=%d out=%d', result.data.length, unique.length)
-              applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'filtered')
-              applySalesResult({ data: unique, seq: result.ctx.seq, cause: result.ctx.cause }, 'map')
-              
-              if (process.env.NEXT_PUBLIC_DEBUG) {
-                console.log(`[ZIP_FLOW] fetchSales.end count=${unique.length}`)
-                console.log(`[ZIP_FLOW] visibleSales.set count=${unique.length} src=fetchSales`)
-              }
-              
-              // Update URL with ZIP parameter
-              updateUrlWithZip(zip)
-            }
-            
-            // Clear loading state
-            setIsZipLoading(false)
-          })
-          .catch(error => {
-            console.error('[FETCH] ZIP bounds fetch error:', error)
-            applySalesResult({ data: [], seq: mySeq, cause: 'Filters' }, 'filtered')
-            applySalesResult({ data: [], seq: mySeq, cause: 'Filters' }, 'map')
-            
-            // Clear loading state on error
-            setIsZipLoading(false)
-          })
+      // Set loading state
+      setIsZipLoading(true)
+      
+      console.log('[SALES_CLIENT] Setting map view...')
+      
+      // Simple map view update - no complex logic
+      if (bbox) {
+        setMapView({ center: { lat, lng }, zoom: 12, bbox: bbox })
       } else {
-        console.log('[SALES_CLIENT] ZIP moveend - no map ref, falling back to distance-based fetch')
-        runFilteredFetch(zipParams, { cause: 'Filters', seq: mySeq, intent: intentRef.current })
-          .finally(() => {
-            // Clear loading state
-            setIsZipLoading(false)
-          })
+        setMapView({ center: { lat, lng }, zoom: 12 })
       }
       
-      // Clear programmatic move flag
-      programmaticMoveRef.current = false
-    }
-    
-    // Store the handler for the map moveend event
-    ;(window as any).__zipMoveEndHandler = handleZipMoveEnd
-    
+      console.log('[SALES_CLIENT] Map view set, triggering simple fetch...')
+      
+      // Simple fetch without complex bounds logic
+      setTimeout(() => {
+        try {
+          console.log('[SALES_CLIENT] Starting simple fetch...')
+          runFilteredFetch(
+            { lat, lng, distance: filters.distance, centerOverride: { lat, lng } }, 
+            { cause: 'Filters', seq: seqRef.current, intent: intentRef.current }
+          ).finally(() => {
+            console.log('[SALES_CLIENT] Simple fetch completed, clearing loading state...')
+            setIsZipLoading(false)
+          })
+        } catch (error) {
+          console.error('[SALES_CLIENT] Error in simple fetch:', error)
+          setIsZipLoading(false)
+        }
+      }, 100) // Small delay to let map settle
+      
+      console.log('[SALES_CLIENT] ZIP resolved handler completed successfully')
+      
     } catch (error) {
-      console.error('[SALES_CLIENT] Error in onZipResolved:', error)
-      // Clear loading state on error
+      console.error('[SALES_CLIENT] Error in simplified onZipResolved:', error)
       setIsZipLoading(false)
-      // Clear programmatic move flag
-      programmaticMoveRef.current = false
     }
-  }, [bumpSeq, runFilteredFetch, filters.distance])
+  }, [runFilteredFetch, filters.distance])
 
   // Create reusable components for the new layout
   const filtersComponent = (

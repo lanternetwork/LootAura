@@ -63,7 +63,7 @@ export default function MapInteractionTester() {
                           document.querySelector('.mapboxgl-map') ||
                           document.querySelector('[class*="map"]')
       const containerVisible = mapContainer && mapContainer.getBoundingClientRect().width > 0
-      addTest('Map Container Visibility', containerVisible, {
+      addTest('Map Container Visibility', !!containerVisible, {
         found: !!mapContainer,
         visible: containerVisible,
         dimensions: mapContainer ? mapContainer.getBoundingClientRect() : null

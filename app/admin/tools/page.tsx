@@ -5,6 +5,8 @@ import DiagnosticOverlay from '@/components/DiagnosticOverlay'
 import DebugToggle from '@/components/debug/DebugToggle'
 import ZipLookupTester from '@/components/ZipLookupTester'
 import ZipLookupDiagnostics from '@/components/ZipLookupDiagnostics'
+import MapDiagnostics from '@/components/MapDiagnostics'
+import MapInteractionTester from '@/components/MapInteractionTester'
 import { useState } from 'react'
 
 export default function AdminToolsPage() {
@@ -47,6 +49,12 @@ export default function AdminToolsPage() {
 
           {/* ZIP Lookup Diagnostics */}
           <ZipLookupDiagnostics />
+
+          {/* Map Functionality Diagnostics */}
+          <MapDiagnostics />
+
+          {/* Map Interaction Testing */}
+          <MapInteractionTester />
 
           {/* Review Key Lookup */}
           <AdminTools />

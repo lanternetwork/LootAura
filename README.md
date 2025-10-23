@@ -2,7 +2,7 @@
 
 **Last updated: 2025-10-13 — Enterprise Documentation Alignment**
 
-A modern web application for discovering and managing yard sales, garage sales, and estate sales in your area. Built with enterprise-grade architecture featuring map-centric source of truth, arbiter logic, Supabase backend, and Mapbox integration.
+A modern web application for discovering and managing yard sales, garage sales, and estate sales in your area. Built with enterprise-grade architecture featuring map-centric source of truth, Supabase backend, and Mapbox integration.
 
 ## 📋 Quick Start
 
@@ -18,12 +18,10 @@ A modern web application for discovering and managing yard sales, garage sales, 
 
 LootAura follows strict architectural invariants to prevent regressions:
 
-- **Map-Centric Authority**: Map is the source of truth for visible sales
-- **Arbiter Logic**: Controls when to suppress list fetches under MAP authority
+- **Map-Centric Source of Truth**: Map viewport drives all data fetching and list display
 - **Parameter Canonicalization**: `categories` parameter with legacy `cat` support
-- **Single Source**: Both markers and list read from `public.items_v2`
+- **Single Source**: Both markers and list read from the same data source
 - **DOM Structure**: List container with direct children, no intermediate wrappers
-- **Suppression Equality**: Under MAP authority, suppress only if markers include identical normalized filter set
 - **Debug Discipline**: Single `NEXT_PUBLIC_DEBUG` flag, no PII in logs
 - **ID Parity**: Marker IDs must be discoverable in list after updates
 
@@ -42,7 +40,7 @@ NEXT_PUBLIC_DEBUG=true
 
 ### Debug Features
 - **Filter Normalization**: See how categories are processed
-- **Suppression Logic**: Understand when list fetches are suppressed
+- **Map Viewport**: Understand how map changes drive data fetching
 - **DOM Structure**: Verify grid layout and card counting
 - **ID Parity**: Check marker-list consistency
 
@@ -231,5 +229,6 @@ LootAura uses advanced PostGIS distance calculations for accurate location-based
 - **Security**: RLS policies and privilege escalation testing
 - **Performance**: Bundle size monitoring and memory optimization#   F o r c e   r e d e p l o y   -   1 0 / 1 3 / 2 0 2 5   2 0 : 4 7 : 1 6 
  
- #   F o r c e   r e d e p l o y  
+ #   F o r c e   r e d e p l o y 
+ 
  

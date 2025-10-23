@@ -78,7 +78,8 @@ export default function AdminToolsPage() {
                    if (!mapElement) return 'No Element'
                    const instance = (mapElement as any)._mapboxgl_map || 
                                    (mapElement as any).__mapboxgl_map ||
-                                   (mapElement as any).getMap?.()
+                                   (mapElement as any).getMap?.() ||
+                                   (mapElement as any).__mapboxgl_map
                    return instance ? 'Available' : 'Not Available'
                  })() : 'N/A'}</div>
                  <div>Map Methods: {typeof window !== 'undefined' ? (() => {
@@ -86,7 +87,8 @@ export default function AdminToolsPage() {
                    if (!mapElement) return 'No Element'
                    const instance = (mapElement as any)._mapboxgl_map || 
                                    (mapElement as any).__mapboxgl_map ||
-                                   (mapElement as any).getMap?.()
+                                   (mapElement as any).getMap?.() ||
+                                   (mapElement as any).__mapboxgl_map
                    return instance ? Object.getOwnPropertyNames(instance).slice(0, 5).join(', ') : 'No Instance'
                  })() : 'N/A'}</div>
                </div>

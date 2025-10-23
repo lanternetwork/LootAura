@@ -64,7 +64,8 @@ export default function SalesMap({
     
     // Store the map instance directly from the event
     const map = event.target
-    console.log('[MAP] Map loaded:', { mapExists: !!map, mapType: typeof map })
+    mapInstanceRef.current = map
+    console.log('[MAP] Map loaded:', { mapExists: !!map, mapType: typeof map, instanceStored: !!mapInstanceRef.current })
     
     if (map && typeof map.resize === 'function') {
       // Resize immediately on load
@@ -337,16 +338,19 @@ export default function SalesMap({
     } catch {}
   }, [centerOverride, zoom])
 
+  // Store map instance from onLoad callback
+  const mapInstanceRef = useRef<any>(null)
+
   // Handle center changes
   useEffect(() => {
     console.log('[MAP] Center effect triggered', { center })
     
-    if (!mapRef.current?.getMap?.()) {
+    if (!mapInstanceRef.current) {
       console.log('[MAP] Center effect - no map instance, returning')
       return
     }
 
-    const map = mapRef.current.getMap()
+    const map = mapInstanceRef.current
     const currentCenter = map.getCenter()
     const newCenter = { lat: center.lat, lng: center.lng }
     

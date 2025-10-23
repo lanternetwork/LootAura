@@ -64,8 +64,7 @@ export default function SalesMap({
     
     // Store the map instance directly from the event
     const map = event.target
-    mapInstanceRef.current = map
-    console.log('[MAP] Stored map instance:', { mapExists: !!map, mapType: typeof map })
+    console.log('[MAP] Map loaded:', { mapExists: !!map, mapType: typeof map })
     
     if (map && typeof map.resize === 'function') {
       // Resize immediately on load
@@ -95,7 +94,13 @@ export default function SalesMap({
     // Handle any pending center changes that were queued before map was ready
     if (pendingCenterChangeRef.current) {
       console.log('[MAP] Map loaded, applying pending center change:', pendingCenterChangeRef.current)
-      handleCenterChange(map)
+      // Apply the pending center change by updating the map view
+      const { center: pendingCenter, zoom: pendingZoom } = pendingCenterChangeRef.current
+      map.easeTo({ 
+        center: [pendingCenter.lng, pendingCenter.lat], 
+        zoom: pendingZoom, 
+        duration: 600 
+      })
       pendingCenterChangeRef.current = null
     } else {
       console.log('[MAP] Map loaded, no pending center changes')
@@ -107,7 +112,6 @@ export default function SalesMap({
   }, [onMapReady])
   const [_selectedSale, _setSelectedSale] = useState<Sale | null>(null)
   const mapRef = useRef<any>(null)
-  const mapInstanceRef = useRef<any>(null) // Direct reference to the Mapbox map instance
   const _fitTokenRef = useRef<string | null>(null)
   const _suppressEmitsRef = useRef(false)
   const [_viewState, setViewState] = useState({
@@ -133,7 +137,6 @@ export default function SalesMap({
   const [isMapLoading, setIsMapLoading] = useState(true)
   
   // Map refs for component lifecycle
-  const mapInstanceRef = useRef<any>(null) // Direct reference to the Mapbox map instance
   
   // ResizeObserver for map container sizing
   useEffect(() => {

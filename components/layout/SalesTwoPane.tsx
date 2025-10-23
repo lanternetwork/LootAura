@@ -9,7 +9,7 @@ type Props = {
 export default function SalesTwoPane({ filters, map, list }: Props) {
   // Sticky filters; main area fills remaining viewport height.
   return (
-    <div className="min-h-screen flex flex-col" data-testid="sales-root-desktop" data-debug-intent="Filters:">
+    <div className="min-h-screen flex flex-col">
       <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b">{filters}</div>
 
       {/* Desktop: two-pane; Mobile: hidden here, mobile uses tabbed version */}

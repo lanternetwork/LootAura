@@ -48,6 +48,8 @@ jobs:
     env:
       INTENT_ENABLED: 1
       NEXT_PUBLIC_FEATURE_CLUSTERING: 1
+      NEXT_PUBLIC_SUPABASE_URL: https://mock-supabase-url.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: mock-anon-key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

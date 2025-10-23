@@ -77,7 +77,6 @@ export default function SalesClient({
     if (!center) return
 
     setLoading(true)
-    setMapUpdating(true)
 
     try {
       const params = new URLSearchParams()

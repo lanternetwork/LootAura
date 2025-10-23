@@ -49,7 +49,8 @@ describe('Intent Pan vs Programmatic', () => {
       </QueryClientProvider>
     )
     
-    const zipInput = screen.getByTestId('zip-input')
+    const zipInputs = screen.getAllByTestId('zip-input')
+    const zipInput = zipInputs[0] // Use the first one (mobile)
     fireEvent.change(zipInput, { target: { value: '40204' } })
     
     // Wait for the input to be enabled

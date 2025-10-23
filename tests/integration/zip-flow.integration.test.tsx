@@ -51,7 +51,9 @@ describe('ZIP Flow Integration', () => {
     )
     
     expect(screen.getByTestId('sales-root-mobile')).toBeInTheDocument()
-    expect(screen.getByTestId('zip-input')).toBeInTheDocument()
+    expect(screen.getByTestId('sales-root-desktop')).toBeInTheDocument()
+    // Use getAllByTestId to get all zip inputs
+    expect(screen.getAllByTestId('zip-input')).toHaveLength(2) // One for mobile, one for desktop
   })
 
   it('simulates entering 40204 and pressing Enter', async () => {
@@ -66,7 +68,8 @@ describe('ZIP Flow Integration', () => {
       </QueryClientProvider>
     )
     
-    const zipInput = screen.getByTestId('zip-input')
+    const zipInputs = screen.getAllByTestId('zip-input')
+    const zipInput = zipInputs[0] // Use the first one (mobile)
     fireEvent.change(zipInput, { target: { value: '40204' } })
     
     // Wait for the input to be enabled
@@ -93,7 +96,8 @@ describe('ZIP Flow Integration', () => {
       </QueryClientProvider>
     )
     
-    const zipInput = screen.getByTestId('zip-input')
+    const zipInputs = screen.getAllByTestId('zip-input')
+    const zipInput = zipInputs[0] // Use the first one (mobile)
     fireEvent.change(zipInput, { target: { value: '40204' } })
     
     // Wait for the input to be enabled

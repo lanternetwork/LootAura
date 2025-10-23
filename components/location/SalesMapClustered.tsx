@@ -402,6 +402,21 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       bounds.getNorth()
     ]
     const currentZoom = map.getZoom()
+    
+    // Validate bounds to prevent incorrect bounds from ZIP search
+    const boundsSpan = Math.abs(bounds.getNorth() - bounds.getSouth())
+    if (boundsSpan > 1.0) { // If bounds span more than ~111km, something is wrong
+      console.log('[SALES_MAP_CLUSTERED] Invalid bounds detected, skipping cluster update:', {
+        bounds: {
+          west: bounds.getWest(),
+          south: bounds.getSouth(),
+          east: bounds.getEast(),
+          north: bounds.getNorth()
+        },
+        span: boundsSpan
+      })
+      return
+    }
 
     console.log('[CLUSTER] updateClusters debug:', JSON.stringify({
       bounds: {
@@ -840,7 +855,13 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     if (!map || !isClusteringEnabled()) return
     
     console.log('[SALES_MAP_CLUSTERED] Sales data changed, updating clusters:', { salesCount: sales.length })
-    updateClusters(map)
+    
+    // Add a small delay to ensure map bounds are stable after ZIP search
+    const timeoutId = setTimeout(() => {
+      updateClusters(map)
+    }, 100)
+    
+    return () => clearTimeout(timeoutId)
   }, [sales.length, updateClusters])
 
   // Handle window resize to fix map layout issues

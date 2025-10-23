@@ -790,6 +790,23 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     ))
   }, [clusters, markers, sales, onSaleClick, handleClusterClick, handlePointClick, handleClusterKeyDown])
 
+  // Force map to update when center prop changes
+  useEffect(() => {
+    const map = mapRef.current?.getMap?.()
+    if (!map) return
+    
+    console.log('[SALES_MAP_CLUSTERED] Center prop changed, forcing map update:', center)
+    console.log('[SALES_MAP_CLUSTERED] Current map center:', map.getCenter())
+    console.log('[SALES_MAP_CLUSTERED] Target center:', center)
+    
+    // Force the map to move to the new center
+    map.easeTo({
+      center: [center.lng, center.lat],
+      zoom: zoom,
+      duration: 0 // Instant move
+    })
+  }, [center.lat, center.lng, zoom])
+
   // Debug logging for map initialization
   mapDebug.log('SalesMapClustered rendering')
   mapDebug.logTokenStatus(getMapboxToken())

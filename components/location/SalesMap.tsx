@@ -348,93 +348,7 @@ export default function SalesMap({
     } catch {}
   }, [centerOverride, zoom])
 
-  // Handle center changes (for ZIP search)
-  useEffect(() => {
-    console.log('[MAP] Center effect triggered - START:', { 
-      newCenter: center, 
-      zoom,
-      mapExists: !!mapRef.current?.getMap?.()
-    })
-    
-    const map = mapInstanceRef.current
-    console.log('[MAP] Center effect - map check:', { 
-      mapRefExists: !!mapRef.current, 
-      mapInstanceExists: !!mapInstanceRef.current,
-      mapExists: !!map,
-      mapRefType: typeof mapRef.current,
-      mapInstanceType: typeof mapInstanceRef.current
-    })
-    if (!map) {
-      console.log('[MAP] Center effect - no map instance, will retry when map loads')
-      // Store the pending center change to apply when map is ready
-      pendingCenterChangeRef.current = { center, zoom }
-      
-      // Fallback: check periodically if map becomes ready
-      const checkInterval = setInterval(() => {
-        const retryMap = mapInstanceRef.current
-        console.log('[MAP] Fallback check:', { 
-          mapRefExists: !!mapRef.current, 
-          mapInstanceExists: !!mapInstanceRef.current,
-          mapExists: !!retryMap,
-          pendingChange: !!pendingCenterChangeRef.current 
-        })
-        if (retryMap && pendingCenterChangeRef.current) {
-          console.log('[MAP] Fallback: Map became ready, applying pending center change')
-          handleCenterChange(retryMap)
-          pendingCenterChangeRef.current = null
-          clearInterval(checkInterval)
-        }
-      }, 200)
-      
-      // Clean up interval after 5 seconds
-      setTimeout(() => {
-        clearInterval(checkInterval)
-        if (pendingCenterChangeRef.current) {
-          console.log('[MAP] Fallback: Timeout reached, clearing pending center change')
-          pendingCenterChangeRef.current = null
-        }
-      }, 5000)
-      
-      return () => clearInterval(checkInterval)
-    }
-    
-    console.log('[MAP] Center effect - map exists, continuing')
-    handleCenterChange(map)
-  }, [center.lat, center.lng, zoom])
-  
-  // Extract center change logic to a separate function
-  const handleCenterChange = (map: any) => {
-    // Only move if center has actually changed
-    const currentCenter = map.getCenter()
-    const currentLat = currentCenter.lat
-    const currentLng = currentCenter.lng
-    
-    console.log('[MAP] Current map center:', { 
-      currentLat, 
-      currentLng 
-    })
-    
-    const latDiff = Math.abs(currentLat - center.lat)
-    const lngDiff = Math.abs(currentLng - center.lng)
-    
-    console.log('[MAP] Center difference:', { 
-      latDiff, 
-      lngDiff, 
-      shouldMove: latDiff > 0.001 || lngDiff > 0.001 
-    })
-    
-    // If center has changed significantly, move the map
-    if (latDiff > 0.001 || lngDiff > 0.001) {
-      console.log('[MAP] Center changed, moving map to:', center)
-      map.easeTo({ 
-        center: [center.lng, center.lat], 
-        zoom: zoom, 
-        duration: 600 
-      })
-    } else {
-      console.log('[MAP] Center unchanged, no movement needed')
-    }
-  }
+  // Simple approach: Map component will remount when center changes due to key prop
 
   // Handle fit bounds
   useEffect(() => {
@@ -612,6 +526,7 @@ export default function SalesMap({
           latitude: center.lat,
           zoom: zoom
         }}
+        key={`${center.lat}-${center.lng}-${zoom}`}
         style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         onLoad={handleMapLoad}

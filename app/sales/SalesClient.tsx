@@ -515,6 +515,9 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       programmaticMoveRef.current = false
     }
     
+    // Store the handler for the map moveend event
+    ;(window as any).__zipMoveEndHandler = handleZipMoveEnd
+    
     } catch (error) {
       console.error('[SALES_CLIENT] Error in onZipResolved:', error)
       // Clear loading state on error
@@ -522,9 +525,6 @@ export default function SalesClient({ initialSales, initialSearchParams: _initia
       // Clear programmatic move flag
       programmaticMoveRef.current = false
     }
-    
-    // Store the handler for the map moveend event
-    ;(window as any).__zipMoveEndHandler = handleZipMoveEnd
   }, [bumpSeq, runFilteredFetch, filters.distance])
 
   // Create reusable components for the new layout

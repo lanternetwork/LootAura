@@ -21,12 +21,14 @@ interface MapViewState {
 
 interface SalesClientProps {
   initialSales: Sale[]
+  initialSearchParams: { [key: string]: string | string[] | undefined }
   initialCenter: { lat: number; lng: number } | null
   user: User | null
 }
 
 export default function SalesClient({ 
   initialSales, 
+  initialSearchParams,
   initialCenter, 
   user 
 }: SalesClientProps) {
@@ -46,8 +48,8 @@ export default function SalesClient({
   // Sales data state - map is source of truth
   const [mapSales, setMapSales] = useState<Sale[]>(initialSales)
   const [loading, setLoading] = useState(false)
-  const [mapUpdating, setMapUpdating] = useState(false)
-  const [mapError, setMapError] = useState<string | null>(null)
+  const [_mapUpdating, setMapUpdating] = useState(false)
+  const [_mapError, setMapError] = useState<string | null>(null)
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [zipError, setZipError] = useState<string | null>(null)
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])

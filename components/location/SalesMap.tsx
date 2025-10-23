@@ -325,12 +325,28 @@ export default function SalesMap({
     
     const map = mapRef.current?.getMap?.()
     if (!map) {
-      console.log('[MAP] Center effect - no map, returning')
-      return
+      console.log('[MAP] Center effect - no map, retrying in 100ms')
+      // Retry after a short delay if map isn't ready
+      const timeoutId = setTimeout(() => {
+        const retryMap = mapRef.current?.getMap?.()
+        if (retryMap) {
+          console.log('[MAP] Center effect - map ready on retry, proceeding')
+          // Recursively call the effect logic
+          handleCenterChange(retryMap)
+        } else {
+          console.log('[MAP] Center effect - map still not ready after retry')
+        }
+      }, 100)
+      
+      return () => clearTimeout(timeoutId)
     }
     
     console.log('[MAP] Center effect - map exists, continuing')
-    
+    handleCenterChange(map)
+  }, [center.lat, center.lng, zoom])
+  
+  // Extract center change logic to a separate function
+  const handleCenterChange = (map: any) => {
     // Only move if center has actually changed
     const currentCenter = map.getCenter()
     const currentLat = currentCenter.lat
@@ -361,7 +377,7 @@ export default function SalesMap({
     } else {
       console.log('[MAP] Center unchanged, no movement needed')
     }
-  }, [center.lat, center.lng, zoom])
+  }
 
   // Handle fit bounds
   useEffect(() => {

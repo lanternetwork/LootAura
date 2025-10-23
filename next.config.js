@@ -126,6 +126,13 @@ const nextConfig = {
       bodySizeLimit: '1mb', // Limit Server Actions body size
     },
   },
+  // Disable Vercel Live Feedback in development
+  ...(process.env.NODE_ENV === 'development' && {
+    devIndicators: {
+      buildActivity: false,
+      buildActivityPosition: 'bottom-right',
+    },
+  }),
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
@@ -136,6 +143,13 @@ const nextConfig = {
       level: 'error',
     }
     return config
+  },
+  // Environment variables for console cleanup
+  env: {
+    // Disable Mapbox telemetry in development and test
+    MAPBOX_ACCESS_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN,
+    // Disable Vercel Live Feedback
+    NEXT_PUBLIC_VERCEL_LIVE_FEEDBACK: 'false',
   },
 }
 

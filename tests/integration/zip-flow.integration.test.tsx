@@ -119,20 +119,18 @@ describe('ZIP Flow Integration', () => {
       lng: -85.7246945,
       city: 'Louisville',
       state: 'KY',
-      zip: '40204',
-      source: 'api'
+      bbox: undefined
     })
   })
 
   it('handles wrapped geocode response format', () => {
     const wrappedResponse = {
-      data: {
-        lat: 38.2380249,
-        lng: -85.7246945,
+      result: {
+        latitude: 38.2380249,
+        longitude: -85.7246945,
         city: 'Louisville',
         state: 'KY',
-        zip: '40204',
-        source: 'api'
+        bbox: [1, 2, 3, 4]
       }
     }
     
@@ -142,8 +140,7 @@ describe('ZIP Flow Integration', () => {
       lng: -85.7246945,
       city: 'Louisville',
       state: 'KY',
-      zip: '40204',
-      source: 'api'
+      bbox: [1, 2, 3, 4]
     })
   })
 })

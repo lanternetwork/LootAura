@@ -618,7 +618,7 @@ export default function SalesMap({
         onMoveEnd={handleMoveEnd}
         onZoomEnd={handleZoomEnd}
         onMove={handleViewChange}
-        onError={(error) => console.log('[MAP] Map error:', error)}
+        onError={(error: any) => console.log('[MAP] Map error:', error)}
         onStyleLoad={() => console.log('[MAP] Style loaded')}
         onStyleData={() => console.log('[MAP] Style data loaded')}
         interactiveLayerIds={[]}

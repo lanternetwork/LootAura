@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
 import SaleCard from '@/components/SaleCard'

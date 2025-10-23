@@ -72,7 +72,7 @@ export default function SalesClient({
     return unique
   }, [])
 
-  // Fetch sales based on map viewport bounds (bbox-based only)
+  // Fetch sales based on map viewport center + distance
   const fetchMapSales = useCallback(async (centerOverride?: { lat: number; lng: number }) => {
     const center = centerOverride || mapView.center
     if (!center) return
@@ -82,10 +82,9 @@ export default function SalesClient({
 
     try {
       const params = new URLSearchParams()
-      params.set('minLng', mapView.bounds.west.toString())
-      params.set('minLat', mapView.bounds.south.toString())
-      params.set('maxLng', mapView.bounds.east.toString())
-      params.set('maxLat', mapView.bounds.north.toString())
+      params.set('lat', center.lat.toString())
+      params.set('lng', center.lng.toString())
+      params.set('distanceKm', '40') // Default 40km radius
       
       if (filters.dateRange) {
         params.set('dateRange', filters.dateRange)
@@ -94,11 +93,10 @@ export default function SalesClient({
         params.set('categories', filters.categories.join(','))
       }
 
-      console.log('[FETCH] Viewport fetch with bbox:', {
-        minLng: mapView.bounds.west,
-        minLat: mapView.bounds.south,
-        maxLng: mapView.bounds.east,
-        maxLat: mapView.bounds.north
+      console.log('[FETCH] Viewport fetch with center:', {
+        lat: center.lat,
+        lng: center.lng,
+        distanceKm: 40
       })
 
       const response = await fetch(`/api/sales/markers?${params.toString()}`)
@@ -139,7 +137,7 @@ export default function SalesClient({
       setLoading(false)
       setMapUpdating(false)
     }
-  }, [mapView.bounds, filters.dateRange, filters.categories, deduplicateSales])
+  }, [mapView.center, filters.dateRange, filters.categories, deduplicateSales])
 
   // Debounce timer for viewport changes
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)

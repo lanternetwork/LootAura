@@ -28,8 +28,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   
   const token = getMapboxToken()
 
-  // Expose the mapRef to parent components
-  useImperativeHandle(ref, () => mapRef.current, [])
+  // Expose the map instance to parent components
+  useImperativeHandle(ref, () => ({
+    getMap: () => mapRef.current?.getMap?.(),
+    isLoaded: () => loaded
+  }), [loaded])
 
   const onLoad = useCallback(() => {
     console.log('[MAP] onLoad')

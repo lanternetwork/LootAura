@@ -18,9 +18,21 @@ export async function waitForMapReady(
   const { retries = 10, delayMs = 200 } = opts
   
   for (let i = 0; i < retries; i++) {
-    const map = ref.current?.getMap?.()
-    if (map && map.isStyleLoaded?.()) {
-      return map
+    console.log(`[MAP_DIAG] Attempt ${i + 1}/${retries}: checking map readiness`)
+    
+    // Check if the ref has the getMap method (new interface)
+    if (ref.current?.getMap) {
+      const map = ref.current.getMap()
+      console.log(`[MAP_DIAG] Map instance found:`, !!map)
+      if (map) {
+        const styleLoaded = map.isStyleLoaded?.()
+        console.log(`[MAP_DIAG] Style loaded:`, styleLoaded)
+        if (styleLoaded) {
+          return map
+        }
+      }
+    } else {
+      console.log(`[MAP_DIAG] No getMap method on ref.current:`, !!ref.current)
     }
     await new Promise(r => setTimeout(r, delayMs))
   }
@@ -35,7 +47,10 @@ export async function waitForMapReady(
  */
 export function getMapInstance(ref: React.RefObject<any>): any | null {
   try {
-    return ref.current?.getMap?.() || null
+    if (ref.current?.getMap) {
+      return ref.current.getMap()
+    }
+    return null
   } catch (error) {
     console.warn('[MAP_DIAG] Failed to get map instance:', error)
     return null

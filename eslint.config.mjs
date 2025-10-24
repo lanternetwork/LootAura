@@ -125,6 +125,31 @@ export default [
       
       // Import rules
       'no-duplicate-imports': 'error',
+      'no-restricted-imports': [
+        'error',
+        {
+          'paths': [
+            {
+              'name': '@/components/location/SalesMap',
+              'message': 'Use SimpleMap instead. SalesMap is deprecated.'
+            },
+            {
+              'name': '@/components/location/SalesMapClustered', 
+              'message': 'Use SimpleMap instead. SalesMapClustered is deprecated.'
+            },
+            {
+              'name': '@/lib/clustering',
+              'message': 'Use @/lib/pins/clustering instead. Legacy clustering is deprecated.'
+            }
+          ],
+          'patterns': [
+            {
+              'group': ['**/deprecated/**'],
+              'message': 'Do not import from deprecated/ folder in app code.'
+            }
+          ]
+        }
+      ],
     },
   },
   // Server-side routes (Node globals)

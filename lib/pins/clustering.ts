@@ -22,7 +22,7 @@ export function buildClusterIndex(
 ): SuperclusterIndex {
   const opts = { ...DEFAULT_OPTIONS, ...options }
   
-  const cluster = new Supercluster({
+  const cluster = new Supercluster<PinPoint, { point_count: number }>({
     radius: opts.radius,
     maxZoom: opts.maxZoom,
     minPoints: opts.minPoints

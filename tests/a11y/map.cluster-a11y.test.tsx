@@ -34,7 +34,6 @@ describe('Cluster Marker Accessibility', () => {
       <ClusterMarker
         cluster={mockCluster}
         onClick={onClick}
-        size="medium"
       />
     )
 
@@ -53,7 +52,6 @@ describe('Cluster Marker Accessibility', () => {
         cluster={mockCluster}
         onClick={onClick}
         onKeyDown={onKeyDown}
-        size="medium"
       />
     )
 
@@ -75,7 +73,6 @@ describe('Cluster Marker Accessibility', () => {
       <ClusterMarker
         cluster={mockCluster}
         onClick={onClick}
-        size="medium"
       />
     )
 
@@ -89,7 +86,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -103,7 +99,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -115,49 +110,45 @@ describe('Cluster Marker Accessibility', () => {
     const { unmount: unmount1 } = render(
       <ClusterMarker
         cluster={mockCluster}
-        size="small"
       />
     )
 
     let button = screen.getByRole('button')
-    expect(button).toHaveClass('w-8')
-    expect(button).toHaveClass('h-8')
-    expect(button).toHaveClass('text-xs')
+    expect(button).toHaveClass('w-4')
+    expect(button).toHaveClass('h-4')
+    expect(button).toHaveClass('text-[10px]')
     unmount1()
 
     // Test medium size
     const { unmount: unmount2 } = render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
     button = screen.getByRole('button')
-    expect(button).toHaveClass('w-10')
-    expect(button).toHaveClass('h-10')
-    expect(button).toHaveClass('text-sm')
+    expect(button).toHaveClass('w-5')
+    expect(button).toHaveClass('h-5')
+    expect(button).toHaveClass('text-[10px]')
     unmount2()
 
     // Test large size
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="large"
       />
     )
 
     button = screen.getByRole('button')
-    expect(button).toHaveClass('w-12')
-    expect(button).toHaveClass('h-12')
-    expect(button).toHaveClass('text-base')
+    expect(button).toHaveClass('w-6')
+    expect(button).toHaveClass('h-6')
+    expect(button).toHaveClass('text-[11px]')
   })
 
   it('should have high contrast colors', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -171,7 +162,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -184,7 +174,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockPoint}
-        size="medium"
       />
     )
 
@@ -195,7 +184,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -208,7 +196,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -233,7 +220,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={largeCluster}
-        size="large"
       />
     )
 

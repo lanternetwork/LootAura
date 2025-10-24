@@ -78,6 +78,17 @@ export default function DiagnosticToolsValidator() {
         ) || null
       }
       
+      // Debug: Log what we found
+      console.log(`[DIAGNOSTIC_VALIDATOR] Looking for "${toolName}"`)
+      console.log(`[DIAGNOSTIC_VALIDATOR] Found element:`, toolElement)
+      if (toolElement) {
+        console.log(`[DIAGNOSTIC_VALIDATOR] Element details:`, {
+          tagName: toolElement.tagName,
+          className: toolElement.className,
+          textContent: toolElement.textContent?.substring(0, 100)
+        })
+      }
+      
       const toolExists = !!toolElement
       addTest('Component Exists', toolExists, {
         found: toolExists,

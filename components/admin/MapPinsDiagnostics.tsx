@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 
 interface PinTestResult {
   testName: string
@@ -18,7 +18,7 @@ interface MapPinsDiagnosticsProps {
 export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [results, setResults] = useState<PinTestResult[]>([])
-  const [testSales, setTestSales] = useState<any[]>([])
+  const [_testSales, _setTestSales] = useState<any[]>([])
   const testStartTime = useRef<number>(0)
 
   const addTest = (testName: string, success: boolean, details: Record<string, any>, error?: string, category: PinTestResult['category'] = 'creation', testStartTime?: number) => {

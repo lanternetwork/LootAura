@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 // MapRef is a namespace in react-map-gl v7, not a type
-import { waitForMapReady, getMapInstance } from './admin/mapDiagUtils'
+import { waitForMapReady } from './admin/mapDiagUtils'
 
 interface MapInteractionTest {
   testName: string

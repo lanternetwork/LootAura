@@ -1,13 +1,17 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react"
-import Map from "react-map-gl"
+import Map, { Marker, Popup } from "react-map-gl"
 import { getMapboxToken } from "@/lib/maps/token"
+import { Sale } from "@/lib/types"
 
 interface SimpleMapProps {
   center: { lat: number; lng: number }
   zoom?: number
   fitBounds?: { west: number; south: number; east: number; north: number } | null
+  sales?: Sale[]
+  onSaleClick?: (sale: Sale) => void
+  selectedSaleId?: string
   onViewportChange?: (args: { 
     center: { lat: number; lng: number }; 
     zoom: number; 
@@ -19,6 +23,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   center, 
   zoom = 11, 
   fitBounds, 
+  sales = [],
+  onSaleClick,
+  selectedSaleId,
   onViewportChange 
 }, ref) => {
   const mapRef = useRef<any>(null)
@@ -153,7 +160,42 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMoveEnd={handleMoveEnd}
-      />
+      >
+        {/* Render sales as markers */}
+        {sales
+          .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
+          .map(sale => (
+            <Marker
+              key={sale.id}
+              longitude={sale.lng!}
+              latitude={sale.lat!}
+              anchor="center"
+            >
+              <button
+                className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500"
+                onClick={() => onSaleClick?.(sale)}
+                aria-label={`Sale: ${sale.title}`}
+              />
+            </Marker>
+          ))}
+        
+        {/* Selected sale popup */}
+        {selectedSaleId && (
+          <Popup
+            longitude={sales.find(s => s.id === selectedSaleId)?.lng || 0}
+            latitude={sales.find(s => s.id === selectedSaleId)?.lat || 0}
+            anchor="bottom"
+            closeButton={true}
+            closeOnClick={false}
+          >
+            <div className="p-2">
+              <h3 className="font-semibold text-sm">
+                {sales.find(s => s.id === selectedSaleId)?.title}
+              </h3>
+            </div>
+          </Popup>
+        )}
+      </Map>
       
       {/* Debug overlay */}
       {process.env.NEXT_PUBLIC_DEBUG === "true" && (

@@ -344,6 +344,11 @@ export default function SalesClient({
               center={mapCenter}
               zoom={mapZoom}
               fitBounds={pendingBounds}
+              sales={mapSales}
+              onSaleClick={(sale) => {
+                console.log('[SALES] Sale clicked:', sale.title)
+                // You can add sale selection logic here
+              }}
               onViewportChange={handleViewportChange}
             />
           </div>

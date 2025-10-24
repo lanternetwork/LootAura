@@ -38,7 +38,7 @@ vi.mock('react-map-gl', () => ({
 }))
 
 // Mock clustering
-vi.mock('@/lib/clustering', () => ({
+vi.mock('@/lib/pins/clustering', () => ({
   buildClusterIndex: vi.fn(),
   getClustersForViewport: vi.fn(() => []),
   getClusterExpansionZoom: vi.fn(() => 12),
@@ -255,7 +255,7 @@ describe('Map Keyboard Navigation', () => {
       { id: 'cluster-1', point_count: 5, lat: 38.2527, lng: -85.7585 }
     ]
 
-    vi.mocked(require('@/lib/clustering').getClustersForViewport).mockReturnValue(mockClusters)
+    vi.mocked(require('@/lib/pins/clustering').getClustersForViewport).mockReturnValue(mockClusters)
 
     render(
       <SalesMapClustered

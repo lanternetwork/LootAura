@@ -36,7 +36,7 @@ vi.mock('@/lib/maps/token', () => ({
 }))
 
 // Mock clustering
-vi.mock('@/lib/clustering', () => ({
+vi.mock('@/lib/pins/clustering', () => ({
   isClusteringEnabled: () => false,
   buildClusterIndex: () => null,
   getClustersForViewport: () => [],

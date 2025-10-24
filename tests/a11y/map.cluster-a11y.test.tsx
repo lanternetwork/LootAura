@@ -1,22 +1,23 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import ClusterMarker from '@/components/location/ClusterMarker'
-import { ClusterResult } from '@/lib/clustering'
+import { ClusterFeature } from '@/lib/pins/types'
 
 describe('Cluster Marker Accessibility', () => {
-  const mockCluster: ClusterResult = {
-    type: 'cluster',
-    id: 'cluster-1',
+  const mockCluster: ClusterFeature = {
+    id: 1,
     count: 5,
-    lon: -85.7585,
-    lat: 38.2527
+    lng: -85.7585,
+    lat: 38.2527,
+    expandToZoom: 12
   }
 
-  const mockPoint: ClusterResult = {
-    type: 'point',
-    id: 'point-1',
-    lon: -85.7585,
-    lat: 38.2527
+  const mockPoint: ClusterFeature = {
+    id: 2,
+    count: 1,
+    lng: -85.7585,
+    lat: 38.2527,
+    expandToZoom: 12
   }
 
   beforeEach(() => {

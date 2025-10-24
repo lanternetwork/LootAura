@@ -9,7 +9,7 @@ import {
   getClusterLabel,
   type ClusterPoint,
   type ClusterResult
-} from '@/lib/clustering'
+} from '@/lib/pins/clustering'
 
 describe('Cluster Engine', () => {
   let testPoints: ClusterPoint[]

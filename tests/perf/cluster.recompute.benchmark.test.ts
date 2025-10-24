@@ -3,7 +3,7 @@ import {
   buildClusterIndex, 
   getClustersForViewport,
   type ClusterPoint 
-} from '@/lib/clustering'
+} from '@/lib/pins/clustering'
 
 describe('Cluster Performance Benchmarks', () => {
   // Generate test data for performance testing

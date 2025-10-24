@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     
     let latitude: number
     let longitude: number
-    let distanceKm: number
+    let distanceKm: number | undefined
     
     // Check if bbox parameters are provided
     if (north && south && east && west) {
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
     }
     
     // 2. Parse & validate other parameters
-    if (!distanceKm) {
+    if (distanceKm === undefined) {
       distanceKm = Math.max(1, Math.min(
         searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm') || '40') : 40,
         160

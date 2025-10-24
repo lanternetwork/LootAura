@@ -107,9 +107,23 @@ export default function ZipLookupTester({ className = '' }: ZipLookupTesterProps
   }
 
   const runStressTest = async () => {
+    // Use realistic ZIP codes from major US cities for stress testing
+    const realisticZips = [
+      '10001', '10002', '10003', '10004', '10005', // New York, NY
+      '90210', '90211', '90212', '90213', '90214', // Beverly Hills, CA
+      '60601', '60602', '60603', '60604', '60605', // Chicago, IL
+      '33101', '33102', '33103', '33104', '33105', // Miami, FL
+      '30301', '30302', '30303', '30304', '30305', // Atlanta, GA
+      '85001', '85002', '85003', '85004', '85005', // Phoenix, AZ
+      '75201', '75202', '75203', '75204', '75205', // Dallas, TX
+      '98101', '98102', '98103', '98104', '98105', // Seattle, WA
+      '78701', '78702', '78703', '78704', '78705', // Austin, TX
+      '97201', '97202', '97203', '97204', '97205'  // Portland, OR
+    ]
+    
+    // Randomly select 10 ZIP codes from the realistic list
     const randomZips = Array.from({ length: 10 }, () => {
-      // Generate random 5-digit ZIP codes
-      return Math.floor(Math.random() * 90000 + 10000).toString()
+      return realisticZips[Math.floor(Math.random() * realisticZips.length)]
     })
     
     setIsRunning(true)

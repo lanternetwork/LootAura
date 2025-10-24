@@ -9,7 +9,7 @@ import MapDiagnostics from '@/components/MapDiagnostics'
 import MapInteractionTester from '@/components/MapInteractionTester'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useState, useRef } from 'react'
-import type { MapRef } from 'react-map-gl'
+import { MapRef } from 'react-map-gl'
 
 export default function AdminToolsPage() {
   const [showDiagnostics, setShowDiagnostics] = useState(false)

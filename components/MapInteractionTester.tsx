@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { MapRef } from 'react-map-gl'
+import { MapRef } from 'react-map-gl'
 import { waitForMapReady } from './admin/mapDiagUtils'
 
 interface MapInteractionTest {

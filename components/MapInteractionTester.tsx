@@ -48,8 +48,8 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
     const startTime = Date.now()
     const tests: MapInteractionTest[] = []
     
-    const addTest = (testName: string, success: boolean, details: any, error?: string, category: MapInteractionTest['category'] = 'viewport') => {
-      const testDuration = Date.now() - startTime
+    const addTest = (testName: string, success: boolean, details: any, error?: string, category: MapInteractionTest['category'] = 'viewport', testStartTime?: number) => {
+      const testDuration = testStartTime ? Date.now() - testStartTime : Date.now() - startTime
       tests.push({
         testName,
         success,
@@ -111,6 +111,7 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
       }, centerOperationsWorking ? undefined : 'Map center/zoom operations failed', 'viewport')
 
       // Test 4: Test map movement (easeTo)
+      const movementTestStart = Date.now()
       let movementWorking = false
       if (mapInstance) {
         try {
@@ -144,7 +145,7 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
       addTest('Map Movement (easeTo)', movementWorking, {
         canMove: movementWorking,
         hasEaseTo: typeof mapInstance?.easeTo === 'function'
-      }, movementWorking ? undefined : 'Map movement not working', 'events')
+      }, movementWorking ? undefined : 'Map movement not working', 'events', movementTestStart)
 
       // Test 5: Test map bounds operations
       let boundsWorking = false
@@ -220,6 +221,7 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
       }, clustersWorking ? undefined : `Clusters not working: ${clustersCount} found, interactive: ${clustersWorking}`, 'clusters')
 
       // Test 8: Test map event listeners
+      const eventTestStart = Date.now()
       let eventListenersWorking = false
       if (mapInstance) {
         try {
@@ -260,9 +262,10 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
         hasOffMethod: typeof mapInstance?.off === 'function',
         hasFireMethod: typeof mapInstance?.fire === 'function',
         listenersWorking: eventListenersWorking
-      }, eventListenersWorking ? undefined : 'Map event system not working', 'events')
+      }, eventListenersWorking ? undefined : 'Map event system not working', 'events', eventTestStart)
 
       // Test 9: Test map resize functionality
+      const resizeTestStart = Date.now()
       let resizeWorking = false
       if (mapInstance) {
         try {
@@ -282,7 +285,7 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
       addTest('Map Resize Functionality', resizeWorking, {
         canResize: resizeWorking,
         hasResize: typeof mapInstance?.resize === 'function'
-      }, resizeWorking ? undefined : 'Map resize not working', 'events')
+      }, resizeWorking ? undefined : 'Map resize not working', 'events', resizeTestStart)
 
       // Test 10: Test map style and rendering
       let styleWorking = false

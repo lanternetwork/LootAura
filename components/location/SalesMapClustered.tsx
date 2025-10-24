@@ -15,7 +15,17 @@ import {
   type ClusterResult,
   type ClusterPoint
 } from '@/lib/clustering'
+import { ClusterFeature } from '@/lib/pins/types'
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
+
+// Convert ClusterResult to ClusterFeature for compatibility with new ClusterMarker
+const convertClusterResultToFeature = (cluster: ClusterResult): ClusterFeature => ({
+  id: parseInt(cluster.id.replace('cluster-', '')) || 0,
+  count: cluster.count || 1,
+  lat: cluster.lat,
+  lng: cluster.lon,
+  expandToZoom: 12 // Default expansion zoom
+})
 import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
 import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
 import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'
@@ -699,7 +709,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     return clusters.map(cluster => (
       <ClusterMarker
         key={cluster.id}
-        cluster={cluster}
+        cluster={convertClusterResultToFeature(cluster)}
         onClick={cluster.type === 'cluster' ? handleClusterClick : handlePointClick}
         onKeyDown={cluster.type === 'cluster' ? handleClusterKeyDown : undefined}
         size={cluster.type === 'cluster' ? getClusterSizeTier(cluster.count || 0) : 'small'}

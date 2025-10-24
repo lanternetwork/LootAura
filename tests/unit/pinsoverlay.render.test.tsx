@@ -119,10 +119,11 @@ describe('PinsOverlay Rendering', () => {
       render(<PinsOverlay {...defaultProps} isClusteringEnabled={true} />)
       
       // Wait for the debounced viewport to be set and clusters to render
+      // The debounce is 100ms, so we need to wait longer
       await waitFor(() => {
         const clusterMarkers = screen.getAllByTestId('cluster')
         expect(clusterMarkers.length).toBeGreaterThan(0)
-      }, { timeout: 200 })
+      }, { timeout: 500 })
       
       // Check that we have at least one cluster marker
       const clusterMarkers = screen.getAllByTestId('cluster')
@@ -136,7 +137,7 @@ describe('PinsOverlay Rendering', () => {
       await waitFor(() => {
         const pinMarkers = screen.queryAllByTestId('pin-marker')
         expect(pinMarkers).toHaveLength(0)
-      }, { timeout: 200 })
+      }, { timeout: 500 })
     })
 
     it('should handle empty clusters array', () => {

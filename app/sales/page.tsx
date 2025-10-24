@@ -46,23 +46,31 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
 
   let initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null = null
 
-  // 1) la_loc cookie
-  try {
-    const c = cookieStore.get('la_loc')?.value
-    console.log(`[SALES_PAGE] la_loc cookie:`, c)
-    if (c) {
-      const parsed = JSON.parse(c)
-      if (parsed?.lat && parsed?.lng) {
-        initialCenter = {
-          lat: Number(parsed.lat),
-          lng: Number(parsed.lng),
-          label: { zip: parsed.zip, city: parsed.city, state: parsed.state }
+  // 0) URL parameters (highest priority)
+  if (_lat && _lng) {
+    initialCenter = { lat: _lat, lng: _lng }
+    console.log(`[SALES_PAGE] Using URL parameters:`, initialCenter)
+  }
+
+  // 1) la_loc cookie (only if no URL params)
+  if (!initialCenter) {
+    try {
+      const c = cookieStore.get('la_loc')?.value
+      console.log(`[SALES_PAGE] la_loc cookie:`, c)
+      if (c) {
+        const parsed = JSON.parse(c)
+        if (parsed?.lat && parsed?.lng) {
+          initialCenter = {
+            lat: Number(parsed.lat),
+            lng: Number(parsed.lng),
+            label: { zip: parsed.zip, city: parsed.city, state: parsed.state }
+          }
+          console.log(`[SALES_PAGE] Using cookie location:`, initialCenter)
         }
-        console.log(`[SALES_PAGE] Using cookie location:`, initialCenter)
       }
+    } catch (e) {
+      console.log(`[SALES_PAGE] Cookie parse error:`, e)
     }
-  } catch (e) {
-    console.log(`[SALES_PAGE] Cookie parse error:`, e)
   }
 
   // 2) user profile.home_zip → lookup zip

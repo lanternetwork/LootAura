@@ -181,8 +181,6 @@ export default function DiagnosticToolsValidator() {
     }) || null
   }
 
-
-
   // Helper function to wait for results to appear
   const waitForResults = async (toolElement: Element, initialCount: number, timeoutMs: number): Promise<boolean> => {
     const startTime = Date.now()

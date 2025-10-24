@@ -1,4 +1,4 @@
-import { MapRef } from 'react-map-gl'
+import { type MapRef } from 'react-map-gl'
 
 export interface MapReadinessOptions {
   retries?: number

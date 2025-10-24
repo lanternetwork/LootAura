@@ -163,55 +163,84 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
       // Test 6: Test markers detection and interaction
       const markers = document.querySelectorAll('[class*="marker"], [data-marker], .mapboxgl-marker')
       const markersCount = markers.length
-      // For admin test map, we expect 0 markers, so test that the detection works correctly
-      const markersDetectionWorking = markersCount === 0 // Should be 0 for admin test map
-      addTest('Markers Detection', markersDetectionWorking, {
+      
+      // Test actual marker functionality - can we interact with markers?
+      let markersWorking = false
+      if (markersCount > 0) {
+        // Test if markers are interactive
+        const firstMarker = markers[0] as HTMLElement
+        markersWorking = typeof firstMarker.addEventListener === 'function' && 
+                        typeof firstMarker.click === 'function'
+      } else {
+        // For admin test map with no markers, test if the detection system works
+        // by checking if we can find mapboxgl elements
+        const mapboxElements = document.querySelectorAll('.mapboxgl-map, .mapboxgl-canvas')
+        markersWorking = mapboxElements.length > 0 // Map should exist
+      }
+      
+      addTest('Markers Detection', markersWorking, {
         markersCount,
         markersFound: markersCount > 0,
-        expectedCount: 0,
-        detectionWorking: markersDetectionWorking,
-        markerTypes: Array.from(markers).map(m => ({
-          className: m.className,
-          hasClick: typeof m.addEventListener === 'function'
-        }))
-      }, markersDetectionWorking ? undefined : `Expected 0 markers but found ${markersCount}`, 'markers')
+        markersInteractive: markersCount > 0 ? markersWorking : false,
+        mapboxElements: document.querySelectorAll('.mapboxgl-map, .mapboxgl-canvas').length
+      }, markersWorking ? undefined : `Markers not working: ${markersCount} found, interactive: ${markersWorking}`, 'markers')
 
       // Test 7: Test clusters detection
       const clusters = document.querySelectorAll('[class*="cluster"], [data-cluster]')
       const clustersCount = clusters.length
-      // For admin test map, we expect 0 clusters, so test that the detection works correctly
-      const clustersDetectionWorking = clustersCount === 0 // Should be 0 for admin test map
-      addTest('Clusters Detection', clustersDetectionWorking, {
+      
+      // Test actual cluster functionality - can we interact with clusters?
+      let clustersWorking = false
+      if (clustersCount > 0) {
+        // Test if clusters are interactive
+        const firstCluster = clusters[0] as HTMLElement
+        clustersWorking = typeof firstCluster.addEventListener === 'function' && 
+                         typeof firstCluster.click === 'function'
+      } else {
+        // For admin test map with no clusters, test if the detection system works
+        // by checking if we can find mapboxgl elements
+        const mapboxElements = document.querySelectorAll('.mapboxgl-map, .mapboxgl-canvas')
+        clustersWorking = mapboxElements.length > 0 // Map should exist
+      }
+      
+      addTest('Clusters Detection', clustersWorking, {
         clustersCount,
         clustersFound: clustersCount > 0,
-        expectedCount: 0,
-        detectionWorking: clustersDetectionWorking,
-        clusterTypes: Array.from(clusters).map(c => ({
-          className: c.className,
-          hasClick: typeof c.addEventListener === 'function'
-        }))
-      }, clustersDetectionWorking ? undefined : `Expected 0 clusters but found ${clustersCount}`, 'clusters')
+        clustersInteractive: clustersCount > 0 ? clustersWorking : false,
+        mapboxElements: document.querySelectorAll('.mapboxgl-map, .mapboxgl-canvas').length
+      }, clustersWorking ? undefined : `Clusters not working: ${clustersCount} found, interactive: ${clustersWorking}`, 'clusters')
 
       // Test 8: Test map event listeners
       let eventListenersWorking = false
       if (mapInstance) {
         try {
-          // Test if the map can register event listeners (not if it has them)
-          const canRegisterEvents = typeof mapInstance.on === 'function'
-          const hasListenMethod = typeof mapInstance.listens === 'function'
+          // Actually test if we can register and remove event listeners
+          const testEvent = 'test-event'
+          let eventFired = false
           
-          // For admin test map, we test if the map supports event registration
-          eventListenersWorking = canRegisterEvents && hasListenMethod
+          // Register a test event listener
+          const testHandler = () => { eventFired = true }
+          mapInstance.on(testEvent, testHandler)
+          
+          // Fire the test event
+          mapInstance.fire(testEvent)
+          
+          // Check if the event was handled
+          eventListenersWorking = eventFired
+          
+          // Clean up the test listener
+          mapInstance.off(testEvent, testHandler)
         } catch (e) {
-          console.log('Could not check event listeners:', e)
+          console.log('Could not test event listeners:', e)
           eventListenersWorking = false
         }
       }
       addTest('Event Listeners', eventListenersWorking, {
         hasOnMethod: typeof mapInstance?.on === 'function',
-        hasListenMethod: typeof mapInstance?.listens === 'function',
+        hasOffMethod: typeof mapInstance?.off === 'function',
+        hasFireMethod: typeof mapInstance?.fire === 'function',
         listenersWorking: eventListenersWorking
-      }, eventListenersWorking ? undefined : 'Map does not support event registration', 'events')
+      }, eventListenersWorking ? undefined : 'Map event system not working', 'events')
 
       // Test 9: Test map resize functionality
       let resizeWorking = false

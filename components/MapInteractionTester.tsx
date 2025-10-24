@@ -121,6 +121,9 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
             const originalCenter = mapInstance.getCenter()
             const testCenter = [originalCenter.lng + 0.001, originalCenter.lat + 0.001]
             
+            console.log('[MOVEMENT_TEST] Original center:', originalCenter)
+            console.log('[MOVEMENT_TEST] Target center:', testCenter)
+            
             // Test the easeTo call and wait for it to complete
             mapInstance.easeTo({ center: testCenter, duration: 100 })
             
@@ -131,6 +134,9 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
             const newCenter = mapInstance.getCenter()
             const moved = Math.abs(newCenter.lng - originalCenter.lng) > 0.0001 || 
                          Math.abs(newCenter.lat - originalCenter.lat) > 0.0001
+            
+            console.log('[MOVEMENT_TEST] New center:', newCenter)
+            console.log('[MOVEMENT_TEST] Moved:', moved, 'lng diff:', Math.abs(newCenter.lng - originalCenter.lng), 'lat diff:', Math.abs(newCenter.lat - originalCenter.lat))
             
             movementWorking = moved
             
@@ -230,14 +236,21 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
           let zoomEventFired = false
           
           // Register test event listeners for real map events
-          const moveHandler = () => { moveEventFired = true }
-          const zoomHandler = () => { zoomEventFired = true }
+          const moveHandler = () => { 
+            console.log('[EVENT_TEST] Move event fired!')
+            moveEventFired = true 
+          }
+          const zoomHandler = () => { 
+            console.log('[EVENT_TEST] Zoom event fired!')
+            zoomEventFired = true 
+          }
           
           mapInstance.on('move', moveHandler)
           mapInstance.on('zoom', zoomHandler)
           
           // Trigger a small map movement to fire the move event
           const currentCenter = mapInstance.getCenter()
+          console.log('[EVENT_TEST] Triggering map movement from', currentCenter)
           mapInstance.easeTo({ 
             center: [currentCenter.lng + 0.001, currentCenter.lat + 0.001], 
             duration: 100 
@@ -248,6 +261,7 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
           
           // Check if events were fired
           eventListenersWorking = moveEventFired || zoomEventFired
+          console.log('[EVENT_TEST] Events fired - move:', moveEventFired, 'zoom:', zoomEventFired, 'working:', eventListenersWorking)
           
           // Clean up the test listeners
           mapInstance.off('move', moveHandler)

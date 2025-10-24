@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useCallback } from "react"
-import Map, { MapRef } from "react-map-gl"
+import Map from "react-map-gl"
 import { getMapboxToken } from "@/lib/maps/token"
 
 interface SimpleMapProps {
@@ -21,7 +21,7 @@ export default function SimpleMap({
   fitBounds, 
   onViewportChange 
 }: SimpleMapProps) {
-  const mapRef = useRef<MapRef | null>(null)
+  const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [loaded, setLoaded] = useState(false)
   const lastBoundsKey = useRef<string>("")

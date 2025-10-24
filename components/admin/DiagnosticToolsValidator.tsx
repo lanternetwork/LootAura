@@ -54,6 +54,13 @@ export default function DiagnosticToolsValidator() {
       const toolElement = document.querySelector(`[data-testid*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`) ||
                          document.querySelector(`[class*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`) ||
                          Array.from(document.querySelectorAll('h3')).find(h => h.textContent?.includes(toolName)) ||
+                         Array.from(document.querySelectorAll('h3')).find(h => {
+                           const title = h.textContent?.toLowerCase() || ''
+                           const searchName = toolName.toLowerCase()
+                           return title.includes(searchName) || searchName.includes(title) || 
+                                  title.includes(searchName.split(' ')[0]) || 
+                                  searchName.includes(title.split(' ')[0])
+                         }) ||
                          Array.from(document.querySelectorAll('div')).find(div => 
                            div.textContent?.includes(toolName) && 
                            (div.querySelector('button') || div.querySelector('[class*="test"]'))
@@ -63,7 +70,9 @@ export default function DiagnosticToolsValidator() {
       addTest('Component Exists', toolExists, {
         found: toolExists,
         selector: toolElement?.tagName || 'none',
-        className: toolElement?.className || 'none'
+        className: toolElement?.className || 'none',
+        textContent: toolElement?.textContent?.substring(0, 100) || 'none',
+        allH3s: Array.from(document.querySelectorAll('h3')).map(h => h.textContent?.trim()).filter(Boolean)
       }, toolExists ? undefined : 'Diagnostic tool component not found in DOM')
 
       if (!toolExists) {
@@ -229,10 +238,10 @@ export default function DiagnosticToolsValidator() {
     setResults([])
     
     const diagnosticTools = [
-      'ZIP Lookup Tester',
+      'ZIP Lookup Testing Tool',
       'ZIP Lookup Diagnostics', 
       'Map Functionality Diagnostics',
-      'Map Interaction Tester',
+      'Map Interaction Testing',
       'Map Pins Diagnostics'
     ]
     

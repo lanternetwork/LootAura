@@ -149,10 +149,10 @@ export default function SalesClient({
       clearTimeout(debounceTimerRef.current)
     }
     
-    // Debounce fetch by 75ms to prevent rapid successive calls
+    // Debounce fetch by 200ms to prevent rapid successive calls
     debounceTimerRef.current = setTimeout(() => {
       fetchMapSales(bounds)
-    }, 75)
+    }, 200)
   }, [fetchMapSales])
 
   // Handle ZIP search with bbox support

@@ -5,10 +5,25 @@ import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
+import { z } from 'zod'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
 export const dynamic = 'force-dynamic'
+
+// Bbox validation schema
+const bboxSchema = z.object({
+  north: z.number().min(-90).max(90),
+  south: z.number().min(-90).max(90),
+  east: z.number().min(-180).max(180),
+  west: z.number().min(-180).max(180)
+}).refine((data) => data.north > data.south, {
+  message: "north must be greater than south",
+  path: ["north"]
+}).refine((data) => data.east > data.west, {
+  message: "east must be greater than west", 
+  path: ["east"]
+})
 
 export async function GET(request: NextRequest) {
   const startedAt = Date.now()
@@ -17,34 +32,77 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseServerClient()
     const { searchParams } = new URL(request.url)
     
-    // 1. Parse & validate required location
+    // 1. Parse & validate location (either lat/lng or bbox)
     const lat = searchParams.get('lat')
     const lng = searchParams.get('lng')
+    const north = searchParams.get('north')
+    const south = searchParams.get('south')
+    const east = searchParams.get('east')
+    const west = searchParams.get('west')
     
-    if (!lat || !lng) {
-      console.log(`[SALES] Missing location: lat=${lat}, lng=${lng}`)
+    let latitude: number
+    let longitude: number
+    let distanceKm: number
+    
+    // Check if bbox parameters are provided
+    if (north && south && east && west) {
+      try {
+        const bboxData = {
+          north: parseFloat(north),
+          south: parseFloat(south),
+          east: parseFloat(east),
+          west: parseFloat(west)
+        }
+        
+        const validatedBbox = bboxSchema.parse(bboxData)
+        console.log(`[API_SALES] bbox=${validatedBbox.north},${validatedBbox.south},${validatedBbox.east},${validatedBbox.west}`)
+        
+        // Calculate center and approximate distance from bbox
+        latitude = (validatedBbox.north + validatedBbox.south) / 2
+        longitude = (validatedBbox.east + validatedBbox.west) / 2
+        
+        // Calculate approximate distance from bbox dimensions
+        const latRange = validatedBbox.north - validatedBbox.south
+        const lngRange = validatedBbox.east - validatedBbox.west
+        const avgLat = latitude
+        const lngRangeKm = lngRange * 111.0 * Math.cos(avgLat * Math.PI / 180)
+        const latRangeKm = latRange * 111.0
+        distanceKm = Math.max(latRangeKm, lngRangeKm) / 2
+        
+      } catch (error: any) {
+        console.log(`[SALES] Invalid bbox: ${error.message}`)
+        return NextResponse.json({ 
+          ok: false, 
+          error: `Invalid bbox: ${error.message}` 
+        }, { status: 400 })
+      }
+    } else if (lat && lng) {
+      // Legacy lat/lng support
+      latitude = parseFloat(lat)
+      longitude = parseFloat(lng)
+      
+      if (isNaN(latitude) || isNaN(longitude)) {
+        console.log(`[SALES] Invalid location: lat=${lat}, lng=${lng}`)
+        return NextResponse.json({ 
+          ok: false, 
+          error: 'Invalid location coordinates' 
+        }, { status: 400 })
+      }
+    } else {
+      console.log(`[SALES] Missing location: lat=${lat}, lng=${lng}, bbox=${north},${south},${east},${west}`)
       return NextResponse.json({ 
         ok: false, 
-        error: 'Missing location' 
-      }, { status: 400 })
-    }
-    
-    const latitude = parseFloat(lat)
-    const longitude = parseFloat(lng)
-    
-    if (isNaN(latitude) || isNaN(longitude)) {
-      console.log(`[SALES] Invalid location: lat=${lat}, lng=${lng}`)
-      return NextResponse.json({ 
-        ok: false, 
-        error: 'Invalid location coordinates' 
+        error: 'Missing location (provide either lat/lng or north/south/east/west)' 
       }, { status: 400 })
     }
     
     // 2. Parse & validate other parameters
-    const distanceKm = Math.max(1, Math.min(
-      searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm') || '40') : 40,
-      160
-    ))
+    if (!distanceKm) {
+      distanceKm = Math.max(1, Math.min(
+        searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm') || '40') : 40,
+        160
+      ))
+    }
     
     const dateRange = searchParams.get('dateRange') || 'any'
     const startDate = searchParams.get('from') || searchParams.get('dateFrom') || searchParams.get('startDate') || undefined

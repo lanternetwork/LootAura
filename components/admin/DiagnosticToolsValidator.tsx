@@ -41,6 +41,16 @@ export default function DiagnosticToolsValidator() {
       }
     }
 
+    // Helper function to get current results
+    const getCurrentResults = (toolElement: Element): Element[] => {
+      // Look for result elements (divs with test results)
+      const resultElements = Array.from(toolElement.querySelectorAll('div')).filter(div => {
+        const text = div.textContent || ''
+        return text.includes('PASS') || text.includes('FAIL') || text.includes('ms') || text.includes('Test')
+      })
+      return resultElements
+    }
+
     try {
       console.log(`[DIAGNOSTIC_VALIDATOR] Testing: ${toolName}`)
       setCurrentTest(toolName)
@@ -172,15 +182,6 @@ export default function DiagnosticToolsValidator() {
   }
 
 
-  // Helper function to get current results
-  const getCurrentResults = (toolElement: Element): Element[] => {
-    // Look for result elements (divs with test results)
-    const resultElements = Array.from(toolElement.querySelectorAll('div')).filter(div => {
-      const text = div.textContent || ''
-      return text.includes('PASS') || text.includes('FAIL') || text.includes('ms') || text.includes('Test')
-    })
-    return resultElements
-  }
 
   // Helper function to wait for results to appear
   const waitForResults = async (toolElement: Element, initialCount: number, timeoutMs: number): Promise<boolean> => {

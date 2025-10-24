@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
-import SalesMap from '@/components/location/SalesMap'
+import SimpleMap from '@/components/location/SimpleMap'
 import ZipInput from '@/components/location/ZipInput'
 import SaleCard from '@/components/SaleCard'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
@@ -49,7 +49,7 @@ export default function SalesClient({
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [zipError, setZipError] = useState<string | null>(null)
   const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
-  const [fitBounds, setFitBounds] = useState<{ north: number; south: number; east: number; west: number; reason?: string } | null>(null)
+  const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [isZipSearching, setIsZipSearching] = useState(false)
 
   // Deduplicate sales by canonical sale ID
@@ -71,18 +71,16 @@ export default function SalesClient({
     return unique
   }, [])
 
-  // Fetch sales based on map viewport center + distance
-  const fetchMapSales = useCallback(async (centerOverride?: { lat: number; lng: number }) => {
-    const center = centerOverride || mapView.center
-    if (!center) return
-
+  // Fetch sales based on map viewport bbox
+  const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }) => {
     setLoading(true)
 
     try {
       const params = new URLSearchParams()
-      params.set('lat', center.lat.toString())
-      params.set('lng', center.lng.toString())
-      params.set('distanceKm', '40') // Default 40km radius
+      params.set('north', bbox.north.toString())
+      params.set('south', bbox.south.toString())
+      params.set('east', bbox.east.toString())
+      params.set('west', bbox.west.toString())
       
       if (filters.dateRange) {
         params.set('dateRange', filters.dateRange)
@@ -91,13 +89,9 @@ export default function SalesClient({
         params.set('categories', filters.categories.join(','))
       }
 
-      console.log('[FETCH] Viewport fetch with center:', {
-        lat: center.lat,
-        lng: center.lng,
-        distanceKm: 40
-      })
+      console.log('[FETCH] Viewport fetch with bbox:', bbox)
 
-      const response = await fetch(`/api/sales/markers?${params.toString()}`)
+      const response = await fetch(`/api/sales?${params.toString()}`)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -133,36 +127,32 @@ export default function SalesClient({
     } finally {
       setLoading(false)
     }
-  }, [mapView.center, filters.dateRange, filters.categories, deduplicateSales])
+  }, [filters.dateRange, filters.categories, deduplicateSales])
 
   // Debounce timer for viewport changes
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Handle map view changes with debouncing
-  const handleMapViewChange = useCallback(({ center, zoom, userInteraction }: { center: { lat: number; lng: number }, zoom: number, userInteraction: boolean }) => {
-    // Don't update map view during ZIP search to prevent overriding the search result
-    if (isZipSearching) {
-      console.log('[MAP] Ignoring view change during ZIP search')
-      return
-    }
+  // Handle viewport changes from SimpleMap
+  const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
+    console.log('[MAP] Viewport change:', { center, zoom, bounds })
     
+    // Update map view state
     setMapView(prev => ({
       ...prev,
       center,
-      zoom
+      zoom,
+      bounds
     }))
 
-    if (userInteraction) {
-      // Clear existing timer
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
-      }
-      
-      // Debounce fetch by 75ms to prevent rapid successive calls
-      debounceTimerRef.current = setTimeout(() => {
-        fetchMapSales(center)
-      }, 75)
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
     }
+    
+    // Debounce fetch by 75ms to prevent rapid successive calls
+    debounceTimerRef.current = setTimeout(() => {
+      fetchMapSales(bounds)
+    }, 75)
   }, [fetchMapSales])
 
   // Handle ZIP search with bbox support
@@ -194,17 +184,24 @@ export default function SalesClient({
 
     // If bbox is available, use fitBounds; otherwise use center/zoom
     if (bbox) {
-      setFitBounds({
+      setPendingBounds({
         west: bbox[0],
         south: bbox[1], 
         east: bbox[2],
-        north: bbox[3],
-        reason: 'ZIP search'
+        north: bbox[3]
       })
+      // Clear bounds after one use
+      setTimeout(() => setPendingBounds(null), 0)
     }
 
-    // Fetch sales for new location
-    fetchMapSales({ lat, lng })
+    // Fetch sales for new location (using center for now, will be updated by viewport change)
+    const tempBounds = {
+      west: lng - 0.1,
+      south: lat - 0.1,
+      east: lng + 0.1,
+      north: lat + 0.1
+    }
+    fetchMapSales(tempBounds)
     
     // Clear the ZIP search flag after a delay to allow map to settle
     setTimeout(() => {
@@ -220,8 +217,10 @@ export default function SalesClient({
   // Handle filter changes
   const handleFiltersChange = (newFilters: any) => {
     updateFilters(newFilters)
-    // Trigger refetch with new filters
-    fetchMapSales()
+    // Trigger refetch with new filters using current bounds
+    if (mapView.bounds) {
+      fetchMapSales(mapView.bounds)
+    }
   }
 
   // Restore ZIP from URL on page load
@@ -326,21 +325,11 @@ export default function SalesClient({
         {/* Map - Left Side (Dominant) */}
         <div className="relative min-h-0 min-w-0 bg-gray-100" style={{ height: '100%' }}>
           <div className="w-full h-full">
-            <SalesMap
-              sales={mapSales}
-              markers={mapMarkers}
-              center={(() => {
-                console.log('[SALES] Passing center to SalesMap:', mapCenter)
-                return mapCenter
-              })()}
+            <SimpleMap
+              center={mapCenter}
               zoom={mapZoom}
-              onViewChange={handleMapViewChange}
-              onMoveEnd={() => {
-                // Trigger fetch after map movement completes
-                fetchMapSales()
-              }}
-              fitBounds={fitBounds}
-              onFitBoundsComplete={() => setFitBounds(null)}
+              fitBounds={pendingBounds}
+              onViewportChange={handleViewportChange}
             />
           </div>
         </div>

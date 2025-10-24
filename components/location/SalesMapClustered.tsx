@@ -1,3 +1,4 @@
+// DEPRECATED: replaced by SimpleMap
 'use client'
 
 import React, { useEffect, useState, useRef, useCallback, useMemo, forwardRef } from 'react'

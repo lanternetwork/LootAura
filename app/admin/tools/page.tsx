@@ -45,6 +45,47 @@ export default function AdminToolsPage() {
             </div>
           </div>
 
+          {/* Map Smoke Tests */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold mb-4">Map Smoke Tests</h3>
+            <div className="space-y-4">
+              <div className="flex space-x-4">
+                <button
+                  onClick={() => {
+                    // Navigate to sales page with Louisville coordinates
+                    window.location.href = '/sales?lat=38.2527&lng=-85.7585&zoom=12'
+                  }}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Set Louisville
+                </button>
+                <button
+                  onClick={() => {
+                    // Navigate to sales page with New York coordinates
+                    window.location.href = '/sales?lat=40.7128&lng=-74.0060&zoom=12'
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Set New York
+                </button>
+                <button
+                  onClick={() => {
+                    // Navigate to sales page with ZIP search
+                    window.location.href = '/sales?zip=10001'
+                  }}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                >
+                  Test ZIP Search (10001)
+                </button>
+              </div>
+              <div className="text-sm text-gray-600">
+                <p>• Set Louisville: Navigate to Louisville, KY with proper coordinates</p>
+                <p>• Set New York: Navigate to New York, NY with proper coordinates</p>
+                <p>• Test ZIP Search: Trigger ZIP lookup for New York ZIP code</p>
+              </div>
+            </div>
+          </div>
+
           {/* ZIP Lookup Testing */}
           <ZipLookupTester />
 

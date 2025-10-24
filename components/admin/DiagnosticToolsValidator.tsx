@@ -104,18 +104,19 @@ export default function DiagnosticToolsValidator() {
 
       // Test 2: Check for required buttons/controls - simplified approach
       const buttons = toolElement?.querySelectorAll('button') || []
+      const allPageButtons = document.querySelectorAll('button')
       
       // Just check if there are any buttons at all in the component
       const hasTestButtons = buttons.length > 0
       addTest('Has Test Controls', hasTestButtons, {
         buttonCount: buttons.length,
-        buttonTexts: Array.from(buttons).map(btn => btn.textContent?.trim()).filter(Boolean),
+        buttonTexts: Array.from(buttons).map((btn: Element) => btn.textContent?.trim()).filter(Boolean),
         hasRunButton: hasTestButtons,
-        allButtons: Array.from(toolElement?.querySelectorAll('button') || []).map(btn => ({
+        allButtons: Array.from(toolElement?.querySelectorAll('button') || []).map((btn: Element) => ({
           text: btn.textContent?.trim(),
           classes: btn.className
         })),
-        allPageButtons: Array.from(allPageButtons).slice(0, 10).map(btn => ({
+        allPageButtons: Array.from(allPageButtons).slice(0, 10).map((btn: Element) => ({
           text: btn.textContent?.trim(),
           classes: btn.className
         }))

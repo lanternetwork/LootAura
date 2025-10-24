@@ -116,45 +116,20 @@ export default function AdminToolsPage() {
                  ref={diagMapRef}
                  center={{ lat: 38.2527, lng: -85.7585 }}
                  zoom={10}
-                 sales={[
-                   {
-                     id: 'test-sale-1',
-                     owner_id: 'test-owner-1',
-                     title: 'Test Sale 1',
-                     lat: 38.2527,
-                     lng: -85.7585,
-                     description: 'Test sale for diagnostics',
-                     city: 'Louisville',
-                     state: 'KY',
-                     date_start: new Date().toISOString().split('T')[0],
-                     time_start: '10:00',
-                     price: 100,
-                     status: 'published' as const,
-                     privacy_mode: 'exact' as const,
-                     is_featured: false,
-                     created_at: new Date().toISOString(),
-                     updated_at: new Date().toISOString()
-                   },
-                   {
-                     id: 'test-sale-2',
-                     owner_id: 'test-owner-2', 
-                     title: 'Test Sale 2',
-                     lat: 38.2627,
-                     lng: -85.7685,
-                     description: 'Another test sale',
-                     city: 'Louisville',
-                     state: 'KY',
-                     date_start: new Date().toISOString().split('T')[0],
-                     time_start: '14:00',
-                     price: 200,
-                     status: 'published' as const,
-                     privacy_mode: 'exact' as const,
-                     is_featured: false,
-                     created_at: new Date().toISOString(),
-                     updated_at: new Date().toISOString()
+                 pins={{
+                   sales: [
+                     { id: 'test-sale-1', lat: 38.2527, lng: -85.7585 },
+                     { id: 'test-sale-2', lat: 38.2627, lng: -85.7685 },
+                     { id: 'test-sale-3', lat: 38.2427, lng: -85.7485 },
+                     { id: 'test-sale-4', lat: 38.2727, lng: -85.7785 },
+                     { id: 'test-sale-5', lat: 38.2327, lng: -85.7385 }
+                   ],
+                   selectedId: null,
+                   onPinClick: (id) => console.log('[ADMIN_DIAG] Pin clicked:', id),
+                   onClusterClick: ({ lat, lng, expandToZoom }) => {
+                     console.log('[ADMIN_DIAG] Cluster clicked:', { lat, lng, expandToZoom })
                    }
-                 ]}
-                 onSaleClick={(sale) => console.log('[ADMIN_DIAG] Sale clicked:', sale.title)}
+                 }}
                  onViewportChange={(vp) => console.log('[ADMIN_DIAG] viewport', vp)}
                />
              </div>

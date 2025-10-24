@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHand
 import Map, { Marker, Popup } from "react-map-gl"
 import { getMapboxToken } from "@/lib/maps/token"
 import { Sale } from "@/lib/types"
+import { PinsProps } from "@/lib/pins/types"
+import PinsOverlay from "./PinsOverlay"
 
 interface SimpleMapProps {
   center: { lat: number; lng: number }
@@ -12,6 +14,7 @@ interface SimpleMapProps {
   sales?: Sale[]
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string
+  pins?: PinsProps
   onViewportChange?: (args: { 
     center: { lat: number; lng: number }; 
     zoom: number; 
@@ -26,6 +29,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   sales = [],
   onSaleClick,
   selectedSaleId,
+  pins,
   onViewportChange 
 }, ref) => {
   const mapRef = useRef<any>(null)
@@ -34,6 +38,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   const lastBoundsKey = useRef<string>("")
   
   const token = getMapboxToken()
+  
+  // Check if clustering is enabled
+  const isClusteringEnabled = process.env.NEXT_PUBLIC_FEATURE_CLUSTERING !== 'false'
 
   // Expose the map instance to parent components
   useImperativeHandle(ref, () => ({
@@ -76,6 +83,25 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     console.log('[MAP] onMoveEnd:', viewport)
     onViewportChange?.(viewport)
   }, [onViewportChange])
+
+  // Handle cluster click
+  const handleClusterClick = useCallback((cluster: any) => {
+    if (!mapRef.current) return
+    
+    const map = mapRef.current.getMap()
+    if (!map) return
+
+    console.log('[CLUSTER] expand', { lat: cluster.lat, lng: cluster.lng, expandToZoom: cluster.expandToZoom })
+    
+    map.flyTo({
+      center: [cluster.lng, cluster.lat],
+      zoom: cluster.expandToZoom,
+      duration: 400
+    })
+    
+    // Call the onClusterClick callback if provided
+    pins?.onClusterClick?.(cluster)
+  }, [pins])
 
   // Handle fitBounds
   useEffect(() => {
@@ -161,24 +187,36 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onStyleData={onStyleData}
         onMoveEnd={handleMoveEnd}
       >
-        {/* Render sales as markers */}
-        {sales
-          .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
-          .map(sale => (
-            <Marker
-              key={sale.id}
-              longitude={sale.lng!}
-              latitude={sale.lat!}
-              anchor="center"
-              data-testid="marker"
-            >
-              <button
-                className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500"
-                onClick={() => onSaleClick?.(sale)}
-                aria-label={`Sale: ${sale.title}`}
-              />
-            </Marker>
-          ))}
+        {/* Render pins overlay if provided, otherwise fall back to sales */}
+        {pins ? (
+          <PinsOverlay
+            sales={pins.sales}
+            selectedId={pins.selectedId}
+            onPinClick={pins.onPinClick}
+            onClusterClick={handleClusterClick}
+            mapRef={mapRef}
+            isClusteringEnabled={isClusteringEnabled}
+          />
+        ) : (
+          /* Fallback to legacy sales rendering */
+          sales
+            .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
+            .map(sale => (
+              <Marker
+                key={sale.id}
+                longitude={sale.lng!}
+                latitude={sale.lat!}
+                anchor="center"
+                data-testid="marker"
+              >
+                <button
+                  className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  onClick={() => onSaleClick?.(sale)}
+                  aria-label={`Sale: ${sale.title}`}
+                />
+              </Marker>
+            ))
+        )}
         
         {/* Selected sale popup */}
         {selectedSaleId && (
@@ -203,6 +241,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         <div className="absolute top-2 left-2 z-50 bg-black bg-opacity-75 text-white text-xs p-2 rounded pointer-events-none">
           <div>Container: {containerRef.current?.offsetWidth}×{containerRef.current?.offsetHeight}</div>
           <div>Loaded: {loaded ? 'Yes' : 'No'}</div>
+          <div>Clustering: {isClusteringEnabled ? 'Enabled' : 'Disabled'}</div>
+          <div>Pins: {pins ? pins.sales.length : sales.length}</div>
         </div>
       )}
     </div>

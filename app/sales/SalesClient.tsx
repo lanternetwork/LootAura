@@ -344,10 +344,19 @@ export default function SalesClient({
               center={mapCenter}
               zoom={mapZoom}
               fitBounds={pendingBounds}
-              sales={mapSales}
-              onSaleClick={(sale) => {
-                console.log('[SALES] Sale clicked:', sale.title)
-                // You can add sale selection logic here
+              pins={{
+                sales: visibleSales
+                  .filter(s => typeof s.lat === 'number' && typeof s.lng === 'number')
+                  .map(s => ({ id: s.id, lat: s.lat!, lng: s.lng! })),
+                selectedId: null, // TODO: Add selected sale state if needed
+                onPinClick: (id) => {
+                  console.log('[SALES] Pin clicked:', id)
+                  // You can add sale selection logic here
+                },
+                onClusterClick: ({ lat, lng, expandToZoom }) => {
+                  console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
+                  // Note: map flyTo is handled in SimpleMap; we just rely on viewport→fetch debounce already in place
+                }
               }}
               onViewportChange={handleViewportChange}
             />

@@ -62,7 +62,8 @@ describe('PinsOverlay Rendering', () => {
           getEast: () => -85,
           getNorth: () => 39
         })),
-        getZoom: vi.fn(() => 10)
+        getZoom: vi.fn(() => 10),
+        isStyleLoaded: vi.fn(() => true)
       }))
     }
   }

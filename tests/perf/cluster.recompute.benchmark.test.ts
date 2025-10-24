@@ -22,8 +22,7 @@ describe('Cluster Performance Benchmarks', () => {
       points.push({
         id: `point-${i}`,
         lng: lon,
-        lat,
-        category: ['furniture', 'tools', 'electronics', 'books'][i % 4]
+        lat
       })
     }
 

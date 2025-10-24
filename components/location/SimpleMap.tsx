@@ -39,6 +39,17 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   
   const token = getMapboxToken()
   
+  // Debug token status
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SIMPLE_MAP] Token status:', {
+        hasToken: !!token,
+        tokenLength: token?.length || 0,
+        tokenPrefix: token?.substring(0, 10) + '...' || 'none'
+      })
+    }
+  }, [token])
+  
   // Check if clustering is enabled
   const isClusteringEnabled = process.env.NEXT_PUBLIC_FEATURE_CLUSTERING !== 'false'
 
@@ -186,6 +197,15 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMoveEnd={handleMoveEnd}
+        onError={(error) => {
+          console.error('[SIMPLE_MAP] Map error:', error)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SIMPLE_MAP] Token for debugging:', {
+              hasToken: !!token,
+              tokenLength: token?.length || 0
+            })
+          }
+        }}
       >
         {/* Render pins overlay if provided, otherwise fall back to sales */}
         {pins ? (

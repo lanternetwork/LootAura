@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react"
-import Map, { type MapRef } from "react-map-gl"
+import Map from "react-map-gl"
 import { getMapboxToken } from "@/lib/maps/token"
 
 interface SimpleMapProps {

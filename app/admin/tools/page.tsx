@@ -9,11 +9,11 @@ import MapDiagnostics from '@/components/MapDiagnostics'
 import MapInteractionTester from '@/components/MapInteractionTester'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useState, useRef } from 'react'
-import { type MapRef } from 'react-map-gl'
+// MapRef is a namespace in react-map-gl v7, not a type
 
 export default function AdminToolsPage() {
   const [showDiagnostics, setShowDiagnostics] = useState(false)
-  const diagMapRef = useRef<MapRef | null>(null)
+  const diagMapRef = useRef<any>(null)
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

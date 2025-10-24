@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { type MapRef } from 'react-map-gl'
+// MapRef is a namespace in react-map-gl v7, not a type
 import { waitForMapReady } from './admin/mapDiagUtils'
 
 interface MapInteractionTest {
@@ -29,7 +29,7 @@ interface MapInteractionResult {
 }
 
 interface MapInteractionTesterProps {
-  mapRef?: React.RefObject<MapRef | null>
+  mapRef?: React.RefObject<any>
 }
 
 export default function MapInteractionTester({ mapRef }: MapInteractionTesterProps) {

@@ -23,6 +23,16 @@ export default function DiagnosticToolsValidator() {
   const [results, setResults] = useState<DiagnosticValidationResult[]>([])
   const [currentTest, setCurrentTest] = useState<string>('')
 
+  // Helper function to get current results
+  const getCurrentResults = (toolElement: Element): Element[] => {
+    // Look for result elements (divs with test results)
+    const resultElements = Array.from(toolElement.querySelectorAll('div')).filter(div => {
+      const text = div.textContent || ''
+      return text.includes('PASS') || text.includes('FAIL') || text.includes('ms') || text.includes('Test')
+    })
+    return resultElements
+  }
+
   const runDiagnosticValidation = async (toolName: string) => {
     const startTime = Date.now()
     const tests: DiagnosticTestResult[] = []
@@ -39,16 +49,6 @@ export default function DiagnosticToolsValidator() {
       if (error) {
         issues.push(error)
       }
-    }
-
-    // Helper function to get current results
-    const getCurrentResults = (toolElement: Element): Element[] => {
-      // Look for result elements (divs with test results)
-      const resultElements = Array.from(toolElement.querySelectorAll('div')).filter(div => {
-        const text = div.textContent || ''
-        return text.includes('PASS') || text.includes('FAIL') || text.includes('ms') || text.includes('Test')
-      })
-      return resultElements
     }
 
     try {

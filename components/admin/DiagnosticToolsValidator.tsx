@@ -96,7 +96,11 @@ export default function DiagnosticToolsValidator() {
       addTest('Has Test Controls', hasTestButtons, {
         buttonCount: buttons.length,
         buttonTexts: Array.from(buttons).map(btn => btn.textContent?.trim()).filter(Boolean),
-        hasRunButton: hasTestButtons
+        hasRunButton: hasTestButtons,
+        allButtons: Array.from(toolElement?.querySelectorAll('button') || []).map(btn => ({
+          text: btn.textContent?.trim(),
+          classes: btn.className
+        }))
       }, hasTestButtons ? undefined : 'No test controls found')
 
       // Test 3: Check for results display area
@@ -117,7 +121,11 @@ export default function DiagnosticToolsValidator() {
       addTest('Has Results Display', hasResultsArea, {
         found: hasResultsArea,
         resultsElement: resultsArea?.tagName || 'none',
-        resultsText: resultsArea?.textContent?.substring(0, 100) || 'none'
+        resultsText: resultsArea?.textContent?.substring(0, 100) || 'none',
+        allDivs: Array.from(toolElement?.querySelectorAll('div') || []).slice(0, 5).map(div => ({
+          text: div.textContent?.substring(0, 50),
+          classes: div.className
+        }))
       }, hasResultsArea ? undefined : 'No results display area found')
 
       // Test 4: Check for proper test structure (not hardcoded passes)

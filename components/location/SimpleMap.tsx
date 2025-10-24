@@ -16,7 +16,7 @@ interface SimpleMapProps {
   }) => void
 }
 
-const SimpleMap = forwardRef<MapRef, SimpleMapProps>(({ 
+const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
   center, 
   zoom = 11, 
   fitBounds, 

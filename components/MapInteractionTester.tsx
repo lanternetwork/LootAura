@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { MapRef } from 'react-map-gl'
-import { waitForMapReady } from './admin/mapDiagUtils'
+import { waitForMapReady, getMapInstance } from './admin/mapDiagUtils'
 
 interface MapInteractionTest {
   testName: string

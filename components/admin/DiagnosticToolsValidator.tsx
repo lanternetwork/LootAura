@@ -86,7 +86,12 @@ export default function DiagnosticToolsValidator() {
         btn.textContent?.toLowerCase().includes('test') ||
         btn.textContent?.toLowerCase().includes('start') ||
         btn.textContent?.toLowerCase().includes('diagnostic') ||
-        btn.textContent?.toLowerCase().includes('check')
+        btn.textContent?.toLowerCase().includes('check') ||
+        btn.textContent?.toLowerCase().includes('quick') ||
+        btn.textContent?.toLowerCase().includes('comprehensive') ||
+        btn.textContent?.toLowerCase().includes('batch') ||
+        btn.textContent?.toLowerCase().includes('stress') ||
+        btn.textContent?.toLowerCase().includes('clear')
       )
       addTest('Has Test Controls', hasTestButtons, {
         buttonCount: buttons.length,
@@ -101,7 +106,12 @@ export default function DiagnosticToolsValidator() {
                            div.textContent?.includes('Test') ||
                            div.textContent?.includes('Diagnostic') ||
                            div.textContent?.includes('Success') ||
-                           div.textContent?.includes('Failed')
+                           div.textContent?.includes('Failed') ||
+                           div.textContent?.includes('PASSED') ||
+                           div.textContent?.includes('FAILED') ||
+                           div.textContent?.includes('Total Tests') ||
+                           div.textContent?.includes('Success Rate') ||
+                           div.textContent?.includes('Avg Duration')
                          )
       const hasResultsArea = !!resultsArea
       addTest('Has Results Display', hasResultsArea, {

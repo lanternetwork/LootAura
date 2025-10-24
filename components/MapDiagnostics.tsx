@@ -156,26 +156,28 @@ export default function MapDiagnostics({ mapRef }: MapDiagnosticsProps) {
       // Step 7: Check for Markers
       const markers = document.querySelectorAll('[class*="marker"], [data-marker], .mapboxgl-marker')
       const markersCount = markers.length
-      addStep('Markers Detection', true, {
+      const markersFound = markersCount > 0
+      addStep('Markers Detection', markersFound, {
         markersCount,
-        markersFound: markersCount > 0,
+        markersFound,
         markerElements: Array.from(markers).map(m => ({
           className: m.className,
           tagName: m.tagName
         }))
-      }, undefined, 'data')
+      }, markersFound ? undefined : 'No markers found on map', 'data')
 
       // Step 8: Check for Clusters
       const clusters = document.querySelectorAll('[class*="cluster"], [data-cluster]')
       const clustersCount = clusters.length
-      addStep('Clusters Detection', true, {
+      const clustersFound = clustersCount > 0
+      addStep('Clusters Detection', clustersFound, {
         clustersCount,
-        clustersFound: clustersCount > 0,
+        clustersFound,
         clusterElements: Array.from(clusters).map(c => ({
           className: c.className,
           tagName: c.tagName
         }))
-      }, undefined, 'data')
+      }, clustersFound ? undefined : 'No clusters found on map', 'data')
 
       // Step 9: Check Map Interactions
       const interactionTestStart = Date.now()
@@ -284,13 +286,12 @@ export default function MapDiagnostics({ mapRef }: MapDiagnosticsProps) {
       }, cssLoaded ? undefined : 'Mapbox CSS not loaded', 'rendering')
 
       const totalDuration = Date.now() - startTime
-      // Calculate success rate - test passes if 80% or more steps succeed
-      const successfulSteps = steps.filter(step => step.success).length
-      const successRate = successfulSteps / steps.length
-      const overallSuccess = successRate >= 0.8
+      const overallSuccess = steps.every(step => step.success)
       
-      console.log(`[MAP_DIAGNOSTIC] Success rate for ${testId}: ${successRate.toFixed(2)} (${successfulSteps}/${steps.length})`)
-      console.log(`[MAP_DIAGNOSTIC] Failed steps:`, steps.filter(step => !step.success).map(step => step.step))
+      console.log(`[MAP_DIAGNOSTIC] Success rate for ${testId}: ${steps.filter(step => step.success).length}/${steps.length}`)
+      if (!overallSuccess) {
+        console.log(`[MAP_DIAGNOSTIC] Failed steps:`, steps.filter(step => !step.success).map(step => step.step))
+      }
 
       const result: MapDiagnosticResult = {
         testId,

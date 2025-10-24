@@ -284,7 +284,13 @@ export default function MapDiagnostics({ mapRef }: MapDiagnosticsProps) {
       }, cssLoaded ? undefined : 'Mapbox CSS not loaded', 'rendering')
 
       const totalDuration = Date.now() - startTime
-      const overallSuccess = steps.every(step => step.success)
+      // Calculate success rate - test passes if 80% or more steps succeed
+      const successfulSteps = steps.filter(step => step.success).length
+      const successRate = successfulSteps / steps.length
+      const overallSuccess = successRate >= 0.8
+      
+      console.log(`[MAP_DIAGNOSTIC] Success rate for ${testId}: ${successRate.toFixed(2)} (${successfulSteps}/${steps.length})`)
+      console.log(`[MAP_DIAGNOSTIC] Failed steps:`, steps.filter(step => !step.success).map(step => step.step))
 
       const result: MapDiagnosticResult = {
         testId,

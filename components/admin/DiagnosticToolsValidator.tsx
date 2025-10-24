@@ -50,9 +50,14 @@ export default function DiagnosticToolsValidator() {
       setCurrentTest(toolName)
 
       // Test 1: Check if the diagnostic tool component exists in DOM
+      // Look for the component by checking for common diagnostic tool patterns
       const toolElement = document.querySelector(`[data-testid*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`) ||
                          document.querySelector(`[class*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`) ||
-                         Array.from(document.querySelectorAll('h3')).find(h => h.textContent?.includes(toolName))
+                         Array.from(document.querySelectorAll('h3')).find(h => h.textContent?.includes(toolName)) ||
+                         Array.from(document.querySelectorAll('div')).find(div => 
+                           div.textContent?.includes(toolName) && 
+                           (div.querySelector('button') || div.querySelector('[class*="test"]'))
+                         )
       
       const toolExists = !!toolElement
       addTest('Component Exists', toolExists, {
@@ -67,26 +72,33 @@ export default function DiagnosticToolsValidator() {
 
       // Test 2: Check for required buttons/controls
       const buttons = toolElement?.querySelectorAll('button') || []
-      const hasTestButtons = buttons.length > 0
+      const hasTestButtons = Array.from(buttons).some(btn => 
+        btn.textContent?.toLowerCase().includes('run') || 
+        btn.textContent?.toLowerCase().includes('test') ||
+        btn.textContent?.toLowerCase().includes('start') ||
+        btn.textContent?.toLowerCase().includes('diagnostic') ||
+        btn.textContent?.toLowerCase().includes('check')
+      )
       addTest('Has Test Controls', hasTestButtons, {
         buttonCount: buttons.length,
         buttonTexts: Array.from(buttons).map(btn => btn.textContent?.trim()).filter(Boolean),
-        hasRunButton: Array.from(buttons).some(btn => 
-          btn.textContent?.toLowerCase().includes('run') || 
-          btn.textContent?.toLowerCase().includes('test') ||
-          btn.textContent?.toLowerCase().includes('start')
-        )
+        hasRunButton: hasTestButtons
       }, hasTestButtons ? undefined : 'No test controls found')
 
       // Test 3: Check for results display area
-      const resultsArea = toolElement?.querySelector('[class*="result"], [data-testid*="result"], [class*="test"]') ||
+      const resultsArea = toolElement?.querySelector('[class*="result"], [data-testid*="result"], [class*="test"], [class*="diagnostic"]') ||
                          Array.from(toolElement?.querySelectorAll('div') || []).find(div => 
-                           div.textContent?.includes('Result') || div.textContent?.includes('Test')
+                           div.textContent?.includes('Result') || 
+                           div.textContent?.includes('Test') ||
+                           div.textContent?.includes('Diagnostic') ||
+                           div.textContent?.includes('Success') ||
+                           div.textContent?.includes('Failed')
                          )
       const hasResultsArea = !!resultsArea
       addTest('Has Results Display', hasResultsArea, {
         found: hasResultsArea,
-        resultsElement: resultsArea?.tagName || 'none'
+        resultsElement: resultsArea?.tagName || 'none',
+        resultsText: resultsArea?.textContent?.substring(0, 100) || 'none'
       }, hasResultsArea ? undefined : 'No results display area found')
 
       // Test 4: Check for proper test structure (not hardcoded passes)

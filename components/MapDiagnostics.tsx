@@ -41,8 +41,8 @@ export default function MapDiagnostics({ mapRef }: MapDiagnosticsProps) {
     const startTime = Date.now()
     const steps: MapDiagnosticStep[] = []
     
-    const addStep = (step: string, success: boolean, details?: any, error?: string, category: MapDiagnosticStep['category'] = 'initialization') => {
-      const stepDuration = Date.now() - startTime
+    const addStep = (step: string, success: boolean, details?: any, error?: string, category: MapDiagnosticStep['category'] = 'initialization', stepStartTime?: number) => {
+      const stepDuration = stepStartTime ? Date.now() - stepStartTime : Date.now() - startTime
       steps.push({
         step,
         success,
@@ -97,21 +97,27 @@ export default function MapDiagnostics({ mapRef }: MapDiagnosticsProps) {
       }, mapInstanceExists ? undefined : 'Map instance not accessible', 'initialization')
 
       // Step 4: Check Map Style
+      const styleTestStart = Date.now()
       let styleLoaded = false
       let currentStyle = 'unknown'
       if (mapInstance) {
         try {
           styleLoaded = mapInstance.isStyleLoaded()
           currentStyle = mapInstance.getStyle()?.name || 'unknown'
+          // Actually test if we can get style information
+          if (styleLoaded) {
+            const styleInfo = mapInstance.getStyle()
+            console.log('[STYLE_TEST] Style loaded:', styleInfo?.name)
+          }
         } catch (e) {
-          console.log('Could not check map style')
+          console.log('Could not check map style:', e)
         }
       }
       addStep('Map Style Validation', styleLoaded, {
         styleLoaded,
         currentStyle,
         hasStyle: !!mapInstance?.getStyle?.()
-      }, styleLoaded ? undefined : 'Map style not loaded', 'rendering')
+      }, styleLoaded ? undefined : 'Map style not loaded', 'rendering', styleTestStart)
 
       // Step 5: Check Map Container Dimensions
       let containerSize = { width: 0, height: 0 }
@@ -172,40 +178,80 @@ export default function MapDiagnostics({ mapRef }: MapDiagnosticsProps) {
       }, undefined, 'data')
 
       // Step 9: Check Map Interactions
+      const interactionTestStart = Date.now()
       let interactionsWorking = false
       if (mapInstance) {
         try {
-          // Test if map can be moved programmatically
+          // Test if map can be moved programmatically and actually moves
           const originalCenter = mapInstance.getCenter()
+          console.log('[INTERACTION_TEST] Original center:', originalCenter)
+          
           mapInstance.easeTo({ center: [originalCenter.lng + 0.001, originalCenter.lat + 0.001], duration: 100 })
-          interactionsWorking = true
+          
+          // Wait for the movement to complete
+          await new Promise(resolve => setTimeout(resolve, 150))
+          
+          // Check if the map actually moved
+          const newCenter = mapInstance.getCenter()
+          const moved = Math.abs(newCenter.lng - originalCenter.lng) > 0.0001 || 
+                       Math.abs(newCenter.lat - originalCenter.lat) > 0.0001
+          
+          console.log('[INTERACTION_TEST] New center:', newCenter)
+          console.log('[INTERACTION_TEST] Moved:', moved)
+          
+          interactionsWorking = moved
+          
+          // Reset to original position
+          mapInstance.easeTo({ center: [originalCenter.lng, originalCenter.lat], duration: 100 })
         } catch (e) {
-          console.log('Map interactions not working')
+          console.log('Map interactions not working:', e)
         }
       }
       addStep('Map Interactions', interactionsWorking, {
         canMove: interactionsWorking,
         hasEaseTo: typeof mapInstance?.easeTo === 'function',
         hasFlyTo: typeof mapInstance?.flyTo === 'function'
-      }, interactionsWorking ? undefined : 'Map interactions not working', 'interaction')
+      }, interactionsWorking ? undefined : 'Map interactions not working', 'interaction', interactionTestStart)
 
       // Step 10: Check Event Listeners
+      const eventTestStart = Date.now()
       let eventListenersWorking = false
       if (mapInstance) {
         try {
-          // Check if map has event listeners
-          const hasMoveListener = mapInstance.listens('move')
-          const hasZoomListener = mapInstance.listens('zoom')
-          eventListenersWorking = hasMoveListener || hasZoomListener
+          // Actually test if we can register and fire event listeners
+          let moveEventFired = false
+          const moveHandler = () => { 
+            console.log('[EVENT_TEST] Move event fired!')
+            moveEventFired = true 
+          }
+          
+          mapInstance.on('move', moveHandler)
+          
+          // Trigger a small map movement to fire the move event
+          const currentCenter = mapInstance.getCenter()
+          console.log('[EVENT_TEST] Triggering map movement from', currentCenter)
+          mapInstance.easeTo({ 
+            center: [currentCenter.lng + 0.001, currentCenter.lat + 0.001], 
+            duration: 100 
+          })
+          
+          // Wait for the event to fire
+          await new Promise(resolve => setTimeout(resolve, 150))
+          
+          eventListenersWorking = moveEventFired
+          console.log('[EVENT_TEST] Events fired - move:', moveEventFired, 'working:', eventListenersWorking)
+          
+          // Clean up the test listener
+          mapInstance.off('move', moveHandler)
         } catch (e) {
-          console.log('Could not check event listeners')
+          console.log('Could not test event listeners:', e)
         }
       }
       addStep('Event Listeners', eventListenersWorking, {
         hasListeners: eventListenersWorking,
         hasMoveListener: mapInstance?.listens?.('move') || false,
         hasZoomListener: mapInstance?.listens?.('zoom') || false
-      }, eventListenersWorking ? undefined : 'No event listeners detected', 'interaction')
+      }, eventListenersWorking ? undefined : 'No event listeners detected', 'interaction', eventTestStart)
 
       // Step 11: Performance Check
       const performanceStart = Date.now()

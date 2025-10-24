@@ -11,7 +11,7 @@ const DEFAULT_OPTIONS: ClusterOptions = {
   minPoints: 2
 }
 
-export type SuperclusterIndex = Supercluster<PinPoint, ClusterFeature>
+export type SuperclusterIndex = Supercluster<PinPoint, { point_count: number }>
 
 /**
  * Build a Supercluster index from sales data
@@ -62,11 +62,11 @@ export function getClustersForViewport(
   const clusters = index.getClusters(bounds, Math.floor(zoom))
   
   return clusters.map(cluster => ({
-    id: cluster.properties?.cluster_id || cluster.id,
+    id: cluster.id as number,
     count: cluster.properties?.point_count || 1,
     lat: cluster.geometry.coordinates[1],
     lng: cluster.geometry.coordinates[0],
-    expandToZoom: expandZoomForCluster(index, cluster.properties?.cluster_id || cluster.id, zoom)
+    expandToZoom: expandZoomForCluster(index, cluster.id as number, zoom)
   }))
 }
 
@@ -76,7 +76,7 @@ export function getClustersForViewport(
 export function expandZoomForCluster(
   index: SuperclusterIndex,
   clusterId: number,
-  currentZoom: number
+  _currentZoom: number
 ): number {
   const expansionZoom = index.getClusterExpansionZoom(clusterId)
   return Math.min(expansionZoom, 16) // Cap at zoom 16

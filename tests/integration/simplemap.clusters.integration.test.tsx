@@ -2,12 +2,13 @@
  * Integration tests for SimpleMap with clustering functionality
  */
 
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import SimpleMap from '@/components/location/SimpleMap'
 import { PinPoint } from '@/lib/pins/types'
 
 // Mock react-map-gl
-jest.mock('react-map-gl', () => ({
+vi.mock('react-map-gl', () => ({
   Map: ({ children, onLoad, onMoveEnd, onClick, ...props }: any) => (
     <div 
       data-testid="map" 

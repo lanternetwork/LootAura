@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { buildClusterIndex, getClustersForViewport, type SuperclusterIndex } from '@/lib/pins/clustering'
-import { PinPoint, ClusterFeature, PinsProps } from '@/lib/pins/types'
+import { ClusterFeature, PinsProps } from '@/lib/pins/types'
 import ClusterMarker from './ClusterMarker'
 import PinMarker from './PinMarker'
 

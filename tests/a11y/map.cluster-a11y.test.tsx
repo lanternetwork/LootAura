@@ -222,12 +222,12 @@ describe('Cluster Marker Accessibility', () => {
   })
 
   it('should handle different cluster sizes', () => {
-    const largeCluster: ClusterResult = {
-      type: 'cluster',
-      id: 'cluster-2',
+    const largeCluster: ClusterFeature = {
+      id: 2,
       count: 100,
-      lon: -85.7585,
-      lat: 38.2527
+      lng: -85.7585,
+      lat: 38.2527,
+      expandToZoom: 12
     }
 
     render(

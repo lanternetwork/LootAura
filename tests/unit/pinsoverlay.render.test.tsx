@@ -2,12 +2,13 @@
  * Unit tests for PinsOverlay rendering
  */
 
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import PinsOverlay from '@/components/location/PinsOverlay'
 import { PinPoint } from '@/lib/pins/types'
 
 // Mock react-map-gl
-jest.mock('react-map-gl', () => ({
+vi.mock('react-map-gl', () => ({
   Marker: ({ children, ...props }: any) => (
     <div data-testid="marker" {...props}>
       {children}
@@ -16,21 +17,21 @@ jest.mock('react-map-gl', () => ({
 }))
 
 // Mock clustering utilities
-jest.mock('@/lib/pins/clustering', () => ({
-  buildClusterIndex: jest.fn(() => ({
-    getClusters: jest.fn(() => [])
+vi.mock('@/lib/pins/clustering', () => ({
+  buildClusterIndex: vi.fn(() => ({
+    getClusters: vi.fn(() => [])
   })),
-  getClustersForViewport: jest.fn(() => [])
+  getClustersForViewport: vi.fn(() => [])
 }))
 
 // Mock ClusterMarker and PinMarker
-jest.mock('@/components/location/ClusterMarker', () => {
+vi.mock('@/components/location/ClusterMarker', () => {
   return function MockClusterMarker({ cluster }: any) {
     return <div data-testid="cluster-marker" data-cluster-id={cluster.id}>{cluster.count}</div>
   }
 })
 
-jest.mock('@/components/location/PinMarker', () => {
+vi.mock('@/components/location/PinMarker', () => {
   return function MockPinMarker({ id, lat, lng }: any) {
     return <div data-testid="pin-marker" data-pin-id={id}>{id}</div>
   }
@@ -39,14 +40,14 @@ jest.mock('@/components/location/PinMarker', () => {
 describe('PinsOverlay Rendering', () => {
   const mockMapRef = {
     current: {
-      getMap: jest.fn(() => ({
-        getBounds: jest.fn(() => ({
+      getMap: vi.fn(() => ({
+        getBounds: vi.fn(() => ({
           getWest: () => -86,
           getSouth: () => 37,
           getEast: () => -85,
           getNorth: () => 39
         })),
-        getZoom: jest.fn(() => 10)
+        getZoom: vi.fn(() => 10)
       }))
     }
   }

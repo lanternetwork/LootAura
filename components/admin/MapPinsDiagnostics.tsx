@@ -128,7 +128,6 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
       let pinInteractionDetails = {}
       
       if (mapInstanceAvailable && mapRef?.current?.getMap) {
-        const map = mapRef.current.getMap()
         try {
           // Test if we can add event listeners to existing markers
           const markers = document.querySelectorAll('[data-pin-marker="true"]')

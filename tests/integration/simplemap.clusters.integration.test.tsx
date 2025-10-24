@@ -33,7 +33,7 @@ vi.mock('react-map-gl', () => ({
 }))
 
 // Mock mapbox token
-jest.mock('@/lib/maps/token', () => ({
+vi.mock('@/lib/maps/token', () => ({
   getMapboxToken: () => 'mock-token'
 }))
 
@@ -43,15 +43,15 @@ const mockClusters = [
   { id: 2, count: 1, lat: 40.7128, lng: -74.0060, expandToZoom: 15 }
 ]
 
-jest.mock('@/lib/pins/clustering', () => ({
-  buildClusterIndex: jest.fn(() => ({
-    getClusters: jest.fn(() => mockClusters)
+vi.mock('@/lib/pins/clustering', () => ({
+  buildClusterIndex: vi.fn(() => ({
+    getClusters: vi.fn(() => mockClusters)
   })),
-  getClustersForViewport: jest.fn(() => mockClusters)
+  getClustersForViewport: vi.fn(() => mockClusters)
 }))
 
 // Mock ClusterMarker and PinMarker
-jest.mock('@/components/location/ClusterMarker', () => {
+vi.mock('@/components/location/ClusterMarker', () => {
   return function MockClusterMarker({ cluster, onClick }: any) {
     return (
       <div 
@@ -65,7 +65,7 @@ jest.mock('@/components/location/ClusterMarker', () => {
   }
 })
 
-jest.mock('@/components/location/PinMarker', () => {
+vi.mock('@/components/location/PinMarker', () => {
   return function MockPinMarker({ id, lat, lng, onClick }: any) {
     return (
       <div 
@@ -94,14 +94,14 @@ describe('SimpleMap Clusters Integration', () => {
     pins: {
       sales: testSales,
       selectedId: null,
-      onPinClick: jest.fn(),
-      onClusterClick: jest.fn()
+      onPinClick: vi.fn(),
+      onClusterClick: vi.fn()
     },
-    onViewportChange: jest.fn()
+    onViewportChange: vi.fn()
   }
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('clustering behavior', () => {
@@ -140,7 +140,7 @@ describe('SimpleMap Clusters Integration', () => {
 
   describe('cluster interactions', () => {
     it('should handle cluster click and call onClusterClick', async () => {
-      const onClusterClick = jest.fn()
+      const onClusterClick = vi.fn()
       const originalEnv = process.env.NEXT_PUBLIC_FEATURE_CLUSTERING
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'true'
 
@@ -161,7 +161,7 @@ describe('SimpleMap Clusters Integration', () => {
     })
 
     it('should handle pin click and call onPinClick', async () => {
-      const onPinClick = jest.fn()
+      const onPinClick = vi.fn()
       const originalEnv = process.env.NEXT_PUBLIC_FEATURE_CLUSTERING
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'false'
 
@@ -184,7 +184,7 @@ describe('SimpleMap Clusters Integration', () => {
 
   describe('viewport changes', () => {
     it('should call onViewportChange when viewport changes', async () => {
-      const onViewportChange = jest.fn()
+      const onViewportChange = vi.fn()
       render(<SimpleMap {...defaultProps} onViewportChange={onViewportChange} />)
 
       // Simulate viewport change
@@ -224,7 +224,7 @@ describe('SimpleMap Clusters Integration', () => {
           {...defaultProps} 
           pins={undefined}
           sales={legacySales}
-          onSaleClick={jest.fn()}
+          onSaleClick={vi.fn()}
         />
       )
 

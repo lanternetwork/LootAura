@@ -227,6 +227,7 @@ export default [
       'supabase/functions/**',
       '**/.eslintrc.*',
       'public/sw.js',
+      'deprecated/**', // Ignore deprecated folder
     ],
   },
 ]

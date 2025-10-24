@@ -100,7 +100,7 @@ export default function HomeClient({ initialSales, user: _user }: HomeClientProp
               center={location || { lat: 38.2527, lng: -85.7585 }}
               zoom={10}
               pins={{
-                sales: sales.map(s => ({ id: s.id, lat: s.lat, lng: s.lng })),
+                sales: sales.filter(s => typeof s.lat === 'number' && typeof s.lng === 'number').map(s => ({ id: s.id, lat: s.lat!, lng: s.lng! })),
                 selectedId: null,
                 onPinClick: () => {},
                 onClusterClick: () => {}

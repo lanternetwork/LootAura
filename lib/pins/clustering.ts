@@ -81,3 +81,26 @@ export function expandZoomForCluster(
   const expansionZoom = index.getClusterExpansionZoom(clusterId)
   return Math.min(expansionZoom, 16) // Cap at zoom 16
 }
+
+/**
+ * Check if clustering is enabled via feature flag
+ */
+export function isClusteringEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_FEATURE_CLUSTERING !== 'false'
+}
+
+/**
+ * Get cluster size tier based on count
+ */
+export function getClusterSizeTier(count: number): 'small' | 'medium' | 'large' {
+  if (count < 10) return 'small'
+  if (count < 50) return 'medium'
+  return 'large'
+}
+
+/**
+ * Generate accessible cluster label
+ */
+export function getClusterLabel(count: number): string {
+  return `Cluster of ${count} sales. Press Enter to zoom in.`
+}

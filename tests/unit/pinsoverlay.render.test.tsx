@@ -61,14 +61,14 @@ describe('PinsOverlay Rendering', () => {
   const defaultProps = {
     sales: testSales,
     selectedId: null,
-    onPinClick: jest.fn(),
-    onClusterClick: jest.fn(),
+    onPinClick: vi.fn(),
+    onClusterClick: vi.fn(),
     mapRef: mockMapRef,
     isClusteringEnabled: false
   }
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('with clustering disabled', () => {
@@ -166,7 +166,7 @@ describe('PinsOverlay Rendering', () => {
 
   describe('callback handling', () => {
     it('should pass onPinClick callback to pin markers', () => {
-      const onPinClick = jest.fn()
+      const onPinClick = vi.fn()
       render(<PinsOverlay {...defaultProps} onPinClick={onPinClick} isClusteringEnabled={false} />)
       
       // The callback should be passed to PinMarker components
@@ -175,7 +175,7 @@ describe('PinsOverlay Rendering', () => {
     })
 
     it('should pass onClusterClick callback to cluster markers', () => {
-      const onClusterClick = jest.fn()
+      const onClusterClick = vi.fn()
       const { getClustersForViewport } = require('@/lib/pins/clustering')
       getClustersForViewport.mockReturnValue([{ id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 }])
       

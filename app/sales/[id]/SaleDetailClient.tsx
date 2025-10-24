@@ -244,7 +244,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                 center={currentCenter}
                 zoom={15}
                 pins={{
-                  sales: [{ id: sale.id, lat: sale.lat, lng: sale.lng }],
+                  sales: (typeof sale.lat === 'number' && typeof sale.lng === 'number') ? [{ id: sale.id, lat: sale.lat!, lng: sale.lng! }] : [],
                   selectedId: sale.id,
                   onPinClick: () => {},
                   onClusterClick: () => {}

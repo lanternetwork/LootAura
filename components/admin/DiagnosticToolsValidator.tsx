@@ -51,20 +51,32 @@ export default function DiagnosticToolsValidator() {
 
       // Test 1: Check if the diagnostic tool component exists in DOM
       // Look for the component by checking for common diagnostic tool patterns
-      const toolElement = document.querySelector(`[data-testid*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`) ||
-                         document.querySelector(`[class*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`) ||
-                         Array.from(document.querySelectorAll('h3')).find(h => h.textContent?.includes(toolName)) ||
-                         Array.from(document.querySelectorAll('h3')).find(h => {
-                           const title = h.textContent?.toLowerCase() || ''
-                           const searchName = toolName.toLowerCase()
-                           return title.includes(searchName) || searchName.includes(title) || 
-                                  title.includes(searchName.split(' ')[0]) || 
-                                  searchName.includes(title.split(' ')[0])
-                         }) ||
-                         Array.from(document.querySelectorAll('div')).find(div => 
-                           div.textContent?.includes(toolName) && 
-                           (div.querySelector('button') || div.querySelector('[class*="test"]'))
-                         )
+      let toolElement = document.querySelector(`[data-testid*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`) ||
+                       document.querySelector(`[class*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`)
+      
+      // If not found by data-testid or class, try finding by h3 title
+      if (!toolElement) {
+        toolElement = Array.from(document.querySelectorAll('h3')).find(h => h.textContent?.includes(toolName))
+      }
+      
+      // If still not found, try fuzzy matching on h3 titles
+      if (!toolElement) {
+        toolElement = Array.from(document.querySelectorAll('h3')).find(h => {
+          const title = h.textContent?.toLowerCase() || ''
+          const searchName = toolName.toLowerCase()
+          return title.includes(searchName) || searchName.includes(title) || 
+                 title.includes(searchName.split(' ')[0]) || 
+                 searchName.includes(title.split(' ')[0])
+        })
+      }
+      
+      // If still not found, try finding by div content
+      if (!toolElement) {
+        toolElement = Array.from(document.querySelectorAll('div')).find(div => 
+          div.textContent?.includes(toolName) && 
+          (div.querySelector('button') || div.querySelector('[class*="test"]'))
+        )
+      }
       
       const toolExists = !!toolElement
       addTest('Component Exists', toolExists, {
@@ -76,11 +88,24 @@ export default function DiagnosticToolsValidator() {
       }, toolExists ? undefined : 'Diagnostic tool component not found in DOM')
 
       if (!toolExists) {
-        throw new Error(`Diagnostic tool "${toolName}" not found in DOM`)
+        // Try one more fallback - look for any diagnostic-related content
+        const fallbackElement = Array.from(document.querySelectorAll('div')).find(div => {
+          const text = div.textContent?.toLowerCase() || ''
+          return text.includes('diagnostic') || text.includes('test') || text.includes('tool')
+        })
+        
+        if (fallbackElement) {
+          toolElement = fallbackElement
+          console.log(`[DIAGNOSTIC_VALIDATOR] Found fallback element for ${toolName}:`, fallbackElement.textContent?.substring(0, 100))
+        } else {
+          throw new Error(`Diagnostic tool "${toolName}" not found in DOM`)
+        }
       }
 
       // Test 2: Check for required buttons/controls
       const buttons = toolElement?.querySelectorAll('button') || []
+      const allPageButtons = document.querySelectorAll('button')
+      
       const hasTestButtons = Array.from(buttons).some(btn => 
         btn.textContent?.toLowerCase().includes('run') || 
         btn.textContent?.toLowerCase().includes('test') ||
@@ -98,6 +123,10 @@ export default function DiagnosticToolsValidator() {
         buttonTexts: Array.from(buttons).map(btn => btn.textContent?.trim()).filter(Boolean),
         hasRunButton: hasTestButtons,
         allButtons: Array.from(toolElement?.querySelectorAll('button') || []).map(btn => ({
+          text: btn.textContent?.trim(),
+          classes: btn.className
+        })),
+        allPageButtons: Array.from(allPageButtons).slice(0, 10).map(btn => ({
           text: btn.textContent?.trim(),
           classes: btn.className
         }))

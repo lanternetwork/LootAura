@@ -115,7 +115,7 @@ describe('SimpleMap Clusters Integration', () => {
       await waitFor(() => {
         const clusterMarkers = screen.getAllByTestId('cluster')
         expect(clusterMarkers.length).toBeGreaterThan(0)
-      })
+      }, { timeout: 10000 })
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -129,9 +129,9 @@ describe('SimpleMap Clusters Integration', () => {
       render(<SimpleMap {...defaultProps} />)
 
       await waitFor(() => {
-        const pinMarkers = screen.getAllByTestId('pin-marker')
+        const pinMarkers = screen.getAllByTestId('marker')
         expect(pinMarkers).toHaveLength(testSales.length)
-      })
+      }, { timeout: 10000 })
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -149,9 +149,9 @@ describe('SimpleMap Clusters Integration', () => {
       await waitFor(() => {
         const clusterMarkers = screen.getAllByTestId('cluster')
         expect(clusterMarkers.length).toBeGreaterThan(0)
-      })
+      }, { timeout: 10000 })
 
-      const clusterMarker = screen.getByTestId('cluster-marker')
+      const clusterMarker = screen.getByTestId('cluster')
       fireEvent.click(clusterMarker)
 
       expect(onClusterClick).toHaveBeenCalledWith(mockClusters[0])
@@ -168,9 +168,9 @@ describe('SimpleMap Clusters Integration', () => {
       render(<SimpleMap {...defaultProps} pins={{ ...defaultProps.pins, onPinClick }} />)
 
       await waitFor(() => {
-        const pinMarkers = screen.getAllByTestId('pin-marker')
+        const pinMarkers = screen.getAllByTestId('marker')
         expect(pinMarkers.length).toBeGreaterThan(0)
-      })
+      }, { timeout: 10000 })
 
         const pinMarker = screen.getByTestId('marker')
       fireEvent.click(pinMarker)

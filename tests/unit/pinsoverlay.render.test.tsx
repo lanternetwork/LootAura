@@ -32,7 +32,7 @@ vi.mock('@/lib/pins/clustering', () => ({
 // Mock ClusterMarker and PinMarker
 vi.mock('@/components/location/ClusterMarker', () => ({
   default: function MockClusterMarker({ cluster }: any) {
-    return <div data-testid="cluster-marker" data-cluster-id={cluster.id}>{cluster.count}</div>
+    return <div data-testid="cluster" data-cluster-id={cluster.id}>{cluster.count}</div>
   }
 }))
 
@@ -91,7 +91,7 @@ describe('PinsOverlay Rendering', () => {
     it('should not render cluster markers when clustering is disabled', () => {
       render(<PinsOverlay {...defaultProps} isClusteringEnabled={false} />)
       
-      const clusterMarkers = screen.queryAllByTestId('cluster-marker')
+      const clusterMarkers = screen.queryAllByTestId('cluster')
       expect(clusterMarkers).toHaveLength(0)
     })
 
@@ -144,7 +144,7 @@ describe('PinsOverlay Rendering', () => {
       
       render(<PinsOverlay {...defaultProps} isClusteringEnabled={true} />)
       
-      const clusterMarkers = screen.queryAllByTestId('cluster-marker')
+      const clusterMarkers = screen.queryAllByTestId('cluster')
       expect(clusterMarkers).toHaveLength(0)
     })
   })
@@ -156,7 +156,7 @@ describe('PinsOverlay Rendering', () => {
       render(<PinsOverlay {...defaultProps} mapRef={nullMapRef} isClusteringEnabled={true} />)
       
       // Should not crash and should render nothing
-      const clusterMarkers = screen.queryAllByTestId('cluster-marker')
+      const clusterMarkers = screen.queryAllByTestId('cluster')
       const pinMarkers = screen.queryAllByTestId('pin-marker')
       expect(clusterMarkers).toHaveLength(0)
       expect(pinMarkers).toHaveLength(0)
@@ -168,7 +168,7 @@ describe('PinsOverlay Rendering', () => {
       render(<PinsOverlay {...defaultProps} mapRef={invalidMapRef} isClusteringEnabled={true} />)
       
       // Should not crash and should render nothing
-      const clusterMarkers = screen.queryAllByTestId('cluster-marker')
+      const clusterMarkers = screen.queryAllByTestId('cluster')
       const pinMarkers = screen.queryAllByTestId('pin-marker')
       expect(clusterMarkers).toHaveLength(0)
       expect(pinMarkers).toHaveLength(0)

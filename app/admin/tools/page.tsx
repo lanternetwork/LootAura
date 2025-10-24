@@ -116,6 +116,27 @@ export default function AdminToolsPage() {
                  ref={diagMapRef}
                  center={{ lat: 38.2527, lng: -85.7585 }}
                  zoom={10}
+                 sales={[
+                   {
+                     id: 'test-sale-1',
+                     title: 'Test Sale 1',
+                     lat: 38.2527,
+                     lng: -85.7585,
+                     description: 'Test sale for diagnostics',
+                     date: new Date().toISOString(),
+                     price: 100
+                   },
+                   {
+                     id: 'test-sale-2', 
+                     title: 'Test Sale 2',
+                     lat: 38.2627,
+                     lng: -85.7685,
+                     description: 'Another test sale',
+                     date: new Date().toISOString(),
+                     price: 200
+                   }
+                 ]}
+                 onSaleClick={(sale) => console.log('[ADMIN_DIAG] Sale clicked:', sale.title)}
                  onViewportChange={(vp) => console.log('[ADMIN_DIAG] viewport', vp)}
                />
              </div>

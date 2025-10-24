@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import PinsOverlay from '@/components/location/PinsOverlay'
 import { PinPoint } from '@/lib/pins/types'
 
@@ -115,21 +115,28 @@ describe('PinsOverlay Rendering', () => {
 
   describe('with clustering enabled', () => {
 
-    it('should render cluster markers when clustering is enabled', () => {
+    it('should render cluster markers when clustering is enabled', async () => {
       render(<PinsOverlay {...defaultProps} isClusteringEnabled={true} />)
       
-      const clusterMarkers = screen.getAllByTestId('cluster')
-      expect(clusterMarkers.length).toBeGreaterThan(0)
+      // Wait for the debounced viewport to be set and clusters to render
+      await waitFor(() => {
+        const clusterMarkers = screen.getAllByTestId('cluster')
+        expect(clusterMarkers.length).toBeGreaterThan(0)
+      }, { timeout: 200 })
       
       // Check that we have at least one cluster marker
+      const clusterMarkers = screen.getAllByTestId('cluster')
       expect(clusterMarkers[0]).toHaveAttribute('data-cluster-id')
     })
 
-    it('should not render individual pin markers when clustering is enabled', () => {
+    it('should not render individual pin markers when clustering is enabled', async () => {
       render(<PinsOverlay {...defaultProps} isClusteringEnabled={true} />)
       
-      const pinMarkers = screen.queryAllByTestId('pin-marker')
-      expect(pinMarkers).toHaveLength(0)
+      // Wait for the debounced viewport to be set
+      await waitFor(() => {
+        const pinMarkers = screen.queryAllByTestId('pin-marker')
+        expect(pinMarkers).toHaveLength(0)
+      }, { timeout: 200 })
     })
 
     it('should handle empty clusters array', () => {

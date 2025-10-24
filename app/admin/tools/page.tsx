@@ -119,21 +119,39 @@ export default function AdminToolsPage() {
                  sales={[
                    {
                      id: 'test-sale-1',
+                     owner_id: 'test-owner-1',
                      title: 'Test Sale 1',
                      lat: 38.2527,
                      lng: -85.7585,
                      description: 'Test sale for diagnostics',
-                     date: new Date().toISOString(),
-                     price: 100
+                     city: 'Louisville',
+                     state: 'KY',
+                     date_start: new Date().toISOString().split('T')[0],
+                     time_start: '10:00',
+                     price: 100,
+                     status: 'published' as const,
+                     privacy_mode: 'exact' as const,
+                     is_featured: false,
+                     created_at: new Date().toISOString(),
+                     updated_at: new Date().toISOString()
                    },
                    {
-                     id: 'test-sale-2', 
+                     id: 'test-sale-2',
+                     owner_id: 'test-owner-2', 
                      title: 'Test Sale 2',
                      lat: 38.2627,
                      lng: -85.7685,
                      description: 'Another test sale',
-                     date: new Date().toISOString(),
-                     price: 200
+                     city: 'Louisville',
+                     state: 'KY',
+                     date_start: new Date().toISOString().split('T')[0],
+                     time_start: '14:00',
+                     price: 200,
+                     status: 'published' as const,
+                     privacy_mode: 'exact' as const,
+                     is_featured: false,
+                     created_at: new Date().toISOString(),
+                     updated_at: new Date().toISOString()
                    }
                  ]}
                  onSaleClick={(sale) => console.log('[ADMIN_DIAG] Sale clicked:', sale.title)}

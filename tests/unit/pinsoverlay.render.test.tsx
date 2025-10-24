@@ -9,12 +9,7 @@ import { PinPoint } from '@/lib/pins/types'
 
 // Mock the clustering module at the top level
 vi.mock('@/lib/pins/clustering', () => ({
-  buildClusterIndex: vi.fn(() => ({
-    getClusters: vi.fn(() => [
-      { id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 },
-      { id: 2, count: 1, lat: 40.7128, lng: -74.0060, expandToZoom: 15 }
-    ])
-  })),
+  buildClusterIndex: vi.fn(() => 'mock-cluster-index'),
   getClustersForViewport: vi.fn(() => [
     { id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 },
     { id: 2, count: 1, lat: 40.7128, lng: -74.0060, expandToZoom: 15 }

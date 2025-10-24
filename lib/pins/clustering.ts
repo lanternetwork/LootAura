@@ -63,7 +63,7 @@ export function getClustersForViewport(
   
   return clusters.map(cluster => ({
     id: cluster.id as number,
-    count: cluster.properties?.point_count || 1,
+    count: (cluster.properties as any)?.point_count || 1,
     lat: cluster.geometry.coordinates[1],
     lng: cluster.geometry.coordinates[0],
     expandToZoom: expandZoomForCluster(index, cluster.id as number, zoom)

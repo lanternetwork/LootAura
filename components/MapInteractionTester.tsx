@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { MapRef } from 'react-map-gl'
+import { waitForMapReady, getMapInstance } from './admin/mapDiagUtils'
 
 interface MapInteractionTest {
   testName: string
@@ -26,7 +28,11 @@ interface MapInteractionResult {
   }
 }
 
-export default function MapInteractionTester() {
+interface MapInteractionTesterProps {
+  mapRef?: React.RefObject<MapRef>
+}
+
+export default function MapInteractionTester({ mapRef }: MapInteractionTesterProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [results, setResults] = useState<MapInteractionResult[]>([])
   const [currentTest, setCurrentTest] = useState<string>('')
@@ -58,13 +64,16 @@ export default function MapInteractionTester() {
       console.log(`[MAP_INTERACTION_TEST] Starting map interaction test: ${testId}`)
       setCurrentTest(testId)
       
-      // Wait a bit for map to load
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Wait for map to be ready using the new helper
+      if (!mapRef) {
+        throw new Error('MapRef not provided to interaction tester')
+      }
+      
+      const mapInstance = await waitForMapReady(mapRef)
+      console.log('[MAP_INTERACTION] Map instance ready:', !!mapInstance)
 
       // Test 1: Check if map container exists and is visible
-      const mapContainer = document.querySelector('[data-testid="map-container"]') || 
-                          document.querySelector('.mapboxgl-map') ||
-                          document.querySelector('[class*="map"]')
+      const mapContainer = document.querySelector('[data-testid="admin-diag-map"]')
       const containerVisible = mapContainer && mapContainer.getBoundingClientRect().width > 0
       addTest('Map Container Visibility', !!containerVisible, {
         found: !!mapContainer,
@@ -73,40 +82,6 @@ export default function MapInteractionTester() {
       }, containerVisible ? undefined : 'Map container not visible', 'viewport')
 
       // Test 2: Check map instance and basic functionality
-      let mapInstance: any = null
-      try {
-        const mapElement = document.querySelector('.mapboxgl-map')
-        console.log('[MAP_INTERACTION] Map element found:', !!mapElement)
-        if (mapElement) {
-          console.log('[MAP_INTERACTION] Map element classes:', mapElement.className)
-          
-          // Try different ways to access the map instance
-          mapInstance = (mapElement as any)._mapboxgl_map || 
-                       (mapElement as any).__mapboxgl_map ||
-                       (mapElement as any).getMap?.() ||
-                       (window as any).mapboxgl?.Map?.getMap?.()
-          
-          // If we still don't have the instance, try to find it through the Map component's ref
-          if (!mapInstance) {
-            // Look for any Map component instances in the DOM
-            const mapComponents = document.querySelectorAll('[class*="mapboxgl"]')
-            for (const comp of mapComponents) {
-              const instance = (comp as any)._mapboxgl_map || 
-                             (comp as any).__mapboxgl_map ||
-                             (comp as any).getMap?.()
-              if (instance) {
-                mapInstance = instance
-                break
-              }
-            }
-          }
-          
-          console.log('[MAP_INTERACTION] Map instance found:', !!mapInstance)
-        }
-      } catch (e) {
-        console.log('Could not access map instance:', e)
-      }
-      
       const mapInstanceWorking = !!mapInstance && typeof mapInstance.getCenter === 'function'
       addTest('Map Instance Functionality', mapInstanceWorking, {
         hasInstance: !!mapInstance,

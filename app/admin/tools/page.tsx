@@ -7,11 +7,13 @@ import ZipLookupTester from '@/components/ZipLookupTester'
 import ZipLookupDiagnostics from '@/components/ZipLookupDiagnostics'
 import MapDiagnostics from '@/components/MapDiagnostics'
 import MapInteractionTester from '@/components/MapInteractionTester'
-import SalesMap from '@/components/location/SalesMap'
-import { useState } from 'react'
+import SimpleMap from '@/components/location/SimpleMap'
+import { useState, useRef } from 'react'
+import { MapRef } from 'react-map-gl'
 
 export default function AdminToolsPage() {
   const [showDiagnostics, setShowDiagnostics] = useState(false)
+  const diagMapRef = useRef<MapRef | null>(null)
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -99,48 +101,23 @@ export default function AdminToolsPage() {
                This map is used by the diagnostic tools below to test map functionality.
              </p>
              <div
-               data-testid="map-container"
-               className="w-full h-96 bg-gray-100 rounded-lg overflow-hidden relative"
+               data-testid="admin-diag-map"
+               className="relative w-full h-96 min-h-96"
              >
-               <SalesMap
-                 sales={[]}
-                 markers={[]}
+               <SimpleMap
+                 ref={diagMapRef}
                  center={{ lat: 38.2527, lng: -85.7585 }}
                  zoom={10}
-                 onViewChange={() => {}}
-                 onMoveEnd={() => {}}
+                 onViewportChange={(vp) => console.log('[ADMIN_DIAG] viewport', vp)}
                />
-               {/* Debug info overlay */}
-               <div className="absolute top-2 left-2 z-50 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
-                 <div>Container: {typeof window !== 'undefined' ? document.querySelector('[data-testid="map-container"]')?.getBoundingClientRect().width : 'N/A'}×{typeof window !== 'undefined' ? document.querySelector('[data-testid="map-container"]')?.getBoundingClientRect().height : 'N/A'}</div>
-                 <div>Map Element: {typeof window !== 'undefined' ? document.querySelector('.mapboxgl-map') ? 'Found' : 'Not Found' : 'N/A'}</div>
-                 <div>Map Instance: {typeof window !== 'undefined' ? (() => {
-                   const mapElement = document.querySelector('.mapboxgl-map')
-                   if (!mapElement) return 'No Element'
-                   const instance = (mapElement as any)._mapboxgl_map || 
-                                   (mapElement as any).__mapboxgl_map ||
-                                   (mapElement as any).getMap?.() ||
-                                   (mapElement as any).__mapboxgl_map
-                   return instance ? 'Available' : 'Not Available'
-                 })() : 'N/A'}</div>
-                 <div>Map Methods: {typeof window !== 'undefined' ? (() => {
-                   const mapElement = document.querySelector('.mapboxgl-map')
-                   if (!mapElement) return 'No Element'
-                   const instance = (mapElement as any)._mapboxgl_map || 
-                                   (mapElement as any).__mapboxgl_map ||
-                                   (mapElement as any).getMap?.() ||
-                                   (mapElement as any).__mapboxgl_map
-                   return instance ? Object.getOwnPropertyNames(instance).slice(0, 5).join(', ') : 'No Instance'
-                 })() : 'N/A'}</div>
-               </div>
              </div>
            </div>
 
           {/* Map Functionality Diagnostics */}
-          <MapDiagnostics />
+          <MapDiagnostics mapRef={diagMapRef} />
 
           {/* Map Interaction Testing */}
-          <MapInteractionTester />
+          <MapInteractionTester mapRef={diagMapRef} />
 
           {/* Review Key Lookup */}
           <AdminTools />

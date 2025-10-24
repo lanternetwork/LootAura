@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { MapRef } from 'react-map-gl'
+import { waitForMapReady, getMapInstance } from './admin/mapDiagUtils'
 
 interface MapDiagnosticStep {
   step: string
@@ -26,7 +28,11 @@ interface MapDiagnosticResult {
   }
 }
 
-export default function MapDiagnostics() {
+interface MapDiagnosticsProps {
+  mapRef?: React.RefObject<MapRef>
+}
+
+export default function MapDiagnostics({ mapRef }: MapDiagnosticsProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [results, setResults] = useState<MapDiagnosticResult[]>([])
   const [currentTest, setCurrentTest] = useState<string>('')
@@ -51,25 +57,13 @@ export default function MapDiagnostics() {
       console.log(`[MAP_DIAGNOSTIC] Starting comprehensive map diagnostic: ${testId}`)
       setCurrentTest(testId)
       
-      // Wait a bit for map to load
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Try to wait for map to be fully loaded
-      let retries = 0
-      while (retries < 5) {
-        const mapElement = document.querySelector('.mapboxgl-map')
-        if (mapElement) {
-          const mapInstance = (mapElement as any)._mapboxgl_map || 
-                             (mapElement as any).__mapboxgl_map ||
-                             (mapElement as any).getMap?.()
-          if (mapInstance) {
-            console.log('[MAP_DIAGNOSTIC] Map instance found after retry', retries)
-            break
-          }
-        }
-        await new Promise(resolve => setTimeout(resolve, 500))
-        retries++
+      // Wait for map to be ready using the new helper
+      if (!mapRef) {
+        throw new Error('MapRef not provided to diagnostics')
       }
+      
+      const mapInstance = await waitForMapReady(mapRef)
+      console.log('[MAP_DIAGNOSTIC] Map instance ready:', !!mapInstance)
       
       // Step 1: Check Mapbox Access Token
       const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
@@ -85,9 +79,7 @@ export default function MapDiagnostics() {
       }
 
       // Step 2: Check Map Container
-      const mapContainer = document.querySelector('[data-testid="map-container"]') || 
-                          document.querySelector('.mapboxgl-map') ||
-                          document.querySelector('[class*="map"]')
+      const mapContainer = document.querySelector('[data-testid="admin-diag-map"]')
       const containerExists = !!mapContainer
       addStep('Map Container Detection', containerExists, {
         found: containerExists,
@@ -95,72 +87,7 @@ export default function MapDiagnostics() {
         tagName: mapContainer?.tagName || 'none'
       }, containerExists ? undefined : 'Map container not found', 'initialization')
 
-      // Step 3: Check Map Instance
-      let mapInstance: any = null
-      try {
-        // Try to find map instance in various ways
-        const mapElement = document.querySelector('.mapboxgl-map')
-        console.log('[MAP_DIAGNOSTIC] Map element found:', !!mapElement)
-        if (mapElement) {
-          console.log('[MAP_DIAGNOSTIC] Map element classes:', mapElement.className)
-          console.log('[MAP_DIAGNOSTIC] Map element properties:', Object.keys(mapElement))
-          
-          // Try different ways to access the map instance
-          // For react-map-gl v7, the map instance is stored differently
-          mapInstance = (mapElement as any)._mapboxgl_map || 
-                       (mapElement as any).__mapboxgl_map ||
-                       (mapElement as any).getMap?.() ||
-                       (window as any).mapboxgl?.Map?.getMap?.() ||
-                       // Try accessing through react-map-gl's internal structure
-                       (mapElement as any).__reactInternalInstance ||
-                       (mapElement as any)._reactInternalFiber ||
-                       // Try accessing the map instance directly from the element
-                       (mapElement as any).__mapboxgl_map ||
-                       (mapElement as any)._mapboxgl_map
-          
-          // If we still don't have the instance, try to find it through the Map component's ref
-          if (!mapInstance) {
-            // Look for any Map component instances in the DOM
-            const mapComponents = document.querySelectorAll('[class*="mapboxgl"]')
-            for (const comp of mapComponents) {
-              const instance = (comp as any)._mapboxgl_map || 
-                             (comp as any).__mapboxgl_map ||
-                             (comp as any).getMap?.()
-              if (instance) {
-                mapInstance = instance
-                break
-              }
-            }
-          }
-          
-          // If still no instance, try accessing through the Map component's internal structure
-          if (!mapInstance) {
-            // Look for the Map component's internal map instance
-            const mapContainer = document.querySelector('[data-testid="map-container"]')
-            if (mapContainer) {
-              // Try to find the map instance through the container's children
-              const mapElements = mapContainer.querySelectorAll('.mapboxgl-map')
-              for (const elem of mapElements) {
-                const instance = (elem as any)._mapboxgl_map || 
-                               (elem as any).__mapboxgl_map ||
-                               (elem as any).getMap?.()
-                if (instance) {
-                  mapInstance = instance
-                  break
-                }
-              }
-            }
-          }
-          
-          console.log('[MAP_DIAGNOSTIC] Map instance found:', !!mapInstance)
-          if (mapInstance) {
-            console.log('[MAP_DIAGNOSTIC] Map instance methods:', Object.getOwnPropertyNames(mapInstance))
-          }
-        }
-      } catch (e) {
-        console.log('Could not access map instance directly:', e)
-      }
-      
+      // Step 3: Check Map Instance (already obtained from waitForMapReady)
       const mapInstanceExists = !!mapInstance
       addStep('Map Instance Detection', mapInstanceExists, {
         found: mapInstanceExists,

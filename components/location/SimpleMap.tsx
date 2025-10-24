@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from "react"
-import Map from "react-map-gl"
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react"
+import Map, { MapRef } from "react-map-gl"
 import { getMapboxToken } from "@/lib/maps/token"
 
 interface SimpleMapProps {
@@ -15,18 +15,21 @@ interface SimpleMapProps {
   }) => void
 }
 
-export default function SimpleMap({ 
+const SimpleMap = forwardRef<MapRef, SimpleMapProps>(({ 
   center, 
   zoom = 11, 
   fitBounds, 
   onViewportChange 
-}: SimpleMapProps) {
+}, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [loaded, setLoaded] = useState(false)
   const lastBoundsKey = useRef<string>("")
   
   const token = getMapboxToken()
+
+  // Expose the mapRef to parent components
+  useImperativeHandle(ref, () => mapRef.current, [])
 
   const onLoad = useCallback(() => {
     console.log('[MAP] onLoad')
@@ -158,4 +161,8 @@ export default function SimpleMap({
       )}
     </div>
   )
-}
+})
+
+SimpleMap.displayName = 'SimpleMap'
+
+export default SimpleMap

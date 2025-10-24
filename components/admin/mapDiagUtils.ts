@@ -13,27 +13,27 @@ export interface MapReadinessOptions {
  */
 export async function waitForMapReady(
   ref: React.RefObject<any>, 
-  opts: MapReadinessOptions = { retries: 10, delayMs: 200 }
+  opts: MapReadinessOptions = { retries: 20, delayMs: 50 }
 ): Promise<any> {
-  const { retries = 10, delayMs = 200 } = opts
+  const { retries = 20, delayMs = 50 } = opts
   
   for (let i = 0; i < retries; i++) {
-    console.log(`[MAP_DIAG] Attempt ${i + 1}/${retries}: checking map readiness`)
-    
     // Check if the ref has the getMap method (new interface)
     if (ref.current?.getMap) {
       const map = ref.current.getMap()
-      console.log(`[MAP_DIAG] Map instance found:`, !!map)
       if (map) {
         const styleLoaded = map.isStyleLoaded?.()
-        console.log(`[MAP_DIAG] Style loaded:`, styleLoaded)
         if (styleLoaded) {
           return map
         }
       }
-    } else {
-      console.log(`[MAP_DIAG] No getMap method on ref.current:`, !!ref.current)
     }
+    
+    // Only log every 5th attempt to reduce console noise
+    if (i % 5 === 0) {
+      console.log(`[MAP_DIAG] Attempt ${i + 1}/${retries}: checking map readiness`)
+    }
+    
     await new Promise(r => setTimeout(r, delayMs))
   }
   

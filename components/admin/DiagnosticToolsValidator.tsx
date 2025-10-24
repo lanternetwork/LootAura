@@ -2,20 +2,18 @@
 
 import { useState } from 'react'
 
-interface DiagnosticToolResult {
-  toolName: string
+interface DiagnosticTestResult {
   testName: string
   success: boolean
   duration: number
   details: any
   error?: string
-  issues?: string[]
 }
 
 interface DiagnosticValidationResult {
   toolName: string
   overallSuccess: boolean
-  tests: DiagnosticToolResult[]
+  tests: DiagnosticTestResult[]
   totalDuration: number
   issues: string[]
 }
@@ -27,212 +25,87 @@ export default function DiagnosticToolsValidator() {
 
   const runDiagnosticValidation = async (toolName: string) => {
     const startTime = Date.now()
-    const tests: DiagnosticToolResult[] = []
+    const tests: DiagnosticTestResult[] = []
     const issues: string[] = []
 
-    const addTest = (testName: string, success: boolean, details: any, error?: string, testIssues?: string[]) => {
+    const addTest = (testName: string, success: boolean, details: any, error?: string) => {
       tests.push({
-        toolName,
         testName,
         success,
         duration: Date.now() - startTime,
         details,
-        error,
-        issues: testIssues
+        error
       })
-      if (testIssues) {
-        issues.push(...testIssues)
+      if (error) {
+        issues.push(error)
       }
     }
 
     try {
-      console.log(`[DIAGNOSTIC_VALIDATOR] Starting validation for: ${toolName}`)
+      console.log(`[DIAGNOSTIC_VALIDATOR] Testing: ${toolName}`)
       setCurrentTest(toolName)
 
-      // Test 1: Check if the diagnostic tool component exists in DOM
-      // Look for the component by checking for common diagnostic tool patterns
-      let toolElement = document.querySelector(`[data-testid*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`) ||
-                       document.querySelector(`[class*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`)
-      
-      // If not found by data-testid or class, try finding by h3 title
+      // Find the diagnostic tool component
+      const toolElement = findDiagnosticTool(toolName)
       if (!toolElement) {
-        toolElement = Array.from(document.querySelectorAll('h3')).find(h => h.textContent?.includes(toolName)) || null
-      }
-      
-      // If still not found, try fuzzy matching on h3 titles
-      if (!toolElement) {
-        toolElement = Array.from(document.querySelectorAll('h3')).find(h => {
-          const title = h.textContent?.toLowerCase() || ''
-          const searchName = toolName.toLowerCase()
-          return title.includes(searchName) || searchName.includes(title) ||
-                 title.includes(searchName.split(' ')[0]) ||
-                 searchName.includes(title.split(' ')[0])
-        }) || null
-      }
-      
-      // If still not found, try finding by div content
-      if (!toolElement) {
-        toolElement = Array.from(document.querySelectorAll('div')).find(div => 
-          div.textContent?.includes(toolName) && 
-          (div.querySelector('button') || div.querySelector('[class*="test"]'))
-        ) || null
-      }
-      
-      // Debug: Log what we found
-      console.log(`[DIAGNOSTIC_VALIDATOR] Looking for "${toolName}"`)
-      console.log(`[DIAGNOSTIC_VALIDATOR] Found element:`, toolElement)
-      if (toolElement) {
-        console.log(`[DIAGNOSTIC_VALIDATOR] Element details:`, {
-          tagName: toolElement.tagName,
-          className: toolElement.className,
-          textContent: toolElement.textContent?.substring(0, 100)
-        })
-      }
-      
-      const toolExists = !!toolElement
-      addTest('Component Exists', toolExists, {
-        found: toolExists,
-        selector: toolElement?.tagName || 'none',
-        className: toolElement?.className || 'none',
-        textContent: toolElement?.textContent?.substring(0, 100) || 'none',
-        allH3s: Array.from(document.querySelectorAll('h3')).map(h => h.textContent?.trim()).filter(Boolean)
-      }, toolExists ? undefined : 'Diagnostic tool component not found in DOM')
-
-      if (!toolExists) {
-        // Try one more fallback - look for any diagnostic-related content
-        const fallbackElement = Array.from(document.querySelectorAll('div')).find(div => {
-          const text = div.textContent?.toLowerCase() || ''
-          return text.includes('diagnostic') || text.includes('test') || text.includes('tool')
-        })
-        
-        if (fallbackElement) {
-          toolElement = fallbackElement
-          console.log(`[DIAGNOSTIC_VALIDATOR] Found fallback element for ${toolName}:`, fallbackElement.textContent?.substring(0, 100))
-        } else {
-          throw new Error(`Diagnostic tool "${toolName}" not found in DOM`)
-        }
+        addTest('Component Found', false, {}, `Diagnostic tool "${toolName}" not found`)
+        throw new Error(`Diagnostic tool "${toolName}" not found`)
       }
 
-      // Test 2: Check for required buttons/controls - simplified approach
-      const buttons = toolElement?.querySelectorAll('button') || []
-      const allPageButtons = document.querySelectorAll('button')
+      addTest('Component Found', true, { 
+        found: true,
+        title: toolElement.querySelector('h3')?.textContent?.trim() || 'Unknown'
+      })
+
+      // Test 1: Check if it has a run button
+      const runButton = findRunButton(toolElement)
+      if (!runButton) {
+        addTest('Has Run Button', false, {}, 'No run button found')
+        throw new Error('No run button found')
+      }
+
+      addTest('Has Run Button', true, { 
+        buttonText: runButton.textContent?.trim() || 'Unknown'
+      })
+
+      // Test 2: Click the run button and wait for results
+      const initialResults = getCurrentResults(toolElement)
+      console.log(`[DIAGNOSTIC_VALIDATOR] Initial results for ${toolName}:`, initialResults.length)
       
-      // Just check if there are any buttons at all in the component
-      const hasTestButtons = buttons.length > 0
-      addTest('Has Test Controls', hasTestButtons, {
-        buttonCount: buttons.length,
-        buttonTexts: Array.from(buttons).map((btn: Element) => btn.textContent?.trim()).filter(Boolean),
-        hasRunButton: hasTestButtons,
-        allButtons: Array.from(toolElement?.querySelectorAll('button') || []).map((btn: Element) => ({
-          text: btn.textContent?.trim(),
-          classes: btn.className
-        })),
-        allPageButtons: Array.from(allPageButtons).slice(0, 10).map((btn: Element) => ({
-          text: btn.textContent?.trim(),
-          classes: btn.className
-        }))
-      }, hasTestButtons ? undefined : 'No test controls found')
+      // Click the button
+      (runButton as HTMLButtonElement).click()
+      
+      // Wait for results to appear (up to 10 seconds)
+      const resultsAppeared = await waitForResults(toolElement, initialResults.length, 10000)
+      if (!resultsAppeared) {
+        addTest('Results Appear', false, {}, 'No results appeared after clicking run button')
+        throw new Error('No results appeared after clicking run button')
+      }
 
-      // Test 3: Check for results display area - simplified approach
-      // Just check if there are any divs with content that could be results
-      const hasResultsArea = (toolElement?.querySelectorAll('div') || []).length > 0
-      addTest('Has Results Display', hasResultsArea, {
-        found: hasResultsArea,
-        divCount: (toolElement?.querySelectorAll('div') || []).length,
-        allDivs: Array.from(toolElement?.querySelectorAll('div') || []).slice(0, 5).map(div => ({
-          text: div.textContent?.substring(0, 50),
-          classes: div.className
-        }))
-      }, hasResultsArea ? undefined : 'No results display area found')
+      addTest('Results Appear', true, { 
+        resultsCount: getCurrentResults(toolElement).length
+      })
 
-      // Test 4: Check for proper test structure (not hardcoded passes)
-      const testCode = toolElement?.innerHTML || ''
-      const hasHardcodedPasses = testCode.includes('success: true') || 
-                                testCode.includes('addStep(.*true') ||
-                                testCode.includes('overallSuccess = true')
-      const hasProperTests = !hasHardcodedPasses
-      addTest('No Hardcoded Passes', hasProperTests, {
-        hasHardcodedPasses,
-        testCodeLength: testCode.length,
-        suspiciousPatterns: [
-          testCode.includes('success: true'),
-          testCode.includes('addStep(.*true'),
-          testCode.includes('overallSuccess = true')
-        ]
-      }, hasProperTests ? undefined : 'Found hardcoded test passes - tests may not be meaningful')
+      // Test 3: Validate that results are meaningful (not just "PASS" or empty)
+      const finalResults = getCurrentResults(toolElement)
+      const meaningfulResults = validateResultsAreMeaningful(finalResults)
+      
+      addTest('Results Are Meaningful', meaningfulResults.isValid, {
+        resultCount: finalResults.length,
+        meaningfulCount: meaningfulResults.meaningfulCount,
+        issues: meaningfulResults.issues
+      }, meaningfulResults.isValid ? undefined : `Results not meaningful: ${meaningfulResults.issues.join(', ')}`)
 
-      // Test 5: Check for proper error handling
-      const hasErrorHandling = testCode.includes('catch') || 
-                              testCode.includes('error') || 
-                              testCode.includes('try')
-      addTest('Has Error Handling', hasErrorHandling, {
-        hasErrorHandling,
-        hasTryCatch: testCode.includes('try') && testCode.includes('catch'),
-        hasErrorProps: testCode.includes('error')
-      }, hasErrorHandling ? undefined : 'No error handling detected - tests may not be robust')
+      // Test 4: Check if results show real data (not hardcoded)
+      const hasRealData = validateResultsHaveRealData(finalResults)
+      addTest('Results Have Real Data', hasRealData.isValid, {
+        hasRealData: hasRealData.hasRealData,
+        hasTiming: hasRealData.hasTiming,
+        hasDetails: hasRealData.hasDetails
+      }, hasRealData.isValid ? undefined : `Results appear hardcoded: ${hasRealData.issues.join(', ')}`)
 
-      // Test 6: Check for meaningful test criteria
-      const hasMeaningfulCriteria = testCode.includes('success') && 
-                                   testCode.includes('false') &&
-                                   !testCode.includes('success: true')
-      addTest('Has Meaningful Criteria', hasMeaningfulCriteria, {
-        hasMeaningfulCriteria,
-        hasSuccessLogic: testCode.includes('success'),
-        hasFailureLogic: testCode.includes('false'),
-        hasConditionalLogic: testCode.includes('if') || testCode.includes('?')
-      }, hasMeaningfulCriteria ? undefined : 'Test criteria may not be meaningful - always passing tests')
-
-      // Test 7: Check for proper logging/debugging
-      const hasLogging = testCode.includes('console.log') || 
-                        testCode.includes('console.error') ||
-                        testCode.includes('console.warn')
-      addTest('Has Proper Logging', hasLogging, {
-        hasLogging,
-        hasConsoleLog: testCode.includes('console.log'),
-        hasConsoleError: testCode.includes('console.error'),
-        hasConsoleWarn: testCode.includes('console.warn')
-      }, hasLogging ? undefined : 'No logging detected - tests may be hard to debug')
-
-      // Test 8: Check for async/await patterns (proper async testing)
-      const hasAsyncPatterns = testCode.includes('async') || 
-                              testCode.includes('await') ||
-                              testCode.includes('Promise')
-      addTest('Has Async Patterns', hasAsyncPatterns, {
-        hasAsyncPatterns,
-        hasAsync: testCode.includes('async'),
-        hasAwait: testCode.includes('await'),
-        hasPromise: testCode.includes('Promise')
-      }, hasAsyncPatterns ? undefined : 'No async patterns detected - tests may not wait for async operations')
-
-      // Test 9: Check for proper test isolation
-      const hasTestIsolation = testCode.includes('beforeEach') || 
-                              testCode.includes('afterEach') ||
-                              testCode.includes('clearResults') ||
-                              testCode.includes('setResults([])')
-      addTest('Has Test Isolation', hasTestIsolation, {
-        hasTestIsolation,
-        hasBeforeEach: testCode.includes('beforeEach'),
-        hasAfterEach: testCode.includes('afterEach'),
-        hasClearResults: testCode.includes('clearResults') || testCode.includes('setResults([])')
-      }, hasTestIsolation ? undefined : 'No test isolation detected - tests may interfere with each other')
-
-      // Test 10: Check for proper test data
-      const hasTestData = testCode.includes('testData') || 
-                         testCode.includes('mockData') ||
-                         testCode.includes('sampleData') ||
-                         testCode.includes('testZips') ||
-                         testCode.includes('testSales')
-      addTest('Has Test Data', hasTestData, {
-        hasTestData,
-        hasTestDataVar: testCode.includes('testData'),
-        hasMockData: testCode.includes('mockData'),
-        hasSampleData: testCode.includes('sampleData'),
-        hasTestZips: testCode.includes('testZips'),
-        hasTestSales: testCode.includes('testSales')
-      }, hasTestData ? undefined : 'No test data detected - tests may not have realistic scenarios')
-
+      const overallSuccess = tests.every(t => t.success)
       const totalDuration = Date.now() - startTime
-      const overallSuccess = tests.every(test => test.success)
 
       const result: DiagnosticValidationResult = {
         toolName,
@@ -243,28 +116,158 @@ export default function DiagnosticToolsValidator() {
       }
 
       setResults(prev => [result, ...prev].slice(0, 10))
-      console.log(`[DIAGNOSTIC_VALIDATOR] Completed validation for ${toolName}:`, result)
-
+      console.log(`[DIAGNOSTIC_VALIDATOR] Completed testing ${toolName}:`, result)
+      
       return result
 
-    } catch (error: any) {
-      const totalDuration = Date.now() - startTime
-      addTest('Overall Process', false, undefined, error.message, ['Fatal error in validation process'])
-      
+    } catch (error) {
       const result: DiagnosticValidationResult = {
         toolName,
         overallSuccess: false,
-        tests,
-        totalDuration,
-        issues: [...issues, error.message]
+        tests: [{
+          testName: 'Component Detection',
+          success: false,
+          duration: Date.now() - startTime,
+          details: { error: error instanceof Error ? error.message : String(error) },
+          error: error instanceof Error ? error.message : String(error)
+        }],
+        totalDuration: Date.now() - startTime,
+        issues: [error instanceof Error ? error.message : String(error)]
       }
 
       setResults(prev => [result, ...prev].slice(0, 10))
-      console.error(`[DIAGNOSTIC_VALIDATOR] Error for ${toolName}:`, error)
+      console.error(`[DIAGNOSTIC_VALIDATOR] Error testing ${toolName}:`, error)
       
       return result
     } finally {
       setCurrentTest('')
+    }
+  }
+
+  // Helper function to find diagnostic tool by name
+  const findDiagnosticTool = (toolName: string): Element | null => {
+    // Look for h3 with the exact title
+    const h3Elements = Array.from(document.querySelectorAll('h3'))
+    const matchingH3 = h3Elements.find(h3 => h3.textContent?.trim() === toolName)
+    
+    if (matchingH3) {
+      // Find the parent container (usually a div with bg-white rounded-lg)
+      let container = matchingH3.parentElement
+      while (container && !container.className.includes('bg-white')) {
+        container = container.parentElement
+      }
+      return container
+    }
+    
+    return null
+  }
+
+  // Helper function to find the run button
+  const findRunButton = (toolElement: Element): Element | null => {
+    const buttons = Array.from(toolElement.querySelectorAll('button'))
+    return buttons.find(btn => {
+      const text = btn.textContent?.toLowerCase() || ''
+      return text.includes('run') || text.includes('test') || text.includes('diagnostic')
+    }) || null
+  }
+
+  // Helper function to get current results
+  const getCurrentResults = (toolElement: Element): Element[] => {
+    // Look for result elements (divs with test results)
+    const resultElements = Array.from(toolElement.querySelectorAll('div')).filter(div => {
+      const text = div.textContent || ''
+      return text.includes('PASS') || text.includes('FAIL') || text.includes('ms') || text.includes('Test')
+    })
+    return resultElements
+  }
+
+  // Helper function to wait for results to appear
+  const waitForResults = async (toolElement: Element, initialCount: number, timeoutMs: number): Promise<boolean> => {
+    const startTime = Date.now()
+    
+    while (Date.now() - startTime < timeoutMs) {
+      const currentResults = getCurrentResults(toolElement)
+      if (currentResults.length > initialCount) {
+        return true
+      }
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    
+    return false
+  }
+
+  // Helper function to validate results are meaningful
+  const validateResultsAreMeaningful = (results: Element[]): { isValid: boolean; meaningfulCount: number; issues: string[] } => {
+    const issues: string[] = []
+    let meaningfulCount = 0
+
+    results.forEach(result => {
+      const text = result.textContent || ''
+      
+      // Check if result has actual content (not just "PASS" or "FAIL")
+      if (text.length < 10) {
+        issues.push('Result too short')
+        return
+      }
+      
+      // Check if result has timing or details
+      if (text.includes('ms') || text.includes('Test') || text.includes('Duration')) {
+        meaningfulCount++
+      } else if (text.includes('PASS') || text.includes('FAIL')) {
+        // Only count as meaningful if it has more than just PASS/FAIL
+        if (text.length > 20) {
+          meaningfulCount++
+        } else {
+          issues.push('Result appears to be just PASS/FAIL without details')
+        }
+      }
+    })
+
+    return {
+      isValid: meaningfulCount > 0 && issues.length === 0,
+      meaningfulCount,
+      issues
+    }
+  }
+
+  // Helper function to validate results have real data
+  const validateResultsHaveRealData = (results: Element[]): { isValid: boolean; hasRealData: boolean; hasTiming: boolean; hasDetails: boolean; issues: string[] } => {
+    const issues: string[] = []
+    let hasRealData = false
+    let hasTiming = false
+    let hasDetails = false
+
+    results.forEach(result => {
+      const text = result.textContent || ''
+      
+      // Check for timing data (real tests should have timing)
+      if (text.includes('ms') && /\d+ms/.test(text)) {
+        hasTiming = true
+        hasRealData = true
+      }
+      
+      // Check for detailed information
+      if (text.includes('Container:') || text.includes('Instance:') || text.includes('Style:')) {
+        hasDetails = true
+        hasRealData = true
+      }
+      
+      // Check for suspicious patterns that suggest hardcoded results
+      if (text.includes('0ms') && text.includes('PASS')) {
+        issues.push('Results appear to be hardcoded (0ms timing)')
+      }
+      
+      if (text.includes('1ms') && results.length > 3) {
+        issues.push('All results showing 1ms suggests hardcoded timing')
+      }
+    })
+
+    return {
+      isValid: hasRealData && issues.length === 0,
+      hasRealData,
+      hasTiming,
+      hasDetails,
+      issues
     }
   }
 
@@ -282,7 +285,7 @@ export default function DiagnosticToolsValidator() {
     
     for (const tool of diagnosticTools) {
       await runDiagnosticValidation(tool)
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second between tests
     }
     
     setIsRunning(false)
@@ -312,8 +315,7 @@ export default function DiagnosticToolsValidator() {
     <div className="bg-white rounded-lg shadow-md p-6">
       <h3 className="text-lg font-semibold mb-4">Diagnostic Tools Validator</h3>
       <p className="text-sm text-gray-600 mb-4">
-        Comprehensive testing of all diagnostic tools to ensure they're actually testing functionality
-        and not just passing by default.
+        Tests the other diagnostic tools by actually running them and validating their output.
       </p>
       
       <div className="space-y-4">
@@ -323,88 +325,76 @@ export default function DiagnosticToolsValidator() {
             disabled={isRunning}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
-            {isRunning ? 'Running...' : 'Run Comprehensive Validation'}
+            {isRunning ? 'Testing...' : 'Run Comprehensive Validation'}
           </button>
+          
           <button
             onClick={clearResults}
-            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+            disabled={isRunning}
+            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50"
           >
             Clear Results
           </button>
         </div>
 
+        {currentTest && (
+          <div className="text-sm text-blue-600">
+            Currently testing: {currentTest}
+          </div>
+        )}
+
         {results.length > 0 && (
-          <div className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-blue-900">Overall Success Rate</h4>
-                <p className="text-2xl font-bold text-blue-600">{getOverallSuccessRate()}%</p>
-                <p className="text-sm text-blue-700">{results.length} tools tested</p>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">{getOverallSuccessRate()}%</div>
+                <div className="text-sm text-gray-600">Overall Success Rate</div>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-green-900">Average Duration</h4>
-                <p className="text-2xl font-bold text-green-600">{getAverageDuration()}ms</p>
-                <p className="text-sm text-green-700">Per tool validation</p>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">{results.length}</div>
+                <div className="text-sm text-gray-600">Tools Tested</div>
               </div>
-              <div className="bg-red-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-red-900">Total Issues</h4>
-                <p className="text-2xl font-bold text-red-600">{getTotalIssues()}</p>
-                <p className="text-sm text-red-700">Issues found</p>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">{getAverageDuration()}ms</div>
+                <div className="text-sm text-gray-600">Average Duration</div>
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               {results.map((result, index) => (
-                <div key={index} className={`border rounded-lg p-4 ${result.overallSuccess ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-semibold">{result.toolName}</h4>
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded text-sm ${result.overallSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {result.overallSuccess ? 'PASS' : 'FAIL'}
-                      </span>
-                      <span className="text-sm text-gray-600">{result.totalDuration}ms</span>
-                    </div>
+                <div key={index} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium">{result.toolName}</h4>
+                    <span className={`px-2 py-1 rounded text-sm ${
+                      result.overallSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {result.overallSuccess ? 'PASS' : 'FAIL'}
+                    </span>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                  <div className="space-y-2">
                     {result.tests.map((test, testIndex) => (
-                      <div key={testIndex} className={`p-2 rounded text-sm ${test.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        <div className="font-medium">{test.testName}</div>
-                        <div className="text-xs">{test.duration}ms</div>
-                        {test.error && <div className="text-xs mt-1 text-red-600">{test.error}</div>}
-                        {test.issues && test.issues.length > 0 && (
-                          <div className="text-xs mt-1 text-orange-600">
-                            Issues: {test.issues.join(', ')}
-                          </div>
-                        )}
+                      <div key={testIndex} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">{test.testName}</span>
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            test.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {test.success ? 'PASS' : 'FAIL'}
+                          </span>
+                          <span className="text-gray-500">{test.duration}ms</span>
+                        </div>
                       </div>
                     ))}
                   </div>
-
+                  
                   {result.issues.length > 0 && (
-                    <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded">
-                      <h5 className="font-medium text-orange-900 mb-2">Issues Found:</h5>
-                      <ul className="text-sm text-orange-800 space-y-1">
-                        {result.issues.map((issue, issueIndex) => (
-                          <li key={issueIndex} className="flex items-start">
-                            <span className="text-orange-600 mr-2">•</span>
-                            <span>{issue}</span>
-                          </li>
-                        ))}
-                      </ul>
+                    <div className="mt-2 text-sm text-red-600">
+                      Issues: {result.issues.join(', ')}
                     </div>
                   )}
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {currentTest && (
-          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-              <span className="text-blue-800">Validating: {currentTest}</span>
             </div>
           </div>
         )}

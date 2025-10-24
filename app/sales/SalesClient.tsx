@@ -36,11 +36,26 @@ export default function SalesClient({
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
   )
 
+  // Check for URL parameters on client side as backup
+  const urlLat = searchParams.get('lat')
+  const urlLng = searchParams.get('lng')
+  const urlZoom = searchParams.get('zoom')
+  
+  console.log('[SALES_CLIENT] URL params:', { urlLat, urlLng, urlZoom })
+  console.log('[SALES_CLIENT] initialCenter:', initialCenter)
+  
+  // Use URL parameters if available, otherwise use initialCenter
+  const effectiveCenter = urlLat && urlLng 
+    ? { lat: parseFloat(urlLat), lng: parseFloat(urlLng) }
+    : initialCenter
+    
+  console.log('[SALES_CLIENT] effectiveCenter:', effectiveCenter)
+
   // Map view state - single source of truth
   const [mapView, setMapView] = useState<MapViewState>({
-    center: initialCenter || { lat: 39.8283, lng: -98.5795 },
+    center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
     bounds: { west: -98.5795, south: 39.8283, east: -98.5795, north: 39.8283 },
-    zoom: 10
+    zoom: urlZoom ? parseFloat(urlZoom) : 10
   })
 
   // Sales data state - map is source of truth

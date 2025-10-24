@@ -51,8 +51,8 @@ vi.mock('@/lib/pins/clustering', () => ({
 }))
 
 // Mock ClusterMarker and PinMarker
-vi.mock('@/components/location/ClusterMarker', () => {
-  return function MockClusterMarker({ cluster, onClick }: any) {
+vi.mock('@/components/location/ClusterMarker', () => ({
+  default: function MockClusterMarker({ cluster, onClick }: any) {
     return (
       <div 
         data-testid="cluster-marker" 
@@ -63,10 +63,10 @@ vi.mock('@/components/location/ClusterMarker', () => {
       </div>
     )
   }
-})
+}))
 
-vi.mock('@/components/location/PinMarker', () => {
-  return function MockPinMarker({ id, lat, lng, onClick }: any) {
+vi.mock('@/components/location/PinMarker', () => ({
+  default: function MockPinMarker({ id, lat, lng, onClick }: any) {
     return (
       <div 
         data-testid="pin-marker" 
@@ -77,7 +77,7 @@ vi.mock('@/components/location/PinMarker', () => {
       </div>
     )
   }
-})
+}))
 
 describe('SimpleMap Clusters Integration', () => {
   const testSales: PinPoint[] = [

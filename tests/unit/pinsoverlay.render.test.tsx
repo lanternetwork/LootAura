@@ -25,17 +25,17 @@ vi.mock('@/lib/pins/clustering', () => ({
 }))
 
 // Mock ClusterMarker and PinMarker
-vi.mock('@/components/location/ClusterMarker', () => {
-  return function MockClusterMarker({ cluster }: any) {
+vi.mock('@/components/location/ClusterMarker', () => ({
+  default: function MockClusterMarker({ cluster }: any) {
     return <div data-testid="cluster-marker" data-cluster-id={cluster.id}>{cluster.count}</div>
   }
-})
+}))
 
-vi.mock('@/components/location/PinMarker', () => {
-  return function MockPinMarker({ id, lat, lng }: any) {
+vi.mock('@/components/location/PinMarker', () => ({
+  default: function MockPinMarker({ id, lat, lng }: any) {
     return <div data-testid="pin-marker" data-pin-id={id}>{id}</div>
   }
-})
+}))
 
 describe('PinsOverlay Rendering', () => {
   const mockMapRef = {

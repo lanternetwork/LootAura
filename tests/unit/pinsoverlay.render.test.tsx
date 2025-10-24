@@ -7,6 +7,21 @@ import { render, screen } from '@testing-library/react'
 import PinsOverlay from '@/components/location/PinsOverlay'
 import { PinPoint } from '@/lib/pins/types'
 
+// Mock the clustering module at the top level
+vi.mock('@/lib/pins/clustering', () => ({
+  buildClusterIndex: vi.fn(() => ({
+    getClusters: vi.fn(() => [
+      { id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 },
+      { id: 2, count: 1, lat: 40.7128, lng: -74.0060, expandToZoom: 15 }
+    ])
+  })),
+  getClustersForViewport: vi.fn(() => [
+    { id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 },
+    { id: 2, count: 1, lat: 40.7128, lng: -74.0060, expandToZoom: 15 }
+  ]),
+  isClusteringEnabled: vi.fn(() => true)
+}))
+
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
   default: ({ children, ...props }: any) => (
@@ -104,21 +119,6 @@ describe('PinsOverlay Rendering', () => {
   })
 
   describe('with clustering enabled', () => {
-    const mockClusters = [
-      { id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 },
-      { id: 2, count: 1, lat: 40.7128, lng: -74.0060, expandToZoom: 15 }
-    ]
-
-    beforeEach(() => {
-      // Mock the clustering module
-      vi.mock('@/lib/pins/clustering', () => ({
-        buildClusterIndex: vi.fn(() => ({
-          getClusters: vi.fn(() => mockClusters)
-        })),
-        getClustersForViewport: vi.fn(() => mockClusters),
-        isClusteringEnabled: vi.fn(() => true)
-      }))
-    })
 
     it('should render cluster markers when clustering is enabled', () => {
       render(<PinsOverlay {...defaultProps} isClusteringEnabled={true} />)
@@ -127,7 +127,8 @@ describe('PinsOverlay Rendering', () => {
       expect(clusterMarkers).toHaveLength(2)
       
       clusterMarkers.forEach((marker, index) => {
-        expect(marker).toHaveAttribute('data-cluster-id', mockClusters[index].id.toString())
+        const expectedId = index === 0 ? '1' : '2'
+        expect(marker).toHaveAttribute('data-cluster-id', expectedId)
       })
     })
 

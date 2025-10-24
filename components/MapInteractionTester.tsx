@@ -119,13 +119,22 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
           if (hasEaseToMethod) {
             const originalCenter = mapInstance.getCenter()
             const testCenter = [originalCenter.lng + 0.001, originalCenter.lat + 0.001]
-            // Test the easeTo call - if it doesn't throw, it's working
+            
+            // Test the easeTo call and wait for it to complete
             mapInstance.easeTo({ center: testCenter, duration: 100 })
-            movementWorking = true
+            
+            // Wait for the movement to complete
+            await new Promise(resolve => setTimeout(resolve, 150))
+            
+            // Check if the map actually moved
+            const newCenter = mapInstance.getCenter()
+            const moved = Math.abs(newCenter.lng - originalCenter.lng) > 0.0001 || 
+                         Math.abs(newCenter.lat - originalCenter.lat) > 0.0001
+            
+            movementWorking = moved
+            
             // Reset to original position
-            setTimeout(() => {
-              mapInstance.easeTo({ center: [originalCenter.lng, originalCenter.lat], duration: 100 })
-            }, 200)
+            mapInstance.easeTo({ center: [originalCenter.lng, originalCenter.lat], duration: 100 })
           }
         } catch (e) {
           console.log('Map movement test failed:', e)
@@ -214,22 +223,33 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
       let eventListenersWorking = false
       if (mapInstance) {
         try {
-          // Actually test if we can register and remove event listeners
-          const testEvent = 'test-event'
-          let eventFired = false
+          // Test if we can register event listeners and they actually fire
+          let moveEventFired = false
+          let zoomEventFired = false
           
-          // Register a test event listener
-          const testHandler = () => { eventFired = true }
-          mapInstance.on(testEvent, testHandler)
+          // Register test event listeners for real map events
+          const moveHandler = () => { moveEventFired = true }
+          const zoomHandler = () => { zoomEventFired = true }
           
-          // Fire the test event
-          mapInstance.fire(testEvent)
+          mapInstance.on('move', moveHandler)
+          mapInstance.on('zoom', zoomHandler)
           
-          // Check if the event was handled
-          eventListenersWorking = eventFired
+          // Trigger a small map movement to fire the move event
+          const currentCenter = mapInstance.getCenter()
+          mapInstance.easeTo({ 
+            center: [currentCenter.lng + 0.001, currentCenter.lat + 0.001], 
+            duration: 100 
+          })
           
-          // Clean up the test listener
-          mapInstance.off(testEvent, testHandler)
+          // Wait a bit for the event to fire
+          await new Promise(resolve => setTimeout(resolve, 150))
+          
+          // Check if events were fired
+          eventListenersWorking = moveEventFired || zoomEventFired
+          
+          // Clean up the test listeners
+          mapInstance.off('move', moveHandler)
+          mapInstance.off('zoom', zoomHandler)
         } catch (e) {
           console.log('Could not test event listeners:', e)
           eventListenersWorking = false
@@ -246,10 +266,17 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
       let resizeWorking = false
       if (mapInstance) {
         try {
-          mapInstance.resize()
-          resizeWorking = true
+          // Test if resize method exists and can be called
+          const hasResizeMethod = typeof mapInstance.resize === 'function'
+          if (hasResizeMethod) {
+            // Call resize and wait a bit for it to complete
+            mapInstance.resize()
+            await new Promise(resolve => setTimeout(resolve, 50))
+            resizeWorking = true
+          }
         } catch (e) {
-          console.log('Map resize failed')
+          console.log('Map resize failed:', e)
+          resizeWorking = false
         }
       }
       addTest('Map Resize Functionality', resizeWorking, {

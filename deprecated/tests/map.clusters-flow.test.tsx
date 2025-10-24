@@ -1,7 +1,8 @@
+/** @deprecated Test for deprecated SalesMapClustered component. Not run by CI. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import React from 'react'
-import SalesMapClustered from '@/components/location/SalesMapClustered'
+import SimpleMap from '@/components/location/SimpleMap'
 import { Sale } from '@/lib/types'
 
 // Mock react-map-gl

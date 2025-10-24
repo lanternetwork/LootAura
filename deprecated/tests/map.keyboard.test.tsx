@@ -2,6 +2,7 @@
  * Accessibility tests for map keyboard navigation
  */
 
+/** @deprecated Test for deprecated SalesMapClustered component. Not run by CI. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import SalesMapClustered from '@/components/location/SalesMapClustered'

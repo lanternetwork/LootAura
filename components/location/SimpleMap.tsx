@@ -197,7 +197,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMoveEnd={handleMoveEnd}
-        onError={(error) => {
+        onError={(error: any) => {
           console.error('[SIMPLE_MAP] Map error:', error)
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.log('[SIMPLE_MAP] Token for debugging:', {

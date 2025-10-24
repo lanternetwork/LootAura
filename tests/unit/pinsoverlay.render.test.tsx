@@ -9,6 +9,11 @@ import { PinPoint } from '@/lib/pins/types'
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
+  default: ({ children, ...props }: any) => (
+    <div data-testid="map" {...props}>
+      {children}
+    </div>
+  ),
   Marker: ({ children, ...props }: any) => (
     <div data-testid="marker" {...props}>
       {children}
@@ -105,7 +110,7 @@ describe('PinsOverlay Rendering', () => {
     ]
 
     beforeEach(() => {
-      const { getClustersForViewport } = require('@/lib/pins/clustering')
+      const { getClustersForViewport } = vi.mocked(require('@/lib/pins/clustering'))
       getClustersForViewport.mockReturnValue(mockClusters)
     })
 
@@ -128,7 +133,7 @@ describe('PinsOverlay Rendering', () => {
     })
 
     it('should handle empty clusters array', () => {
-      const { getClustersForViewport } = require('@/lib/pins/clustering')
+      const { getClustersForViewport } = vi.mocked(require('@/lib/pins/clustering'))
       getClustersForViewport.mockReturnValue([])
       
       render(<PinsOverlay {...defaultProps} isClusteringEnabled={true} />)
@@ -176,7 +181,7 @@ describe('PinsOverlay Rendering', () => {
 
     it('should pass onClusterClick callback to cluster markers', () => {
       const onClusterClick = vi.fn()
-      const { getClustersForViewport } = require('@/lib/pins/clustering')
+      const { getClustersForViewport } = vi.mocked(require('@/lib/pins/clustering'))
       getClustersForViewport.mockReturnValue([{ id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 }])
       
       render(<PinsOverlay {...defaultProps} onClusterClick={onClusterClick} isClusteringEnabled={true} />)

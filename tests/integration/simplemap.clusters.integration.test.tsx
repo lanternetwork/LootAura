@@ -9,7 +9,7 @@ import { PinPoint } from '@/lib/pins/types'
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  Map: ({ children, onLoad, onMoveEnd, onClick, ...props }: any) => (
+  default: ({ children, onLoad, onMoveEnd, onClick, ...props }: any) => (
     <div 
       data-testid="map" 
       data-center-lat={props.initialViewState?.latitude}

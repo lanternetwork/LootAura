@@ -23,6 +23,7 @@ describe('Cluster Marker Accessibility', () => {
   beforeEach(() => {
     // Mock react-map-gl Marker
     vi.mock('react-map-gl', () => ({
+      default: ({ children, ...props }: any) => <div data-testid="map" {...props}>{children}</div>,
       Marker: ({ children, ...props }: any) => <div data-testid="marker" {...props}>{children}</div>
     }))
   })

@@ -135,7 +135,7 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
       let pinInteractionDetails = {}
       
       if (mapInstanceAvailable && mapRef?.current?.getMap) {
-        const mapInstance = mapRef.current.getMap()
+        const _mapInstance = mapRef.current.getMap()
         try {
           // Test if existing markers can be interacted with
           const markers = document.querySelectorAll('.mapboxgl-marker button')

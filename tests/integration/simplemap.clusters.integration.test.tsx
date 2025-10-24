@@ -55,7 +55,7 @@ vi.mock('@/components/location/ClusterMarker', () => ({
   default: function MockClusterMarker({ cluster, onClick }: any) {
     return (
       <div 
-        data-testid="cluster-marker" 
+        data-testid="cluster" 
         data-cluster-id={cluster.id}
         onClick={() => onClick?.(cluster)}
       >
@@ -69,7 +69,7 @@ vi.mock('@/components/location/PinMarker', () => ({
   default: function MockPinMarker({ id, lat, lng, onClick }: any) {
     return (
       <div 
-        data-testid="pin-marker" 
+        data-testid="marker" 
         data-pin-id={id}
         onClick={() => onClick?.(id)}
       >
@@ -113,7 +113,7 @@ describe('SimpleMap Clusters Integration', () => {
       render(<SimpleMap {...defaultProps} />)
 
       await waitFor(() => {
-        const clusterMarkers = screen.getAllByTestId('cluster-marker')
+        const clusterMarkers = screen.getAllByTestId('cluster')
         expect(clusterMarkers.length).toBeGreaterThan(0)
       })
 
@@ -147,7 +147,7 @@ describe('SimpleMap Clusters Integration', () => {
       render(<SimpleMap {...defaultProps} pins={{ ...defaultProps.pins, onClusterClick }} />)
 
       await waitFor(() => {
-        const clusterMarkers = screen.getAllByTestId('cluster-marker')
+        const clusterMarkers = screen.getAllByTestId('cluster')
         expect(clusterMarkers.length).toBeGreaterThan(0)
       })
 
@@ -172,7 +172,7 @@ describe('SimpleMap Clusters Integration', () => {
         expect(pinMarkers.length).toBeGreaterThan(0)
       })
 
-      const pinMarker = screen.getByTestId('pin-marker')
+        const pinMarker = screen.getByTestId('marker')
       fireEvent.click(pinMarker)
 
       expect(onPinClick).toHaveBeenCalledWith(testSales[0].id)

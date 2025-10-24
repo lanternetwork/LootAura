@@ -110,14 +110,20 @@ describe('PinsOverlay Rendering', () => {
     ]
 
     beforeEach(() => {
-      const { getClustersForViewport } = vi.mocked(require('@/lib/pins/clustering'))
-      getClustersForViewport.mockReturnValue(mockClusters)
+      // Mock the clustering module
+      vi.mock('@/lib/pins/clustering', () => ({
+        buildClusterIndex: vi.fn(() => ({
+          getClusters: vi.fn(() => mockClusters)
+        })),
+        getClustersForViewport: vi.fn(() => mockClusters),
+        isClusteringEnabled: vi.fn(() => true)
+      }))
     })
 
     it('should render cluster markers when clustering is enabled', () => {
       render(<PinsOverlay {...defaultProps} isClusteringEnabled={true} />)
       
-      const clusterMarkers = screen.getAllByTestId('cluster-marker')
+      const clusterMarkers = screen.getAllByTestId('cluster')
       expect(clusterMarkers).toHaveLength(2)
       
       clusterMarkers.forEach((marker, index) => {
@@ -181,8 +187,14 @@ describe('PinsOverlay Rendering', () => {
 
     it('should pass onClusterClick callback to cluster markers', () => {
       const onClusterClick = vi.fn()
-      const { getClustersForViewport } = vi.mocked(require('@/lib/pins/clustering'))
-      getClustersForViewport.mockReturnValue([{ id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 }])
+      // Mock the clustering module
+      vi.mock('@/lib/pins/clustering', () => ({
+        buildClusterIndex: vi.fn(() => ({
+          getClusters: vi.fn(() => [{ id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 }])
+        })),
+        getClustersForViewport: vi.fn(() => [{ id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 }]),
+        isClusteringEnabled: vi.fn(() => true)
+      }))
       
       render(<PinsOverlay {...defaultProps} onClusterClick={onClusterClick} isClusteringEnabled={true} />)
       

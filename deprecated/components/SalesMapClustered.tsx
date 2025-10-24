@@ -1,3 +1,4 @@
+/** @deprecated Replaced by components/location/SimpleMap.tsx. Not loaded by the app. */
 // DEPRECATED: replaced by SimpleMap
 'use client'
 

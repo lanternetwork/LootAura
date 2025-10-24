@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Sale } from '@/lib/types'
-import SalesMap from '@/components/location/SalesMap'
+import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
 
 interface SaleDetailClientProps {
@@ -240,10 +240,15 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Location</h3>
             <div className="h-64 rounded-lg overflow-hidden">
-              <SalesMap
-                sales={[sale]}
+              <SimpleMap
                 center={currentCenter}
                 zoom={15}
+                pins={{
+                  sales: [{ id: sale.id, lat: sale.lat, lng: sale.lng }],
+                  selectedId: sale.id,
+                  onPinClick: () => {},
+                  onClusterClick: () => {}
+                }}
               />
             </div>
             <div className="mt-4 text-sm text-gray-600">

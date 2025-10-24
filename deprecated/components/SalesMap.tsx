@@ -1,3 +1,4 @@
+/** @deprecated Replaced by components/location/SimpleMap.tsx. Not loaded by the app. */
 // DEPRECATED: replaced by SimpleMap
 'use client'
 
@@ -9,7 +10,8 @@ import { Sale } from '@/lib/types'
 import { getMapboxToken } from '@/lib/maps/token'
 import { incMapLoad } from '@/lib/usageLogs'
 import { isClusteringEnabled } from '@/lib/clustering'
-import SalesMapClustered from './SalesMapClustered'
+// DEPRECATED: SalesMapClustered removed - use SimpleMap with pins prop instead
+import SimpleMap from './SimpleMap'
 import MapLoadingIndicator from './MapLoadingIndicator'
 import mapDebug from '@/lib/debug/mapDebug'
 

@@ -189,16 +189,15 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
                         typeof firstMarker.click === 'function'
       } else {
         // For admin test map with no markers, test if the detection system works
-        // by checking if we can find mapboxgl elements
-        const mapboxElements = document.querySelectorAll('.mapboxgl-map, .mapboxgl-canvas')
-        markersWorking = mapboxElements.length > 0 // Map should exist
+        // by checking if we can access the map instance through MapRef
+        markersWorking = !!mapInstance // Map instance should be available
       }
       
       addTest('Markers Detection', markersWorking, {
         markersCount,
         markersFound: markersCount > 0,
         markersInteractive: markersCount > 0 ? markersWorking : false,
-        mapboxElements: document.querySelectorAll('.mapboxgl-map, .mapboxgl-canvas').length
+        mapInstanceAvailable: !!mapInstance
       }, markersWorking ? undefined : `Markers not working: ${markersCount} found, interactive: ${markersWorking}`, 'markers')
 
       // Test 7: Test clusters detection
@@ -214,16 +213,15 @@ export default function MapInteractionTester({ mapRef }: MapInteractionTesterPro
                          typeof firstCluster.click === 'function'
       } else {
         // For admin test map with no clusters, test if the detection system works
-        // by checking if we can find mapboxgl elements
-        const mapboxElements = document.querySelectorAll('.mapboxgl-map, .mapboxgl-canvas')
-        clustersWorking = mapboxElements.length > 0 // Map should exist
+        // by checking if we can access the map instance through MapRef
+        clustersWorking = !!mapInstance // Map instance should be available
       }
       
       addTest('Clusters Detection', clustersWorking, {
         clustersCount,
         clustersFound: clustersCount > 0,
         clustersInteractive: clustersCount > 0 ? clustersWorking : false,
-        mapboxElements: document.querySelectorAll('.mapboxgl-map, .mapboxgl-canvas').length
+        mapInstanceAvailable: !!mapInstance
       }, clustersWorking ? undefined : `Clusters not working: ${clustersCount} found, interactive: ${clustersWorking}`, 'clusters')
 
       // Test 8: Test map event listeners

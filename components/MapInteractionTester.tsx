@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { MapRef } from 'react-map-gl'
-import { waitForMapReady, getMapInstance } from './admin/mapDiagUtils'
+import { waitForMapReady } from './admin/mapDiagUtils'
 
 interface MapInteractionTest {
   testName: string
@@ -29,7 +29,7 @@ interface MapInteractionResult {
 }
 
 interface MapInteractionTesterProps {
-  mapRef?: React.RefObject<MapRef>
+  mapRef?: React.RefObject<MapRef | null>
 }
 
 export default function MapInteractionTester({ mapRef }: MapInteractionTesterProps) {

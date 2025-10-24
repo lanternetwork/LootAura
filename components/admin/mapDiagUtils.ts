@@ -12,7 +12,7 @@ export interface MapReadinessOptions {
  * @returns Promise that resolves to the map instance when ready
  */
 export async function waitForMapReady(
-  ref: React.RefObject<MapRef>, 
+  ref: React.RefObject<MapRef | null>, 
   opts: MapReadinessOptions = { retries: 10, delayMs: 200 }
 ): Promise<any> {
   const { retries = 10, delayMs = 200 } = opts
@@ -33,7 +33,7 @@ export async function waitForMapReady(
  * @param ref - React ref to the MapRef
  * @returns Map instance or null if not available
  */
-export function getMapInstance(ref: React.RefObject<MapRef>): any | null {
+export function getMapInstance(ref: React.RefObject<MapRef | null>): any | null {
   try {
     return ref.current?.getMap?.() || null
   } catch (error) {
@@ -47,7 +47,7 @@ export function getMapInstance(ref: React.RefObject<MapRef>): any | null {
  * @param ref - React ref to the MapRef
  * @returns Promise that resolves to true if ready, false otherwise
  */
-export async function isMapReady(ref: React.RefObject<MapRef>): Promise<boolean> {
+export async function isMapReady(ref: React.RefObject<MapRef | null>): Promise<boolean> {
   try {
     const map = getMapInstance(ref)
     return !!(map && map.isStyleLoaded?.())

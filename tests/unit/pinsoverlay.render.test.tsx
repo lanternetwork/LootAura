@@ -140,10 +140,9 @@ describe('PinsOverlay Rendering', () => {
     })
 
     it('should handle empty clusters array', () => {
-      const { getClustersForViewport } = vi.mocked(require('@/lib/pins/clustering'))
-      getClustersForViewport.mockReturnValue([])
-      
-      render(<PinsOverlay {...defaultProps} isClusteringEnabled={true} />)
+      // Test with empty sales array to simulate no clusters
+      const emptyProps = { ...defaultProps, sales: [] }
+      render(<PinsOverlay {...emptyProps} isClusteringEnabled={true} />)
       
       const clusterMarkers = screen.queryAllByTestId('cluster')
       expect(clusterMarkers).toHaveLength(0)

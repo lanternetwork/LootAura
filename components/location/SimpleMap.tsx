@@ -170,6 +170,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
               longitude={sale.lng!}
               latitude={sale.lat!}
               anchor="center"
+              data-testid="marker"
             >
               <button
                 className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500"

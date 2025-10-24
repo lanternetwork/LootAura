@@ -202,6 +202,7 @@ describe('SimpleMap Clusters Integration', () => {
       const legacySales = [
         {
           id: 'legacy-1',
+          owner_id: 'test-owner',
           title: 'Legacy Sale 1',
           lat: 38.2527,
           lng: -85.7585,

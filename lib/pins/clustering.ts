@@ -5,6 +5,10 @@
 import Supercluster from 'supercluster'
 import { PinPoint, ClusterFeature, ClusterOptions } from './types'
 
+// Re-export types for backward compatibility
+export type { PinPoint, ClusterFeature }
+export type ClusterPoint = PinPoint
+
 const DEFAULT_OPTIONS: ClusterOptions = {
   radius: 60,
   maxZoom: 20,

@@ -57,7 +57,7 @@ describe('Cluster Engine', () => {
     const clusters = getClustersForViewport(index, bbox, 10)
     
     // With minPoints=7, no clusters should form from our 6 points
-    const clusterCount = clusters.filter(c => c.type === 'cluster').length
+    const clusterCount = clusters.filter(c => c.count > 1).length
     expect(clusterCount).toBe(0)
   })
 
@@ -85,10 +85,9 @@ describe('Cluster Engine', () => {
     const bbox: [number, number, number, number] = [-85.76, 38.25, -85.75, 38.26]
     const clusters = getClustersForViewport(index, bbox, 10)
     
-    const cluster = clusters.find(c => c.type === 'cluster')
+    const cluster = clusters.find(c => c.count > 1)
     if (cluster) {
-      const clusterId = parseInt(cluster.id.replace('cluster-', ''))
-      const expansionZoom = expandZoomForCluster(index, clusterId, 10)
+      const expansionZoom = expandZoomForCluster(index, cluster.id, 10)
       expect(expansionZoom).toBeGreaterThan(0)
       expect(expansionZoom).toBeLessThanOrEqual(20)
     }

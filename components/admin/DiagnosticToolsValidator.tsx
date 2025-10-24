@@ -56,7 +56,7 @@ export default function DiagnosticToolsValidator() {
       
       // If not found by data-testid or class, try finding by h3 title
       if (!toolElement) {
-        toolElement = Array.from(document.querySelectorAll('h3')).find(h => h.textContent?.includes(toolName))
+        toolElement = Array.from(document.querySelectorAll('h3')).find(h => h.textContent?.includes(toolName)) || null
       }
       
       // If still not found, try fuzzy matching on h3 titles
@@ -64,10 +64,10 @@ export default function DiagnosticToolsValidator() {
         toolElement = Array.from(document.querySelectorAll('h3')).find(h => {
           const title = h.textContent?.toLowerCase() || ''
           const searchName = toolName.toLowerCase()
-          return title.includes(searchName) || searchName.includes(title) || 
-                 title.includes(searchName.split(' ')[0]) || 
+          return title.includes(searchName) || searchName.includes(title) ||
+                 title.includes(searchName.split(' ')[0]) ||
                  searchName.includes(title.split(' ')[0])
-        })
+        }) || null
       }
       
       // If still not found, try finding by div content
@@ -75,7 +75,7 @@ export default function DiagnosticToolsValidator() {
         toolElement = Array.from(document.querySelectorAll('div')).find(div => 
           div.textContent?.includes(toolName) && 
           (div.querySelector('button') || div.querySelector('[class*="test"]'))
-        )
+        ) || null
       }
       
       const toolExists = !!toolElement

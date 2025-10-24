@@ -54,26 +54,32 @@ export default function AdminToolsPage() {
               <div className="flex space-x-4">
                 <button
                   onClick={() => {
-                    // Navigate to sales page with Louisville coordinates
-                    window.location.href = '/sales?lat=38.2527&lng=-85.7585&zoom=12'
+                    // Test Louisville coordinates by opening in new tab
+                    const url = '/sales?lat=38.2527&lng=-85.7585&zoom=12'
+                    window.open(url, '_blank')
+                    console.log('[SMOKE_TEST] Opening Louisville test:', url)
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                 >
-                  Set Louisville
+                  Test Louisville
                 </button>
                 <button
                   onClick={() => {
-                    // Navigate to sales page with New York coordinates
-                    window.location.href = '/sales?lat=40.7128&lng=-74.0060&zoom=12'
+                    // Test New York coordinates by opening in new tab
+                    const url = '/sales?lat=40.7128&lng=-74.0060&zoom=12'
+                    window.open(url, '_blank')
+                    console.log('[SMOKE_TEST] Opening New York test:', url)
                   }}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
-                  Set New York
+                  Test New York
                 </button>
                 <button
                   onClick={() => {
-                    // Navigate to sales page with ZIP search
-                    window.location.href = '/sales?zip=10001'
+                    // Test ZIP search by opening in new tab
+                    const url = '/sales?zip=10001'
+                    window.open(url, '_blank')
+                    console.log('[SMOKE_TEST] Opening ZIP search test:', url)
                   }}
                   className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
                 >
@@ -81,9 +87,10 @@ export default function AdminToolsPage() {
                 </button>
               </div>
               <div className="text-sm text-gray-600">
-                <p>• Set Louisville: Navigate to Louisville, KY with proper coordinates</p>
-                <p>• Set New York: Navigate to New York, NY with proper coordinates</p>
-                <p>• Test ZIP Search: Trigger ZIP lookup for New York ZIP code</p>
+                <p>• Test Louisville: Opens sales page with Louisville, KY coordinates in new tab</p>
+                <p>• Test New York: Opens sales page with New York, NY coordinates in new tab</p>
+                <p>• Test ZIP Search: Opens sales page with ZIP lookup for New York ZIP code in new tab</p>
+                <p className="mt-2 text-blue-600"><strong>Note:</strong> These tests open in new tabs so you can verify the map loads and functions correctly.</p>
               </div>
             </div>
           </div>

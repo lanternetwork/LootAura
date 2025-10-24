@@ -67,7 +67,7 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
         testPin.remove()
       } catch (e) {
         console.log('Pin creation test failed:', e)
-        pinCreationDetails = { error: e.message }
+        pinCreationDetails = { error: e instanceof Error ? e.message : String(e) }
       }
       
       addTest('Pin Creation System', pinCreationWorking, pinCreationDetails, pinCreationWorking ? undefined : 'Cannot create pin elements', 'creation', creationTestStart)
@@ -131,7 +131,7 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
           testMarker.remove()
         } catch (e) {
           console.log('Pin placement test failed:', e)
-          pinPlacementDetails = { error: e.message, hasMapboxGL: typeof (window as any).mapboxgl !== 'undefined' }
+          pinPlacementDetails = { error: e instanceof Error ? e.message : String(e), hasMapboxGL: typeof (window as any).mapboxgl !== 'undefined' }
         }
       }
       
@@ -181,7 +181,7 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
           testMarker.remove()
         } catch (e) {
           console.log('Pin interaction test failed:', e)
-          pinInteractionDetails = { error: e.message }
+          pinInteractionDetails = { error: e instanceof Error ? e.message : String(e) }
         }
       }
       
@@ -206,7 +206,7 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
         }
       } catch (e) {
         console.log('Clustering test failed:', e)
-        clusteringDetails = { error: e.message }
+        clusteringDetails = { error: e instanceof Error ? e.message : String(e) }
       }
       
       addTest('Pin Clustering System', clusteringWorking, clusteringDetails, clusteringWorking ? undefined : 'No clustering detected', 'clustering', clusteringTestStart)
@@ -251,7 +251,7 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
           mapInstance.off('click', mapClickHandler)
         } catch (e) {
           console.log('Event system test failed:', e)
-          eventSystemDetails = { error: e.message }
+          eventSystemDetails = { error: e instanceof Error ? e.message : String(e) }
         }
       }
       
@@ -279,7 +279,7 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
         }
       } catch (e) {
         console.log('Data integration test failed:', e)
-        dataIntegrationDetails = { error: e.message }
+        dataIntegrationDetails = { error: e instanceof Error ? e.message : String(e) }
       }
       
       addTest('Pin Data Integration', dataIntegrationWorking, dataIntegrationDetails, dataIntegrationWorking ? undefined : 'No pin data integration detected', 'creation', dataIntegrationTestStart)
@@ -320,14 +320,14 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
         markers.forEach(marker => marker.remove())
       } catch (e) {
         console.log('Performance test failed:', e)
-        performanceDetails = { error: e.message }
+        performanceDetails = { error: e instanceof Error ? e.message : String(e) }
       }
       
       addTest('Pin Performance', performanceWorking, performanceDetails, performanceWorking ? undefined : 'Pin performance issues detected', 'creation', performanceTestStart)
 
     } catch (error) {
       console.error('[PIN_DIAGNOSTICS] Error during diagnostics:', error)
-      addTest('Diagnostics Error', false, { error: error.message }, 'Diagnostics failed to complete', 'creation')
+      addTest('Diagnostics Error', false, { error: error instanceof Error ? error.message : String(error) }, 'Diagnostics failed to complete', 'creation')
     }
 
     setIsRunning(false)

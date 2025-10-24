@@ -48,9 +48,9 @@ export default function SalesClient({
   const [loading, setLoading] = useState(false)
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [zipError, setZipError] = useState<string | null>(null)
-  const [mapMarkers, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
+  const [, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
-  const [isZipSearching, setIsZipSearching] = useState(false)
+  const [, setIsZipSearching] = useState(false)
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {

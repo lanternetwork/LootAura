@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import Map from "react-map-gl"
 import { getMapboxToken } from "@/lib/maps/token"
 

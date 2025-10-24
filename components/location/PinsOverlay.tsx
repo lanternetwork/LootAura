@@ -45,6 +45,10 @@ export default function PinsOverlay({
     const bounds = map.getBounds()
     const zoom = map.getZoom()
     
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[PINS] viewport calculated:', { zoom, salesCount: sales.length })
+    }
+    
     return {
       bounds: [
         bounds.getWest(),
@@ -57,15 +61,23 @@ export default function PinsOverlay({
   }, [mapRef, sales]) // Add sales as dependency to recalculate when data changes
   
   // Debounce viewport updates to prevent excessive recalculations
+  // But don't debounce on initial load to avoid slow first render
   useEffect(() => {
     if (!viewportInfo) return
     
+    // If this is the first viewport info, set it immediately
+    if (!debouncedViewport) {
+      setDebouncedViewport(viewportInfo)
+      return
+    }
+    
+    // For subsequent updates, debounce to prevent excessive recalculations
     const timeoutId = setTimeout(() => {
       setDebouncedViewport(viewportInfo)
-    }, 100) // 100ms debounce
+    }, 50) // 50ms debounce for better responsiveness
     
     return () => clearTimeout(timeoutId)
-  }, [viewportInfo])
+  }, [viewportInfo, debouncedViewport])
 
   // Get clusters for current viewport - only when needed
   const clusters = useMemo((): ClusterFeature[] => {

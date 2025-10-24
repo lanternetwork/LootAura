@@ -52,7 +52,7 @@ export default function DiagnosticToolsValidator() {
       // Test 1: Check if the diagnostic tool component exists in DOM
       const toolElement = document.querySelector(`[data-testid*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`) ||
                          document.querySelector(`[class*="${toolName.toLowerCase().replace(/\s+/g, '-')}"]`) ||
-                         document.querySelector(`h3:contains("${toolName}")`)
+                         Array.from(document.querySelectorAll('h3')).find(h => h.textContent?.includes(toolName))
       
       const toolExists = !!toolElement
       addTest('Component Exists', toolExists, {
@@ -80,7 +80,9 @@ export default function DiagnosticToolsValidator() {
 
       // Test 3: Check for results display area
       const resultsArea = toolElement?.querySelector('[class*="result"], [data-testid*="result"], [class*="test"]') ||
-                         toolElement?.querySelector('div:contains("Result"), div:contains("Test")')
+                         Array.from(toolElement?.querySelectorAll('div') || []).find(div => 
+                           div.textContent?.includes('Result') || div.textContent?.includes('Test')
+                         )
       const hasResultsArea = !!resultsArea
       addTest('Has Results Display', hasResultsArea, {
         found: hasResultsArea,

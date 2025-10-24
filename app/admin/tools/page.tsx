@@ -7,6 +7,7 @@ import ZipLookupTester from '@/components/ZipLookupTester'
 import ZipLookupDiagnostics from '@/components/ZipLookupDiagnostics'
 import MapDiagnostics from '@/components/MapDiagnostics'
 import MapInteractionTester from '@/components/MapInteractionTester'
+import MapPinsDiagnostics from '@/components/admin/MapPinsDiagnostics'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useState, useRef } from 'react'
 // MapRef is a namespace in react-map-gl v7, not a type
@@ -125,6 +126,9 @@ export default function AdminToolsPage() {
 
           {/* Map Interaction Testing */}
           <MapInteractionTester mapRef={diagMapRef} />
+
+          {/* Map Pins Diagnostics */}
+          <MapPinsDiagnostics mapRef={diagMapRef} />
 
           {/* Review Key Lookup */}
           <AdminTools />

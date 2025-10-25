@@ -31,7 +31,7 @@ export default function LocationPin({
       <button
         className={`
           w-2 h-2 bg-red-500 rounded-full shadow-sm
-          hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500
+          hover:bg-red-600 focus:outline-none
           transition-all duration-200
           cursor-pointer
           ${isSelected ? 'ring-1 ring-white outline outline-1 outline-red-500' : ''}

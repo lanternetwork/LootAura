@@ -106,16 +106,31 @@ export default function SalesClient({
   const hybridResult = useMemo(() => {
     if (!currentViewport) return null
     
+    console.log('[HYBRID] Creating hybrid pins:', {
+      salesCount: mapSales.length,
+      viewport: currentViewport,
+      sampleSales: mapSales.slice(0, 3).map(s => ({ id: s.id, lat: s.lat, lng: s.lng }))
+    })
+    
     // Import the hybrid clustering function
     const { createHybridPins } = require('@/lib/pins/hybridClustering')
-    return createHybridPins(mapSales, currentViewport, {
-      coordinatePrecision: 6,
+    const result = createHybridPins(mapSales, currentViewport, {
+      coordinatePrecision: 4, // Reduced from 6 to group sales within ~11m radius
       clusterRadius: 0.5,
       minClusterSize: 2,
       maxZoom: 16,
       enableLocationGrouping: true,
       enableVisualClustering: true
     })
+    
+    console.log('[HYBRID] Result:', {
+      type: result.type,
+      pinsCount: result.pins.length,
+      locationsCount: result.locations.length,
+      samplePins: result.pins.slice(0, 3)
+    })
+    
+    return result
   }, [mapSales, currentViewport])
 
   // Fetch sales based on map viewport bbox

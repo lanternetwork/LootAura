@@ -56,6 +56,11 @@ export default function DiagnosticToolsValidator() {
     // Trigger input event to update the component state
     zipInput.dispatchEvent(new Event('input', { bubbles: true }))
     
+    // Also trigger change event
+    zipInput.dispatchEvent(new Event('change', { bubbles: true }))
+    
+    console.log(`[DIAGNOSTIC_VALIDATOR] Set ZIP input to: ${testZip}`)
+    
     // Find and click the test button (different for different tools)
     let testButton: HTMLButtonElement | null = null
     
@@ -77,10 +82,12 @@ export default function DiagnosticToolsValidator() {
     }
     
     // Click the test button
+    console.log(`[DIAGNOSTIC_VALIDATOR] Clicking button: ${testButton.textContent}`)
     testButton.click()
     
     // Wait a moment for the test to start
     await new Promise(resolve => setTimeout(resolve, 500))
+    console.log(`[DIAGNOSTIC_VALIDATOR] Button clicked, waiting for results...`)
   }
 
   // Helper function to validate that the tool actually performed its intended function

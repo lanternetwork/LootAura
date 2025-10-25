@@ -273,19 +273,11 @@ export default function SalesClient({
       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-gray-900">Yard Sales</h1>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setShowFiltersModal(true)}
-              className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-            >
-              Filters {hasActiveFilters && '(Active)'}
-            </button>
-            {user && (
-              <div className="text-sm text-gray-600">
-                Welcome, {user.email}
-              </div>
-            )}
-          </div>
+          {user && (
+            <div className="text-sm text-gray-600">
+              Welcome, {user.email}
+            </div>
+          )}
         </div>
       </div>
 

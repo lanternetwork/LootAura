@@ -216,7 +216,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
               selectedId={pins.selectedId}
               onPinClick={pins.onPinClick}
               onClusterClick={handleClusterClick}
-              mapRef={mapRef}
+              mapRef={{ current: { getMap: () => mapRef.current?.getMap?.() } }}
               isClusteringEnabled={isClusteringEnabled}
             />
           </>

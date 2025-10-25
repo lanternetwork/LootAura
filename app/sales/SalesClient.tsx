@@ -48,12 +48,12 @@ export default function SalesClient({
 
   // Map view state - single source of truth
   const [mapView, setMapView] = useState<MapViewState>({
-    center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
+    center: effectiveCenter || { lat: 38.2527, lng: -85.7585 }, // Louisville, KY
     bounds: { 
-      west: (effectiveCenter?.lng || -98.5795) - 0.1, 
-      south: (effectiveCenter?.lat || 39.8283) - 0.1, 
-      east: (effectiveCenter?.lng || -98.5795) + 0.1, 
-      north: (effectiveCenter?.lat || 39.8283) + 0.1 
+      west: (effectiveCenter?.lng || -85.7585) - 0.1, 
+      south: (effectiveCenter?.lat || 38.2527) - 0.1, 
+      east: (effectiveCenter?.lng || -85.7585) + 0.1, 
+      north: (effectiveCenter?.lat || 38.2527) + 0.1 
     },
     zoom: urlZoom ? parseFloat(urlZoom) : 10
   })

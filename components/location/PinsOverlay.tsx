@@ -116,33 +116,17 @@ export default function PinsOverlay({
     })
   }
 
-  // Render plain pins when clustering is disabled
-  if (!isClusteringEnabled) {
-    return (
-      <>
-        {sales.map(sale => (
-          <PinMarker
-            key={sale.id}
-            id={sale.id}
-            lat={sale.lat}
-            lng={sale.lng}
-            isSelected={selectedId === sale.id}
-            onClick={onPinClick}
-          />
-        ))}
-      </>
-    )
-  }
-
-  // Render clusters and individual pins when clustering is enabled
-  console.log('[PINS_OVERLAY] Rendering clusters:', { clustersCount: clusters.length })
+  // Always render plain pins (clustering disabled for testing)
   return (
     <>
-      {clusters.map(cluster => (
-        <ClusterMarker
-          key={cluster.id}
-          cluster={cluster}
-          onClick={onClusterClick}
+      {sales.map(sale => (
+        <PinMarker
+          key={sale.id}
+          id={sale.id}
+          lat={sale.lat}
+          lng={sale.lng}
+          isSelected={selectedId === sale.id}
+          onClick={onPinClick}
         />
       ))}
     </>

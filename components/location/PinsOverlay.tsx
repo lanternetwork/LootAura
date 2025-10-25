@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { buildClusterIndex, getClustersForViewport, type SuperclusterIndex } from '@/lib/pins/clustering'
 import { ClusterFeature, PinsProps } from '@/lib/pins/types'
 import PinMarker from './PinMarker'
+import ClusterMarker from './ClusterMarker'
 
 interface PinsOverlayProps extends PinsProps {
   mapRef: React.RefObject<any>
@@ -116,24 +117,28 @@ export default function PinsOverlay({
   }
 
   // Check if clustering is enabled and we have a valid map ref
-  if (isClusteringEnabled && mapRef.current?.getMap) {
-    // Use clustering logic
-    if (clusters.length > 0) {
-      return (
-        <>
-          {clusters.map(cluster => (
-            <ClusterMarker
-              key={cluster.id}
-              cluster={cluster}
-              onClick={onClusterClick}
-            />
-          ))}
-        </>
-      )
+  if (isClusteringEnabled) {
+    if (mapRef.current?.getMap) {
+      // Use clustering logic
+      if (_clusters.length > 0) {
+        return (
+          <>
+            {_clusters.map(cluster => (
+              <ClusterMarker
+                key={cluster.id}
+                cluster={cluster}
+                onClick={_onClusterClick}
+              />
+            ))}
+          </>
+        )
+      }
     }
+    // If clustering is enabled but no valid map ref, don't render anything
+    return null
   }
   
-  // Render individual pins when clustering is disabled or no clusters
+  // Render individual pins when clustering is disabled
   return (
     <>
       {sales.map(sale => (

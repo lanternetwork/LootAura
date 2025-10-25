@@ -263,23 +263,11 @@ export default function SalesClient({
   const mapZoom = mapView.zoom
 
   // Constants for layout calculations
-  const HEADER_HEIGHT = 64 // px - header height
   const FILTERS_HEIGHT = 56 // px - filters bar height
-  const MAIN_CONTENT_HEIGHT = `calc(100vh - ${HEADER_HEIGHT + FILTERS_HEIGHT}px)`
+  const MAIN_CONTENT_HEIGHT = `calc(100vh - ${FILTERS_HEIGHT}px)`
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Header */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-gray-900">Yard Sales</h1>
-          {user && (
-            <div className="text-sm text-gray-600">
-              Welcome, {user.email}
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Advanced Filters Bar */}
       <FiltersBar

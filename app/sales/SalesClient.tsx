@@ -68,6 +68,7 @@ export default function SalesClient({
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [, setIsZipSearching] = useState(false)
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
@@ -361,6 +362,11 @@ export default function SalesClient({
 
   const mapZoom = mapView.zoom
 
+  // Mobile drawer toggle
+  const toggleMobileDrawer = useCallback(() => {
+    setIsMobileDrawerOpen(prev => !prev)
+  }, [])
+
   // Constants for layout calculations
   const FILTERS_HEIGHT = 56 // px - filters bar height
   const MAIN_CONTENT_HEIGHT = `calc(100vh - ${FILTERS_HEIGHT}px)`
@@ -386,13 +392,22 @@ export default function SalesClient({
         filtersMoreTestId="filters-more"
       />
 
-      {/* Main Content - Zillow Style */}
+      {/* Main Content - Responsive Layout */}
       <div 
-        className="grid grid-cols-[minmax(0,1fr)_628px] gap-0 min-h-0 min-w-0 overflow-hidden"
+        className="grid grid-cols-[minmax(0,1fr)_628px] lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] max-lg:grid-cols-1 gap-0 min-h-0 min-w-0 overflow-hidden"
         style={{ height: MAIN_CONTENT_HEIGHT }}
       >
         {/* Map - Left Side (Dominant) */}
-        <div className="relative min-h-0 min-w-0 bg-gray-100" style={{ height: '100%' }}>
+        <div className="relative min-h-0 min-w-0 bg-gray-100 max-lg:h-[60vh] max-md:h-[70vh]" style={{ height: '100%' }}>
+          {/* Mobile Toggle Button */}
+          <button
+            onClick={toggleMobileDrawer}
+            className="md:hidden fixed top-20 right-4 z-50 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg shadow-lg transition-colors"
+            aria-label="Toggle sales panel"
+          >
+            {isMobileDrawerOpen ? 'Hide Sales' : 'Show Sales'}
+          </button>
+          
           <div className="w-full h-full">
             <SimpleMap
               center={mapCenter}
@@ -417,7 +432,7 @@ export default function SalesClient({
           </div>
 
         {/* Sales List - Right Panel */}
-        <div className="bg-white border-l border-gray-200 flex flex-col min-h-0 min-w-0">
+        <div className="bg-white border-l border-gray-200 flex flex-col min-h-0 min-w-0 max-lg:h-[40vh] max-md:h-[30vh]">
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
@@ -468,6 +483,62 @@ export default function SalesClient({
           </div>
           </div>
         </div>
+
+      {/* Mobile Sales Drawer */}
+      <div className={`
+        md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40
+        transform transition-transform duration-300 ease-in-out
+        ${isMobileDrawerOpen ? 'translate-y-0' : 'translate-y-full'}
+      `}>
+        <div className="flex-shrink-0 p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">
+              Sales ({visibleSales.length})
+              {selectedPinId && (
+                <span className="text-sm text-blue-600 ml-2">
+                  (Location selected)
+                </span>
+              )}
+            </h2>
+            {selectedPinId && (
+              <button
+                onClick={() => setSelectedPinId(null)}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Show All Sales
+              </button>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-4 max-h-[50vh]">
+          {loading && (
+            <div className="grid grid-cols-1 gap-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SaleCardSkeleton key={i} />
+              ))}
+            </div>
+          )}
+
+          {!loading && visibleSales.length === 0 && (
+            <div className="text-center py-8">
+              <div className="text-gray-500 mb-4">
+                No sales found in this area
+              </div>
+              <button
+                onClick={() => updateFilters({ distance: Math.min(100, filters.distance + 10) })}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Increase Distance
+              </button>
+            </div>
+          )}
+
+          {!loading && visibleSales.length > 0 && (
+            <SalesList sales={visibleSales} mode="grid" />
+          )}
+        </div>
+      </div>
 
       {/* Filters Modal */}
             <FiltersModal 

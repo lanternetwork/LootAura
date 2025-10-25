@@ -8,6 +8,7 @@ import ZipInput from '@/components/location/ZipInput'
 import SaleCard from '@/components/SaleCard'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import FiltersModal from '@/components/filters/FiltersModal'
+import DateWindowLabel from '@/components/filters/DateWindowLabel'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 
@@ -295,7 +296,7 @@ export default function SalesClient({
             />
           </div>
 
-          {/* Center: Filter Chips */}
+          {/* Center: Filter Status */}
           <div className="flex-1 flex items-center justify-center min-w-0 px-4">
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <span>{filters.dateRange}</span>
@@ -324,6 +325,29 @@ export default function SalesClient({
           <div className="mt-2 text-sm text-red-600">{zipError}</div>
         )}
       </div>
+
+      {/* Active filter chips - under search controls, above map/list */}
+      {(filters.dateRange !== 'any' || filters.categories.length > 0) && (
+        <div className="mt-2 overflow-x-auto whitespace-nowrap flex gap-2">
+          {filters.dateRange !== 'any' && (
+            <button
+              onClick={() => updateFilters({ dateRange: 'any' as any })}
+              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
+            >
+              {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'weekend' ? 'This Weekend' : 'Next Weekend'} ×
+            </button>
+          )}
+          {filters.categories.map((c) => (
+            <button
+              key={c}
+              onClick={() => updateFilters({ categories: filters.categories.filter(x => x !== c) })}
+              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
+            >
+              {c} ×
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Main Content - Zillow Style */}
       <div 

@@ -99,11 +99,10 @@ export default function SalesClient({
         params.set('categories', filters.categories.join(','))
       }
 
-      // Fetch logging reduced for performance
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[FETCH] Viewport fetch with bbox:', bbox)
-        console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
-      }
+      // Fetch logging - always log for debugging
+      console.log('[FETCH] Viewport fetch with bbox:', bbox)
+      console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
+      console.log('[FETCH] Debug flag:', process.env.NEXT_PUBLIC_DEBUG)
 
       const response = await fetch(`/api/sales?${params.toString()}`)
       if (!response.ok) {
@@ -238,6 +237,14 @@ export default function SalesClient({
       fetchMapSales(mapView.bounds)
     }
   }
+
+  // Initial fetch on mount
+  useEffect(() => {
+    if (mapView.bounds) {
+      console.log('[INITIAL] Fetching sales on mount with bounds:', mapView.bounds)
+      fetchMapSales(mapView.bounds)
+    }
+  }, []) // Only run on mount
 
   // Restore ZIP from URL on page load
   useEffect(() => {

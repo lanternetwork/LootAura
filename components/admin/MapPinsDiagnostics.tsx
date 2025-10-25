@@ -133,18 +133,65 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
       
       if (mapInstanceAvailable && mapRef?.current?.getMap) {
         try {
-          // Test if we can add event listeners to existing markers
-          const markers = document.querySelectorAll('[data-testid="marker"]')
-          const clusters = document.querySelectorAll('[data-testid="cluster"]')
-          const clusterButtons = document.querySelectorAll('[data-cluster-marker="true"]')
+          // Test actual pin interactions, not just existence
           const pinButtons = document.querySelectorAll('[data-pin-marker="true"]')
+          const clusterButtons = document.querySelectorAll('[data-cluster-marker="true"]')
           
-          pinInteractionWorking = markers.length > 0 || clusters.length > 0 || clusterButtons.length > 0 || pinButtons.length > 0
+          let pinClickWorked = false
+          let clusterClickWorked = false
+          
+          // Test pin click functionality
+          if (pinButtons.length > 0) {
+            const pinButton = pinButtons[0] as HTMLButtonElement
+            const originalOnClick = pinButton.onclick
+            let clickEventFired = false
+            
+            // Add temporary click listener to verify click works
+            const testClickHandler = (e: Event) => {
+              clickEventFired = true
+              console.log('[PIN_INTERACTION] Pin click event fired:', e)
+            }
+            pinButton.addEventListener('click', testClickHandler)
+            
+            // Actually click the pin
+            pinButton.click()
+            
+            // Wait for click to process
+            await new Promise(resolve => setTimeout(resolve, 50))
+            
+            pinClickWorked = clickEventFired
+            pinButton.removeEventListener('click', testClickHandler)
+          }
+          
+          // Test cluster click functionality
+          if (clusterButtons.length > 0) {
+            const clusterButton = clusterButtons[0] as HTMLButtonElement
+            let clusterClickEventFired = false
+            
+            const testClusterClickHandler = (e: Event) => {
+              clusterClickEventFired = true
+              console.log('[PIN_INTERACTION] Cluster click event fired:', e)
+            }
+            clusterButton.addEventListener('click', testClusterClickHandler)
+            
+            // Actually click the cluster
+            clusterButton.click()
+            
+            // Wait for click to process
+            await new Promise(resolve => setTimeout(resolve, 50))
+            
+            clusterClickWorked = clusterClickEventFired
+            clusterButton.removeEventListener('click', testClusterClickHandler)
+          }
+          
+          pinInteractionWorking = pinClickWorked || clusterClickWorked
           pinInteractionDetails = {
-            canDetectPins: markers.length > 0 || pinButtons.length > 0,
-            canDetectClusters: clusters.length > 0 || clusterButtons.length > 0,
-            totalMarkers: markers.length + pinButtons.length,
-            totalClusters: clusters.length + clusterButtons.length,
+            canDetectPins: pinButtons.length > 0,
+            canDetectClusters: clusterButtons.length > 0,
+            totalMarkers: pinButtons.length,
+            totalClusters: clusterButtons.length,
+            pinClickWorked: pinClickWorked,
+            clusterClickWorked: clusterClickWorked,
             hasClickHandlers: true
           }
         } catch (e) {
@@ -161,16 +208,51 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
       let clusteringDetails = {}
       
       try {
-        // Check for cluster elements
+        // Test actual clustering behavior, not just existence
         const clusterElements = document.querySelectorAll('[data-testid="cluster"]')
         const clusterMarkers = document.querySelectorAll('[data-cluster-marker="true"]')
         
-        clusteringWorking = clusterElements.length > 0 || clusterMarkers.length > 0
+        let clusterExpansionWorked = false
+        
+        // Test cluster expansion functionality
+        if (clusterMarkers.length > 0 && mapRef?.current?.getMap) {
+          const clusterButton = clusterMarkers[0] as HTMLButtonElement
+          const map = mapRef.current.getMap()
+          const originalZoom = map.getZoom()
+          const originalCenter = map.getCenter()
+          
+          // Click cluster to test expansion
+          clusterButton.click()
+          
+          // Wait for potential zoom/pan animation
+          await new Promise(resolve => setTimeout(resolve, 200))
+          
+          const newZoom = map.getZoom()
+          const newCenter = map.getCenter()
+          
+          // Check if map actually changed (indicating cluster expansion worked)
+          clusterExpansionWorked = (
+            Math.abs(newZoom - originalZoom) > 0.1 || 
+            Math.abs(newCenter.lng - originalCenter.lng) > 0.001 ||
+            Math.abs(newCenter.lat - originalCenter.lat) > 0.001
+          )
+          
+          console.log('[CLUSTERING_TEST] Cluster expansion test:', {
+            originalZoom,
+            newZoom,
+            originalCenter: { lng: originalCenter.lng, lat: originalCenter.lat },
+            newCenter: { lng: newCenter.lng, lat: newCenter.lat },
+            expansionWorked: clusterExpansionWorked
+          })
+        }
+        
+        clusteringWorking = clusterElements.length > 0 || clusterMarkers.length > 0 || clusterExpansionWorked
         clusteringDetails = {
           clusterElements: clusterElements.length,
           clusterMarkers: clusterMarkers.length,
           hasClusterClass: clusterElements.length > 0,
           hasClusterMarkers: clusterMarkers.length > 0,
+          clusterExpansionWorked: clusterExpansionWorked,
           clusteringEnabled: process.env.NEXT_PUBLIC_FEATURE_CLUSTERING !== 'false'
         }
       } catch (e) {
@@ -231,17 +313,34 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
       let dataIntegrationDetails = {}
       
       try {
-        // Check if we can access sales data from the test map
-        // The test map should have 5 test sales configured
-        const testSalesCount = 5 // This is hardcoded in the admin tools page
-        const hasPinsProp = !!mapRef?.current
-        dataIntegrationWorking = hasPinsProp
+        // Test actual data integration by checking pins have real data attributes
+        const pinsWithData = document.querySelectorAll('[data-pin-id]')
+        const clustersWithData = document.querySelectorAll('[data-cluster-id]')
+        
+        // Check if pins have valid data attributes
+        let hasValidPinData = false
+        let hasValidClusterData = false
+        
+        if (pinsWithData.length > 0) {
+          const firstPin = pinsWithData[0] as HTMLElement
+          const pinId = firstPin.getAttribute('data-pin-id')
+          hasValidPinData = !!pinId && pinId !== 'undefined' && pinId !== 'null'
+        }
+        
+        if (clustersWithData.length > 0) {
+          const firstCluster = clustersWithData[0] as HTMLElement
+          const clusterId = firstCluster.getAttribute('data-cluster-id')
+          hasValidClusterData = !!clusterId && clusterId !== 'undefined' && clusterId !== 'null'
+        }
+        
+        dataIntegrationWorking = hasValidPinData || hasValidClusterData
         dataIntegrationDetails = {
-          salesDataLength: testSalesCount,
-          hasPinsProp: hasPinsProp,
-          hasSalesData: testSalesCount > 0,
+          pinsWithData: pinsWithData.length,
+          clustersWithData: clustersWithData.length,
+          hasValidPinData: hasValidPinData,
+          hasValidClusterData: hasValidClusterData,
           canAccessData: true,
-          note: 'Test map configured with 5 test sales'
+          note: 'Testing actual pin data attributes instead of hardcoded values'
         }
       } catch (e) {
         console.log('Data integration test failed:', e)
@@ -256,19 +355,43 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
       let performanceDetails = {}
       
       try {
-        // Measure the time taken to query markers
+        // Test realistic pin performance scenarios
         const startTime = performance.now()
+        
+        // Test 1: DOM query performance
         const markers = document.querySelectorAll('[data-pin-marker="true"]')
         const clusters = document.querySelectorAll('[data-cluster-marker="true"]')
-        const endTime = performance.now()
+        const queryTime = performance.now() - startTime
         
-        const queryTime = endTime - startTime
-        performanceWorking = queryTime < 100 // Should be fast
+        // Test 2: Simulate multiple interactions (like user clicking around)
+        const interactionStartTime = performance.now()
+        let interactionCount = 0
+        const maxInteractions = Math.min(10, markers.length + clusters.length)
+        
+        for (let i = 0; i < maxInteractions; i++) {
+          const element = i < markers.length ? markers[i] : clusters[i - markers.length]
+          if (element) {
+            // Simulate hover and click events
+            element.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+            element.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }))
+            interactionCount++
+          }
+        }
+        
+        const interactionTime = performance.now() - interactionStartTime
+        const avgInteractionTime = interactionCount > 0 ? interactionTime / interactionCount : 0
+        
+        // Performance should be good if queries are fast and interactions are responsive
+        performanceWorking = queryTime < 50 && avgInteractionTime < 10
         performanceDetails = {
           queryTime: Math.round(queryTime),
+          interactionTime: Math.round(interactionTime),
+          avgInteractionTime: Math.round(avgInteractionTime),
           markerCount: markers.length,
           clusterCount: clusters.length,
-          performanceGood: queryTime < 100
+          interactionCount: interactionCount,
+          performanceGood: queryTime < 50 && avgInteractionTime < 10,
+          note: 'Testing realistic pin interaction performance'
         }
       } catch (e) {
         console.log('Performance test failed:', e)

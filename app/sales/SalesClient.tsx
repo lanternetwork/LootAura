@@ -92,7 +92,7 @@ export default function SalesClient({
   const currentViewport = useMemo(() => {
     if (!mapView.bounds) return null
     
-    return {
+        return {
       bounds: [
         mapView.bounds.west,
         mapView.bounds.south,
@@ -115,7 +115,22 @@ export default function SalesClient({
       }
     }
     
-    const result = createHybridPins(mapSales, currentViewport, {
+    // Filter sales to only those within the current viewport bounds
+    const visibleSales = mapSales.filter(sale => {
+      if (typeof sale.lat !== 'number' || typeof sale.lng !== 'number') return false
+      
+      return sale.lat >= currentViewport.bounds[1] && // south
+             sale.lat <= currentViewport.bounds[3] && // north
+             sale.lng >= currentViewport.bounds[0] && // west
+             sale.lng <= currentViewport.bounds[2]    // east
+    })
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', mapSales.length, 'total')
+    }
+    
+    // Only run clustering on visible sales
+    const result = createHybridPins(visibleSales, currentViewport, {
       coordinatePrecision: 5, // Increased to group sales within ~1m radius (more precise)
       clusterRadius: 0.3, // Reduced cluster radius for less aggressive clustering
       minClusterSize: 3, // Increased minimum cluster size
@@ -124,13 +139,15 @@ export default function SalesClient({
       enableVisualClustering: true
     })
     
-    console.log('[HYBRID] Clustering completed:', {
-      type: result.type,
-      pinsCount: result.pins.length,
-      locationsCount: result.locations.length,
-      salesCount: mapSales.length,
-      duration: performance.now() - startTime
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[HYBRID] Clustering completed:', {
+        type: result.type,
+        pinsCount: result.pins.length,
+        locationsCount: result.locations.length,
+        visibleSalesCount: visibleSales.length,
+        totalSalesCount: mapSales.length
+      })
+    }
     
     return result
   }, [mapSales, currentViewport])
@@ -150,9 +167,9 @@ export default function SalesClient({
         params.set('dateRange', filters.dateRange)
       }
       if (filters.categories && filters.categories.length > 0) {
-        params.set('categories', filters.categories.join(','))
+      params.set('categories', filters.categories.join(','))
       }
-
+      
       // Log API call for debugging (only when debug is enabled)
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[FETCH] Viewport fetch with bbox:', bbox)
@@ -172,7 +189,7 @@ export default function SalesClient({
         console.error('[FETCH] Invalid response from server')
         return
       }
-
+      
       if (data.ok && Array.isArray(data.data)) {
         const deduplicated = deduplicateSales(data.data)
         // Log sales received (only when debug is enabled or when there are sales)
@@ -250,7 +267,7 @@ export default function SalesClient({
     const currentParams = new URLSearchParams(searchParams.toString())
     if (zip) {
       currentParams.set('zip', zip)
-    } else {
+      } else {
       currentParams.delete('zip')
     }
     router.replace(`/sales?${currentParams.toString()}`, { scroll: false })
@@ -402,9 +419,9 @@ export default function SalesClient({
                 viewport: currentViewport!
               }}
               onViewportChange={handleViewportChange}
-            />
+              />
+            </div>
           </div>
-        </div>
 
         {/* Sales List - Right Panel */}
         <div className="bg-white border-l border-gray-200 flex flex-col min-h-0 min-w-0">
@@ -425,31 +442,31 @@ export default function SalesClient({
                 >
                   Show All Sales
                 </button>
-              )}
-            </div>
-          </div>
-          
+                  )}
+                </div>
+                </div>
+
           <div className="flex-1 overflow-y-auto p-4">
             {loading && (
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SaleCardSkeleton key={i} />
                 ))}
-              </div>
-            )}
-
+                    </div>
+                  )}
+                  
             {!loading && visibleSales.length === 0 && (
               <div className="text-center py-8">
                 <div className="text-gray-500 mb-4">
                   No sales found in this area
-                </div>
-                <button
+                    </div>
+                          <button
                   onClick={() => updateFilters({ distance: Math.min(100, filters.distance + 10) })}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
+                          >
                   Increase Distance
-                </button>
-              </div>
+                          </button>
+                        </div>
             )}
 
             {!loading && visibleSales.length > 0 && (
@@ -460,18 +477,18 @@ export default function SalesClient({
               </div>
             )}
           </div>
+          </div>
         </div>
-      </div>
 
       {/* Filters Modal */}
-      <FiltersModal
+            <FiltersModal 
         isOpen={showFiltersModal}
         onClose={() => setShowFiltersModal(false)}
-        filters={{
-          distance: filters.distance,
+              filters={{
+                distance: filters.distance,
           dateRange: filters.dateRange as any,
-          categories: filters.categories
-        }}
+                categories: filters.categories
+              }}
         onFiltersChange={handleFiltersChange}
       />
 

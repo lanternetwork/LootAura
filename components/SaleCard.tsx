@@ -9,16 +9,16 @@ export default function SaleCard({ sale }: { sale: Sale }) {
 
   return (
     <article 
-      className="sale-row rounded-xl border p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow" 
+      className="sale-row rounded-lg border p-3 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow" 
       data-testid="sale-card" 
       data-debug="sale-card" 
       data-sale-id={String(sale?.id || '')}
       data-card="sale"
       data-kind="sale-row"
-      style={{ minHeight: '200px' }}
+      style={{ minHeight: '160px' }}
     >
-      <div className="flex justify-between">
-        <h3 className="text-xl font-semibold line-clamp-1">{sale?.title || `Sale ${sale?.id}`}</h3>
+      <div className="flex justify-between items-start">
+        <h3 className="text-lg font-semibold line-clamp-1">{sale?.title || `Sale ${sale?.id}`}</h3>
         {sale?.id && <FavoriteButton saleId={sale.id} initial={false} />}
       </div>
       

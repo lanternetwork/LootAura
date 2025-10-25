@@ -328,7 +328,7 @@ export default function SalesClient({
           
           <div className="flex-1 overflow-y-auto p-4">
             {loading && (
-              <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SaleCardSkeleton key={i} />
                 ))}
@@ -350,7 +350,7 @@ export default function SalesClient({
             )}
 
             {!loading && visibleSales.length > 0 && (
-              <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
                 {visibleSales.map((sale) => (
                   <SaleCard key={sale.id} sale={sale} />
                 ))}

@@ -25,6 +25,8 @@ export default function PinsOverlay({
     salesCount: sales.length,
     isClusteringEnabled,
     hasMapRef: !!mapRef.current,
+    mapRefType: typeof mapRef.current,
+    mapRefKeys: mapRef.current ? Object.keys(mapRef.current) : 'no current',
     sales: sales.slice(0, 2) // Log first 2 sales for debugging
   })
   

@@ -392,7 +392,7 @@ export default function SalesClient({
               zoom={mapZoom}
               fitBounds={pendingBounds}
               hybridPins={{
-                hybridResult: hybridResult,
+                sales: mapSales,
                 selectedId: selectedPinId,
                 onLocationClick: (locationId) => {
                   console.log('[SALES] Location clicked:', locationId)
@@ -401,7 +401,8 @@ export default function SalesClient({
                 onClusterClick: ({ lat, lng, expandToZoom }) => {
                   console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
                   // Note: map flyTo is handled in SimpleMap; we just rely on viewport→fetch debounce already in place
-                }
+                },
+                viewport: currentViewport!
               }}
               onViewportChange={handleViewportChange}
             />

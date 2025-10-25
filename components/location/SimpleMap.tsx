@@ -209,14 +209,17 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       >
         {/* Render pins overlay if provided, otherwise fall back to sales */}
         {pins ? (
-          <PinsOverlay
-            sales={pins.sales}
-            selectedId={pins.selectedId}
-            onPinClick={pins.onPinClick}
-            onClusterClick={handleClusterClick}
-            mapRef={mapRef}
-            isClusteringEnabled={isClusteringEnabled}
-          />
+          <>
+            {console.log('[SIMPLE_MAP] Rendering PinsOverlay with pins:', pins.sales.length)}
+            <PinsOverlay
+              sales={pins.sales}
+              selectedId={pins.selectedId}
+              onPinClick={pins.onPinClick}
+              onClusterClick={handleClusterClick}
+              mapRef={mapRef}
+              isClusteringEnabled={isClusteringEnabled}
+            />
+          </>
         ) : (
           /* Fallback to legacy sales rendering */
           sales

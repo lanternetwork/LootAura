@@ -105,7 +105,15 @@ export default function SalesClient({
 
   // Hybrid system: Create location groups and apply clustering
   const hybridResult = useMemo(() => {
-    if (!currentViewport || mapSales.length === 0) return null
+    // Early return for empty sales - no need to run clustering
+    if (!currentViewport || mapSales.length === 0) {
+      return {
+        type: 'individual' as const,
+        pins: [],
+        locations: [],
+        clusters: []
+      }
+    }
     
     const result = createHybridPins(mapSales, currentViewport, {
       coordinatePrecision: 4, // Reduced from 6 to group sales within ~11m radius
@@ -147,11 +155,9 @@ export default function SalesClient({
         params.set('categories', filters.categories.join(','))
       }
 
-      // Only log in debug mode
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[FETCH] Viewport fetch with bbox:', bbox)
-        console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
-      }
+      // Log API call for debugging
+      console.log('[FETCH] Viewport fetch with bbox:', bbox)
+      console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
 
       const response = await fetch(`/api/sales?${params.toString()}`)
       if (!response.ok) {
@@ -169,13 +175,11 @@ export default function SalesClient({
 
       if (data.ok && Array.isArray(data.data)) {
         const deduplicated = deduplicateSales(data.data)
-        // Only log in debug mode
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[FETCH] Sales received:', { 
-            raw: data.data.length, 
-            deduplicated: deduplicated.length
-          })
-        }
+        // Log sales received
+        console.log('[FETCH] Sales received:', { 
+          raw: data.data.length, 
+          deduplicated: deduplicated.length
+        })
         setMapSales(deduplicated)
         setMapMarkers(deduplicated
           .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')

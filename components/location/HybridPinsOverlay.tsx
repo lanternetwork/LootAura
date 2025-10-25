@@ -8,35 +8,20 @@ import ClusterMarker from './ClusterMarker'
 import LocationPin from './LocationPin'
 
 interface HybridPinsOverlayProps {
-  sales: Sale[]
+  hybridResult: any // Pre-calculated hybrid result
   selectedId?: string | null
   onLocationClick?: (locationId: string) => void
   onClusterClick?: (cluster: any) => void
-  viewport: { bounds: [number, number, number, number]; zoom: number }
 }
 
 export default function HybridPinsOverlay({
-  sales,
+  hybridResult,
   selectedId,
   onLocationClick,
-  onClusterClick,
-  viewport
+  onClusterClick
 }: HybridPinsOverlayProps) {
-  
-  // Create hybrid pins using the two-stage process
-  const hybridResult = useMemo((): HybridPinsResult => {
-    return createHybridPins(sales, viewport, {
-      coordinatePrecision: 6,
-      clusterRadius: 0.5,
-      minClusterSize: 2,
-      maxZoom: 16,
-      enableLocationGrouping: true,
-      enableVisualClustering: true
-    })
-  }, [sales, viewport])
-
-  // Early return if no sales
-  if (sales.length === 0) {
+  // Early return if no hybrid result
+  if (!hybridResult || hybridResult.pins.length === 0) {
     return null
   }
 

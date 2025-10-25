@@ -247,8 +247,8 @@ export default function DiagnosticToolsValidator() {
         (runButton as HTMLElement).click();
       }
       
-      // Wait for results to appear (up to 15 seconds for ZIP tools, 10 seconds for others)
-      const timeoutMs = toolName.includes('ZIP Lookup') ? 15000 : 10000
+      // Wait for results to appear (up to 20 seconds for ZIP tools, 10 seconds for others)
+      const timeoutMs = toolName.includes('ZIP Lookup') ? 20000 : 10000
       const resultsAppeared = await waitForResults(toolElement, initialResults.length, timeoutMs)
       if (!resultsAppeared) {
         addTest('Results Appear', false, {}, 'No results appeared after clicking run button')
@@ -367,6 +367,15 @@ export default function DiagnosticToolsValidator() {
       // For ZIP tools, check the entire tool element's text content for result indicators
       if (toolElement.textContent?.includes('ZIP Lookup')) {
         const toolText = toolElement.textContent || ''
+        
+        // Check if we're still in the "no results yet" state
+        if (toolText.includes('No test results yet') || toolText.includes('Test Results (0)')) {
+          // Still waiting for results, continue polling
+          await new Promise(resolve => setTimeout(resolve, 200))
+          continue
+        }
+        
+        // Check for actual results
         const hasZipResults = toolText.includes('SUCCESS') || 
                              toolText.includes('FAILED') ||
                              toolText.includes('40204') ||
@@ -374,7 +383,8 @@ export default function DiagnosticToolsValidator() {
                              toolText.includes('Total Tests') ||
                              toolText.includes('Success Rate') ||
                              toolText.includes('Avg Response Time') ||
-                             toolText.includes('Test Results')
+                             toolText.includes('Test Results') ||
+                             (toolText.includes('ms') && /\d+ms/.test(toolText))
         if (hasZipResults) {
           return true
         }

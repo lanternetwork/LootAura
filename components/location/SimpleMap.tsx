@@ -209,7 +209,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       >
         {/* Render pins overlay if provided, otherwise fall back to sales */}
         {pins ? (
-          <PinsOverlay
+          <>
+            <PinsOverlay
               sales={pins.sales}
               selectedId={pins.selectedId}
               onPinClick={pins.onPinClick}

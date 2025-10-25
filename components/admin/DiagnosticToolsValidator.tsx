@@ -39,52 +39,6 @@ export default function DiagnosticToolsValidator() {
     return resultElements
   }
 
-  // Helper function to run a ZIP lookup test
-  const runZipLookupTest = async (toolElement: Element, toolName: string) => {
-    console.log(`[DIAGNOSTIC_VALIDATOR] Running ZIP lookup test for ${toolName}`)
-    
-    // Find the ZIP input field
-    const zipInput = toolElement.querySelector('input[type="text"]') as HTMLInputElement
-    if (!zipInput) {
-      throw new Error('ZIP input field not found')
-    }
-    
-    // Set a test ZIP code
-    const testZip = '40204' // Louisville, KY
-    zipInput.value = testZip
-    
-    // Trigger input event to update the component state
-    zipInput.dispatchEvent(new Event('input', { bubbles: true }))
-    
-    // Also trigger change event
-    zipInput.dispatchEvent(new Event('change', { bubbles: true }))
-    
-    // Find and click the test button (different for different tools)
-    let testButton: HTMLButtonElement | null = null
-    
-    if (toolName.includes('Diagnostics')) {
-      // For diagnostics, look for "Run Diagnostic" button
-      const buttons = Array.from(toolElement.querySelectorAll('button'))
-      testButton = buttons.find(btn => btn.textContent?.includes('Run Diagnostic')) as HTMLButtonElement
-      if (!testButton) {
-        // Fallback to any button with "Diagnostic" in the text
-        testButton = buttons.find(btn => btn.textContent?.includes('Diagnostic')) as HTMLButtonElement
-      }
-    } else {
-      // For testing tool, look for any test button
-      testButton = toolElement.querySelector('button') as HTMLButtonElement
-    }
-    
-    if (!testButton) {
-      throw new Error('Test button not found')
-    }
-    
-    // Click the test button
-    testButton.click()
-    
-    // Wait a moment for the test to start
-    await new Promise(resolve => setTimeout(resolve, 500))
-  }
 
   // Helper function to validate that the tool actually performed its intended function
   const validateToolFunction = async (toolName: string, toolElement: Element, results: Element[]): Promise<{

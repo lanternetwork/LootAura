@@ -164,7 +164,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect
-        console.log('[MAP_RESIZE] Container resized:', { width, height })
+        // Map resize logging reduced for performance
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[MAP_RESIZE] Container resized:', { width, height })
+        }
         
         if (loaded && mapRef.current) {
           const map = mapRef.current.getMap()

@@ -124,8 +124,8 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
       }
     }
 
-    // Debug logging - only log when result actually changes
-    if (process.env.NEXT_PUBLIC_DEBUG && !isSameResult) {
+    // Debug logging - only log when result actually changes and in debug mode
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && !isSameResult) {
       console.log(`[OVERFLOW] centerWidth=${centerWidth} visible=${nextVisible.length} overflow=${nextOverflow.length} sum=${used} available=${available}`)
     }
   }, [allChips, centerEl, measureEl, hysteresis])

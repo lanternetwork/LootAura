@@ -100,7 +100,10 @@ export default function SalesClient({
         params.set('categories', filters.categories.join(','))
       }
 
-      console.log('[FETCH] Viewport fetch with bbox:', bbox)
+      // Fetch logging reduced for performance
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FETCH] Viewport fetch with bbox:', bbox)
+      }
 
       const response = await fetch(`/api/sales?${params.toString()}`)
       if (!response.ok) {
@@ -118,7 +121,10 @@ export default function SalesClient({
 
       if (data.ok && Array.isArray(data.data)) {
         const deduplicated = deduplicateSales(data.data)
-        console.log('[FETCH] Applied deduplication:', { input: data.data.length, output: deduplicated.length })
+        // Deduplication logging reduced for performance
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FETCH] Applied deduplication:', { input: data.data.length, output: deduplicated.length })
+        }
         setMapSales(deduplicated)
         setMapMarkers(deduplicated
           .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')

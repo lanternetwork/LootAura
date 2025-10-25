@@ -105,8 +105,15 @@ export default function SalesClient({
 
   // Hybrid system: Create location groups and apply clustering
   const hybridResult = useMemo(() => {
+    const startTime = performance.now()
+    
     // Early return for empty sales - no need to run clustering
     if (!currentViewport || mapSales.length === 0) {
+      console.log('[HYBRID] Early return for empty data:', { 
+        hasViewport: !!currentViewport, 
+        salesCount: mapSales.length,
+        duration: performance.now() - startTime 
+      })
       return {
         type: 'individual' as const,
         pins: [],
@@ -114,6 +121,11 @@ export default function SalesClient({
         clusters: []
       }
     }
+    
+    console.log('[HYBRID] Starting clustering calculation:', { 
+      salesCount: mapSales.length,
+      viewport: currentViewport 
+    })
     
     const result = createHybridPins(mapSales, currentViewport, {
       coordinatePrecision: 5, // Increased to group sales within ~1m radius (more precise)
@@ -124,15 +136,13 @@ export default function SalesClient({
       enableVisualClustering: true
     })
     
-    // Only log when debug is enabled and there are sales
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && mapSales.length > 0) {
-      console.log('[HYBRID] Result:', {
-        type: result.type,
-        pinsCount: result.pins.length,
-        locationsCount: result.locations.length,
-        salesCount: mapSales.length
-      })
-    }
+    console.log('[HYBRID] Clustering completed:', {
+      type: result.type,
+      pinsCount: result.pins.length,
+      locationsCount: result.locations.length,
+      salesCount: mapSales.length,
+      duration: performance.now() - startTime
+    })
     
     return result
   }, [mapSales, currentViewport])

@@ -6,6 +6,7 @@ import { Sale } from '@/lib/types'
 import SimpleMap from '@/components/location/SimpleMap'
 import SaleCard from '@/components/SaleCard'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
+import SalesList from '@/components/SalesList'
 import FiltersModal from '@/components/filters/FiltersModal'
 import FiltersBar from '@/components/sales/FiltersBar'
 import { useFilters } from '@/lib/hooks/useFilters'
@@ -284,14 +285,7 @@ export default function SalesClient({
       setTimeout(() => setPendingBounds(null), 0)
     }
 
-    // Fetch sales for new location (using center for now, will be updated by viewport change)
-    const tempBounds = {
-      west: lng - 0.1,
-      south: lat - 0.1,
-      east: lng + 0.1,
-      north: lat + 0.1
-    }
-    fetchMapSales(tempBounds)
+    // Sales will be fetched automatically when the map viewport updates
     
     // Clear the ZIP search flag after a delay to allow map to settle
     setTimeout(() => {
@@ -470,11 +464,7 @@ export default function SalesClient({
             )}
 
             {!loading && visibleSales.length > 0 && (
-              <div className="grid grid-cols-2 gap-3">
-                {visibleSales.map((sale: any) => (
-                  <SaleCard key={sale.id} sale={sale} />
-                ))}
-              </div>
+              <SalesList sales={visibleSales} mode="grid" />
             )}
           </div>
           </div>

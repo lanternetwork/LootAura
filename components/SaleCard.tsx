@@ -3,8 +3,6 @@ import FavoriteButton from './FavoriteButton'
 import { Sale } from '@/lib/types'
 
 export default function SaleCard({ sale }: { sale: Sale }) {
-  console.log('[DOM] item mounts id=', sale?.id)
-
   if (!sale) return null
 
   return (

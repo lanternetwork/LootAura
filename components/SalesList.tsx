@@ -22,7 +22,7 @@ export default function SalesList({ sales, mode }: { sales: Sale[]; mode?: strin
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3" data-testid="sales-list" data-debug={`mode:${mode}|items:${sales.length}`}>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2" data-testid="sales-list" data-debug={`mode:${mode}|items:${sales.length}`}>
       {sales.map(sale => (
         <SaleCard key={sale.id} sale={sale} />
       ))}

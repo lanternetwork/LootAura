@@ -388,7 +388,7 @@ export default function SalesClient({
 
       {/* Main Content - Zillow Style */}
       <div 
-        className="grid grid-cols-[minmax(0,1fr)_420px] gap-0 min-h-0 min-w-0 overflow-hidden"
+        className="grid grid-cols-[minmax(0,1fr)_546px] gap-0 min-h-0 min-w-0 overflow-hidden"
         style={{ height: MAIN_CONTENT_HEIGHT }}
       >
         {/* Map - Left Side (Dominant) */}

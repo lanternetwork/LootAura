@@ -25,11 +25,6 @@ export default function HybridPinsOverlay({
   viewport
 }: HybridPinsOverlayProps) {
   
-  // Early return if no sales - avoid unnecessary clustering calculation
-  if (sales.length === 0) {
-    return null
-  }
-
   // Create hybrid pins using the two-stage process
   const hybridResult = useMemo((): HybridPinsResult => {
     return createHybridPins(sales, viewport, {
@@ -41,6 +36,11 @@ export default function HybridPinsOverlay({
       enableVisualClustering: true
     })
   }, [sales, viewport])
+
+  // Early return if no sales - avoid unnecessary rendering
+  if (sales.length === 0) {
+    return null
+  }
 
   // Debug logging (only when debug is enabled and there are results)
   if (process.env.NEXT_PUBLIC_DEBUG === 'true' && hybridResult.pins.length > 0) {

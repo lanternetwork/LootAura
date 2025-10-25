@@ -7,7 +7,7 @@ type FiltersBarProps = {
   // ZIP Search
   onZipLocationFound: (lat: number, lng: number, _city?: string, _state?: string, _zip?: string, bbox?: [number, number, number, number]) => void
   onZipError: (error: string) => void
-  zipError?: string
+  zipError?: string | null
   
   // Date Filter
   dateRange: string

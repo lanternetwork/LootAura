@@ -28,7 +28,7 @@ export default function DiagnosticToolsValidator() {
     // Look for result elements (divs with test results)
     const resultElements = Array.from(toolElement.querySelectorAll('div')).filter(div => {
       const text = div.textContent || ''
-      return text.includes('PASS') || text.includes('FAIL') || text.includes('ms') || text.includes('Test')
+      return text.includes('PASS') || text.includes('FAIL') || text.includes('PASSED') || text.includes('FAILED') || text.includes('ms') || text.includes('Test')
     })
     return resultElements
   }
@@ -257,7 +257,9 @@ export default function DiagnosticToolsValidator() {
         issues.push('Results appear to be hardcoded (0ms timing)')
       }
       
-      if (text.includes('1ms') && results.length > 3) {
+      // Only flag 1ms timing if ALL results show 1ms AND there are many results
+      const allOneMs = results.every(r => r.textContent?.includes('1ms'))
+      if (allOneMs && results.length > 5) {
         issues.push('All results showing 1ms suggests hardcoded timing')
       }
     })

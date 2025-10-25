@@ -42,7 +42,7 @@ export default function MapDiagnostics({ mapRef }: MapDiagnosticsProps) {
     const steps: MapDiagnosticStep[] = []
     
     const addStep = (step: string, success: boolean, details?: any, error?: string, category: MapDiagnosticStep['category'] = 'initialization', stepStartTime?: number) => {
-      const stepDuration = stepStartTime ? Date.now() - stepStartTime : Date.now() - startTime
+      const stepDuration = stepStartTime ? Date.now() - stepStartTime : 0
       steps.push({
         step,
         success,

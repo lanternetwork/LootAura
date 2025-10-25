@@ -126,16 +126,10 @@ export default function PinsOverlay({
       return []
     }
     
-    // Skip clustering for very small datasets
+    // Skip clustering for very small datasets - return empty clusters
     if (sales.length < 2) {
-      console.log('[PINS_OVERLAY] Small dataset - returning individual pins')
-      return sales.map(sale => ({
-        id: parseInt(sale.id) || 0,
-        count: 1,
-        lat: sale.lat,
-        lng: sale.lng,
-        expandToZoom: debouncedViewport.zoom
-      }))
+      console.log('[PINS_OVERLAY] Small dataset - returning empty clusters')
+      return []
     }
     
     const viewportClusters = getClustersForViewport(

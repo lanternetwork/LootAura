@@ -38,9 +38,9 @@ export default function ClusterMarker({
   const sizeTier = getSizeTier(cluster.count)
   
   const sizeClasses = {
-    S: 'w-4 h-4 text-[10px]',
-    M: 'w-5 h-5 text-[10px]', 
-    L: 'w-6 h-6 text-[11px]'
+    S: 'w-3 h-3 text-[8px]',
+    M: 'w-4 h-4 text-[9px]', 
+    L: 'w-5 h-5 text-[10px]'
   }
 
   return (
@@ -69,7 +69,7 @@ export default function ClusterMarker({
         aria-label={`Cluster of ${cluster.count} sales. Press Enter to zoom in.`}
         title={`Cluster of ${cluster.count} sales`}
       >
-        <span className="text-white font-bold">+</span>
+        <span className="text-white font-bold">{cluster.count}</span>
       </button>
     </Marker>
   )

@@ -65,6 +65,105 @@ export default function DiagnosticToolsValidator() {
     await new Promise(resolve => setTimeout(resolve, 500))
   }
 
+  // Helper function to validate that the tool actually performed its intended function
+  const validateToolFunction = async (toolName: string, toolElement: Element, results: Element[]): Promise<{
+    isValid: boolean;
+    functionType: string;
+    evidence: string[];
+    issues: string[];
+  }> => {
+    const issues: string[] = []
+    const evidence: string[] = []
+    let functionType = 'unknown'
+
+    if (toolName.includes('ZIP Lookup')) {
+      functionType = 'ZIP Lookup'
+      
+      // Check for ZIP lookup specific evidence
+      const hasZipResults = results.some(r => 
+        r.textContent?.includes('SUCCESS') || 
+        r.textContent?.includes('FAILED') ||
+        r.textContent?.includes('40204') ||
+        r.textContent?.includes('Louisville')
+      )
+      
+      if (hasZipResults) {
+        evidence.push('ZIP lookup results found')
+      } else {
+        issues.push('No ZIP lookup results found')
+      }
+      
+      // Check for response time evidence
+      const hasResponseTime = results.some(r => 
+        r.textContent?.includes('ms') && /\d+ms/.test(r.textContent || '')
+      )
+      
+      if (hasResponseTime) {
+        evidence.push('Response time data found')
+      } else {
+        issues.push('No response time data found')
+      }
+      
+    } else if (toolName.includes('Map Functionality')) {
+      functionType = 'Map Diagnostics'
+      
+      // Check for map-specific evidence
+      const hasMapInfo = results.some(r => 
+        r.textContent?.includes('Container:') ||
+        r.textContent?.includes('Instance:') ||
+        r.textContent?.includes('Style:') ||
+        r.textContent?.includes('Mapbox')
+      )
+      
+      if (hasMapInfo) {
+        evidence.push('Map diagnostic information found')
+      } else {
+        issues.push('No map diagnostic information found')
+      }
+      
+    } else if (toolName.includes('Map Interaction')) {
+      functionType = 'Map Interaction Testing'
+      
+      // Check for interaction-specific evidence
+      const hasInteractionInfo = results.some(r => 
+        r.textContent?.includes('Moved:') ||
+        r.textContent?.includes('Events fired') ||
+        r.textContent?.includes('Movement') ||
+        r.textContent?.includes('Interaction')
+      )
+      
+      if (hasInteractionInfo) {
+        evidence.push('Map interaction test evidence found')
+      } else {
+        issues.push('No map interaction test evidence found')
+      }
+      
+    } else if (toolName.includes('Map Pins')) {
+      functionType = 'Map Pins Diagnostics'
+      
+      // Check for pins-specific evidence
+      const hasPinsInfo = results.some(r => 
+        r.textContent?.includes('Pin') ||
+        r.textContent?.includes('Cluster') ||
+        r.textContent?.includes('Marker') ||
+        r.textContent?.includes('Pins')
+      )
+      
+      if (hasPinsInfo) {
+        evidence.push('Map pins diagnostic information found')
+      } else {
+        issues.push('No map pins diagnostic information found')
+      }
+    }
+
+    return {
+      isValid: issues.length === 0,
+      functionType,
+      evidence,
+      issues
+    }
+  }
+
   const runDiagnosticValidation = async (toolName: string) => {
     const startTime = Date.now()
     const tests: DiagnosticTestResult[] = []
@@ -150,6 +249,14 @@ export default function DiagnosticToolsValidator() {
         hasTiming: hasRealData.hasTiming,
         hasDetails: hasRealData.hasDetails
       }, hasRealData.isValid ? undefined : `Results appear hardcoded: ${hasRealData.issues.join(', ')}`)
+
+      // Test 5: Verify the tool actually performed its intended function
+      const functionPerformed = await validateToolFunction(toolName, toolElement, finalResults)
+      addTest('Tool Function Performed', functionPerformed.isValid, {
+        functionType: functionPerformed.functionType,
+        evidence: functionPerformed.evidence,
+        issues: functionPerformed.issues
+      }, functionPerformed.isValid ? undefined : `Tool did not perform its function: ${functionPerformed.issues.join(', ')}`)
 
       const overallSuccess = tests.every(t => t.success)
       const totalDuration = Date.now() - startTime

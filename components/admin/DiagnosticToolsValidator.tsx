@@ -116,6 +116,14 @@ export default function DiagnosticToolsValidator() {
       // Check for response time evidence
       const hasResponseTime = toolText.includes('ms') && /\d+ms/.test(toolText)
       
+      // Debug logging for ZIP tools
+      if (toolName.includes('ZIP Lookup')) {
+        console.log(`[DIAGNOSTIC_VALIDATOR] ZIP tool text content:`, toolText.substring(0, 500))
+        console.log(`[DIAGNOSTIC_VALIDATOR] Has 'ms' text:`, toolText.includes('ms'))
+        console.log(`[DIAGNOSTIC_VALIDATOR] Matches digit+ms pattern:`, /\d+ms/.test(toolText))
+        console.log(`[DIAGNOSTIC_VALIDATOR] Has response time:`, hasResponseTime)
+      }
+      
       if (hasResponseTime) {
         evidence.push('Response time data found')
       } else {
@@ -484,6 +492,17 @@ export default function DiagnosticToolsValidator() {
           hasTiming = true
           hasRealData = true
         }
+        
+        // Debug logging for ZIP tools
+        console.log(`[DIAGNOSTIC_VALIDATOR] ZIP tool real data check:`, {
+          hasSuccess: toolText.includes('SUCCESS'),
+          hasFailed: toolText.includes('FAILED'),
+          hasAvgResponseTime: toolText.includes('Avg Response Time'),
+          hasResponseTime: toolText.includes('Response Time'),
+          hasMs: toolText.includes('ms'),
+          hasDigitMs: /\d+ms/.test(toolText),
+          toolTextSample: toolText.substring(0, 300)
+        })
       }
       
       // Check for suspicious patterns that suggest hardcoded results

@@ -102,6 +102,7 @@ export default function SalesClient({
       // Fetch logging reduced for performance
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[FETCH] Viewport fetch with bbox:', bbox)
+        console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
       }
 
       const response = await fetch(`/api/sales?${params.toString()}`)

@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         
         const validatedBbox = bboxSchema.parse(bboxData)
         console.log(`[API_SALES] bbox=${validatedBbox.north},${validatedBbox.south},${validatedBbox.east},${validatedBbox.west}`)
+        console.log(`[API_SALES] bbox range: lat=${validatedBbox.north - validatedBbox.south}, lng=${validatedBbox.east - validatedBbox.west}`)
         
         // Calculate center and approximate distance from bbox
         latitude = (validatedBbox.north + validatedBbox.south) / 2
@@ -305,7 +306,8 @@ export async function GET(request: NextRequest) {
       console.log(`[SALES] Direct query response:`, { 
         dataCount: salesData?.length || 0, 
         error: salesError,
-        sampleData: salesData?.slice(0, 2)
+        sampleData: salesData?.slice(0, 2),
+        bboxUsed: actualBbox ? 'viewport' : 'distance-based'
       })
       
       if (salesError) {
@@ -397,7 +399,12 @@ export async function GET(request: NextRequest) {
                 })
                 .slice(offset, offset + limit)
       
-      console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`, { windowStart, windowEnd })
+      console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`, { 
+        windowStart, 
+        windowEnd,
+        bboxUsed: actualBbox ? 'viewport' : 'distance-based',
+        finalCount: salesWithDistance.length
+      })
       
       // Debug: Log sample sales and their dates
       if (salesWithDistance.length > 0) {

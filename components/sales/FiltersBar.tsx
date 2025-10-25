@@ -234,7 +234,7 @@ export default function FiltersBar({
   return (
     <div className="border-b bg-white">
       {/* Desktop/Tablet Layout - 3 Column Grid */}
-      <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3 px-2 h-12 hidden md:grid">
+      <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3 px-4 h-12 hidden md:grid">
         {/* Left: ZIP */}
         <div ref={zipRef} className="shrink-0 flex items-center gap-2 w-[260px] md:w-[320px]">
           <ZipInput
@@ -358,7 +358,7 @@ export default function FiltersBar({
 
       {/* Mobile Layout */}
       <div className="md:hidden">
-        <div className="flex items-center gap-2 px-3 py-2">
+        <div className="flex items-center gap-2 px-4 py-2">
           {/* ZIP Search - Compact */}
           <div className="flex-1">
             <ZipInput

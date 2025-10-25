@@ -20,15 +20,19 @@ export default function PinsOverlay({
   isClusteringEnabled 
 }: PinsOverlayProps) {
   
-  // Debug logging - always show for troubleshooting
-  console.log('[PINS_OVERLAY] Render v3:', {
-    salesCount: sales.length,
-    isClusteringEnabled,
-    hasMapRef: !!mapRef.current,
-    mapRefType: typeof mapRef.current,
-    mapRefKeys: mapRef.current ? Object.keys(mapRef.current) : 'no current',
-    sales: sales.slice(0, 2) // Log first 2 sales for debugging
-  })
+  // Early return if no sales to prevent unnecessary renders
+  if (sales.length === 0) {
+    return null
+  }
+  
+  // Debug logging - only when there are sales
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[PINS_OVERLAY] Render v3:', {
+      salesCount: sales.length,
+      isClusteringEnabled,
+      hasMapRef: !!mapRef.current
+    })
+  }
   
   // Debounced viewport state to prevent excessive recalculations
   const [debouncedViewport, setDebouncedViewport] = useState<{
@@ -47,40 +51,17 @@ export default function PinsOverlay({
 
   // Get current viewport bounds and zoom - only when map is ready
   const viewportInfo = useMemo(() => {
-    console.log('[PINS_OVERLAY] Viewport calculation:', {
-      hasMapRef: !!mapRef.current,
-      hasGetMap: !!mapRef.current?.getMap
-    })
-    
     if (!mapRef.current?.getMap) {
-      console.log('[PINS_OVERLAY] No map ref or getMap method')
       return null
     }
     
     const map = mapRef.current.getMap()
-    if (!map) {
-      console.log('[PINS_OVERLAY] No map instance')
-      return null
-    }
-    
-    if (!map.isStyleLoaded?.()) {
-      console.log('[PINS_OVERLAY] Map style not loaded yet')
+    if (!map || !map.isStyleLoaded?.()) {
       return null
     }
     
     const bounds = map.getBounds()
     const zoom = map.getZoom()
-    
-    console.log('[PINS_OVERLAY] Viewport calculated:', { 
-      zoom, 
-      salesCount: sales.length,
-      bounds: {
-        west: bounds.getWest(),
-        south: bounds.getSouth(),
-        east: bounds.getEast(),
-        north: bounds.getNorth()
-      }
-    })
     
     return {
       bounds: [
@@ -114,21 +95,7 @@ export default function PinsOverlay({
 
   // Get clusters for current viewport - only when needed
   const clusters = useMemo((): ClusterFeature[] => {
-    console.log('[PINS_OVERLAY] Clusters calculation:', {
-      hasClusterIndex: !!clusterIndex,
-      hasDebouncedViewport: !!debouncedViewport,
-      salesLength: sales.length,
-      debouncedViewport: debouncedViewport
-    })
-    
-    if (!clusterIndex || !debouncedViewport || sales.length === 0) {
-      console.log('[PINS_OVERLAY] Returning empty clusters - missing requirements')
-      return []
-    }
-    
-    // Skip clustering for very small datasets - return empty clusters
-    if (sales.length < 2) {
-      console.log('[PINS_OVERLAY] Small dataset - returning empty clusters')
+    if (!clusterIndex || !debouncedViewport || sales.length < 2) {
       return []
     }
     
@@ -151,7 +118,6 @@ export default function PinsOverlay({
 
   // Render plain pins when clustering is disabled
   if (!isClusteringEnabled) {
-    console.log('[PINS_OVERLAY] Rendering plain pins:', { salesCount: sales.length })
     return (
       <>
         {sales.map(sale => (

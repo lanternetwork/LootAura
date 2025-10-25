@@ -41,15 +41,10 @@ export default function SalesClient({
   const urlLng = searchParams.get('lng')
   const urlZoom = searchParams.get('zoom')
   
-  console.log('[SALES_CLIENT] URL params:', { urlLat, urlLng, urlZoom })
-  console.log('[SALES_CLIENT] initialCenter:', initialCenter)
-  
   // Use URL parameters if available, otherwise use initialCenter
   const effectiveCenter = urlLat && urlLng 
     ? { lat: parseFloat(urlLat), lng: parseFloat(urlLng) }
     : initialCenter
-    
-  console.log('[SALES_CLIENT] effectiveCenter:', effectiveCenter)
 
   // Map view state - single source of truth
   const [mapView, setMapView] = useState<MapViewState>({
@@ -149,7 +144,6 @@ export default function SalesClient({
 
   // Handle viewport changes from SimpleMap
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
-    console.log('[MAP] Viewport change:', { center, zoom, bounds })
     
     // Update map view state
     setMapView(prev => ({
@@ -256,7 +250,6 @@ export default function SalesClient({
 
   // Memoized map center
   const mapCenter = useMemo(() => {
-    console.log('[SALES] mapCenter memo triggered:', mapView.center)
     return mapView.center
   }, [mapView.center])
 

@@ -107,7 +107,8 @@ export default function AdminToolsPage() {
            <div className="bg-white rounded-lg shadow-md p-6">
              <h3 className="text-lg font-semibold mb-4">Test Map for Diagnostics</h3>
              <p className="text-sm text-gray-600 mb-4">
-               This map is used by the diagnostic tools below to test map functionality.
+               This is a miniature version of the same map users see on the main sales page. 
+               It uses the exact same rendering system to verify functionality works correctly.
              </p>
              <div
                data-testid="admin-diag-map"
@@ -125,10 +126,14 @@ export default function AdminToolsPage() {
                      { id: 'test-sale-4', lat: 38.2727, lng: -85.7785 },
                      { id: 'test-sale-5', lat: 38.2327, lng: -85.7385 }
                    ],
-                   selectedId: null,
-                   onPinClick: (id) => console.log('[ADMIN_DIAG] Pin clicked:', id),
+                   selectedId: null, // Same as main app - no selected sale by default
+                   onPinClick: (id) => {
+                     console.log('[ADMIN_DIAG] Pin clicked:', id)
+                     // Same behavior as main app - just logging for now
+                   },
                    onClusterClick: ({ lat, lng, expandToZoom }) => {
                      console.log('[ADMIN_DIAG] Cluster clicked:', { lat, lng, expandToZoom })
+                     // Same behavior as main app - cluster expansion handled by SimpleMap
                    }
                  }}
                  onViewportChange={(vp) => console.log('[ADMIN_DIAG] viewport', vp)}

@@ -57,8 +57,9 @@ export interface PinsProps {
 
 // Hybrid pins props
 export interface HybridPinsProps {
-  hybridResult: HybridPinsResult
+  sales: any[] // Sale objects
   selectedId?: string | null
   onLocationClick?: (locationId: string) => void
   onClusterClick?: (cluster: ClusterFeature) => void
+  viewport: { bounds: [number, number, number, number]; zoom: number }
 }

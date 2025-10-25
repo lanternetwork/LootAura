@@ -87,38 +87,36 @@ export default function SalesClient({
     return unique
   }, [])
 
-  // Group sales by unique coordinates for map pins
-  const groupedSales = useMemo(() => {
-    const groups = new Map<string, { lat: number; lng: number; sales: Sale[] }>()
+  // Hybrid system: Get current viewport for clustering
+  const currentViewport = useMemo(() => {
+    if (!mapView.bounds) return null
     
-    mapSales.forEach(sale => {
-      if (typeof sale.lat === 'number' && typeof sale.lng === 'number') {
-        // Create a key from coordinates (rounded to avoid floating point issues)
-        const key = `${sale.lat.toFixed(6)},${sale.lng.toFixed(6)}`
-        
-        if (!groups.has(key)) {
-          groups.set(key, {
-            lat: sale.lat,
-            lng: sale.lng,
-            sales: []
-          })
-        }
-        groups.get(key)!.sales.push(sale)
-      }
-    })
-    
-    return Array.from(groups.values())
-  }, [mapSales])
+    return {
+      bounds: [
+        mapView.bounds.west,
+        mapView.bounds.south,
+        mapView.bounds.east,
+        mapView.bounds.north
+      ] as [number, number, number, number],
+      zoom: mapView.zoom
+    }
+  }, [mapView.bounds, mapView.zoom])
 
-  // Create pin data for map (one pin per unique location)
-  const mapPins = useMemo(() => {
-    return groupedSales.map((group, index) => ({
-      id: `location-${index}`,
-      lat: group.lat,
-      lng: group.lng,
-      sales: group.sales
-    }))
-  }, [groupedSales])
+  // Hybrid system: Create location groups and apply clustering
+  const hybridResult = useMemo(() => {
+    if (!currentViewport) return null
+    
+    // Import the hybrid clustering function
+    const { createHybridPins } = require('@/lib/pins/hybridClustering')
+    return createHybridPins(mapSales, currentViewport, {
+      coordinatePrecision: 6,
+      clusterRadius: 0.5,
+      minClusterSize: 2,
+      maxZoom: 16,
+      enableLocationGrouping: true,
+      enableVisualClustering: true
+    })
+  }, [mapSales, currentViewport])
 
   // Fetch sales based on map viewport bbox
   const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }) => {
@@ -300,15 +298,15 @@ export default function SalesClient({
 
   // Memoized visible sales - always derived from mapSales
   const visibleSales = useMemo(() => {
-    // If a pin is selected, show only sales from that location
-    if (selectedPinId) {
-      const selectedPin = mapPins.find(pin => pin.id === selectedPinId)
-      if (selectedPin) {
-        console.log('[SALES] Showing sales for selected pin:', { 
-          pinId: selectedPinId,
-          salesCount: selectedPin.sales.length 
+    // If a location is selected, show only sales from that location
+    if (selectedPinId && hybridResult) {
+      const selectedLocation = hybridResult.locations.find(loc => loc.id === selectedPinId)
+      if (selectedLocation) {
+        console.log('[SALES] Showing sales for selected location:', { 
+          locationId: selectedPinId,
+          salesCount: selectedLocation.sales.length 
         })
-        return selectedPin.sales
+        return selectedLocation.sales
       }
     }
     
@@ -317,10 +315,11 @@ export default function SalesClient({
       mapSales: mapSales.length, 
       visibleSales: deduplicated.length,
       selectedPinId,
-      mapPinsCount: mapPins.length
+      hybridType: hybridResult?.type,
+      locationsCount: hybridResult?.locations.length || 0
     })
     return deduplicated
-  }, [mapSales, deduplicateSales, selectedPinId, mapPins])
+  }, [mapSales, deduplicateSales, selectedPinId, hybridResult])
 
   // Memoized map center
   const mapCenter = useMemo(() => {
@@ -366,18 +365,19 @@ export default function SalesClient({
               center={mapCenter}
               zoom={mapZoom}
               fitBounds={pendingBounds}
-              pins={{
-                sales: mapPins.map(pin => ({ id: pin.id, lat: pin.lat, lng: pin.lng })),
+              hybridPins={{
+                sales: mapSales,
                 selectedId: selectedPinId,
-                onPinClick: (id) => {
-                  console.log('[SALES] Pin clicked:', id)
-                  setSelectedPinId(selectedPinId === id ? null : id)
+                onLocationClick: (locationId) => {
+                  console.log('[SALES] Location clicked:', locationId)
+                  setSelectedPinId(selectedPinId === locationId ? null : locationId)
                 },
                 onClusterClick: ({ lat, lng, expandToZoom }) => {
                   console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
                   // Note: map flyTo is handled in SimpleMap; we just rely on viewport→fetch debounce already in place
                 }
               }}
+              viewport={currentViewport}
               onViewportChange={handleViewportChange}
             />
           </div>

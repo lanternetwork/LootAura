@@ -4,8 +4,9 @@ import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHand
 import Map, { Marker, Popup } from "react-map-gl"
 import { getMapboxToken } from "@/lib/maps/token"
 import { Sale } from "@/lib/types"
-import { PinsProps } from "@/lib/pins/types"
+import { PinsProps, HybridPinsProps } from "@/lib/pins/types"
 import PinsOverlay from "./PinsOverlay"
+import HybridPinsOverlay from "./HybridPinsOverlay"
 
 interface SimpleMapProps {
   center: { lat: number; lng: number }
@@ -15,6 +16,7 @@ interface SimpleMapProps {
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string
   pins?: PinsProps
+  hybridPins?: HybridPinsProps & { viewport: { bounds: [number, number, number, number]; zoom: number } }
   onViewportChange?: (args: { 
     center: { lat: number; lng: number }; 
     zoom: number; 
@@ -30,6 +32,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   onSaleClick,
   selectedSaleId,
   pins,
+  hybridPins,
   onViewportChange 
 }, ref) => {
   const mapRef = useRef<any>(null)
@@ -210,8 +213,17 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
           }
         }}
       >
-        {/* Render pins overlay if provided, otherwise fall back to sales */}
-        {pins ? (
+        {/* Render hybrid pins if provided, otherwise fall back to regular pins or sales */}
+        {hybridPins ? (
+          <HybridPinsOverlay
+            sales={hybridPins.sales}
+            selectedId={hybridPins.selectedId}
+            onLocationClick={hybridPins.onLocationClick}
+            onClusterClick={handleClusterClick}
+            mapRef={{ current: { getMap: () => mapRef.current?.getMap?.() } }}
+            viewport={hybridPins.viewport}
+          />
+        ) : pins ? (
           <>
             <PinsOverlay
               sales={pins.sales}

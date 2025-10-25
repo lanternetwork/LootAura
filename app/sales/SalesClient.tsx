@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
 import SimpleMap from '@/components/location/SimpleMap'
-import ZipInput from '@/components/location/ZipInput'
 import SaleCard from '@/components/SaleCard'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import FiltersModal from '@/components/filters/FiltersModal'
@@ -29,11 +28,11 @@ interface SalesClientProps {
 export default function SalesClient({ 
   initialSales, 
   initialCenter, 
-  user 
+  user: _user 
 }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { filters, updateFilters, hasActiveFilters } = useFilters(
+  const { filters, updateFilters, hasActiveFilters: _hasActiveFilters } = useFilters(
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
   )
 

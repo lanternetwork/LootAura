@@ -20,20 +20,6 @@ export default function PinsOverlay({
   isClusteringEnabled 
 }: PinsOverlayProps) {
   
-  // Early return if no sales to prevent unnecessary renders
-  if (sales.length === 0) {
-    return null
-  }
-  
-  // Debug logging - only when there are sales
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PINS_OVERLAY] Render v3:', {
-      salesCount: sales.length,
-      isClusteringEnabled,
-      hasMapRef: !!mapRef.current
-    })
-  }
-  
   // Debounced viewport state to prevent excessive recalculations
   const [debouncedViewport, setDebouncedViewport] = useState<{
     bounds: [number, number, number, number]
@@ -115,6 +101,20 @@ export default function PinsOverlay({
     
     return viewportClusters
   }, [clusterIndex, debouncedViewport, sales])
+
+  // Early return if no sales to prevent unnecessary renders
+  if (sales.length === 0) {
+    return null
+  }
+  
+  // Debug logging - only when there are sales
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[PINS_OVERLAY] Render v3:', {
+      salesCount: sales.length,
+      isClusteringEnabled,
+      hasMapRef: !!mapRef.current
+    })
+  }
 
   // Render plain pins when clustering is disabled
   if (!isClusteringEnabled) {

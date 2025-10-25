@@ -31,7 +31,7 @@ interface SalesClientProps {
 export default function SalesClient({ 
   initialSales, 
   initialCenter, 
-  user 
+  user: _user 
 }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -69,8 +69,8 @@ export default function SalesClient({
   const [, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [, setIsZipSearching] = useState(false)
-  const [dateWindow, setDateWindow] = useState<{ from: string; to: string } | null>(null)
-  const [degraded, setDegraded] = useState(false)
+  const [dateWindow, _setDateWindow] = useState<{ label: string; start: string; end: string; display: string } | null>(null)
+  const [degraded, _setDegraded] = useState(false)
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
@@ -234,14 +234,7 @@ export default function SalesClient({
     setZipError(error)
   }
 
-  // Handle filter changes
-  const handleFiltersChange = (newFilters: any) => {
-    updateFilters(newFilters)
-    // Trigger refetch with new filters using current bounds
-    if (mapView.bounds) {
-      fetchMapSales(mapView.bounds)
-    }
-  }
+  // Handle filter changes (removed unused function)
 
   // Restore ZIP from URL on page load
   useEffect(() => {
@@ -267,10 +260,7 @@ export default function SalesClient({
 
   const mapZoom = mapView.zoom
 
-  // Constants for layout calculations
-  const HEADER_HEIGHT = 64 // px - header height
-  const FILTERS_HEIGHT = 56 // px - filters bar height
-  const MAIN_CONTENT_HEIGHT = `calc(100vh - ${HEADER_HEIGHT + FILTERS_HEIGHT}px)`
+  // Constants for layout calculations (removed unused constants)
 
   return (
     <div className="container mx-auto p-4">

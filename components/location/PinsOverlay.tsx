@@ -20,6 +20,16 @@ export default function PinsOverlay({
   isClusteringEnabled 
 }: PinsOverlayProps) {
   
+  // Debug logging
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[PINS_OVERLAY] Render:', {
+      salesCount: sales.length,
+      isClusteringEnabled,
+      hasMapRef: !!mapRef.current,
+      sales: sales.slice(0, 2) // Log first 2 sales for debugging
+    })
+  }
+  
   // Debounced viewport state to prevent excessive recalculations
   const [debouncedViewport, setDebouncedViewport] = useState<{
     bounds: [number, number, number, number]
@@ -113,6 +123,9 @@ export default function PinsOverlay({
 
   // Render plain pins when clustering is disabled
   if (!isClusteringEnabled) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[PINS_OVERLAY] Rendering plain pins:', { salesCount: sales.length })
+    }
     return (
       <>
         {sales.map(sale => (
@@ -130,6 +143,9 @@ export default function PinsOverlay({
   }
 
   // Render clusters and individual pins when clustering is enabled
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[PINS_OVERLAY] Rendering clusters:', { clustersCount: clusters.length })
+  }
   return (
     <>
       {clusters.map(cluster => (

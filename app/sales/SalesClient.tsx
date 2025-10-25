@@ -10,6 +10,7 @@ import FiltersModal from '@/components/filters/FiltersModal'
 import FiltersBar from '@/components/sales/FiltersBar'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
+import { createHybridPins } from '@/lib/pins/hybridClustering'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -104,16 +105,8 @@ export default function SalesClient({
 
   // Hybrid system: Create location groups and apply clustering
   const hybridResult = useMemo(() => {
-    if (!currentViewport) return null
+    if (!currentViewport || mapSales.length === 0) return null
     
-    console.log('[HYBRID] Creating hybrid pins:', {
-      salesCount: mapSales.length,
-      viewport: currentViewport,
-      sampleSales: mapSales.slice(0, 3).map(s => ({ id: s.id, lat: s.lat, lng: s.lng }))
-    })
-    
-    // Import the hybrid clustering function
-    const { createHybridPins } = require('@/lib/pins/hybridClustering')
     const result = createHybridPins(mapSales, currentViewport, {
       coordinatePrecision: 4, // Reduced from 6 to group sales within ~11m radius
       clusterRadius: 0.5,
@@ -123,12 +116,15 @@ export default function SalesClient({
       enableVisualClustering: true
     })
     
-    console.log('[HYBRID] Result:', {
-      type: result.type,
-      pinsCount: result.pins.length,
-      locationsCount: result.locations.length,
-      samplePins: result.pins.slice(0, 3)
-    })
+    // Only log when debug is enabled and there are sales
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && mapSales.length > 0) {
+      console.log('[HYBRID] Result:', {
+        type: result.type,
+        pinsCount: result.pins.length,
+        locationsCount: result.locations.length,
+        salesCount: mapSales.length
+      })
+    }
     
     return result
   }, [mapSales, currentViewport])
@@ -151,10 +147,11 @@ export default function SalesClient({
         params.set('categories', filters.categories.join(','))
       }
 
-      // Fetch logging - always log for debugging
-      console.log('[FETCH] Viewport fetch with bbox:', bbox)
-      console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
-      console.log('[FETCH] Debug flag:', process.env.NEXT_PUBLIC_DEBUG)
+      // Only log in debug mode
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FETCH] Viewport fetch with bbox:', bbox)
+        console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
+      }
 
       const response = await fetch(`/api/sales?${params.toString()}`)
       if (!response.ok) {
@@ -172,12 +169,13 @@ export default function SalesClient({
 
       if (data.ok && Array.isArray(data.data)) {
         const deduplicated = deduplicateSales(data.data)
-        // Always log the sales count to debug the mismatch
-        console.log('[FETCH] Sales received:', { 
-          raw: data.data.length, 
-          deduplicated: deduplicated.length,
-          bbox: bbox
-        })
+        // Only log in debug mode
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FETCH] Sales received:', { 
+            raw: data.data.length, 
+            deduplicated: deduplicated.length
+          })
+        }
         setMapSales(deduplicated)
         setMapMarkers(deduplicated
           .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
@@ -275,7 +273,6 @@ export default function SalesClient({
     // Clear the ZIP search flag after a delay to allow map to settle
     setTimeout(() => {
       setIsZipSearching(false)
-      console.log('[ZIP] Search completed, allowing map view changes')
     }, 1000)
   }
 

@@ -35,6 +35,36 @@ export default function DiagnosticToolsValidator() {
     return resultElements
   }
 
+  // Helper function to run a ZIP lookup test
+  const runZipLookupTest = async (toolElement: Element, toolName: string) => {
+    console.log(`[DIAGNOSTIC_VALIDATOR] Running ZIP lookup test for ${toolName}`)
+    
+    // Find the ZIP input field
+    const zipInput = toolElement.querySelector('input[type="text"]') as HTMLInputElement
+    if (!zipInput) {
+      throw new Error('ZIP input field not found')
+    }
+    
+    // Set a test ZIP code
+    const testZip = '40204' // Louisville, KY
+    zipInput.value = testZip
+    
+    // Trigger input event to update the component state
+    zipInput.dispatchEvent(new Event('input', { bubbles: true }))
+    
+    // Find and click the test button
+    const testButton = toolElement.querySelector('button') as HTMLButtonElement
+    if (!testButton) {
+      throw new Error('Test button not found')
+    }
+    
+    // Click the test button
+    testButton.click()
+    
+    // Wait a moment for the test to start
+    await new Promise(resolve => setTimeout(resolve, 500))
+  }
+
   const runDiagnosticValidation = async (toolName: string) => {
     const startTime = Date.now()
     const tests: DiagnosticTestResult[] = []
@@ -80,12 +110,17 @@ export default function DiagnosticToolsValidator() {
         buttonText: runButton.textContent?.trim() || 'Unknown'
       })
 
-      // Test 2: Click the run button and wait for results
+      // Test 2: For ZIP tools, actually run a test; for others, just click run button
       const initialResults = getCurrentResults(toolElement);
       console.log(`[DIAGNOSTIC_VALIDATOR] Initial results for ${toolName}:`, initialResults.length);
       
-      // Click the button
-      (runButton as HTMLElement).click();
+      if (toolName.includes('ZIP Lookup')) {
+        // For ZIP tools, we need to actually run a ZIP lookup test
+        await runZipLookupTest(toolElement, toolName);
+      } else {
+        // For other tools, just click the run button
+        (runButton as HTMLElement).click();
+      }
       
       // Wait for results to appear (up to 10 seconds)
       const resultsAppeared = await waitForResults(toolElement, initialResults.length, 10000)

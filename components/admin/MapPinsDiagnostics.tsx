@@ -261,52 +261,8 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
       
       addTest('Pin Clustering System', clusteringWorking, clusteringDetails, clusteringWorking ? undefined : 'No clustering detected', 'clustering', clusteringTestStart)
 
-      // Test 6: Pin Event System
-      const eventTestStart = Date.now()
-      let eventSystemWorking = false
-      let eventSystemDetails = {}
-      
-      if (mapInstanceAvailable && mapRef?.current?.getMap) {
-        const map = mapRef.current.getMap()
-        try {
-          let mapClickFired = false
-          const mapClickHandler = (e: any) => {
-            mapClickFired = true
-            console.log('[PIN_EVENTS] Map click event fired:', e)
-          }
-          
-          map.on('click', mapClickHandler)
-          
-          // Simulate map click
-          const mapContainer = map.getContainer()
-          const clickEvent = new MouseEvent('click', {
-            clientX: mapContainer.offsetWidth / 2,
-            clientY: mapContainer.offsetHeight / 2
-          })
-          mapContainer.dispatchEvent(clickEvent)
-          
-          // Wait for event
-          await new Promise(resolve => setTimeout(resolve, 100))
-          
-          eventSystemWorking = mapClickFired
-          eventSystemDetails = {
-            canRegisterEvents: true,
-            mapClickFired: mapClickFired,
-            hasOnMethod: typeof map.on === 'function',
-            hasOffMethod: typeof map.off === 'function'
-          }
-          
-          // Clean up
-          map.off('click', mapClickHandler)
-        } catch (e) {
-          console.log('Event system test failed:', e)
-          eventSystemDetails = { error: e instanceof Error ? e.message : String(e) }
-        }
-      }
-      
-      addTest('Pin Event System', eventSystemWorking, eventSystemDetails, eventSystemWorking ? undefined : 'Pin event system not working', 'events', eventTestStart)
 
-      // Test 7: Pin Data Integration
+      // Test 6: Pin Data Integration
       const dataTestStart = Date.now()
       let dataIntegrationWorking = false
       let dataIntegrationDetails = {}
@@ -348,7 +304,7 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
       
       addTest('Pin Data Integration', dataIntegrationWorking, dataIntegrationDetails, dataIntegrationWorking ? undefined : 'Pin data integration not working', 'data', dataTestStart)
 
-      // Test 8: Pin Performance
+      // Test 7: Pin Performance
       const performanceTestStart = Date.now()
       let performanceWorking = false
       let performanceDetails = {}

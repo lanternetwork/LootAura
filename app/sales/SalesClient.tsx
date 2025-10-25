@@ -49,7 +49,12 @@ export default function SalesClient({
   // Map view state - single source of truth
   const [mapView, setMapView] = useState<MapViewState>({
     center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
-    bounds: { west: -98.5795, south: 39.8283, east: -98.5795, north: 39.8283 },
+    bounds: { 
+      west: (effectiveCenter?.lng || -98.5795) - 0.1, 
+      south: (effectiveCenter?.lat || 39.8283) - 0.1, 
+      east: (effectiveCenter?.lng || -98.5795) + 0.1, 
+      north: (effectiveCenter?.lat || 39.8283) + 0.1 
+    },
     zoom: urlZoom ? parseFloat(urlZoom) : 10
   })
 

@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
     let latitude: number
     let longitude: number
     let distanceKm: number | undefined
+    let actualBbox: any = null
     
     // Check if bbox parameters are provided
     if (north && south && east && west) {
@@ -68,6 +69,9 @@ export async function GET(request: NextRequest) {
         const lngRangeKm = lngRange * 111.0 * Math.cos(avgLat * Math.PI / 180)
         const latRangeKm = latRange * 111.0
         distanceKm = Math.max(latRangeKm, lngRangeKm) / 2
+        
+        // Store the actual bbox for proper filtering
+        const actualBbox = validatedBbox
         
       } catch (error: any) {
         console.log(`[SALES] Invalid bbox: ${error.message}`)
@@ -195,20 +199,36 @@ export async function GET(request: NextRequest) {
     try {
       console.log(`[SALES] Querying sales_v2 view directly...`)
       
-      // Calculate bounding box for approximate distance filtering
-      const latRange = distanceKm / 111.0 // 1 degree ≈ 111km
-      const lngRange = distanceKm / (111.0 * Math.cos(latitude * Math.PI / 180))
+      // Use actual bbox if provided, otherwise calculate from distance
+      let minLat, maxLat, minLng, maxLng
       
-      const minLat = latitude - latRange
-      const maxLat = latitude + latRange
-      const minLng = longitude - lngRange
-      const maxLng = longitude + lngRange
-      
-      console.log(`[SALES] Bounding box: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
+      if (actualBbox) {
+        // Use the actual viewport bounds
+        minLat = actualBbox.south
+        maxLat = actualBbox.north
+        minLng = actualBbox.west
+        maxLng = actualBbox.east
+        console.log(`[SALES] Using viewport bbox: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
+      } else {
+        // Calculate bounding box for approximate distance filtering
+        const latRange = distanceKm / 111.0 // 1 degree ≈ 111km
+        const lngRange = distanceKm / (111.0 * Math.cos(latitude * Math.PI / 180))
+        
+        minLat = latitude - latRange
+        maxLat = latitude + latRange
+        minLng = longitude - lngRange
+        maxLng = longitude + lngRange
+        
+        console.log(`[SALES] Calculated bbox: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
+      }
       
       let query = supabase
         .from('sales_v2')
         .select('*')
+        .gte('lat', minLat)
+        .lte('lat', maxLat)
+        .gte('lng', minLng)
+        .lte('lng', maxLng)
       
       // NOTE: We filter by date window after fetching to avoid PostgREST OR-composition issues
       

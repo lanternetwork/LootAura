@@ -125,10 +125,12 @@ export default function SalesClient({
 
       if (data.ok && Array.isArray(data.data)) {
         const deduplicated = deduplicateSales(data.data)
-        // Deduplication logging reduced for performance
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[FETCH] Applied deduplication:', { input: data.data.length, output: deduplicated.length })
-        }
+        // Always log the sales count to debug the mismatch
+        console.log('[FETCH] Sales received:', { 
+          raw: data.data.length, 
+          deduplicated: deduplicated.length,
+          bbox: bbox
+        })
         setMapSales(deduplicated)
         setMapMarkers(deduplicated
           .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
@@ -264,7 +266,12 @@ export default function SalesClient({
 
   // Memoized visible sales - always derived from mapSales
   const visibleSales = useMemo(() => {
-    return deduplicateSales(mapSales)
+    const deduplicated = deduplicateSales(mapSales)
+    console.log('[SALES] Visible sales count:', { 
+      mapSales: mapSales.length, 
+      visibleSales: deduplicated.length 
+    })
+    return deduplicated
   }, [mapSales, deduplicateSales])
 
   // Memoized map center

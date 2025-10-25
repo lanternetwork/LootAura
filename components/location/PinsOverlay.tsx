@@ -21,7 +21,7 @@ export default function PinsOverlay({
 }: PinsOverlayProps) {
   
   // Debug logging - always show for troubleshooting
-  console.log('[PINS_OVERLAY] Render:', {
+  console.log('[PINS_OVERLAY] Render v2:', {
     salesCount: sales.length,
     isClusteringEnabled,
     hasMapRef: !!mapRef.current,

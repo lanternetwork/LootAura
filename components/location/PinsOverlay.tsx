@@ -45,17 +45,40 @@ export default function PinsOverlay({
 
   // Get current viewport bounds and zoom - only when map is ready
   const viewportInfo = useMemo(() => {
-    if (!mapRef.current?.getMap) return null
+    console.log('[PINS_OVERLAY] Viewport calculation:', {
+      hasMapRef: !!mapRef.current,
+      hasGetMap: !!mapRef.current?.getMap
+    })
+    
+    if (!mapRef.current?.getMap) {
+      console.log('[PINS_OVERLAY] No map ref or getMap method')
+      return null
+    }
     
     const map = mapRef.current.getMap()
-    if (!map || !map.isStyleLoaded?.()) return null
+    if (!map) {
+      console.log('[PINS_OVERLAY] No map instance')
+      return null
+    }
+    
+    if (!map.isStyleLoaded?.()) {
+      console.log('[PINS_OVERLAY] Map style not loaded yet')
+      return null
+    }
     
     const bounds = map.getBounds()
     const zoom = map.getZoom()
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[PINS] viewport calculated:', { zoom, salesCount: sales.length })
-    }
+    console.log('[PINS_OVERLAY] Viewport calculated:', { 
+      zoom, 
+      salesCount: sales.length,
+      bounds: {
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth()
+      }
+    })
     
     return {
       bounds: [
@@ -89,10 +112,21 @@ export default function PinsOverlay({
 
   // Get clusters for current viewport - only when needed
   const clusters = useMemo((): ClusterFeature[] => {
-    if (!clusterIndex || !debouncedViewport || sales.length === 0) return []
+    console.log('[PINS_OVERLAY] Clusters calculation:', {
+      hasClusterIndex: !!clusterIndex,
+      hasDebouncedViewport: !!debouncedViewport,
+      salesLength: sales.length,
+      debouncedViewport: debouncedViewport
+    })
+    
+    if (!clusterIndex || !debouncedViewport || sales.length === 0) {
+      console.log('[PINS_OVERLAY] Returning empty clusters - missing requirements')
+      return []
+    }
     
     // Skip clustering for very small datasets
     if (sales.length < 2) {
+      console.log('[PINS_OVERLAY] Small dataset - returning individual pins')
       return sales.map(sale => ({
         id: parseInt(sale.id) || 0,
         count: 1,

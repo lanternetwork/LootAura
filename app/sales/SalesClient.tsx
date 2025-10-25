@@ -8,6 +8,9 @@ import ZipInput from '@/components/location/ZipInput'
 import SaleCard from '@/components/SaleCard'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import FiltersModal from '@/components/filters/FiltersModal'
+import FilterTrigger from '@/components/filters/FilterTrigger'
+import DateWindowLabel from '@/components/filters/DateWindowLabel'
+import DegradedBanner from '@/components/DegradedBanner'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 
@@ -66,6 +69,8 @@ export default function SalesClient({
   const [, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [, setIsZipSearching] = useState(false)
+  const [dateWindow, setDateWindow] = useState<{ from: string; to: string } | null>(null)
+  const [degraded, setDegraded] = useState(false)
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
@@ -268,153 +273,221 @@ export default function SalesClient({
   const MAIN_CONTENT_HEIGHT = `calc(100vh - ${HEADER_HEIGHT + FILTERS_HEIGHT}px)`
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-gray-900">Yard Sales</h1>
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setShowFiltersModal(true)}
-              className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-            >
-              Filters {hasActiveFilters && '(Active)'}
-            </button>
-            {user && (
-              <div className="text-sm text-gray-600">
-                Welcome, {user.email}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Single-row Filters Bar */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          {/* Left: ZIP Input */}
-          <div className="flex-shrink-0">
-            <ZipInput
-              onLocationFound={handleZipLocationFound}
-              onError={handleZipError}
-              placeholder="Enter ZIP code"
-              className="w-48"
-            />
-          </div>
-
-          {/* Center: Filter Chips */}
-          <div className="flex-1 flex items-center justify-center min-w-0 px-4">
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <span>{filters.dateRange}</span>
-              <span>•</span>
-              <span>{filters.distance} miles</span>
-              {filters.categories.length > 0 && (
-                <>
-                  <span>•</span>
-                  <span>{filters.categories.length} categories</span>
-                </>
+    <div className="container mx-auto p-4">
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Main Content */}
+        <div className="lg:w-3/4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Sales Search</h1>
+              {dateWindow && (
+                <DateWindowLabel dateWindow={dateWindow} className="mb-4" />
               )}
+              {degraded && (
+                <DegradedBanner className="mb-4" />
+              )}
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  {/* ZIP Input */}
+                  <div className="flex-1 sm:flex-none">
+                    <div className="text-xs text-gray-500 mb-1">Search different area:</div>
+                    <ZipInput
+                      onLocationFound={handleZipLocationFound}
+                      onError={handleZipError}
+                      placeholder="Enter ZIP code"
+                      className="w-full sm:w-auto"
+                    />
+                    {zipError && (
+                      <p className="text-red-500 text-sm mt-1">{zipError}</p>
+                    )}
+                  </div>
+              
+              {/* Location Button removed per server-side auto center */}
+              
+              {/* Mobile Filter Trigger */}
+              <FilterTrigger
+                isOpen={showFiltersModal}
+                onToggle={() => setShowFiltersModal(!showFiltersModal)}
+                activeFiltersCount={hasActiveFilters ? 1 : 0}
+                className="md:hidden"
+              />
             </div>
           </div>
 
-          {/* Right: More Filters */}
-          <div className="flex-shrink-0">
-            <button
-              onClick={() => setShowFiltersModal(true)}
-              className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-            >
-              More Filters
-            </button>
-          </div>
-        </div>
-        {zipError && (
-          <div className="mt-2 text-sm text-red-600">{zipError}</div>
-        )}
-      </div>
-
-      {/* Main Content - Zillow Style */}
-      <div 
-        className="grid grid-cols-[minmax(0,1fr)_420px] gap-0 min-h-0 min-w-0 overflow-hidden"
-        style={{ height: MAIN_CONTENT_HEIGHT }}
-      >
-        {/* Map - Left Side (Dominant) */}
-        <div className="relative min-h-0 min-w-0 bg-gray-100" style={{ height: '100%' }}>
-          <div className="w-full h-full">
-            <SimpleMap
-              center={mapCenter}
-              zoom={mapZoom}
-              fitBounds={pendingBounds}
-              pins={{
-                sales: visibleSales
-                  .filter(s => typeof s.lat === 'number' && typeof s.lng === 'number')
-                  .map(s => ({ id: s.id, lat: s.lat!, lng: s.lng! })),
-                selectedId: null, // TODO: Add selected sale state if needed
-                onPinClick: (id) => {
-                  console.log('[SALES] Pin clicked:', id)
-                  // You can add sale selection logic here
-                },
-                onClusterClick: ({ lat, lng, expandToZoom }) => {
-                  console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
-                  // Note: map flyTo is handled in SimpleMap; we just rely on viewport→fetch debounce already in place
-                }
-              }}
-              onViewportChange={handleViewportChange}
-            />
-          </div>
-        </div>
-
-        {/* Sales List - Right Panel */}
-        <div className="bg-white border-l border-gray-200 flex flex-col min-h-0 min-w-0">
-          <div className="flex-shrink-0 p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold">
-              Sales ({visibleSales.length})
-            </h2>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4">
-            {loading && (
-              <div className="space-y-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <SaleCardSkeleton key={i} />
-                ))}
-              </div>
-            )}
-
-            {!loading && visibleSales.length === 0 && (
-              <div className="text-center py-8">
-                <div className="text-gray-500 mb-4">
-                  No sales found in this area
-                </div>
+          {/* Active filter chips - under search controls, above map/list */}
+          {(filters.dateRange !== 'any' || filters.categories.length > 0) && (
+            <div className="mt-2 overflow-x-auto whitespace-nowrap flex gap-2">
+              {filters.dateRange !== 'any' && (
                 <button
-                  onClick={() => updateFilters({ distance: Math.min(100, filters.distance + 10) })}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  onClick={() => updateFilters({ dateRange: 'any' as any })}
+                  className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
                 >
-                  Increase Distance
+                  {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'weekend' ? 'This Weekend' : 'Next Weekend'} ×
                 </button>
-              </div>
-            )}
+              )}
+              {filters.categories.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => updateFilters({ categories: filters.categories.filter(x => x !== c) })}
+                  className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
+                >
+                  {c} ×
+                </button>
+              ))}
+            </div>
+          )}
 
-            {!loading && visibleSales.length > 0 && (
-              <div className="space-y-4">
-                {visibleSales.map((sale) => (
-                  <SaleCard key={sale.id} sale={sale} />
-                ))}
+          {/* Sales Grid */}
+          <div className="mb-6">
+            {(!filters.lat || !filters.lng) ? (
+              <div className="text-center py-12">
+                <div className="text-6xl mb-4">📍</div>
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                  Location unavailable. Enter a ZIP to see nearby sales.
+                </h3>
+                <p className="text-gray-500 mb-4">We couldn't determine your location automatically.</p>
+                <div className="max-w-md mx-auto">
+                  <ZipInput
+                    onLocationFound={handleZipLocationFound}
+                    onError={handleZipError}
+                    placeholder="Enter ZIP code"
+                    className="w-full"
+                  />
+                  {zipError && (
+                    <p className="text-red-500 text-sm mt-2">{zipError}</p>
+                  )}
+                </div>
               </div>
+            ) : (
+              <>
+                {/* Show spinner only when loading */}
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={`${loading ? 'flex' : 'hidden'} justify-center items-center py-12`}
+                >
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                  <span className="ml-2">Loading sales...</span>
+                </div>
+
+                {/* Sales list grid container */}
+                <div
+                  className={`w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${
+                    loading ? 'opacity-75' : 'opacity-100'
+                  }`}
+                  data-testid="sales-grid"
+                >
+                  {loading ? (
+                    Array.from({ length: 6 }).map((_, idx) => (
+                      <SaleCardSkeleton key={idx} />
+                    ))
+                  ) : visibleSales.length === 0 ? (
+                    <div className="col-span-full text-center py-16">
+                      <h3 className="text-xl font-semibold text-gray-800">No sales found nearby</h3>
+                      <p className="text-gray-500 mt-2">Try expanding your search radius or changing the date range.</p>
+                      <button
+                        onClick={() => updateFilters({ distance: Math.min(100, filters.distance + 10) })}
+                        className="mt-4 inline-flex items-center px-4 py-2 rounded-md bg-amber-500 hover:bg-amber-600 text-white shadow-sm"
+                      >
+                        Increase distance by 10 miles
+                      </button>
+                    </div>
+                  ) : (
+                    visibleSales.map((sale) => (
+                      <SaleCard key={sale.id} sale={sale} />
+                    ))
+                  )}
+                </div>
+              </>
             )}
+          </div>
+        </div>
+
+        {/* Desktop Filters Sidebar */}
+        <div className="hidden lg:block lg:w-1/3">
+          <div className="sticky top-4 space-y-6">
+            {/* Filters */}
+            <FiltersModal 
+              isOpen={true} 
+              onClose={() => {}} 
+              filters={{
+                distance: filters.distance,
+                dateRange: { type: filters.dateRange as any },
+                categories: filters.categories
+              }}
+              onFiltersChange={(newFilters) => {
+                updateFilters({
+                  distance: newFilters.distance,
+                  dateRange: newFilters.dateRange.type as any,
+                  categories: newFilters.categories
+                })
+              }}
+            />
+            
+            {/* Map */}
+            <div className="bg-white rounded-lg shadow-sm border p-4">
+              <h2 className="text-xl font-semibold mb-4">
+                Map View
+                {visibleSales.length > 0 && (
+                  <span className="ml-2 text-sm font-normal text-gray-600">
+                    ({visibleSales.length} in view)
+                  </span>
+                )}
+              </h2>
+              <div className="h-[400px] rounded-lg overflow-hidden relative">
+                <SimpleMap
+                  center={mapCenter}
+                  zoom={mapZoom}
+                  fitBounds={pendingBounds}
+                  pins={{
+                    sales: visibleSales
+                      .filter(s => typeof s.lat === 'number' && typeof s.lng === 'number')
+                      .map(s => ({ id: s.id, lat: s.lat!, lng: s.lng! })),
+                    selectedId: null,
+                    onPinClick: (id) => {
+                      console.log('[SALES] Pin clicked:', id)
+                    },
+                    onClusterClick: ({ lat, lng, expandToZoom }) => {
+                      console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
+                    }
+                  }}
+                  onViewportChange={handleViewportChange}
+                />
+              </div>
+              
+              {/* Location Info */}
+              {filters.lat && filters.lng && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Searching within {filters.distance} miles</strong> of your location
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Showing {visibleSales.length} sales
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Filters Modal */}
+      {/* Mobile Filters Modal */}
       <FiltersModal
         isOpen={showFiltersModal}
         onClose={() => setShowFiltersModal(false)}
         filters={{
           distance: filters.distance,
-          dateRange: filters.dateRange as any,
+          dateRange: { type: filters.dateRange as any },
           categories: filters.categories
         }}
-        onFiltersChange={handleFiltersChange}
+        onFiltersChange={(newFilters) => {
+          updateFilters({
+            distance: newFilters.distance,
+            dateRange: newFilters.dateRange.type as any,
+            categories: newFilters.categories
+          })
+        }}
       />
 
     </div>

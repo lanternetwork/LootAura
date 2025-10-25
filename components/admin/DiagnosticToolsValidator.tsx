@@ -83,7 +83,7 @@ export default function DiagnosticToolsValidator() {
       console.log(`[DIAGNOSTIC_VALIDATOR] Initial results for ${toolName}:`, initialResults.length)
       
       // Click the button
-      runButton.click()
+      (runButton as HTMLElement).click()
       
       // Wait for results to appear (up to 10 seconds)
       const resultsAppeared = await waitForResults(toolElement, initialResults.length, 10000)

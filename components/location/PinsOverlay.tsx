@@ -115,7 +115,25 @@ export default function PinsOverlay({
     })
   }
 
-  // Always render plain pins (clustering disabled for testing)
+  // Check if clustering is enabled and we have a valid map ref
+  if (isClusteringEnabled && mapRef.current?.getMap) {
+    // Use clustering logic
+    if (clusters.length > 0) {
+      return (
+        <>
+          {clusters.map(cluster => (
+            <ClusterMarker
+              key={cluster.id}
+              cluster={cluster}
+              onClick={onClusterClick}
+            />
+          ))}
+        </>
+      )
+    }
+  }
+  
+  // Render individual pins when clustering is disabled or no clusters
   return (
     <>
       {sales.map(sale => (

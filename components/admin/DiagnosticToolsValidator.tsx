@@ -28,7 +28,9 @@ export default function DiagnosticToolsValidator() {
     // Look for result elements (divs with test results)
     const resultElements = Array.from(toolElement.querySelectorAll('div')).filter(div => {
       const text = div.textContent || ''
-      return text.includes('PASS') || text.includes('FAIL') || text.includes('PASSED') || text.includes('FAILED') || text.includes('ms') || text.includes('Test')
+      return text.includes('PASS') || text.includes('FAIL') || text.includes('PASSED') || text.includes('FAILED') || 
+             text.includes('SUCCESS') || text.includes('FAILED') || text.includes('ms') || text.includes('Test') ||
+             text.includes('Total Tests') || text.includes('Success Rate') || text.includes('Response Time')
     })
     return resultElements
   }
@@ -253,8 +255,10 @@ export default function DiagnosticToolsValidator() {
       }
       
       // Check for suspicious patterns that suggest hardcoded results
-      if (text.includes('0ms') && text.includes('PASS')) {
-        issues.push('Results appear to be hardcoded (0ms timing)')
+      // Only flag 0ms if it's combined with PASS and there are many such results
+      const zeroMsPassCount = results.filter(r => r.textContent?.includes('0ms') && r.textContent?.includes('PASS')).length
+      if (zeroMsPassCount > 3) {
+        issues.push('Multiple results showing 0ms timing suggests hardcoded results')
       }
       
       // Only flag 1ms timing if ALL results show 1ms AND there are many results

@@ -66,35 +66,38 @@ export default function MapDiagnostics({ mapRef }: MapDiagnosticsProps) {
       console.log('[MAP_DIAGNOSTIC] Map instance ready:', !!mapInstance)
       
       // Step 1: Check Mapbox Access Token
+      const tokenTestStart = Date.now()
       const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN
       const hasToken = !!mapboxToken && mapboxToken.length > 0
       addStep('Mapbox Token Validation', hasToken, { 
         hasToken, 
         tokenLength: mapboxToken?.length || 0,
         tokenPrefix: mapboxToken?.substring(0, 10) + '...' || 'none'
-      }, hasToken ? undefined : 'Missing or invalid Mapbox token', 'initialization')
+      }, hasToken ? undefined : 'Missing or invalid Mapbox token', 'initialization', tokenTestStart)
 
       if (!hasToken) {
         throw new Error('Mapbox token not available')
       }
 
       // Step 2: Check Map Container
+      const containerTestStart = Date.now()
       const mapContainer = document.querySelector('[data-testid="admin-diag-map"]')
       const containerExists = !!mapContainer
       addStep('Map Container Detection', containerExists, {
         found: containerExists,
         selector: mapContainer ? mapContainer.className : 'none',
         tagName: mapContainer?.tagName || 'none'
-      }, containerExists ? undefined : 'Map container not found', 'initialization')
+      }, containerExists ? undefined : 'Map container not found', 'initialization', containerTestStart)
 
       // Step 3: Check Map Instance (already obtained from waitForMapReady)
+      const instanceTestStart = Date.now()
       const mapInstanceExists = !!mapInstance
       addStep('Map Instance Detection', mapInstanceExists, {
         found: mapInstanceExists,
         hasGetMap: typeof mapInstance?.getMap === 'function',
         hasResize: typeof mapInstance?.resize === 'function',
         hasEaseTo: typeof mapInstance?.easeTo === 'function'
-      }, mapInstanceExists ? undefined : 'Map instance not accessible', 'initialization')
+      }, mapInstanceExists ? undefined : 'Map instance not accessible', 'initialization', instanceTestStart)
 
       // Step 4: Check Map Style
       const styleTestStart = Date.now()

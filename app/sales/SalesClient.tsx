@@ -48,12 +48,12 @@ export default function SalesClient({
 
   // Map view state - single source of truth
   const [mapView, setMapView] = useState<MapViewState>({
-    center: effectiveCenter || { lat: 38.2527, lng: -85.7585 }, // Louisville, KY
+    center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
     bounds: { 
-      west: (effectiveCenter?.lng || -85.7585) - 0.1, 
-      south: (effectiveCenter?.lat || 38.2527) - 0.1, 
-      east: (effectiveCenter?.lng || -85.7585) + 0.1, 
-      north: (effectiveCenter?.lat || 38.2527) + 0.1 
+      west: (effectiveCenter?.lng || -98.5795) - 0.1, 
+      south: (effectiveCenter?.lat || 39.8283) - 0.1, 
+      east: (effectiveCenter?.lng || -98.5795) + 0.1, 
+      north: (effectiveCenter?.lat || 39.8283) + 0.1 
     },
     zoom: urlZoom ? parseFloat(urlZoom) : 10
   })
@@ -66,6 +66,7 @@ export default function SalesClient({
   const [, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [, setIsZipSearching] = useState(false)
+  const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
@@ -85,6 +86,39 @@ export default function SalesClient({
     
     return unique
   }, [])
+
+  // Group sales by unique coordinates for map pins
+  const groupedSales = useMemo(() => {
+    const groups = new Map<string, { lat: number; lng: number; sales: Sale[] }>()
+    
+    mapSales.forEach(sale => {
+      if (typeof sale.lat === 'number' && typeof sale.lng === 'number') {
+        // Create a key from coordinates (rounded to avoid floating point issues)
+        const key = `${sale.lat.toFixed(6)},${sale.lng.toFixed(6)}`
+        
+        if (!groups.has(key)) {
+          groups.set(key, {
+            lat: sale.lat,
+            lng: sale.lng,
+            sales: []
+          })
+        }
+        groups.get(key)!.sales.push(sale)
+      }
+    })
+    
+    return Array.from(groups.values())
+  }, [mapSales])
+
+  // Create pin data for map (one pin per unique location)
+  const mapPins = useMemo(() => {
+    return groupedSales.map((group, index) => ({
+      id: `location-${index}`,
+      lat: group.lat,
+      lng: group.lng,
+      sales: group.sales
+    }))
+  }, [groupedSales])
 
   // Fetch sales based on map viewport bbox
   const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }) => {
@@ -266,13 +300,27 @@ export default function SalesClient({
 
   // Memoized visible sales - always derived from mapSales
   const visibleSales = useMemo(() => {
+    // If a pin is selected, show only sales from that location
+    if (selectedPinId) {
+      const selectedPin = mapPins.find(pin => pin.id === selectedPinId)
+      if (selectedPin) {
+        console.log('[SALES] Showing sales for selected pin:', { 
+          pinId: selectedPinId,
+          salesCount: selectedPin.sales.length 
+        })
+        return selectedPin.sales
+      }
+    }
+    
     const deduplicated = deduplicateSales(mapSales)
     console.log('[SALES] Visible sales count:', { 
       mapSales: mapSales.length, 
-      visibleSales: deduplicated.length 
+      visibleSales: deduplicated.length,
+      selectedPinId,
+      mapPinsCount: mapPins.length
     })
     return deduplicated
-  }, [mapSales, deduplicateSales])
+  }, [mapSales, deduplicateSales, selectedPinId, mapPins])
 
   // Memoized map center
   const mapCenter = useMemo(() => {
@@ -319,13 +367,11 @@ export default function SalesClient({
               zoom={mapZoom}
               fitBounds={pendingBounds}
               pins={{
-                sales: visibleSales
-                  .filter(s => typeof s.lat === 'number' && typeof s.lng === 'number')
-                  .map(s => ({ id: s.id, lat: s.lat!, lng: s.lng! })),
-                selectedId: null, // TODO: Add selected sale state if needed
+                sales: mapPins.map(pin => ({ id: pin.id, lat: pin.lat, lng: pin.lng })),
+                selectedId: selectedPinId,
                 onPinClick: (id) => {
                   console.log('[SALES] Pin clicked:', id)
-                  // You can add sale selection logic here
+                  setSelectedPinId(selectedPinId === id ? null : id)
                 },
                 onClusterClick: ({ lat, lng, expandToZoom }) => {
                   console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
@@ -340,9 +386,24 @@ export default function SalesClient({
         {/* Sales List - Right Panel */}
         <div className="bg-white border-l border-gray-200 flex flex-col min-h-0 min-w-0">
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold">
-              Sales ({visibleSales.length})
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                Sales ({visibleSales.length})
+                {selectedPinId && (
+                  <span className="text-sm text-blue-600 ml-2">
+                    (Location selected)
+                  </span>
+                )}
+              </h2>
+              {selectedPinId && (
+                <button
+                  onClick={() => setSelectedPinId(null)}
+                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                >
+                  Show All Sales
+                </button>
+              )}
+            </div>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4">

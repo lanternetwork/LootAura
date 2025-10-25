@@ -33,11 +33,11 @@ export default function PinMarker({
     >
       <button
         className={`
-          w-3 h-3 bg-red-500 rounded-full shadow-sm
+          w-2 h-2 bg-red-500 rounded-full shadow-sm
           hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500
           transition-all duration-200
           cursor-pointer
-          ${isSelected ? 'ring-2 ring-white outline outline-2 outline-red-500' : ''}
+          ${isSelected ? 'ring-1 ring-white outline outline-1 outline-red-500' : ''}
         `}
         data-pin-marker="true"
         data-pin-id={id}

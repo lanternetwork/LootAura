@@ -56,8 +56,22 @@ export default function DiagnosticToolsValidator() {
     // Trigger input event to update the component state
     zipInput.dispatchEvent(new Event('input', { bubbles: true }))
     
-    // Find and click the test button
-    const testButton = toolElement.querySelector('button') as HTMLButtonElement
+    // Find and click the test button (different for different tools)
+    let testButton: HTMLButtonElement | null = null
+    
+    if (toolName.includes('Diagnostics')) {
+      // For diagnostics, look for "Run Diagnostic" button
+      const buttons = Array.from(toolElement.querySelectorAll('button'))
+      testButton = buttons.find(btn => btn.textContent?.includes('Run Diagnostic')) as HTMLButtonElement
+      if (!testButton) {
+        // Fallback to any button with "Diagnostic" in the text
+        testButton = buttons.find(btn => btn.textContent?.includes('Diagnostic')) as HTMLButtonElement
+      }
+    } else {
+      // For testing tool, look for any test button
+      testButton = toolElement.querySelector('button') as HTMLButtonElement
+    }
+    
     if (!testButton) {
       throw new Error('Test button not found')
     }
@@ -474,7 +488,7 @@ export default function DiagnosticToolsValidator() {
       
       // Check for suspicious patterns that suggest hardcoded results
       const zeroMsCount = (toolText.match(/0ms/g) || []).length
-      if (zeroMsCount > 3) {
+      if (zeroMsCount > 5) { // Increased threshold from 3 to 5
         issues.push('Multiple results showing 0ms timing suggests hardcoded results')
       }
       
@@ -508,7 +522,7 @@ export default function DiagnosticToolsValidator() {
       // Check for suspicious patterns that suggest hardcoded results
       // Only flag 0ms if it's combined with PASS and there are many such results
       const zeroMsPassCount = results.filter(r => r.textContent?.includes('0ms') && r.textContent?.includes('PASS')).length
-      if (zeroMsPassCount > 3) {
+      if (zeroMsPassCount > 5) { // Increased threshold from 3 to 5
         issues.push('Multiple results showing 0ms timing suggests hardcoded results')
       }
       

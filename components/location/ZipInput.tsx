@@ -110,7 +110,7 @@ export default function ZipInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           maxLength={10}
-          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[40px] ${
             error ? 'border-red-300' : 'border-gray-300'
           }`}
           disabled={loading}
@@ -118,15 +118,15 @@ export default function ZipInput({
         <button
           type="submit"
           disabled={loading || !zip || (zip.length < 5)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] flex items-center justify-center"
         >
           {loading ? (
             <div className="flex items-center">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              Looking up...
+              <span>Looking up...</span>
             </div>
           ) : (
-            'Set'
+            <span>Set</span>
           )}
         </button>
       </form>

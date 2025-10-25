@@ -2,9 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ZipInput from '@/components/location/ZipInput'
-import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { Filter } from 'lucide-react'
 
 type FiltersBarProps = {
   // ZIP Search
@@ -315,16 +312,17 @@ export default function FiltersBar({
 
           {/* More Filters button (existing) - overflow host */}
           <div className="relative">
-            <Button
-              variant="outline"
+            <button
               onClick={toggleOverflowMenu}
               data-testid={filtersMoreTestId}
-              className="flex items-center gap-1 px-3 py-1 text-sm"
+              className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors"
             >
-              <Filter className="h-4 w-4" />
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
               {overflow.length > 0 ? `More (${overflow.length})` : 'More Filters'}
               {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
-            </Button>
+            </button>
 
             {/* Overflow menu popover */}
             {showOverflowMenu && overflow.length > 0 && (
@@ -401,16 +399,36 @@ export default function FiltersBar({
           </select>
 
           {/* More Filters Button */}
-          <Sheet open={showMobileFilters} onOpenChange={setShowMobileFilters}>
-            <SheetTrigger className="flex items-center gap-1 px-2 py-1 border border-gray-300 bg-white hover:bg-gray-50 rounded text-sm">
-              <Filter className="h-4 w-4" />
-              {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
-            </SheetTrigger>
-            <SheetContent side="bottom" className="h-[80vh]">
-              <SheetHeader>
-                <SheetTitle>Filters</SheetTitle>
-              </SheetHeader>
-              <div className="space-y-6 mt-6">
+          <button
+            onClick={() => setShowMobileFilters(true)}
+            className="flex items-center gap-1 px-2 py-1 border border-gray-300 bg-white hover:bg-gray-50 rounded text-sm"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Filters Modal */}
+      {showMobileFilters && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden">
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-lg max-h-[80vh] overflow-y-auto">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Filters</h2>
+                <button
+                  onClick={() => setShowMobileFilters(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-6">
                 {/* Date Selector */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Date Range</label>
@@ -471,21 +489,20 @@ export default function FiltersBar({
                 </div>
 
                 {/* Advanced Filters */}
-                <Button
-                  variant="outline"
+                <button
                   onClick={() => {
                     setShowMobileFilters(false)
                     onAdvancedFiltersOpen()
                   }}
-                  className="w-full"
+                  className="w-full px-4 py-2 border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors"
                 >
                   Advanced Filters
-                </Button>
+                </button>
               </div>
-            </SheetContent>
-          </Sheet>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

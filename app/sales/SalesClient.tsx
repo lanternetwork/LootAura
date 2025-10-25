@@ -116,9 +116,9 @@ export default function SalesClient({
     }
     
     const result = createHybridPins(mapSales, currentViewport, {
-      coordinatePrecision: 4, // Reduced from 6 to group sales within ~11m radius
-      clusterRadius: 0.5,
-      minClusterSize: 2,
+      coordinatePrecision: 5, // Increased to group sales within ~1m radius (more precise)
+      clusterRadius: 0.3, // Reduced cluster radius for less aggressive clustering
+      minClusterSize: 3, // Increased minimum cluster size
       maxZoom: 16,
       enableLocationGrouping: true,
       enableVisualClustering: true

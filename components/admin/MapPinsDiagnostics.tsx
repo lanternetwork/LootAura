@@ -143,7 +143,6 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
           // Test pin click functionality
           if (pinButtons.length > 0) {
             const pinButton = pinButtons[0] as HTMLButtonElement
-            const originalOnClick = pinButton.onclick
             let clickEventFired = false
             
             // Add temporary click listener to verify click works

@@ -376,7 +376,7 @@ export default function FiltersBar({
           {/* Date Dropdown - Compact */}
           <select
             value={dateRange}
-            onChange={(e) => onDateRangeChange(e.target.value)}
+            onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
             className="px-2 py-1 border rounded text-xs min-w-[80px]"
           >
             <option value="any">Any</option>
@@ -434,7 +434,7 @@ export default function FiltersBar({
                   <label className="block text-sm font-medium mb-2">Date Range</label>
                   <select
                     value={dateRange}
-                    onChange={(e) => onDateRangeChange(e.target.value)}
+                    onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
                     className="w-full px-3 py-2 border rounded-md"
                   >
                     <option value="any">Any Date</option>

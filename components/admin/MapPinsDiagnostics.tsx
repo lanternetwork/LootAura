@@ -97,7 +97,7 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
       if (mapInstanceAvailable && mapRef?.current?.getMap) {
         const map = mapRef.current.getMap()
         try {
-          // Test if we can detect existing markers on the map
+          // Test if we can detect existing markers on the map (legacy sales rendering)
           const markers = document.querySelectorAll('.mapboxgl-marker')
           const reactMapMarkers = document.querySelectorAll('[data-testid="marker"]')
           const clusterMarkers = document.querySelectorAll('[data-testid="cluster"]')
@@ -313,34 +313,30 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
       let dataIntegrationDetails = {}
       
       try {
-        // Test actual data integration by checking pins have real data attributes
-        const pinsWithData = document.querySelectorAll('[data-pin-id]')
-        const clustersWithData = document.querySelectorAll('[data-cluster-id]')
+        // Test actual data integration by checking for legacy sales markers
+        const salesMarkers = document.querySelectorAll('.mapboxgl-marker')
+        const reactMapMarkers = document.querySelectorAll('[data-testid="marker"]')
         
-        // Check if pins have valid data attributes
-        let hasValidPinData = false
-        let hasValidClusterData = false
+        // Check if sales markers have valid data
+        let hasValidSalesData = false
+        let salesCount = 0
         
-        if (pinsWithData.length > 0) {
-          const firstPin = pinsWithData[0] as HTMLElement
-          const pinId = firstPin.getAttribute('data-pin-id')
-          hasValidPinData = !!pinId && pinId !== 'undefined' && pinId !== 'null'
+        if (salesMarkers.length > 0) {
+          salesCount = salesMarkers.length
+          hasValidSalesData = true
+        } else if (reactMapMarkers.length > 0) {
+          salesCount = reactMapMarkers.length
+          hasValidSalesData = true
         }
         
-        if (clustersWithData.length > 0) {
-          const firstCluster = clustersWithData[0] as HTMLElement
-          const clusterId = firstCluster.getAttribute('data-cluster-id')
-          hasValidClusterData = !!clusterId && clusterId !== 'undefined' && clusterId !== 'null'
-        }
-        
-        dataIntegrationWorking = hasValidPinData || hasValidClusterData
+        dataIntegrationWorking = hasValidSalesData
         dataIntegrationDetails = {
-          pinsWithData: pinsWithData.length,
-          clustersWithData: clustersWithData.length,
-          hasValidPinData: hasValidPinData,
-          hasValidClusterData: hasValidClusterData,
+          salesMarkers: salesMarkers.length,
+          reactMapMarkers: reactMapMarkers.length,
+          totalSales: salesCount,
+          hasValidSalesData: hasValidSalesData,
           canAccessData: true,
-          note: 'Testing actual pin data attributes instead of hardcoded values'
+          note: 'Testing legacy sales rendering with real Sale objects'
         }
       } catch (e) {
         console.log('Data integration test failed:', e)

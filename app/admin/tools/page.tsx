@@ -117,20 +117,64 @@ export default function AdminToolsPage() {
                  ref={diagMapRef}
                  center={{ lat: 38.2527, lng: -85.7585 }}
                  zoom={10}
-                 pins={{
-                   sales: [
-                     { id: 'test-sale-1', lat: 38.2527, lng: -85.7585 },
-                     { id: 'test-sale-2', lat: 38.2627, lng: -85.7685 },
-                     { id: 'test-sale-3', lat: 38.2427, lng: -85.7485 },
-                     { id: 'test-sale-4', lat: 38.2727, lng: -85.7785 },
-                     { id: 'test-sale-5', lat: 38.2327, lng: -85.7385 }
-                   ],
-                   selectedId: null,
-                   onPinClick: (id) => console.log('[ADMIN_DIAG] Pin clicked:', id),
-                   onClusterClick: ({ lat, lng, expandToZoom }) => {
-                     console.log('[ADMIN_DIAG] Cluster clicked:', { lat, lng, expandToZoom })
+                 sales={[
+                   { 
+                     id: 'test-sale-1', 
+                     lat: 38.2527, 
+                     lng: -85.7585,
+                     title: 'Test Sale 1',
+                     description: 'Test sale for diagnostics',
+                     date_start: '2024-01-01',
+                     time_start: '09:00',
+                     address: '123 Test St, Louisville, KY',
+                     categories: ['Electronics']
+                   },
+                   { 
+                     id: 'test-sale-2', 
+                     lat: 38.2627, 
+                     lng: -85.7685,
+                     title: 'Test Sale 2',
+                     description: 'Test sale for diagnostics',
+                     date_start: '2024-01-01',
+                     time_start: '10:00',
+                     address: '456 Test Ave, Louisville, KY',
+                     categories: ['Furniture']
+                   },
+                   { 
+                     id: 'test-sale-3', 
+                     lat: 38.2427, 
+                     lng: -85.7485,
+                     title: 'Test Sale 3',
+                     description: 'Test sale for diagnostics',
+                     date_start: '2024-01-01',
+                     time_start: '11:00',
+                     address: '789 Test Blvd, Louisville, KY',
+                     categories: ['Clothing']
+                   },
+                   { 
+                     id: 'test-sale-4', 
+                     lat: 38.2727, 
+                     lng: -85.7785,
+                     title: 'Test Sale 4',
+                     description: 'Test sale for diagnostics',
+                     date_start: '2024-01-01',
+                     time_start: '12:00',
+                     address: '321 Test Rd, Louisville, KY',
+                     categories: ['Books']
+                   },
+                   { 
+                     id: 'test-sale-5', 
+                     lat: 38.2327, 
+                     lng: -85.7385,
+                     title: 'Test Sale 5',
+                     description: 'Test sale for diagnostics',
+                     date_start: '2024-01-01',
+                     time_start: '13:00',
+                     address: '654 Test Ln, Louisville, KY',
+                     categories: ['Toys']
                    }
-                 }}
+                 ]}
+                 onSaleClick={(sale) => console.log('[ADMIN_DIAG] Sale clicked:', sale.id)}
                  onViewportChange={(vp) => console.log('[ADMIN_DIAG] viewport', vp)}
                />
              </div>

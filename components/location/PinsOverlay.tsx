@@ -3,7 +3,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { buildClusterIndex, getClustersForViewport, type SuperclusterIndex } from '@/lib/pins/clustering'
 import { ClusterFeature, PinsProps } from '@/lib/pins/types'
-import ClusterMarker from './ClusterMarker'
 import PinMarker from './PinMarker'
 
 interface PinsOverlayProps extends PinsProps {
@@ -15,7 +14,7 @@ export default function PinsOverlay({
   sales, 
   selectedId, 
   onPinClick, 
-  onClusterClick,
+  onClusterClick: _onClusterClick,
   mapRef,
   isClusteringEnabled 
 }: PinsOverlayProps) {
@@ -80,7 +79,7 @@ export default function PinsOverlay({
   }, [viewportInfo, debouncedViewport])
 
   // Get clusters for current viewport - only when needed
-  const clusters = useMemo((): ClusterFeature[] => {
+  const _clusters = useMemo((): ClusterFeature[] => {
     if (!clusterIndex || !debouncedViewport || sales.length < 2) {
       return []
     }

@@ -2,9 +2,8 @@
 
 import { useMemo } from 'react'
 import { Sale } from '@/lib/types'
-import { HybridPinsResult, HybridPin, LocationGroup } from '@/lib/pins/types'
+import { HybridPinsResult } from '@/lib/pins/types'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
-import PinMarker from './PinMarker'
 import ClusterMarker from './ClusterMarker'
 import LocationPin from './LocationPin'
 
@@ -13,7 +12,6 @@ interface HybridPinsOverlayProps {
   selectedId?: string | null
   onLocationClick?: (locationId: string) => void
   onClusterClick?: (cluster: any) => void
-  mapRef: React.RefObject<any>
   viewport: { bounds: [number, number, number, number]; zoom: number }
 }
 
@@ -22,7 +20,6 @@ export default function HybridPinsOverlay({
   selectedId,
   onLocationClick,
   onClusterClick,
-  mapRef,
   viewport
 }: HybridPinsOverlayProps) {
   

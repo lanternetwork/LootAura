@@ -300,7 +300,7 @@ export default function SalesClient({
   const visibleSales = useMemo(() => {
     // If a location is selected, show only sales from that location
     if (selectedPinId && hybridResult) {
-      const selectedLocation = hybridResult.locations.find(loc => loc.id === selectedPinId)
+      const selectedLocation = hybridResult.locations.find((loc: any) => loc.id === selectedPinId)
       if (selectedLocation) {
         console.log('[SALES] Showing sales for selected location:', { 
           locationId: selectedPinId,
@@ -375,9 +375,9 @@ export default function SalesClient({
                 onClusterClick: ({ lat, lng, expandToZoom }) => {
                   console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
                   // Note: map flyTo is handled in SimpleMap; we just rely on viewport→fetch debounce already in place
-                }
+                },
+                viewport: currentViewport || { bounds: [0, 0, 0, 0], zoom: 10 }
               }}
-              viewport={currentViewport}
               onViewportChange={handleViewportChange}
             />
           </div>
@@ -431,7 +431,7 @@ export default function SalesClient({
 
             {!loading && visibleSales.length > 0 && (
               <div className="grid grid-cols-2 gap-3">
-                {visibleSales.map((sale) => (
+                {visibleSales.map((sale: any) => (
                   <SaleCard key={sale.id} sale={sale} />
                 ))}
               </div>

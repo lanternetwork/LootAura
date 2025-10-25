@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         distanceKm = Math.max(latRangeKm, lngRangeKm) / 2
         
         // Store the actual bbox for proper filtering
-        const actualBbox = validatedBbox
+        const _actualBbox = validatedBbox
         
       } catch (error: any) {
         console.log(`[SALES] Invalid bbox: ${error.message}`)

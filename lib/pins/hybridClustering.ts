@@ -140,7 +140,7 @@ export function applyVisualClustering(
   
   // Add individual locations that aren't clustered
   const clusteredLocationIds = new Set(
-    clusters.flatMap(cluster => {
+    clusters.flatMap(_cluster => {
       // This would need to be implemented to get the actual location IDs in each cluster
       // For now, we'll add all locations as individual pins
       return []
@@ -150,7 +150,7 @@ export function applyVisualClustering(
   locations.forEach(location => {
     if (!clusteredLocationIds.has(location.id)) {
       pins.push({
-        type: 'location',
+        type: 'location' as const,
         id: location.id,
         lat: location.lat,
         lng: location.lng,

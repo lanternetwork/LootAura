@@ -220,7 +220,6 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
             selectedId={hybridPins.selectedId}
             onLocationClick={hybridPins.onLocationClick}
             onClusterClick={handleClusterClick}
-            mapRef={{ current: { getMap: () => mapRef.current?.getMap?.() } }}
             viewport={hybridPins.viewport}
           />
         ) : pins ? (

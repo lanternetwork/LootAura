@@ -21,7 +21,7 @@ export default function HybridPinsOverlay({
   selectedId,
   onLocationClick,
   onClusterClick,
-  mapRef,
+  mapRef: _mapRef,
   viewport
 }: HybridPinsOverlayProps) {
   

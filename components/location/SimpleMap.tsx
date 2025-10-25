@@ -216,10 +216,12 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         {/* Render hybrid pins if provided, otherwise fall back to regular pins or sales */}
         {hybridPins ? (
           <HybridPinsOverlay
-            hybridResult={hybridPins.hybridResult}
+            sales={hybridPins.sales}
             selectedId={hybridPins.selectedId}
             onLocationClick={hybridPins.onLocationClick}
             onClusterClick={handleClusterClick}
+            mapRef={{ current: { getMap: () => mapRef.current?.getMap?.() } }}
+            viewport={hybridPins.viewport}
           />
         ) : pins ? (
           <>

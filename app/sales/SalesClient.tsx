@@ -8,7 +8,7 @@ import ZipInput from '@/components/location/ZipInput'
 import SaleCard from '@/components/SaleCard'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import FiltersModal from '@/components/filters/FiltersModal'
-import DateWindowLabel from '@/components/filters/DateWindowLabel'
+import FiltersBar from '@/components/sales/FiltersBar'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 
@@ -283,71 +283,23 @@ export default function SalesClient({
         </div>
       </div>
 
-      {/* Single-row Filters Bar */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          {/* Left: ZIP Input */}
-          <div className="flex-shrink-0">
-            <ZipInput
-              onLocationFound={handleZipLocationFound}
-              onError={handleZipError}
-              placeholder="Enter ZIP code"
-              className="w-48"
-            />
-          </div>
-
-          {/* Center: Filter Status */}
-          <div className="flex-1 flex items-center justify-center min-w-0 px-4">
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <span>{filters.dateRange}</span>
-              <span>•</span>
-              <span>{filters.distance} miles</span>
-              {filters.categories.length > 0 && (
-                <>
-                  <span>•</span>
-                  <span>{filters.categories.length} categories</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Right: More Filters */}
-          <div className="flex-shrink-0">
-            <button
-              onClick={() => setShowFiltersModal(true)}
-              className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-            >
-              More Filters
-            </button>
-          </div>
-        </div>
-        {zipError && (
-          <div className="mt-2 text-sm text-red-600">{zipError}</div>
-        )}
-      </div>
-
-      {/* Active filter chips - under search controls, above map/list */}
-      {(filters.dateRange !== 'any' || filters.categories.length > 0) && (
-        <div className="mt-2 overflow-x-auto whitespace-nowrap flex gap-2">
-          {filters.dateRange !== 'any' && (
-            <button
-              onClick={() => updateFilters({ dateRange: 'any' as any })}
-              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
-            >
-              {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'weekend' ? 'This Weekend' : 'Next Weekend'} ×
-            </button>
-          )}
-          {filters.categories.map((c) => (
-            <button
-              key={c}
-              onClick={() => updateFilters({ categories: filters.categories.filter(x => x !== c) })}
-              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
-            >
-              {c} ×
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Advanced Filters Bar */}
+      <FiltersBar
+        onZipLocationFound={handleZipLocationFound}
+        onZipError={handleZipError}
+        zipError={zipError}
+        dateRange={filters.dateRange}
+        onDateRangeChange={(dateRange) => updateFilters({ dateRange })}
+        categories={filters.categories}
+        onCategoriesChange={(categories) => updateFilters({ categories })}
+        distance={filters.distance}
+        onDistanceChange={(distance) => updateFilters({ distance })}
+        onAdvancedFiltersOpen={() => setShowFiltersModal(true)}
+        hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
+        zipInputTestId="zip-input"
+        filtersCenterTestId="filters-center"
+        filtersMoreTestId="filters-more"
+      />
 
       {/* Main Content - Zillow Style */}
       <div 

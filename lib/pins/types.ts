@@ -57,7 +57,7 @@ export interface PinsProps {
 
 // Hybrid pins props
 export interface HybridPinsProps {
-  sales: any[] // Sale objects
+  hybridResult: HybridPinsResult
   selectedId?: string | null
   onLocationClick?: (locationId: string) => void
   onClusterClick?: (cluster: ClusterFeature) => void

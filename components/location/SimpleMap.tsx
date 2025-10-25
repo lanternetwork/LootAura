@@ -16,7 +16,7 @@ interface SimpleMapProps {
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string
   pins?: PinsProps
-  hybridPins?: HybridPinsProps & { viewport: { bounds: [number, number, number, number]; zoom: number } }
+  hybridPins?: HybridPinsProps
   onViewportChange?: (args: { 
     center: { lat: number; lng: number }; 
     zoom: number; 

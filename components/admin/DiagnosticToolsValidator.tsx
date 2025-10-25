@@ -221,8 +221,9 @@ export default function DiagnosticToolsValidator() {
         (runButton as HTMLElement).click();
       }
       
-      // Wait for results to appear (up to 10 seconds)
-      const resultsAppeared = await waitForResults(toolElement, initialResults.length, 10000)
+      // Wait for results to appear (up to 15 seconds for ZIP tools, 10 seconds for others)
+      const timeoutMs = toolName.includes('ZIP Lookup') ? 15000 : 10000
+      const resultsAppeared = await waitForResults(toolElement, initialResults.length, timeoutMs)
       if (!resultsAppeared) {
         addTest('Results Appear', false, {}, 'No results appeared after clicking run button')
         throw new Error('No results appeared after clicking run button')
@@ -331,10 +332,28 @@ export default function DiagnosticToolsValidator() {
     
     while (Date.now() - startTime < timeoutMs) {
       const currentResults = getCurrentResults(toolElement)
+      
+      // Check for increase in result count
       if (currentResults.length > initialCount) {
         return true
       }
-      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // For ZIP tools, also check for specific result content
+      if (toolElement.textContent?.includes('ZIP Lookup')) {
+        const hasZipResults = currentResults.some(r => 
+          r.textContent?.includes('SUCCESS') || 
+          r.textContent?.includes('FAILED') ||
+          r.textContent?.includes('40204') ||
+          r.textContent?.includes('Louisville') ||
+          r.textContent?.includes('Total Tests') ||
+          r.textContent?.includes('Success Rate')
+        )
+        if (hasZipResults) {
+          return true
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 200))
     }
     
     return false

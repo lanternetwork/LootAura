@@ -100,16 +100,18 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
           // Test if we can detect existing markers on the map (new pins system)
           const markers = document.querySelectorAll('.mapboxgl-marker')
           const reactMapMarkers = document.querySelectorAll('[data-testid="marker"]')
+          const locationMarkers = document.querySelectorAll('[data-testid="location-marker"]')
           const clusterMarkers = document.querySelectorAll('[data-testid="cluster"]')
           const clusterButtons = document.querySelectorAll('[data-cluster-marker="true"]')
           const pinButtons = document.querySelectorAll('[data-pin-marker="true"]')
           
-          // Check if there are any markers already on the map
-          pinPlacementWorking = markers.length > 0 || reactMapMarkers.length > 0 || clusterMarkers.length > 0 || clusterButtons.length > 0 || pinButtons.length > 0
+          // Check if there are any markers already on the map (including new hybrid system)
+          pinPlacementWorking = markers.length > 0 || reactMapMarkers.length > 0 || locationMarkers.length > 0 || clusterMarkers.length > 0 || clusterButtons.length > 0 || pinButtons.length > 0
           pinPlacementDetails = {
             canDetectMarkers: true,
             markersOnMap: markers.length,
             reactMapMarkers: reactMapMarkers.length,
+            locationMarkers: locationMarkers.length,
             clusterMarkers: clusterMarkers.length,
             clusterButtons: clusterButtons.length,
             pinButtons: pinButtons.length,

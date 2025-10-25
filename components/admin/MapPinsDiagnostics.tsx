@@ -102,15 +102,17 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
           const reactMapMarkers = document.querySelectorAll('[data-testid="marker"]')
           const clusterMarkers = document.querySelectorAll('[data-testid="cluster"]')
           const clusterButtons = document.querySelectorAll('[data-cluster-marker="true"]')
+          const pinButtons = document.querySelectorAll('[data-pin-marker="true"]')
           
           // Check if there are any markers already on the map
-          pinPlacementWorking = markers.length > 0 || reactMapMarkers.length > 0 || clusterMarkers.length > 0 || clusterButtons.length > 0
+          pinPlacementWorking = markers.length > 0 || reactMapMarkers.length > 0 || clusterMarkers.length > 0 || clusterButtons.length > 0 || pinButtons.length > 0
           pinPlacementDetails = {
             canDetectMarkers: true,
             markersOnMap: markers.length,
             reactMapMarkers: reactMapMarkers.length,
             clusterMarkers: clusterMarkers.length,
             clusterButtons: clusterButtons.length,
+            pinButtons: pinButtons.length,
             hasMapboxGL: typeof (window as any).mapboxgl !== 'undefined',
             hasReactMapGL: typeof (window as any).ReactMapGL !== 'undefined',
             mapContainer: !!map.getContainer(),
@@ -135,12 +137,13 @@ export default function MapPinsDiagnostics({ mapRef }: MapPinsDiagnosticsProps) 
           const markers = document.querySelectorAll('[data-testid="marker"]')
           const clusters = document.querySelectorAll('[data-testid="cluster"]')
           const clusterButtons = document.querySelectorAll('[data-cluster-marker="true"]')
+          const pinButtons = document.querySelectorAll('[data-pin-marker="true"]')
           
-          pinInteractionWorking = markers.length > 0 || clusters.length > 0 || clusterButtons.length > 0
+          pinInteractionWorking = markers.length > 0 || clusters.length > 0 || clusterButtons.length > 0 || pinButtons.length > 0
           pinInteractionDetails = {
-            canDetectPins: markers.length > 0,
+            canDetectPins: markers.length > 0 || pinButtons.length > 0,
             canDetectClusters: clusters.length > 0 || clusterButtons.length > 0,
-            totalMarkers: markers.length,
+            totalMarkers: markers.length + pinButtons.length,
             totalClusters: clusters.length + clusterButtons.length,
             hasClickHandlers: true
           }

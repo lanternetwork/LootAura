@@ -63,7 +63,6 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   }), [loaded])
 
   const onLoad = useCallback(() => {
-    const loadTime = performance.now()
     console.log('[MAP] onLoad - Map initialization completed')
     setLoaded(true)
     mapRef.current?.getMap()?.resize()

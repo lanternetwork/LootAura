@@ -1,9 +1,5 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Sale } from '@/lib/types'
-import { HybridPinsResult } from '@/lib/pins/types'
-import { createHybridPins } from '@/lib/pins/hybridClustering'
 import ClusterMarker from './ClusterMarker'
 import LocationPin from './LocationPin'
 

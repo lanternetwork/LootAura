@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         const validatedBbox = bboxSchema.parse(bboxData)
         console.log(`[API_SALES] bbox=${validatedBbox.north},${validatedBbox.south},${validatedBbox.east},${validatedBbox.west}`)
         console.log(`[API_SALES] bbox range: lat=${validatedBbox.north - validatedBbox.south}, lng=${validatedBbox.east - validatedBbox.west}`)
+        console.log(`[API_SALES] bbox center: lat=${(validatedBbox.north + validatedBbox.south) / 2}, lng=${(validatedBbox.east + validatedBbox.west) / 2}`)
         
         // Calculate center and approximate distance from bbox
         latitude = (validatedBbox.north + validatedBbox.south) / 2

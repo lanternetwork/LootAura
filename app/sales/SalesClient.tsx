@@ -196,6 +196,16 @@ export default function SalesClient({
 
   // Fetch sales based on map viewport bbox
   const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }) => {
+    console.log('[FETCH] fetchMapSales called with bbox:', bbox)
+    console.log('[FETCH] Bbox range:', {
+      latRange: bbox.north - bbox.south,
+      lngRange: bbox.east - bbox.west,
+      center: {
+        lat: (bbox.north + bbox.south) / 2,
+        lng: (bbox.east + bbox.west) / 2
+      }
+    })
+    
     setLoading(true)
 
     try {
@@ -212,11 +222,8 @@ export default function SalesClient({
       params.set('categories', filters.categories.join(','))
       }
       
-      // Log API call for debugging (only when debug is enabled)
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[FETCH] Viewport fetch with bbox:', bbox)
-        console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
-      }
+      console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
+      console.log('[FETCH] Viewport fetch with bbox:', bbox)
 
       const response = await fetch(`/api/sales?${params.toString()}`)
       if (!response.ok) {
@@ -233,14 +240,20 @@ export default function SalesClient({
       }
       
       if (data.ok && Array.isArray(data.data)) {
+        console.log('[FETCH] API Response:', {
+          ok: data.ok,
+          dataCount: data.data.length,
+          center: data.center,
+          distanceKm: data.distanceKm,
+          degraded: data.degraded
+        })
+        
         const deduplicated = deduplicateSales(data.data)
-        // Log sales received (only when debug is enabled or when there are sales)
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true' || deduplicated.length > 0) {
-          console.log('[FETCH] Sales received:', { 
-            raw: data.data.length, 
-            deduplicated: deduplicated.length
-          })
-        }
+        console.log('[FETCH] Sales received:', { 
+          raw: data.data.length, 
+          deduplicated: deduplicated.length,
+          bbox: bbox
+        })
         setMapSales(deduplicated)
         setMapMarkers(deduplicated
           .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
@@ -268,6 +281,16 @@ export default function SalesClient({
   // Handle viewport changes from SimpleMap
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
     
+    console.log('[SALES] handleViewportChange called with:', {
+      center,
+      zoom,
+      bounds,
+      boundsRange: {
+        latRange: bounds.north - bounds.south,
+        lngRange: bounds.east - bounds.west
+      }
+    })
+    
     // Update map view state
     setMapView(prev => ({
       ...prev,
@@ -283,6 +306,7 @@ export default function SalesClient({
     
     // Debounce fetch by 200ms to prevent rapid successive calls
     debounceTimerRef.current = setTimeout(() => {
+      console.log('[SALES] Debounced fetchMapSales called with bounds:', bounds)
       fetchMapSales(bounds)
     }, 200)
   }, [fetchMapSales])

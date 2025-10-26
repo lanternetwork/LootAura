@@ -139,7 +139,7 @@ export function applyVisualClustering(
   })
   
   // Add individual locations that aren't clustered
-  const clusteredLocationIds = new Set<string>()
+  const _clusteredLocationIds = new Set<string>()
   
   // For each cluster, we need to determine which locations are included
   // Since we don't have direct access to the cluster's children, we'll use a different approach:

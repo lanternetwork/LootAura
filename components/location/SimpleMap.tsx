@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react"
-import Map, { Marker, Popup } from "react-map-gl"
+import Map, { Popup } from "react-map-gl"
 import { getMapboxToken } from "@/lib/maps/token"
 import { Sale } from "@/lib/types"
 import { PinsProps, HybridPinsProps } from "@/lib/pins/types"

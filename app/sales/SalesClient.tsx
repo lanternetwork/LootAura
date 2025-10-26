@@ -317,7 +317,7 @@ export default function SalesClient({
       clearTimeout(debounceTimerRef.current)
     }
     
-    // Debounce fetch by 300ms to prevent rapid successive calls during zoom
+    // Debounce fetch by 150ms to prevent rapid successive calls during zoom
     debounceTimerRef.current = setTimeout(() => {
       // Check if bounds have changed significantly (more than 5% change)
       const lastBounds = lastBoundsRef.current
@@ -404,6 +404,7 @@ export default function SalesClient({
     // Trigger refetch with new filters using current bounds
     if (mapView.bounds) {
       console.log('[FILTERS] Triggering refetch with new filters:', newFilters)
+      setLoading(true) // Show loading state immediately
       fetchMapSales(mapView.bounds, newFilters)
     }
   }

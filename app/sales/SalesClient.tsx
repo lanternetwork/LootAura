@@ -442,8 +442,6 @@ export default function SalesClient({
       case 5: return 12  // Close - medium-high zoom
       case 10: return 10 // Medium - medium zoom
       case 25: return 8  // Far - low zoom
-      case 50: return 6  // Very far - very low zoom
-      case 100: return 4 // Extremely far - minimum zoom
       default: return 10 // Default to medium zoom
     }
   }
@@ -658,7 +656,7 @@ export default function SalesClient({
                   No sales found in this area
                     </div>
                           <button
-                  onClick={() => handleFiltersChange({ ...filters, distance: Math.min(100, filters.distance + 10) })}
+                  onClick={() => handleFiltersChange({ ...filters, distance: Math.min(25, filters.distance + 5) })}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                           >
                   Increase Distance
@@ -715,7 +713,7 @@ export default function SalesClient({
                 No sales found in this area
               </div>
               <button
-                onClick={() => handleFiltersChange({ ...filters, distance: Math.min(100, filters.distance + 10) })}
+                onClick={() => handleFiltersChange({ ...filters, distance: Math.min(25, filters.distance + 5) })}
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               >
                 Increase Distance

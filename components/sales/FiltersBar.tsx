@@ -325,8 +325,6 @@ export default function FiltersBar({
               <option value={5}>5 mi</option>
               <option value={10}>10 mi</option>
               <option value={25}>25 mi</option>
-              <option value={50}>50 mi</option>
-              <option value={100}>100 mi</option>
             </select>
           </div>
 
@@ -417,8 +415,6 @@ export default function FiltersBar({
             <option value={5}>5mi</option>
             <option value={10}>10mi</option>
             <option value={25}>25mi</option>
-            <option value={50}>50mi</option>
-            <option value={100}>100mi</option>
           </select>
 
           {/* More Filters Button */}
@@ -509,8 +505,6 @@ export default function FiltersBar({
                     <option value={5}>5 miles</option>
                     <option value={10}>10 miles</option>
                     <option value={25}>25 miles</option>
-                    <option value={50}>50 miles</option>
-                    <option value={100}>100 miles</option>
                   </select>
                 </div>
 

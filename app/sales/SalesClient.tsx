@@ -232,7 +232,10 @@ export default function SalesClient({
         params.set('dateRange', activeFilters.dateRange)
       }
       if (activeFilters.categories && activeFilters.categories.length > 0) {
-      params.set('categories', activeFilters.categories.join(','))
+        params.set('categories', activeFilters.categories.join(','))
+      }
+      if (activeFilters.distance) {
+        params.set('dist', activeFilters.distance.toString())
       }
       
       // Request more sales to show all pins in viewport

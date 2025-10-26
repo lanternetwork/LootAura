@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
       console.log('[AUTH] Google OAuth initiated:', { event: 'google-oauth', status: 'ok' })
     }
 
-    // Redirect to Google OAuth URL
-    return NextResponse.redirect(data.url)
+    // Return the OAuth URL instead of redirecting
+    return NextResponse.json({ url: data.url })
 
   } catch (error) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

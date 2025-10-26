@@ -14,19 +14,16 @@ export default function GoogleSignInButton() {
       })
 
       if (response.ok) {
-        // The response will be a redirect, so we need to follow it
-        if (response.redirected && response.url) {
-          window.location.href = response.url
+        const data = await response.json()
+        if (data.url) {
+          // Redirect to Google OAuth URL
+          window.location.href = data.url
         } else {
-          // Handle the case where we get a redirect response
-          const data = await response.json()
-          if (data.url) {
-            window.location.href = data.url
-          }
+          console.error('No OAuth URL received from server')
         }
       } else {
         const data = await response.json()
-        console.error('Google sign-in failed:', data.message)
+        console.error('Google sign-in failed:', data.message || data.error)
       }
     } catch (error) {
       console.error('Google sign-in error:', error)

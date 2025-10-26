@@ -224,6 +224,11 @@ export default function SalesClient({
       
       console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
       console.log('[FETCH] Viewport fetch with bbox:', bbox)
+      console.log('[FETCH] Bbox area (degrees):', {
+        latRange: bbox.north - bbox.south,
+        lngRange: bbox.east - bbox.west,
+        area: (bbox.north - bbox.south) * (bbox.east - bbox.west)
+      })
 
       const response = await fetch(`/api/sales?${params.toString()}`)
       if (!response.ok) {

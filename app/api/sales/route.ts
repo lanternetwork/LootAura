@@ -211,12 +211,18 @@ export async function GET(request: NextRequest) {
       let minLat, maxLat, minLng, maxLng
       
       if (actualBbox) {
-        // Use the actual viewport bounds
-        minLat = actualBbox.south
-        maxLat = actualBbox.north
-        minLng = actualBbox.west
-        maxLng = actualBbox.east
-        console.log(`[SALES] Using viewport bbox: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
+        // Expand the viewport bounds by 50% to ensure we capture nearby sales
+        const latBuffer = (actualBbox.north - actualBbox.south) * 0.5
+        const lngBuffer = (actualBbox.east - actualBbox.west) * 0.5
+        
+        minLat = actualBbox.south - latBuffer
+        maxLat = actualBbox.north + latBuffer
+        minLng = actualBbox.west - lngBuffer
+        maxLng = actualBbox.east + lngBuffer
+        
+        console.log(`[SALES] Using expanded viewport bbox: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
+        console.log(`[SALES] Original bbox: lat=${actualBbox.south} to ${actualBbox.north}, lng=${actualBbox.west} to ${actualBbox.east}`)
+        console.log(`[SALES] Expansion: latBuffer=${latBuffer}, lngBuffer=${lngBuffer}`)
       } else {
         // Calculate bounding box for approximate distance filtering
         const latRange = distanceKm / 111.0 // 1 degree ≈ 111km

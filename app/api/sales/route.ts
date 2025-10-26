@@ -196,17 +196,19 @@ export async function GET(request: NextRequest) {
     
     let results: PublicSale[] = []
     let degraded = false
+    let totalSalesCount = 0
     
     // 3. Use direct query to sales_v2 view (RPC functions have permission issues)
     try {
       console.log(`[SALES] Querying sales_v2 view directly...`)
       
       // First, let's check the total count of sales in the database
-      const { count: totalSalesCount, error: _countError } = await supabase
+      const { count: totalCount, error: _countError } = await supabase
         .from('sales_v2')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'published')
       
+      totalSalesCount = totalCount || 0
       console.log(`[SALES] Total published sales in database:`, totalSalesCount)
       
       // Use actual bbox if provided, otherwise calculate from distance

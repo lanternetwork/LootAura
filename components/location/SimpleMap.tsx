@@ -246,9 +246,18 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
                 anchor="center"
                 data-testid="marker"
               >
-                <button
-                  className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-500"
+                <div
+                  className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600"
+                  style={{
+                    outline: 'none',
+                    boxShadow: 'none',
+                    border: '1px solid white',
+                    background: 'red',
+                    borderRadius: '50%'
+                  }}
                   onClick={() => onSaleClick?.(sale)}
+                  role="button"
+                  tabIndex={0}
                   aria-label={`Sale: ${sale.title}`}
                 />
               </Marker>

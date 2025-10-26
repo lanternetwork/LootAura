@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useAuth, useSignIn } from '@/lib/hooks/useAuth'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 
 export default function SignIn() {
   const router = useRouter()
@@ -83,6 +84,17 @@ export default function SignIn() {
             >
               {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-neutral-50 text-gray-500">Or continue with</span>
+              </div>
+            </div>
+
+            <GoogleSignInButton />
 
             <Link 
               href="/auth/signup"

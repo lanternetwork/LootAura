@@ -31,7 +31,7 @@ describe('Share Redirect Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // The mock is already set up in tests/setup.ts, just reset it
+    // Set up the mock properly
     vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
   })
 

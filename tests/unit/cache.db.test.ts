@@ -2,7 +2,7 @@
  * Unit tests for IndexedDB cache functionality
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 // Mock Dexie to avoid IndexedDB issues in test environment
 vi.mock('dexie', () => ({

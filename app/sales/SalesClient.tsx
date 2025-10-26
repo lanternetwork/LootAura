@@ -56,7 +56,7 @@ export default function SalesClient({
       east: (effectiveCenter?.lng || -98.5795) + 1.0, 
       north: (effectiveCenter?.lat || 39.8283) + 1.0 
     },
-    zoom: urlZoom ? parseFloat(urlZoom) : 8
+    zoom: urlZoom ? parseFloat(urlZoom) : 10
   })
 
   // Sales data state - map is source of truth
@@ -334,7 +334,7 @@ export default function SalesClient({
       const newView = {
         ...prev,
         center: { lat, lng },
-        zoom: 8 // Further reduced to show much larger area
+        zoom: 9 // Balanced zoom level for good coverage
       }
       console.log('[ZIP] New map view:', newView)
       return newView
@@ -400,7 +400,7 @@ export default function SalesClient({
     }
   }, [searchParams])
 
-  // Memoized visible sales - always derived from mapSales
+  // Memoized visible sales - filtered by current viewport bounds to match map pins
   const visibleSales = useMemo(() => {
     // If a location is selected, show only sales from that location
     if (selectedPinId && hybridResult) {
@@ -414,12 +414,27 @@ export default function SalesClient({
       }
     }
     
-    const deduplicated = deduplicateSales(mapSales)
+    // Filter sales to only those within the current viewport bounds (same as map pins)
+    if (!currentViewport) {
+      return []
+    }
+    
+    const viewportFilteredSales = mapSales.filter(sale => {
+      if (typeof sale.lat !== 'number' || typeof sale.lng !== 'number') return false
+      
+      return sale.lat >= currentViewport.bounds[1] && // south
+             sale.lat <= currentViewport.bounds[3] && // north
+             sale.lng >= currentViewport.bounds[0] && // west
+             sale.lng <= currentViewport.bounds[2]    // east
+    })
+    
+    const deduplicated = deduplicateSales(viewportFilteredSales)
     
     // Only log when there are sales or when debug is enabled
     if (deduplicated.length > 0 || process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SALES] Visible sales count:', { 
         mapSales: mapSales.length, 
+        viewportFiltered: viewportFilteredSales.length,
         visibleSales: deduplicated.length,
         selectedPinId,
         hybridType: hybridResult?.type,
@@ -428,7 +443,7 @@ export default function SalesClient({
     }
     
     return deduplicated
-  }, [mapSales, deduplicateSales, selectedPinId, hybridResult])
+  }, [mapSales, currentViewport, deduplicateSales, selectedPinId, hybridResult])
 
   // Memoized map center
   const mapCenter = useMemo(() => {

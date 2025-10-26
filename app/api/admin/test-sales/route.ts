@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import * as dateBounds from '@/lib/shared/dateBounds'
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,14 +74,44 @@ export async function POST(request: NextRequest) {
     // 4. Get sales in date range
     let salesInDateRange = 0
     if (dateRange !== 'any') {
-      const dateConstraints = dateBounds.getDateRange(dateRange as any)
-      if (dateConstraints) {
+      let startDateParam: string | null = null
+      let endDateParam: string | null = null
+      
+      // Compute from dateRange presets (same logic as sales route)
+      const now = new Date()
+      switch (dateRange) {
+        case 'today': {
+          startDateParam = now.toISOString().split('T')[0]
+          endDateParam = now.toISOString().split('T')[0]
+          break
+        }
+        case 'weekend': {
+          const saturday = new Date(now)
+          saturday.setDate(now.getDate() + (6 - now.getDay()))
+          const sunday = new Date(saturday)
+          sunday.setDate(saturday.getDate() + 1)
+          startDateParam = saturday.toISOString().split('T')[0]
+          endDateParam = sunday.toISOString().split('T')[0]
+          break
+        }
+        case 'next_weekend': {
+          const nextSaturday = new Date(now)
+          nextSaturday.setDate(now.getDate() + (6 - now.getDay()) + 7)
+          const nextSunday = new Date(nextSaturday)
+          nextSunday.setDate(nextSaturday.getDate() + 1)
+          startDateParam = nextSaturday.toISOString().split('T')[0]
+          endDateParam = nextSunday.toISOString().split('T')[0]
+          break
+        }
+      }
+      
+      if (startDateParam && endDateParam) {
         const { count, error: dateError } = await supabase
           .from('sales_v2')
           .select('*', { count: 'exact', head: true })
           .eq('status', 'published')
-          .gte('date_start', dateConstraints.start)
-          .lte('date_start', dateConstraints.end)
+          .gte('date_start', startDateParam)
+          .lte('date_start', endDateParam)
 
         if (dateError) {
           console.error('Date range sales count error:', dateError)

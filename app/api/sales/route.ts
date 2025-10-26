@@ -202,7 +202,7 @@ export async function GET(request: NextRequest) {
       console.log(`[SALES] Querying sales_v2 view directly...`)
       
       // First, let's check the total count of sales in the database
-      const { count: totalSalesCount, error: countError } = await supabase
+      const { count: totalSalesCount, error: _countError } = await supabase
         .from('sales_v2')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'published')
@@ -588,7 +588,7 @@ export async function GET(request: NextRequest) {
       center: { lat: latitude, lng: longitude },
       distanceKm,
       count: results.length,
-      totalCount: totalSalesCount, // Add total database count to response
+      totalCount: totalSalesCount || 0, // Add total database count to response
       durationMs: Date.now() - startedAt
     }
     

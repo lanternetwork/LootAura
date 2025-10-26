@@ -294,14 +294,15 @@ export default function FiltersBar({
 
         {/* Right: Distance + More */}
         <div ref={rightRef} className="shrink-0 flex items-center gap-3 ml-auto">
-          {/* Distance select */}
+          {/* Search Area select */}
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium whitespace-nowrap">Distance:</label>
+            <label className="text-sm font-medium whitespace-nowrap">Search Area:</label>
             <select
               value={distance}
               onChange={(e) => onDistanceChange(Number(e.target.value))}
               className="px-2 py-1 border rounded text-sm min-w-[80px]"
             >
+              <option value={2}>2 mi</option>
               <option value={5}>5 mi</option>
               <option value={10}>10 mi</option>
               <option value={25}>25 mi</option>
@@ -385,12 +386,13 @@ export default function FiltersBar({
             <option value="next_weekend">Next</option>
           </select>
 
-          {/* Distance - Compact */}
+          {/* Search Area - Compact */}
           <select
             value={distance}
             onChange={(e) => onDistanceChange(Number(e.target.value))}
             className="px-2 py-1 border rounded text-xs min-w-[60px]"
           >
+            <option value={2}>2mi</option>
             <option value={5}>5mi</option>
             <option value={10}>10mi</option>
             <option value={25}>25mi</option>
@@ -472,14 +474,15 @@ export default function FiltersBar({
                   </div>
                 </div>
 
-                {/* Distance Filter */}
+                {/* Search Area Filter */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Distance</label>
+                  <label className="block text-sm font-medium mb-2">Search Area</label>
                   <select
                     value={distance}
                     onChange={(e) => onDistanceChange(Number(e.target.value))}
                     className="w-full px-3 py-2 border rounded-md"
                   >
+                    <option value={2}>2 miles</option>
                     <option value={5}>5 miles</option>
                     <option value={10}>10 miles</option>
                     <option value={25}>25 miles</option>

@@ -65,9 +65,14 @@ export async function GET(request: NextRequest) {
         longitude = (validatedBbox.east + validatedBbox.west) / 2
         
         // When using viewport bounds, still respect distance filter if provided
-        // Parse distance from URL parameters
+        // Parse distance from URL parameters (DEPRECATED - will be ignored)
         const distanceParam = searchParams.get('dist') || searchParams.get('distance')
         distanceKm = distanceParam ? parseFloat(distanceParam) : 1000 // Default to unlimited if not specified
+        
+        // Log deprecation warning if distance parameter is provided
+        if (distanceParam) {
+          console.log('[API_SALES] DEPRECATION WARNING: distance parameter ignored. Use map viewport bounds instead.')
+        }
         
         // Store the actual bbox for proper filtering
         actualBbox = validatedBbox
@@ -101,10 +106,16 @@ export async function GET(request: NextRequest) {
     
     // 2. Parse & validate other parameters
     if (distanceKm === undefined) {
+      const legacyDistanceParam = searchParams.get('distanceKm')
       distanceKm = Math.max(1, Math.min(
-        searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm') || '40') : 40,
+        legacyDistanceParam ? parseFloat(legacyDistanceParam) : 40,
         160
       ))
+      
+      // Log deprecation warning for legacy distance parameter
+      if (legacyDistanceParam) {
+        console.log('[API_SALES] DEPRECATION WARNING: distanceKm parameter ignored. Use map viewport bounds instead.')
+      }
     }
     
     const dateRange = searchParams.get('dateRange') || 'any'

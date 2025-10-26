@@ -234,9 +234,7 @@ export default function SalesClient({
       if (activeFilters.categories && activeFilters.categories.length > 0) {
         params.set('categories', activeFilters.categories.join(','))
       }
-      if (activeFilters.distance) {
-        params.set('dist', activeFilters.distance.toString())
-      }
+      // Distance parameter removed - map zoom controls visible area
       
       // Request more sales to show all pins in viewport
       params.set('limit', '200')
@@ -419,10 +417,41 @@ export default function SalesClient({
     setZipError(error)
   }
 
+  // Distance to zoom level mapping (miles to zoom level)
+  const distanceToZoom = (distance: number): number => {
+    switch (distance) {
+      case 2: return 14  // Very close - high zoom
+      case 5: return 12  // Close - medium-high zoom
+      case 10: return 10 // Medium - medium zoom
+      case 25: return 8  // Far - low zoom
+      case 50: return 6  // Very far - very low zoom
+      case 100: return 4 // Extremely far - minimum zoom
+      default: return 10 // Default to medium zoom
+    }
+  }
+
   // Handle filter changes
   const handleFiltersChange = (newFilters: any) => {
+    // Check if this is a distance change
+    if (newFilters.distance && newFilters.distance !== filters.distance) {
+      console.log('[DISTANCE] Converting distance to zoom:', { distance: newFilters.distance, zoom: distanceToZoom(newFilters.distance) })
+      
+      // Update filters for UI state
+      updateFilters(newFilters)
+      
+      // Change map zoom instead of triggering API call
+      const newZoom = distanceToZoom(newFilters.distance)
+      setMapView(prev => ({
+        ...prev,
+        zoom: newZoom
+      }))
+      
+      // No direct API call - let viewport change trigger the fetch
+      return
+    }
+    
+    // For other filter changes, trigger refetch with new filters using current bounds
     updateFilters(newFilters) // Keep URL update for filter state
-    // Trigger refetch with new filters using current bounds
     if (mapView.bounds) {
       console.log('[FILTERS] Triggering refetch with new filters:', newFilters)
       setLoading(true) // Show loading state immediately

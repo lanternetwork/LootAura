@@ -1,27 +1,29 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import ClusterMarker from '@/components/location/ClusterMarker'
-import { ClusterResult } from '@/lib/clustering'
+import { ClusterFeature } from '@/lib/pins/types'
 
 describe('Cluster Marker Accessibility', () => {
-  const mockCluster: ClusterResult = {
-    type: 'cluster',
-    id: 'cluster-1',
+  const mockCluster: ClusterFeature = {
+    id: 1,
     count: 5,
-    lon: -85.7585,
-    lat: 38.2527
+    lng: -85.7585,
+    lat: 38.2527,
+    expandToZoom: 12
   }
 
-  const mockPoint: ClusterResult = {
-    type: 'point',
-    id: 'point-1',
-    lon: -85.7585,
-    lat: 38.2527
+  const mockPoint: ClusterFeature = {
+    id: 2,
+    count: 1,
+    lng: -85.7585,
+    lat: 38.2527,
+    expandToZoom: 12
   }
 
   beforeEach(() => {
     // Mock react-map-gl Marker
     vi.mock('react-map-gl', () => ({
+      default: ({ children, ...props }: any) => <div data-testid="map" {...props}>{children}</div>,
       Marker: ({ children, ...props }: any) => <div data-testid="marker" {...props}>{children}</div>
     }))
   })
@@ -33,7 +35,6 @@ describe('Cluster Marker Accessibility', () => {
       <ClusterMarker
         cluster={mockCluster}
         onClick={onClick}
-        size="medium"
       />
     )
 
@@ -52,7 +53,6 @@ describe('Cluster Marker Accessibility', () => {
         cluster={mockCluster}
         onClick={onClick}
         onKeyDown={onKeyDown}
-        size="medium"
       />
     )
 
@@ -74,7 +74,6 @@ describe('Cluster Marker Accessibility', () => {
       <ClusterMarker
         cluster={mockCluster}
         onClick={onClick}
-        size="medium"
       />
     )
 
@@ -88,7 +87,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -102,7 +100,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -114,49 +111,45 @@ describe('Cluster Marker Accessibility', () => {
     const { unmount: unmount1 } = render(
       <ClusterMarker
         cluster={mockCluster}
-        size="small"
       />
     )
 
     let button = screen.getByRole('button')
-    expect(button).toHaveClass('w-8')
-    expect(button).toHaveClass('h-8')
-    expect(button).toHaveClass('text-xs')
+    expect(button).toHaveClass('w-4')
+    expect(button).toHaveClass('h-4')
+    expect(button).toHaveClass('text-[10px]')
     unmount1()
 
     // Test medium size
     const { unmount: unmount2 } = render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
     button = screen.getByRole('button')
-    expect(button).toHaveClass('w-10')
-    expect(button).toHaveClass('h-10')
-    expect(button).toHaveClass('text-sm')
+    expect(button).toHaveClass('w-5')
+    expect(button).toHaveClass('h-5')
+    expect(button).toHaveClass('text-[10px]')
     unmount2()
 
     // Test large size
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="large"
       />
     )
 
     button = screen.getByRole('button')
-    expect(button).toHaveClass('w-12')
-    expect(button).toHaveClass('h-12')
-    expect(button).toHaveClass('text-base')
+    expect(button).toHaveClass('w-6')
+    expect(button).toHaveClass('h-6')
+    expect(button).toHaveClass('text-[11px]')
   })
 
   it('should have high contrast colors', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -170,7 +163,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -183,7 +175,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockPoint}
-        size="medium"
       />
     )
 
@@ -194,7 +185,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -207,7 +197,6 @@ describe('Cluster Marker Accessibility', () => {
     render(
       <ClusterMarker
         cluster={mockCluster}
-        size="medium"
       />
     )
 
@@ -221,18 +210,17 @@ describe('Cluster Marker Accessibility', () => {
   })
 
   it('should handle different cluster sizes', () => {
-    const largeCluster: ClusterResult = {
-      type: 'cluster',
-      id: 'cluster-2',
+    const largeCluster: ClusterFeature = {
+      id: 2,
       count: 100,
-      lon: -85.7585,
-      lat: 38.2527
+      lng: -85.7585,
+      lat: 38.2527,
+      expandToZoom: 12
     }
 
     render(
       <ClusterMarker
         cluster={largeCluster}
-        size="large"
       />
     )
 

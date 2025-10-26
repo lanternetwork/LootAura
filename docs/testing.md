@@ -1,6 +1,37 @@
 # Testing Guide
 
-**Last updated: 2025-10-19**
+**Last updated: 2025-01-27 — Map-Centric Architecture**
+
+This guide covers testing strategies, requirements, and best practices for LootAura's map-centric architecture.
+
+## Map-Centric Testing Strategy
+
+### Core Testing Principles
+
+1. **Single Fetch Path**: Test only 2 entry points to `fetchMapSales`
+2. **Distance-to-Zoom**: Test distance slider controls map zoom
+3. **Viewport Synchronization**: Test map and list stay synchronized
+4. **Performance**: Test debouncing and bounds change detection
+
+### Test Categories
+
+#### Unit Tests
+- **Distance-to-Zoom Mapping**: Test `distanceToZoom()` function
+- **Single Fetch Path**: Test only 2 entry points exist
+- **Viewport Calculations**: Test bounds and zoom calculations
+- **Filter Logic**: Test category and date filtering
+
+#### Integration Tests
+- **Map-List Sync**: Test map viewport changes update list
+- **Filter Integration**: Test filter changes trigger correct API calls
+- **ZIP Search**: Test ZIP search updates both map and list
+- **Performance**: Test debouncing and request cancellation
+
+#### E2E Tests
+- **Complete User Flows**: Test end-to-end user interactions
+- **Mobile Responsiveness**: Test mobile-specific interactions
+- **Performance Under Load**: Test with large datasets
+- **Cross-Browser**: Test across different browsers
 
 ## Console Guardrail System
 

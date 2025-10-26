@@ -1,8 +1,8 @@
 # LootAura Protocol Invariants
 
-**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
+**Last updated: 2025-01-27 — Map-Centric Architecture**
 
-This document defines the authoritative contracts and invariants that must be maintained across the UI→Arbiter→API→DB→List pipeline to prevent regressions.
+This document defines the authoritative contracts and invariants that must be maintained across the map-centric architecture to prevent regressions.
 
 ## Parameter Canonicalization
 
@@ -17,28 +17,40 @@ This document defines the authoritative contracts and invariants that must be ma
 - **Legacy**: `cat` (read-only, never emitted)
 - **Consistency**: Same parameter names used in both markers and list requests
 
-## Suppression Rule
+## Map-Centric Architecture Invariants
 
-### MAP Authority Suppression Logic
-Under MAP authority, suppress `/api/sales` **only if** markers payload will include an **identical normalized filter set** (at minimum: categories, date range, distance, city).
+### Single Fetch Path
+Only **2 entry points** to `fetchMapSales`:
+1. **`handleViewportChange`** (debounced, 300ms) - for map movements, zoom changes, ZIP search
+2. **`handleFiltersChange`** (immediate) - for category changes, date range changes
 
-**Critical**: "Empty == empty" must NOT hide user-initiated filter updates if markers lack the filter.
+**Critical**: No other code paths should call `fetchMapSales` directly.
 
-### Suppression Decision Matrix
-| Authority | Filter Change | Markers Include Filters | Suppress List |
-|-----------|---------------|-------------------------|---------------|
-| MAP | No | Yes | ✅ Yes |
-| MAP | No | No | ❌ No |
-| MAP | Yes | Yes | ❌ No |
-| MAP | Yes | No | ❌ No |
-| FILTER | Any | Any | ❌ No |
+### Distance-to-Zoom Mapping
+Distance slider controls map zoom instead of API filtering:
+- **2 mi** → **z14** (very close)
+- **5 mi** → **z12** (close) 
+- **10 mi** → **z10** (medium)
+- **25 mi** → **z8** (far)
+
+**Critical**: Distance parameter is deprecated and ignored by API.
+
+### Viewport-Based Filtering
+All data fetching uses map viewport bounds (`north`, `south`, `east`, `west`) instead of distance-based filtering.
+
+**Critical**: No server-side distance filtering when using viewport bounds.
 
 ## Single Source of Truth
 
+### Map Viewport as Source
+- **Primary Source**: Map viewport bounds determine visible sales
+- **Consistency**: Both map pins and list read from same data source
+- **Synchronization**: Map and list always show same sales
+
 ### Database Relations
-- **Primary Source**: `public.items_v2` for both markers and list
-- **Consistency**: Both endpoints read from the same relation/view
-- **Documentation**: Any superseding relations must be documented
+- **Primary Source**: `lootaura_v2.sales_v2` for sales data
+- **Consistency**: All endpoints read from the same relation
+- **Documentation**: Any schema changes must be documented
 
 ### Category Predicate Model
 Choose ONE predicate model based on schema:

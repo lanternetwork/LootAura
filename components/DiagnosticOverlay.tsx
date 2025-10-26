@@ -6,7 +6,6 @@ interface FetchEvent {
   id: string
   endpoint: string
   params: Record<string, string>
-  authority: string
   viewportSeq: number
   requestSeq: number
   status: 'pending' | 'success' | 'error'
@@ -81,7 +80,7 @@ export default function DiagnosticOverlay({ isVisible, onToggle }: DiagnosticOve
       
       {suppressedCount > 0 && (
         <div className="mb-3 p-2 bg-red-100 border border-red-300 rounded text-sm text-red-800">
-          <strong>⚠️ {suppressedCount} wide fetches suppressed under MAP authority</strong>
+          <strong>⚠️ {suppressedCount} wide fetches suppressed</strong>
         </div>
       )}
 
@@ -125,7 +124,6 @@ export default function DiagnosticOverlay({ isVisible, onToggle }: DiagnosticOve
                 )}
                 
                 <div className="mt-1 text-gray-500">
-                  <div>Authority: {event.authority}</div>
                   <div>ViewportSeq: {event.viewportSeq} | RequestSeq: {event.requestSeq}</div>
                   {event.timeMs && <div>Time: {event.timeMs}ms</div>}
                   {event.size && <div>Size: {event.size} bytes</div>}

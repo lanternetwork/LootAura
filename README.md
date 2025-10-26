@@ -1,12 +1,12 @@
 # LootAura
 
-**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
+**Last updated: 2025-01-27 — Map-Centric Architecture Documentation**
 
-A modern web application for discovering and managing yard sales, garage sales, and estate sales in your area. Built with enterprise-grade architecture featuring map-centric source of truth, arbiter logic, Supabase backend, and Mapbox integration.
+A modern web application for discovering and managing yard sales, garage sales, and estate sales in your area. Built with enterprise-grade architecture featuring **map-centric design**, Supabase backend, and Mapbox integration.
 
 ## 📋 Quick Start
 
-- **Architecture Overview**: See [docs/operating-handbook.md](docs/operating-handbook.md) for comprehensive development standards
+- **Architecture Overview**: See [docs/architecture.md](docs/architecture.md) for comprehensive development standards
 - **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
 - **Deployment**: See [DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md) for production deployment
 - **Launch**: See [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) for launch validation
@@ -18,12 +18,12 @@ A modern web application for discovering and managing yard sales, garage sales, 
 
 LootAura follows strict architectural invariants to prevent regressions:
 
-- **Map-Centric Authority**: Map is the source of truth for visible sales
-- **Arbiter Logic**: Controls when to suppress list fetches under MAP authority
+- **Map-Centric Design**: Map viewport drives all data fetching and list display
+- **Single Fetch Path**: Only 2 entry points to fetchMapSales (viewport changes, filter changes)
+- **Distance-to-Zoom Mapping**: Distance slider controls map zoom instead of API filtering
 - **Parameter Canonicalization**: `categories` parameter with legacy `cat` support
-- **Single Source**: Both markers and list read from `public.items_v2`
+- **Single Source**: Both markers and list read from the same data source
 - **DOM Structure**: List container with direct children, no intermediate wrappers
-- **Suppression Equality**: Under MAP authority, suppress only if markers include identical normalized filter set
 - **Debug Discipline**: Single `NEXT_PUBLIC_DEBUG` flag, no PII in logs
 - **ID Parity**: Marker IDs must be discoverable in list after updates
 
@@ -42,11 +42,35 @@ NEXT_PUBLIC_DEBUG=true
 
 ### Debug Features
 - **Filter Normalization**: See how categories are processed
-- **Suppression Logic**: Understand when list fetches are suppressed
+- **Map Viewport**: Understand how map changes drive data fetching
 - **DOM Structure**: Verify grid layout and card counting
 - **ID Parity**: Check marker-list consistency
+- **Admin Tools**: Access comprehensive debugging tools at `/admin/tools`
 
 See [docs/DEBUG_GUIDE.md](docs/DEBUG_GUIDE.md) for complete debug guide.
+
+## 🔧 Admin Tools
+
+LootAura includes comprehensive admin and debugging tools accessible at `/admin/tools`:
+
+### Available Tools
+- **Debug Controls**: Toggle debug mode and view real-time diagnostics
+- **Review Key Lookup**: Look up sale information and review keys by sale ID
+- **System Information**: View environment variables and configuration status
+- **Health Checks**: Quick access to system health endpoints
+- **Diagnostic Overlay**: Real-time monitoring of fetch events and system behavior
+
+### Access
+- **URL**: `/admin/tools`
+- **Authentication**: None required (publicly accessible)
+- **API Endpoint**: `/api/lookup-sale` (also publicly accessible)
+
+### Features
+- **Sale Lookup**: Enter any sale ID to get comprehensive sale information
+- **Multi-table Support**: Searches across `sales_v2`, `sales`, and `yard_sales` tables
+- **Real-time Diagnostics**: Monitor fetch events, timing, and system behavior
+- **Health Monitoring**: Direct links to health check endpoints
+- **Environment Status**: View current configuration and feature flags
 
 ## Features
 
@@ -55,6 +79,7 @@ See [docs/DEBUG_GUIDE.md](docs/DEBUG_GUIDE.md) for complete debug guide.
 - **User Authentication**: Sign up and manage your account
 - **Favorites**: Save sales you're interested in
 - **CSV Import/Export**: Import and export sales data
+- **Admin Tools**: Comprehensive debugging and development tools
 - **Responsive Design**: Works on desktop and mobile devices
 
 ## Data Sources
@@ -231,5 +256,6 @@ LootAura uses advanced PostGIS distance calculations for accurate location-based
 - **Security**: RLS policies and privilege escalation testing
 - **Performance**: Bundle size monitoring and memory optimization#   F o r c e   r e d e p l o y   -   1 0 / 1 3 / 2 0 2 5   2 0 : 4 7 : 1 6 
  
- #   F o r c e   r e d e p l o y  
+ #   F o r c e   r e d e p l o y 
+ 
  

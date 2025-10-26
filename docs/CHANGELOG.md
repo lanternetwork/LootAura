@@ -2,7 +2,28 @@
 
 **Last updated: 2025-10-19 — Release Hardening & Documentation**
 
-## [Unreleased] Release Hardening & Documentation
+## [Unreleased] Map Performance & UX Fixes
+
+### Added
+- **Map Performance Documentation**: Comprehensive fixes and improvements guide
+- **Bounds Change Detection**: Prevents unnecessary API calls during zoom
+- **Immediate Loading State**: Visual feedback for filter changes
+- **Coordinate Logging**: Debug tools for ZIP search functionality
+
+### Changed
+- **API Limit Cap**: Increased from 48 to 200 sales for full viewport coverage
+- **Filter Response**: Reduced delay from 300ms to 150ms for better UX
+- **Viewport Sync**: Sales list now matches map viewport bounds
+- **Zoom Levels**: Standardized default and ZIP search zoom to level 12
+
+### Fixed
+- **Map Bounds Issue**: Now shows all sales in visible viewport instead of small central area
+- **Filter Chips**: Category filters now work and affect both sales list and map pins
+- **Sales Blinking**: Eliminated unnecessary re-renders during zoom
+- **ZIP Search**: Now centers on correct coordinates instead of generic city center
+- **API Filtering**: Removed redundant distance filtering when using viewport bounds
+
+## [Previous] Release Hardening & Documentation
 
 ### Added
 - **URL State Management**: Robust compression/decompression with legacy URL handling

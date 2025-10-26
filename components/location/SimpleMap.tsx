@@ -57,8 +57,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     }
   }, [token])
   
-  // Check if clustering is enabled
-  const isClusteringEnabled = process.env.NEXT_PUBLIC_FEATURE_CLUSTERING !== 'false'
+  // Check if clustering is enabled - FORCE DISABLED to prevent blue circles
+  const isClusteringEnabled = false  // Disabled to prevent blue cluster markers
 
   // Expose the map instance to parent components
   useImperativeHandle(ref, () => ({
@@ -114,9 +114,17 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
 
     console.log('[CLUSTER] expand', { lat: cluster.lat, lng: cluster.lng, expandToZoom: cluster.expandToZoom })
     
+    // TEMPORARILY DISABLED: Zoom functionality works but is disabled for UX testing
+    // Original zoom behavior (commented out):
+    // map.flyTo({
+    //   center: [cluster.lng, cluster.lat],
+    //   zoom: cluster.expandToZoom,
+    //   duration: 400
+    // })
+    
+    // TEMPORARY: Just center the map on the cluster without zooming
     map.flyTo({
       center: [cluster.lng, cluster.lat],
-      zoom: cluster.expandToZoom,
       duration: 400
     })
     
@@ -220,7 +228,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
           }
         }}
       >
-        {/* Render hybrid pins if provided, otherwise fall back to regular pins or sales */}
+        {/* Custom pin rendering - no Mapbox Markers */}
         {hybridPins ? (
           <HybridPinsOverlay
             sales={hybridPins.sales}
@@ -242,36 +250,31 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
             />
           </>
         ) : (
-          /* Fallback to legacy sales rendering */
+          /* Custom pin rendering for sales */
           sales
             .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
             .map(sale => (
-              <Marker
+              <div
                 key={sale.id}
-                longitude={sale.lng!}
-                latitude={sale.lat!}
-                anchor="center"
+                style={{
+                  position: 'absolute',
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: '#ef4444',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  border: '1px solid white',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                  outline: 'none !important',
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 1000
+                }}
+                onClick={() => onSaleClick?.(sale)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Sale: ${sale.title}`}
                 data-testid="marker"
-              >
-                <div
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    backgroundColor: '#ef4444',
-                    borderRadius: '50%',
-                    cursor: 'pointer',
-                    border: '1px solid white',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                    outline: 'none',
-                    position: 'relative',
-                    zIndex: 1
-                  }}
-                  onClick={() => onSaleClick?.(sale)}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Sale: ${sale.title}`}
-                />
-              </Marker>
+              />
             ))
         )}
         

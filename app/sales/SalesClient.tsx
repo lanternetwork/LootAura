@@ -331,13 +331,14 @@ export default function SalesClient({
     console.log('[ZIP] Received coordinates:', { lat, lng, type: typeof lat, type_lng: typeof lng })
     console.log('[ZIP] Actual lat value:', lat)
     console.log('[ZIP] Actual lng value:', lng)
+    console.log('[ZIP] Expected ZIP 40204 coordinates: 38.2380249, -85.7246945')
     
     // Update map center
     setMapView(prev => {
       const newView = {
         ...prev,
         center: { lat, lng },
-        zoom: 12 // Higher zoom level to focus on specific ZIP area
+        zoom: 10 // Balanced zoom level to show more sales around ZIP area
       }
       console.log('[ZIP] New map view:', newView)
       return newView

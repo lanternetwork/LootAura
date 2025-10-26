@@ -6,6 +6,30 @@
 @import 'mapbox-gl/dist/mapbox-gl.css';
 body { min-height: 100vh; }
 
+/* Completely eliminate blue circles on map markers */
+.mapboxgl-marker,
+.mapboxgl-marker *,
+[data-testid="marker"],
+[data-testid="location-marker"],
+[data-pin-marker="true"],
+[data-location-marker="true"] {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.mapboxgl-marker:focus,
+.mapboxgl-marker:active,
+.mapboxgl-marker:focus-visible,
+[data-testid="marker"]:focus,
+[data-testid="location-marker"]:focus,
+[data-pin-marker="true"]:focus,
+[data-location-marker="true"]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
 /* Enterprise-grade responsive grid system */
 .sales-grid {
   display: grid;

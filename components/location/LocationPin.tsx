@@ -37,11 +37,11 @@ export default function LocationPin({
           ${isSelected ? 'ring-1 ring-white outline outline-1 outline-red-500' : ''}
         `}
         style={{
-          outline: 'none',
-          boxShadow: 'none',
-          border: 'none',
-          background: 'red',
-          borderRadius: '50%'
+          outline: 'none !important',
+          boxShadow: 'none !important',
+          border: 'none !important',
+          background: 'red !important',
+          borderRadius: '50% !important'
         }}
         data-location-marker="true"
         data-location-id={location.id}

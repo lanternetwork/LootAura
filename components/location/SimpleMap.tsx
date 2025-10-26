@@ -256,11 +256,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
                 <div
                   className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600"
                   style={{
-                    outline: 'none',
-                    boxShadow: 'none',
-                    border: '1px solid white',
-                    background: 'red',
-                    borderRadius: '50%'
+                    outline: 'none !important',
+                    boxShadow: 'none !important',
+                    border: '1px solid white !important',
+                    background: 'red !important',
+                    borderRadius: '50% !important'
                   }}
                   onClick={() => onSaleClick?.(sale)}
                   role="button"

@@ -573,6 +573,7 @@ export default function SalesClient({
         onDistanceChange={(distance) => handleFiltersChange({ ...filters, distance })}
         onAdvancedFiltersOpen={() => setShowFiltersModal(true)}
         hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
+        isLoading={loading}
         zipInputTestId="zip-input"
         filtersCenterTestId="filters-center"
         filtersMoreTestId="filters-more"

@@ -25,6 +25,9 @@ type FiltersBarProps = {
   onAdvancedFiltersOpen: () => void
   hasActiveFilters: boolean
   
+  // Loading state for visual feedback
+  isLoading?: boolean
+  
   // Test IDs for different layouts
   zipInputTestId?: string
   filtersCenterTestId?: string
@@ -173,6 +176,7 @@ export default function FiltersBar({
   onDistanceChange,
   onAdvancedFiltersOpen,
   hasActiveFilters,
+  isLoading = false,
   zipInputTestId = "zip-input",
   filtersCenterTestId = "filters-center",
   filtersMoreTestId = "filters-more"
@@ -258,17 +262,31 @@ export default function FiltersBar({
                 <li key={category.id} data-chip={category.id}>
                   <button
                     onClick={() => handleCategoryToggle(category.id)}
+                    disabled={isLoading}
                     className={`
                       shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
+                      ${isLoading 
+                        ? 'opacity-50 cursor-not-allowed' 
+                        : ''
+                      }
                       ${isSelected 
                         ? 'bg-blue-100 text-blue-800 border border-blue-200' 
                         : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
                       }
                     `}
                   >
-                    {category.label}
-                    {isSelected && (
-                      <span className="ml-1 text-blue-600">×</span>
+                    {isLoading && isSelected ? (
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        {category.label}
+                      </div>
+                    ) : (
+                      <>
+                        {category.label}
+                        {isSelected && (
+                          <span className="ml-1 text-blue-600">×</span>
+                        )}
+                      </>
                     )}
                   </button>
                 </li>
@@ -300,7 +318,8 @@ export default function FiltersBar({
             <select
               value={distance}
               onChange={(e) => onDistanceChange(Number(e.target.value))}
-              className="px-2 py-1 border rounded text-sm min-w-[80px]"
+              disabled={isLoading}
+              className={`px-2 py-1 border rounded text-sm min-w-[80px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <option value={2}>2 mi</option>
               <option value={5}>5 mi</option>
@@ -378,7 +397,8 @@ export default function FiltersBar({
           <select
             value={dateRange}
             onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
-            className="px-2 py-1 border rounded text-xs min-w-[80px]"
+            disabled={isLoading}
+            className={`px-2 py-1 border rounded text-xs min-w-[80px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <option value="any">Any</option>
             <option value="today">Today</option>
@@ -390,7 +410,8 @@ export default function FiltersBar({
           <select
             value={distance}
             onChange={(e) => onDistanceChange(Number(e.target.value))}
-            className="px-2 py-1 border rounded text-xs min-w-[60px]"
+            disabled={isLoading}
+            className={`px-2 py-1 border rounded text-xs min-w-[60px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <option value={2}>2mi</option>
             <option value={5}>5mi</option>
@@ -437,7 +458,8 @@ export default function FiltersBar({
                   <select
                     value={dateRange}
                     onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
-                    className="w-full px-3 py-2 border rounded-md"
+                    disabled={isLoading}
+                    className={`w-full px-3 py-2 border rounded-md ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <option value="any">Any Date</option>
                     <option value="today">Today</option>
@@ -480,7 +502,8 @@ export default function FiltersBar({
                   <select
                     value={distance}
                     onChange={(e) => onDistanceChange(Number(e.target.value))}
-                    className="w-full px-3 py-2 border rounded-md"
+                    disabled={isLoading}
+                    className={`w-full px-3 py-2 border rounded-md ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <option value={2}>2 miles</option>
                     <option value={5}>5 miles</option>

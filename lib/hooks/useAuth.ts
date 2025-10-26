@@ -144,8 +144,12 @@ export function useFavorites() {
     queryFn: async () => {
       if (!user) return []
 
+      // Use schema-aware table name
+      const schema = process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'
+      const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
+
       const { data, error } = await sb
-        .from('lootaura_v2.favorites')
+        .from(favoritesTable)
         .select(`
           sale_id,
           sales:sale_id (*)
@@ -172,9 +176,13 @@ export function useToggleFavorite() {
         throw new Error('Please sign in to save favorites')
       }
 
+      // Use schema-aware table name
+      const schema = process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'
+      const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
+
       if (isFavorited) {
         const { error } = await sb
-          .from('favorites')
+          .from(favoritesTable)
           .delete()
           .eq('user_id', user.id)
           .eq('sale_id', saleId)
@@ -184,7 +192,7 @@ export function useToggleFavorite() {
         }
       } else {
         const { error } = await sb
-          .from('favorites')
+          .from(favoritesTable)
           .insert({ user_id: user.id, sale_id: saleId })
 
         if (error) {

@@ -327,7 +327,8 @@ export default function SalesClient({
     setIsZipSearching(true) // Prevent map view changes from overriding ZIP search
     setIsMapTransitioning(true) // Show loading overlay
     
-    console.log('[ZIP] Updating map center to:', { lat, lng, zip })
+    console.log('[ZIP] Updating map center to:', { lat, lng, zip, city, state })
+    console.log('[ZIP] Received coordinates:', { lat, lng, type: typeof lat, type_lng: typeof lng })
     
     // Update map center
     setMapView(prev => {

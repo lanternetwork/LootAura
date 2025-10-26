@@ -352,7 +352,7 @@ export default function SalesClient({
       const newView = {
         ...prev,
         center: { lat, lng },
-        zoom: 10 // Balanced zoom level to show more sales around ZIP area
+        zoom: 12 // More zoomed in to focus on specific ZIP area
       }
       console.log('[ZIP] New map view:', newView)
       return newView

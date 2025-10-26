@@ -22,7 +22,8 @@ export default function CustomPin({
   useEffect(() => {
     if (!pinRef.current) return
 
-    const map = pinRef.current.closest('.mapboxgl-map')?.__mapboxgl_map
+    const mapElement = pinRef.current.closest('.mapboxgl-map') as HTMLElement
+    const map = mapElement?.__mapboxgl_map
     if (!map) return
 
     // Create a custom DOM element
@@ -78,3 +79,4 @@ export default function CustomPin({
 
   return <div ref={pinRef} style={{ display: 'none' }} />
 }
+

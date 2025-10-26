@@ -201,6 +201,14 @@ export async function GET(request: NextRequest) {
     try {
       console.log(`[SALES] Querying sales_v2 view directly...`)
       
+      // First, let's check the total count of sales in the database
+      const { count: totalSalesCount, error: countError } = await supabase
+        .from('sales_v2')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'published')
+      
+      console.log(`[SALES] Total published sales in database:`, totalSalesCount)
+      
       // Use actual bbox if provided, otherwise calculate from distance
       let minLat, maxLat, minLng, maxLng
       
@@ -308,7 +316,16 @@ export async function GET(request: NextRequest) {
         dataCount: salesData?.length || 0, 
         error: salesError,
         sampleData: salesData?.slice(0, 2),
-        bboxUsed: actualBbox ? 'viewport' : 'distance-based'
+        bboxUsed: actualBbox ? 'viewport' : 'distance-based',
+        fetchWindow,
+        limit,
+        queryParams: {
+          minLat, maxLat, minLng, maxLng,
+          categories: categories.length,
+          dateRange,
+          startDateParam,
+          endDateParam
+        }
       })
       
       if (salesError) {

@@ -56,7 +56,7 @@ export default function SalesClient({
       east: (effectiveCenter?.lng || -98.5795) + 1.0, 
       north: (effectiveCenter?.lat || 39.8283) + 1.0 
     },
-    zoom: urlZoom ? parseFloat(urlZoom) : 10
+    zoom: urlZoom ? parseFloat(urlZoom) : 12
   })
 
   // Sales data state - map is source of truth

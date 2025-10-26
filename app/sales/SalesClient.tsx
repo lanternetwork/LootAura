@@ -116,6 +116,26 @@ export default function SalesClient({
       }
     }
     
+    // Skip clustering for very small datasets to improve performance
+    if (mapSales.length < 3) {
+      return {
+        type: 'individual' as const,
+        pins: [],
+        locations: [],
+        clusters: []
+      }
+    }
+    
+    // Skip expensive clustering for small datasets
+    if (mapSales.length < 5) {
+      return {
+        type: 'individual' as const,
+        pins: [],
+        locations: [],
+        clusters: []
+      }
+    }
+    
     // Filter sales to only those within the current viewport bounds
     const visibleSales = mapSales.filter(sale => {
       if (typeof sale.lat !== 'number' || typeof sale.lng !== 'number') return false
@@ -125,6 +145,16 @@ export default function SalesClient({
              sale.lng >= currentViewport.bounds[0] && // west
              sale.lng <= currentViewport.bounds[2]    // east
     })
+    
+    // Skip clustering if no visible sales
+    if (visibleSales.length === 0) {
+      return {
+        type: 'individual' as const,
+        pins: [],
+        locations: [],
+        clusters: []
+      }
+    }
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', mapSales.length, 'total')
@@ -306,11 +336,16 @@ export default function SalesClient({
     }
   }
 
-  // Initial fetch on mount
+  // Initial fetch on mount - optimized for performance
   useEffect(() => {
     if (mapView.bounds) {
       console.log('[INITIAL] Fetching sales on mount with bounds:', mapView.bounds)
-      fetchMapSales(mapView.bounds)
+      // Debounce initial fetch to prevent multiple rapid calls
+      const timeoutId = setTimeout(() => {
+        fetchMapSales(mapView.bounds)
+      }, 150) // Slightly longer debounce for initial load
+      
+      return () => clearTimeout(timeoutId)
     }
   }, []) // Only run on mount
 

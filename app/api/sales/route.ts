@@ -588,6 +588,7 @@ export async function GET(request: NextRequest) {
       center: { lat: latitude, lng: longitude },
       distanceKm,
       count: results.length,
+      totalCount: totalSalesCount, // Add total database count to response
       durationMs: Date.now() - startedAt
     }
     

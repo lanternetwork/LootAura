@@ -240,13 +240,15 @@ export default function SalesClient({
       }
       
       if (data.ok && Array.isArray(data.data)) {
-        console.log('[FETCH] API Response:', {
-          ok: data.ok,
-          dataCount: data.data.length,
-          center: data.center,
-          distanceKm: data.distanceKm,
-          degraded: data.degraded
-        })
+      console.log('[FETCH] API Response:', {
+        ok: data.ok,
+        dataCount: data.data.length,
+        center: data.center,
+        distanceKm: data.distanceKm,
+        degraded: data.degraded,
+        totalCount: data.totalCount,
+        bbox: bbox
+      })
         
         const deduplicated = deduplicateSales(data.data)
         console.log('[FETCH] Sales received:', { 

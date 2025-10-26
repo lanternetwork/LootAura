@@ -9,6 +9,7 @@ import MapDiagnostics from '@/components/MapDiagnostics'
 import MapInteractionTester from '@/components/MapInteractionTester'
 import MapPinsDiagnostics from '@/components/admin/MapPinsDiagnostics'
 import DiagnosticToolsValidator from '@/components/admin/DiagnosticToolsValidator'
+import SalesDataTester from '@/components/admin/SalesDataTester'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useState, useRef } from 'react'
 // MapRef is a namespace in react-map-gl v7, not a type
@@ -96,6 +97,9 @@ export default function AdminToolsPage() {
               </div>
             </div>
           </div>
+
+          {/* Sales Data Tester */}
+          <SalesDataTester />
 
           {/* ZIP Lookup Testing */}
           <ZipLookupTester />

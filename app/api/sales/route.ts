@@ -64,9 +64,10 @@ export async function GET(request: NextRequest) {
         latitude = (validatedBbox.north + validatedBbox.south) / 2
         longitude = (validatedBbox.east + validatedBbox.west) / 2
         
-        // When using viewport bounds, don't calculate distance - we'll use bbox filtering instead
-        // Set distanceKm to a very large value to effectively disable distance filtering
-        distanceKm = 1000 // 1000km - effectively unlimited
+        // When using viewport bounds, still respect distance filter if provided
+        // Parse distance from URL parameters
+        const distanceParam = searchParams.get('dist') || searchParams.get('distance')
+        distanceKm = distanceParam ? parseFloat(distanceParam) : 1000 // Default to unlimited if not specified
         
         // Store the actual bbox for proper filtering
         actualBbox = validatedBbox
@@ -403,16 +404,15 @@ export async function GET(request: NextRequest) {
             distance_km: Math.round(distanceKm * 100) / 100
           }
         })
-                .filter((sale) => {
-                  // Only apply distance filtering if we're using distance-based search (not viewport bounds)
-                  if (actualBbox) {
-                    // When using viewport bounds, don't filter by distance - the bbox already defines the visible area
-                    return sale !== null
-                  } else {
-                    // When using distance-based search, apply distance filtering
-                    return sale && (sale.distance_km || 0) <= distanceKm
-                  }
-                })
+        .filter((sale) => {
+          // Always apply distance filtering if distanceKm is specified and less than 1000
+          if (distanceKm && distanceKm < 1000) {
+            return sale && (sale.distance_km || 0) <= distanceKm
+          } else {
+            // No distance filtering (distanceKm >= 1000 or undefined)
+            return sale !== null
+          }
+        })
                 .sort((a, b) => {
                   if (!a || !b) return 0
                   // Primary sort: distance

@@ -70,8 +70,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
 
   const onStyleData = useCallback(() => {
     console.log('[MAP] onStyleData')
-    mapRef.current?.getMap()?.resize()
-  }, [])
+    // Only resize if map is not already loaded to avoid excessive resizing
+    if (!loaded) {
+      mapRef.current?.getMap()?.resize()
+    }
+  }, [loaded])
 
   const handleMoveEnd = useCallback(() => {
     if (!mapRef.current) return

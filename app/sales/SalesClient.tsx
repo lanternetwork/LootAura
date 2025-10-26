@@ -350,8 +350,12 @@ export default function SalesClient({
   useEffect(() => {
     if (mapView.bounds) {
       console.log('[INITIAL] Fetching sales on mount with bounds:', mapView.bounds)
-      // Immediate fetch for initial load - no debounce needed
-      fetchMapSales(mapView.bounds)
+      // Small delay to ensure map is fully loaded before fetching data
+      const timeoutId = setTimeout(() => {
+        fetchMapSales(mapView.bounds)
+      }, 100)
+      
+      return () => clearTimeout(timeoutId)
     }
   }, []) // Only run on mount
 

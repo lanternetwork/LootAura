@@ -3,7 +3,7 @@ import {
   buildClusterIndex, 
   getClustersForViewport,
   type ClusterPoint 
-} from '@/lib/clustering'
+} from '@/lib/pins/clustering'
 
 describe('Cluster Performance Benchmarks', () => {
   // Generate test data for performance testing
@@ -21,9 +21,8 @@ describe('Cluster Performance Benchmarks', () => {
 
       points.push({
         id: `point-${i}`,
-        lon,
-        lat,
-        category: ['furniture', 'tools', 'electronics', 'books'][i % 4]
+        lng: lon,
+        lat
       })
     }
 

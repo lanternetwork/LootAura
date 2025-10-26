@@ -1,0 +1,17 @@
+{
+  "analysis_timestamp": "2025-10-23T09:56:00Z",
+  "branch": "release/ui-refresh-simple-map",
+  "phase": "post-arbiter-removal",
+  "findings": {
+    "unused_ts_exports": [],
+    "unused_dependencies": [],
+    "unused_imports": [],
+    "unused_routes_apis": [],
+    "dead_feature_flags": [],
+    "orphaned_styles": [],
+    "orphaned_assets": [],
+    "stale_tests": [],
+    "unused_scripts": [],
+    "stale_docs": []
+  }
+}

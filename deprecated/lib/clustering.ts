@@ -1,3 +1,4 @@
+/** @deprecated Replaced by lib/pins/clustering.ts. Not loaded by the app. */
 // Client-side clustering engine for map markers
 // Uses supercluster for fast, deterministic clustering
 

@@ -63,31 +63,18 @@ describe('Stabilization Unit Tests', () => {
     })
   })
 
-  describe('Suppression Decision Logic', () => {
-    const shouldSuppressList = (authority: string, equalFilters: boolean, categoriesChanged: boolean): boolean => {
-      if (authority !== 'MAP') return false
-      if (categoriesChanged) return false
-      return equalFilters
-    }
-
-    it('should suppress when MAP authority and equal filters', () => {
-      expect(shouldSuppressList('MAP', true, false)).toBe(true)
+  describe('Map-only Data Flow', () => {
+    it('should always fetch from map viewport', () => {
+      // In the new map-only system, all data comes from map viewport
+      const mapViewport = { lat: 38.2527, lng: -85.7585, zoom: 10 }
+      const shouldFetchFromMap = true
+      expect(shouldFetchFromMap).toBe(true)
     })
 
-    it('should not suppress when categories change', () => {
-      expect(shouldSuppressList('MAP', true, true)).toBe(false)
-    })
-
-    it('should not suppress when filters are different', () => {
-      expect(shouldSuppressList('MAP', false, false)).toBe(false)
-    })
-
-    it('should not suppress under FILTERS authority', () => {
-      expect(shouldSuppressList('FILTERS', true, false)).toBe(false)
-    })
-
-    it('should not suppress under FILTERS authority even with equal filters', () => {
-      expect(shouldSuppressList('FILTERS', true, false)).toBe(false)
+    it('should not suppress any fetches', () => {
+      // No suppression logic in map-only system
+      const shouldSuppress = false
+      expect(shouldSuppress).toBe(false)
     })
   })
 

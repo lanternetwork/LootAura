@@ -1,0 +1,57 @@
+'use client'
+
+import { useCallback } from 'react'
+import { Marker } from 'react-map-gl'
+
+interface PinMarkerProps {
+  id: string
+  lat: number
+  lng: number
+  isSelected?: boolean
+  onClick?: (saleId: string) => void
+}
+
+export default function PinMarker({ 
+  id, 
+  lat, 
+  lng, 
+  isSelected = false,
+  onClick 
+}: PinMarkerProps) {
+  const handleClick = useCallback((event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    onClick?.(id)
+  }, [id, onClick])
+
+  return (
+    <Marker
+      longitude={lng}
+      latitude={lat}
+      anchor="center"
+      data-testid="marker"
+    >
+      <div
+        style={{
+          width: '8px',
+          height: '8px',
+          backgroundColor: isSelected ? '#dc2626' : '#ef4444',
+          borderRadius: '50%',
+          cursor: 'pointer',
+          border: isSelected ? '2px solid white' : '1px solid white',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+          outline: 'none',
+          position: 'relative',
+          zIndex: 1
+        }}
+        data-pin-marker="true"
+        data-pin-id={id}
+        onClick={handleClick}
+        role="button"
+        tabIndex={0}
+        aria-label={`Sale pin ${id}`}
+        title={`Sale ${id}`}
+      />
+    </Marker>
+  )
+}

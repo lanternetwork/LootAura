@@ -1,15 +1,17 @@
+/** @deprecated Replaced by components/location/SimpleMap.tsx. Not loaded by the app. */
+// DEPRECATED: replaced by SimpleMap
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Map, { Marker, Popup } from 'react-map-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
 // import mapboxgl from 'mapbox-gl'
 import { Sale } from '@/lib/types'
 // import { formatLocation } from '@/lib/location/client'
 import { getMapboxToken } from '@/lib/maps/token'
 import { incMapLoad } from '@/lib/usageLogs'
 import { isClusteringEnabled } from '@/lib/clustering'
-import SalesMapClustered from './SalesMapClustered'
+// DEPRECATED: SalesMapClustered removed - use SimpleMap with pins prop instead
+import SimpleMap from './SimpleMap'
 import MapLoadingIndicator from './MapLoadingIndicator'
 import mapDebug from '@/lib/debug/mapDebug'
 
@@ -31,8 +33,6 @@ interface SalesMapProps {
   onMoveEnd?: () => void
   onZoomEnd?: () => void
   onMapReady?: () => void
-  arbiterMode?: 'initial' | 'map' | 'zip' | 'distance'
-  arbiterAuthority?: 'FILTERS' | 'MAP'
 }
 
 export default function SalesMap({ 
@@ -53,8 +53,6 @@ export default function SalesMap({
   onMoveEnd,
   onZoomEnd,
   onMapReady,
-  arbiterMode,
-  arbiterAuthority
 }: SalesMapProps) {
   // All hooks must be called unconditionally at the top
   useEffect(() => {
@@ -62,9 +60,56 @@ export default function SalesMap({
   }, [])
 
   // Call onMapReady when map loads (not onLoad bounds emission)
-  const handleMapLoad = useCallback(() => {
+  const handleMapLoad = useCallback((event: any) => {
+    console.log('[MAP] handleMapLoad called - map is ready!', { event })
     mapDebug.logMapLoad('SalesMap', 'success', { onMapReady: !!onMapReady })
     setIsMapLoading(false) // Map is loaded, hide loading indicator
+    
+    // Store the map instance directly from the event
+    const map = event.target
+    mapInstanceRef.current = map
+    console.log('[MAP] Map loaded:', { mapExists: !!map, mapType: typeof map, instanceStored: !!mapInstanceRef.current })
+    
+    if (map && typeof map.resize === 'function') {
+      // Resize immediately on load
+      map.resize()
+      
+      // Also resize after style loads (important for proper rendering)
+      map.on('style.load', () => {
+        map.resize()
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
+          console.log(`[MAP_RESIZE] invoked reason=style.load`)
+        }
+      })
+      
+      // One-shot resize after first frame
+      requestAnimationFrame(() => {
+        map.resize()
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
+          console.log(`[MAP_RESIZE] invoked reason=requestAnimationFrame`)
+        }
+      })
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
+        console.log(`[MAP_RESIZE] invoked reason=load`)
+      }
+    }
+    
+    // Handle any pending center changes that were queued before map was ready
+    if (pendingCenterChangeRef.current) {
+      console.log('[MAP] Map loaded, applying pending center change:', pendingCenterChangeRef.current)
+      // Apply the pending center change by updating the map view
+      const { center: pendingCenter, zoom: pendingZoom } = pendingCenterChangeRef.current
+      map.easeTo({ 
+        center: [pendingCenter.lng, pendingCenter.lat], 
+        zoom: pendingZoom, 
+        duration: 600 
+      })
+      pendingCenterChangeRef.current = null
+    } else {
+      console.log('[MAP] Map loaded, no pending center changes')
+    }
+    
     if (onMapReady) {
       onMapReady()
     }
@@ -81,9 +126,74 @@ export default function SalesMap({
   const [visiblePinIds, setVisiblePinIds] = useState<string[]>([])
   const [visiblePinCount, setVisiblePinCount] = useState(0)
   const [_moved, _setMoved] = useState(false)
+  
+  // Debug state for container sizing
+  const [debugInfo, setDebugInfo] = useState({
+    containerWidth: 0,
+    containerHeight: 0,
+    parentWidth: 0,
+    parentHeight: 0,
+    lastResize: 0
+  })
+  const containerRef = useRef<HTMLDivElement>(null)
   const autoFitAttemptedRef = useRef(false)
+  const pendingCenterChangeRef = useRef<{ center: { lat: number; lng: number }; zoom: number } | null>(null)
   const [isMapLoading, setIsMapLoading] = useState(true)
   
+  // Map refs for component lifecycle
+  
+  // ResizeObserver for map container sizing
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect
+        const parent = entry.target.parentElement
+        const parentRect = parent?.getBoundingClientRect()
+        
+        const newDebugInfo = {
+          containerWidth: Math.round(width),
+          containerHeight: Math.round(height),
+          parentWidth: parentRect ? Math.round(parentRect.width) : 0,
+          parentHeight: parentRect ? Math.round(parentRect.height) : 0,
+          lastResize: Date.now()
+        }
+        
+        setDebugInfo(newDebugInfo)
+        
+        // Log resize event
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
+          console.log(`[MAP_RESIZE] invoked reason=observer size=${newDebugInfo.containerWidth}x${newDebugInfo.containerHeight}`)
+          console.log(`[MAP_VIS] container=${newDebugInfo.containerWidth}x${newDebugInfo.containerHeight} parent=${newDebugInfo.parentWidth}x${newDebugInfo.parentHeight}`)
+        }
+        
+        // Call map.resize() if map is available
+        const map = mapRef.current?.getMap?.()
+        if (map && typeof map.resize === 'function') {
+          map.resize()
+          
+          // One-shot resize after first observer event
+          if (newDebugInfo.containerHeight > 0 && !autoFitAttemptedRef.current) {
+            autoFitAttemptedRef.current = true
+            requestAnimationFrame(() => {
+              map.resize()
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) {
+                console.log(`[MAP_RESIZE] invoked reason=first-observer-frame`)
+              }
+            })
+          }
+        }
+      }
+    })
+
+    resizeObserver.observe(containerRef.current)
+    
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [])
+
   // All remaining hooks must be called unconditionally
   useEffect(() => {
     mapDebug.logMapState('SalesMap', { 
@@ -160,17 +270,7 @@ export default function SalesMap({
         
         // Auto-fit if no pins are visible but markers exist (only once per session)
         if (markers.length > 0 && visiblePinCount === 0 && !autoFitAttemptedRef.current) {
-          // Block AUTO-FIT in MAP authority mode
-          if (arbiterAuthority === 'MAP') {
-            console.log('[BLOCK] AUTO-FIT suppressed (mode=map)')
-            return
-          }
-          
-          // Block AUTO-FIT in FILTERS authority mode (not distance change)
-          if (arbiterAuthority === 'FILTERS' && arbiterMode !== 'distance') {
-            console.log('[BLOCK] AUTO-FIT suppressed (filters authoritative, not distance)')
-            return
-          }
+          // Allow AUTO-FIT for all cases
           
           console.log('[AUTO-FIT] No visible pins but markers exist, fitting to bounds')
           autoFitAttemptedRef.current = true
@@ -208,18 +308,14 @@ export default function SalesMap({
     try {
       const map = mapRef.current?.getMap?.()
       if (map) {
-        // Block programmatic movement in MAP authority mode
-        if (arbiterAuthority === 'MAP') {
-          console.log('[BLOCK] programmatic move suppressed (map authoritative)')
-          return
-        }
+        // Allow programmatic movement
         
         const currentZoom = typeof map.getZoom === 'function' ? map.getZoom() : (zoom || 11)
         // Do not force a minimum zoom during programmatic recenters; respect current zoom
         map.easeTo({ center: [center.lng, center.lat], zoom: currentZoom, duration: 600 })
       }
     } catch {}
-  }, [center.lat, center.lng, arbiterAuthority])
+  }, [center.lat, center.lng])
 
   // Simple map load handling - no complex state management needed
   useEffect(() => {
@@ -234,11 +330,7 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (!map) return
       
-      // Block programmatic movement in MAP authority mode
-      if (arbiterAuthority === 'MAP') {
-        console.log('[BLOCK] center override suppressed (map authoritative)')
-        return
-      }
+      // Allow programmatic movement
       
       const targetZoom = centerOverride.zoom || zoom
       map.easeTo({ 
@@ -247,7 +339,40 @@ export default function SalesMap({
         duration: 600 
       })
     } catch {}
-  }, [centerOverride, arbiterAuthority, zoom])
+  }, [centerOverride, zoom])
+
+  // Store map instance from onLoad callback
+  const mapInstanceRef = useRef<any>(null)
+
+  // Handle center changes
+  useEffect(() => {
+    console.log('[MAP] Center effect triggered', { center })
+    
+    if (!mapInstanceRef.current) {
+      console.log('[MAP] Center effect - no map instance, returning')
+      return
+    }
+
+    const map = mapInstanceRef.current
+    const currentCenter = map.getCenter()
+    const newCenter = { lat: center.lat, lng: center.lng }
+    
+    console.log('[MAP] Current center:', currentCenter, 'New center:', newCenter)
+    
+    // Check if center has changed significantly
+    const latDiff = Math.abs(currentCenter.lat - newCenter.lat)
+    const lngDiff = Math.abs(currentCenter.lng - newCenter.lng)
+    
+    if (latDiff > 0.001 || lngDiff > 0.001) {
+      console.log('[MAP] Moving map to new center:', newCenter)
+      map.easeTo({
+        center: [newCenter.lng, newCenter.lat],
+        duration: 1000
+      })
+    } else {
+      console.log('[MAP] Center unchanged, no movement needed')
+    }
+  }, [center.lat, center.lng])
 
   // Handle fit bounds
   useEffect(() => {
@@ -257,12 +382,7 @@ export default function SalesMap({
       const map = mapRef.current?.getMap?.()
       if (!map) return
       
-      // Allow fitBounds for ZIP searches and other programmatic moves
-      // Only block if it's a MAP authority mode AND not a ZIP search
-      if (arbiterAuthority === 'MAP' && arbiterMode !== 'zip') {
-        console.log('[BLOCK] fit bounds suppressed (map authoritative, not ZIP)')
-        return
-      }
+      // Allow fitBounds for all cases
       
       const bounds = [
         [fitBounds.west, fitBounds.south],
@@ -270,9 +390,7 @@ export default function SalesMap({
       ]
       
       console.log('[MAP] fitBounds executing', { 
-        reason: fitBounds.reason, 
-        authority: arbiterAuthority, 
-        mode: arbiterMode 
+        reason: fitBounds.reason
       })
       
       map.fitBounds(bounds, { padding: 0, maxZoom: 15, duration: 0 })
@@ -283,7 +401,7 @@ export default function SalesMap({
     } catch (error) {
       console.error('[MAP] fitBounds error:', error)
     }
-  }, [fitBounds, arbiterAuthority, arbiterMode, onFitBoundsComplete])
+  }, [fitBounds, onFitBoundsComplete])
 
   // Handle view changes
   const handleViewChange = useCallback((evt: any) => {
@@ -402,8 +520,6 @@ export default function SalesMap({
         onMoveEnd={onMoveEnd}
         onZoomEnd={onZoomEnd}
         onMapReady={onMapReady}
-        arbiterMode={arbiterMode}
-        arbiterAuthority={arbiterAuthority}
       />
     )
   }
@@ -414,8 +530,18 @@ export default function SalesMap({
 
   // Non-clustered map implementation
   return (
-    <div className="w-full h-full relative">
+    <div ref={containerRef} className="relative min-h-0 min-w-0 w-full h-full">
       {isMapLoading && <MapLoadingIndicator />}
+      
+      {/* Debug overlay */}
+      {(process.env.NEXT_PUBLIC_DEBUG === 'true' || window.location.search.includes('debug=1')) && (
+        <div className="absolute top-2 left-2 z-50 bg-black bg-opacity-75 text-white text-xs p-2 rounded pointer-events-none">
+          <div>Container: {debugInfo.containerWidth}×{debugInfo.containerHeight}</div>
+          <div>Parent: {debugInfo.parentWidth}×{debugInfo.parentHeight}</div>
+          <div>Last resize: {new Date(debugInfo.lastResize).toLocaleTimeString()}</div>
+        </div>
+      )}
+      
       <Map
         ref={mapRef}
         mapboxAccessToken={getMapboxToken()}
@@ -424,12 +550,16 @@ export default function SalesMap({
           latitude: center.lat,
           zoom: zoom
         }}
-        style={{ width: '100%', height: '100%' }}
+        key={`${center.lat}-${center.lng}-${zoom}`}
+        style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         onLoad={handleMapLoad}
         onMoveEnd={handleMoveEnd}
         onZoomEnd={handleZoomEnd}
         onMove={handleViewChange}
+        onError={(error: any) => console.log('[MAP] Map error:', error)}
+        onStyleLoad={() => console.log('[MAP] Style loaded')}
+        onStyleData={() => console.log('[MAP] Style data loaded')}
         interactiveLayerIds={[]}
         // Performance optimizations
         optimizeForTerrain={false}

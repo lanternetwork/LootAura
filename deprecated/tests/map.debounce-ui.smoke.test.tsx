@@ -1,3 +1,4 @@
+/** @deprecated Test for deprecated SalesMapClustered component. Not run by CI. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, waitFor } from '@testing-library/react'
 import React from 'react'
@@ -36,7 +37,7 @@ vi.mock('@/lib/maps/token', () => ({
 }))
 
 // Mock clustering
-vi.mock('@/lib/clustering', () => ({
+vi.mock('@/lib/pins/clustering', () => ({
   isClusteringEnabled: () => false,
   buildClusterIndex: () => null,
   getClustersForViewport: () => [],

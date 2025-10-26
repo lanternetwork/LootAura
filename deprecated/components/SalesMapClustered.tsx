@@ -1,8 +1,9 @@
+/** @deprecated Replaced by components/location/SimpleMap.tsx. Not loaded by the app. */
+// DEPRECATED: replaced by SimpleMap
 'use client'
 
 import React, { useEffect, useState, useRef, useCallback, useMemo, forwardRef } from 'react'
 import Map, { Marker, Popup } from 'react-map-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
 import { Sale } from '@/lib/types'
 import { getMapboxToken } from '@/lib/maps/token'
 import { 
@@ -15,7 +16,17 @@ import {
   type ClusterResult,
   type ClusterPoint
 } from '@/lib/clustering'
+import { ClusterFeature } from '@/lib/pins/types'
 import { createViewportFetchManager, type Viewport, type Filters } from '@/lib/map/viewportFetchManager'
+
+// Convert ClusterResult to ClusterFeature for compatibility with new ClusterMarker
+const convertClusterResultToFeature = (cluster: ClusterResult): ClusterFeature => ({
+  id: parseInt(cluster.id.replace('cluster-', '')) || 0,
+  count: cluster.count || 1,
+  lat: cluster.lat,
+  lng: cluster.lon,
+  expandToZoom: 12 // Default expansion zoom
+})
 import { saveViewportState, loadViewportState, type ViewportState, type FilterState } from '@/lib/map/viewportPersistence'
 import { getCurrentTileId, adjacentTileIds } from '@/lib/map/tiles'
 import { hashFilters, type FilterState as FilterStateType } from '@/lib/filters/hash'
@@ -46,8 +57,6 @@ interface SalesMapClusteredProps {
   onMoveEnd?: () => void
   onZoomEnd?: () => void
   onMapReady?: () => void
-  arbiterMode?: 'initial' | 'map' | 'zip' | 'distance'
-  arbiterAuthority?: 'FILTERS' | 'MAP'
   // DOM props that can be safely passed to wrapper
   className?: string
   style?: React.CSSProperties
@@ -73,8 +82,6 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
   onMoveEnd,
   onZoomEnd,
   onMapReady,
-  arbiterMode: _arbiterMode,
-  arbiterAuthority: _arbiterAuthority,
   // DOM props
   className,
   style,
@@ -336,7 +343,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     const viewportClusters = getClustersForViewport(clusterIndex, bbox, currentZoom)
     setClusters(viewportClusters)
 
-    // Update visible pins for arbiter authority
+    // Update visible pins for map viewport
     const visibleIds = viewportClusters
       .filter(cluster => cluster.type === 'point')
       .map(cluster => cluster.id)
@@ -650,11 +657,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       if (!map) return
       
       // Allow fitBounds for ZIP searches and other programmatic moves
-      // Only block if it's a MAP authority mode AND not a ZIP search
-      if (_arbiterAuthority === 'MAP' && _arbiterMode !== 'zip') {
-        console.log('[BLOCK] fit bounds suppressed (map authoritative, not ZIP)')
-        return
-      }
+      // Allow fitBounds for all cases
       
       const bounds = [
         [_fitBounds.west, _fitBounds.south],
@@ -662,9 +665,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
       ]
       
       console.log('[MAP] fitBounds executing (clustered)', { 
-        reason: _fitBounds.reason, 
-        authority: _arbiterAuthority, 
-        mode: _arbiterMode 
+        reason: _fitBounds.reason
       })
       
       map.fitBounds(bounds, { padding: 0, maxZoom: 15, duration: 0 })
@@ -675,7 +676,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     } catch (error) {
       console.error('[MAP] fitBounds error (clustered):', error)
     }
-  }, [_fitBounds, _arbiterAuthority, _arbiterMode, _onFitBoundsComplete])
+  }, [_fitBounds, _onFitBoundsComplete])
 
   // Render cluster markers
   const renderClusters = useMemo(() => {
@@ -709,7 +710,7 @@ const SalesMapClustered = forwardRef<any, SalesMapClusteredProps>(({
     return clusters.map(cluster => (
       <ClusterMarker
         key={cluster.id}
-        cluster={cluster}
+        cluster={convertClusterResultToFeature(cluster)}
         onClick={cluster.type === 'cluster' ? handleClusterClick : handlePointClick}
         onKeyDown={cluster.type === 'cluster' ? handleClusterKeyDown : undefined}
         size={cluster.type === 'cluster' ? getClusterSizeTier(cluster.count || 0) : 'small'}

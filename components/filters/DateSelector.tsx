@@ -17,11 +17,9 @@ interface DateSelectorProps {
 export default function DateSelector({ value, onChange, className = '' }: DateSelectorProps) {
   const [showCustomRange, setShowCustomRange] = useState(false)
   
-  // Debug logging
-  console.log('[DateSelector] Current value:', value)
+  // Debug logging removed for performance
 
   const handleTypeChange = (type: DateRange['type']) => {
-    console.log('[DateSelector] handleTypeChange called with:', type)
     if (type === 'range') {
       setShowCustomRange(true)
       onChange({ type, startDate: '', endDate: '' })
@@ -29,7 +27,6 @@ export default function DateSelector({ value, onChange, className = '' }: DateSe
       setShowCustomRange(false)
       onChange({ type })
     }
-    console.log('[DateSelector] onChange called with:', { type })
   }
 
   const handleCustomRangeChange = (field: 'startDate' | 'endDate', date: string) => {

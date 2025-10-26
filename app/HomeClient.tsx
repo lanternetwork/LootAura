@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Sale } from '@/lib/types'
 import { User } from '@supabase/supabase-js'
-import SalesMap from '@/components/location/SalesMap'
+import SimpleMap from '@/components/location/SimpleMap'
 import UseLocationButton from '@/components/location/UseLocationButton'
 import { useLocationSearch } from '@/lib/location/useLocation'
 
@@ -96,10 +96,15 @@ export default function HomeClient({ initialSales, user: _user }: HomeClientProp
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Sales Map</h2>
           <div className="h-64 rounded-lg overflow-hidden">
-            <SalesMap
-              sales={sales}
+            <SimpleMap
               center={location || { lat: 38.2527, lng: -85.7585 }}
               zoom={10}
+              pins={{
+                sales: sales.filter(s => typeof s.lat === 'number' && typeof s.lng === 'number').map(s => ({ id: s.id, lat: s.lat!, lng: s.lng! })),
+                selectedId: null,
+                onPinClick: () => {},
+                onClusterClick: () => {}
+              }}
             />
           </div>
         </div>

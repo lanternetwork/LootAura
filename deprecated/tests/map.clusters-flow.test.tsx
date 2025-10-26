@@ -1,7 +1,8 @@
+/** @deprecated Test for deprecated SalesMapClustered component. Not run by CI. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import React from 'react'
-import SalesMapClustered from '@/components/location/SalesMapClustered'
+import SimpleMap from '@/components/location/SimpleMap'
 import { Sale } from '@/lib/types'
 
 // Mock react-map-gl
@@ -265,7 +266,7 @@ describe('Map Clusters Flow', () => {
     unmount()
   })
 
-  it('should maintain arbiter authority with clustering', async () => {
+  it('should handle clustering with map-only data flow', async () => {
     const onVisiblePinsChange = vi.fn()
     
     const { unmount } = render(
@@ -274,7 +275,6 @@ describe('Map Clusters Flow', () => {
         markers={mockMarkers}
         center={{ lat: 38.2527, lng: -85.7585 }}
         zoom={10}
-        arbiterAuthority="MAP"
         onVisiblePinsChange={onVisiblePinsChange}
         data-testid="map-container-8"
       />

@@ -139,16 +139,16 @@ export function applyVisualClustering(
   })
   
   // Add individual locations that aren't clustered
-  const clusteredLocationIds = new Set<string>(
-    clusters.flatMap(_cluster => {
-      // This would need to be implemented to get the actual location IDs in each cluster
-      // For now, we'll add all locations as individual pins
-      return []
-    })
-  )
+  const clusteredLocationIds = new Set<string>()
   
-  locations.forEach(location => {
-    if (!clusteredLocationIds.has(location.id)) {
+  // For each cluster, we need to determine which locations are included
+  // Since we don't have direct access to the cluster's children, we'll use a different approach:
+  // Only show individual pins if there are no clusters, or if the zoom level is high enough
+  const shouldShowIndividualPins = clusters.length === 0 || viewport.zoom >= opts.maxZoom
+  
+  // Only add individual locations if we should show them
+  if (shouldShowIndividualPins) {
+    locations.forEach(location => {
       pins.push({
         type: 'location' as const,
         id: location.id,
@@ -156,8 +156,8 @@ export function applyVisualClustering(
         lng: location.lng,
         sales: location.sales
       })
-    }
-  })
+    })
+  }
   
   return {
     type: 'clustered',

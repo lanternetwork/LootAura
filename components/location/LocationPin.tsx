@@ -28,15 +28,12 @@ export default function LocationPin({
       anchor="center"
       data-testid="location-marker"
     >
-      <div
+      <svg
+        width="8"
+        height="8"
+        viewBox="0 0 8 8"
         style={{
-          width: '8px',
-          height: '8px',
-          backgroundColor: isSelected ? '#dc2626' : '#ef4444',
-          borderRadius: '50%',
           cursor: 'pointer',
-          border: isSelected ? '2px solid white' : '1px solid white',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
           outline: 'none',
           position: 'relative',
           zIndex: 1
@@ -48,7 +45,16 @@ export default function LocationPin({
         tabIndex={0}
         aria-label={`Location with ${location.totalSales} sales`}
         title={`${location.totalSales} sales at this location`}
-      />
+      >
+        <circle
+          cx="4"
+          cy="4"
+          r="3"
+          fill={isSelected ? '#dc2626' : '#ef4444'}
+          stroke="white"
+          strokeWidth={isSelected ? '2' : '1'}
+        />
+      </svg>
     </Marker>
   )
 }

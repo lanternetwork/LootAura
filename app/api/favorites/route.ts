@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getSchema } from '@/lib/supabase/schema'
 
 /**
  * GET /api/favorites - Get user favorites
@@ -22,9 +23,13 @@ export async function GET(_request: NextRequest) {
       )
     }
 
+    // Get schema-aware table name
+    const schema = getSchema()
+    const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
+
     // Get user's favorites
     const { data: favorites, error } = await supabase
-      .from('favorites_v2')
+      .from(favoritesTable)
       .select('*')
       .eq('user_id', user.id)
 
@@ -73,9 +78,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get schema-aware table name
+    const schema = getSchema()
+    const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
+
     // Add favorite
     const { data: favorite, error } = await supabase
-      .from('favorites_v2')
+      .from(favoritesTable)
       .insert({
         user_id: user.id,
         sale_id: sale_id
@@ -128,9 +137,13 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // Get schema-aware table name
+    const schema = getSchema()
+    const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
+
     // Remove favorite
     const { error } = await supabase
-      .from('favorites_v2')
+      .from(favoritesTable)
       .delete()
       .eq('user_id', user.id)
       .eq('sale_id', sale_id)

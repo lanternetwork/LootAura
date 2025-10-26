@@ -11,7 +11,6 @@ const signupSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one lowercase letter, one uppercase letter, and one number'),
-  returnTo: z.string().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -33,18 +32,17 @@ export async function POST(request: NextRequest) {
     const cookieStore = cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
-    // Configure email redirect URL with returnTo parameter
-    const returnTo = body.returnTo || '/sales'
+    // Configure email redirect URL
     const emailRedirectTo = process.env.NEXT_PUBLIC_SITE_URL
-      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`
-      : `${request.nextUrl.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`
+      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+      : undefined
 
-    if (!process.env.NEXT_PUBLIC_SITE_URL && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH] WARNING: NEXT_PUBLIC_SITE_URL not set, using request origin for email redirect')
+    if (!emailRedirectTo && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[AUTH] WARNING: NEXT_PUBLIC_SITE_URL not set, using Supabase default email redirect')
     }
 
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH] Sign-up redirect configured:', { event: 'signup', redirectToSet: !!emailRedirectTo, returnTo })
+      console.log('[AUTH] Sign-up redirect configured:', { event: 'signup', redirectToSet: !!emailRedirectTo })
     }
 
     // Attempt to sign up with Supabase

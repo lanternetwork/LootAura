@@ -38,23 +38,9 @@ export default function SignUp() {
 
     setLoading(true)
     try {
-      // Capture current context for seamless return after email verification
-      const currentUrl = window.location.href
-      const redirectTo = params.get('redirectTo') || '/sales'
-      
-      // Store context in localStorage for email verification return
-      localStorage.setItem('auth_return_context', JSON.stringify({
-        originalUrl: currentUrl,
-        redirectTo: redirectTo,
-        timestamp: Date.now()
-      }))
-
       const { data, error } = await sb.auth.signUp({
         email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(redirectTo)}`
-        }
+        password
       })
 
       if (error) {
@@ -67,6 +53,7 @@ export default function SignUp() {
         return
       }
 
+      const redirectTo = params.get('redirectTo') || '/sales'
       router.replace(redirectTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')

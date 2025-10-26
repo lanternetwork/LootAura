@@ -9,9 +9,6 @@ export async function GET(request: NextRequest) {
     const cookieStore = cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
-    // Get return destination from URL parameters
-    const returnTo = request.nextUrl.searchParams.get('returnTo') || '/sales'
-
     // Handle OAuth callback
     const { data, error } = await supabase.auth.getSession()
 
@@ -20,19 +17,18 @@ export async function GET(request: NextRequest) {
         console.log('[AUTH] OAuth callback failed:', { event: 'oauth-callback', status: 'fail' })
       }
       
-      // Redirect to signin with error and preserve return destination
+      // Redirect to signin with error
       const signinUrl = new URL('/auth/signin', request.url)
       signinUrl.searchParams.set('error', 'oauth_failed')
-      signinUrl.searchParams.set('redirectTo', returnTo)
       return NextResponse.redirect(signinUrl)
     }
 
     // Set session cookies
-    const response = NextResponse.redirect(new URL(returnTo, request.url))
+    const response = NextResponse.redirect(new URL('/', request.url))
     setSessionCookies(response, data.session)
 
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH] OAuth callback successful:', { event: 'oauth-callback', status: 'ok', returnTo })
+      console.log('[AUTH] OAuth callback successful:', { event: 'oauth-callback', status: 'ok' })
     }
 
     return response

@@ -82,7 +82,7 @@ The following paths are publicly accessible:
 ## Required Secrets
 
 ### Environment Variables
-- `SUPABASE_SERVICE_ROLE_KEY` - Required for server-side Supabase operations
+- `SUPABASE_SERVICE_ROLE` - Required for server-side Supabase operations
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `NEXT_PUBLIC_DEBUG` - Debug logging flag
 - `NEXT_PUBLIC_SITE_URL` - Required for email confirmation redirects
@@ -90,7 +90,7 @@ The following paths are publicly accessible:
 
 ### GitHub Actions Secrets
 The following secrets must be configured in GitHub Actions:
-- `SUPABASE_SERVICE_ROLE_KEY` - For CI/CD authentication
+- `SUPABASE_SERVICE_ROLE` - For CI/CD authentication
 
 ## Email Confirmations & OAuth
 

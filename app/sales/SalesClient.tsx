@@ -331,7 +331,7 @@ export default function SalesClient({
       const newView = {
         ...prev,
         center: { lat, lng },
-        zoom: 12
+        zoom: 10 // Reduced from 12 to show larger area
       }
       console.log('[ZIP] New map view:', newView)
       return newView

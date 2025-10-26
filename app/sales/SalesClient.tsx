@@ -329,13 +329,15 @@ export default function SalesClient({
     
     console.log('[ZIP] Updating map center to:', { lat, lng, zip, city, state })
     console.log('[ZIP] Received coordinates:', { lat, lng, type: typeof lat, type_lng: typeof lng })
+    console.log('[ZIP] Actual lat value:', lat)
+    console.log('[ZIP] Actual lng value:', lng)
     
     // Update map center
     setMapView(prev => {
       const newView = {
         ...prev,
         center: { lat, lng },
-        zoom: 11 // Closer zoom level for better detail around ZIP area
+        zoom: 12 // Higher zoom level to focus on specific ZIP area
       }
       console.log('[ZIP] New map view:', newView)
       return newView

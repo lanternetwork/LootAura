@@ -1,11 +1,11 @@
 // Service Worker for LootAura PWA
 // const CACHE_NAME = 'yardsalefinder-v1'
-const STATIC_CACHE = 'static-v1'
-const DYNAMIC_CACHE = 'dynamic-v1'
+const STATIC_CACHE = 'static-v2' // Force cache update
+const DYNAMIC_CACHE = 'dynamic-v2' // Force cache update
 
 // Files to cache for offline use
+// NOTE: Removed '/' from cache to prevent OAuth callback interference
 const STATIC_FILES = [
-  '/',
   '/explore',
   '/favorites',
   '/signin',
@@ -66,7 +66,8 @@ self.addEventListener('fetch', (event) => {
 
   // CRITICAL: Skip OAuth callback URLs to prevent caching interference
   if (url.searchParams.has('code') || url.searchParams.has('error')) {
-    console.log('OAuth callback detected, skipping service worker cache:', url.href)
+    console.log('🚨 OAuth callback detected, skipping service worker cache:', url.href)
+    console.log('🚨 Service worker version:', STATIC_CACHE)
     return // Let the request go through normally without caching
   }
 

@@ -50,6 +50,10 @@ describe('Google OAuth', () => {
       provider: 'google',
       options: {
         redirectTo: 'http://localhost:3000/auth/callback',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     })
   })
@@ -104,6 +108,10 @@ describe('Google OAuth', () => {
       provider: 'google',
       options: {
         redirectTo: 'https://example.com/auth/callback',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     })
   })

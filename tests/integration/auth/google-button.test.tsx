@@ -122,7 +122,7 @@ describe('Google Sign-In Button', () => {
 
     await new Promise(resolve => setTimeout(resolve, 0)) // Wait for async operations
 
-    expect(consoleSpy).toHaveBeenCalledWith('Google sign-in failed:', 'OAuth provider not configured')
+    expect(consoleSpy).toHaveBeenCalledWith('[GOOGLE_AUTH] Google sign-in failed:', 'OAuth provider not configured')
 
     consoleSpy.mockRestore()
   })

@@ -51,10 +51,10 @@ export default function SalesClient({
   const [mapView, setMapView] = useState<MapViewState>({
     center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
     bounds: { 
-      west: (effectiveCenter?.lng || -98.5795) - 0.1, 
-      south: (effectiveCenter?.lat || 39.8283) - 0.1, 
-      east: (effectiveCenter?.lng || -98.5795) + 0.1, 
-      north: (effectiveCenter?.lat || 39.8283) + 0.1 
+      west: (effectiveCenter?.lng || -98.5795) - 0.5, 
+      south: (effectiveCenter?.lat || 39.8283) - 0.5, 
+      east: (effectiveCenter?.lng || -98.5795) + 0.5, 
+      north: (effectiveCenter?.lat || 39.8283) + 0.5 
     },
     zoom: urlZoom ? parseFloat(urlZoom) : 10
   })
@@ -178,7 +178,7 @@ export default function SalesClient({
       minClusterSize: 3, // Increased minimum cluster size
       maxZoom: 16,
       enableLocationGrouping: true,
-      enableVisualClustering: false  // Disable visual clustering to prevent blue circles
+      enableVisualClustering: true
     })
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -353,18 +353,7 @@ export default function SalesClient({
     }
   }
 
-  // Initial fetch on mount - optimized for performance
-  useEffect(() => {
-    if (mapView.bounds) {
-      console.log('[INITIAL] Fetching sales on mount with bounds:', mapView.bounds)
-      // Small delay to ensure map is fully loaded before fetching data
-      const timeoutId = setTimeout(() => {
-        fetchMapSales(mapView.bounds)
-      }, 100)
-      
-      return () => clearTimeout(timeoutId)
-    }
-  }, []) // Only run on mount
+  // Initial fetch will be triggered by map onLoad event with proper bounds
 
   // Restore ZIP from URL on page load
   useEffect(() => {

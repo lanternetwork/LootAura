@@ -70,7 +70,31 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     console.log('[MAP] onLoad - Map initialization completed')
     setLoaded(true)
     mapRef.current?.getMap()?.resize()
-  }, [])
+    
+    // Trigger initial viewport change to set proper bounds
+    if (mapRef.current) {
+      const map = mapRef.current.getMap()
+      if (map) {
+        const center = map.getCenter()
+        const zoom = map.getZoom()
+        const bounds = map.getBounds()
+        
+        const viewport = {
+          center: { lat: center.lat, lng: center.lng },
+          zoom,
+          bounds: {
+            west: bounds.getWest(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            north: bounds.getNorth()
+          }
+        }
+        
+        console.log('[MAP] onLoad - Initial viewport:', viewport)
+        onViewportChange?.(viewport)
+      }
+    }
+  }, [onViewportChange])
 
   const onStyleData = useCallback(() => {
     console.log('[MAP] onStyleData')

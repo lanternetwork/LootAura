@@ -42,8 +42,10 @@ describe('Google OAuth', () => {
     })
 
     const response = await googlePOST(request)
+    const data = await response.json()
 
-    expect(response.status).toBe(307) // Redirect
+    expect(response.status).toBe(200) // Success with JSON response
+    expect(data.url).toBe('https://accounts.google.com/oauth/authorize?client_id=...')
     expect(mockSupabase.auth.signInWithOAuth).toHaveBeenCalledWith({
       provider: 'google',
       options: {

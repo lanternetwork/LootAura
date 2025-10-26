@@ -22,7 +22,7 @@ export default function CustomPin({
   useEffect(() => {
     if (!pinRef.current) return
 
-    const mapElement = pinRef.current.closest('.mapboxgl-map') as HTMLElement
+    const mapElement = pinRef.current.closest('.mapboxgl-map') as HTMLElement & { __mapboxgl_map?: any }
     const map = mapElement?.__mapboxgl_map
     if (!map) return
 

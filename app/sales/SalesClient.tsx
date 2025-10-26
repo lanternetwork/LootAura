@@ -491,11 +491,11 @@ export default function SalesClient({
         onZipError={handleZipError}
         zipError={zipError}
         dateRange={filters.dateRange}
-        onDateRangeChange={(dateRange) => updateFilters({ dateRange })}
+        onDateRangeChange={(dateRange) => handleFiltersChange({ ...filters, dateRange })}
         categories={filters.categories}
-        onCategoriesChange={(categories) => updateFilters({ categories })}
+        onCategoriesChange={(categories) => handleFiltersChange({ ...filters, categories })}
         distance={filters.distance}
-        onDistanceChange={(distance) => updateFilters({ distance })}
+        onDistanceChange={(distance) => handleFiltersChange({ ...filters, distance })}
         onAdvancedFiltersOpen={() => setShowFiltersModal(true)}
         hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
         zipInputTestId="zip-input"
@@ -582,7 +582,7 @@ export default function SalesClient({
                   No sales found in this area
                     </div>
                           <button
-                  onClick={() => updateFilters({ distance: Math.min(100, filters.distance + 10) })}
+                  onClick={() => handleFiltersChange({ ...filters, distance: Math.min(100, filters.distance + 10) })}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                           >
                   Increase Distance
@@ -639,7 +639,7 @@ export default function SalesClient({
                 No sales found in this area
               </div>
               <button
-                onClick={() => updateFilters({ distance: Math.min(100, filters.distance + 10) })}
+                onClick={() => handleFiltersChange({ ...filters, distance: Math.min(100, filters.distance + 10) })}
                 className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
               >
                 Increase Distance

@@ -1,17 +1,23 @@
 "use client"
 import { useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 export default function Home() {
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
-    // Handle OAuth callback
-    const code = searchParams.get('code')
-    const error = searchParams.get('error')
+    // Handle OAuth callback by checking URL directly
+    const urlParams = new URLSearchParams(window.location.search)
+    const code = urlParams.get('code')
+    const error = urlParams.get('error')
+
+    console.log('[AUTH] Root page mounted, checking for OAuth callback:', { 
+      code: !!code, 
+      error, 
+      url: window.location.href 
+    })
 
     if (code || error) {
       console.log('[AUTH] OAuth callback detected on root page:', { code: !!code, error })
@@ -24,7 +30,7 @@ export default function Home() {
       console.log('[AUTH] Redirecting to callback handler:', callbackUrl.toString())
       router.replace(callbackUrl.toString())
     }
-  }, [searchParams, router])
+  }, [router])
 
   return (
     <div className="min-h-screen bg-gray-50">

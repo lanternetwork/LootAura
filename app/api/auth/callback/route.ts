@@ -11,16 +11,16 @@ export async function GET(request: NextRequest) {
 
     // Get the authorization code from URL parameters
     const code = request.nextUrl.searchParams.get('code')
-    const error = request.nextUrl.searchParams.get('error')
+    const oauthError = request.nextUrl.searchParams.get('error')
 
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH] OAuth callback received:', { code: !!code, error })
+      console.log('[AUTH] OAuth callback received:', { code: !!code, error: oauthError })
     }
 
     // Handle OAuth error
-    if (error) {
+    if (oauthError) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AUTH] OAuth callback error:', { event: 'oauth-callback', status: 'fail', error })
+        console.log('[AUTH] OAuth callback error:', { event: 'oauth-callback', status: 'fail', error: oauthError })
       }
       
       const signinUrl = new URL('/auth/signin', request.url)

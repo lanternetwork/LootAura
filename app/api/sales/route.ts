@@ -401,7 +401,16 @@ export async function GET(request: NextRequest) {
             distance_km: Math.round(distanceKm * 100) / 100
           }
         })
-                .filter((sale) => sale && (sale.distance_km || 0) <= distanceKm)
+                .filter((sale) => {
+                  // Only apply distance filtering if we're using distance-based search (not viewport bounds)
+                  if (actualBbox) {
+                    // When using viewport bounds, don't filter by distance - the bbox already defines the visible area
+                    return sale !== null
+                  } else {
+                    // When using distance-based search, apply distance filtering
+                    return sale && (sale.distance_km || 0) <= distanceKm
+                  }
+                })
                 .sort((a, b) => {
                   if (!a || !b) return 0
                   // Primary sort: distance

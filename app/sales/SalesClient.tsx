@@ -51,12 +51,12 @@ export default function SalesClient({
   const [mapView, setMapView] = useState<MapViewState>({
     center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
     bounds: { 
-      west: (effectiveCenter?.lng || -98.5795) - 0.5, 
-      south: (effectiveCenter?.lat || 39.8283) - 0.5, 
-      east: (effectiveCenter?.lng || -98.5795) + 0.5, 
-      north: (effectiveCenter?.lat || 39.8283) + 0.5 
+      west: (effectiveCenter?.lng || -98.5795) - 1.0, 
+      south: (effectiveCenter?.lat || 39.8283) - 1.0, 
+      east: (effectiveCenter?.lng || -98.5795) + 1.0, 
+      north: (effectiveCenter?.lat || 39.8283) + 1.0 
     },
-    zoom: urlZoom ? parseFloat(urlZoom) : 10
+    zoom: urlZoom ? parseFloat(urlZoom) : 8
   })
 
   // Sales data state - map is source of truth
@@ -334,7 +334,7 @@ export default function SalesClient({
       const newView = {
         ...prev,
         center: { lat, lng },
-        zoom: 10 // Reduced from 12 to show larger area
+        zoom: 8 // Further reduced to show much larger area
       }
       console.log('[ZIP] New map view:', newView)
       return newView

@@ -1,7 +1,31 @@
 "use client"
+import { useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+
 export const dynamic = 'force-dynamic'
 
 export default function Home() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // Handle OAuth callback
+    const code = searchParams.get('code')
+    const error = searchParams.get('error')
+
+    if (code || error) {
+      console.log('[AUTH] OAuth callback detected on root page:', { code: !!code, error })
+      
+      // Redirect to the callback handler
+      const callbackUrl = new URL('/auth/callback', window.location.origin)
+      if (code) callbackUrl.searchParams.set('code', code)
+      if (error) callbackUrl.searchParams.set('error', error)
+      
+      console.log('[AUTH] Redirecting to callback handler:', callbackUrl.toString())
+      router.replace(callbackUrl.toString())
+    }
+  }, [searchParams, router])
+
   return (
     <div className="min-h-screen bg-gray-50">
       <section className="bg-gradient-to-b from-amber-50 to-gray-50 border-b">

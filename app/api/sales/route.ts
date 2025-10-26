@@ -64,13 +64,9 @@ export async function GET(request: NextRequest) {
         latitude = (validatedBbox.north + validatedBbox.south) / 2
         longitude = (validatedBbox.east + validatedBbox.west) / 2
         
-        // Calculate approximate distance from bbox dimensions
-        const latRange = validatedBbox.north - validatedBbox.south
-        const lngRange = validatedBbox.east - validatedBbox.west
-        const avgLat = latitude
-        const lngRangeKm = lngRange * 111.0 * Math.cos(avgLat * Math.PI / 180)
-        const latRangeKm = latRange * 111.0
-        distanceKm = Math.max(latRangeKm, lngRangeKm) / 2
+        // When using viewport bounds, don't calculate distance - we'll use bbox filtering instead
+        // Set distanceKm to a very large value to effectively disable distance filtering
+        distanceKm = 1000 // 1000km - effectively unlimited
         
         // Store the actual bbox for proper filtering
         actualBbox = validatedBbox

@@ -23,8 +23,6 @@ describe('Google OAuth', () => {
   })
 
   it('should initiate Google OAuth successfully', async () => {
-    process.env.NEXT_PUBLIC_SITE_URL = 'https://example.com'
-
     const mockSupabase = {
       auth: {
         signInWithOAuth: vi.fn().mockResolvedValue({
@@ -49,7 +47,7 @@ describe('Google OAuth', () => {
     expect(mockSupabase.auth.signInWithOAuth).toHaveBeenCalledWith({
       provider: 'google',
       options: {
-        redirectTo: 'https://example.com/auth/callback',
+        redirectTo: 'http://localhost:3000/auth/callback',
       },
     })
   })
@@ -79,9 +77,7 @@ describe('Google OAuth', () => {
     expect(data.message).toBe('Auth failed')
   })
 
-  it('should use fallback redirect URL when NEXT_PUBLIC_SITE_URL is not set', async () => {
-    delete process.env.NEXT_PUBLIC_SITE_URL
-
+  it('should use request origin for redirect URL', async () => {
     const mockSupabase = {
       auth: {
         signInWithOAuth: vi.fn().mockResolvedValue({
@@ -96,7 +92,7 @@ describe('Google OAuth', () => {
     const { createServerSupabaseClient } = await import('@/lib/auth/server-session')
     vi.mocked(createServerSupabaseClient).mockReturnValue(mockSupabase as any)
 
-    const request = new NextRequest('http://localhost:3000/api/auth/google', {
+    const request = new NextRequest('https://example.com/api/auth/google', {
       method: 'POST',
     })
 
@@ -105,7 +101,7 @@ describe('Google OAuth', () => {
     expect(mockSupabase.auth.signInWithOAuth).toHaveBeenCalledWith({
       provider: 'google',
       options: {
-        redirectTo: 'http://localhost:3000/auth/callback',
+        redirectTo: 'https://example.com/auth/callback',
       },
     })
   })

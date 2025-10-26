@@ -1,12 +1,12 @@
 # LootAura
 
-**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
+**Last updated: 2025-01-27 — Map-Centric Architecture Documentation**
 
-A modern web application for discovering and managing yard sales, garage sales, and estate sales in your area. Built with enterprise-grade architecture featuring map-centric source of truth, Supabase backend, and Mapbox integration.
+A modern web application for discovering and managing yard sales, garage sales, and estate sales in your area. Built with enterprise-grade architecture featuring **map-centric design**, Supabase backend, and Mapbox integration.
 
 ## 📋 Quick Start
 
-- **Architecture Overview**: See [docs/operating-handbook.md](docs/operating-handbook.md) for comprehensive development standards
+- **Architecture Overview**: See [docs/architecture.md](docs/architecture.md) for comprehensive development standards
 - **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
 - **Deployment**: See [DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md) for production deployment
 - **Launch**: See [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) for launch validation
@@ -18,7 +18,9 @@ A modern web application for discovering and managing yard sales, garage sales, 
 
 LootAura follows strict architectural invariants to prevent regressions:
 
-- **Map-Centric Source of Truth**: Map viewport drives all data fetching and list display
+- **Map-Centric Design**: Map viewport drives all data fetching and list display
+- **Single Fetch Path**: Only 2 entry points to fetchMapSales (viewport changes, filter changes)
+- **Distance-to-Zoom Mapping**: Distance slider controls map zoom instead of API filtering
 - **Parameter Canonicalization**: `categories` parameter with legacy `cat` support
 - **Single Source**: Both markers and list read from the same data source
 - **DOM Structure**: List container with direct children, no intermediate wrappers

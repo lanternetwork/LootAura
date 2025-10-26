@@ -1,27 +1,34 @@
 # Architecture Documentation
 
-## Map-as-Source Architecture
+**Last updated: 2025-01-27 — Map-Centric Architecture**
 
-This application uses a **map-as-source** architecture where the map viewport is the single source of truth for what sales are displayed in the list.
+## Map-Centric Architecture
+
+This application uses a **map-centric** architecture where the map viewport is the single source of truth for what sales are displayed in the list.
 
 ### Core Principles
 
 1. **Single Source of Truth**: The map viewport determines what sales are visible
-2. **No Authority Conflicts**: No arbiter/authority system to manage competing data sources
-3. **Bbox-based Fetching**: All sales data is fetched using map viewport bounds
-4. **Deduplication**: Sales are deduplicated by `sale.id` to prevent duplicates
+2. **Single Fetch Path**: Only 2 entry points to fetchMapSales (viewport changes, filter changes)
+3. **Distance-to-Zoom Mapping**: Distance slider controls map zoom instead of API filtering
+4. **Bbox-based Fetching**: All sales data is fetched using map viewport bounds
+5. **Deduplication**: Sales are deduplicated by `sale.id` to prevent duplicates
 
 ### Data Flow
 
 ```
-User Interaction → Map Viewport Change → Bbox Fetch → Deduplication → List Update
+User Action → Map Viewport Change → Single API Fetch → Display Results
 ```
 
-1. **User Interaction**: User pans/zooms map or searches by ZIP
-2. **Map Viewport Change**: Map bounds are updated
-3. **Bbox Fetch**: `/api/sales/markers` called with viewport bounds
-4. **Deduplication**: Sales deduplicated by ID
-5. **List Update**: List displays deduplicated sales from map
+**Entry Points:**
+1. **Distance Slider** → Map Zoom Change → Viewport Change → Fetch
+2. **ZIP Search** → Map Center/Bounds Change → Viewport Change → Fetch  
+3. **Category/Date Filters** → Direct Fetch with Current Bounds
+4. **Map Movement** → Viewport Change → Debounced Fetch
+
+**Single Fetch Path:**
+- **handleViewportChange** (debounced, 300ms) - for map movements, zoom changes, ZIP search
+- **handleFiltersChange** (immediate) - for category changes, date range changes
 
 ### Key Components
 
@@ -29,12 +36,14 @@ User Interaction → Map Viewport Change → Bbox Fetch → Deduplication → Li
 - **State**: `mapView`, `mapSales`, `visibleSales`
 - **Fetch**: `fetchMapSales()` - bbox-based viewport fetching
 - **Deduplication**: `deduplicateSales()` - removes duplicates by sale ID
+- **Distance-to-Zoom**: `distanceToZoom()` - maps distance values to zoom levels
 - **Layout**: Zillow-style with map left, list right, filters top
 
 #### Map Components
-- **SalesMap**: Basic map component
-- **SalesMapClustered**: Clustered map with supercluster
-- **No Authority Props**: Removed arbiter/authority system
+- **SimpleMap**: Main map component with hybrid clustering
+- **LocationPin**: Individual sale location pins
+- **PinMarker**: Legacy pin component (deprecated)
+- **CustomPin**: Custom DOM-based pin component
 
 #### ZIP Search (`components/location/ZipInput.tsx`)
 - **Validation**: Supports 5-digit and ZIP+4 formats
@@ -44,10 +53,10 @@ User Interaction → Map Viewport Change → Bbox Fetch → Deduplication → Li
 
 ### API Endpoints
 
-#### `/api/sales/markers`
+#### `/api/sales`
 - **Method**: GET
-- **Parameters**: `minLng`, `minLat`, `maxLng`, `maxLat`, `dateRange`, `categories`
-- **Response**: `{ ok: boolean, data: Sale[] }`
+- **Parameters**: `north`, `south`, `east`, `west`, `dateRange`, `categories`, `limit`
+- **Response**: `{ ok: boolean, data: Sale[], dataCount: number }`
 - **Purpose**: Fetch sales within viewport bounds
 
 #### `/api/geocoding/zip`
@@ -104,14 +113,26 @@ interface MapViewState {
 - Map and list synchronization
 - ZIP search with URL persistence
 
-### Migration from Intent System
+### Distance-to-Zoom Mapping
 
-The previous intent/arbiter system has been removed. Key changes:
+The distance slider controls map zoom instead of API filtering:
 
-1. **No Authority Logic**: Removed `arbiter.authority` checks
-2. **No Sequence Gating**: Removed `seq` and `bumpSeq` logic
-3. **No Dual Sources**: Only map viewport as data source
-4. **Simplified State**: Removed complex state management
+```typescript
+const distanceToZoom = (distance: number): number => {
+  switch (distance) {
+    case 2: return 14  // Very close - high zoom
+    case 5: return 12  // Close - medium-high zoom
+    case 10: return 10 // Medium - medium zoom
+    case 25: return 8  // Far - low zoom
+    default: return 10 // Default to medium zoom
+  }
+}
+```
+
+**Benefits:**
+- **Map-centric**: Zoom level determines visible area
+- **Performance**: No server-side distance filtering
+- **UX**: Intuitive zoom-based search area control
 
 ### Future Considerations
 

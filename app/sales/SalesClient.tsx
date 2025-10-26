@@ -116,6 +116,16 @@ export default function SalesClient({
       }
     }
     
+    // Skip clustering during initial load to improve performance
+    if (loading) {
+      return {
+        type: 'individual' as const,
+        pins: [],
+        locations: [],
+        clusters: []
+      }
+    }
+    
     // Skip clustering for very small datasets to improve performance
     if (mapSales.length < 3) {
       return {
@@ -181,7 +191,7 @@ export default function SalesClient({
     }
     
     return result
-  }, [mapSales, currentViewport])
+  }, [mapSales, currentViewport, loading])
 
   // Fetch sales based on map viewport bbox
   const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }) => {
@@ -340,12 +350,8 @@ export default function SalesClient({
   useEffect(() => {
     if (mapView.bounds) {
       console.log('[INITIAL] Fetching sales on mount with bounds:', mapView.bounds)
-      // Debounce initial fetch to prevent multiple rapid calls
-      const timeoutId = setTimeout(() => {
-        fetchMapSales(mapView.bounds)
-      }, 150) // Slightly longer debounce for initial load
-      
-      return () => clearTimeout(timeoutId)
+      // Immediate fetch for initial load - no debounce needed
+      fetchMapSales(mapView.bounds)
     }
   }, []) // Only run on mount
 

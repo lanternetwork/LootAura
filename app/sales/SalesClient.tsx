@@ -268,12 +268,6 @@ export default function SalesClient({
   // Handle viewport changes from SimpleMap
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
     
-    // Show brief transition for viewport changes (not ZIP search)
-    if (!isZipSearching) {
-      setIsMapTransitioning(true)
-      setTimeout(() => setIsMapTransitioning(false), 500)
-    }
-    
     // Update map view state
     setMapView(prev => ({
       ...prev,

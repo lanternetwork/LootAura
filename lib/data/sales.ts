@@ -1,5 +1,4 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getSchema } from '@/lib/supabase/schema'
 import { z } from 'zod'
 import { Sale } from '@/lib/types'
 

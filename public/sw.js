@@ -64,6 +64,12 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // CRITICAL: Skip OAuth callback URLs to prevent caching interference
+  if (url.searchParams.has('code') || url.searchParams.has('error')) {
+    console.log('OAuth callback detected, skipping service worker cache:', url.href)
+    return // Let the request go through normally without caching
+  }
+
   // Block Mapbox telemetry requests
   if (url.hostname === 'events.mapbox.com') {
     console.log('Blocking Mapbox telemetry request:', url.href)

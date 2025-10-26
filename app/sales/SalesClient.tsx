@@ -287,6 +287,7 @@ export default function SalesClient({
 
   // Debounce timer for viewport changes
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const lastBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)
 
   // Handle viewport changes from SimpleMap
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
@@ -314,11 +315,24 @@ export default function SalesClient({
       clearTimeout(debounceTimerRef.current)
     }
     
-    // Debounce fetch by 200ms to prevent rapid successive calls
+    // Debounce fetch by 300ms to prevent rapid successive calls during zoom
     debounceTimerRef.current = setTimeout(() => {
+      // Check if bounds have changed significantly (more than 5% change)
+      const lastBounds = lastBoundsRef.current
+      if (lastBounds) {
+        const latChange = Math.abs(bounds.north - bounds.south - (lastBounds.north - lastBounds.south)) / (lastBounds.north - lastBounds.south)
+        const lngChange = Math.abs(bounds.east - bounds.west - (lastBounds.east - lastBounds.west)) / (lastBounds.east - lastBounds.west)
+        
+        if (latChange < 0.05 && lngChange < 0.05) {
+          console.log('[SALES] Bounds change too small, skipping fetch:', { latChange, lngChange })
+          return
+        }
+      }
+      
       console.log('[SALES] Debounced fetchMapSales called with bounds:', bounds)
+      lastBoundsRef.current = bounds
       fetchMapSales(bounds)
-    }, 200)
+    }, 300)
   }, [fetchMapSales])
 
   // Handle ZIP search with bbox support

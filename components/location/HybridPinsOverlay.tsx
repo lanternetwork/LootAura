@@ -52,8 +52,6 @@ export default function HybridPinsOverlay({
     })
   }
 
-  console.log('[HYBRID_PINS_OVERLAY] Rendering', hybridResult.pins.length, 'pins')
-  
   return (
     <>
       {hybridResult.pins.map((pin: HybridPin) => {

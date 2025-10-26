@@ -106,16 +106,8 @@ export default function SalesClient({
 
   // Hybrid system: Create location groups and apply clustering
   const hybridResult = useMemo(() => {
-    console.log('[HYBRID] Starting clustering calculation:', {
-      hasViewport: !!currentViewport,
-      salesCount: mapSales.length,
-      loading,
-      timestamp: Date.now()
-    })
-    
     // Early return for empty sales - no need to run clustering
     if (!currentViewport || mapSales.length === 0) {
-      console.log('[HYBRID] Early return - no viewport or sales')
       return {
         type: 'individual' as const,
         pins: [],
@@ -126,7 +118,6 @@ export default function SalesClient({
     
     // Skip clustering during initial load to improve performance
     if (loading) {
-      console.log('[HYBRID] Skipping clustering - still loading')
       return {
         type: 'individual' as const,
         pins: [],
@@ -179,9 +170,6 @@ export default function SalesClient({
       console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', mapSales.length, 'total')
     }
     
-    console.log('[HYBRID] About to run clustering on', visibleSales.length, 'visible sales')
-    const startTime = Date.now()
-    
     // Only run clustering on visible sales
     const result = createHybridPins(visibleSales, currentViewport, {
       coordinatePrecision: 5, // Increased to group sales within ~1m radius (more precise)
@@ -191,9 +179,6 @@ export default function SalesClient({
       enableLocationGrouping: true,
       enableVisualClustering: true
     })
-    
-    const endTime = Date.now()
-    console.log('[HYBRID] Clustering completed in', endTime - startTime, 'ms')
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[HYBRID] Clustering completed:', {

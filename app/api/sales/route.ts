@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
     
-    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24, 48)
+    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24, 200)
     const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset') || '0') : 0, 0)
     
     // Validate date range parameters

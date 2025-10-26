@@ -178,7 +178,7 @@ export default function SalesClient({
       minClusterSize: 3, // Increased minimum cluster size
       maxZoom: 16,
       enableLocationGrouping: true,
-      enableVisualClustering: true
+      enableVisualClustering: false  // Disable visual clustering to prevent blue circles
     })
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

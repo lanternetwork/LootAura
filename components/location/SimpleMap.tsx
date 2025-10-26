@@ -94,8 +94,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         console.log('[MAP] onLoad - Bounds range:', {
           latRange: viewport.bounds.north - viewport.bounds.south,
           lngRange: viewport.bounds.east - viewport.bounds.west,
-          center: viewport.center
+          center: viewport.center,
+          zoom: viewport.zoom
         })
+        console.log('[MAP] onLoad - Bounds area (square degrees):', (viewport.bounds.north - viewport.bounds.south) * (viewport.bounds.east - viewport.bounds.west))
         onViewportChange?.(viewport)
       }
     }

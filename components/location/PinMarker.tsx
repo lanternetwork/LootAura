@@ -31,23 +31,26 @@ export default function PinMarker({
       anchor="center"
       data-testid="marker"
     >
-      <button
+      <div
         className={`
           w-2 h-2 bg-red-500 rounded-full shadow-sm
           hover:bg-red-600 
-          focus:outline-none focus:ring-0 focus:ring-offset-0
-          active:outline-none active:ring-0 active:ring-offset-0
           transition-all duration-200
           cursor-pointer
           ${isSelected ? 'ring-1 ring-white outline outline-1 outline-red-500' : ''}
         `}
         style={{
           outline: 'none',
-          boxShadow: 'none'
+          boxShadow: 'none',
+          border: 'none',
+          background: 'red',
+          borderRadius: '50%'
         }}
         data-pin-marker="true"
         data-pin-id={id}
         onClick={handleClick}
+        role="button"
+        tabIndex={0}
         aria-label={`Sale pin ${id}`}
         title={`Sale ${id}`}
       />

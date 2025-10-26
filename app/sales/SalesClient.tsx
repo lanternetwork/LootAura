@@ -194,8 +194,19 @@ export default function SalesClient({
     return result
   }, [mapSales, currentViewport, loading])
 
+  // Request cancellation for preventing race conditions
+  const abortControllerRef = useRef<AbortController | null>(null)
+
   // Fetch sales based on map viewport bbox
   const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }, customFilters?: any) => {
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController()
+    
     console.log('[FETCH] fetchMapSales called with bbox:', bbox)
     console.log('[FETCH] Bbox range:', {
       latRange: bbox.north - bbox.south,
@@ -235,7 +246,9 @@ export default function SalesClient({
         area: (bbox.north - bbox.south) * (bbox.east - bbox.west)
       })
 
-      const response = await fetch(`/api/sales?${params.toString()}`)
+      const response = await fetch(`/api/sales?${params.toString()}`, {
+        signal: abortControllerRef.current.signal
+      })
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -281,6 +294,11 @@ export default function SalesClient({
         setMapMarkers([])
       }
     } catch (error) {
+      // Don't log errors for aborted requests
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('[FETCH] Request aborted (newer request started)')
+        return
+      }
       console.error('[FETCH] Map sales error:', error)
     } finally {
       setLoading(false)
@@ -400,7 +418,7 @@ export default function SalesClient({
 
   // Handle filter changes
   const handleFiltersChange = (newFilters: any) => {
-    updateFilters(newFilters)
+    updateFilters(newFilters) // Keep URL update for filter state
     // Trigger refetch with new filters using current bounds
     if (mapView.bounds) {
       console.log('[FILTERS] Triggering refetch with new filters:', newFilters)
@@ -411,16 +429,20 @@ export default function SalesClient({
 
   // Initial fetch will be triggered by map onLoad event with proper bounds
 
-  // Restore ZIP from URL on page load
+  // Restore ZIP from URL on page load only (not on every URL change)
+  const [hasRestoredZip, setHasRestoredZip] = useState(false)
   useEffect(() => {
+    if (hasRestoredZip) return // Only run once on mount
+    
     const zipFromUrl = searchParams.get('zip')
     if (zipFromUrl) {
       // Trigger ZIP lookup from URL
       console.log('[ZIP] Restoring from URL:', zipFromUrl)
       // This would need to be implemented with a ZIP lookup service
       // For now, we'll just log it
+      setHasRestoredZip(true) // Mark as restored
     }
-  }, [searchParams])
+  }, [searchParams, hasRestoredZip])
 
   // Memoized visible sales - filtered by current viewport bounds to match map pins
   const visibleSales = useMemo(() => {

@@ -196,6 +196,9 @@ export default function SalesClient({
 
   // Request cancellation for preventing race conditions
   const abortControllerRef = useRef<AbortController | null>(null)
+  
+  // Track API calls for debugging single fetch path
+  const apiCallCounterRef = useRef(0)
 
   // Fetch sales based on map viewport bbox
   const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }, customFilters?: any) => {
@@ -207,7 +210,12 @@ export default function SalesClient({
     // Create new abort controller for this request
     abortControllerRef.current = new AbortController()
     
+    // Increment API call counter for debugging
+    apiCallCounterRef.current += 1
+    const callId = apiCallCounterRef.current
+    
     console.log('[FETCH] fetchMapSales called with bbox:', bbox)
+    console.log('[FETCH] API Call #' + callId + ' - Single fetch path verification')
     console.log('[FETCH] Bbox range:', {
       latRange: bbox.north - bbox.south,
       lngRange: bbox.east - bbox.west,
@@ -351,6 +359,7 @@ export default function SalesClient({
       }
       
       console.log('[SALES] Debounced fetchMapSales called with bounds:', bounds)
+      console.log('[SALES] Entry point: VIEWPORT_CHANGE - Single fetch verification')
       lastBoundsRef.current = bounds
       fetchMapSales(bounds)
     }, 300)
@@ -435,6 +444,7 @@ export default function SalesClient({
     // Check if this is a distance change
     if (newFilters.distance && newFilters.distance !== filters.distance) {
       console.log('[DISTANCE] Converting distance to zoom:', { distance: newFilters.distance, zoom: distanceToZoom(newFilters.distance) })
+      console.log('[DISTANCE] Entry point: DISTANCE_CHANGE - No direct fetch, viewport change will trigger fetch')
       
       // Update filters for UI state
       updateFilters(newFilters)
@@ -450,10 +460,11 @@ export default function SalesClient({
       return
     }
     
-    // For other filter changes, trigger refetch with new filters using current bounds
+    // For other filter changes, trigger single fetch with current bounds
     updateFilters(newFilters) // Keep URL update for filter state
     if (mapView.bounds) {
-      console.log('[FILTERS] Triggering refetch with new filters:', newFilters)
+      console.log('[FILTERS] Triggering single fetch with new filters:', newFilters)
+      console.log('[FILTERS] Entry point: FILTER_CHANGE - Single fetch verification')
       setLoading(true) // Show loading state immediately
       fetchMapSales(mapView.bounds, newFilters)
     }

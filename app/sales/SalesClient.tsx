@@ -69,6 +69,7 @@ export default function SalesClient({
   const [, setIsZipSearching] = useState(false)
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
+  const [isMapTransitioning, setIsMapTransitioning] = useState(false)
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
@@ -267,6 +268,12 @@ export default function SalesClient({
   // Handle viewport changes from SimpleMap
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
     
+    // Show brief transition for viewport changes (not ZIP search)
+    if (!isZipSearching) {
+      setIsMapTransitioning(true)
+      setTimeout(() => setIsMapTransitioning(false), 500)
+    }
+    
     // Update map view state
     setMapView(prev => ({
       ...prev,
@@ -290,6 +297,7 @@ export default function SalesClient({
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => {
     setZipError(null)
     setIsZipSearching(true) // Prevent map view changes from overriding ZIP search
+    setIsMapTransitioning(true) // Show loading overlay
     
     console.log('[ZIP] Updating map center to:', { lat, lng, zip })
     
@@ -324,6 +332,11 @@ export default function SalesClient({
       // Clear bounds after one use
       setTimeout(() => setPendingBounds(null), 0)
     }
+    
+    // Hide transition overlay after map has time to load
+    setTimeout(() => {
+      setIsMapTransitioning(false)
+    }, 1500) // Give map time to load new tiles
 
     // Sales will be fetched automatically when the map viewport updates
     
@@ -472,6 +485,8 @@ export default function SalesClient({
                 viewport: currentViewport!
               }}
               onViewportChange={handleViewportChange}
+              isTransitioning={isMapTransitioning}
+              transitionMessage="Loading new location..."
               />
             </div>
           </div>

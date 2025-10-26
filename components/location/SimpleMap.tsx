@@ -22,6 +22,8 @@ interface SimpleMapProps {
     zoom: number; 
     bounds: { west: number; south: number; east: number; north: number } 
   }) => void
+  isTransitioning?: boolean
+  transitionMessage?: string
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -33,7 +35,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   selectedSaleId,
   pins,
   hybridPins,
-  onViewportChange 
+  onViewportChange,
+  isTransitioning = false,
+  transitionMessage = "Loading..."
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -284,6 +288,16 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
           </Popup>
         )}
       </Map>
+      
+      {/* Loading overlay for smooth transitions */}
+      {isTransitioning && (
+        <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 transition-opacity duration-300">
+          <div className="bg-white rounded-lg shadow-lg p-4 flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
+            <span className="text-gray-700 font-medium">{transitionMessage}</span>
+          </div>
+        </div>
+      )}
       
       {/* Debug overlay */}
       {process.env.NEXT_PUBLIC_DEBUG === "true" && (

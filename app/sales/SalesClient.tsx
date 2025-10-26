@@ -222,6 +222,9 @@ export default function SalesClient({
       params.set('categories', filters.categories.join(','))
       }
       
+      // Request more sales to show all pins in viewport
+      params.set('limit', '200')
+      
       console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
       console.log('[FETCH] Viewport fetch with bbox:', bbox)
       console.log('[FETCH] Bbox area (degrees):', {

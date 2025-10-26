@@ -195,7 +195,7 @@ export default function SalesClient({
   }, [mapSales, currentViewport, loading])
 
   // Fetch sales based on map viewport bbox
-  const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }) => {
+  const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }, customFilters?: any) => {
     console.log('[FETCH] fetchMapSales called with bbox:', bbox)
     console.log('[FETCH] Bbox range:', {
       latRange: bbox.north - bbox.south,
@@ -215,11 +215,13 @@ export default function SalesClient({
       params.set('east', bbox.east.toString())
       params.set('west', bbox.west.toString())
       
-      if (filters.dateRange) {
-        params.set('dateRange', filters.dateRange)
+      const activeFilters = customFilters || filters
+      
+      if (activeFilters.dateRange) {
+        params.set('dateRange', activeFilters.dateRange)
       }
-      if (filters.categories && filters.categories.length > 0) {
-      params.set('categories', filters.categories.join(','))
+      if (activeFilters.categories && activeFilters.categories.length > 0) {
+      params.set('categories', activeFilters.categories.join(','))
       }
       
       // Request more sales to show all pins in viewport
@@ -401,7 +403,8 @@ export default function SalesClient({
     updateFilters(newFilters)
     // Trigger refetch with new filters using current bounds
     if (mapView.bounds) {
-      fetchMapSales(mapView.bounds)
+      console.log('[FILTERS] Triggering refetch with new filters:', newFilters)
+      fetchMapSales(mapView.bounds, newFilters)
     }
   }
 

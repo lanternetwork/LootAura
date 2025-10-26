@@ -97,7 +97,7 @@ export default function SignIn() {
             <GoogleSignInButton />
 
             <Link 
-              href="/auth/signup"
+              href={`/auth/signup${params.get('redirectTo') ? `?redirectTo=${encodeURIComponent(params.get('redirectTo')!)}` : ''}`}
               className="block text-center w-full rounded border border-amber-500 px-4 py-2 text-amber-600 font-medium hover:bg-amber-50"
             >
               Create Account

@@ -283,7 +283,7 @@ export default function DiagnosticToolsValidator() {
 
       setResults(prev => [result, ...prev].slice(0, 10))
       console.log(`[DIAGNOSTIC_VALIDATOR] Completed testing ${toolName}:`, result)
-      
+
       return result
 
     } catch (error) {
@@ -653,8 +653,8 @@ export default function DiagnosticToolsValidator() {
                     <span className={`px-2 py-1 rounded text-sm ${
                       result.overallSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                     }`}>
-                      {result.overallSuccess ? 'PASS' : 'FAIL'}
-                    </span>
+                        {result.overallSuccess ? 'PASS' : 'FAIL'}
+                      </span>
                   </div>
                   
                   <div className="space-y-2">
@@ -668,11 +668,11 @@ export default function DiagnosticToolsValidator() {
                             {test.success ? 'PASS' : 'FAIL'}
                           </span>
                           <span className="text-gray-500">{test.duration}ms</span>
-                        </div>
+                          </div>
                       </div>
                     ))}
                   </div>
-                  
+
                   {result.issues.length > 0 && (
                     <div className="mt-2 text-sm text-red-600">
                       Issues: {result.issues.join(', ')}

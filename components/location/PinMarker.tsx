@@ -47,7 +47,6 @@ export default function PinMarker({
         role="button"
         tabIndex={0}
         aria-label={`Sale pin ${id}`}
-        title={`Sale ${id}`}
       >
         <circle
           cx="4"

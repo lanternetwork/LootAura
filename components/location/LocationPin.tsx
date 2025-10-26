@@ -44,7 +44,6 @@ export default function LocationPin({
         role="button"
         tabIndex={0}
         aria-label={`Location with ${location.totalSales} sales`}
-        title={`${location.totalSales} sales at this location`}
       >
         <circle
           cx="4"

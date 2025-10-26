@@ -254,13 +254,17 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
                 data-testid="marker"
               >
                 <div
-                  className="w-3 h-3 bg-red-500 rounded-full border border-white shadow-md hover:bg-red-600"
                   style={{
-                    outline: 'none !important',
-                    boxShadow: 'none !important',
-                    border: '1px solid white !important',
-                    background: 'red !important',
-                    borderRadius: '50% !important'
+                    width: '8px',
+                    height: '8px',
+                    backgroundColor: '#ef4444',
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    border: '1px solid white',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    outline: 'none',
+                    position: 'relative',
+                    zIndex: 1
                   }}
                   onClick={() => onSaleClick?.(sale)}
                   role="button"

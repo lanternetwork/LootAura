@@ -43,6 +43,10 @@ export async function POST(request: NextRequest) {
       console.log('[AUTH] Google OAuth initiated:', { event: 'google-oauth', status: 'ok', url: data.url })
     }
 
+    // Debug: Log the actual URL being returned
+    console.log('[AUTH] DEBUG: OAuth URL returned by Supabase:', data.url)
+    console.log('[AUTH] DEBUG: Expected Google OAuth URL should start with: https://accounts.google.com/oauth/authorize')
+
     // Return the OAuth URL instead of redirecting
     return NextResponse.json({ url: data.url })
 

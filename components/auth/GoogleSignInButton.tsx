@@ -9,24 +9,31 @@ export default function GoogleSignInButton() {
     setIsLoading(true)
 
     try {
+      console.log('[GOOGLE_AUTH] Starting Google OAuth flow...')
+      
       const response = await fetch('/api/auth/google', {
         method: 'POST',
       })
 
+      console.log('[GOOGLE_AUTH] Response status:', response.status)
+
       if (response.ok) {
         const data = await response.json()
+        console.log('[GOOGLE_AUTH] Received OAuth URL:', data.url)
+        
         if (data.url) {
+          console.log('[GOOGLE_AUTH] Redirecting to Google OAuth...')
           // Redirect to Google OAuth URL
           window.location.href = data.url
         } else {
-          console.error('No OAuth URL received from server')
+          console.error('[GOOGLE_AUTH] No OAuth URL received from server')
         }
       } else {
         const data = await response.json()
-        console.error('Google sign-in failed:', data.message || data.error)
+        console.error('[GOOGLE_AUTH] Google sign-in failed:', data.message || data.error)
       }
     } catch (error) {
-      console.error('Google sign-in error:', error)
+      console.error('[GOOGLE_AUTH] Google sign-in error:', error)
     } finally {
       setIsLoading(false)
     }

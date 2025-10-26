@@ -21,6 +21,10 @@ export async function POST(request: NextRequest) {
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent', // Force consent screen to show
+        },
       },
     })
 
@@ -36,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH] Google OAuth initiated:', { event: 'google-oauth', status: 'ok' })
+      console.log('[AUTH] Google OAuth initiated:', { event: 'google-oauth', status: 'ok', url: data.url })
     }
 
     // Return the OAuth URL instead of redirecting

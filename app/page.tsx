@@ -7,6 +7,9 @@ export const dynamic = 'force-dynamic'
 export default function Home() {
   const router = useRouter()
 
+  // TEST: Simple console log to verify component is mounting
+  console.log('[TEST] Home component is mounting!')
+
   // Immediate OAuth callback check (runs on every render)
   const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const code = urlParams.get('code')

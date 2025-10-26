@@ -317,6 +317,7 @@ export default function SalesClient({
   // Debounce timer for viewport changes
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)
+  const initialLoadRef = useRef(true) // Track if this is the initial load
 
   // Handle viewport changes from SimpleMap
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
@@ -344,8 +345,15 @@ export default function SalesClient({
       clearTimeout(debounceTimerRef.current)
     }
     
-    // Debounce fetch by 150ms to prevent rapid successive calls during zoom
+    // Debounce fetch by 300ms to prevent rapid successive calls during zoom
     debounceTimerRef.current = setTimeout(() => {
+      // Skip second API call during initial load (map settling)
+      if (initialLoadRef.current && lastBoundsRef.current) {
+        console.log('[SALES] Skipping second API call during initial load (map settling)')
+        initialLoadRef.current = false // Mark initial load as complete
+        return
+      }
+      
       // Check if bounds have changed significantly (more than 5% change)
       const lastBounds = lastBoundsRef.current
       if (lastBounds) {
@@ -361,6 +369,7 @@ export default function SalesClient({
       console.log('[SALES] Debounced fetchMapSales called with bounds:', bounds)
       console.log('[SALES] Entry point: VIEWPORT_CHANGE - Single fetch verification')
       lastBoundsRef.current = bounds
+      initialLoadRef.current = false // Mark initial load as complete
       fetchMapSales(bounds)
     }, 300)
   }, [fetchMapSales])

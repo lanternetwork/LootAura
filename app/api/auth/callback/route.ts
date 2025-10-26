@@ -6,6 +6,9 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
+    // Always log callback attempts for debugging
+    console.log('[AUTH] OAuth callback hit:', { url: request.url, method: request.method })
+    
     const cookieStore = cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
@@ -13,9 +16,7 @@ export async function GET(request: NextRequest) {
     const code = request.nextUrl.searchParams.get('code')
     const oauthError = request.nextUrl.searchParams.get('error')
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH] OAuth callback received:', { code: !!code, error: oauthError })
-    }
+    console.log('[AUTH] OAuth callback received:', { code: !!code, error: oauthError, url: request.url })
 
     // Handle OAuth error
     if (oauthError) {
@@ -30,12 +31,18 @@ export async function GET(request: NextRequest) {
 
     // Exchange code for session
     if (code) {
+      console.log('[AUTH] Attempting code exchange for session...')
       const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
       
+      console.log('[AUTH] Code exchange result:', { 
+        hasData: !!data, 
+        hasError: !!exchangeError, 
+        hasSession: !!(data?.session),
+        errorMessage: exchangeError?.message 
+      })
+      
       if (exchangeError) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[AUTH] Code exchange failed:', { event: 'oauth-callback', status: 'fail', error: exchangeError.message })
-        }
+        console.log('[AUTH] Code exchange failed:', { event: 'oauth-callback', status: 'fail', error: exchangeError.message })
         
         const signinUrl = new URL('/auth/signin', request.url)
         signinUrl.searchParams.set('error', 'oauth_failed')
@@ -43,15 +50,16 @@ export async function GET(request: NextRequest) {
       }
 
       if (data.session && isValidSession(data.session)) {
+        console.log('[AUTH] Code exchange successful, setting session cookies...')
         // Set session cookies
         const response = NextResponse.redirect(new URL('/', request.url))
         setSessionCookies(response, data.session)
 
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[AUTH] OAuth callback successful:', { event: 'oauth-callback', status: 'ok', userId: data.session.user.id })
-        }
+        console.log('[AUTH] OAuth callback successful:', { event: 'oauth-callback', status: 'ok', userId: data.session.user.id })
 
         return response
+      } else {
+        console.log('[AUTH] Code exchange succeeded but no valid session:', { hasSession: !!data.session, isValid: data.session ? isValidSession(data.session) : false })
       }
     }
 

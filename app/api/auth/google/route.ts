@@ -9,10 +9,12 @@ export async function POST(request: NextRequest) {
     const cookieStore = cookies()
     const supabase = createServerSupabaseClient(cookieStore)
 
-    // Get the redirect URL for OAuth
-    const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL
-      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
-      : `${request.nextUrl.origin}/auth/callback`
+    // Get the redirect URL for OAuth - use current request origin for dynamic URLs
+    const redirectUrl = `${request.nextUrl.origin}/auth/callback`
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[AUTH] Google OAuth redirect URL:', redirectUrl)
+    }
 
     // Initiate Google OAuth
     const { data, error } = await supabase.auth.signInWithOAuth({

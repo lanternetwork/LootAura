@@ -177,7 +177,7 @@ export default function SalesClient({
       clusterRadius: 0.3, // Reduced cluster radius for less aggressive clustering
       minClusterSize: 3, // Increased minimum cluster size
       maxZoom: 16,
-      enableLocationGrouping: true,
+      enableLocationGrouping: false, // Disable location grouping to show all sales
       enableVisualClustering: true
     })
     

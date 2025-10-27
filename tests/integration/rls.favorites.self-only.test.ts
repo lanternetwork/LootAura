@@ -63,7 +63,7 @@ describe('RLS Favorites Self-Only Access', () => {
 
     expect(error).toBeNull()
     expect(data).toEqual(mockFavorites)
-    expect(data[0].user_id).toBe('user123')
+    expect(data?.[0]?.user_id).toBe('user123')
   })
 
   it('should prevent access to other users favorites_v2', async () => {
@@ -277,7 +277,7 @@ describe('RLS Favorites Self-Only Access', () => {
 
     expect(error).toBeNull()
     expect(data).toEqual(mockFavorites)
-    expect(data[0].user_id).toBe('user123')
+    expect(data?.[0]?.user_id).toBe('user123')
   })
 
   it('should prevent access to favorites_v2 without proper authentication', async () => {

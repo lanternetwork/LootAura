@@ -59,7 +59,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
   })
 
   describe('Owner-Only Access', () => {
-    it('should only allow users to access their own favorites_v2_v2', async () => {
+    it('should only allow users to access their own favorites_v2', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -101,7 +101,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
     })
 
-    it('should prevent access to other users favorites_v2_v2', async () => {
+    it('should prevent access to other users favorites_v2', async () => {
       const user1 = { id: 'user1', email: 'user1@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -109,7 +109,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
         error: null,
       })
 
-      // Mock empty result (RLS prevents access to other users' favorites_v2_v2)
+      // Mock empty result (RLS prevents access to other users' favorites_v2)
       const mockFrom = vi.fn(() => ({
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
@@ -154,7 +154,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
   })
 
   describe('Owner-Only Write Access', () => {
-    it('should allow users to create their own favorites_v2_v2', async () => {
+    it('should allow users to create their own favorites_v2', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -175,7 +175,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites_v2_v2', {
+      const request = new NextRequest('https://example.com/api/favorites_v2', {
         method: 'POST',
         body: JSON.stringify({
           sale_id: 'sale123',
@@ -197,13 +197,13 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
     })
 
-    it('should prevent unauthenticated users from creating favorites_v2_v2', async () => {
+    it('should prevent unauthenticated users from creating favorites_v2', async () => {
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: null },
         error: { message: 'No user' },
       })
 
-      const request = new NextRequest('https://example.com/api/favorites_v2_v2', {
+      const request = new NextRequest('https://example.com/api/favorites_v2', {
         method: 'POST',
         body: JSON.stringify({
           sale_id: 'sale123',
@@ -218,7 +218,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(data.error).toBe('Authentication required')
     })
 
-    it('should prevent users from creating favorites_v2_v2 for other users', async () => {
+    it('should prevent users from creating favorites_v2 for other users', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -226,7 +226,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
         error: null,
       })
 
-      const request = new NextRequest('https://example.com/api/favorites_v2_v2', {
+      const request = new NextRequest('https://example.com/api/favorites_v2', {
         method: 'POST',
         body: JSON.stringify({
           sale_id: 'sale123',
@@ -247,7 +247,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
   })
 
   describe('Owner-Only Delete Access', () => {
-    it('should allow users to delete their own favorites_v2_v2', async () => {
+    it('should allow users to delete their own favorites_v2', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -268,7 +268,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites_v2_v2?sale_id=sale123', {
+      const request = new NextRequest('https://example.com/api/favorites_v2?sale_id=sale123', {
         method: 'DELETE',
         headers: { 'Cookie': 'session=valid' },
       })
@@ -283,7 +283,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
     })
 
-    it('should prevent users from deleting other users favorites_v2_v2', async () => {
+    it('should prevent users from deleting other users favorites_v2', async () => {
       const user1 = { id: 'user1', email: 'user1@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -291,7 +291,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
         error: null,
       })
 
-      // Mock no rows affected (RLS prevents deletion of other users' favorites_v2_v2)
+      // Mock no rows affected (RLS prevents deletion of other users' favorites_v2)
       const mockFrom = vi.fn(() => ({
         delete: vi.fn(() => ({
           eq: vi.fn(() => ({
@@ -305,7 +305,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites_v2_v2?sale_id=sale123', {
+      const request = new NextRequest('https://example.com/api/favorites_v2?sale_id=sale123', {
         method: 'DELETE',
         headers: { 'Cookie': 'session=user1-session' },
       })
@@ -319,11 +319,11 @@ describe('RLS Policy Verification - Favorites Access', () => {
   })
 
   describe('Data Isolation', () => {
-    it('should ensure users can only access their own favorites_v2_v2', async () => {
+    it('should ensure users can only access their own favorites_v2', async () => {
       const user1 = { id: 'user1', email: 'user1@example.com' }
       const user2 = { id: 'user2', email: 'user2@example.com' }
 
-      // User1 gets their favorites_v2_v2
+      // User1 gets their favorites_v2
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: user1 },
         error: null,
@@ -344,7 +344,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom1
 
-      const request1 = new NextRequest('https://example.com/api/favorites_v2_v2')
+      const request1 = new NextRequest('https://example.com/api/favorites_v2')
       
       const response1 = await GET(request1)
       const data1 = await response1.json()
@@ -352,7 +352,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(response1.status).toBe(200)
       expect(data1.favorites_v2[0].user_id).toBe('user1')
 
-      // User2 gets their favorites_v2_v2
+      // User2 gets their favorites_v2
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: user2 },
         error: null,
@@ -373,7 +373,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom2
 
-      const request2 = new NextRequest('https://example.com/api/favorites_v2_v2')
+      const request2 = new NextRequest('https://example.com/api/favorites_v2')
       
       const response2 = await GET(request2)
       const data2 = await response2.json()
@@ -387,7 +387,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
   })
 
   describe('RLS Policy Compliance', () => {
-    it('should enforce owner-only favorites_v2_v2 access', async () => {
+    it('should enforce owner-only favorites_v2 access', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -418,11 +418,11 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(response.status).toBe(200)
       expect(data.favorites_v2[0].user_id).toBe('user123')
       
-      // The RLS policy ensures the user can only access their own favorites_v2_v2
+      // The RLS policy ensures the user can only access their own favorites_v2
       // This is enforced at the database level
     })
 
-    it('should prevent access to favorites_v2_v2 without proper authentication', async () => {
+    it('should prevent access to favorites_v2 without proper authentication', async () => {
       // Simulate a request without proper authentication
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: null },

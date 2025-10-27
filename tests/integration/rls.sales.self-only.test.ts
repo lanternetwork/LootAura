@@ -146,7 +146,7 @@ describe('RLS Sales Self-Only Access', () => {
 
     expect(error).toBeNull()
     expect(data).toEqual(mockSales)
-    expect(data[0].owner_id).toBe('user123')
+    expect(data?.[0]?.owner_id).toBe('user123')
   })
 
   it('should ensure users can only access their own sales_v2 for management', async () => {
@@ -223,7 +223,7 @@ describe('RLS Sales Self-Only Access', () => {
 
     expect(error).toBeNull()
     expect(data).toEqual([mockSale])
-    expect(data[0].owner_id).toBe('user123')
+    expect(data?.[0]?.owner_id).toBe('user123')
   })
 
   it('should prevent user from creating sales_v2 for other users', async () => {

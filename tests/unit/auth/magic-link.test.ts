@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { POST } from '../../app/api/auth/magic-link/route'
+import { POST } from '@/app/api/auth/magic-link/route'
 
 // Mock Supabase client
 const mockSupabaseClient = {

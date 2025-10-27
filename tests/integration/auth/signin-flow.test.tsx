@@ -49,7 +49,7 @@ describe('Sign In Page Integration', () => {
     mockGet.mockReturnValue(null)
     
     // Dynamic import to avoid module resolution issues
-    const module = await import('../../app/auth/signin/page')
+    const module = await import('@/app/auth/signin/page')
     SignIn = module.default
   })
 

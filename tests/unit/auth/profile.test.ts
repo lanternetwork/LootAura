@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { POST, GET } from '../../app/api/profile/route'
+import { POST, GET } from '@/app/api/profile/route'
 
 // Mock Supabase client
 const mockSupabaseClient = {

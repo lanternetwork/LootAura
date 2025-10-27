@@ -22,8 +22,8 @@ const mockSupabaseClient = {
   })),
 }
 
-vi.mock('@/lib/auth/server-session', () => ({
-  createServerSupabaseClient: vi.fn(() => mockSupabaseClient),
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(() => mockSupabaseClient),
 }))
 
 vi.mock('next/headers', () => ({

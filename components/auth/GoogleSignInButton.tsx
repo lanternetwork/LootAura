@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function GoogleSignInButton() {
   const [isLoading, setIsLoading] = useState(false)
@@ -11,26 +12,26 @@ export default function GoogleSignInButton() {
     try {
       console.log('[GOOGLE_AUTH] Starting Google OAuth flow...')
       
-      const response = await fetch('/api/auth/google', {
-        method: 'POST',
+      const supabase = createClientComponentClient()
+      const redirectTo = `${window.location.origin}/auth/callback`
+      
+      console.log('[GOOGLE_AUTH] Redirect URL:', redirectTo)
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          queryParams: { 
+            prompt: 'select_account' // Better UX - always show account selection
+          }
+        }
       })
 
-      console.log('[GOOGLE_AUTH] Response status:', response.status)
-
-      if (response.ok) {
-        const data = await response.json()
-        console.log('[GOOGLE_AUTH] Received OAuth URL:', data.url)
-        
-        if (data.url) {
-          console.log('[GOOGLE_AUTH] Redirecting to Google OAuth...')
-          // Redirect to Google OAuth URL
-          window.location.href = data.url
-        } else {
-          console.error('[GOOGLE_AUTH] No OAuth URL received from server')
-        }
+      if (error) {
+        console.error('[GOOGLE_AUTH] Google sign-in failed:', error.message)
       } else {
-        const data = await response.json()
-        console.error('[GOOGLE_AUTH] Google sign-in failed:', data.message || data.error)
+        console.log('[GOOGLE_AUTH] OAuth URL generated, redirecting...')
+        // Supabase will handle the redirect automatically
       }
     } catch (error) {
       console.error('[GOOGLE_AUTH] Google sign-in error:', error)

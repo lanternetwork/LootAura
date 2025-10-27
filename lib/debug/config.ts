@@ -72,3 +72,4 @@ export const isDebugFeatureEnabled = (feature: keyof DebugConfig): boolean => {
 }
 
 export default debugConfig
+

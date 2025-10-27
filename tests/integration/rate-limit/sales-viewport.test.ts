@@ -31,7 +31,7 @@ vi.mock('@/lib/rateLimit/withRateLimit', () => ({
       }
       
       // Find the most restrictive result
-      let mostRestrictive = results.find(r => !r.allowed) || results.find(r => r.softLimited) || results[0]
+      const mostRestrictive = results.find(r => !r.allowed) || results.find(r => r.softLimited) || results[0]
       
       if (!mostRestrictive) {
         return handler(req)
@@ -82,28 +82,68 @@ vi.mock('@/lib/rateLimit/headers', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => ({
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        gte: vi.fn(() => ({
-          lte: vi.fn(() => ({
-            gte: vi.fn(() => ({
-              lte: vi.fn(() => ({
+    from: vi.fn((tableName: string) => {
+      if (tableName === 'sales_v2') {
+        return {
+          select: vi.fn((columns: string | string[], options?: any) => {
+            if (options?.count === 'exact' && options?.head === true) {
+              // Count query
+              return {
+                eq: vi.fn().mockResolvedValue({
+                  count: 0,
+                  error: null
+                })
+              }
+            } else {
+              // Regular select query
+              return {
                 gte: vi.fn(() => ({
                   lte: vi.fn(() => ({
-                    order: vi.fn(() => ({
-                      limit: vi.fn().mockResolvedValue({
-                        data: [],
-                        error: null
-                      })
+                    gte: vi.fn(() => ({
+                      lte: vi.fn(() => ({
+                        order: vi.fn(() => ({
+                          limit: vi.fn().mockResolvedValue({
+                            data: [],
+                            error: null
+                          })
+                        }))
+                      }))
                     }))
+                  }))
+                }))
+              }
+            }
+          })
+        }
+      } else if (tableName === 'items_v2') {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn().mockResolvedValue({
+              data: [],
+              error: null
+            })
+          }))
+        }
+      }
+      return {
+        select: vi.fn(() => ({
+          gte: vi.fn(() => ({
+            lte: vi.fn(() => ({
+              gte: vi.fn(() => ({
+                lte: vi.fn(() => ({
+                  order: vi.fn(() => ({
+                    limit: vi.fn().mockResolvedValue({
+                      data: [],
+                      error: null
+                    })
                   }))
                 }))
               }))
             }))
           }))
         }))
-      }))
-    }))
+      }
+    })
   }))
 }))
 

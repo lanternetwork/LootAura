@@ -9,11 +9,63 @@ import { NextRequest } from 'next/server'
 
 // Mock the rate limiting modules
 vi.mock('@/lib/rateLimit/config', () => ({
-  shouldBypassRateLimit: vi.fn(() => false)
+  isRateLimitingEnabled: vi.fn(() => true),
+  isPreviewEnv: vi.fn(() => false),
+  shouldBypassRateLimit: vi.fn(() => false) // Force rate limiting to be active
 }))
 
 vi.mock('@/lib/rateLimit/withRateLimit', () => ({
-  withRateLimit: vi.fn((handler) => handler)
+  withRateLimit: vi.fn((handler, policies) => {
+    return async (req: any) => {
+      // Simulate rate limiting logic
+      const { deriveKey } = await import('@/lib/rateLimit/keys')
+      const { check } = await import('@/lib/rateLimit/limiter')
+      const { applyRateHeaders } = await import('@/lib/rateLimit/headers')
+      
+      const userId = undefined
+      const results = []
+      
+      for (const policy of policies) {
+        const key = await deriveKey(req, policy.scope, userId)
+        results.push(await check(policy, key))
+      }
+      
+      // Find the most restrictive result
+      const mostRestrictive = results.find(r => !r.allowed) || results.find(r => r.softLimited) || results[0]
+      
+      if (!mostRestrictive) {
+        return handler(req)
+      }
+      
+      // Handle hard limit
+      if (!mostRestrictive.allowed) {
+        const { NextResponse } = await import('next/server')
+        const errorResponse = NextResponse.json(
+          { error: 'rate_limited', message: 'Too many requests. Please slow down.' },
+          { status: 429 }
+        )
+        
+        return applyRateHeaders(
+          errorResponse,
+          mostRestrictive.policy,
+          mostRestrictive.remaining,
+          mostRestrictive.resetAt,
+          mostRestrictive.softLimited
+        )
+      }
+      
+      // Call handler and apply headers
+      const response = await handler(req)
+      
+      return applyRateHeaders(
+        response,
+        mostRestrictive.policy,
+        mostRestrictive.remaining,
+        mostRestrictive.resetAt,
+        mostRestrictive.softLimited
+      )
+    }
+  })
 }))
 
 vi.mock('@/lib/rateLimit/limiter', () => ({
@@ -28,8 +80,19 @@ vi.mock('@/lib/rateLimit/headers', () => ({
   applyRateHeaders: vi.fn((response) => response)
 }))
 
+vi.mock('@/lib/auth/server-session', () => ({
+  createServerSupabaseClient: vi.fn(() => ({
+    auth: {
+      exchangeCodeForSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: 'user123' } } },
+        error: null
+      })
+    }
+  }))
+}))
+
 // Import after mocking
-import { callbackHandler } from '@/app/api/auth/callback/route'
+import { GET } from '@/app/api/auth/callback/route'
 import { check } from '@/lib/rateLimit/limiter'
 import { deriveKey } from '@/lib/rateLimit/keys'
 import { applyRateHeaders } from '@/lib/rateLimit/headers'
@@ -56,25 +119,13 @@ describe('Rate Limiting Integration - Auth Callback', () => {
   it('should allow requests within rate limit', async () => {
     const request = new NextRequest('https://example.com/auth/callback?code=abc123')
     
-    // Mock successful auth flow
-    vi.mock('@/lib/auth/server-session', () => ({
-      createServerSupabaseClient: vi.fn(() => ({
-        auth: {
-          exchangeCodeForSession: vi.fn().mockResolvedValue({
-            data: { session: { user: { id: 'user123' } } },
-            error: null
-          })
-        }
-      }))
-    }))
-    
     // Mock fetch for profile creation
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ created: true })
     })
     
-    const response = await callbackHandler(request)
+    const response = await GET(request)
     
     expect(response.status).toBe(307) // Redirect (not 302)
     expect(mockDeriveKey).toHaveBeenCalledWith(request, 'ip', undefined)
@@ -91,7 +142,7 @@ describe('Rate Limiting Integration - Auth Callback', () => {
     
     const request = new NextRequest('https://example.com/auth/callback?code=abc123')
     
-    const response = await callbackHandler(request)
+    const response = await GET(request)
     
     expect(response.status).toBe(429)
     expect(response.headers.get('X-RateLimit-Limit')).toBe('10')
@@ -108,24 +159,12 @@ describe('Rate Limiting Integration - Auth Callback', () => {
     
     const request = new NextRequest('https://example.com/auth/callback?code=abc123')
     
-    // Mock successful auth flow
-    vi.mock('@/lib/auth/server-session', () => ({
-      createServerSupabaseClient: vi.fn(() => ({
-        auth: {
-          exchangeCodeForSession: vi.fn().mockResolvedValue({
-            data: { session: { user: { id: 'user123' } } },
-            error: null
-          })
-        }
-      }))
-    }))
-    
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ created: true })
     })
     
-    const response = await callbackHandler(request)
+    const response = await GET(request)
     
     expect(response.status).toBe(307) // Still redirects (not 302)
     expect(response.headers.get('X-RateLimit-Remaining')).toBe('0')
@@ -134,12 +173,19 @@ describe('Rate Limiting Integration - Auth Callback', () => {
 
   it('should bypass rate limiting when disabled', async () => {
     vi.doMock('@/lib/rateLimit/config', () => ({
+      isRateLimitingEnabled: vi.fn(() => false),
+      isPreviewEnv: vi.fn(() => true),
       shouldBypassRateLimit: vi.fn(() => true)
     }))
     
     const request = new NextRequest('https://example.com/auth/callback?code=abc123')
     
-    const response = await callbackHandler(request)
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ created: true })
+    })
+    
+    const response = await GET(request)
     
     expect(mockCheck).not.toHaveBeenCalled()
     expect(response.status).toBe(307) // Should still work (not 302)

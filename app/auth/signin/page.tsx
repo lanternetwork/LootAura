@@ -152,27 +152,23 @@ export default function SignIn() {
           </>
         )}
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-neutral-50 text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <GoogleSignInButton />
-
-            <Link 
-              href="/auth/signup"
-              className="block text-center w-full rounded border border-amber-500 px-4 py-2 text-amber-600 font-medium hover:bg-amber-50"
-            >
-              Create Account
-            </Link>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300" />
           </div>
-        </form>
-          </>
-        )}
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-neutral-50 text-gray-500">Or continue with</span>
+          </div>
+        </div>
+
+        <GoogleSignInButton />
+
+        <Link 
+          href="/auth/signup"
+          className="block text-center w-full rounded border border-amber-500 px-4 py-2 text-amber-600 font-medium hover:bg-amber-50"
+        >
+          Create Account
+        </Link>
 
         <div className="text-center">
           <Link

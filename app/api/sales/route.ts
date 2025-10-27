@@ -708,10 +708,72 @@ export const GET = withRateLimit(salesHandler, [
   Policies.SALES_VIEW_HOURLY
 ])
 
-export const POST = withRateLimit(async (_request: NextRequest) => {
-  // POST handler implementation would go here
-  // For now, return a placeholder
-  return NextResponse.json({ error: 'POST not implemented' }, { status: 501 })
+export const POST = withRateLimit(async (request: NextRequest) => {
+  try {
+    const supabase = createSupabaseServerClient()
+    
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Auth failed:', { event: 'sales-create', status: 'fail', code: authError?.message })
+      }
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    
+    const body = await request.json()
+    
+    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact } = body
+    
+    // Validate required fields
+    if (!title || !address || !city || !state || !zip_code || !lat || !lng || !date_start || !time_start) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+    
+    // Create datetime strings
+    const startDateTime = `${date_start}T${time_start}:00`
+    const endDateTime = `${date_end || date_start}T${time_end || time_start}:00`
+    
+    // Insert sale
+    const { data, error } = await supabase
+      .from('sales_v2')
+      .insert({
+        title,
+        description,
+        address,
+        city,
+        state,
+        zip_code,
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+        starts_at: startDateTime,
+        ends_at: endDateTime,
+        owner_id: user.id,
+        status: 'published'
+      })
+      .select()
+      .single()
+    
+    if (error) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Insert failed:', { event: 'sales-create', status: 'fail', code: error.message })
+      }
+      console.error('Sales insert error:', error)
+      return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
+    }
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES] Sale created:', { event: 'sales-create', status: 'ok', saleId: data.id })
+    }
+    
+    return NextResponse.json({ ok: true, sale: data })
+  } catch (error: any) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES] Unexpected error:', { event: 'sales-create', status: 'fail' })
+    }
+    console.error('Sales POST error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
 }, [
   Policies.MUTATE_MINUTE,
   Policies.MUTATE_DAILY

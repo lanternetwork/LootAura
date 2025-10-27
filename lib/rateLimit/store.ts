@@ -15,9 +15,9 @@ const memoryStore = new Map<string, WindowCount>()
 
 // Clean up expired entries every 5 minutes
 setInterval(() => {
-  const now = now()
+  const currentTime = Math.floor(Date.now() / 1000)
   for (const [key, entry] of memoryStore.entries()) {
-    if (now > entry.resetAt) {
+    if (currentTime > entry.resetAt) {
       memoryStore.delete(key)
     }
   }

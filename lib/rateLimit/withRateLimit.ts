@@ -73,7 +73,7 @@ export function withRateLimit(
         mostRestrictive.remaining,
         mostRestrictive.resetAt,
         mostRestrictive.softLimited
-      )
+      ) as NextResponse
     }
     
     // Call handler and apply headers
@@ -85,6 +85,6 @@ export function withRateLimit(
       mostRestrictive.remaining,
       mostRestrictive.resetAt,
       mostRestrictive.softLimited
-    )
+    ) as NextResponse
   }
 }

@@ -76,7 +76,7 @@ describe('Rate Limiting Integration - Auth Callback', () => {
     
     const response = await callbackHandler(request)
     
-    expect(response.status).toBe(302) // Redirect
+    expect(response.status).toBe(307) // Redirect (not 302)
     expect(mockDeriveKey).toHaveBeenCalledWith(request, 'ip', undefined)
     expect(mockCheck).toHaveBeenCalled()
   })
@@ -127,7 +127,7 @@ describe('Rate Limiting Integration - Auth Callback', () => {
     
     const response = await callbackHandler(request)
     
-    expect(response.status).toBe(302) // Still redirects
+    expect(response.status).toBe(307) // Still redirects (not 302)
     expect(response.headers.get('X-RateLimit-Remaining')).toBe('0')
     expect(response.headers.get('Retry-After')).toBeNull()
   })
@@ -142,6 +142,6 @@ describe('Rate Limiting Integration - Auth Callback', () => {
     const response = await callbackHandler(request)
     
     expect(mockCheck).not.toHaveBeenCalled()
-    expect(response.status).toBe(302) // Should still work
+    expect(response.status).toBe(307) // Should still work (not 302)
   })
 })

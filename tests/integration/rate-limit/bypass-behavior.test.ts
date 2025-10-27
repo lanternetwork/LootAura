@@ -14,10 +14,9 @@ describe('Rate Limiting Integration - Bypass Behavior', () => {
 
   it('should bypass rate limiting when RATE_LIMITING_ENABLED is not set', async () => {
     // Mock environment
-    const originalEnv = process.env.NODE_ENV
     const originalRateLimit = process.env.RATE_LIMITING_ENABLED
     
-    process.env.NODE_ENV = 'production'
+    // Temporarily remove the env var
     delete process.env.RATE_LIMITING_ENABLED
     
     // Re-import config to pick up new env
@@ -30,7 +29,6 @@ describe('Rate Limiting Integration - Bypass Behavior', () => {
     expect(shouldBypassRateLimit()).toBe(true)
     
     // Restore environment
-    process.env.NODE_ENV = originalEnv
     if (originalRateLimit) {
       process.env.RATE_LIMITING_ENABLED = originalRateLimit
     }
@@ -38,10 +36,8 @@ describe('Rate Limiting Integration - Bypass Behavior', () => {
 
   it('should bypass rate limiting in development', async () => {
     // Mock environment
-    const originalEnv = process.env.NODE_ENV
     const originalRateLimit = process.env.RATE_LIMITING_ENABLED
     
-    process.env.NODE_ENV = 'development'
     process.env.RATE_LIMITING_ENABLED = 'true'
     
     // Re-import config to pick up new env
@@ -54,7 +50,6 @@ describe('Rate Limiting Integration - Bypass Behavior', () => {
     expect(shouldBypassRateLimit()).toBe(true)
     
     // Restore environment
-    process.env.NODE_ENV = originalEnv
     if (originalRateLimit) {
       process.env.RATE_LIMITING_ENABLED = originalRateLimit
     }
@@ -62,11 +57,9 @@ describe('Rate Limiting Integration - Bypass Behavior', () => {
 
   it('should bypass rate limiting in preview deployments', async () => {
     // Mock environment
-    const originalEnv = process.env.NODE_ENV
     const originalVercelEnv = process.env.VERCEL_ENV
     const originalRateLimit = process.env.RATE_LIMITING_ENABLED
     
-    process.env.NODE_ENV = 'production'
     process.env.VERCEL_ENV = 'preview'
     process.env.RATE_LIMITING_ENABLED = 'true'
     
@@ -80,7 +73,6 @@ describe('Rate Limiting Integration - Bypass Behavior', () => {
     expect(shouldBypassRateLimit()).toBe(true)
     
     // Restore environment
-    process.env.NODE_ENV = originalEnv
     if (originalVercelEnv) {
       process.env.VERCEL_ENV = originalVercelEnv
     }
@@ -91,10 +83,8 @@ describe('Rate Limiting Integration - Bypass Behavior', () => {
 
   it('should enable rate limiting in production with explicit flag', async () => {
     // Mock environment
-    const originalEnv = process.env.NODE_ENV
     const originalRateLimit = process.env.RATE_LIMITING_ENABLED
     
-    process.env.NODE_ENV = 'production'
     process.env.RATE_LIMITING_ENABLED = 'true'
     
     // Re-import config to pick up new env
@@ -107,7 +97,6 @@ describe('Rate Limiting Integration - Bypass Behavior', () => {
     expect(shouldBypassRateLimit()).toBe(false)
     
     // Restore environment
-    process.env.NODE_ENV = originalEnv
     if (originalRateLimit) {
       process.env.RATE_LIMITING_ENABLED = originalRateLimit
     }

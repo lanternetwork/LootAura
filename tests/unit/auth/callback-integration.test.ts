@@ -159,7 +159,12 @@ describe('OAuth Callback Route', () => {
       
       expect(mockFetch).toHaveBeenCalledWith(
         'https://example.com/api/profile',
-        expect.anything()
+        {
+          method: 'POST',
+          headers: {
+            'Cookie': '',
+          },
+        }
       )
     })
 

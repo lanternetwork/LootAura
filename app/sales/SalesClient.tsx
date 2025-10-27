@@ -6,7 +6,6 @@ import { Sale } from '@/lib/types'
 import SimpleMap from '@/components/location/SimpleMap'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import SalesList from '@/components/SalesList'
-import FiltersModal from '@/components/filters/FiltersModal'
 import FiltersBar from '@/components/sales/FiltersBar'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
@@ -62,7 +61,6 @@ export default function SalesClient({
   // Sales data state - map is source of truth
   const [mapSales, setMapSales] = useState<Sale[]>(initialSales)
   const [loading, setLoading] = useState(false)
-  const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [zipError, setZipError] = useState<string | null>(null)
   const [, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
@@ -569,7 +567,6 @@ export default function SalesClient({
         onCategoriesChange={(categories) => handleFiltersChange({ ...filters, categories })}
         distance={filters.distance}
         onDistanceChange={(distance) => handleFiltersChange({ ...filters, distance })}
-        onAdvancedFiltersOpen={() => setShowFiltersModal(true)}
         hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
         isLoading={loading}
         zipInputTestId="zip-input"
@@ -726,18 +723,6 @@ export default function SalesClient({
           )}
         </div>
       </div>
-
-      {/* Filters Modal */}
-            <FiltersModal 
-        isOpen={showFiltersModal}
-        onClose={() => setShowFiltersModal(false)}
-              filters={{
-                distance: filters.distance,
-          dateRange: filters.dateRange as any,
-                categories: filters.categories
-              }}
-        onFiltersChange={handleFiltersChange}
-      />
 
     </div>
   )

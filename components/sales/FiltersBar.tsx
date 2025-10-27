@@ -21,8 +21,7 @@ type FiltersBarProps = {
   distance: number
   onDistanceChange: (distance: number) => void
   
-  // Advanced Filters
-  onAdvancedFiltersOpen: () => void
+  // Active filters indicator
   hasActiveFilters: boolean
   
   // Loading state for visual feedback
@@ -174,7 +173,6 @@ export default function FiltersBar({
   onCategoriesChange,
   distance,
   onDistanceChange,
-  onAdvancedFiltersOpen,
   hasActiveFilters,
   isLoading = false,
   zipInputTestId = "zip-input",
@@ -199,14 +197,6 @@ export default function FiltersBar({
       onCategoriesChange(categories.filter(c => c !== categoryId))
     } else {
       onCategoriesChange([...categories, categoryId])
-    }
-  }
-
-  const toggleOverflowMenu = () => {
-    if (overflow.length > 0) {
-      setShowOverflowMenu(!showOverflowMenu)
-    } else {
-      onAdvancedFiltersOpen()
     }
   }
 
@@ -328,49 +318,51 @@ export default function FiltersBar({
             </select>
           </div>
 
-          {/* More Filters button (existing) - overflow host */}
-          <div className="relative">
-            <button
-              onClick={toggleOverflowMenu}
-              data-testid={filtersMoreTestId}
-              className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
-              {overflow.length > 0 ? `More (${overflow.length})` : 'More Filters'}
-              {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
-            </button>
+          {/* Overflow menu for additional categories */}
+          {overflow.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowOverflowMenu(!showOverflowMenu)}
+                data-testid={filtersMoreTestId}
+                className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                More ({overflow.length})
+                {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+              </button>
 
-            {/* Overflow menu popover */}
-            {showOverflowMenu && overflow.length > 0 && (
-              <div data-overflow-menu className="absolute right-0 top-full mt-2 w-64 rounded-lg border bg-white shadow-lg z-50">
-                <div className="p-2 flex flex-wrap gap-2">
-                  {overflow.map((category) => {
-                    const isSelected = categories.includes(category.id)
-                    return (
-                      <button
-                        key={category.id}
-                        onClick={() => handleCategoryToggle(category.id)}
-                        className={`
-                          shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
-                          ${isSelected 
-                            ? 'bg-blue-100 text-blue-800 border border-blue-200' 
-                            : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
-                          }
-                        `}
-                      >
-                        {category.label}
-                        {isSelected && (
-                          <span className="ml-1 text-blue-600">×</span>
-                        )}
-                      </button>
-                    )
-                  })}
+              {/* Overflow menu popover */}
+              {showOverflowMenu && (
+                <div data-overflow-menu className="absolute right-0 top-full mt-2 w-64 rounded-lg border bg-white shadow-lg z-50">
+                  <div className="p-2 flex flex-wrap gap-2">
+                    {overflow.map((category) => {
+                      const isSelected = categories.includes(category.id)
+                      return (
+                        <button
+                          key={category.id}
+                          onClick={() => handleCategoryToggle(category.id)}
+                          className={`
+                            shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors
+                            ${isSelected 
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                              : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                            }
+                          `}
+                        >
+                          {category.label}
+                          {isSelected && (
+                            <span className="ml-1 text-blue-600">×</span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { Suspense } from 'react'
 
 interface AuthErrorPageProps {
   searchParams: { error?: string }
@@ -6,78 +6,55 @@ interface AuthErrorPageProps {
 
 export default function AuthErrorPage({ searchParams }: AuthErrorPageProps) {
   const error = searchParams.error || 'unknown_error'
-  
-  // Map error codes to user-friendly messages
-  const getErrorMessage = (errorCode: string) => {
-    switch (errorCode) {
-      case 'access_denied':
-        return 'You cancelled the sign-in process. Please try again if you want to continue.'
-      case 'missing_code':
-        return 'The authorization code was missing. Please try signing in again.'
-      case 'no_session':
-        return 'Unable to create a session. Please try signing in again.'
-      case 'exchange_failed':
-        return 'Failed to complete the sign-in process. Please try again.'
-      default:
-        return 'An error occurred during sign-in. Please try again.'
-    }
-  }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <div className="text-center">
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-              <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              Sign-in Error
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-600">
-              {getErrorMessage(error)}
-            </p>
+    <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
+        <div className="text-center">
+          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+            <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
           </div>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">What would you like to do?</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-3">
-              <Link
-                href="/auth/signin"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Try Again
-              </Link>
-              
-              <Link
-                href="/"
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Go Home
-              </Link>
-            </div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">
+            Authentication Error
+          </h1>
+          <p className="text-gray-600 mb-6">
+            {getErrorMessage(error)}
+          </p>
+          <div className="space-y-3">
+            <a
+              href="/auth/signin"
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors inline-block"
+            >
+              Try Again
+            </a>
+            <a
+              href="/"
+              className="w-full bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition-colors inline-block"
+            >
+              Go Home
+            </a>
           </div>
-
-          {process.env.NEXT_PUBLIC_DEBUG === 'true' && (
-            <div className="mt-6 p-4 bg-gray-100 rounded-md">
-              <h3 className="text-sm font-medium text-gray-900 mb-2">Debug Information</h3>
-              <p className="text-xs text-gray-600 font-mono">
-                Error Code: {error}
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>
   )
+}
+
+function getErrorMessage(error: string): string {
+  switch (error) {
+    case 'access_denied':
+      return 'You cancelled the authentication process. Please try again if you want to sign in.'
+    case 'missing_code':
+      return 'The authentication process was incomplete. Please try signing in again.'
+    case 'no_session':
+      return 'Authentication completed but no session was created. Please try again.'
+    case 'session_verification_failed':
+      return 'Authentication completed but session verification failed. Please try again.'
+    case 'exchange_failed':
+      return 'There was an error processing your authentication. Please try again.'
+    default:
+      return 'An unexpected error occurred during authentication. Please try again.'
+  }
 }

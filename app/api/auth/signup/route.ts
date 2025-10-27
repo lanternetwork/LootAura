@@ -15,7 +15,7 @@ const signupSchema = z.object({
 })
 
 async function signupHandler(request: NextRequest) {
-
+  try {
     const body = await request.json()
     const { email, password } = signupSchema.parse(body)
 

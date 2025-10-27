@@ -6,7 +6,7 @@
  */
 
 import { Policy } from './policies'
-import { incrAndGet, now } from './store'
+import { incrAndGet } from './store'
 
 export interface RateLimitResult {
   allowed: boolean

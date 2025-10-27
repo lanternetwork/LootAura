@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
-interface RateLimitStatus {
+interface RateLimitStatusData {
   enabled: boolean
   backend: 'upstash' | 'memory'
   policies: string[]
@@ -10,7 +10,7 @@ interface RateLimitStatus {
 }
 
 export default function RateLimitStatus() {
-  const [status, setStatus] = useState<RateLimitStatus | null>(null)
+  const [status, setStatus] = useState<RateLimitStatusData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 

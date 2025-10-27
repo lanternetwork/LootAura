@@ -13,7 +13,7 @@ const magicLinkSchema = z.object({
 })
 
 async function magicLinkHandler(request: NextRequest) {
-
+  try {
     const body = await request.json()
     
     if (!body || typeof body !== 'object') {

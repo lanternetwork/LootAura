@@ -13,7 +13,7 @@ const signinSchema = z.object({
 })
 
 async function signinHandler(request: NextRequest) {
-
+  try {
     const body = await request.json()
     const { email, password } = signinSchema.parse(body)
 

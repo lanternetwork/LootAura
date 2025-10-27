@@ -92,6 +92,7 @@ async function callbackHandler(request: NextRequest) {
   }
 }
 
+export { callbackHandler }
 export const GET = withRateLimit(callbackHandler, [
   Policies.AUTH_CALLBACK,
   Policies.AUTH_HOURLY

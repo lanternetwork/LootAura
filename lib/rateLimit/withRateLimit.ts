@@ -30,7 +30,7 @@ export function withRateLimit(
     
     // Derive key from first policy's scope (or combine per-scope)
     const primaryPolicy = policies[0]
-    const key = await deriveKey(req, primaryPolicy.scope, opts.userId)
+    await deriveKey(req, primaryPolicy.scope, opts.userId)
     
     // Check all policies and find the most restrictive result
     let mostRestrictive: {

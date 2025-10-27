@@ -708,7 +708,7 @@ export const GET = withRateLimit(salesHandler, [
   Policies.SALES_VIEW_HOURLY
 ])
 
-export const POST = withRateLimit(async (request: NextRequest) => {
+export const POST = withRateLimit(async (_request: NextRequest) => {
   // POST handler implementation would go here
   // For now, return a placeholder
   return NextResponse.json({ error: 'POST not implemented' }, { status: 501 })

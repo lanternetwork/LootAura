@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/auth/server-session'
 import { cookies } from 'next/headers'
+import { authDebug } from '@/lib/debug/authDebug'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,13 +20,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[PROFILE] Creating/ensuring profile for user:', { 
-        event: 'profile-create', 
-        userId: user.id, 
-        email: user.email 
-      })
-    }
+    authDebug.logAuthFlow('profile-creation', 'start', 'start', { 
+      userId: user.id, 
+      email: user.email 
+    })
 
     // Check if profile already exists
     const { data: existingProfile, error: fetchError } = await supabase
@@ -41,12 +39,9 @@ export async function POST(request: NextRequest) {
 
     // If profile exists, return it
     if (existingProfile) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[PROFILE] Profile already exists:', { 
-          event: 'profile-exists', 
-          userId: user.id 
-        })
-      }
+      authDebug.logAuthFlow('profile-creation', 'exists', 'success', { 
+        userId: user.id 
+      })
       
       return NextResponse.json({ 
         profile: existingProfile,
@@ -84,13 +79,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 })
     }
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[PROFILE] Profile created successfully:', { 
-        event: 'profile-created', 
-        userId: user.id,
-        profileId: newProfile.id
-      })
-    }
+    authDebug.logAuthFlow('profile-creation', 'created', 'success', { 
+      userId: user.id,
+      profileId: newProfile.id
+    })
 
     return NextResponse.json({ 
       profile: newProfile,

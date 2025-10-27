@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/auth/server-session'
 import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
 import { cookies } from 'next/headers'
+import { authDebug } from '@/lib/debug/authDebug'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,9 +39,7 @@ export async function POST(request: NextRequest) {
       console.log('[AUTH] WARNING: NEXT_PUBLIC_SITE_URL not set, using Supabase default email redirect')
     }
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH] Magic link request:', { event: 'magic-link', email, redirectToSet: !!emailRedirectTo })
-    }
+    authDebug.logMagicLink(email, 'sent', { redirectToSet: !!emailRedirectTo })
 
     // Send magic link
     const { data, error } = await supabase.auth.signInWithOtp({
@@ -52,9 +51,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AUTH] Magic link failed:', { event: 'magic-link', status: 'fail', code: error.message })
-      }
+      authDebug.logMagicLink(email, 'error', { code: error.message })
       
       return NextResponse.json(
         { code: error.message, message: 'Failed to send magic link' },
@@ -62,9 +59,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[AUTH] Magic link sent:', { event: 'magic-link', status: 'ok' })
-    }
+    authDebug.logMagicLink(email, 'sent')
 
     return NextResponse.json(
       { 

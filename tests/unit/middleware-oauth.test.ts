@@ -40,10 +40,7 @@ describe('OAuth Callback Middleware', () => {
     await middleware(request)
     
     expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/auth/callback',
-        search: '?code=abc123'
-      }),
+      'https://example.com/auth/callback?code=abc123',
       307
     )
   })
@@ -55,10 +52,7 @@ describe('OAuth Callback Middleware', () => {
     await middleware(request)
     
     expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/auth/callback',
-        search: '?error=access_denied'
-      }),
+      'https://example.com/auth/callback?error=access_denied',
       307
     )
   })
@@ -70,10 +64,7 @@ describe('OAuth Callback Middleware', () => {
     await middleware(request)
     
     expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/auth/callback',
-        search: '?code=abc123&state=xyz&next=/sales'
-      }),
+      'https://example.com/auth/callback?code=abc123&state=xyz&next=%2Fsales',
       307
     )
   })

@@ -2,13 +2,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 
-// Mock fetch
-global.fetch = vi.fn()
+// Mock Supabase client
+const mockSignInWithOAuth = vi.fn()
+vi.mock('@supabase/ssr', () => ({
+  createBrowserClient: vi.fn(() => ({
+    auth: {
+      signInWithOAuth: mockSignInWithOAuth
+    }
+  }))
+}))
 
 // Mock window.location
 Object.defineProperty(window, 'location', {
   value: {
     href: '',
+    origin: 'https://example.com'
   },
   writable: true,
 })
@@ -17,7 +25,7 @@ describe('Google Sign-In Button', () => {
   beforeEach(() => {
     // Clear mocks before each test
     vi.clearAllMocks()
-    vi.mocked(fetch).mockClear()
+    mockSignInWithOAuth.mockClear()
     // Reset environment
     delete process.env.NEXT_PUBLIC_GOOGLE_ENABLED
   })
@@ -56,29 +64,21 @@ describe('Google Sign-In Button', () => {
   it('should handle Google sign-in click', async () => {
     process.env.NEXT_PUBLIC_GOOGLE_ENABLED = 'true'
 
-    const mockResponse = {
-      ok: true,
-      redirected: false,
-      url: 'https://accounts.google.com/oauth/authorize?client_id=...',
-      json: vi.fn().mockResolvedValue({
-        url: 'https://accounts.google.com/oauth/authorize?client_id=...'
-      })
-    } as any
-
-    vi.mocked(fetch).mockResolvedValueOnce(mockResponse)
+    mockSignInWithOAuth.mockResolvedValueOnce({ error: null })
 
     render(<GoogleSignInButton />)
 
     const button = screen.getByRole('button', { name: 'Continue with Google' })
     fireEvent.click(button)
 
-    expect(fetch).toHaveBeenCalledWith('/api/auth/google', {
-      method: 'POST',
-    })
-
-    // Wait for the async operation to complete and check redirect
-    await waitFor(() => {
-      expect(window.location.href).toBe('https://accounts.google.com/oauth/authorize?client_id=...')
+    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+      provider: 'google',
+      options: {
+        redirectTo: 'https://example.com/auth/callback',
+        queryParams: { 
+          prompt: 'select_account'
+        }
+      }
     })
   })
 
@@ -86,13 +86,8 @@ describe('Google Sign-In Button', () => {
     process.env.NEXT_PUBLIC_GOOGLE_ENABLED = 'true'
 
     // Mock a slow response
-    vi.mocked(fetch).mockImplementation(() => 
-      new Promise(resolve => setTimeout(() => resolve({
-        ok: true,
-        redirected: false,
-        url: 'https://accounts.google.com/oauth/authorize?client_id=...',
-        json: vi.fn().mockResolvedValue({ url: 'https://accounts.google.com/oauth/authorize?client_id=...' })
-      } as any), 100))
+    mockSignInWithOAuth.mockImplementation(() => 
+      new Promise(resolve => setTimeout(() => resolve({ error: null }), 100))
     )
 
     render(<GoogleSignInButton />)
@@ -108,10 +103,9 @@ describe('Google Sign-In Button', () => {
   it('should handle sign-in failure', async () => {
     process.env.NEXT_PUBLIC_GOOGLE_ENABLED = 'true'
 
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ message: 'OAuth provider not configured' }),
-    } as Response)
+    mockSignInWithOAuth.mockResolvedValueOnce({
+      error: { message: 'OAuth provider not configured' }
+    })
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 

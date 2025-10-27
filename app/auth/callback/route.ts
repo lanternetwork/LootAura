@@ -67,6 +67,29 @@ export async function GET(req: Request) {
     if (data.session) {
       console.log('[AUTH_CALLBACK] Code exchange successful, user authenticated:', data.session.user.id)
       
+      // Ensure profile exists for the user (idempotent)
+      try {
+        const profileResponse = await fetch(new URL('/api/profile', url.origin), {
+          method: 'POST',
+          headers: {
+            'Cookie': req.headers.get('cookie') || '',
+          },
+        })
+        
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json()
+          console.log('[AUTH_CALLBACK] Profile ensured:', { 
+            created: profileData.created,
+            userId: data.session.user.id 
+          })
+        } else {
+          console.log('[AUTH_CALLBACK] Profile creation failed, but continuing:', profileResponse.status)
+        }
+      } catch (profileError) {
+        console.log('[AUTH_CALLBACK] Profile creation error, but continuing:', profileError)
+        // Don't fail the auth flow if profile creation fails
+      }
+      
       // Success: user session cookies are automatically set by auth-helpers
       console.log('[AUTH_CALLBACK] Redirecting to:', next)
       return NextResponse.redirect(new URL(next, url.origin))

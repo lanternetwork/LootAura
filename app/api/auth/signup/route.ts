@@ -80,6 +80,32 @@ export async function POST(request: NextRequest) {
 
     // If session is available and valid, set cookies
     if (data.session && isValidSession(data.session) && data.user) {
+      // Ensure profile exists for the user (idempotent)
+      try {
+        const profileResponse = await fetch(new URL('/api/profile', request.url), {
+          method: 'POST',
+          headers: {
+            'Cookie': request.headers.get('cookie') || '',
+          },
+        })
+        
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json()
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[AUTH] Profile ensured during signup:', { 
+              event: 'signup', 
+              created: profileData.created,
+              userId: data.user.id 
+            })
+          }
+        }
+      } catch (profileError) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[AUTH] Profile creation error during signup, but continuing:', profileError)
+        }
+        // Don't fail the auth flow if profile creation fails
+      }
+
       const response = NextResponse.json(
         { 
           user: {

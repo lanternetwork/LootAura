@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     if (my_items === 'true') {
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       if (authError || !user) {
-        return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
       query = query.eq('owner_id', user.id)
     } else if (sale_id) {
@@ -48,7 +48,24 @@ export async function POST(request: NextRequest) {
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    // Validate that the sale belongs to the authenticated user
+    if (body.sale_id) {
+      const { data: sale, error: saleError } = await supabase
+        .from('sales_v2')
+        .select('owner_id')
+        .eq('id', body.sale_id)
+        .single()
+      
+      if (saleError || !sale) {
+        return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
+      }
+      
+      if (sale.owner_id !== user.id) {
+        return NextResponse.json({ error: 'You can only create items for your own sales' }, { status: 400 })
+      }
     }
     
     const { data: item, error } = await supabase
@@ -71,7 +88,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create item' }, { status: 500 })
     }
     
-    return NextResponse.json({ item })
+    return NextResponse.json({ item }, { status: 201 })
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -92,7 +109,7 @@ export async function PUT(request: NextRequest) {
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
     const { data: item, error } = await supabase
@@ -132,7 +149,7 @@ export async function DELETE(request: NextRequest) {
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
     const { error } = await supabase

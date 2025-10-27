@@ -204,6 +204,23 @@ describe('RLS Policy Verification - Items Access', () => {
         error: null,
       })
 
+      // Mock the sale validation query to return a sale owned by another user
+      const mockFrom = vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            single: vi.fn().mockResolvedValueOnce({ 
+              data: { 
+                id: 'other-user-sale', 
+                owner_id: 'other-user' // Different owner
+              }, 
+              error: null 
+            }),
+          })),
+        })),
+      }))
+      
+      mockSupabaseClient.from = mockFrom
+
       const request = new NextRequest('https://example.com/api/items_v2_v2', {
         method: 'POST',
         body: JSON.stringify({

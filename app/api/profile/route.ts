@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { cookies } from 'next/headers'
 import { authDebug } from '@/lib/debug/authDebug'
 
 export const dynamic = 'force-dynamic'

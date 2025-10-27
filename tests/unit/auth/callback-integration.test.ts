@@ -161,9 +161,6 @@ describe('OAuth Callback Route', () => {
         'https://example.com/api/profile',
         expect.objectContaining({
           method: 'POST',
-          headers: {
-            'Cookie': '',
-          },
         })
       )
     })

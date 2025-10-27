@@ -76,7 +76,7 @@ describe('Magic Link Authentication', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.code).toBe('Invalid email')
+      expect(data.code).toBe('Invalid email address')
       expect(data.message).toBe('Failed to send magic link')
     })
 

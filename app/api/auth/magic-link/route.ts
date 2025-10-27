@@ -26,6 +26,13 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid input data', details: 'Request body must be a valid JSON object' },
+        { status: 400 }
+      )
+    }
+    
     let email: string
     try {
       const parsed = magicLinkSchema.parse(body)

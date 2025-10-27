@@ -82,7 +82,7 @@ vi.mock('@/lib/supabase/server', () => ({
               gte: vi.fn(() => ({
                 lte: vi.fn(() => ({
                   order: vi.fn(() => ({
-                    limit: vi.fn().mockResolvedValue({
+                    range: vi.fn().mockResolvedValue({
                       data: [],
                       error: null
                     })

@@ -41,6 +41,12 @@ vi.mock('@/lib/auth/server-session', () => ({
   }))
 }))
 
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(() => ({
+    get: vi.fn(() => ({ value: 'mock-cookie-value' }))
+  }))
+}))
+
 // Import after mocking
 import { GET } from '@/app/api/auth/callback/route'
 import { check } from '@/lib/rateLimit/limiter'

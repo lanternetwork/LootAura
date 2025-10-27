@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
-import { GET, PUT } from '../../app/api/profile/route'
+import { GET, POST } from '../../app/api/profile/route'
 
 // Mock Supabase client
 const mockSupabaseClient = {
@@ -166,7 +166,7 @@ describe('RLS Policy Verification - Profiles Access', () => {
       mockSupabaseClient.from = mockFrom
 
       const request = new NextRequest('https://example.com/api/profile', {
-        method: 'PUT',
+        method: 'POST',
         body: JSON.stringify({
           display_name: 'Updated Name',
           avatar_url: 'https://example.com/new-avatar.jpg',
@@ -179,7 +179,7 @@ describe('RLS Policy Verification - Profiles Access', () => {
         },
       })
 
-      const response = await PUT(request)
+      const response = await POST(request)
       const data = await response.json()
 
       expect(response.status).toBe(200)
@@ -215,7 +215,7 @@ describe('RLS Policy Verification - Profiles Access', () => {
       mockSupabaseClient.from = mockFrom
 
       const request = new NextRequest('https://example.com/api/profile', {
-        method: 'PUT',
+        method: 'POST',
         body: JSON.stringify({
           display_name: 'Updated Name',
         }),
@@ -225,7 +225,7 @@ describe('RLS Policy Verification - Profiles Access', () => {
         },
       })
 
-      const response = await PUT(request)
+      const response = await POST(request)
       const data = await response.json()
 
       expect(response.status).toBe(404)
@@ -239,14 +239,14 @@ describe('RLS Policy Verification - Profiles Access', () => {
       })
 
       const request = new NextRequest('https://example.com/api/profile', {
-        method: 'PUT',
+        method: 'POST',
         body: JSON.stringify({
           display_name: 'Updated Name',
         }),
         headers: { 'Content-Type': 'application/json' },
       })
 
-      const response = await PUT(request)
+      const response = await POST(request)
       const data = await response.json()
 
       expect(response.status).toBe(401)
@@ -262,7 +262,7 @@ describe('RLS Policy Verification - Profiles Access', () => {
       })
 
       const request = new NextRequest('https://example.com/api/profile', {
-        method: 'PUT',
+        method: 'POST',
         body: JSON.stringify({
           id: 'other-user', // Attempting to update another user's profile
           display_name: 'Updated Name',
@@ -273,7 +273,7 @@ describe('RLS Policy Verification - Profiles Access', () => {
         },
       })
 
-      const response = await PUT(request)
+      const response = await POST(request)
       
       // The RLS policy should prevent this, but the application should also validate
       // that the profile ID matches the authenticated user
@@ -434,7 +434,7 @@ describe('RLS Policy Verification - Profiles Access', () => {
       mockSupabaseClient.from = mockFrom
 
       const request = new NextRequest('https://example.com/api/profile', {
-        method: 'PUT',
+        method: 'POST',
         body: JSON.stringify({
           display_name: 'Updated Profile',
         }),
@@ -444,7 +444,7 @@ describe('RLS Policy Verification - Profiles Access', () => {
         },
       })
 
-      const response = await PUT(request)
+      const response = await POST(request)
       const data = await response.json()
 
       expect(response.status).toBe(200)

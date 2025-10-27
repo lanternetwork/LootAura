@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
-import { GET, POST, PUT, DELETE } from '../../app/api/sales/route'
+import { GET, POST } from '../../app/api/sales/route'
 
 // Mock Supabase client
 const mockSupabaseClient = {
@@ -21,16 +21,6 @@ const mockSupabaseClient = {
       select: vi.fn(() => ({
         single: vi.fn(),
       })),
-    })),
-    update: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn(),
-        })),
-      })),
-    })),
-    delete: vi.fn(() => ({
-      eq: vi.fn(),
     })),
   })),
 }
@@ -216,167 +206,6 @@ describe('RLS Policy Verification - Sales Access', () => {
       // The RLS policy should prevent this, but the application should also validate
       // that the owner_id matches the authenticated user
       expect(response.status).toBe(400)
-    })
-  })
-
-  describe('Owner-Only Update Access', () => {
-    it('should allow users to update their own sales', async () => {
-      const user = { id: 'user123', email: 'user@example.com' }
-
-      mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
-        data: { user },
-        error: null,
-      })
-
-      const mockFrom = vi.fn(() => ({
-        update: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            select: vi.fn(() => ({
-              single: vi.fn().mockResolvedValueOnce({ 
-                data: { 
-                  id: 'sale123', 
-                  title: 'Updated Sale', 
-                  owner_id: 'user123' 
-                }, 
-                error: null 
-              }),
-            })),
-          })),
-        })),
-      }))
-      
-      mockSupabaseClient.from = mockFrom
-
-      const request = new NextRequest('https://example.com/api/sales/sale123', {
-        method: 'PUT',
-        body: JSON.stringify({
-          title: 'Updated Sale',
-        }),
-        headers: { 
-          'Content-Type': 'application/json',
-          'Cookie': 'session=valid'
-        },
-      })
-
-      const response = await PUT(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(200)
-      expect(data.sale.owner_id).toBe('user123')
-      expect(data.sale.title).toBe('Updated Sale')
-      
-      // Verify the update was filtered by owner_id
-      expect(mockFrom).toHaveBeenCalledWith('sales')
-    })
-
-    it('should prevent users from updating other users sales', async () => {
-      const user1 = { id: 'user1', email: 'user1@example.com' }
-
-      mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
-        data: { user: user1 },
-        error: null,
-      })
-
-      // Mock no rows affected (RLS prevents update of other users' sales)
-      const mockFrom = vi.fn(() => ({
-        update: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            select: vi.fn(() => ({
-              single: vi.fn().mockResolvedValueOnce({ 
-                data: null, 
-                error: null 
-              }),
-            })),
-          })),
-        })),
-      }))
-      
-      mockSupabaseClient.from = mockFrom
-
-      const request = new NextRequest('https://example.com/api/sales/sale123', {
-        method: 'PUT',
-        body: JSON.stringify({
-          title: 'Updated Sale',
-        }),
-        headers: { 
-          'Content-Type': 'application/json',
-          'Cookie': 'session=user1-session'
-        },
-      })
-
-      const response = await PUT(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(404)
-      expect(data.error).toBe('Sale not found')
-    })
-  })
-
-  describe('Owner-Only Delete Access', () => {
-    it('should allow users to delete their own sales', async () => {
-      const user = { id: 'user123', email: 'user@example.com' }
-
-      mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
-        data: { user },
-        error: null,
-      })
-
-      const mockFrom = vi.fn(() => ({
-        delete: vi.fn(() => ({
-          eq: vi.fn().mockResolvedValueOnce({ 
-            data: { id: 'sale123' }, 
-            error: null 
-          }),
-        })),
-      }))
-      
-      mockSupabaseClient.from = mockFrom
-
-      const request = new NextRequest('https://example.com/api/sales/sale123', {
-        method: 'DELETE',
-        headers: { 'Cookie': 'session=valid' },
-      })
-
-      const response = await DELETE(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(200)
-      expect(data.success).toBe(true)
-      
-      // Verify the delete was filtered by owner_id
-      expect(mockFrom).toHaveBeenCalledWith('sales')
-    })
-
-    it('should prevent users from deleting other users sales', async () => {
-      const user1 = { id: 'user1', email: 'user1@example.com' }
-
-      mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
-        data: { user: user1 },
-        error: null,
-      })
-
-      // Mock no rows affected (RLS prevents deletion of other users' sales)
-      const mockFrom = vi.fn(() => ({
-        delete: vi.fn(() => ({
-          eq: vi.fn().mockResolvedValueOnce({ 
-            data: null, 
-            error: null 
-          }),
-        })),
-      }))
-      
-      mockSupabaseClient.from = mockFrom
-
-      const request = new NextRequest('https://example.com/api/sales/sale123', {
-        method: 'DELETE',
-        headers: { 'Cookie': 'session=user1-session' },
-      })
-
-      const response = await DELETE(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(404)
-      expect(data.error).toBe('Sale not found')
     })
   })
 

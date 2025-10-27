@@ -9,11 +9,63 @@ import { NextRequest } from 'next/server'
 
 // Mock the rate limiting modules
 vi.mock('@/lib/rateLimit/config', () => ({
-  shouldBypassRateLimit: vi.fn(() => false)
+  isRateLimitingEnabled: vi.fn(() => true),
+  isPreviewEnv: vi.fn(() => false),
+  shouldBypassRateLimit: vi.fn(() => false) // Force rate limiting to be active
 }))
 
 vi.mock('@/lib/rateLimit/withRateLimit', () => ({
-  withRateLimit: vi.fn((handler) => handler)
+  withRateLimit: vi.fn((handler, policies) => {
+    return async (req: any) => {
+      // Simulate rate limiting logic
+      const { deriveKey } = await import('@/lib/rateLimit/keys')
+      const { check } = await import('@/lib/rateLimit/limiter')
+      const { applyRateHeaders } = await import('@/lib/rateLimit/headers')
+      
+      const userId = undefined
+      const results = []
+      
+      for (const policy of policies) {
+        const key = await deriveKey(req, policy.scope, userId)
+        results.push(await check(policy, key))
+      }
+      
+      // Find the most restrictive result
+      let mostRestrictive = results.find(r => !r.allowed) || results.find(r => r.softLimited) || results[0]
+      
+      if (!mostRestrictive) {
+        return handler(req)
+      }
+      
+      // Handle hard limit
+      if (!mostRestrictive.allowed) {
+        const { NextResponse } = await import('next/server')
+        const errorResponse = NextResponse.json(
+          { error: 'rate_limited', message: 'Too many requests. Please slow down.' },
+          { status: 429 }
+        )
+        
+        return applyRateHeaders(
+          errorResponse,
+          mostRestrictive.policy,
+          mostRestrictive.remaining,
+          mostRestrictive.resetAt,
+          mostRestrictive.softLimited
+        )
+      }
+      
+      // Call handler and apply headers
+      const response = await handler(req)
+      
+      return applyRateHeaders(
+        response,
+        mostRestrictive.policy,
+        mostRestrictive.remaining,
+        mostRestrictive.resetAt,
+        mostRestrictive.softLimited
+      )
+    }
+  })
 }))
 
 vi.mock('@/lib/rateLimit/limiter', () => ({
@@ -28,8 +80,35 @@ vi.mock('@/lib/rateLimit/headers', () => ({
   applyRateHeaders: vi.fn((response) => response)
 }))
 
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(() => ({
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        gte: vi.fn(() => ({
+          lte: vi.fn(() => ({
+            gte: vi.fn(() => ({
+              lte: vi.fn(() => ({
+                gte: vi.fn(() => ({
+                  lte: vi.fn(() => ({
+                    order: vi.fn(() => ({
+                      limit: vi.fn().mockResolvedValue({
+                        data: [],
+                        error: null
+                      })
+                    }))
+                  }))
+                }))
+              }))
+            }))
+          }))
+        }))
+      }))
+    }))
+  }))
+}))
+
 // Import after mocking
-import { salesHandler } from '@/app/api/sales/route'
+import { GET } from '@/app/api/sales/route'
 import { check } from '@/lib/rateLimit/limiter'
 import { deriveKey } from '@/lib/rateLimit/keys'
 import { applyRateHeaders } from '@/lib/rateLimit/headers'
@@ -54,37 +133,9 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
   })
 
   it('should allow requests within limit', async () => {
-    const request = new NextRequest('https://example.com/api/sales?bbox=38.0,-85.0,38.1,-84.9')
+    const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
-    // Mock successful sales fetch
-    vi.mock('@/lib/supabase/server', () => ({
-      createSupabaseServerClient: vi.fn(() => ({
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            gte: vi.fn(() => ({
-              lte: vi.fn(() => ({
-                gte: vi.fn(() => ({
-                  lte: vi.fn(() => ({
-                    gte: vi.fn(() => ({
-                      lte: vi.fn(() => ({
-                        order: vi.fn(() => ({
-                          limit: vi.fn().mockResolvedValue({
-                            data: [],
-                            error: null
-                          })
-                        }))
-                      }))
-                    }))
-                  }))
-                }))
-              }))
-            }))
-          }))
-        }))
-      }))
-    }))
-    
-    const response = await salesHandler(request)
+    const response = await GET(request)
     
     expect(response.status).toBe(200)
     expect(mockDeriveKey).toHaveBeenCalledWith(request, 'ip', undefined)
@@ -99,37 +150,9 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
       resetAt: Math.floor(Date.now() / 1000) + 30
     })
     
-    const request = new NextRequest('https://example.com/api/sales?bbox=38.0,-85.0,38.1,-84.9')
+    const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
-    // Mock successful sales fetch
-    vi.mock('@/lib/supabase/server', () => ({
-      createSupabaseServerClient: vi.fn(() => ({
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            gte: vi.fn(() => ({
-              lte: vi.fn(() => ({
-                gte: vi.fn(() => ({
-                  lte: vi.fn(() => ({
-                    gte: vi.fn(() => ({
-                      lte: vi.fn(() => ({
-                        order: vi.fn(() => ({
-                          limit: vi.fn().mockResolvedValue({
-                            data: [],
-                            error: null
-                          })
-                        }))
-                      }))
-                    }))
-                  }))
-                }))
-              }))
-            }))
-          }))
-        }))
-      }))
-    }))
-    
-    const response = await salesHandler(request)
+    const response = await GET(request)
     
     expect(response.status).toBe(200) // Still succeeds
     expect(response.headers.get('X-RateLimit-Remaining')).toBe('0')
@@ -144,9 +167,9 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
       resetAt: Math.floor(Date.now() / 1000) + 30
     })
     
-    const request = new NextRequest('https://example.com/api/sales?bbox=38.0,-85.0,38.1,-84.9')
+    const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
-    const response = await salesHandler(request)
+    const response = await GET(request)
     
     expect(response.status).toBe(429)
     expect(response.headers.get('X-RateLimit-Limit')).toBe('20')
@@ -154,35 +177,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
   })
 
   it('should simulate burst panning scenario', async () => {
-    const request = new NextRequest('https://example.com/api/sales?bbox=38.0,-85.0,38.1,-84.9')
-    
-    // Mock successful sales fetch
-    vi.mock('@/lib/supabase/server', () => ({
-      createSupabaseServerClient: vi.fn(() => ({
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            gte: vi.fn(() => ({
-              lte: vi.fn(() => ({
-                gte: vi.fn(() => ({
-                  lte: vi.fn(() => ({
-                    gte: vi.fn(() => ({
-                      lte: vi.fn(() => ({
-                        order: vi.fn(() => ({
-                          limit: vi.fn().mockResolvedValue({
-                            data: [],
-                            error: null
-                          })
-                        }))
-                      }))
-                    }))
-                  }))
-                }))
-              }))
-            }))
-          }))
-        }))
-      }))
-    }))
+    const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
     // Simulate 25 rapid requests
     const responses = []
@@ -212,20 +207,20 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
           resetAt: Math.floor(Date.now() / 1000) + 30
         })
       }
-      
-      const response = await salesHandler(request)
+
+      const response = await GET(request)
       responses.push(response)
     }
-    
+
     // First 20 should succeed
     for (let i = 0; i < 20; i++) {
       expect(responses[i].status).toBe(200)
     }
-    
+
     // Next 2 should succeed but be soft-limited
     expect(responses[20].status).toBe(200)
     expect(responses[21].status).toBe(200)
-    
+
     // Remaining should be blocked
     for (let i = 22; i < 25; i++) {
       expect(responses[i].status).toBe(429)

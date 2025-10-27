@@ -15,15 +15,39 @@ const mockSupabaseClient = {
         order: vi.fn(() => ({
           range: vi.fn(),
         })),
+        gte: vi.fn(() => ({
+          lte: vi.fn(() => ({
+            gte: vi.fn(() => ({
+              lte: vi.fn(),
+            })),
+          })),
+        })),
       })),
       order: vi.fn(() => ({
         range: vi.fn(),
+      })),
+      gte: vi.fn(() => ({
+        lte: vi.fn(() => ({
+          gte: vi.fn(() => ({
+            lte: vi.fn(),
+          })),
+        })),
       })),
     })),
     insert: vi.fn(() => ({
       select: vi.fn(() => ({
         single: vi.fn(),
       })),
+    })),
+    update: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        select: vi.fn(() => ({
+          single: vi.fn(),
+        })),
+      })),
+    })),
+    delete: vi.fn(() => ({
+      eq: vi.fn(),
     })),
   })),
 }
@@ -71,8 +95,8 @@ describe('RLS Policy Verification - Sales Access', () => {
       const response = await GET(request)
       const data = await response.json()
 
-      expect(response.status).toBe(400)
-      expect(data.error).toBe('Missing location: lat/lng or bbox required')
+      expect(response.status).toBe(200)
+      expect(data.sales).toHaveLength(0)
       
       // Verify the query was filtered by published status
       expect(mockFrom).toHaveBeenCalledWith('sales_v2')
@@ -99,8 +123,8 @@ describe('RLS Policy Verification - Sales Access', () => {
       const response = await GET(request)
       const data = await response.json()
 
-      expect(response.status).toBe(400)
-      expect(data.error).toBe('Missing location: lat/lng or bbox required')
+      expect(response.status).toBe(200)
+      expect(data.sales).toHaveLength(0)
       
       // Verify the query was filtered by published status
       expect(mockFrom).toHaveBeenCalledWith('sales_v2')

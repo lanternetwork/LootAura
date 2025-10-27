@@ -158,6 +158,8 @@ describe('Profile Management', () => {
     })
 
     it('should handle profile creation errors gracefully', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      
       const mockUser = {
         id: 'user123',
         email: 'test@example.com',
@@ -197,6 +199,8 @@ describe('Profile Management', () => {
 
       expect(response.status).toBe(500)
       expect(data.error).toBe('Failed to create profile')
+      
+      consoleSpy.mockRestore()
     })
 
     it('should log debug information when enabled', async () => {

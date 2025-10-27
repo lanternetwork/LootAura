@@ -5,6 +5,8 @@ import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 import { z } from 'zod'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
@@ -25,7 +27,7 @@ const bboxSchema = z.object({
   path: ["east"]
 })
 
-export async function GET(request: NextRequest) {
+async function salesHandler(request: NextRequest) {
   const startedAt = Date.now()
   
   try {
@@ -700,3 +702,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export const GET = withRateLimit(salesHandler, [
+  Policies.SALES_VIEW_30S,
+  Policies.SALES_VIEW_HOURLY
+])
+
+export const POST = withRateLimit(async (request: NextRequest) => {
+  // POST handler implementation would go here
+  // For now, return a placeholder
+  return NextResponse.json({ error: 'POST not implemented' }, { status: 501 })
+}, [
+  Policies.MUTATE_MINUTE,
+  Policies.MUTATE_DAILY
+])

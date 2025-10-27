@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/auth/server-session'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 import { cookies } from 'next/headers'
 import { authDebug } from '@/lib/debug/authDebug'
 
@@ -25,7 +27,7 @@ interface PerformanceMetrics {
   timestamp: string
 }
 
-export async function GET(_request: NextRequest) {
+async function metricsHandler(_request: NextRequest) {
   try {
     // Only allow in debug mode or for authenticated admin users
     const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === 'true'
@@ -84,6 +86,11 @@ export async function GET(_request: NextRequest) {
     )
   }
 }
+
+export const GET = withRateLimit(metricsHandler, [
+  Policies.ADMIN_TOOLS,
+  Policies.ADMIN_HOURLY
+])
 
 async function getDatabaseMetrics() {
   try {

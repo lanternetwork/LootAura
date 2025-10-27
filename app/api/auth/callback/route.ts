@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/auth/server-session'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 import { cookies } from 'next/headers'
 import { authDebug } from '@/lib/debug/authDebug'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+async function callbackHandler(request: NextRequest) {
   try {
     const url = new URL(request.url)
     const code = url.searchParams.get('code')
@@ -89,3 +91,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/error?error=unexpected_error', request.url))
   }
 }
+
+export const GET = withRateLimit(callbackHandler, [
+  Policies.AUTH_CALLBACK,
+  Policies.AUTH_HOURLY
+])

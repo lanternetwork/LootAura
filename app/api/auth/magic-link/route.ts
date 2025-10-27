@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient } from '@/lib/auth/server-session'
-import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 import { cookies } from 'next/headers'
 import { authDebug } from '@/lib/debug/authDebug'
 
@@ -11,18 +12,7 @@ const magicLinkSchema = z.object({
   email: z.string().email('Invalid email address'),
 })
 
-export async function POST(request: NextRequest) {
-  try {
-    // Rate limiting
-    const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMITS.AUTH)
-    const { allowed, error: rateLimitError } = rateLimitMiddleware(request)
-    
-    if (!allowed) {
-      return NextResponse.json(
-        { error: rateLimitError },
-        { status: 429 }
-      )
-    }
+async function magicLinkHandler(request: NextRequest) {
 
     const body = await request.json()
     
@@ -107,3 +97,8 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withRateLimit(magicLinkHandler, [
+  Policies.AUTH_DEFAULT,
+  Policies.AUTH_HOURLY
+])

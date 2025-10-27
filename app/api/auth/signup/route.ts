@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient, setSessionCookies, isValidSession } from '@/lib/auth/server-session'
-import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
@@ -13,18 +14,7 @@ const signupSchema = z.object({
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one lowercase letter, one uppercase letter, and one number'),
 })
 
-export async function POST(request: NextRequest) {
-  try {
-    // Rate limiting
-    const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMITS.AUTH)
-    const { allowed, error: rateLimitError } = rateLimitMiddleware(request)
-    
-    if (!allowed) {
-      return NextResponse.json(
-        { error: rateLimitError },
-        { status: 429 }
-      )
-    }
+async function signupHandler(request: NextRequest) {
 
     const body = await request.json()
     const { email, password } = signupSchema.parse(body)
@@ -150,3 +140,8 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withRateLimit(signupHandler, [
+  Policies.AUTH_DEFAULT,
+  Policies.AUTH_HOURLY
+])

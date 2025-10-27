@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+
+// Simple per-process cache for ZIP lookups (60s TTL)
+const zipCache = new Map<string, { data: any; expires: number }>()
 
 // Nominatim rate limiting (1 request per second)
 let lastNominatimCall = 0
@@ -9,6 +14,24 @@ const NOMINATIM_DELAY = 1000 // 1 second
 
 async function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function getCachedZip(zip: string): any | null {
+  const cached = zipCache.get(zip)
+  if (cached && Date.now() < cached.expires) {
+    return cached.data
+  }
+  if (cached) {
+    zipCache.delete(zip) // Clean up expired entry
+  }
+  return null
+}
+
+function setCachedZip(zip: string, data: any): void {
+  zipCache.set(zip, {
+    data,
+    expires: Date.now() + 60000 // 60 seconds
+  })
 }
 
 function normalizeZip(rawZip: string): string | null {
@@ -72,7 +95,7 @@ function escapeForLogging(input: string | null | undefined): string {
 }
 
 
-export async function GET(request: NextRequest) {
+async function zipHandler(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const rawZip = searchParams.get('zip')
@@ -88,6 +111,23 @@ export async function GET(request: NextRequest) {
         ok: false, 
         error: 'Invalid ZIP format' 
       }, { status: 400 })
+    }
+    
+    // Check cache first
+    const cachedResult = getCachedZip(normalizedZip)
+    if (cachedResult) {
+      console.log('[ZIP] source=cache status=ok', {
+        input: escapeForLogging(rawZip),
+        normalized: escapeForLogging(normalizedZip)
+      })
+      return NextResponse.json({
+        ...cachedResult,
+        source: 'cache'
+      }, {
+        headers: {
+          'Cache-Control': 'public, max-age=60'
+        }
+      })
     }
     
     const supabase = createSupabaseServerClient()
@@ -117,7 +157,7 @@ export async function GET(request: NextRequest) {
         input: escapeForLogging(rawZip),
         normalized: escapeForLogging(normalizedZip)
       })
-      return NextResponse.json({
+      const result = {
         ok: true,
         zip: localData.zip,
         lat: localData.lat,
@@ -125,7 +165,12 @@ export async function GET(request: NextRequest) {
         city: localData.city,
         state: localData.state,
         source: 'local'
-      }, {
+      }
+      
+      // Cache the result
+      setCachedZip(normalizedZip, result)
+      
+      return NextResponse.json(result, {
         headers: {
           'Cache-Control': 'public, max-age=86400'
         }
@@ -338,3 +383,8 @@ export async function GET(request: NextRequest) {
     }, { status: 500 })
   }
 }
+
+export const GET = withRateLimit(zipHandler, [
+  Policies.GEO_ZIP_SHORT,
+  Policies.GEO_ZIP_HOURLY
+])

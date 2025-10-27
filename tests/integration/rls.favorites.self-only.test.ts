@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
-import { GET, POST, DELETE } from '../../app/api/favorites/route'
+import { GET, POST, DELETE } from '../../app/api/favorites_v2/route'
 
 // Mock Supabase client
 const mockSupabaseClient = {
@@ -12,6 +12,9 @@ const mockSupabaseClient = {
       eq: vi.fn(() => ({
         maybeSingle: vi.fn(),
         single: vi.fn(),
+        order: vi.fn(() => ({
+          range: vi.fn(),
+        })),
       })),
       order: vi.fn(() => ({
         range: vi.fn(),
@@ -47,7 +50,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
   })
 
   describe('Owner-Only Access', () => {
-    it('should only allow users to access their own favorites_v2', async () => {
+    it('should only allow users to access their own favorites_v2_v2', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -75,21 +78,21 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites')
+      const request = new NextRequest('https://example.com/api/favorites_v2')
       
       const response = await GET(request)
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.favorites).toHaveLength(2)
-      expect(data.favorites[0].user_id).toBe('user123')
-      expect(data.favorites[1].user_id).toBe('user123')
+      expect(data.favorites_v2).toHaveLength(2)
+      expect(data.favorites_v2[0].user_id).toBe('user123')
+      expect(data.favorites_v2[1].user_id).toBe('user123')
       
       // Verify the query was filtered by user ID
-      expect(mockFrom).toHaveBeenCalledWith('favorites')
+      expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
     })
 
-    it('should prevent access to other users favorites_v2', async () => {
+    it('should prevent access to other users favorites_v2_v2', async () => {
       const user1 = { id: 'user1', email: 'user1@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -97,7 +100,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
         error: null,
       })
 
-      // Mock empty result (RLS prevents access to other users' favorites_v2)
+      // Mock empty result (RLS prevents access to other users' favorites_v2_v2)
       const mockFrom = vi.fn(() => ({
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
@@ -113,16 +116,16 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites')
+      const request = new NextRequest('https://example.com/api/favorites_v2')
       
       const response = await GET(request)
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.favorites).toHaveLength(0)
+      expect(data.favorites_v2).toHaveLength(0)
       
       // Verify the query was filtered by user ID
-      expect(mockFrom).toHaveBeenCalledWith('favorites')
+      expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
     })
 
     it('should reject unauthenticated requests', async () => {
@@ -131,7 +134,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
         error: { message: 'No user' },
       })
 
-      const request = new NextRequest('https://example.com/api/favorites')
+      const request = new NextRequest('https://example.com/api/favorites_v2')
       
       const response = await GET(request)
       const data = await response.json()
@@ -142,7 +145,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
   })
 
   describe('Owner-Only Write Access', () => {
-    it('should allow users to create their own favorites_v2', async () => {
+    it('should allow users to create their own favorites_v2_v2', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -163,7 +166,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites_v2', {
+      const request = new NextRequest('https://example.com/api/favorites_v2_v2', {
         method: 'POST',
         body: JSON.stringify({
           sale_id: 'sale123',
@@ -182,16 +185,16 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(data.favorite.sale_id).toBe('sale123')
       
       // Verify the insert was called with the correct user_id
-      expect(mockFrom).toHaveBeenCalledWith('favorites')
+      expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
     })
 
-    it('should prevent unauthenticated users from creating favorites_v2', async () => {
+    it('should prevent unauthenticated users from creating favorites_v2_v2', async () => {
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: null },
         error: { message: 'No user' },
       })
 
-      const request = new NextRequest('https://example.com/api/favorites_v2', {
+      const request = new NextRequest('https://example.com/api/favorites_v2_v2', {
         method: 'POST',
         body: JSON.stringify({
           sale_id: 'sale123',
@@ -206,7 +209,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(data.error).toBe('Authentication required')
     })
 
-    it('should prevent users from creating favorites_v2 for other users', async () => {
+    it('should prevent users from creating favorites_v2_v2 for other users', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -214,7 +217,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
         error: null,
       })
 
-      const request = new NextRequest('https://example.com/api/favorites_v2', {
+      const request = new NextRequest('https://example.com/api/favorites_v2_v2', {
         method: 'POST',
         body: JSON.stringify({
           sale_id: 'sale123',
@@ -235,7 +238,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
   })
 
   describe('Owner-Only Delete Access', () => {
-    it('should allow users to delete their own favorites_v2', async () => {
+    it('should allow users to delete their own favorites_v2_v2', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -256,7 +259,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites_v2?sale_id=sale123', {
+      const request = new NextRequest('https://example.com/api/favorites_v2_v2?sale_id=sale123', {
         method: 'DELETE',
         headers: { 'Cookie': 'session=valid' },
       })
@@ -268,10 +271,10 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(data.success).toBe(true)
       
       // Verify the delete was filtered by user ID
-      expect(mockFrom).toHaveBeenCalledWith('favorites')
+      expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
     })
 
-    it('should prevent users from deleting other users favorites_v2', async () => {
+    it('should prevent users from deleting other users favorites_v2_v2', async () => {
       const user1 = { id: 'user1', email: 'user1@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -279,7 +282,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
         error: null,
       })
 
-      // Mock no rows affected (RLS prevents deletion of other users' favorites_v2)
+      // Mock no rows affected (RLS prevents deletion of other users' favorites_v2_v2)
       const mockFrom = vi.fn(() => ({
         delete: vi.fn(() => ({
           eq: vi.fn(() => ({
@@ -293,7 +296,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites_v2?sale_id=sale123', {
+      const request = new NextRequest('https://example.com/api/favorites_v2_v2?sale_id=sale123', {
         method: 'DELETE',
         headers: { 'Cookie': 'session=user1-session' },
       })
@@ -307,11 +310,11 @@ describe('RLS Policy Verification - Favorites Access', () => {
   })
 
   describe('Data Isolation', () => {
-    it('should ensure users can only access their own favorites_v2', async () => {
+    it('should ensure users can only access their own favorites_v2_v2', async () => {
       const user1 = { id: 'user1', email: 'user1@example.com' }
       const user2 = { id: 'user2', email: 'user2@example.com' }
 
-      // User1 gets their favorites_v2
+      // User1 gets their favorites_v2_v2
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: user1 },
         error: null,
@@ -332,15 +335,15 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom1
 
-      const request1 = new NextRequest('https://example.com/api/favorites_v2')
+      const request1 = new NextRequest('https://example.com/api/favorites_v2_v2')
       
       const response1 = await GET(request1)
       const data1 = await response1.json()
 
       expect(response1.status).toBe(200)
-      expect(data1.favorites[0].user_id).toBe('user1')
+      expect(data1.favorites_v2[0].user_id).toBe('user1')
 
-      // User2 gets their favorites_v2
+      // User2 gets their favorites_v2_v2
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: user2 },
         error: null,
@@ -361,21 +364,21 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom2
 
-      const request2 = new NextRequest('https://example.com/api/favorites_v2')
+      const request2 = new NextRequest('https://example.com/api/favorites_v2_v2')
       
       const response2 = await GET(request2)
       const data2 = await response2.json()
 
       expect(response2.status).toBe(200)
-      expect(data2.favorites[0].user_id).toBe('user2')
+      expect(data2.favorites_v2[0].user_id).toBe('user2')
 
       // Verify data isolation
-      expect(data1.favorites[0].user_id).not.toBe(data2.favorites[0].user_id)
+      expect(data1.favorites_v2[0].user_id).not.toBe(data2.favorites_v2[0].user_id)
     })
   })
 
   describe('RLS Policy Compliance', () => {
-    it('should enforce owner-only favorites_v2 access', async () => {
+    it('should enforce owner-only favorites_v2_v2 access', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -398,26 +401,26 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites')
+      const request = new NextRequest('https://example.com/api/favorites_v2')
       
       const response = await GET(request)
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.favorites[0].user_id).toBe('user123')
+      expect(data.favorites_v2[0].user_id).toBe('user123')
       
-      // The RLS policy ensures the user can only access their own favorites_v2
+      // The RLS policy ensures the user can only access their own favorites_v2_v2
       // This is enforced at the database level
     })
 
-    it('should prevent access to favorites_v2 without proper authentication', async () => {
+    it('should prevent access to favorites_v2_v2 without proper authentication', async () => {
       // Simulate a request without proper authentication
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: null },
         error: { message: 'Invalid token' },
       })
 
-      const request = new NextRequest('https://example.com/api/favorites')
+      const request = new NextRequest('https://example.com/api/favorites_v2')
       
       const response = await GET(request)
       const data = await response.json()

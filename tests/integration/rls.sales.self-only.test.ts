@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
-import { GET, POST } from '../../app/api/sales/route'
+import { GET, POST } from '../../app/api/sales_v2/route'
 
 // Mock Supabase client
 const mockSupabaseClient = {
@@ -12,6 +12,9 @@ const mockSupabaseClient = {
       eq: vi.fn(() => ({
         maybeSingle: vi.fn(),
         single: vi.fn(),
+        order: vi.fn(() => ({
+          range: vi.fn(),
+        })),
       })),
       order: vi.fn(() => ({
         range: vi.fn(),
@@ -42,7 +45,7 @@ describe('RLS Policy Verification - Sales Access', () => {
   })
 
   describe('Public Read Access', () => {
-    it('should allow public access to published sales', async () => {
+    it('should allow public access to published sales_v2', async () => {
       const mockSales = [
         { id: 'sale1', title: 'Sale 1', status: 'published', owner_id: 'user1' },
         { id: 'sale2', title: 'Sale 2', status: 'published', owner_id: 'user2' },
@@ -63,7 +66,7 @@ describe('RLS Policy Verification - Sales Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/sales')
+      const request = new NextRequest('https://example.com/api/sales_v2')
       
       const response = await GET(request)
       const data = await response.json()
@@ -72,16 +75,16 @@ describe('RLS Policy Verification - Sales Access', () => {
       expect(data.error).toBe('Missing location: lat/lng or bbox required')
       
       // Verify the query was filtered by published status
-      expect(mockFrom).toHaveBeenCalledWith('sales')
+      expect(mockFrom).toHaveBeenCalledWith('sales_v2')
     })
 
-    it('should not expose draft sales to public', async () => {
+    it('should not expose draft sales_v2 to public', async () => {
       const mockFrom = vi.fn(() => ({
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
             order: vi.fn(() => ({
               range: vi.fn().mockResolvedValueOnce({ 
-                data: [], // No draft sales returned
+                data: [], // No draft sales_v2 returned
                 error: null 
               }),
             })),
@@ -91,7 +94,7 @@ describe('RLS Policy Verification - Sales Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/sales')
+      const request = new NextRequest('https://example.com/api/sales_v2')
       
       const response = await GET(request)
       const data = await response.json()
@@ -100,12 +103,12 @@ describe('RLS Policy Verification - Sales Access', () => {
       expect(data.error).toBe('Missing location: lat/lng or bbox required')
       
       // Verify the query was filtered by published status
-      expect(mockFrom).toHaveBeenCalledWith('sales')
+      expect(mockFrom).toHaveBeenCalledWith('sales_v2')
     })
   })
 
   describe('Owner-Only Write Access', () => {
-    it('should allow authenticated users to create sales', async () => {
+    it('should allow authenticated users to create sales_v2', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -131,7 +134,7 @@ describe('RLS Policy Verification - Sales Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/sales', {
+      const request = new NextRequest('https://example.com/api/sales_v2', {
         method: 'POST',
         body: JSON.stringify({
           title: 'Test Sale',
@@ -153,16 +156,16 @@ describe('RLS Policy Verification - Sales Access', () => {
       expect(data.sale.title).toBe('Test Sale')
       
       // Verify the insert was called with the correct owner_id
-      expect(mockFrom).toHaveBeenCalledWith('sales')
+      expect(mockFrom).toHaveBeenCalledWith('sales_v2')
     })
 
-    it('should prevent unauthenticated users from creating sales', async () => {
+    it('should prevent unauthenticated users from creating sales_v2', async () => {
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: null },
         error: { message: 'No user' },
       })
 
-      const request = new NextRequest('https://example.com/api/sales', {
+      const request = new NextRequest('https://example.com/api/sales_v2', {
         method: 'POST',
         body: JSON.stringify({
           title: 'Test Sale',
@@ -178,7 +181,7 @@ describe('RLS Policy Verification - Sales Access', () => {
       expect(data.error).toBe('Authentication required')
     })
 
-    it('should prevent users from creating sales for other users', async () => {
+    it('should prevent users from creating sales_v2 for other users', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -186,7 +189,7 @@ describe('RLS Policy Verification - Sales Access', () => {
         error: null,
       })
 
-      const request = new NextRequest('https://example.com/api/sales', {
+      const request = new NextRequest('https://example.com/api/sales_v2', {
         method: 'POST',
         body: JSON.stringify({
           title: 'Test Sale',
@@ -210,11 +213,11 @@ describe('RLS Policy Verification - Sales Access', () => {
   })
 
   describe('Data Isolation', () => {
-    it('should ensure users can only access their own sales for management', async () => {
+    it('should ensure users can only access their own sales_v2 for management', async () => {
       const user1 = { id: 'user1', email: 'user1@example.com' }
       const user2 = { id: 'user2', email: 'user2@example.com' }
 
-      // User1 gets their sales
+      // User1 gets their sales_v2
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: user1 },
         error: null,
@@ -235,15 +238,15 @@ describe('RLS Policy Verification - Sales Access', () => {
       
       mockSupabaseClient.from = mockFrom1
 
-      const request1 = new NextRequest('https://example.com/api/sales?my_sales=true&lat=40.7128&lng=-74.0060')
+      const request1 = new NextRequest('https://example.com/api/sales_v2?my_sales_v2=true&lat=40.7128&lng=-74.0060')
       
       const response1 = await GET(request1)
       const data1 = await response1.json()
 
       expect(response1.status).toBe(200)
-      expect(data1.sales[0].owner_id).toBe('user1')
+      expect(data1.sales_v2[0].owner_id).toBe('user1')
 
-      // User2 gets their sales
+      // User2 gets their sales_v2
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: user2 },
         error: null,
@@ -264,21 +267,21 @@ describe('RLS Policy Verification - Sales Access', () => {
       
       mockSupabaseClient.from = mockFrom2
 
-      const request2 = new NextRequest('https://example.com/api/sales?my_sales=true&lat=40.7128&lng=-74.0060')
+      const request2 = new NextRequest('https://example.com/api/sales_v2?my_sales_v2=true&lat=40.7128&lng=-74.0060')
       
       const response2 = await GET(request2)
       const data2 = await response2.json()
 
       expect(response2.status).toBe(200)
-      expect(data2.sales[0].owner_id).toBe('user2')
+      expect(data2.sales_v2[0].owner_id).toBe('user2')
 
       // Verify data isolation
-      expect(data1.sales[0].owner_id).not.toBe(data2.sales[0].owner_id)
+      expect(data1.sales_v2[0].owner_id).not.toBe(data2.sales_v2[0].owner_id)
     })
   })
 
   describe('RLS Policy Compliance', () => {
-    it('should enforce owner-only sales management', async () => {
+    it('should enforce owner-only sales_v2 management', async () => {
       const user = { id: 'user123', email: 'user@example.com' }
 
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
@@ -301,26 +304,26 @@ describe('RLS Policy Verification - Sales Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/sales?my_sales=true&lat=40.7128&lng=-74.0060')
+      const request = new NextRequest('https://example.com/api/sales_v2?my_sales_v2=true&lat=40.7128&lng=-74.0060')
       
       const response = await GET(request)
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.sales[0].owner_id).toBe('user123')
+      expect(data.sales_v2[0].owner_id).toBe('user123')
       
-      // The RLS policy ensures the user can only access their own sales
+      // The RLS policy ensures the user can only access their own sales_v2
       // This is enforced at the database level
     })
 
-    it('should prevent access to sales without proper authentication for management', async () => {
+    it('should prevent access to sales_v2 without proper authentication for management', async () => {
       // Simulate a request without proper authentication
       mockSupabaseClient.auth.getUser.mockResolvedValueOnce({
         data: { user: null },
         error: { message: 'Invalid token' },
       })
 
-      const request = new NextRequest('https://example.com/api/sales?my_sales=true&lat=40.7128&lng=-74.0060')
+      const request = new NextRequest('https://example.com/api/sales_v2?my_sales_v2=true&lat=40.7128&lng=-74.0060')
       
       const response = await GET(request)
       const data = await response.json()

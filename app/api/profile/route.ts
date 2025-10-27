@@ -11,8 +11,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(_request: NextRequest) {
   try {
-    const cookieStore = cookies()
-    const supabase = createSupabaseServerClient(cookieStore)
+    const supabase = createSupabaseServerClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -101,8 +100,7 @@ export async function POST(_request: NextRequest) {
  */
 export async function GET(_request: NextRequest) {
   try {
-    const cookieStore = cookies()
-    const supabase = createSupabaseServerClient(cookieStore)
+    const supabase = createSupabaseServerClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()

@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
       console.log(`[SALES] Missing location: lat=${lat}, lng=${lng}, bbox=${north},${south},${east},${west}`)
       return NextResponse.json({ 
         ok: false, 
-        error: 'Missing location (provide either lat/lng or north/south/east/west)' 
+        error: 'Missing location: lat/lng or bbox required' 
       }, { status: 400 })
     }
     

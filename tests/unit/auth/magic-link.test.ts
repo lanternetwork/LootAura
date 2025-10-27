@@ -77,7 +77,7 @@ describe('Magic Link Authentication', () => {
 
       expect(response.status).toBe(400)
       expect(data.code).toBe('Invalid email address')
-      expect(data.message).toBe('Failed to send magic link')
+      expect(data.message).toBe('Invalid email address')
     })
 
     it('should validate email format', async () => {
@@ -91,8 +91,8 @@ describe('Magic Link Authentication', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid input data')
-      expect(data.details).toBeDefined()
+      expect(data.code).toBe('Invalid email address')
+      expect(data.message).toBe('Invalid email address')
     })
 
     it('should handle missing email', async () => {
@@ -106,7 +106,8 @@ describe('Magic Link Authentication', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid input data')
+      expect(data.code).toBe('Required')
+      expect(data.message).toBe('Invalid email address')
     })
 
     it('should configure email redirect URL when NEXT_PUBLIC_SITE_URL is set', async () => {

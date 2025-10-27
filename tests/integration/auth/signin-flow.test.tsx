@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import SignIn from '../../app/auth/signin/page'
 
 // Mock Next.js hooks
 const mockPush = vi.fn()
@@ -39,13 +38,19 @@ vi.mock('@/components/auth/GoogleSignInButton', () => ({
 global.fetch = vi.fn()
 
 describe('Sign In Page Integration', () => {
-  beforeEach(() => {
+  let SignIn: any
+
+  beforeEach(async () => {
     vi.clearAllMocks()
     mockUseAuth.mockReturnValue({
       data: null,
       isLoading: false,
     })
     mockGet.mockReturnValue(null)
+    
+    // Dynamic import to avoid module resolution issues
+    const module = await import('../../app/auth/signin/page')
+    SignIn = module.default
   })
 
   describe('Email/Password Sign In', () => {

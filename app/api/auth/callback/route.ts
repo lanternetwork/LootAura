@@ -19,12 +19,12 @@ export async function GET(request: NextRequest) {
     })
 
     if (error) {
-      authDebug.logAuthFlow('oauth-callback', 'error', 'fail', { error })
+      authDebug.logAuthFlow('oauth-callback', 'oauth-error', 'error', { error })
       return NextResponse.redirect(new URL(`/auth/error?error=${error}`, url.origin))
     }
 
     if (!code) {
-      authDebug.logAuthFlow('oauth-callback', 'no-code', 'fail')
+      authDebug.logAuthFlow('oauth-callback', 'no-code', 'error')
       return NextResponse.redirect(new URL('/auth/error?error=missing_code', url.origin))
     }
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
     if (exchangeError) {
-      authDebug.logAuthFlow('oauth-callback', 'exchange-error', 'fail', { error: exchangeError.message })
+      authDebug.logAuthFlow('oauth-callback', 'exchange-error', 'error', { error: exchangeError.message })
       return NextResponse.redirect(new URL(`/auth/error?error=${exchangeError.message}`, url.origin))
     }
 
@@ -61,13 +61,13 @@ export async function GET(request: NextRequest) {
             userId: data.session.user.id
           })
         } else {
-          authDebug.logAuthFlow('oauth-callback', 'profile-failed', 'warn', {
+          authDebug.logAuthFlow('oauth-callback', 'profile-failed', 'error', {
             status: profileResponse.status,
             userId: data.session.user.id
           })
         }
       } catch (profileError) {
-        authDebug.logAuthFlow('oauth-callback', 'profile-error', 'warn', {
+        authDebug.logAuthFlow('oauth-callback', 'profile-error', 'error', {
           error: profileError instanceof Error ? profileError.message : 'unknown',
           userId: data.session.user.id
         })
@@ -79,11 +79,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL(next, url.origin))
     }
 
-    authDebug.logAuthFlow('oauth-callback', 'no-session', 'fail')
+    authDebug.logAuthFlow('oauth-callback', 'no-session', 'error')
     return NextResponse.redirect(new URL('/auth/error?error=no_session', url.origin))
 
   } catch (error) {
-    authDebug.logAuthFlow('oauth-callback', 'unexpected-error', 'fail', {
+    authDebug.logAuthFlow('oauth-callback', 'unexpected-error', 'error', {
       error: error instanceof Error ? error.message : 'unknown'
     })
     return NextResponse.redirect(new URL('/auth/error?error=unexpected_error', request.url))

@@ -133,7 +133,8 @@ describe('RLS Items Self-Only Access', () => {
 
     expect(error).toBeNull()
     expect(data).toEqual([mockItem])
-    expect(data[0].owner_id).toBe('user123')
+    expect(data).toBeDefined()
+    expect(data?.[0]?.owner_id).toBe('user123')
   })
 
   it('should allow users to update items_v2 from their own sales', async () => {
@@ -174,7 +175,8 @@ describe('RLS Items Self-Only Access', () => {
 
     expect(error).toBeNull()
     expect(data).toEqual([mockItem])
-    expect(data[0].owner_id).toBe('user123')
+    expect(data).toBeDefined()
+    expect(data?.[0]?.owner_id).toBe('user123')
   })
 
   it('should prevent users from updating items_v2 from other users sales', async () => {
@@ -313,7 +315,8 @@ describe('RLS Items Self-Only Access', () => {
 
     expect(error).toBeNull()
     expect(data).toEqual(mockItems)
-    expect(data[0].owner_id).toBe('user123')
+    expect(data).toBeDefined()
+    expect(data?.[0]?.owner_id).toBe('user123')
   })
 
   it('should prevent user from creating items_v2 for other users sales', async () => {

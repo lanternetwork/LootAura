@@ -27,8 +27,10 @@ const mockSupabaseClient = {
     })),
     update: vi.fn(() => ({
       eq: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn(),
+        eq: vi.fn(() => ({
+          select: vi.fn(() => ({
+            single: vi.fn(),
+          })),
         })),
       })),
     })),

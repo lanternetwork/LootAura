@@ -50,7 +50,7 @@ describe('Rate Limiting Integration - Auth Callback', () => {
       remaining: 4,
       resetAt: Math.floor(Date.now() / 1000) + 60
     })
-    mockApplyHeaders.mockImplementation((response) => response)
+    mockApplyHeaders.mockImplementation((response: Response) => response)
   })
 
   it('should allow requests within rate limit', async () => {

@@ -50,7 +50,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
       remaining: 15,
       resetAt: Math.floor(Date.now() / 1000) + 30
     })
-    mockApplyHeaders.mockImplementation((response) => response)
+    mockApplyHeaders.mockImplementation((response: Response) => response)
   })
 
   it('should allow requests within limit', async () => {

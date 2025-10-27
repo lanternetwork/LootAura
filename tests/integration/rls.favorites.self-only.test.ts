@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
-import { GET, POST, DELETE } from '../../app/api/favorites_v2/route'
+import { GET, POST, DELETE } from '../../app/api/favorites/route'
 
 // Mock Supabase client
 const mockSupabaseClient = {
@@ -75,7 +75,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites_v2')
+      const request = new NextRequest('https://example.com/api/favorites')
       
       const response = await GET(request)
       const data = await response.json()
@@ -86,7 +86,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(data.favorites[1].user_id).toBe('user123')
       
       // Verify the query was filtered by user ID
-      expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
+      expect(mockFrom).toHaveBeenCalledWith('favorites')
     })
 
     it('should prevent access to other users favorites_v2', async () => {
@@ -113,7 +113,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites_v2')
+      const request = new NextRequest('https://example.com/api/favorites')
       
       const response = await GET(request)
       const data = await response.json()
@@ -122,7 +122,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(data.favorites).toHaveLength(0)
       
       // Verify the query was filtered by user ID
-      expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
+      expect(mockFrom).toHaveBeenCalledWith('favorites')
     })
 
     it('should reject unauthenticated requests', async () => {
@@ -131,7 +131,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
         error: { message: 'No user' },
       })
 
-      const request = new NextRequest('https://example.com/api/favorites_v2')
+      const request = new NextRequest('https://example.com/api/favorites')
       
       const response = await GET(request)
       const data = await response.json()
@@ -182,7 +182,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(data.favorite.sale_id).toBe('sale123')
       
       // Verify the insert was called with the correct user_id
-      expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
+      expect(mockFrom).toHaveBeenCalledWith('favorites')
     })
 
     it('should prevent unauthenticated users from creating favorites_v2', async () => {
@@ -268,7 +268,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       expect(data.success).toBe(true)
       
       // Verify the delete was filtered by user ID
-      expect(mockFrom).toHaveBeenCalledWith('favorites_v2')
+      expect(mockFrom).toHaveBeenCalledWith('favorites')
     })
 
     it('should prevent users from deleting other users favorites_v2', async () => {
@@ -398,7 +398,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
       
       mockSupabaseClient.from = mockFrom
 
-      const request = new NextRequest('https://example.com/api/favorites_v2')
+      const request = new NextRequest('https://example.com/api/favorites')
       
       const response = await GET(request)
       const data = await response.json()
@@ -417,7 +417,7 @@ describe('RLS Policy Verification - Favorites Access', () => {
         error: { message: 'Invalid token' },
       })
 
-      const request = new NextRequest('https://example.com/api/favorites_v2')
+      const request = new NextRequest('https://example.com/api/favorites')
       
       const response = await GET(request)
       const data = await response.json()

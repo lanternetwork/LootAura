@@ -64,10 +64,7 @@ export async function GET(_request: NextRequest) {
     const responseTime = Date.now() - startTime
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      authDebug.logPerformance('performance-metrics', startTime, {
-        responseTime,
-        metricsCount: Object.keys(metrics).length
-      })
+      authDebug.logPerformance('performance-metrics', startTime)
     }
 
     return NextResponse.json({
@@ -108,12 +105,12 @@ async function getDatabaseMetrics() {
       .limit(1)
 
     return {
-      connectionPool: connectionInfo?.[0]?.count || 0,
-      queryTime: queryStats?.[0]?.avg_execution_time_ms || 0,
-      slowQueries: queryStats?.filter(q => q.avg_execution_time_ms > 1000).length || 0,
+      connectionPool: (connectionInfo as any)?.[0]?.count || 0,
+      queryTime: (queryStats as any)?.[0]?.avg_execution_time_ms || 0,
+      slowQueries: (queryStats as any)?.filter((q: any) => q.avg_execution_time_ms > 1000).length || 0,
       indexUsage: indexStats || []
     }
-  } catch (error) {
+  } catch (error: any) {
     return {
       connectionPool: 0,
       queryTime: 0,

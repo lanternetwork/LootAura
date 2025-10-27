@@ -68,7 +68,10 @@ export const debugConfig: DebugConfig = {
 export const getDebugConfig = (): DebugConfig => debugConfig
 
 export const isDebugFeatureEnabled = (feature: keyof DebugConfig): boolean => {
-  return debugConfig.enabled && debugConfig[feature].enabled
+  if (feature === 'enabled') {
+    return debugConfig.enabled
+  }
+  return debugConfig.enabled && (debugConfig[feature] as any).enabled
 }
 
 export default debugConfig

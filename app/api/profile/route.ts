@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/auth/server-session'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { authDebug } from '@/lib/debug/authDebug'
 
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(_request: NextRequest) {
   try {
     const cookieStore = cookies()
-    const supabase = createServerSupabaseClient(cookieStore)
+    const supabase = createSupabaseServerClient(cookieStore)
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -102,7 +102,7 @@ export async function POST(_request: NextRequest) {
 export async function GET(_request: NextRequest) {
   try {
     const cookieStore = cookies()
-    const supabase = createServerSupabaseClient(cookieStore)
+    const supabase = createSupabaseServerClient(cookieStore)
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()

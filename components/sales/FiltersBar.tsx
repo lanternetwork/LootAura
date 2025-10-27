@@ -500,16 +500,7 @@ export default function FiltersBar({
                   </select>
                 </div>
 
-                {/* Advanced Filters */}
-                <button
-                  onClick={() => {
-                    setShowMobileFilters(false)
-                    onAdvancedFiltersOpen()
-                  }}
-                  className="w-full px-4 py-2 border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors"
-                >
-                  Advanced Filters
-                </button>
+                {/* Advanced Filters - Removed */}
               </div>
             </div>
           </div>

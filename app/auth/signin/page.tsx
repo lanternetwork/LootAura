@@ -13,6 +13,8 @@ export default function SignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [magicLinkSent, setMagicLinkSent] = useState(false)
+  const [magicLinkLoading, setMagicLinkLoading] = useState(false)
 
   useEffect(() => {
     if (!authLoading && currentUser) {
@@ -33,6 +35,34 @@ export default function SignIn() {
     }
   }
 
+  async function onMagicLinkSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setMagicLinkLoading(true)
+
+    try {
+      const response = await fetch('/api/auth/magic-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to send magic link')
+      }
+
+      setMagicLinkSent(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+    } finally {
+      setMagicLinkLoading(false)
+    }
+  }
+
   const isLoading = signIn.isPending || authLoading
 
   return (
@@ -45,45 +75,82 @@ export default function SignIn() {
           </p>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700">
-              {error}
+        {magicLinkSent ? (
+          <div className="text-center space-y-4">
+            <div className="p-4 bg-green-50 border border-green-200 rounded text-green-700">
+              <p className="font-medium">Magic link sent!</p>
+              <p className="text-sm">Check your email and click the link to sign in.</p>
             </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input 
-              type="email"
-              className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              placeholder="your@email.com"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Password</label>
-            <input 
-              type="password" 
-              className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          <div className="space-y-3">
-            <button 
-              type="submit"
-              disabled={isLoading}
-              className="w-full rounded bg-amber-500 px-4 py-2 text-white font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            <button
+              onClick={() => setMagicLinkSent(false)}
+              className="text-amber-600 hover:text-amber-700 font-medium"
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              ← Back to sign in
             </button>
+          </div>
+        ) : (
+          <>
+            <form onSubmit={onSubmit} className="space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700">
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input 
+                  type="email"
+                  className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
+                  value={email} 
+                  onChange={e => setEmail(e.target.value)} 
+                  placeholder="your@email.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Password</label>
+                <input 
+                  type="password" 
+                  className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              <div className="space-y-3">
+                <button 
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full rounded bg-amber-500 px-4 py-2 text-white font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Signing in...' : 'Sign In'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onMagicLinkSubmit}
+                  disabled={magicLinkLoading || !email}
+                  className="w-full rounded border border-amber-500 px-4 py-2 text-amber-600 font-medium hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {magicLinkLoading ? 'Sending...' : 'Send Magic Link'}
+                </button>
+
+                <div className="text-center">
+                  <Link 
+                    href="/auth/forgot-password"
+                    className="text-sm text-amber-600 hover:text-amber-700"
+                  >
+                    Forgot your password?
+                  </Link>
+                </div>
+              </div>
+            </form>
+          </>
+        )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

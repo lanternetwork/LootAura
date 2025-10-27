@@ -45,22 +45,26 @@ vi.mock('@/lib/supabase/server', () => ({
                 })
               }
             } else {
-              // Regular select query
+              // Regular select query - create a chainable mock
+              const createChainableMock = () => {
+                const mockFn = vi.fn(() => createChainableMock())
+                mockFn.mockResolvedValue = vi.fn(() => mockFn)
+                return mockFn
+              }
+              
+              const chainableMock = createChainableMock()
+              chainableMock.mockResolvedValue({
+                data: [],
+                error: null
+              })
+              
               return {
-                gte: vi.fn(() => ({
-                  lte: vi.fn(() => ({
-                    gte: vi.fn(() => ({
-                      lte: vi.fn(() => ({
-                        order: vi.fn(() => ({
-                          limit: vi.fn().mockResolvedValue({
-                            data: [],
-                            error: null
-                          })
-                        }))
-                      }))
-                    }))
-                  }))
-                }))
+                gte: chainableMock,
+                lte: chainableMock,
+                in: chainableMock,
+                or: chainableMock,
+                order: chainableMock,
+                range: chainableMock
               }
             }
           })

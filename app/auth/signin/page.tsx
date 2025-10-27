@@ -173,8 +173,8 @@ export default function SignIn() {
         </form>
 
         <div className="text-center">
-          <Link 
-            href="/" 
+          <Link
+            href="/"
             className="text-amber-600 hover:text-amber-700 font-medium"
           >
             ← Back to home

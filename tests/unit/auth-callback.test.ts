@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { GET } from '../app/auth/callback/route'
+import { GET } from '../../app/auth/callback/route'
 
 // Mock NextResponse
 vi.mock('next/server', async () => {
@@ -22,7 +22,7 @@ vi.mock('next/headers', () => ({
 }))
 
 // Mock Supabase auth helpers
-vi.mock('@supabase/auth-helpers-nextjs', () => ({
+vi.mock('@supabase/ssr', () => ({
   createServerClient: vi.fn(() => ({
     auth: {
       exchangeCodeForSession: vi.fn()
@@ -52,7 +52,7 @@ describe('OAuth Callback Route', () => {
   })
 
   it('should redirect to error page when code exchange fails', async () => {
-    const { createServerClient } = await import('@supabase/auth-helpers-nextjs')
+    const { createServerClient } = await import('@supabase/ssr')
     const mockSupabase = {
       auth: {
         exchangeCodeForSession: vi.fn().mockResolvedValue({
@@ -71,7 +71,7 @@ describe('OAuth Callback Route', () => {
   })
 
   it('should redirect to /sales when code exchange succeeds', async () => {
-    const { createServerClient } = await import('@supabase/auth-helpers-nextjs')
+    const { createServerClient } = await import('@supabase/ssr')
     const mockSupabase = {
       auth: {
         exchangeCodeForSession: vi.fn().mockResolvedValue({
@@ -94,7 +94,7 @@ describe('OAuth Callback Route', () => {
   })
 
   it('should redirect to custom next parameter when provided', async () => {
-    const { createServerClient } = await import('@supabase/auth-helpers-nextjs')
+    const { createServerClient } = await import('@supabase/ssr')
     const mockSupabase = {
       auth: {
         exchangeCodeForSession: vi.fn().mockResolvedValue({

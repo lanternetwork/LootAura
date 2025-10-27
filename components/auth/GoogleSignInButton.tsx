@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr'
 
 export default function GoogleSignInButton() {
   const [isLoading, setIsLoading] = useState(false)
@@ -12,7 +12,10 @@ export default function GoogleSignInButton() {
     try {
       console.log('[GOOGLE_AUTH] Starting Google OAuth flow...')
       
-      const supabase = createClientComponentClient()
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
       const redirectTo = `${window.location.origin}/auth/callback`
       
       console.log('[GOOGLE_AUTH] Redirect URL:', redirectTo)

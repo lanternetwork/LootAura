@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { middleware } from '../middleware'
+import { middleware } from '../../middleware'
 
 // Mock NextResponse
 vi.mock('next/server', async () => {

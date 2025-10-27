@@ -221,7 +221,7 @@ describe('OAuth Callback Route', () => {
       await GET(request)
       
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[AUTH_CALLBACK] Processing OAuth callback:',
+        '🔄 [AUTH FLOW] oauth-callback → start: start',
         expect.objectContaining({
           hasCode: true,
           hasError: false,

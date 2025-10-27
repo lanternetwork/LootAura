@@ -25,7 +25,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { email } = magicLinkSchema.parse(body)
+    
+    let email: string
+    try {
+      const parsed = magicLinkSchema.parse(body)
+      email = parsed.email
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return NextResponse.json(
+          { code: error.errors[0].message, message: 'Invalid email address' },
+          { status: 400 }
+        )
+      }
+      throw error
+    }
 
     const cookieStore = cookies()
     const supabase = createServerSupabaseClient(cookieStore)

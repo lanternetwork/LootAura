@@ -239,9 +239,8 @@ describe('Profile Management', () => {
       await POST(request)
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[PROFILE] Creating/ensuring profile for user:',
+        '🔄 [AUTH FLOW] profile-creation → start: start',
         expect.objectContaining({
-          event: 'profile-create',
           userId: 'user123',
         })
       )

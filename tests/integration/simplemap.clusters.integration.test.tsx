@@ -2,8 +2,8 @@
  * Integration tests for SimpleMap with clustering functionality
  */
 
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import SimpleMap from '@/components/location/SimpleMap'
 import { PinPoint } from '@/lib/pins/types'
 
@@ -80,6 +80,14 @@ vi.mock('@/components/location/PinMarker', () => ({
 }))
 
 describe('SimpleMap Clusters Integration', () => {
+  beforeEach(() => {
+    cleanup()
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
   const testSales: PinPoint[] = [
     { id: '1', lat: 38.2527, lng: -85.7585 },
     { id: '2', lat: 38.2530, lng: -85.7590 },
@@ -113,7 +121,7 @@ describe('SimpleMap Clusters Integration', () => {
       render(<SimpleMap {...defaultProps} />)
 
       // Check that map renders (clustering behavior tested in unit tests)
-      expect(screen.getByTestId('map')).toBeInTheDocument()
+      expect(screen.getAllByTestId('map')[0]).toBeInTheDocument()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -145,7 +153,7 @@ describe('SimpleMap Clusters Integration', () => {
       render(<SimpleMap {...defaultProps} pins={{ ...defaultProps.pins, onClusterClick }} />)
 
       // Just verify the component renders with the callback (actual clustering tested in unit tests)
-      expect(screen.getByTestId('map')).toBeInTheDocument()
+      expect(screen.getAllByTestId('map')[0]).toBeInTheDocument()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -180,7 +188,7 @@ describe('SimpleMap Clusters Integration', () => {
       render(<SimpleMap {...defaultProps} onViewportChange={onViewportChange} />)
 
       // Simulate viewport change
-      const map = screen.getByTestId('map')
+      const map = screen.getAllByTestId('map')[0]
       fireEvent.click(map)
 
       // The onMoveEnd handler should be called

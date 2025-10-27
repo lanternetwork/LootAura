@@ -148,10 +148,9 @@ describe('Magic Link Authentication', () => {
       await POST(request)
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[AUTH] Magic link request:',
+        '📧 [AUTH MAGIC LINK] tes***@example.com: sent',
         expect.objectContaining({
-          event: 'magic-link',
-          email: 'test@example.com',
+          redirectToSet: false,
         })
       )
 

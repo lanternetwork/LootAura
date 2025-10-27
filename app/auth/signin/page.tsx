@@ -98,8 +98,9 @@ export default function SignIn() {
               )}
 
               <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
+                <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
                 <input 
+                  id="email"
                   type="email"
                   className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
                   value={email} 
@@ -110,8 +111,9 @@ export default function SignIn() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Password</label>
+                <label htmlFor="password" className="block text-sm font-medium mb-1">Password</label>
                 <input 
+                  id="password"
                   type="password" 
                   className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
                   value={password} 

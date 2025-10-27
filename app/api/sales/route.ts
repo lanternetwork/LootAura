@@ -703,7 +703,6 @@ async function postHandler(request: NextRequest) {
   }
 }
 
-export { salesHandler }
 export const GET = withRateLimit(salesHandler, [
   Policies.SALES_VIEW_30S,
   Policies.SALES_VIEW_HOURLY

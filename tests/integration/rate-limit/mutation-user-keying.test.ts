@@ -9,7 +9,9 @@ import { NextRequest } from 'next/server'
 
 // Mock the rate limiting modules
 vi.mock('@/lib/rateLimit/config', () => ({
-  shouldBypassRateLimit: vi.fn(() => false)
+  isRateLimitingEnabled: vi.fn(() => true),
+  isPreviewEnv: vi.fn(() => false),
+  shouldBypassRateLimit: vi.fn(() => false) // Force rate limiting to be active
 }))
 
 vi.mock('@/lib/rateLimit/withRateLimit', () => ({

@@ -81,6 +81,14 @@ describe('OAuth Callback Route', () => {
             }
           },
           error: null
+        }),
+        getSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              user: { id: 'user123' }
+            }
+          },
+          error: null
         })
       }
     }
@@ -98,6 +106,14 @@ describe('OAuth Callback Route', () => {
     const mockSupabase = {
       auth: {
         exchangeCodeForSession: vi.fn().mockResolvedValue({
+          data: {
+            session: {
+              user: { id: 'user123' }
+            }
+          },
+          error: null
+        }),
+        getSession: vi.fn().mockResolvedValue({
           data: {
             session: {
               user: { id: 'user123' }

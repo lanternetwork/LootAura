@@ -1,5 +1,3 @@
-import { Suspense } from 'react'
-
 interface AuthErrorPageProps {
   searchParams: { error?: string }
 }

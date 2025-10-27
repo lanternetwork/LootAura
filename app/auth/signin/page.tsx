@@ -171,6 +171,8 @@ export default function SignIn() {
             </Link>
           </div>
         </form>
+          </>
+        )}
 
         <div className="text-center">
           <Link

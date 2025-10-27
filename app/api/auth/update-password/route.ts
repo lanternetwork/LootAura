@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update password
-    const { data, error } = await supabase.auth.updateUser({
+    const { data: _data, error } = await supabase.auth.updateUser({
       password: password
     })
 

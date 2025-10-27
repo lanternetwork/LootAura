@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     authDebug.logMagicLink(email, 'sent', { redirectToSet: !!emailRedirectTo })
 
     // Send magic link
-    const { data, error } = await supabase.auth.signInWithOtp({
+    const { data: _data, error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         emailRedirectTo,

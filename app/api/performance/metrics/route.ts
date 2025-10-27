@@ -25,7 +25,7 @@ interface PerformanceMetrics {
   timestamp: string
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Only allow in debug mode or for authenticated admin users
     const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === 'true'
@@ -94,15 +94,15 @@ async function getDatabaseMetrics() {
     const supabase = createServerSupabaseClient(cookieStore)
 
     // Get query performance stats
-    const { data: queryStats, error: queryError } = await supabase
+    const { data: queryStats, error: _queryError } = await supabase
       .rpc('get_query_performance_stats')
 
     // Get index usage stats
-    const { data: indexStats, error: indexError } = await supabase
+    const { data: indexStats, error: _indexError } = await supabase
       .rpc('get_index_usage_stats')
 
     // Get connection pool info (simplified)
-    const { data: connectionInfo, error: connectionError } = await supabase
+    const { data: connectionInfo, error: _connectionError } = await supabase
       .from('pg_stat_activity')
       .select('count(*)')
       .limit(1)

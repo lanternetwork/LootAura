@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
  * Idempotent profile creation - ensures a profile exists for the authenticated user
  * This function can be called multiple times safely without creating duplicates
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const cookieStore = cookies()
     const supabase = createServerSupabaseClient(cookieStore)
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 /**
  * Get current user's profile
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const cookieStore = cookies()
     const supabase = createServerSupabaseClient(cookieStore)

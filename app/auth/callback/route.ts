@@ -67,16 +67,8 @@ export async function GET(req: Request) {
     if (data.session) {
       console.log('[AUTH_CALLBACK] Code exchange successful, user authenticated:', data.session.user.id)
       
-      // Verify the session is properly set by checking it immediately
-      const { data: { session: verifySession }, error: verifyError } = await supabase.auth.getSession()
-      
-      if (verifyError || !verifySession) {
-        console.log('[AUTH_CALLBACK] Session verification failed after exchange:', verifyError?.message)
-        return NextResponse.redirect(new URL('/auth/error?error=session_verification_failed', url.origin))
-      }
-      
-      console.log('[AUTH_CALLBACK] Session verified successfully, redirecting to:', next)
       // Success: user session cookies are automatically set by auth-helpers
+      console.log('[AUTH_CALLBACK] Redirecting to:', next)
       return NextResponse.redirect(new URL(next, url.origin))
     } else {
       console.log('[AUTH_CALLBACK] Code exchange succeeded but no session received')

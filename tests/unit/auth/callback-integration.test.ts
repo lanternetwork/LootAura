@@ -158,7 +158,9 @@ describe('OAuth Callback Route', () => {
       await GET(request)
       
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://example.com/api/profile',
+        expect.objectContaining({
+          href: 'https://example.com/api/profile'
+        }),
         {
           method: 'POST',
           headers: {

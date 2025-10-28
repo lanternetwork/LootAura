@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Dispatch the reusable workflow
     const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/load-test.yml/dispatches`
-    const resp = await fetch(url, {
+    let resp = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -50,9 +50,40 @@ export async function POST(request: NextRequest) {
       })
     })
 
+    // If 404, try resolving workflow ID dynamically and retry
+    if (resp.status === 404) {
+      const listUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows`
+      const listResp = await fetch(listUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'LootAura-Admin-LoadTest-Dispatch'
+        }
+      })
+      if (listResp.ok) {
+        const workflows = await listResp.json() as any
+        const wf = (workflows.workflows || []).find((w: any) => w.path?.endsWith('/load-test.yml') || w.name === 'Load Tests')
+        if (wf?.id) {
+          const idUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf.id}/dispatches`
+          resp = await fetch(idUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/vnd.github+json',
+              'Content-Type': 'application/json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'LootAura-Admin-LoadTest-Dispatch'
+            },
+            body: JSON.stringify({ ref, inputs: { baseURL, scenario } })
+          })
+        }
+      }
+    }
+
     if (!resp.ok) {
       const text = await resp.text()
-      return NextResponse.json({ error: 'Failed to dispatch workflow', status: resp.status, details: text, hint: 'Ensure token has workflow write permissions and workflow exists on ref' }, { status: 502 })
+      return NextResponse.json({ error: 'Failed to dispatch workflow', status: resp.status, details: text, repo: `${owner}/${repo}`, ref, workflow: 'load-test.yml' }, { status: 502 })
     }
 
     // Best-effort link to Actions tab

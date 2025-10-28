@@ -21,6 +21,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Disallow running the load runner on Vercel (both preview and prod) to avoid 500s
+    if (process.env.VERCEL === '1') {
+      return NextResponse.json(
+        {
+          error: 'Load testing is unavailable in Vercel environments',
+          message: 'Run load tests locally or in a non-Vercel environment.'
+        },
+        { status: 501 }
+      )
+    }
+
     const body: LoadTestRequest = await request.json()
     const { scenario, baseURL = 'http://localhost:3000', ip, userToken } = body
 

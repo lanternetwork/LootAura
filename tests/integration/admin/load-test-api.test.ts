@@ -23,8 +23,11 @@ describe('Admin Load Test API', () => {
 
   it('should return 403 Forbidden only in actual production environment', async () => {
     // Mock actual production environment using vi.stubEnv
-    vi.stubEnv('NODE_ENV', 'production')
-    vi.stubEnv('VERCEL_ENV', 'production')
+    const originalNodeEnv = process.env.NODE_ENV
+    const originalVercelEnv = process.env.VERCEL_ENV
+    
+    process.env.NODE_ENV = 'production'
+    process.env.VERCEL_ENV = 'production'
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -45,14 +48,18 @@ describe('Admin Load Test API', () => {
       expect(data.error).toBe('Load testing is disabled in production environment')
     } finally {
       // Restore original environment
-      vi.unstubAllEnvs()
+      process.env.NODE_ENV = originalNodeEnv
+      process.env.VERCEL_ENV = originalVercelEnv
     }
   })
 
   it('should allow load testing in staging/preview environment', async () => {
     // Mock staging environment (production build but not production deployment)
-    vi.stubEnv('NODE_ENV', 'production')
-    vi.stubEnv('VERCEL_ENV', 'preview')
+    const originalNodeEnv = process.env.NODE_ENV
+    const originalVercelEnv = process.env.VERCEL_ENV
+    
+    process.env.NODE_ENV = 'production'
+    process.env.VERCEL_ENV = 'preview'
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -72,13 +79,16 @@ describe('Admin Load Test API', () => {
       expect(response.status).not.toBe(403)
     } finally {
       // Restore original environment
-      vi.unstubAllEnvs()
+      process.env.NODE_ENV = originalNodeEnv
+      process.env.VERCEL_ENV = originalVercelEnv
     }
   })
 
   it('should allow load testing in development environment', async () => {
     // Mock development environment
-    vi.stubEnv('NODE_ENV', 'development')
+    const originalNodeEnv = process.env.NODE_ENV
+    
+    process.env.NODE_ENV = 'development'
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -98,13 +108,15 @@ describe('Admin Load Test API', () => {
       expect(response.status).not.toBe(403)
     } finally {
       // Restore original environment
-      vi.unstubAllEnvs()
+      process.env.NODE_ENV = originalNodeEnv
     }
   })
 
   it('should allow load testing in test environment', async () => {
     // Mock test environment
-    vi.stubEnv('NODE_ENV', 'test')
+    const originalNodeEnv = process.env.NODE_ENV
+    
+    process.env.NODE_ENV = 'test'
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -124,13 +136,15 @@ describe('Admin Load Test API', () => {
       expect(response.status).not.toBe(403)
     } finally {
       // Restore original environment
-      vi.unstubAllEnvs()
+      process.env.NODE_ENV = originalNodeEnv
     }
   })
 
   it('should validate scenario parameter', async () => {
     // Mock development environment
-    vi.stubEnv('NODE_ENV', 'development')
+    const originalNodeEnv = process.env.NODE_ENV
+    
+    process.env.NODE_ENV = 'development'
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -152,13 +166,15 @@ describe('Admin Load Test API', () => {
       expect(data.validScenarios).toBeDefined()
     } finally {
       // Restore original environment
-      vi.unstubAllEnvs()
+      process.env.NODE_ENV = originalNodeEnv
     }
   })
 
   it('should handle missing scenario parameter', async () => {
     // Mock development environment
-    vi.stubEnv('NODE_ENV', 'development')
+    const originalNodeEnv = process.env.NODE_ENV
+    
+    process.env.NODE_ENV = 'development'
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -178,7 +194,7 @@ describe('Admin Load Test API', () => {
       expect(data.error).toBe('Invalid scenario')
     } finally {
       // Restore original environment
-      vi.unstubAllEnvs()
+      process.env.NODE_ENV = originalNodeEnv
     }
   })
 })

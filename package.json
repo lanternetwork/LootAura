@@ -21,7 +21,21 @@
     "update:status": "tsx scripts/update-status.ts",
     "smoke:sales": "tsx scripts/smoke-sales.ts",
     "check:css": "node scripts/check-css-tokens.js",
-    "verify:migration": "node scripts/verify-migration.js"
+    "verify:migration": "node scripts/verify-migration.js",
+    "load:help": "tsx scripts/load/cli.ts --help",
+    "load:sales:baseline": "tsx scripts/load/cli.ts --scenario sales-baseline",
+    "load:sales:burst": "tsx scripts/load/cli.ts --scenario sales-burst",
+    "load:sales:sustained": "tsx scripts/load/cli.ts --scenario sales-sustained",
+    "load:geo:cache": "tsx scripts/load/cli.ts --scenario geo-cache-warmup",
+    "load:geo:abuse": "tsx scripts/load/cli.ts --scenario geo-abuse",
+    "load:auth:signin": "tsx scripts/load/cli.ts --scenario auth-signin",
+    "load:auth:magic": "tsx scripts/load/cli.ts --scenario auth-magic-link",
+    "load:mutation:sales": "tsx scripts/load/cli.ts --scenario mutation-sales",
+    "load:multi:ip": "tsx scripts/load/cli.ts --scenario multi-ip-sales",
+    "load:suite": "tsx scripts/load/suite.ts",
+    "load:suite:staging": "tsx scripts/load/suite.ts --baseURL https://staging.lootaura.com",
+    "load:local": "tsx scripts/load/local-test.ts",
+    "load:local:burst": "tsx scripts/load/local-test.ts --scenario sales-burst"
   },
   "dependencies": {
     "next": "^14.2.15",
@@ -44,7 +58,7 @@
     "mapbox-gl": "^3.5.1",
     "mongodb": "^6.8.0",
     "mongoose": "^8.5.0",
-    "next-auth": "^4.24.7",
+    "next-auth": "4.24.7",
     "photoswipe": "^5.4.4",
     "react-geocode": "^1.0.0-alpha.1",
     "react-icons": "^5.2.1",
@@ -56,7 +70,7 @@
     "react-share": "^5.1.0",
     "react-spinners": "^0.14.1",
     "react-toastify": "^10.0.5",
-    "nodemailer": "^7.0.7"
+    "nodemailer": "^6.9.8"
   },
   "devDependencies": {
     "eslint-config-next": "^14.2.15",

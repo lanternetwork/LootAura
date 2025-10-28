@@ -6,7 +6,6 @@
 
 import { vi, beforeAll, afterAll, afterEach, expect, it, describe } from 'vitest'
 import { NextRequest } from 'next/server'
-import { makeSupabaseFromMock } from '@/tests/utils/mocks/makeSupabaseQueryChain'
 
 // Mock rate limiting to bypass in tests
 vi.mock('@/lib/rateLimit/config', () => ({
@@ -27,42 +26,50 @@ vi.mock('@/lib/rateLimit/headers', () => ({
   applyRateHeaders: vi.fn((response) => response)
 }))
 
-// Mock Supabase server client with robust chain mock
+// Simple Supabase mock that returns a working chain
 const mockSalesData = [
   { id: 's1', lat: 38.25, lng: -85.76, title: 'Yard Sale A', status: 'published' },
   { id: 's2', lat: 38.26, lng: -85.75, title: 'Yard Sale B', status: 'published' },
 ]
 
-const from = makeSupabaseFromMock({
-  sales_v2: [
-    { data: mockSalesData, error: null }, // For regular queries
-    { data: [], error: null }, // For count queries
-  ],
-  items_v2: [
-    { data: [], error: null }, // For category filtering queries
-  ]
-})
+// Create a simple chain mock that actually works
+const createMockChain = (data: any) => {
+  const chain = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    gte: vi.fn(() => chain),
+    lte: vi.fn(() => chain),
+    in: vi.fn(() => chain),
+    or: vi.fn(() => chain),
+    order: vi.fn(() => chain),
+    limit: vi.fn(() => Promise.resolve({ data, error: null })),
+    range: vi.fn(() => Promise.resolve({ data, error: null })),
+    single: vi.fn(() => Promise.resolve({ data, error: null })),
+    maybeSingle: vi.fn(() => Promise.resolve({ data, error: null })),
+    then: (onFulfilled: any, onRejected: any) => Promise.resolve({ data, error: null }).then(onFulfilled, onRejected),
+  }
+  return chain
+}
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => ({
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
     },
-    from, // returns our fluent chain
+    from: vi.fn((table: string) => {
+      if (table === 'sales_v2') {
+        return createMockChain(mockSalesData)
+      } else if (table === 'items_v2') {
+        return createMockChain([])
+      }
+      return createMockChain([])
+    }),
   })),
 }))
 
-// Clear module cache and import the route after the mocks are installed
+// Import the route after the mocks are installed
 let route: any
 beforeAll(async () => {
-  // Clear the module cache to ensure fresh import with mocks
-  const modulePath = require.resolve('@/app/api/sales/route')
-  delete require.cache[modulePath]
-  
-  // Also clear any related modules
-  const supabaseModulePath = require.resolve('@/lib/supabase/server')
-  delete require.cache[supabaseModulePath]
-  
   route = await import('@/app/api/sales/route')
 })
 

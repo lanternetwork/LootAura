@@ -6,27 +6,67 @@
 
 import { vi, beforeAll, afterEach, describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
-import { makeSupabaseFromMock, mockCreateSupabaseServerClient } from '@/tests/utils/mocks/supabaseServerMock'
 
-const from = makeSupabaseFromMock({
-  sales_v2: [
-    // First call: count query with head: true - this will be handled by the mock's count logic
-    { data: [], error: null },
-    // Second call: items query for category filtering
-    { data: [{ sale_id: 's1' }, { sale_id: 's2' }], error: null },
-    // Third call: main sales query
-    { data: [
-      { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A' },
-      { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B' },
-    ], error: null },
-  ],
-  items_v2: [
-    // Items query for category filtering
-    { data: [{ sale_id: 's1' }, { sale_id: 's2' }], error: null },
-  ],
-})
+// Mock the Supabase client with proper chaining
+const mockSupabaseClient = {
+  from: vi.fn((table: string) => {
+    const chain = {
+      select: vi.fn((columns?: string | string[], options?: any) => {
+        // Handle count query with head: true
+        if (options?.count === 'exact' && options?.head === true) {
+          return {
+            eq: vi.fn(() => Promise.resolve({ count: 2, error: null })),
+          }
+        }
+        // Regular select query - return the chain
+        return chain
+      }),
+      eq: vi.fn(() => chain),
+      gte: vi.fn(() => chain),
+      lte: vi.fn(() => chain),
+      in: vi.fn(() => chain),
+      or: vi.fn(() => chain),
+      order: vi.fn(() => chain),
+      range: vi.fn(() => Promise.resolve({
+        data: [
+          { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+          { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
+        ],
+        error: null
+      })),
+      limit: vi.fn(() => Promise.resolve({
+        data: [
+          { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+          { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
+        ],
+        error: null
+      })),
+      single: vi.fn(() => Promise.resolve({
+        data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+        error: null
+      })),
+      maybeSingle: vi.fn(() => Promise.resolve({
+        data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+        error: null
+      })),
+      then: (onFulfilled: any, onRejected: any) => Promise.resolve({
+        data: [
+          { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+          { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
+        ],
+        error: null
+      }).then(onFulfilled, onRejected),
+    }
+    return chain
+  }),
+  auth: {
+    getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+  },
+}
 
-vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(() => mockSupabaseClient),
+}))
 
 // Disable rate limiting in tests
 ;(process.env as any).RATE_LIMITING_ENABLED = 'false'

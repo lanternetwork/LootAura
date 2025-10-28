@@ -102,17 +102,16 @@ vi.mock('@/lib/supabase/server', () => ({
               }
             } else {
               // Return a chain object with all the methods the sales route needs
-              const chain = {
-                gte: vi.fn().mockReturnThis(),
-                lte: vi.fn().mockReturnThis(),
-                in: vi.fn().mockReturnThis(),
-                or: vi.fn().mockReturnThis(),
-                order: vi.fn().mockReturnThis(),
-                range: vi.fn().mockResolvedValue({
-                  data: [],
-                  error: null
-                })
-              }
+              const chain: any = {}
+              chain.gte = vi.fn(() => chain)
+              chain.lte = vi.fn(() => chain)
+              chain.in = vi.fn(() => chain)
+              chain.or = vi.fn(() => chain)
+              chain.order = vi.fn(() => chain)
+              chain.range = vi.fn().mockResolvedValue({
+                data: [],
+                error: null
+              })
               return chain
             }
           })

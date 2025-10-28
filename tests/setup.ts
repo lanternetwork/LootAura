@@ -109,9 +109,37 @@ vi.mock('@/lib/supabase/server', () => ({
       signUp: vi.fn(),
       signOut: vi.fn(),
     },
-    from: vi.fn(() => {
+    from: vi.fn((tableName: string) => {
       const chain: any = {}
-      chain.select = vi.fn(() => chain)
+      chain.select = vi.fn((columns: string | string[], options?: any) => {
+        if (options?.count === 'exact' && options?.head === true) {
+          // Count query
+          return {
+            eq: vi.fn().mockResolvedValue({
+              count: 0,
+              error: null
+            })
+          }
+        } else {
+          // Regular select query - return a properly mocked chain
+          const mockChain = {
+            gte: vi.fn().mockReturnThis(),
+            lte: vi.fn().mockReturnThis(),
+            in: vi.fn().mockReturnThis(),
+            or: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis(),
+            range: vi.fn().mockResolvedValue({
+              data: [],
+              error: null
+            }),
+            limit: vi.fn().mockResolvedValue({
+              data: [],
+              error: null
+            })
+          }
+          return mockChain
+        }
+      })
       chain.insert = vi.fn((rows: any[]) => ({ data: rows, error: null }))
       chain.update = vi.fn(() => chain)
       chain.delete = vi.fn(() => chain)

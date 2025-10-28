@@ -20,11 +20,16 @@ export async function POST(request: NextRequest) {
     const repository = process.env.GH_WORKFLOW_REPO || process.env.GITHUB_REPOSITORY || fallbackRepo
     const [owner, repo] = repository.split('/')
     const defaultRef = process.env.GH_WORKFLOW_REF || process.env.VERCEL_GIT_COMMIT_REF || 'main'
-    const fallbackRefs = [
-      defaultRef,
-      'milestone/auth-security-hardening',
-      'main'
-    ].filter((v, i, a) => !!v && a.indexOf(v) === i)
+    function asRefVariants(branch: string | undefined) {
+      if (!branch) return [] as string[]
+      const full = branch.startsWith('refs/') ? branch : `refs/heads/${branch}`
+      return [branch, full]
+    }
+    const fallbackRefs = Array.from(new Set([
+      ...asRefVariants(defaultRef),
+      ...asRefVariants('milestone/auth-security-hardening'),
+      ...asRefVariants('main')
+    ]))
 
     const body: DispatchBody = await request.json()
     const scenario = body.scenario || 'all'
@@ -73,7 +78,7 @@ export async function POST(request: NextRequest) {
         const wf = (workflows.workflows || []).find((w: any) => w.path?.endsWith('/load-test.yml') || w.name === 'Load Tests')
         if (wf?.id) {
           const idUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf.id}/dispatches`
-          // Try known refs in order
+          // Try known refs in order (plain and refs/heads/*)
           for (const candidateRef of fallbackRefs) {
             resp = await tryDispatch(idUrl, candidateRef)
             if (resp.ok) {
@@ -86,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     if (!resp.ok) {
       const text = await resp.text()
-      return NextResponse.json({ error: 'Failed to dispatch workflow', status: resp.status, details: text, repo: `${owner}/${repo}`, refTried: [ref, ...fallbackRefs], workflow: 'load-test.yml' }, { status: 502 })
+      return NextResponse.json({ error: 'Failed to dispatch workflow', status: resp.status, details: text, repo: `${owner}/${repo}`, refTried: Array.from(new Set([ref, ...fallbackRefs])), workflow: 'load-test.yml' }, { status: 502 })
     }
 
     // Best-effort link to Actions tab

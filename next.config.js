@@ -100,7 +100,7 @@ const nextConfig = {
                    // Network connections
                    "connect-src 'self' https: https://api.cloudinary.com; " +
                    // Misc
-                   "frame-src 'none' https://widget.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self';",
+                   "frame-src https://widget.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self';",
           },
         ],
       },

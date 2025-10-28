@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from 'react'
 
+declare global {
+  interface Window {
+    cloudinary: {
+      createUploadWidget: (config: any, callback: (error: any, result: any) => void) => any
+    }
+  }
+}
+
 interface CloudinaryStatus {
   cloudNamePresent: boolean
   presetPresent: boolean
@@ -47,13 +55,32 @@ export default function CloudinaryDiagnostics() {
     }
   }, [])
 
-  const openWidgetTest = () => {
-    if (typeof window === 'undefined' || !window.cloudinary) {
+  const openWidgetTest = async () => {
+    if (typeof window === 'undefined') {
       setStatus(prev => ({ 
         ...prev, 
-        lastWidgetError: 'Cloudinary widget not loaded' 
+        lastWidgetError: 'Not in browser environment' 
       }))
       return
+    }
+
+    // Load Cloudinary script if not already loaded
+    if (!window.cloudinary) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script')
+          script.src = 'https://widget.cloudinary.com/v2.0/global/all.js'
+          script.onload = () => resolve()
+          script.onerror = () => reject(new Error('Failed to load Cloudinary script'))
+          document.head.appendChild(script)
+        })
+      } catch (error) {
+        setStatus(prev => ({ 
+          ...prev, 
+          lastWidgetError: 'Failed to load Cloudinary script' 
+        }))
+        return
+      }
     }
 
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME

@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const repository = process.env.GH_WORKFLOW_REPO || process.env.GITHUB_REPOSITORY || fallbackRepo
     const [owner, repo] = repository.split('/')
     const defaultRef = process.env.GH_WORKFLOW_REF || process.env.VERCEL_GIT_COMMIT_REF || 'main'
-    function asRefVariants(branch: string | undefined) {
+    const asRefVariants = (branch: string | undefined): string[] => {
       if (!branch) return [] as string[]
       const full = branch.startsWith('refs/') ? branch : `refs/heads/${branch}`
       return [branch, full]
@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
 
     // Dispatch the reusable workflow
     const byNameUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/load-test.yml/dispatches`
-    async function tryDispatch(targetUrl: string, targetRef: string) {
-      return fetch(targetUrl, {
+    const tryDispatch = async (targetUrl: string, targetRef: string) => {
+      return await fetch(targetUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

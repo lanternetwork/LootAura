@@ -23,6 +23,13 @@ const mockSupabaseClient = {
           single: vi.fn()
         }))
       }))
+    })),
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn()
+        }))
+      }))
     }))
   }))
 }

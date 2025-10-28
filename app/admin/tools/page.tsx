@@ -12,7 +12,7 @@ import DiagnosticToolsValidator from '@/components/admin/DiagnosticToolsValidato
 import SalesDataTester from '@/components/admin/SalesDataTester'
 import SimpleMap from '@/components/location/SimpleMap'
 import RateLimitStatus from '@/components/admin/RateLimitStatus'
-import CloudinaryDiagnostics from '@/components/admin/CloudinaryDiagnostics'
+import LoadTestControls from '@/components/admin/LoadTestControls'
 import { useState, useRef } from 'react'
 // MapRef is a namespace in react-map-gl v7, not a type
 

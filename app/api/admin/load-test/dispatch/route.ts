@@ -16,12 +16,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine repo and ref
-    const ownerFromVercel = process.env.VERCEL_GIT_REPO_OWNER
-    const repoFromVercel = process.env.VERCEL_GIT_REPO_SLUG
     const fallbackRepo = 'lanternetwork/LootAura'
-    const repository = process.env.GITHUB_REPOSITORY || (ownerFromVercel && repoFromVercel ? `${ownerFromVercel}/${repoFromVercel}` : fallbackRepo)
+    const repository = process.env.GH_WORKFLOW_REPO || process.env.GITHUB_REPOSITORY || fallbackRepo
     const [owner, repo] = repository.split('/')
-    const defaultRef = process.env.VERCEL_GIT_COMMIT_REF || 'main'
+    const defaultRef = process.env.GH_WORKFLOW_REF || process.env.VERCEL_GIT_COMMIT_REF || 'main'
     const fallbackRefs = [
       defaultRef,
       'milestone/auth-security-hardening',

@@ -111,6 +111,32 @@ vi.mock('@/lib/supabase/server', () => ({
     },
     from: vi.fn((tableName: string) => {
       const chain: any = {}
+      
+      // Create a proper chain object that returns itself for method chaining
+      const createChain = () => {
+        const mockChain = {
+          gte: vi.fn().mockReturnThis(),
+          lte: vi.fn().mockReturnThis(),
+          in: vi.fn().mockReturnThis(),
+          or: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn().mockResolvedValue({
+            data: [],
+            error: null
+          }),
+          limit: vi.fn().mockResolvedValue({
+            data: [],
+            error: null
+          }),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({
+            data: { id: 'test-id', owner_id: 'test-user' },
+            error: null
+          })
+        }
+        return mockChain
+      }
+      
       chain.select = vi.fn((columns: string | string[], options?: any) => {
         if (options?.count === 'exact' && options?.head === true) {
           // Count query
@@ -122,36 +148,23 @@ vi.mock('@/lib/supabase/server', () => ({
           }
         } else {
           // Regular select query - return a properly mocked chain
-          const mockChain = {
-            gte: vi.fn().mockReturnThis(),
-            lte: vi.fn().mockReturnThis(),
-            in: vi.fn().mockReturnThis(),
-            or: vi.fn().mockReturnThis(),
-            order: vi.fn().mockReturnThis(),
-            range: vi.fn().mockResolvedValue({
-              data: [],
-              error: null
-            }),
-            limit: vi.fn().mockResolvedValue({
-              data: [],
-              error: null
-            })
-          }
-          return mockChain
+          return createChain()
         }
       })
+      
       chain.insert = vi.fn((rows: any[]) => ({ data: rows, error: null }))
-      chain.update = vi.fn(() => chain)
-      chain.delete = vi.fn(() => chain)
-      chain.eq = vi.fn(() => chain)
-      chain.gte = vi.fn(() => chain)
-      chain.lte = vi.fn(() => chain)
-      chain.in = vi.fn(() => chain)
-      chain.or = vi.fn(() => chain)
-      chain.order = vi.fn(() => chain)
+      chain.update = vi.fn(() => createChain())
+      chain.delete = vi.fn(() => createChain())
+      chain.eq = vi.fn(() => createChain())
+      chain.gte = vi.fn(() => createChain())
+      chain.lte = vi.fn(() => createChain())
+      chain.in = vi.fn(() => createChain())
+      chain.or = vi.fn(() => createChain())
+      chain.order = vi.fn(() => createChain())
       chain.range = vi.fn(() => Promise.resolve({ data: [], error: null }))
       chain.limit = vi.fn(() => Promise.resolve({ data: [], error: null }))
       chain.single = vi.fn(async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
+      
       return chain
     }),
   })),

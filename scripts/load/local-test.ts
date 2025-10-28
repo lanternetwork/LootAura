@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { spawn } from 'child_process'
+import { spawn, ChildProcess } from 'child_process'
 import { join } from 'path'
 
 interface LocalTestOptions {
@@ -113,7 +113,7 @@ async function runLocalTest(options: LocalTestOptions): Promise<void> {
       cwd: process.cwd()
     }) as ChildProcess
     
-    child.on('close', (code) => {
+    child.on('close', (code: number | null) => {
       if (code === 0) {
         console.log()
         console.log('✅ Local load test completed successfully!')
@@ -124,7 +124,7 @@ async function runLocalTest(options: LocalTestOptions): Promise<void> {
       }
     })
     
-    child.on('error', (error) => {
+    child.on('error', (error: Error) => {
       console.error('❌ Failed to start load test:', error)
       reject(error)
     })

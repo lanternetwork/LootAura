@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createBrowserClient } from '@supabase/ssr'
 
 export default function GoogleSignInButton() {
   const [isLoading, setIsLoading] = useState(false)
@@ -9,27 +10,34 @@ export default function GoogleSignInButton() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/auth/google', {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        // The response will be a redirect, so we need to follow it
-        if (response.redirected && response.url) {
-          window.location.href = response.url
-        } else {
-          // Handle the case where we get a redirect response
-          const data = await response.json()
-          if (data.url) {
-            window.location.href = data.url
+      console.log('[GOOGLE_AUTH] Starting Google OAuth flow...')
+      
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      const redirectTo = `${window.location.origin}/auth/callback`
+      
+      console.log('[GOOGLE_AUTH] Redirect URL:', redirectTo)
+      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          queryParams: { 
+            prompt: 'select_account' // Better UX - always show account selection
           }
         }
+      })
+
+      if (error) {
+        console.error('[GOOGLE_AUTH] Google sign-in failed:', error.message)
       } else {
-        const data = await response.json()
-        console.error('Google sign-in failed:', data.message)
+        console.log('[GOOGLE_AUTH] OAuth URL generated, redirecting...')
+        // Supabase will handle the redirect automatically
       }
     } catch (error) {
-      console.error('Google sign-in error:', error)
+      console.error('[GOOGLE_AUTH] Google sign-in error:', error)
     } finally {
       setIsLoading(false)
     }

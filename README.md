@@ -29,6 +29,87 @@ LootAura follows strict architectural invariants to prevent regressions:
 
 See [docs/INVARIANTS.md](docs/INVARIANTS.md) for complete protocol contracts.
 
+## 🚦 Rate Limiting
+
+LootAura implements production-grade rate limiting to protect against abuse and ensure fair usage.
+
+### Policies
+
+| Policy | Limit | Window | Scope | Description |
+|--------|-------|--------|-------|-------------|
+| `AUTH_DEFAULT` | 5 req | 30s | IP | Authentication attempts |
+| `AUTH_HOURLY` | 60 req | 1h | IP | Hourly auth limit |
+| `AUTH_CALLBACK` | 10 req | 60s | IP | OAuth callback burst |
+| `GEO_ZIP_SHORT` | 10 req | 60s | IP | ZIP code lookups |
+| `GEO_ZIP_HOURLY` | 300 req | 1h | IP | Hourly geocoding |
+| `SALES_VIEW_30S` | 20 req | 30s | IP | Map viewport fetches |
+| `SALES_VIEW_HOURLY` | 800 req | 1h | IP | Hourly map requests |
+| `MUTATE_MINUTE` | 3 req | 60s | User | Sale/item creation |
+| `MUTATE_DAILY` | 100 req | 24h | User | Daily mutations |
+| `ADMIN_TOOLS` | 3 req | 30s | IP | Admin endpoints |
+
+### Enable/Disable
+
+Rate limiting is **disabled by default** and only enabled when:
+- `NODE_ENV === 'production'` AND `RATE_LIMITING_ENABLED === 'true'`
+
+```bash
+# Enable in production
+RATE_LIMITING_ENABLED=true
+
+# Disable (default)
+# RATE_LIMITING_ENABLED=false or unset
+```
+
+### Backend Configuration
+
+**Production (Upstash Redis):**
+```bash
+UPSTASH_REDIS_REST_URL=https://your-redis-url.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your-redis-token
+```
+
+**Development (In-Memory):**
+- No Redis credentials needed
+- Uses in-memory sliding window
+- Resets on server restart
+
+### Testing Rate Limits
+
+```bash
+# Test auth rate limiting
+curl -X POST https://your-domain.com/api/auth/signin \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password"}' \
+  -v
+
+# Test sales viewport rate limiting  
+for i in {1..25}; do
+  curl "https://your-domain.com/api/sales?bbox=38.0,-85.0,38.1,-84.9" \
+    -H "X-Forwarded-For: 192.168.1.1" \
+    -v
+done
+```
+
+### Response Headers
+
+All responses include rate limiting headers:
+
+```
+X-RateLimit-Limit: 5
+X-RateLimit-Remaining: 3
+X-RateLimit-Reset: 1640995200
+X-RateLimit-Policy: AUTH_DEFAULT 5/30
+Retry-After: 30  # Only on 429 responses
+```
+
+### Soft-Then-Hard Behavior
+
+Some policies support burst tolerance:
+- **Sales Viewport**: Allows 2 extra requests in 5-second window
+- **Headers**: `X-RateLimit-Remaining: 0` indicates soft limit
+- **No Retry-After**: Soft limits don't include `Retry-After` header
+
 ## 🐛 Debug Mode
 
 ### Enabling Debug Mode

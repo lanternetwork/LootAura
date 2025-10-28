@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient, setSessionCookies, isValidSession } from '@/lib/auth/server-session'
-import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
@@ -13,19 +14,8 @@ const signupSchema = z.object({
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain at least one lowercase letter, one uppercase letter, and one number'),
 })
 
-export async function POST(request: NextRequest) {
+async function signupHandler(request: NextRequest) {
   try {
-    // Rate limiting
-    const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMITS.AUTH)
-    const { allowed, error: rateLimitError } = rateLimitMiddleware(request)
-    
-    if (!allowed) {
-      return NextResponse.json(
-        { error: rateLimitError },
-        { status: 429 }
-      )
-    }
-
     const body = await request.json()
     const { email, password } = signupSchema.parse(body)
 
@@ -80,6 +70,32 @@ export async function POST(request: NextRequest) {
 
     // If session is available and valid, set cookies
     if (data.session && isValidSession(data.session) && data.user) {
+      // Ensure profile exists for the user (idempotent)
+      try {
+        const profileResponse = await fetch(new URL('/api/profile', request.url), {
+          method: 'POST',
+          headers: {
+            'Cookie': request.headers.get('cookie') || '',
+          },
+        })
+        
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json()
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[AUTH] Profile ensured during signup:', { 
+              event: 'signup', 
+              created: profileData.created,
+              userId: data.user.id 
+            })
+          }
+        }
+      } catch (profileError) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[AUTH] Profile creation error during signup, but continuing:', profileError)
+        }
+        // Don't fail the auth flow if profile creation fails
+      }
+
       const response = NextResponse.json(
         { 
           user: {
@@ -124,3 +140,8 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withRateLimit(signupHandler, [
+  Policies.AUTH_DEFAULT,
+  Policies.AUTH_HOURLY
+])

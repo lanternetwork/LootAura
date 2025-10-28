@@ -47,7 +47,16 @@ We currently support the following versions with security updates:
 - **Structured Logging**: Use structured logging format for consistency
 - **Log Rotation**: Implement log rotation to prevent disk space issues
 
-## Reporting a Vulnerability
+### Rate Limiting & DDoS Protection
+- **Production-Grade Limiting**: Sliding window rate limiting with Redis backend
+- **Policy-Based Protection**: Different limits for auth, geocoding, viewport, and mutations
+- **Soft-Then-Hard**: Burst tolerance for legitimate usage patterns
+- **IP-Based Auth Protection**: Authentication endpoints always use IP-based limiting
+- **User-Based Mutations**: Creation/modification endpoints use user-based limiting
+- **Bypass Controls**: Disabled by default, only enabled in production with explicit flag
+- **Header Transparency**: All responses include rate limit status headers
+
+### Security Headers
 
 If you discover a security vulnerability, please report it responsibly:
 

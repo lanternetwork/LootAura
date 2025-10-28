@@ -5,6 +5,8 @@ import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 import { z } from 'zod'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
@@ -25,7 +27,7 @@ const bboxSchema = z.object({
   path: ["east"]
 })
 
-export async function GET(request: NextRequest) {
+async function salesHandler(request: NextRequest) {
   const startedAt = Date.now()
   
   try {
@@ -100,7 +102,7 @@ export async function GET(request: NextRequest) {
       console.log(`[SALES] Missing location: lat=${lat}, lng=${lng}, bbox=${north},${south},${east},${west}`)
       return NextResponse.json({ 
         ok: false, 
-        error: 'Missing location (provide either lat/lng or north/south/east/west)' 
+        error: 'Missing location: lat/lng or bbox required' 
       }, { status: 400 })
     }
     
@@ -639,7 +641,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
     
@@ -700,3 +702,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export const GET = withRateLimit(salesHandler, [
+  Policies.SALES_VIEW_30S,
+  Policies.SALES_VIEW_HOURLY
+])
+
+export const POST = withRateLimit(postHandler, [
+  Policies.MUTATE_MINUTE,
+  Policies.MUTATE_DAILY
+])

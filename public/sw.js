@@ -1,11 +1,11 @@
-// Service Worker for YardSaleFinder PWA
+// Service Worker for LootAura PWA
 // const CACHE_NAME = 'yardsalefinder-v1'
-const STATIC_CACHE = 'static-v1'
-const DYNAMIC_CACHE = 'dynamic-v1'
+const STATIC_CACHE = 'static-v2' // Force cache update
+const DYNAMIC_CACHE = 'dynamic-v2' // Force cache update
 
 // Files to cache for offline use
+// NOTE: Removed '/' from cache to prevent OAuth callback interference
 const STATIC_FILES = [
-  '/',
   '/explore',
   '/favorites',
   '/signin',
@@ -62,6 +62,13 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (request.method !== 'GET') {
     return
+  }
+
+  // CRITICAL: Skip OAuth callback URLs to prevent caching interference
+  if (url.searchParams.has('code') || url.searchParams.has('error')) {
+    console.log('🚨 OAuth callback detected, skipping service worker cache:', url.href)
+    console.log('🚨 Service worker version:', STATIC_CACHE)
+    return // Let the request go through normally without caching
   }
 
   // Block Mapbox telemetry requests
@@ -164,7 +171,7 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification('YardSaleFinder', options)
+    self.registration.showNotification('LootAura', options)
   )
 })
 
@@ -203,7 +210,7 @@ async function handleBackgroundSync() {
 // IndexedDB helpers for offline storage
 function getOfflineActions() {
   return new Promise((resolve) => {
-    const request = indexedDB.open('YardSaleFinder', 1)
+    const request = indexedDB.open('LootAura', 1)
     
     request.onsuccess = (event) => {
       const db = event.target.result
@@ -224,7 +231,7 @@ function getOfflineActions() {
 
 function removeOfflineAction(id) {
   return new Promise((resolve) => {
-    const request = indexedDB.open('YardSaleFinder', 1)
+    const request = indexedDB.open('LootAura', 1)
     
     request.onsuccess = (event) => {
       const db = event.target.result

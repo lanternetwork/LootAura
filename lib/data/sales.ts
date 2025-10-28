@@ -1,5 +1,4 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { T } from '@/lib/supabase/tables'
 import { z } from 'zod'
 import { Sale } from '@/lib/types'
 
@@ -244,7 +243,7 @@ export async function createSale(input: SaleInput): Promise<Sale> {
     }
 
     const { data, error } = await supabase
-      .from('lootaura_v2.sales')
+      .from('sales')
       .insert({
         owner_id: user.id,
         ...validatedInput,
@@ -276,7 +275,7 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
     }
 
     const { data, error } = await supabase
-      .from('lootaura_v2.sales')
+      .from('sales')
       .update(validatedInput)
       .eq('id', id)
       .eq('owner_id', user.id) // Ensure user owns the sale
@@ -306,7 +305,7 @@ export async function deleteSale(id: string): Promise<void> {
     }
 
     const { error } = await supabase
-      .from('lootaura_v2.sales')
+      .from('sales')
       .delete()
       .eq('id', id)
       .eq('owner_id', user.id) // Ensure user owns the sale
@@ -326,7 +325,7 @@ export async function listItems(saleId: string): Promise<Item[]> {
     const supabase = createSupabaseServerClient()
     
     const { data, error } = await supabase
-      .from(T.items)
+      .from('items')
       .select('*')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: false })
@@ -361,7 +360,7 @@ export async function createItem(saleId: string, input: ItemInput): Promise<Item
     }
 
     const { data, error } = await supabase
-      .from(T.items)
+      .from('items')
       .insert({
         sale_id: saleId,
         ...validatedInput,
@@ -393,7 +392,7 @@ export async function toggleFavorite(saleId: string): Promise<{ is_favorited: bo
 
     // Check if already favorited
     const { data: existingFavorite } = await supabase
-      .from(T.favorites)
+      .from('favorites')
       .select('id')
       .eq('sale_id', saleId)
       .eq('user_id', user.id)
@@ -402,7 +401,7 @@ export async function toggleFavorite(saleId: string): Promise<{ is_favorited: bo
     if (existingFavorite) {
       // Remove from favorites
       const { error } = await supabase
-        .from(T.favorites)
+        .from('favorites')
         .delete()
         .eq('sale_id', saleId)
         .eq('user_id', user.id)
@@ -416,7 +415,7 @@ export async function toggleFavorite(saleId: string): Promise<{ is_favorited: bo
     } else {
       // Add to favorites
       const { error } = await supabase
-        .from(T.favorites)
+        .from('favorites')
         .insert({
           sale_id: saleId,
           user_id: user.id,

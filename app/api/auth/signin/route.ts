@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerSupabaseClient, setSessionCookies, isValidSession } from '@/lib/auth/server-session'
-import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
@@ -11,19 +12,8 @@ const signinSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 })
 
-export async function POST(request: NextRequest) {
+async function signinHandler(request: NextRequest) {
   try {
-    // Rate limiting
-    const rateLimitMiddleware = createRateLimitMiddleware(RATE_LIMITS.AUTH)
-    const { allowed, error: rateLimitError } = rateLimitMiddleware(request)
-    
-    if (!allowed) {
-      return NextResponse.json(
-        { error: rateLimitError },
-        { status: 429 }
-      )
-    }
-
     const body = await request.json()
     const { email, password } = signinSchema.parse(body)
 
@@ -45,6 +35,32 @@ export async function POST(request: NextRequest) {
         { code: error?.message || 'Invalid session', message: 'Auth failed' },
         { status: 401 }
       )
+    }
+
+    // Ensure profile exists for the user (idempotent)
+    try {
+      const profileResponse = await fetch(new URL('/api/profile', request.url), {
+        method: 'POST',
+        headers: {
+          'Cookie': request.headers.get('cookie') || '',
+        },
+      })
+      
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json()
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[AUTH] Profile ensured during signin:', { 
+            event: 'signin', 
+            created: profileData.created,
+            userId: data.user.id 
+          })
+        }
+      }
+    } catch (profileError) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[AUTH] Profile creation error during signin, but continuing:', profileError)
+      }
+      // Don't fail the auth flow if profile creation fails
     }
 
     // Create response and set session cookies
@@ -85,3 +101,8 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withRateLimit(signinHandler, [
+  Policies.AUTH_DEFAULT,
+  Policies.AUTH_HOURLY
+])

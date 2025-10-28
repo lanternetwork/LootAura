@@ -3,7 +3,27 @@ import { cookies } from 'next/headers'
 import { hasValidSession, validateSession } from '@/lib/auth/server-session'
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, searchParams } = req.nextUrl;
+  
+  // 0. Handle OAuth callbacks - redirect to /auth/callback if code or error present
+  const hasCode = searchParams.has('code')
+  const hasError = searchParams.has('error')
+  
+  if (hasCode || hasError) {
+    console.log('[MIDDLEWARE] OAuth callback detected, redirecting to /auth/callback:', { 
+      hasCode, 
+      hasError, 
+      pathname 
+    })
+    
+    const callbackUrl = new URL('/auth/callback', req.url)
+    // Preserve entire querystring (code, error, state, next, etc.)
+    searchParams.forEach((value, key) => {
+      callbackUrl.searchParams.set(key, value)
+    })
+    
+    return NextResponse.redirect(callbackUrl, 307)
+  }
   
   // 1. Public pages that don't require authentication
   const isPublicPage = 
@@ -191,8 +211,8 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all app routes except static assets and health endpoints
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|robots.txt|sitemap.xml|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/|api/health/).*)',
+    // Match all app routes except static assets, health endpoints, and auth callback
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|robots.txt|sitemap.xml|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/|api/health/|auth/callback).*)',
     // Match API routes except health endpoints
     '/api/((?!health/).)*'
   ],

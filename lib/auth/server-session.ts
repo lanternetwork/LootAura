@@ -42,7 +42,7 @@ export function isValidSession(session: any): session is SupabaseSession {
 export function createServerSupabaseClient(cookieStore: ReturnType<typeof cookies>) {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    process.env.SUPABASE_SERVICE_ROLE!,
     {
       cookies: {
         getAll() {

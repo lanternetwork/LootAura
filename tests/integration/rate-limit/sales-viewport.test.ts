@@ -83,6 +83,69 @@ vi.mock('@/lib/rateLimit/headers', () => ({
   applyRateHeaders: vi.fn((response) => response)
 }))
 
+// Specific Supabase mock for sales viewport test
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(() => ({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+    },
+    from: vi.fn((tableName: string) => {
+      if (tableName === 'sales_v2') {
+        return {
+          select: vi.fn((columns: string | string[], options?: any) => {
+            if (options?.count === 'exact' && options?.head === true) {
+              return {
+                eq: vi.fn().mockResolvedValue({
+                  count: 0,
+                  error: null
+                })
+              }
+            } else {
+              // Return a chain object with all the methods the sales route needs
+              const chain = {
+                gte: vi.fn().mockReturnThis(),
+                lte: vi.fn().mockReturnThis(),
+                in: vi.fn().mockReturnThis(),
+                or: vi.fn().mockReturnThis(),
+                order: vi.fn().mockReturnThis(),
+                range: vi.fn().mockResolvedValue({
+                  data: [],
+                  error: null
+                })
+              }
+              return chain
+            }
+          })
+        }
+      } else if (tableName === 'items_v2') {
+        return {
+          select: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue({
+              data: [],
+              error: null
+            }),
+            in: vi.fn().mockResolvedValue({
+              data: [],
+              error: null
+            })
+          }))
+        }
+      }
+      return {
+        select: vi.fn(() => ({
+          gte: vi.fn().mockReturnThis(),
+          lte: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn().mockResolvedValue({
+            data: [],
+            error: null
+          })
+        }))
+      }
+    })
+  }))
+}))
+
 // Import after mocking
 import { GET } from '@/app/api/sales/route'
 import { check } from '@/lib/rateLimit/limiter'

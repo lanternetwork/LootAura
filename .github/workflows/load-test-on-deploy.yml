@@ -1,0 +1,33 @@
+name: Load Tests on Deployment
+
+on:
+  deployment_status:
+    types: [created, success]
+
+jobs:
+  run-on-success:
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Determine target URL
+        id: url
+        run: |
+          # Prefer environment_url; fallback to target_url
+          URL="${{ github.event.deployment_status.environment_url }}"
+          if [ -z "$URL" ]; then
+            URL="${{ github.event.deployment.payload?.web_url || github.event.deployment.target_url }}"
+          fi
+          if [ -z "$URL" ]; then
+            echo "::error::No deployment URL found; skipping"
+            exit 1
+          fi
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Call reusable load-test workflow (all scenarios)
+        uses: ./.github/workflows/load-test.yml
+        with:
+          baseURL: ${{ steps.url.outputs.url }}
+          scenario: all
+
+

@@ -22,6 +22,16 @@ on:
           - auth-magic-link
           - mutation-sales
           - multi-ip-sales
+  workflow_call:
+    inputs:
+      baseURL:
+        description: "Target base URL"
+        required: true
+        type: string
+      scenario:
+        description: "Scenario to run"
+        required: true
+        type: string
 
 jobs:
   run-load-tests:

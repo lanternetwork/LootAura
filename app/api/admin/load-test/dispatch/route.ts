@@ -20,6 +20,11 @@ export async function POST(request: NextRequest) {
     const repository = process.env.GITHUB_REPOSITORY || fallbackRepo
     const [owner, repo] = repository.split('/')
     const defaultRef = process.env.VERCEL_GIT_COMMIT_REF || 'main'
+    const fallbackRefs = [
+      defaultRef,
+      'milestone/auth-security-hardening',
+      'main'
+    ].filter((v, i, a) => !!v && a.indexOf(v) === i)
 
     const body: DispatchBody = await request.json()
     const scenario = body.scenario || 'all'
@@ -31,24 +36,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Dispatch the reusable workflow
-    const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/load-test.yml/dispatches`
-    let resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'LootAura-Admin-LoadTest-Dispatch'
-      },
-      body: JSON.stringify({
-        ref,
-        inputs: {
-          baseURL,
-          scenario
-        }
+    const byNameUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/load-test.yml/dispatches`
+    async function tryDispatch(targetUrl: string, targetRef: string) {
+      return fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'LootAura-Admin-LoadTest-Dispatch'
+        },
+        body: JSON.stringify({
+          ref: targetRef,
+          inputs: { baseURL, scenario }
+        })
       })
-    })
+    }
+
+    // First attempt: dispatch by filename on provided ref
+    let resp = await tryDispatch(byNameUrl, ref)
 
     // If 404, try resolving workflow ID dynamically and retry
     if (resp.status === 404) {
@@ -66,24 +73,20 @@ export async function POST(request: NextRequest) {
         const wf = (workflows.workflows || []).find((w: any) => w.path?.endsWith('/load-test.yml') || w.name === 'Load Tests')
         if (wf?.id) {
           const idUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${wf.id}/dispatches`
-          resp = await fetch(idUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/vnd.github+json',
-              'Content-Type': 'application/json',
-              'X-GitHub-Api-Version': '2022-11-28',
-              'User-Agent': 'LootAura-Admin-LoadTest-Dispatch'
-            },
-            body: JSON.stringify({ ref, inputs: { baseURL, scenario } })
-          })
+          // Try known refs in order
+          for (const candidateRef of fallbackRefs) {
+            resp = await tryDispatch(idUrl, candidateRef)
+            if (resp.ok) {
+              break
+            }
+          }
         }
       }
     }
 
     if (!resp.ok) {
       const text = await resp.text()
-      return NextResponse.json({ error: 'Failed to dispatch workflow', status: resp.status, details: text, repo: `${owner}/${repo}`, ref, workflow: 'load-test.yml' }, { status: 502 })
+      return NextResponse.json({ error: 'Failed to dispatch workflow', status: resp.status, details: text, repo: `${owner}/${repo}`, refTried: [ref, ...fallbackRefs], workflow: 'load-test.yml' }, { status: 502 })
     }
 
     // Best-effort link to Actions tab

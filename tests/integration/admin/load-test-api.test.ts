@@ -4,7 +4,7 @@ import { POST } from '@/app/api/admin/load-test/route'
 
 // Mock child_process to prevent actual process spawning
 vi.mock('child_process', async (importOriginal) => {
-  const actual = await importOriginal()
+  const actual = await importOriginal() as any
   return {
     ...actual,
     spawn: vi.fn(() => ({

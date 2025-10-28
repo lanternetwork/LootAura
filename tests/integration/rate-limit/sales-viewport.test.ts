@@ -52,10 +52,18 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }))
 
-// Import the route after the mocks are installed
+// Clear module cache and import the route after the mocks are installed
 let route: any
 beforeAll(async () => {
-  route = await import('@/app/api/sales/route') // path must be exact
+  // Clear the module cache to ensure fresh import with mocks
+  const modulePath = require.resolve('@/app/api/sales/route')
+  delete require.cache[modulePath]
+  
+  // Also clear any related modules
+  const supabaseModulePath = require.resolve('@/lib/supabase/server')
+  delete require.cache[supabaseModulePath]
+  
+  route = await import('@/app/api/sales/route')
 })
 
 const mockCheck = vi.fn()

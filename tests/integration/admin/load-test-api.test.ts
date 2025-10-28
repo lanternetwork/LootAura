@@ -17,10 +17,12 @@ describe('Admin Load Test API', () => {
     vi.clearAllMocks()
   })
 
-  it('should return 403 Forbidden in production environment', async () => {
-    // Mock production environment
-    const originalEnv = process.env.NODE_ENV
+  it('should return 403 Forbidden only in actual production environment', async () => {
+    // Mock actual production environment
+    const originalNodeEnv = process.env.NODE_ENV
+    const originalVercelEnv = process.env.VERCEL_ENV
     process.env.NODE_ENV = 'production'
+    process.env.VERCEL_ENV = 'production'
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -41,7 +43,38 @@ describe('Admin Load Test API', () => {
       expect(data.error).toBe('Load testing is disabled in production environment')
     } finally {
       // Restore original environment
-      process.env.NODE_ENV = originalEnv
+      process.env.NODE_ENV = originalNodeEnv
+      process.env.VERCEL_ENV = originalVercelEnv
+    }
+  })
+
+  it('should allow load testing in staging/preview environment', async () => {
+    // Mock staging environment (production build but not production deployment)
+    const originalNodeEnv = process.env.NODE_ENV
+    const originalVercelEnv = process.env.VERCEL_ENV
+    process.env.NODE_ENV = 'production'
+    process.env.VERCEL_ENV = 'preview' // or 'development'
+
+    try {
+      const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
+        method: 'POST',
+        body: JSON.stringify({
+          scenario: 'sales-baseline',
+          baseURL: 'http://localhost:3000'
+        }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const response = await POST(request)
+      
+      // In staging/preview, it should not return 403
+      expect(response.status).not.toBe(403)
+    } finally {
+      // Restore original environment
+      process.env.NODE_ENV = originalNodeEnv
+      process.env.VERCEL_ENV = originalVercelEnv
     }
   })
 

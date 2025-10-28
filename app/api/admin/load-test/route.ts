@@ -13,8 +13,8 @@ interface LoadTestRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    // Disable load testing in production for security reasons
-    if (process.env.NODE_ENV === 'production') {
+    // Disable load testing only in actual production (not staging/preview)
+    if (process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV === 'production') {
       return NextResponse.json(
         { error: 'Load testing is disabled in production environment' },
         { status: 403 }

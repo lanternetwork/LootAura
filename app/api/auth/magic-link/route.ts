@@ -1,0 +1,104 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { createServerSupabaseClient } from '@/lib/auth/server-session'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
+import { cookies } from 'next/headers'
+import { authDebug } from '@/lib/debug/authDebug'
+
+export const dynamic = 'force-dynamic'
+
+const magicLinkSchema = z.object({
+  email: z.string().email('Invalid email address'),
+})
+
+async function magicLinkHandler(request: NextRequest) {
+  try {
+    const body = await request.json()
+    
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid input data', details: 'Request body must be a valid JSON object' },
+        { status: 400 }
+      )
+    }
+    
+    let email: string
+    try {
+      const parsed = magicLinkSchema.parse(body)
+      email = parsed.email
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return NextResponse.json(
+          { code: error.errors[0].message, message: 'Invalid email address' },
+          { status: 400 }
+        )
+      }
+      throw error
+    }
+
+    const cookieStore = cookies()
+    const supabase = createServerSupabaseClient(cookieStore)
+
+    // Configure email redirect URL
+    const emailRedirectTo = process.env.NEXT_PUBLIC_SITE_URL
+      ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+      : undefined
+
+    if (!emailRedirectTo && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[AUTH] WARNING: NEXT_PUBLIC_SITE_URL not set, using Supabase default email redirect')
+    }
+
+    authDebug.logMagicLink(email, 'sent', { redirectToSet: !!emailRedirectTo })
+
+    // Send magic link
+    const { data: _data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo,
+        shouldCreateUser: true, // Allow new users to sign up via magic link
+      }
+    })
+
+    if (error) {
+      authDebug.logMagicLink(email, 'error', { code: error.message })
+      
+      return NextResponse.json(
+        { code: error.message, message: 'Failed to send magic link' },
+        { status: 400 }
+      )
+    }
+
+    authDebug.logMagicLink(email, 'sent')
+
+    return NextResponse.json(
+      { 
+        message: 'Magic link sent! Check your email to sign in.',
+        success: true
+      },
+      { status: 200 }
+    )
+
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Invalid input data', details: error.errors },
+        { status: 400 }
+      )
+    }
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[AUTH] Magic link error:', error)
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export const POST = withRateLimit(magicLinkHandler, [
+  Policies.AUTH_DEFAULT,
+  Policies.AUTH_HOURLY
+])

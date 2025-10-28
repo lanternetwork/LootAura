@@ -1,13 +1,10 @@
 # Loot Aura Repository Status
 
-Conflict reconciled on 2025-10-13 — stabilization content retained; recent main entries preserved.
-
 ## 1. Branch & Commit
-- **Current branch:** milestone/auth-profile
-- **Latest commit (branch):** e55f25a — ci: redeploy trigger (by system)
-- **Recent on main:** 7a5b049 — Close Milestone: Map + Filter Sync — enforce single grid container, fix layout hierarchy, verify arbiter authority, add tests & CI guards (by lanternetwork on 2025-10-12 17:11:56 -0400)
-- **Active PR:** milestone/auth-profile → main
-- **CI status:** pending (will start after conflicts resolved)
+- **Current branch:** main
+- **Latest commit:** 7a5b049 — Close Milestone: Map + Filter Sync — enforce single grid container, fix layout hierarchy, verify arbiter authority, add tests & CI guards (by lanternetwork on 2025-10-12 17:11:56 -0400)
+- **Active PR:** n/a
+- **CI status:** running, last run: run 18449563326
 
 ## 2. Database Schema
 - **Schema:** lootaura_v2
@@ -38,7 +35,7 @@ Conflict reconciled on 2025-10-13 — stabilization content retained; recent mai
 
 ## 6. Deployments
 - **Vercel URLs:** Production/Preview (insert)
-- **Environment vars:** NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_MAPBOX_TOKEN, etc. (verify set)
+- **Environment vars:** NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, etc. (verify set)
 - **Last deploy health:** unknown in this run
 
 ## 7. Known Issues / TODO
@@ -48,34 +45,36 @@ Conflict reconciled on 2025-10-13 — stabilization content retained; recent mai
 - Seed minimal data (Louisville, Nashville, Atlanta) and verify counts
 - Consider marker clustering for dense maps
 
-## 8. CI Hygiene
+## 8. Next Milestone: Auth + Profile (In Progress)
 
-### Workflow Cleanup
-- **Legacy workflows removed**: bootstrap.yml, ci-main.yml, generate-lockfile.yml, update-status.yml, ingest-craigslist-backup.yml, test.yml, ysf-step-b.yml
-- **Unified workflow only**: `.github/workflows/ci.yml`
-- **Standard job names**: env-presence, lint, typecheck, test-unit, test-integration, build, css-scan, migration-verify
-- **Required checks for Rulesets/Vercel**: ci/env-presence, ci/lint, ci/typecheck, ci/test-unit, ci/test-integration, ci/build
+### Scope
+- **Providers**: Email + Google only (no other social providers)
+- **Storage**: `profiles` table with strict RLS policies
+- **Performance**: Auth/profile DB p95 ≤ 50ms, initial sales p95 ≤ 300ms
+- **Security**: Self-read/self-write only; no public reads by default
 
-### CI Stabilization: Red→Green
-- **ESLint Configuration**: Added comprehensive rules for TypeScript, React, testing
-- **Test Harness**: Added global DOM shims, fetch mocking, network isolation
-- **Harness Parse Fixes**: DOMRect.fromRect, JSX-free setup.ts, JSX tests renamed to .tsx
-- **Env-aware Lint**: Browser/Node overrides; legacy folder ignored
-- **Environment Handling**: Public envs only, no service role in CI
-- **CSS Validation**: Tailwind grid token scanner for responsive layouts
-- **Migration Verification**: Database schema validation on SQL changes
-- **Build Process**: Next.js build with proper environment variables
-- **Status**: Foundation ready, awaiting Owner secrets configuration
-- **CI Failure Map**: `ci-failure-map` workflow auto-posts the first failing lines per job after `ci` completes, or can be run manually (Actions → ci-failure-map → Run). Use it to target the next fix quickly.
+### Implementation Tasks
+- [ ] Restore Google sign-in button and verify end-to-end flow
+- [ ] Verify Email auth (magic link/OTP) with proper error handling
+- [ ] Implement idempotent profile creation on first login
+- [ ] Add route gating with consistent navbar/session state
+- [ ] Add comprehensive test coverage for auth flows
+- [ ] Implement debug diagnostics (gated by NEXT_PUBLIC_DEBUG)
+- [ ] Document performance monitoring and index proposals
 
-### CI Status
-- **Single workflow**: Only `ci` workflow is active
-- **Triggers**: pull_request to main, push to any branch
-- **Concurrency**: Single-key per-branch to cancel superseded runs
-- **Environment validation**: Fast failure on missing required variables
-
-## 9. Next Milestone
-- Bulk generator + clustering polish
+### Acceptance Criteria
+- [ ] Google OAuth flow works end-to-end
+- [ ] Email magic link/OTP works with proper error handling
+- [ ] Profile creation is idempotent (no duplicates)
+- [ ] Route gating works consistently
+- [ ] RLS policies enforce self-only access
+- [ ] Performance targets met (p95 ≤ 50ms auth, ≤ 300ms sales)
+- [ ] All tests pass (unit, integration, E2E)
+- [ ] Debug logs removed before merge
 
 ---
-Updated automatically by Cursor on 2025-10-13T12:00:00.000Z
+<<<<<<< HEAD
+Updated automatically by Cursor on 2025-10-12T21:12:34.152Z
+=======
+Updated automatically by Cursor on 2025-01-27T20:48:41.033Z
+>>>>>>> cd9d503 (Milestone scaffold: Auth + Profile milestone setup)

@@ -1,10 +1,11 @@
-# Performance Notes - Auth + Profile
+# Performance Notes - Auth + Profile + Sales Search Optimization
 
 ## Performance Budgets
 
 ### Database Response Times
 - **Auth/Profile Operations**: p95 ≤ 50ms
-- **Initial Sales Load**: p95 ≤ 300ms
+- **Initial Sales Load**: p95 ≤ 300ms → **p95 ≤ 150ms** (with caching)
+- **Sales Search**: p95 ≤ 200ms → **p95 ≤ 100ms** (with optimization)
 - **Bundle Growth**: ≤ +5KB gzip (no new dependencies without approval)
 
 ### Measurement Methodology
@@ -21,9 +22,10 @@
 - **Profile Upsert**: `profiles` table - should be < 30ms
 
 ### Sales Operations
-- **Initial Load**: `sales_v2` view with bbox filter - should be < 300ms
-- **Markers**: `search_sales_bbox` RPC - should be < 200ms
+- **Initial Load**: `sales_v2` view with bbox filter - should be < 300ms → **< 150ms** (with caching)
+- **Markers**: `search_sales_bbox` RPC - should be < 200ms → **< 100ms** (with optimization)
 - **Details**: Single sale lookup - should be < 50ms
+- **Search with Filters**: Category/date filtering - should be < 150ms → **< 75ms** (with indexes)
 
 ## Index Strategy
 
@@ -31,6 +33,7 @@
 - **Primary**: `profiles.user_id` (PK, already indexed)
 - **Sales**: `sales_v2` view with GIST index on `geom`
 - **Favorites**: `favorites_v2` with composite indexes
+- **Performance Optimization**: Added indexes for category filtering, date ranges, and spatial queries
 
 ### Proposed Indexes (Require Owner Approval)
 - **Profile Lookups**: `profiles.user_id` (already exists)
@@ -83,7 +86,10 @@
 - Session caching in memory
 - Profile data caching
 - Auth state persistence
-- API response caching
+- **API response caching** with CDN headers (2-10 min TTL)
+- **Database query result caching** with in-memory cache
+- **Client-side data prefetching** for common scenarios
+- **Progressive loading** with skeleton screens
 
 ## Troubleshooting
 
@@ -98,6 +104,33 @@
 - Browser DevTools Performance tab
 - Network tab for API timing
 - Console logs for auth flow debugging
+
+## Performance Optimizations Implemented (2025-10-15)
+
+### Database Optimizations
+- **Query Result Caching**: In-memory cache with 1-minute TTL for frequent queries
+- **Database Indexes**: Added GIST, composite, and category indexes for faster filtering
+- **Connection Pooling**: Optimized database connection reuse
+- **Query Optimization**: Reduced N+1 problems with efficient joins
+
+### API Optimizations
+- **Response Caching**: CDN headers (2-10 min TTL) for API responses
+- **Cache Headers**: Proper cache-control headers for static and dynamic content
+- **Progressive Loading**: Skeleton screens during data loading
+- **Data Prefetching**: Client-side prefetching of common scenarios
+
+### Frontend Optimizations
+- **Performance Monitoring**: Real-time performance metrics and alerting
+- **Optimistic Updates**: Immediate UI updates before server confirmation
+- **Bundle Optimization**: Lazy loading and code splitting
+- **Memory Management**: Efficient cache cleanup and garbage collection
+
+### Expected Performance Improvements
+- **Sales Search**: 50-75% faster load times
+- **Category Filtering**: 60-80% faster with new indexes
+- **Date Range Filtering**: 40-60% faster with optimized queries
+- **Map Rendering**: 30-50% faster with prefetching
+- **Overall UX**: Significantly improved perceived performance
 
 ## Future Considerations
 

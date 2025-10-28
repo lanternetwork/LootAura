@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { screen, cleanup } from '@testing-library/react'
 import { renderWithProviders } from '../utils/renderWithProviders'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import SalesList from '@/components/SalesList'
@@ -43,6 +43,8 @@ describe('SalesList Integration', () => {
   let queryClient: QueryClient
 
   beforeEach(() => {
+    // Clear mocks and create fresh query client
+    vi.clearAllMocks()
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -52,11 +54,17 @@ describe('SalesList Integration', () => {
     })
   })
 
+  afterEach(() => {
+    // Clean up mocks and reset state
+    cleanup()
+    vi.clearAllMocks()
+  })
+
   it('should render sales list with proper grid layout', () => {
     renderWithProviders(<SalesList sales={mockSales} />)
 
     // Check that sales are rendered
-    expect(screen.getByText('Vintage Chair')).toBeInTheDocument()
+    expect(screen.getAllByText('Vintage Chair')).toHaveLength(1)
     expect(screen.getByText('Power Tools')).toBeInTheDocument()
     
     // Check grid container exists
@@ -84,7 +92,7 @@ describe('SalesList Integration', () => {
     renderWithProviders(<SalesList sales={filteredSales} />)
 
     // Should only show furniture
-    expect(screen.getByText('Vintage Chair')).toBeInTheDocument()
+    expect(screen.getAllByText('Vintage Chair')).toHaveLength(1)
     expect(screen.queryByText('Power Tools')).not.toBeInTheDocument()
   })
 })

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
+import { toDbSet } from '@/lib/shared/categoryContract'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     
     const limitParam = q.get('limit')
     // Accept both canonical 'categories' and legacy 'cat' parameters
-    const catsParam = q.get('categories') || q.get('cat') || q.get('cats') || ''
+    const catsParam = q.get('categories') || q.get('cat') || q.get('cats') || undefined
 
     // Validate lat/lng
     const originLat = latParam !== null ? parseFloat(latParam) : NaN
@@ -37,10 +38,11 @@ export async function GET(request: NextRequest) {
     const limit = Number.isFinite(parseFloat(String(limitParam))) ? Math.min(parseInt(String(limitParam), 10), 1000) : 1000
     // Canonical parameter parsing - normalize to sorted, deduplicated array
     const categories = normalizeCategories(catsParam)
-    const catsCsv = categories.join(',')
+    // Treat empty result as undefined (no category filter)
+    const catsCsv = categories.length > 0 ? categories.join(',') : ''
     
-    // Use categories directly since they match the computed column values
-    const dbCategories = categories
+    // Map UI categories to DB tokens exactly like list endpoint
+    const dbCategories = toDbSet(categories)
 
     // Debug server-side category processing
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -52,13 +54,15 @@ export async function GET(request: NextRequest) {
     // Build query with category filtering if categories are provided
     let query = sb
       .from('sales_v2')
-      .select('id, title, description, lat, lng, starts_at, ends_at, date_start, date_end, time_start, time_end')
+      .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
 
     // Apply category filtering by joining with items table
-    if (categories.length > 0) {
-      console.log('[MARKERS API] Applying category filter:', categories)
+    if (Array.isArray(categories) && categories.length > 0) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MARKERS API] Applying category filter:', { categories, dbCategories })
+      }
       
       // Debug: Check if items_v2 table has category column
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -155,6 +159,32 @@ export async function GET(request: NextRequest) {
         starts_at: s.starts_at
       }))
     })
+    
+    // If no date filtering is applied, return all sales
+    if (!dateWindow) {
+      console.log('[MARKERS API] No date filtering applied, returning all sales')
+      const markers = data?.map((sale: any) => {
+        const R = 6371
+        const dLat = (sale.lat - originLat) * Math.PI / 180
+        const dLng = (sale.lng - originLng) * Math.PI / 180
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(originLat * Math.PI / 180) * Math.cos(sale.lat * Math.PI / 180) *
+          Math.sin(dLng / 2) * Math.sin(dLng / 2)
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        const distance = R * c
+
+        return {
+          id: sale.id,
+          title: sale.title,
+          description: sale.description,
+          lat: sale.lat,
+          lng: sale.lng,
+          distance: Math.round(distance * 100) / 100
+        }
+      }) || []
+
+      return NextResponse.json(markers)
+    }
 
     const filtered = (data || [])
       .map((sale: any) => {
@@ -258,6 +288,12 @@ export async function GET(request: NextRequest) {
       distanceKm,
       count: markers.length,
       durationMs: Date.now() - startedAt
+    }, {
+      headers: {
+        'Cache-Control': 'public, max-age=120, s-maxage=600', // 2 min client, 10 min CDN
+        'CDN-Cache-Control': 'public, max-age=600',
+        'Vary': 'Accept-Encoding'
+      }
     })
   } catch (error: any) {
     console.error('Markers API error:', error)

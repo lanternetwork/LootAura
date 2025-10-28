@@ -1,7 +1,5 @@
-"use client"
-export const dynamic = 'force-dynamic'
-
 export default function Home() {
+
   return (
     <div className="min-h-screen bg-gray-50">
       <section className="bg-gradient-to-b from-amber-50 to-gray-50 border-b">

@@ -1,31 +1,114 @@
 # LootAura
 
-**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
+**Last updated: 2025-01-27 — Map-Centric Architecture Documentation**
 
-A modern web application for discovering and managing yard sales, garage sales, and estate sales in your area. Built with enterprise-grade architecture featuring map-centric source of truth, arbiter logic, Supabase backend, and Mapbox integration.
+A modern web application for discovering and managing yard sales, garage sales, and estate sales in your area. Built with enterprise-grade architecture featuring **map-centric design**, Supabase backend, and Mapbox integration.
 
 ## 📋 Quick Start
 
-- **Architecture Overview**: See [docs/operating-handbook.md](docs/operating-handbook.md) for comprehensive development standards
+- **Architecture Overview**: See [docs/architecture.md](docs/architecture.md) for comprehensive development standards
 - **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
 - **Deployment**: See [DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md) for production deployment
 - **Launch**: See [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md) for launch validation
 - **Roadmap**: See [ROADMAP.md](ROADMAP.md) for development milestones
+- **What's New**: See [docs/CHANGELOG.md](docs/CHANGELOG.md) for latest updates and release notes
+- **Environment Setup**: See [docs/env-parity.md](docs/env-parity.md) for environment variable configuration
 
 ## 🏗️ Architecture Invariants
 
 LootAura follows strict architectural invariants to prevent regressions:
 
-- **Map-Centric Authority**: Map is the source of truth for visible sales
-- **Arbiter Logic**: Controls when to suppress list fetches under MAP authority
+- **Map-Centric Design**: Map viewport drives all data fetching and list display
+- **Single Fetch Path**: Only 2 entry points to fetchMapSales (viewport changes, filter changes)
+- **Distance-to-Zoom Mapping**: Distance slider controls map zoom instead of API filtering
 - **Parameter Canonicalization**: `categories` parameter with legacy `cat` support
-- **Single Source**: Both markers and list read from `public.items_v2`
+- **Single Source**: Both markers and list read from the same data source
 - **DOM Structure**: List container with direct children, no intermediate wrappers
-- **Suppression Equality**: Under MAP authority, suppress only if markers include identical normalized filter set
 - **Debug Discipline**: Single `NEXT_PUBLIC_DEBUG` flag, no PII in logs
 - **ID Parity**: Marker IDs must be discoverable in list after updates
 
 See [docs/INVARIANTS.md](docs/INVARIANTS.md) for complete protocol contracts.
+
+## 🚦 Rate Limiting
+
+LootAura implements production-grade rate limiting to protect against abuse and ensure fair usage.
+
+### Policies
+
+| Policy | Limit | Window | Scope | Description |
+|--------|-------|--------|-------|-------------|
+| `AUTH_DEFAULT` | 5 req | 30s | IP | Authentication attempts |
+| `AUTH_HOURLY` | 60 req | 1h | IP | Hourly auth limit |
+| `AUTH_CALLBACK` | 10 req | 60s | IP | OAuth callback burst |
+| `GEO_ZIP_SHORT` | 10 req | 60s | IP | ZIP code lookups |
+| `GEO_ZIP_HOURLY` | 300 req | 1h | IP | Hourly geocoding |
+| `SALES_VIEW_30S` | 20 req | 30s | IP | Map viewport fetches |
+| `SALES_VIEW_HOURLY` | 800 req | 1h | IP | Hourly map requests |
+| `MUTATE_MINUTE` | 3 req | 60s | User | Sale/item creation |
+| `MUTATE_DAILY` | 100 req | 24h | User | Daily mutations |
+| `ADMIN_TOOLS` | 3 req | 30s | IP | Admin endpoints |
+
+### Enable/Disable
+
+Rate limiting is **disabled by default** and only enabled when:
+- `NODE_ENV === 'production'` AND `RATE_LIMITING_ENABLED === 'true'`
+
+```bash
+# Enable in production
+RATE_LIMITING_ENABLED=true
+
+# Disable (default)
+# RATE_LIMITING_ENABLED=false or unset
+```
+
+### Backend Configuration
+
+**Production (Upstash Redis):**
+```bash
+UPSTASH_REDIS_REST_URL=https://your-redis-url.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your-redis-token
+```
+
+**Development (In-Memory):**
+- No Redis credentials needed
+- Uses in-memory sliding window
+- Resets on server restart
+
+### Testing Rate Limits
+
+```bash
+# Test auth rate limiting
+curl -X POST https://your-domain.com/api/auth/signin \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password"}' \
+  -v
+
+# Test sales viewport rate limiting  
+for i in {1..25}; do
+  curl "https://your-domain.com/api/sales?bbox=38.0,-85.0,38.1,-84.9" \
+    -H "X-Forwarded-For: 192.168.1.1" \
+    -v
+done
+```
+
+### Response Headers
+
+All responses include rate limiting headers:
+
+```
+X-RateLimit-Limit: 5
+X-RateLimit-Remaining: 3
+X-RateLimit-Reset: 1640995200
+X-RateLimit-Policy: AUTH_DEFAULT 5/30
+Retry-After: 30  # Only on 429 responses
+```
+
+### Soft-Then-Hard Behavior
+
+Some policies support burst tolerance:
+- **Sales Viewport**: Allows 2 extra requests in 5-second window
+- **Headers**: `X-RateLimit-Remaining: 0` indicates soft limit
+- **No Retry-After**: Soft limits don't include `Retry-After` header
 
 ## 🐛 Debug Mode
 
@@ -40,11 +123,35 @@ NEXT_PUBLIC_DEBUG=true
 
 ### Debug Features
 - **Filter Normalization**: See how categories are processed
-- **Suppression Logic**: Understand when list fetches are suppressed
+- **Map Viewport**: Understand how map changes drive data fetching
 - **DOM Structure**: Verify grid layout and card counting
 - **ID Parity**: Check marker-list consistency
+- **Admin Tools**: Access comprehensive debugging tools at `/admin/tools`
 
 See [docs/DEBUG_GUIDE.md](docs/DEBUG_GUIDE.md) for complete debug guide.
+
+## 🔧 Admin Tools
+
+LootAura includes comprehensive admin and debugging tools accessible at `/admin/tools`:
+
+### Available Tools
+- **Debug Controls**: Toggle debug mode and view real-time diagnostics
+- **Review Key Lookup**: Look up sale information and review keys by sale ID
+- **System Information**: View environment variables and configuration status
+- **Health Checks**: Quick access to system health endpoints
+- **Diagnostic Overlay**: Real-time monitoring of fetch events and system behavior
+
+### Access
+- **URL**: `/admin/tools`
+- **Authentication**: None required (publicly accessible)
+- **API Endpoint**: `/api/lookup-sale` (also publicly accessible)
+
+### Features
+- **Sale Lookup**: Enter any sale ID to get comprehensive sale information
+- **Multi-table Support**: Searches across `sales_v2`, `sales`, and `yard_sales` tables
+- **Real-time Diagnostics**: Monitor fetch events, timing, and system behavior
+- **Health Monitoring**: Direct links to health check endpoints
+- **Environment Status**: View current configuration and feature flags
 
 ## Features
 
@@ -53,6 +160,7 @@ See [docs/DEBUG_GUIDE.md](docs/DEBUG_GUIDE.md) for complete debug guide.
 - **User Authentication**: Sign up and manage your account
 - **Favorites**: Save sales you're interested in
 - **CSV Import/Export**: Import and export sales data
+- **Admin Tools**: Comprehensive debugging and development tools
 - **Responsive Design**: Works on desktop and mobile devices
 
 ## Data Sources
@@ -207,5 +315,28 @@ LootAura uses advanced PostGIS distance calculations for accurate location-based
 ### Performance Indicators
 - **Normal Mode**: PostGIS distance calculations (most accurate)
 - **Degraded Mode**: Only appears if PostGIS fails (rare)
-- **Real-time**: Results update as filters change#   F o r c e   r e d e p l o y   -   1 0 / 1 3 / 2 0 2 5   2 0 : 4 7 : 1 6  
+- **Real-time**: Results update as filters change
+
+## Operations
+
+### Rollback Procedures
+- **Emergency Rollback**: See [docs/runbook-rollback.md](docs/runbook-rollback.md) for detailed rollback procedures
+- **Owner's Runbook**: See [docs/owners-runbook.md](docs/owners-runbook.md) for incident response procedures
+- **Health Checks**: Monitor `/api/health` endpoint for system status
+- **Feature Flags**: Use environment variables to disable features during incidents
+
+### Monitoring & Alerts
+- **Error Tracking**: Sentry integration for real-time error monitoring
+- **Performance**: Web Vitals monitoring for Core Web Vitals metrics
+- **Database**: Supabase monitoring for query performance and RLS policies
+- **External Services**: Mapbox, Redis, and CDN status monitoring
+
+### Quality Assurance
+- **Accessibility**: See [docs/a11y-check.md](docs/a11y-check.md) for manual accessibility testing
+- **Testing**: Comprehensive test suite with unit, integration, and E2E tests
+- **Security**: RLS policies and privilege escalation testing
+- **Performance**: Bundle size monitoring and memory optimization#   F o r c e   r e d e p l o y   -   1 0 / 1 3 / 2 0 2 5   2 0 : 4 7 : 1 6 
+ 
+ #   F o r c e   r e d e p l o y 
+ 
  

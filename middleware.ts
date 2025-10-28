@@ -1,15 +1,36 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
+import { hasValidSession, validateSession } from '@/lib/auth/server-session'
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, searchParams } = req.nextUrl;
+  
+  // 0. Handle OAuth callbacks - redirect to /auth/callback if code or error present
+  const hasCode = searchParams.has('code')
+  const hasError = searchParams.has('error')
+  
+  if (hasCode || hasError) {
+    console.log('[MIDDLEWARE] OAuth callback detected, redirecting to /auth/callback:', { 
+      hasCode, 
+      hasError, 
+      pathname 
+    })
+    
+    const callbackUrl = new URL('/auth/callback', req.url)
+    // Preserve entire querystring (code, error, state, next, etc.)
+    searchParams.forEach((value, key) => {
+      callbackUrl.searchParams.set(key, value)
+    })
+    
+    return NextResponse.redirect(callbackUrl, 307)
+  }
   
   // 1. Public pages that don't require authentication
   const isPublicPage = 
     pathname === '/' ||
     pathname === '/sales' ||
-    pathname === '/sell/new';
+    pathname === '/sell/new' ||
+    pathname === '/admin/tools';
   
   if (isPublicPage) {
     console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
@@ -44,7 +65,8 @@ export async function middleware(req: NextRequest) {
     (pathname === '/api/sales' && req.method === 'GET') ||
     (pathname === '/api/sales/markers' && req.method === 'GET') ||
     pathname.startsWith('/api/geocoding/') ||
-    pathname === '/api/location';
+    pathname === '/api/location' ||
+    pathname === '/api/lookup-sale';
   
   if (isPublicAPI) {
     console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
@@ -74,7 +96,7 @@ export async function middleware(req: NextRequest) {
   // 6. Protected routes that require authentication
   const isProtectedRoute = 
     pathname.startsWith('/favorites/') ||
-    pathname.startsWith('/account/') ||
+    pathname.startsWith('/account') ||  // Remove trailing slash to match /account
     pathname.startsWith('/admin/');
   
   // 7. Write APIs that require authentication
@@ -91,62 +113,92 @@ export async function middleware(req: NextRequest) {
   }
   
   // Only run auth checks for protected routes or write APIs
-  console.log(`[MIDDLEWARE] checking authentication for → ${pathname}`);
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log(`[MIDDLEWARE] checking authentication for → ${pathname}`);
+  }
   
-  const res = NextResponse.next()
   const cookieStore = cookies()
   
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get: (name) => cookieStore.get(name)?.value,
-        set: (name, value, options) => {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove: (name, options) => {
-          cookieStore.set({ name, value: '', ...options })
-        },
-      },
+  // Fast session check for middleware
+  if (!hasValidSession(cookieStore)) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MIDDLEWARE] No valid session found', { event: 'auth-mw', path: pathname, authenticated: false })
     }
-  )
-
-  // Get the current user
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // All routes matched by this middleware require authentication
-  if (!user) {
+    
+    // For API routes, return 401
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    // For pages, redirect to signin
     const loginUrl = new URL('/auth/signin', req.url)
-    loginUrl.searchParams.set('redirectTo', req.nextUrl.pathname)
+    // Only allow same-origin relative paths for redirectTo
+    const redirectTo = req.nextUrl.pathname.startsWith('/') ? req.nextUrl.pathname : '/'
+    loginUrl.searchParams.set('redirectTo', redirectTo)
     return NextResponse.redirect(loginUrl)
   }
 
-  // If user is authenticated, auto-upsert profile on first request
-  if (user) {
-    try {
-      const { data: profile } = await supabase
-        .from('profiles_v2')
-        .select('home_zip')
-        .eq('id', user.id)
-        .maybeSingle()
+  // Validate session with Supabase
+  const session = await validateSession(cookieStore)
+  if (!session) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MIDDLEWARE] Session validation failed', { event: 'auth-mw', path: pathname, authenticated: false })
+    }
+    
+    // For API routes, return 401
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    // For pages, redirect to signin
+    const loginUrl = new URL('/auth/signin', req.url)
+    // Only allow same-origin relative paths for redirectTo
+    const redirectTo = req.nextUrl.pathname.startsWith('/') ? req.nextUrl.pathname : '/'
+    loginUrl.searchParams.set('redirectTo', redirectTo)
+    return NextResponse.redirect(loginUrl)
+  }
 
-      // Best-effort: if la_loc cookie missing and profile has home_zip, resolve coordinates and set la_loc
-      const hasCookie = !!cookieStore.get('la_loc')?.value
-      const homeZip = profile?.home_zip as string | undefined
-      if (!hasCookie && homeZip) {
-        try {
-          const url = new URL(req.url)
-          const geoUrl = `${url.origin}/api/geocoding/zip?zip=${encodeURIComponent(homeZip)}`
-          const r = await fetch(geoUrl, { cache: 'no-store' })
-          if (r.ok) {
-            const z = await r.json()
-            if (z?.ok && z.lat && z.lng) {
-              const payload = JSON.stringify({ lat: z.lat, lng: z.lng, zip: z.zip, city: z.city, state: z.state })
-              cookieStore.set({ name: 'la_loc', value: payload, httpOnly: false, maxAge: 60 * 60 * 24, sameSite: 'lax', path: '/' })
-            }
-          }
-        } catch {}
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[MIDDLEWARE] Session valid', { event: 'auth-mw', path: pathname, authenticated: true })
+  }
+
+  // If user is authenticated, auto-upsert profile on first request
+  if (session?.user) {
+    try {
+      // Create a server client for profile operations
+      const { createServerSupabaseClient } = await import('@/lib/auth/server-session')
+      const supabase = createServerSupabaseClient(cookieStore)
+      
+      if (supabase && supabase.from) {
+        const { data: profile } = await supabase
+          .from('profiles_v2')
+          .select('home_zip')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        // Best-effort: if la_loc cookie missing and profile has home_zip, set a placeholder
+        // Note: We avoid making HTTP requests in middleware to prevent SSRF
+        const hasCookie = !!cookieStore.get('la_loc')?.value
+        const homeZip = profile?.home_zip as string | undefined
+        if (!hasCookie && homeZip) {
+          // Set a placeholder cookie that will be resolved on the client side
+          const placeholderPayload = JSON.stringify({ 
+            zip: homeZip, 
+            city: '', 
+            state: '', 
+            lat: 0, 
+            lng: 0,
+            placeholder: true 
+          })
+          cookieStore.set({ 
+            name: 'la_loc', 
+            value: placeholderPayload, 
+            httpOnly: false, 
+            maxAge: 60 * 60 * 24, 
+            sameSite: 'lax', 
+            path: '/' 
+          })
+        }
       }
     } catch (error) {
       console.error('Error upserting profile:', error)
@@ -154,14 +206,14 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  return res
+  return NextResponse.next()
 }
 
 export const config = {
   matcher: [
-    // Match all app routes except static assets
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|robots.txt|sitemap.xml|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/).*)',
-    // Match API routes
-    '/api/:path*'
+    // Match all app routes except static assets, health endpoints, and auth callback
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|robots.txt|sitemap.xml|apple-touch-icon.png|icon.png|icons/|assets/|static/|public/|api/health/|auth/callback).*)',
+    // Match API routes except health endpoints
+    '/api/((?!health/).)*'
   ],
 }

@@ -1,50 +1,124 @@
 /* eslint-disable no-undef */
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { Sale } from '@/lib/types'
+import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
+import { z } from 'zod'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+// Bbox validation schema
+const bboxSchema = z.object({
+  north: z.number().min(-90).max(90),
+  south: z.number().min(-90).max(90),
+  east: z.number().min(-180).max(180),
+  west: z.number().min(-180).max(180)
+}).refine((data) => data.north > data.south, {
+  message: "north must be greater than south",
+  path: ["north"]
+}).refine((data) => data.east > data.west, {
+  message: "east must be greater than west", 
+  path: ["east"]
+})
+
+async function salesHandler(request: NextRequest) {
   const startedAt = Date.now()
   
   try {
     const supabase = createSupabaseServerClient()
     const { searchParams } = new URL(request.url)
     
-    // 1. Parse & validate required location
+    // 1. Parse & validate location (either lat/lng or bbox)
     const lat = searchParams.get('lat')
     const lng = searchParams.get('lng')
+    const north = searchParams.get('north')
+    const south = searchParams.get('south')
+    const east = searchParams.get('east')
+    const west = searchParams.get('west')
     
-    if (!lat || !lng) {
-      console.log(`[SALES] Missing location: lat=${lat}, lng=${lng}`)
+    let latitude: number
+    let longitude: number
+    let distanceKm: number | undefined
+    let actualBbox: any = null
+    
+    // Check if bbox parameters are provided
+    if (north && south && east && west) {
+      try {
+        const bboxData = {
+          north: parseFloat(north),
+          south: parseFloat(south),
+          east: parseFloat(east),
+          west: parseFloat(west)
+        }
+        
+        const validatedBbox = bboxSchema.parse(bboxData)
+        console.log(`[API_SALES] bbox=${validatedBbox.north},${validatedBbox.south},${validatedBbox.east},${validatedBbox.west}`)
+        console.log(`[API_SALES] bbox range: lat=${validatedBbox.north - validatedBbox.south}, lng=${validatedBbox.east - validatedBbox.west}`)
+        console.log(`[API_SALES] bbox center: lat=${(validatedBbox.north + validatedBbox.south) / 2}, lng=${(validatedBbox.east + validatedBbox.west) / 2}`)
+        
+        // Calculate center and approximate distance from bbox
+        latitude = (validatedBbox.north + validatedBbox.south) / 2
+        longitude = (validatedBbox.east + validatedBbox.west) / 2
+        
+        // When using viewport bounds, still respect distance filter if provided
+        // Parse distance from URL parameters (DEPRECATED - will be ignored)
+        const distanceParam = searchParams.get('dist') || searchParams.get('distance')
+        distanceKm = distanceParam ? parseFloat(distanceParam) : 1000 // Default to unlimited if not specified
+        
+        // Log deprecation warning if distance parameter is provided
+        if (distanceParam) {
+          console.log('[API_SALES] DEPRECATION WARNING: distance parameter ignored. Use map viewport bounds instead.')
+        }
+        
+        // Store the actual bbox for proper filtering
+        actualBbox = validatedBbox
+        
+      } catch (error: any) {
+        console.log(`[SALES] Invalid bbox: ${error.message}`)
+        return NextResponse.json({ 
+          ok: false, 
+          error: `Invalid bbox: ${error.message}` 
+        }, { status: 400 })
+      }
+    } else if (lat && lng) {
+      // Legacy lat/lng support
+      latitude = parseFloat(lat)
+      longitude = parseFloat(lng)
+      
+      if (isNaN(latitude) || isNaN(longitude)) {
+        console.log(`[SALES] Invalid location: lat=${lat}, lng=${lng}`)
+        return NextResponse.json({ 
+          ok: false, 
+          error: 'Invalid location coordinates' 
+        }, { status: 400 })
+      }
+    } else {
+      console.log(`[SALES] Missing location: lat=${lat}, lng=${lng}, bbox=${north},${south},${east},${west}`)
       return NextResponse.json({ 
         ok: false, 
-        error: 'Missing location' 
-      }, { status: 400 })
-    }
-    
-    const latitude = parseFloat(lat)
-    const longitude = parseFloat(lng)
-    
-    if (isNaN(latitude) || isNaN(longitude)) {
-      console.log(`[SALES] Invalid location: lat=${lat}, lng=${lng}`)
-      return NextResponse.json({ 
-        ok: false, 
-        error: 'Invalid location coordinates' 
+        error: 'Missing location: lat/lng or bbox required' 
       }, { status: 400 })
     }
     
     // 2. Parse & validate other parameters
-    const distanceKm = Math.max(1, Math.min(
-      searchParams.get('distanceKm') ? parseFloat(searchParams.get('distanceKm') || '40') : 40,
-      160
-    ))
+    if (distanceKm === undefined) {
+      const legacyDistanceParam = searchParams.get('distanceKm')
+      distanceKm = Math.max(1, Math.min(
+        legacyDistanceParam ? parseFloat(legacyDistanceParam) : 40,
+        160
+      ))
+      
+      // Log deprecation warning for legacy distance parameter
+      if (legacyDistanceParam) {
+        console.log('[API_SALES] DEPRECATION WARNING: distanceKm parameter ignored. Use map viewport bounds instead.')
+      }
+    }
     
     const dateRange = searchParams.get('dateRange') || 'any'
     const startDate = searchParams.get('from') || searchParams.get('dateFrom') || searchParams.get('startDate') || undefined
@@ -52,7 +126,7 @@ export async function GET(request: NextRequest) {
     
     
     // Accept both canonical 'categories' and legacy 'cat' parameters
-    const categoriesParam = searchParams.get('categories') || searchParams.get('cat')
+    const categoriesParam = searchParams.get('categories') || searchParams.get('cat') || undefined
     // Canonical parameter parsing - normalize to sorted, deduplicated array
     const categories = normalizeCategories(categoriesParam)
     
@@ -78,7 +152,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
     
-    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24, 48)
+    const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24, 200)
     const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset') || '0') : 0, 0)
     
     // Validate date range parameters
@@ -130,27 +204,59 @@ export async function GET(request: NextRequest) {
     
     console.log(`[SALES] Query params: lat=${latitude}, lng=${longitude}, km=${distanceKm}, start=${startDateParam}, end=${endDateParam}, categories=[${categories.join(',')}], q=${q}, limit=${limit}, offset=${offset}`)
     
-    let results: Sale[] = []
+    let results: PublicSale[] = []
     let degraded = false
+    let totalSalesCount = 0
     
     // 3. Use direct query to sales_v2 view (RPC functions have permission issues)
     try {
       console.log(`[SALES] Querying sales_v2 view directly...`)
       
-      // Calculate bounding box for approximate distance filtering
-      const latRange = distanceKm / 111.0 // 1 degree ≈ 111km
-      const lngRange = distanceKm / (111.0 * Math.cos(latitude * Math.PI / 180))
+      // First, let's check the total count of sales in the database
+      const { count: totalCount, error: _countError } = await supabase
+        .from('sales_v2')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'published')
       
-      const minLat = latitude - latRange
-      const maxLat = latitude + latRange
-      const minLng = longitude - lngRange
-      const maxLng = longitude + lngRange
+      totalSalesCount = totalCount || 0
+      console.log(`[SALES] Total published sales in database:`, totalSalesCount)
       
-      console.log(`[SALES] Bounding box: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
+      // Use actual bbox if provided, otherwise calculate from distance
+      let minLat, maxLat, minLng, maxLng
+      
+      if (actualBbox) {
+        // Expand the viewport bounds by 50% to ensure we capture nearby sales
+        const latBuffer = (actualBbox.north - actualBbox.south) * 0.5
+        const lngBuffer = (actualBbox.east - actualBbox.west) * 0.5
+        
+        minLat = actualBbox.south - latBuffer
+        maxLat = actualBbox.north + latBuffer
+        minLng = actualBbox.west - lngBuffer
+        maxLng = actualBbox.east + lngBuffer
+        
+        console.log(`[SALES] Using expanded viewport bbox: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
+        console.log(`[SALES] Original bbox: lat=${actualBbox.south} to ${actualBbox.north}, lng=${actualBbox.west} to ${actualBbox.east}`)
+        console.log(`[SALES] Expansion: latBuffer=${latBuffer}, lngBuffer=${lngBuffer}`)
+      } else {
+        // Calculate bounding box for approximate distance filtering
+        const latRange = distanceKm / 111.0 // 1 degree ≈ 111km
+        const lngRange = distanceKm / (111.0 * Math.cos(latitude * Math.PI / 180))
+        
+        minLat = latitude - latRange
+        maxLat = latitude + latRange
+        minLng = longitude - lngRange
+        maxLng = longitude + lngRange
+        
+        console.log(`[SALES] Calculated bbox: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
+      }
       
       let query = supabase
         .from('sales_v2')
         .select('*')
+        .gte('lat', minLat)
+        .lte('lat', maxLat)
+        .gte('lng', minLng)
+        .lte('lng', maxLng)
       
       // NOTE: We filter by date window after fetching to avoid PostgREST OR-composition issues
       
@@ -227,7 +333,17 @@ export async function GET(request: NextRequest) {
       console.log(`[SALES] Direct query response:`, { 
         dataCount: salesData?.length || 0, 
         error: salesError,
-        sampleData: salesData?.slice(0, 2)
+        sampleData: salesData?.slice(0, 2),
+        bboxUsed: actualBbox ? 'viewport' : 'distance-based',
+        fetchWindow,
+        limit,
+        queryParams: {
+          minLat, maxLat, minLng, maxLng,
+          categories: categories.length,
+          dateRange,
+          startDateParam,
+          endDateParam
+        }
       })
       
       if (salesError) {
@@ -301,7 +417,15 @@ export async function GET(request: NextRequest) {
             distance_km: Math.round(distanceKm * 100) / 100
           }
         })
-                .filter((sale) => sale && (sale.distance_km || 0) <= distanceKm)
+        .filter((sale) => {
+          // Always apply distance filtering if distanceKm is specified and less than 1000
+          if (distanceKm && distanceKm < 1000) {
+            return sale && (sale.distance_km || 0) <= distanceKm
+          } else {
+            // No distance filtering (distanceKm >= 1000 or undefined)
+            return sale !== null
+          }
+        })
                 .sort((a, b) => {
                   if (!a || !b) return 0
                   // Primary sort: distance
@@ -319,7 +443,12 @@ export async function GET(request: NextRequest) {
                 })
                 .slice(offset, offset + limit)
       
-      console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`, { windowStart, windowEnd })
+      console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`, { 
+        windowStart, 
+        windowEnd,
+        bboxUsed: actualBbox ? 'viewport' : 'distance-based',
+        finalCount: salesWithDistance.length
+      })
       
       // Debug: Log sample sales and their dates
       if (salesWithDistance.length > 0) {
@@ -417,9 +546,9 @@ export async function GET(request: NextRequest) {
           .sort((a: any, b: any) => a.distance_m - b.distance_m)
           .slice(0, limit)
 
-        results = fallbackFiltered.map((row: any): Sale => ({
+        results = fallbackFiltered.map((row: any): PublicSale => ({
           id: row.id,
-          owner_id: row.owner_id || '',
+          // owner_id removed for security - not exposed in public API
           title: row.title,
           description: row.description,
           address: row.address,
@@ -442,9 +571,9 @@ export async function GET(request: NextRequest) {
           distance_m: row.distance_m
         }))
       } else {
-        results = salesWithDistance.map((row: any): Sale => ({
+        results = salesWithDistance.map((row: any): PublicSale => ({
           id: row.id,
-          owner_id: row.owner_id || '',
+          // owner_id removed for security - not exposed in public API
           title: row.title,
           description: row.description,
           address: row.address,
@@ -485,6 +614,7 @@ export async function GET(request: NextRequest) {
       center: { lat: latitude, lng: longitude },
       distanceKm,
       count: results.length,
+      totalCount: totalSalesCount || 0, // Add total database count to response
       durationMs: Date.now() - startedAt
     }
     
@@ -494,7 +624,13 @@ export async function GET(request: NextRequest) {
     
     console.log(`[SALES] Final result: ${results.length} sales, degraded=${degraded}, duration=${Date.now() - startedAt}ms`)
     
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'public, max-age=60, s-maxage=300', // 1 min client, 5 min CDN
+        'CDN-Cache-Control': 'public, max-age=300',
+        'Vary': 'Accept-Encoding'
+      }
+    })
     
   } catch (error: any) {
     console.log(`[SALES][ERROR] Unexpected error: ${error?.message || error}`)
@@ -505,13 +641,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
     
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Auth failed:', { event: 'sales-create', status: 'fail', code: authError?.message })
+      }
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
     
@@ -519,6 +658,8 @@ export async function POST(request: NextRequest) {
     
     const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact } = body
     
+    // Ensure owner_id is set server-side from authenticated user
+    // Never trust client payload for owner_id
     const { data, error } = await supabase
       .from('sales_v2')
       .insert({
@@ -535,19 +676,39 @@ export async function POST(request: NextRequest) {
         date_end,
         time_end,
         status: 'published',
-        owner_id: user.id
+        owner_id: user.id // Server-side binding - never trust client
       })
       .select()
       .single()
     
     if (error) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Insert failed:', { event: 'sales-create', status: 'fail', code: error.message })
+      }
       console.error('Sales insert error:', error)
       return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
     }
     
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES] Sale created:', { event: 'sales-create', status: 'ok', saleId: data.id })
+    }
+    
     return NextResponse.json({ ok: true, sale: data })
   } catch (error: any) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES] Unexpected error:', { event: 'sales-create', status: 'fail' })
+    }
     console.error('Sales POST error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export const GET = withRateLimit(salesHandler, [
+  Policies.SALES_VIEW_30S,
+  Policies.SALES_VIEW_HOURLY
+])
+
+export const POST = withRateLimit(postHandler, [
+  Policies.MUTATE_MINUTE,
+  Policies.MUTATE_DAILY
+])

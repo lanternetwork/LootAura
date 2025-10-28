@@ -1,4 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('RLS and Owner Permissions', () => {
   it('should set owner_id to auth.uid() when inserting sale', async () => {
@@ -15,8 +19,9 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    supabase.auth.getUser.mockResolvedValue({
-      data: { user: { id: testUserId, email: 'test@example.com' } }
+    ;(supabase.auth.getUser as any).mockResolvedValue({
+      data: { user: { id: testUserId, email: 'test@example.com' } },
+      error: null
     })
 
     // Simulate the insert operation
@@ -25,7 +30,7 @@ describe('RLS and Owner Permissions', () => {
       .insert([{ ...saleData, owner_id: testUserId }])
 
     expect(error).toBeNull()
-    expect(data[0].owner_id).toBe(testUserId)
+    expect((data as any)[0].owner_id).toBe(testUserId)
   })
 
   it('should allow public read access to sales list', async () => {
@@ -44,8 +49,9 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock anonymous user
-    supabase.auth.getUser.mockResolvedValue({
-      data: { user: null }
+    ;(supabase.auth.getUser as any).mockResolvedValue({
+      data: { user: null },
+      error: null
     })
 
     // Mock successful select
@@ -74,8 +80,9 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    supabase.auth.getUser.mockResolvedValue({
-      data: { user: { id: testUserId, email: 'test@example.com' } }
+    ;(supabase.auth.getUser as any).mockResolvedValue({
+      data: { user: { id: testUserId, email: 'test@example.com' } },
+      error: null
     })
 
     // Mock successful update
@@ -97,7 +104,7 @@ describe('RLS and Owner Permissions', () => {
       .single()
 
     expect(error).toBeNull()
-    expect(data.title).toBe('Updated Sale')
+    expect((data as any).title).toBe('Updated Sale')
   })
 
   it('should prevent non-owner from updating sale', async () => {
@@ -110,8 +117,9 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    supabase.auth.getUser.mockResolvedValue({
-      data: { user: { id: testUserId, email: 'test@example.com' } }
+    ;(supabase.auth.getUser as any).mockResolvedValue({
+      data: { user: { id: testUserId, email: 'test@example.com' } },
+      error: null
     })
 
     // Mock RLS policy violation
@@ -146,8 +154,9 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    supabase.auth.getUser.mockResolvedValue({
-      data: { user: { id: testUserId, email: 'test@example.com' } }
+    ;(supabase.auth.getUser as any).mockResolvedValue({
+      data: { user: { id: testUserId, email: 'test@example.com' } },
+      error: null
     })
 
     // Mock successful delete
@@ -181,7 +190,7 @@ describe('RLS and Owner Permissions', () => {
     const supabase = createSupabaseBrowserClient()
 
     // Mock authenticated user
-    supabase.auth.getUser.mockResolvedValue({
+    ;(supabase.auth.getUser as any).mockResolvedValue({
       data: { user: { id: testUserId, email: 'test@example.com' } }
     })
 

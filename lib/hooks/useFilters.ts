@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { normalizeCategoryParams } from '@/lib/shared/categoryNormalizer'
+import { normalizeCategoryParams, normalizeCategories } from '@/lib/shared/categoryNormalizer'
 
 export interface FilterState {
   lat?: number
@@ -103,9 +103,10 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
       params.delete('date')
     }
     
-    // Update categories using canonical parameter
-    if (updatedFilters.categories.length > 0) {
-      params.set('categories', updatedFilters.categories.join(','))
+    // Update categories using canonical parameter (normalize and drop empties)
+    const normalizedCats = normalizeCategories(updatedFilters.categories)
+    if (normalizedCats.length > 0) {
+      params.set('categories', normalizedCats.join(','))
     } else {
       params.delete('categories')
     }
@@ -125,10 +126,15 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
       params.delete('city')
     }
     
-    // Update URL
+    // Update URL without navigation or scroll using History API
     const newUrl = `${window.location.pathname}?${params.toString()}`
-    console.log('[FILTERS] push URL:', newUrl)
-    router.push(newUrl)
+    console.log('[FILTERS] history.replaceState (no scroll):', newUrl)
+    try {
+      window.history.replaceState(null, '', newUrl)
+    } catch {
+      // Fallback to router.replace as a safety net
+      router.replace(newUrl, { scroll: false })
+    }
   }, [filters, searchParams, router])
 
   const clearFilters = useCallback(() => {

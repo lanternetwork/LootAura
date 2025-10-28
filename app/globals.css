@@ -1,7 +1,75 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Mapbox GL CSS - imported once globally */
+@import 'mapbox-gl/dist/mapbox-gl.css';
 body { min-height: 100vh; }
+
+/* Completely eliminate blue circles on map markers */
+.mapboxgl-marker,
+.mapboxgl-marker *,
+[data-testid="marker"],
+[data-testid="location-marker"],
+[data-pin-marker="true"],
+[data-location-marker="true"],
+.mapboxgl-marker div,
+.mapboxgl-marker button,
+.mapboxgl-marker span {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  focus: none !important;
+  focus-visible: none !important;
+  focus-within: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-focus-ring-color: transparent !important;
+}
+
+/* Override any Mapbox GL focus states */
+.mapboxgl-marker:focus,
+.mapboxgl-marker:focus-visible,
+.mapboxgl-marker:active,
+.mapboxgl-marker:hover,
+.mapboxgl-marker *:focus,
+.mapboxgl-marker *:focus-visible,
+.mapboxgl-marker *:active,
+.mapboxgl-marker *:hover {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  background: inherit !important;
+}
+
+/* Force remove any blue circles */
+*[data-testid="marker"] *,
+*[data-pin-marker="true"] *,
+*[data-location-marker="true"] * {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Global focus ring removal for map elements */
+.mapboxgl-map *:focus,
+.mapboxgl-map *:focus-visible,
+.mapboxgl-map *:active {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.mapboxgl-marker:focus,
+.mapboxgl-marker:active,
+.mapboxgl-marker:focus-visible,
+[data-testid="marker"]:focus,
+[data-testid="location-marker"]:focus,
+[data-pin-marker="true"]:focus,
+[data-location-marker="true"]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
 
 /* Enterprise-grade responsive grid system */
 .sales-grid {

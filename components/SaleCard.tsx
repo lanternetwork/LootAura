@@ -2,27 +2,21 @@ import Link from 'next/link'
 import FavoriteButton from './FavoriteButton'
 import { Sale } from '@/lib/types'
 
-export default function SaleCard({ sale, authority }: { sale: Sale; authority?: 'MAP' | 'FILTERS' }) {
-  console.log('[DOM] item mounts id=', sale?.id)
-  const isMap = authority === 'MAP'
-
-  // Never early-return null in MAP authority; render a minimal stub instead
-  if (!sale && !isMap) return null
+export default function SaleCard({ sale }: { sale: Sale }) {
+  if (!sale) return null
 
   return (
     <article 
-      className="sale-row rounded-xl border p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow" 
+      className="sale-row rounded-lg border p-3 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition-shadow" 
       data-testid="sale-card" 
-      data-debug={`auth:${authority}`} 
+      data-debug="sale-card" 
       data-sale-id={String(sale?.id || '')}
       data-card="sale"
       data-kind="sale-row"
-      style={isMap ? { 
-        minHeight: '200px'
-      } : undefined}
+      style={{ minHeight: '160px' }}
     >
-      <div className="flex justify-between">
-        <h3 className="text-xl font-semibold line-clamp-1">{sale?.title || (isMap ? `Sale ${sale?.id}` : '')}</h3>
+      <div className="flex justify-between items-start">
+        <h3 className="text-lg font-semibold line-clamp-1">{sale?.title || `Sale ${sale?.id}`}</h3>
         {sale?.id && <FavoriteButton saleId={sale.id} initial={false} />}
       </div>
       
@@ -33,7 +27,7 @@ export default function SaleCard({ sale, authority }: { sale: Sale; authority?: 
       <div className="text-sm text-neutral-700">
         {sale?.address && <div>{sale.address}</div>}
         {sale?.city && sale?.state && <div>{sale.city}, {sale.state}</div>}
-        {isMap && (!sale?.address || !sale?.city) && (
+        {(!sale?.address || !sale?.city) && (
           <div className="text-neutral-500">id:{String(sale?.id)}{sale?.lat && sale?.lng ? ` @ ${sale.lat.toFixed?.(3)},${sale.lng.toFixed?.(3)}` : ''}</div>
         )}
       </div>

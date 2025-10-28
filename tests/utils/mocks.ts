@@ -26,7 +26,24 @@ export function mockNominatimFetch() {
   global.fetch = async (url: string | URL | Request, init?: RequestInit) => {
     const urlString = url.toString()
     
-    if (urlString.includes('nominatim.openstreetmap.org')) {
+    // Validate URL is safe for testing
+    try {
+      const urlObj = new URL(urlString)
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        throw new Error('Invalid protocol')
+      }
+    } catch {
+      throw new Error('Invalid URL')
+    }
+    
+    // Check for allowed external service with proper hostname validation
+    const allowedExternalServices = ['nominatim.openstreetmap.org']
+    const urlObj = new URL(urlString)
+    const isAllowedService = allowedExternalServices.some(service => 
+      urlObj.hostname === service || urlObj.hostname.endsWith('.' + service)
+    )
+    
+    if (isAllowedService) {
       const searchParams = new URL(urlString).searchParams
       const query = searchParams.get('q')
       

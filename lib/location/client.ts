@@ -117,15 +117,17 @@ async function getIPLocation(): Promise<LocationResult> {
 }
 
 /**
- * Get fallback location (Louisville, KY)
+ * Get fallback location - should never be called in production
+ * This is a last resort that indicates a system failure
  */
 function getFallbackLocation(): LocationResult {
+  console.error('CRITICAL: All location detection methods failed - this should not happen in production')
   return {
-    lat: 38.2527,
-    lng: -85.7585,
+    lat: 39.8283,
+    lng: -98.5795,
     source: 'fallback',
-    city: 'Louisville',
-    state: 'KY',
+    city: 'United States',
+    state: 'US',
     country: 'US'
   }
 }

@@ -29,8 +29,8 @@ export function sanitizeHtml(input: string, options: SanitizeOptions = {}): stri
   let sanitized = input.length > maxLength ? input.substring(0, maxLength) : input
 
   if (stripHtml) {
-    // Remove all HTML tags
-    sanitized = sanitized.replace(/<[^>]*>/g, '')
+    // Remove all HTML tags - improved regex to handle nested tags
+    sanitized = sanitized.replace(/<\/?[^>]+(>|$)/g, '')
   } else {
     // Sanitize HTML
     sanitized = purify.sanitize(sanitized, {
@@ -49,7 +49,7 @@ export function sanitizeText(input: string, maxLength: number = 1000): string {
 
   // Remove HTML tags and normalize whitespace
   let sanitized = input
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/<\/?[^>]+(>|$)/g, '') // Remove HTML tags - improved regex
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim()
 
@@ -148,7 +148,7 @@ export function sanitizeAddress(input: string): string {
 
   // Remove HTML tags and normalize
   const sanitized = input
-    .replace(/<[^>]*>/g, '')
+    .replace(/<\/?[^>]+(>|$)/g, '') // Improved regex for HTML tag removal
     .replace(/\s+/g, ' ')
     .trim()
 
@@ -203,17 +203,73 @@ export function sanitizeSearchQuery(input: string): string {
   // Remove potentially dangerous characters
   sanitized = sanitized.replace(/[<>'"&]/g, '')
 
-  // Remove XSS patterns
-  const xssPatterns = [
-    /<script[^>]*>.*?<\/script>/gi,
-    /javascript:/gi,
-    /on\w+\s*=/gi,
-    /alert\s*\([^)]*\)/gi,
-    /<[^>]*>/gi
-  ]
+  // Remove XSS patterns using string methods instead of complex regex
+  // Remove script tags by finding and removing them iteratively
+  let scriptStart = sanitized.indexOf('<script')
+  while (scriptStart !== -1) {
+    const scriptEnd = sanitized.indexOf('</script>', scriptStart)
+    if (scriptEnd !== -1) {
+      sanitized = sanitized.substring(0, scriptStart) + sanitized.substring(scriptEnd + 9)
+    } else {
+      sanitized = sanitized.substring(0, scriptStart)
+    }
+    scriptStart = sanitized.indexOf('<script')
+  }
   
-  for (const pattern of xssPatterns) {
-    sanitized = sanitized.replace(pattern, '')
+  // Remove javascript: protocols using string methods
+  let jsIndex = sanitized.toLowerCase().indexOf('javascript:')
+  while (jsIndex !== -1) {
+    sanitized = sanitized.substring(0, jsIndex) + sanitized.substring(jsIndex + 11)
+    jsIndex = sanitized.toLowerCase().indexOf('javascript:')
+  }
+  
+  // Remove common event handlers using string methods
+  const eventHandlers = ['onclick', 'onload', 'onerror', 'onmouseover', 'onfocus', 'onblur']
+  for (const handler of eventHandlers) {
+    let handlerIndex = sanitized.toLowerCase().indexOf(handler + '=')
+    while (handlerIndex !== -1) {
+      // Find the end of the attribute value
+      const quoteStart = sanitized.indexOf('"', handlerIndex)
+      const singleQuoteStart = sanitized.indexOf("'", handlerIndex)
+      let quoteEnd = -1
+      
+      if (quoteStart !== -1 && (singleQuoteStart === -1 || quoteStart < singleQuoteStart)) {
+        quoteEnd = sanitized.indexOf('"', quoteStart + 1)
+      } else if (singleQuoteStart !== -1) {
+        quoteEnd = sanitized.indexOf("'", singleQuoteStart + 1)
+      }
+      
+      if (quoteEnd !== -1) {
+        sanitized = sanitized.substring(0, handlerIndex) + sanitized.substring(quoteEnd + 1)
+      } else {
+        sanitized = sanitized.substring(0, handlerIndex)
+      }
+      handlerIndex = sanitized.toLowerCase().indexOf(handler + '=')
+    }
+  }
+  
+  // Remove alert() calls using string methods
+  let alertIndex = sanitized.toLowerCase().indexOf('alert(')
+  while (alertIndex !== -1) {
+    const parenIndex = sanitized.indexOf(')', alertIndex)
+    if (parenIndex !== -1) {
+      sanitized = sanitized.substring(0, alertIndex) + sanitized.substring(parenIndex + 1)
+    } else {
+      sanitized = sanitized.substring(0, alertIndex)
+    }
+    alertIndex = sanitized.toLowerCase().indexOf('alert(')
+  }
+  
+  // Remove HTML tags using simple angle bracket removal
+  let tagStart = sanitized.indexOf('<')
+  while (tagStart !== -1) {
+    const tagEnd = sanitized.indexOf('>', tagStart)
+    if (tagEnd !== -1) {
+      sanitized = sanitized.substring(0, tagStart) + sanitized.substring(tagEnd + 1)
+    } else {
+      sanitized = sanitized.substring(0, tagStart)
+    }
+    tagStart = sanitized.indexOf('<')
   }
 
   return sanitized.trim()

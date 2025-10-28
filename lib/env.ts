@@ -7,6 +7,7 @@ const publicSchema = z.object({
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().min(10).optional(),
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
   NEXT_PUBLIC_SUPABASE_SCHEMA: z.string().optional(),
+  NEXT_PUBLIC_GOOGLE_ENABLED: z.string().optional(),
 })
 
 const serverSchema = z.object({
@@ -25,6 +26,7 @@ export const ENV_PUBLIC = publicSchema.parse({
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
   NEXT_PUBLIC_SUPABASE_SCHEMA: process.env.NEXT_PUBLIC_SUPABASE_SCHEMA,
+  NEXT_PUBLIC_GOOGLE_ENABLED: process.env.NEXT_PUBLIC_GOOGLE_ENABLED,
 })
 
 // Validate server environment variables (only in server context)

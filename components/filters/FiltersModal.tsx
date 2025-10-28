@@ -43,11 +43,6 @@ interface FiltersModalProps {
     dateRange: DateRange
     categories: string[]
   }) => void
-  arbiter?: {
-    mode: 'initial' | 'map' | 'zip' | 'distance'
-    programmaticMoveGuard: boolean
-    lastChangedAt: number
-  }
 }
 
 interface FilterState {
@@ -71,7 +66,7 @@ const CATEGORY_OPTIONS = [
   { value: 'misc', label: 'Miscellaneous', icon: '📦' }
 ]
 
-export default function FiltersModal({ isOpen, onClose, className = '', filters: externalFilters, onFiltersChange, arbiter }: FiltersModalProps) {
+export default function FiltersModal({ isOpen, onClose, className = '', filters: externalFilters, onFiltersChange }: FiltersModalProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -152,9 +147,13 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
         params.delete('cat')
       }
       
-      // Update URL
+      // Update URL without navigation or scroll (History API)
       const newUrl = `${window.location.pathname}?${params.toString()}`
-      router.push(newUrl)
+      try {
+        window.history.replaceState(null, '', newUrl)
+      } catch {
+        router.replace(newUrl, { scroll: false })
+      }
       
       return updatedFilters
     })
@@ -215,13 +214,13 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
       {/* Mobile Modal Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
           onClick={onClose}
         />
       )}
 
       {/* Mobile Modal */}
-      <div className={`md:hidden fixed inset-x-0 bottom-0 bg-white rounded-t-xl shadow-2xl z-50 transform transition-transform duration-300 ${
+      <div className={`lg:hidden fixed inset-x-0 bottom-0 bg-white rounded-t-xl shadow-2xl z-50 transform transition-transform duration-300 ${
         isOpen ? 'translate-y-0' : 'translate-y-full'
       }`}>
         <div className="p-6">
@@ -243,13 +242,13 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
             onCategoryToggle={handleCategoryToggle}
             onClearFilters={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
-            arbiter={arbiter}
           />
         </div>
       </div>
 
-      {/* Desktop Sidebar */}
-      <div className={`hidden md:block ${className}`}>
+      {/* Desktop/Tablet Sidebar - show at md and up only when open; mobile uses modal */}
+      {isOpen && (
+        <div className={`hidden md:block ${className}`}>
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
@@ -270,10 +269,10 @@ export default function FiltersModal({ isOpen, onClose, className = '', filters:
             onCategoryToggle={handleCategoryToggle}
             onClearFilters={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
-            arbiter={arbiter}
           />
         </div>
       </div>
+      )}
     </>
   )
 }
@@ -285,11 +284,6 @@ interface FiltersContentProps {
   onCategoryToggle: (category: string) => void
   onClearFilters: () => void
   hasActiveFilters: boolean
-  arbiter?: {
-    mode: 'initial' | 'map' | 'zip' | 'distance'
-    programmaticMoveGuard: boolean
-    lastChangedAt: number
-  }
 }
 
 function FiltersContent({
@@ -299,7 +293,6 @@ function FiltersContent({
   onCategoryToggle,
   onClearFilters: _onClearFilters,
   hasActiveFilters,
-  arbiter
 }: FiltersContentProps) {
   return (
     <div className="space-y-6">
@@ -308,8 +301,8 @@ function FiltersContent({
         <div className="flex items-center mb-3">
           <MapMarkerIcon />
           <span className="text-gray-500 mr-2"></span>
-          <label className={`text-sm font-medium ${arbiter?.mode === 'map' ? 'text-gray-600' : 'text-gray-700'}`}>
-            {arbiter?.mode === 'map' ? 'Distance (Select)' : 'Distance'}
+          <label className="text-sm font-medium text-gray-700">
+            Distance
           </label>
         </div>
         <select
@@ -321,7 +314,7 @@ function FiltersContent({
             <option key={miles} value={miles}>{miles} miles</option>
           ))}
         </select>
-        {arbiter?.mode === 'map' && (
+        {false && (
           <p className="text-xs text-gray-500 mt-1">
             Currently using map view
           </p>
@@ -352,11 +345,11 @@ function FiltersContent({
           <span className="text-gray-500 mr-2"></span>
           <label className="text-sm font-medium text-gray-700">Categories</label>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {CATEGORY_OPTIONS.map((category) => (
             <label
               key={category.value}
-              className={`flex items-center p-2 rounded-lg border cursor-pointer transition-colors ${
+              className={`flex items-start p-2 rounded-lg border cursor-pointer transition-colors min-h-[44px] w-full overflow-hidden ${
                 filters.categories.includes(category.value)
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -366,10 +359,12 @@ function FiltersContent({
                 type="checkbox"
                 checked={filters.categories.includes(category.value)}
                 onChange={() => onCategoryToggle(category.value)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 min-h-4 min-w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0 mt-0.5"
               />
-              <span className="ml-2 text-sm font-medium">{category.icon}</span>
-              <span className="ml-1 text-sm">{category.label}</span>
+              <div className="ml-2 flex-1 min-w-0">
+                <div className="text-sm font-medium flex-shrink-0 mb-1">{category.icon}</div>
+                <div className="text-xs font-medium text-left break-words leading-tight">{category.label}</div>
+              </div>
             </label>
           ))}
         </div>

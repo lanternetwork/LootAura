@@ -36,13 +36,12 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const core = require('@actions/core')
-            const context = github.context
+            const ctx = github.context
             let prNumber = core.getInput('pr_number') || ''
             let branch = core.getInput('branch') || 'milestone/auth-profile'
 
-            if (context.eventName === 'repository_dispatch') {
-              const payload = context.payload.client_payload || {}
+            if (ctx.eventName === 'repository_dispatch') {
+              const payload = ctx.payload.client_payload || {}
               if (payload.branch) branch = payload.branch
               if (payload.pr_number) prNumber = String(payload.pr_number)
               console.log(`Repository dispatch payload: ${JSON.stringify(payload)}`)
@@ -50,7 +49,7 @@ jobs:
 
             if (!prNumber) {
               // Try to find an open PR for this branch
-              const prs = await github.rest.pulls.list({ owner: context.repo.owner, repo: context.repo.repo, state: 'open', head: `${context.repo.owner}:${branch}` })
+              const prs = await github.rest.pulls.list({ owner: ctx.repo.owner, repo: ctx.repo.repo, state: 'open', head: `${ctx.repo.owner}:${branch}` })
               if (prs.data.length > 0) prNumber = String(prs.data[0].number)
             }
 
@@ -64,13 +63,13 @@ jobs:
           TARGET_BRANCH: ${{ steps.resolve.outputs.branch }}
         with:
           script: |
-            const context = github.context
+            const ctx = github.context
             // Find workflow id for 'ci'
-            const wfs = await github.rest.actions.listRepoWorkflows({ owner: context.repo.owner, repo: context.repo.repo })
+            const wfs = await github.rest.actions.listRepoWorkflows({ owner: ctx.repo.owner, repo: ctx.repo.repo })
             const ci = wfs.data.workflows.find(w => (w.name || '').toLowerCase() === 'ci')
             if (!ci) core.setFailed('ci workflow not found')
             // List runs for this workflow on target branch
-            const runsResp = await github.rest.actions.listWorkflowRuns({ owner: context.repo.owner, repo: context.repo.repo, workflow_id: ci.id, branch: process.env.TARGET_BRANCH, per_page: 20 })
+            const runsResp = await github.rest.actions.listWorkflowRuns({ owner: ctx.repo.owner, repo: ctx.repo.repo, workflow_id: ci.id, branch: process.env.TARGET_BRANCH, per_page: 20 })
             let runs = runsResp.data.workflow_runs.filter(r => r.status === 'completed' && r.conclusion)
             if (runs.length === 0) core.setFailed(`No completed ci runs found for branch ${process.env.TARGET_BRANCH}`)
             // Prefer pull_request runs over push if both exist for same SHA
@@ -87,8 +86,8 @@ jobs:
           RUN_ID: ${{ steps.findrun.outputs.run_id }}
         with:
           script: |
-            const context = github.context
-            const jobs = await github.rest.actions.listJobsForWorkflowRun({ owner: context.repo.owner, repo: context.repo.repo, run_id: Number(process.env.RUN_ID) })
+            const ctx = github.context
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({ owner: ctx.repo.owner, repo: ctx.repo.repo, run_id: Number(process.env.RUN_ID) })
             const mapped = jobs.data.jobs.map(j => ({ id: j.id, name: j.name, conclusion: j.conclusion, html_url: j.html_url }))
             core.setOutput('jobs', JSON.stringify(mapped))
 
@@ -180,18 +179,18 @@ jobs:
         with:
           script: |
             const fs = require('fs')
-            const context = github.context
+            const ctx = github.context
             const prNumber = process.env.PR_NUMBER
             if (!prNumber) {
               core.info('No PR number found; skipping comment')
               return
             }
             const body = fs.readFileSync('failure_map.md', 'utf8')
-            const { data: comments } = await github.rest.issues.listComments({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(prNumber) })
+            const { data: comments } = await github.rest.issues.listComments({ owner: ctx.repo.owner, repo: ctx.repo.repo, issue_number: Number(prNumber) })
             const existing = comments.find(c => (c.body || '').startsWith('**CI Failure Map (snapshot)**'))
             if (existing) {
-              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body })
+              await github.rest.issues.updateComment({ owner: ctx.repo.owner, repo: ctx.repo.repo, comment_id: existing.id, body })
             } else {
-              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: Number(prNumber), body })
+              await github.rest.issues.createComment({ owner: ctx.repo.owner, repo: ctx.repo.repo, issue_number: Number(prNumber), body })
             }
 

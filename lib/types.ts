@@ -25,6 +25,9 @@ export type Sale = {
   distance_km?: number
 }
 
+// Public sale type for API responses (without owner_id for security)
+export type PublicSale = Omit<Sale, 'owner_id'>
+
 export type SaleItem = {
   id: string
   sale_id: string

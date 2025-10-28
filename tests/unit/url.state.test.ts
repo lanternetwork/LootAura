@@ -1,0 +1,225 @@
+/**
+ * Unit tests for URL state management
+ */
+
+import { describe, it, expect } from 'vitest'
+import { 
+  serializeState, 
+  deserializeState, 
+  compressState, 
+  decompressState,
+  hasStateChanged,
+  getDefaultState,
+  type AppState 
+} from '@/lib/url/state'
+
+describe('URL State Management', () => {
+  const defaultState: AppState = {
+    view: { lat: 38.2527, lng: -85.7585, zoom: 10 },
+    filters: { dateRange: 'any', categories: [], radius: 25 }
+  }
+
+  const customState: AppState = {
+    view: { lat: 40.7128, lng: -74.0060, zoom: 12 },
+    filters: { dateRange: 'today', categories: ['electronics', 'furniture'], radius: 50 }
+  }
+
+  describe('serializeState', () => {
+    it('should serialize default state as stable JSON', () => {
+      const result = serializeState(defaultState)
+      const parsed = JSON.parse(result)
+      expect(parsed).toEqual({
+        view: { lat: 38.2527, lng: -85.7585, zoom: 10 },
+        filters: { dateRange: 'any', categories: [], radius: 25 }
+      })
+    })
+
+    it('should serialize custom state as stable JSON', () => {
+      const result = serializeState(customState)
+      const parsed = JSON.parse(result)
+      expect(parsed).toEqual({
+        view: { lat: 40.7128, lng: -74.006, zoom: 12 },
+        filters: { dateRange: 'today', categories: ['electronics', 'furniture'], radius: 50 }
+      })
+    })
+
+    it('should sort categories for consistent output', () => {
+      const stateWithUnsortedCategories: AppState = {
+        view: { lat: 40.7128, lng: -74.0060, zoom: 12 },
+        filters: { dateRange: 'any', categories: ['zebra', 'apple', 'banana'], radius: 25 }
+      }
+      
+      const result = serializeState(stateWithUnsortedCategories)
+      const parsed = JSON.parse(result)
+      expect(parsed.filters.categories).toEqual(['apple', 'banana', 'zebra'])
+    })
+  })
+
+  describe('deserializeState', () => {
+    it('should deserialize minimal URL to default state', () => {
+      const result = deserializeState('lat=38.2527&lng=-85.7585&zoom=10')
+      expect(result).toEqual(defaultState)
+    })
+
+    it('should deserialize full URL with all params', () => {
+      const result = deserializeState('lat=40.7128&lng=-74.006&zoom=12&date=today&cats=electronics,furniture&radius=50')
+      expect(result).toEqual(customState)
+    })
+
+    it('should handle missing params with defaults', () => {
+      const result = deserializeState('lat=40.7128&lng=-74.006')
+      expect(result.view).toEqual({ lat: 40.7128, lng: -74.006, zoom: 10 })
+      expect(result.filters).toEqual({ dateRange: 'any', categories: [], radius: 25 })
+    })
+
+    it('should ignore unknown parameters', () => {
+      const result = deserializeState('lat=40.7128&lng=-74.006&unknown=value&other=123')
+      expect(result.view).toEqual({ lat: 40.7128, lng: -74.006, zoom: 10 })
+    })
+
+    it('should handle empty search string', () => {
+      const result = deserializeState('')
+      expect(result).toEqual(defaultState)
+    })
+  })
+
+  describe('round-trip serialization', () => {
+    it('should preserve state through serialize/deserialize', () => {
+      const serialized = serializeState(customState)
+      const deserialized = deserializeState(serialized)
+      // Categories will be sorted during serialization, so we need to sort them for comparison
+      const expectedState = {
+        ...customState,
+        filters: {
+          ...customState.filters,
+          categories: customState.filters.categories ? Array.from(customState.filters.categories).sort() : []
+        }
+      }
+      expect(deserialized).toEqual(expectedState)
+    })
+
+    it('should preserve default state through serialize/deserialize', () => {
+      const serialized = serializeState(defaultState)
+      const deserialized = deserializeState(serialized)
+      expect(deserialized).toEqual(defaultState)
+    })
+  })
+
+  describe('compressState', () => {
+    it('should compress and decompress state correctly', () => {
+      const compressed = compressState(customState)
+      const decompressed = decompressState(compressed)
+      expect(decompressed).toEqual(customState)
+    })
+
+    it('should compress and decompress complex states correctly', () => {
+      // Create a more complex state that would benefit from compression
+      const complexState: AppState = {
+        view: { lat: 40.7128, lng: -74.006, zoom: 12 },
+        filters: { 
+          dateRange: 'today', 
+          categories: ['electronics', 'furniture', 'tools', 'books', 'clothing', 'sports', 'toys', 'home', 'garden', 'automotive'], 
+          radius: 50 
+        }
+      }
+      const serialized = serializeState(complexState)
+      const compressed = compressState(complexState)
+      
+      // Should start with either compression or JSON prefix
+      expect(compressed).toMatch(/^[cj]:/)
+      
+      // Should be able to decompress back to original state (categories will be sorted)
+      const decompressed = decompressState(compressed)
+      const expectedState = {
+        ...complexState,
+        filters: {
+          ...complexState.filters,
+          categories: complexState.filters.categories ? [...complexState.filters.categories].sort() : []
+        }
+      }
+      expect(decompressed).toEqual(expectedState)
+      
+      // Verify the compressed format works correctly
+      expect(compressed.length).toBeGreaterThan(0)
+      expect(serialized.length).toBeGreaterThan(0)
+    })
+
+    it('should compress highly repetitive data effectively', () => {
+      // Create a state with highly repetitive data that should compress well
+      // Use many repeated categories to create a large dataset that benefits from compression
+      const repetitiveState: AppState = {
+        view: { lat: 40.7128, lng: -74.006, zoom: 12 },
+        filters: { 
+          dateRange: 'today', 
+          categories: Array(20).fill('electronics'), // 20 repetitions
+          radius: 50 
+        }
+      }
+      const serialized = serializeState(repetitiveState)
+      const compressed = compressState(repetitiveState)
+      
+      // Should start with compression prefix (since repetitive data compresses well)
+      expect(compressed).toMatch(/^c:/)
+      
+      // Should be able to decompress back to original state
+      const decompressed = decompressState(compressed)
+      expect(decompressed).toEqual(repetitiveState)
+      
+      // For highly repetitive data, compression should be beneficial
+      expect(compressed.length).toBeLessThan(serialized.length)
+    })
+
+    it('should handle unrecognized prefix gracefully', () => {
+      // Test unrecognized prefix (x:) should return safe fallback
+      expect(() => decompressState('x:invalid')).toThrow('Invalid state format')
+    })
+
+    it('should handle corrupted JSON under j: prefix', () => {
+      // Test corrupted JSON should return safe fallback
+      expect(() => decompressState('j:{invalid json}')).toThrow()
+    })
+
+    it('should handle corrupted payload under c: prefix', () => {
+      // Test corrupted compression should return safe fallback
+      expect(() => decompressState('c:corrupted')).toThrow('Decompression failed')
+    })
+
+    it('should handle empty/blank state param', () => {
+      // Test empty state should return defaults
+      expect(() => decompressState('')).toThrow('Empty state blob')
+    })
+
+    it('should handle non-string param type gracefully', () => {
+      // Test non-string input should be handled safely
+      expect(() => decompressState(null as any)).toThrow()
+      expect(() => decompressState(undefined as any)).toThrow()
+    })
+  })
+
+  describe('hasStateChanged', () => {
+    it('should return false for identical states', () => {
+      expect(hasStateChanged(defaultState, defaultState)).toBe(false)
+    })
+
+    it('should return true for different states', () => {
+      expect(hasStateChanged(defaultState, customState)).toBe(true)
+    })
+
+    it('should detect viewport changes', () => {
+      const modifiedState = { ...defaultState, view: { ...defaultState.view, zoom: 15 } }
+      expect(hasStateChanged(defaultState, modifiedState)).toBe(true)
+    })
+
+    it('should detect filter changes', () => {
+      const modifiedState = { ...defaultState, filters: { ...defaultState.filters, radius: 50 } }
+      expect(hasStateChanged(defaultState, modifiedState)).toBe(true)
+    })
+  })
+
+  describe('getDefaultState', () => {
+    it('should return default state', () => {
+      const result = getDefaultState()
+      expect(result).toEqual(defaultState)
+    })
+  })
+})

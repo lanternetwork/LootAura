@@ -12,6 +12,11 @@ This guide explains how to use the unified debug system to diagnose issues and v
 - **Policy**: No additional debug flags allowed
 - **Security**: No PII (personally identifiable information) in logs
 
+### Admin Tools Interface
+- **URL**: `/admin/tools` (publicly accessible)
+- **Purpose**: Comprehensive debugging and development tools
+- **Features**: Debug controls, sale lookup, system information, health checks
+
 ### Enabling Debug Mode
 
 #### Local Development
@@ -33,6 +38,36 @@ echo "NEXT_PUBLIC_DEBUG=true" >> .env.local
 // Check if debug mode is enabled
 console.log('Debug mode:', process.env.NEXT_PUBLIC_DEBUG === 'true')
 ```
+
+## Admin Tools Interface
+
+### Accessing Admin Tools
+Visit `/admin/tools` to access comprehensive debugging and development tools:
+
+#### Available Tools
+- **Debug Controls**: Toggle debug mode and show/hide diagnostics overlay
+- **Review Key Lookup**: Look up sale information by sale ID
+- **System Information**: View environment variables and configuration
+- **Health Checks**: Quick access to system health endpoints
+- **Diagnostic Overlay**: Real-time monitoring of fetch events
+
+#### Sale Lookup Tool
+- **Purpose**: Debug sale data and review key generation
+- **Input**: Sale ID (searches across multiple tables)
+- **Output**: Complete sale information, address key, review key, review count
+- **Tables**: Searches `sales_v2`, `sales`, and `yard_sales` tables
+
+#### System Information
+- **Environment**: Development/Production status
+- **Debug Mode**: Current debug state
+- **Clustering**: Feature flag status  
+- **Schema**: Current Supabase schema
+
+#### Health Check Links
+- **Overall Health**: `/api/health`
+- **Database**: `/api/health/db`
+- **Mapbox**: `/api/health/mapbox`
+- **Supabase**: `/api/health/supabase`
 
 ## Debug Features
 

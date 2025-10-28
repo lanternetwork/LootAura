@@ -4,6 +4,7 @@ import { Providers } from './providers'
 import WebVitals from '@/components/WebVitals'
 import { Header } from './Header'
 import { PWAComponents } from './PWAComponents'
+import DebugToggle from '@/components/debug/DebugToggle'
 import { createHomepageStructuredData, createOrganizationStructuredData } from '@/lib/metadata'
 // Disable Mapbox telemetry at app startup
 import '@/lib/maps/telemetry'
@@ -30,7 +31,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0b3d2e" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
         <script
@@ -46,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <WebVitals />
           {children}
           <PWAComponents />
+          <DebugToggle />
         </Providers>
       </body>
     </html>

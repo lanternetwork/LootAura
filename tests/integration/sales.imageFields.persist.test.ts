@@ -71,12 +71,6 @@ describe('Sales Image Fields Persistence', () => {
       const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
       vi.mocked(isAllowedImageUrl).mockReturnValue(true)
 
-      // Mock successful insert
-      mockSupabaseClient.from().insert().select().single.mockResolvedValue({
-        data: { id: 'test-sale-id', title: 'Test Sale' },
-        error: null
-      })
-
       const { POST } = await import('@/app/api/sales/route')
       
       const request = new NextRequest('http://localhost/api/sales', {
@@ -138,12 +132,6 @@ describe('Sales Image Fields Persistence', () => {
     it('should accept null cover_image_url', async () => {
       const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
       vi.mocked(isAllowedImageUrl).mockReturnValue(true)
-
-      // Mock successful insert
-      mockSupabaseClient.from().insert().select().single.mockResolvedValue({
-        data: { id: 'test-sale-id', title: 'Test Sale' },
-        error: null
-      })
 
       const { POST } = await import('@/app/api/sales/route')
       

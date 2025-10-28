@@ -126,20 +126,13 @@ vi.mock('@/lib/supabase/server', () => ({
       }
       return {
         select: vi.fn(() => ({
-          gte: vi.fn(() => ({
-            lte: vi.fn(() => ({
-              gte: vi.fn(() => ({
-                lte: vi.fn(() => ({
-                  order: vi.fn(() => ({
-                    range: vi.fn().mockResolvedValue({
-                      data: [],
-                      error: null
-                    })
-                  }))
-                }))
-              }))
-            }))
-          }))
+          gte: vi.fn().mockReturnThis(),
+          lte: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn().mockResolvedValue({
+            data: [],
+            error: null
+          })
         }))
       }
     })

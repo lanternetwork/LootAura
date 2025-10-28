@@ -59,11 +59,10 @@ export default function LoadTestControls() {
         })
       })
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
       const data = await response.json()
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${data?.error || 'dispatch failed'}${data?.details ? ` — ${data.details}` : ''}`)
+      }
       const duration = Date.now() - startTime
 
       setResults(prev => ({

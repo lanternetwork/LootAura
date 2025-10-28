@@ -37,6 +37,9 @@ export async function POST(request: NextRequest) {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'LootAura-Admin-LoadTest-Dispatch'
       },
       body: JSON.stringify({
         ref,
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     if (!resp.ok) {
       const text = await resp.text()
-      return NextResponse.json({ error: 'Failed to dispatch workflow', status: resp.status, details: text }, { status: 502 })
+      return NextResponse.json({ error: 'Failed to dispatch workflow', status: resp.status, details: text, hint: 'Ensure token has workflow write permissions and workflow exists on ref' }, { status: 502 })
     }
 
     // Best-effort link to Actions tab

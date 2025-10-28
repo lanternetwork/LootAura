@@ -47,8 +47,8 @@ export default function LoadTestControls() {
     try {
       const startTime = Date.now()
       
-      // Simulate API call to run load test
-      const response = await fetch('/api/admin/load-test', {
+      // Dispatch CI workflow to run load test in GitHub Actions
+      const response = await fetch('/api/admin/load-test/dispatch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -71,9 +71,12 @@ export default function LoadTestControls() {
         [scenarioId]: {
           scenario: scenarioId,
           status: 'completed',
-          output: data.output || [`${scenarioId} completed successfully`],
+          output: [
+            `${scenarioId} dispatched to CI`,
+            data.actionsUrl ? `View in GitHub Actions: ${data.actionsUrl}` : 'Open Actions tab to view runs'
+          ],
           duration,
-          metrics: data.metrics
+          metrics: undefined
         }
       }))
 

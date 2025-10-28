@@ -2,6 +2,10 @@ import '@testing-library/jest-dom/vitest'
 
 import { vi } from 'vitest'
 
+// Ensure rate limiting is bypassed in tests
+process.env.RATE_LIMITING_ENABLED = 'false'
+process.env.NODE_ENV = 'test'
+
 // Minimal globals to satisfy failing tests
 // Functional ResizeObserver mock with simulation hook used by tests
 {

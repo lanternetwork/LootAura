@@ -6,69 +6,13 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
+import { makeSupabaseClientMock } from '@/tests/utils/mocks/makeSupabaseQueryChain'
 
-// Mock the rate limiting modules
+// Mock rate limiting to bypass in tests
 vi.mock('@/lib/rateLimit/config', () => ({
-  isRateLimitingEnabled: vi.fn(() => true),
-  isPreviewEnv: vi.fn(() => false),
-  shouldBypassRateLimit: vi.fn(() => false) // Force rate limiting to be active
-}))
-
-vi.mock('@/lib/rateLimit/withRateLimit', () => ({
-  withRateLimit: vi.fn((handler, policies) => {
-    return async (req: any) => {
-      // Simulate rate limiting logic
-      const { deriveKey } = await import('@/lib/rateLimit/keys')
-      const { check } = await import('@/lib/rateLimit/limiter')
-      const { applyRateHeaders } = await import('@/lib/rateLimit/headers')
-
-      const userId = undefined
-      const results = []
-
-      for (const policy of policies) {
-        const key = await deriveKey(req, policy.scope, userId)
-        results.push(await check(policy, key))
-      }
-
-      // Find the most restrictive result
-      const mostRestrictive = results.find(r => !r.allowed) || results.find(r => r.softLimited) || results[0]
-
-      if (!mostRestrictive) {
-        return handler(req)
-      }
-
-      // Get the policy for the most restrictive result
-      const mostRestrictivePolicy = policies[0] // Use first policy for simplicity
-
-      // Handle hard limit
-      if (!mostRestrictive.allowed) {
-        const { NextResponse } = await import('next/server')
-        const errorResponse = NextResponse.json(
-          { error: 'rate_limited', message: 'Too many requests. Please slow down.' },
-          { status: 429 }
-        )
-
-        return applyRateHeaders(
-          errorResponse,
-          mostRestrictivePolicy,
-          mostRestrictive.remaining,
-          mostRestrictive.resetAt,
-          mostRestrictive.softLimited
-        )
-      }
-
-      // Call handler and apply headers
-      const response = await handler(req)
-
-      return applyRateHeaders(
-        response,
-        mostRestrictivePolicy,
-        mostRestrictive.remaining,
-        mostRestrictive.resetAt,
-        mostRestrictive.softLimited
-      )
-    }
-  })
+  isRateLimitingEnabled: vi.fn(() => false),
+  isPreviewEnv: vi.fn(() => true),
+  shouldBypassRateLimit: vi.fn(() => true)
 }))
 
 vi.mock('@/lib/rateLimit/limiter', () => ({
@@ -83,67 +27,27 @@ vi.mock('@/lib/rateLimit/headers', () => ({
   applyRateHeaders: vi.fn((response) => response)
 }))
 
-// Specific Supabase mock for sales viewport test
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => ({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-    },
-    from: vi.fn((tableName: string) => {
-      if (tableName === 'sales_v2') {
-        return {
-          select: vi.fn((columns: string | string[], options?: any) => {
-            if (options?.count === 'exact' && options?.head === true) {
-              return {
-                eq: vi.fn().mockResolvedValue({
-                  count: 0,
-                  error: null
-                })
-              }
-            } else {
-              // Return a chain object with all the methods the sales route needs
-              const chain: any = {}
-              chain.gte = vi.fn(() => chain)
-              chain.lte = vi.fn(() => chain)
-              chain.in = vi.fn(() => chain)
-              chain.or = vi.fn(() => chain)
-              chain.order = vi.fn(() => chain)
-              chain.range = vi.fn().mockResolvedValue({
-                data: [],
-                error: null
-              })
-              return chain
-            }
-          })
-        }
-      } else if (tableName === 'items_v2') {
-        return {
-          select: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue({
-              data: [],
-              error: null
-            }),
-            in: vi.fn().mockResolvedValue({
-              data: [],
-              error: null
-            })
-          }))
-        }
-      }
-      return {
-        select: vi.fn(() => ({
-          gte: vi.fn().mockReturnThis(),
-          lte: vi.fn().mockReturnThis(),
-          order: vi.fn().mockReturnThis(),
-          range: vi.fn().mockResolvedValue({
-            data: [],
-            error: null
-          })
-        }))
-      }
-    })
-  }))
-}))
+// Mock Supabase server client with robust chain mock
+vi.mock('@/lib/supabase/server', () => {
+  const mockSalesData = [
+    { id: 's1', lat: 38.25, lng: -85.76, title: 'Yard Sale A', status: 'published' },
+    { id: 's2', lat: 38.26, lng: -85.75, title: 'Yard Sale B', status: 'published' },
+  ]
+  
+  const mockClient = makeSupabaseClientMock({
+    sales_v2: [
+      { data: mockSalesData, error: null }, // For regular queries
+      { data: [], error: null }, // For count queries
+    ],
+    items_v2: [
+      { data: [], error: null }, // For category filtering queries
+    ]
+  })
+  
+  return {
+    createSupabaseServerClient: vi.fn(() => mockClient)
+  }
+})
 
 // Import after mocking
 import { GET } from '@/app/api/sales/route'

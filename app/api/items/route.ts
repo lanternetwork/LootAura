@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json()
-    const { title, description, price, sale_id, category, condition } = body
+    const { title, description, price, sale_id, category, condition, image_url } = body
     
     if (!sale_id) {
       return NextResponse.json({ error: 'Sale ID is required' }, { status: 400 })
@@ -85,6 +86,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Sale not found or access denied' }, { status: 400 })
     }
     
+    // Validate optional image URL
+    if (image_url && !isAllowedImageUrl(image_url)) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[ITEMS] Rejected image_url', image_url)
+      }
+      return NextResponse.json({ error: 'Invalid image_url' }, { status: 400 })
+    }
+
     const { data, error } = await supabase
       .from('items_v2')
       .insert({
@@ -94,6 +103,7 @@ export async function POST(request: NextRequest) {
         price,
         category,
         condition,
+        image_url: image_url || null,
         owner_id: user.id // This will be enforced by RLS
       })
       .select()
@@ -129,8 +139,16 @@ export async function PUT(request: NextRequest) {
     }
     
     const body = await request.json()
-    const { title, description, price, category, condition } = body
-    
+    const { title, description, price, category, condition, image_url } = body
+
+    // Validate optional image URL
+    if (image_url && !isAllowedImageUrl(image_url)) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[ITEMS] Rejected image_url on update', image_url)
+      }
+      return NextResponse.json({ error: 'Invalid image_url' }, { status: 400 })
+    }
+
     const { data, error } = await supabase
       .from('items_v2')
       .update({
@@ -138,7 +156,8 @@ export async function PUT(request: NextRequest) {
         description,
         price,
         category,
-        condition
+        condition,
+        image_url: image_url || null
       })
       .eq('id', itemId)
       .select()

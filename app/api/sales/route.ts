@@ -8,6 +8,7 @@ import { toDbSet } from '@/lib/shared/categoryContract'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { z } from 'zod'
+import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
@@ -656,7 +657,15 @@ async function postHandler(request: NextRequest) {
     
     const body = await request.json()
     
-    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact } = body
+    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url } = body
+
+    // Validate optional cover image URL
+    if (cover_image_url && !isAllowedImageUrl(cover_image_url)) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Rejected cover_image_url', cover_image_url)
+      }
+      return NextResponse.json({ error: 'Invalid cover_image_url' }, { status: 400 })
+    }
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
@@ -675,6 +684,7 @@ async function postHandler(request: NextRequest) {
         time_start,
         date_end,
         time_end,
+        cover_image_url: cover_image_url || null,
         status: 'published',
         owner_id: user.id // Server-side binding - never trust client
       })

@@ -262,6 +262,8 @@ This project uses configurable Supabase schemas via environment variables. The s
 - `UPSTASH_REDIS_REST_URL` - Upstash Redis URL for rate limiting
 - `UPSTASH_REDIS_REST_TOKEN` - Upstash Redis token
 - `NOMINATIM_APP_EMAIL` - Email for Nominatim geocoding service
+- `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` - Cloudinary cloud name for image uploads
+- `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` - Cloudinary upload preset for image uploads
 
 ### Development
 

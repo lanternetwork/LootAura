@@ -47,6 +47,23 @@ describe('Sales Image Fields Persistence', () => {
       data: { user: { id: 'test-user-id' } },
       error: null
     })
+
+    // Mock successful insert/update responses
+    mockSupabaseClient.from().insert().select().single.mockResolvedValue({
+      data: { id: 'test-sale-id', title: 'Test Sale' },
+      error: null
+    })
+
+    mockSupabaseClient.from().update().eq().select().single.mockResolvedValue({
+      data: { id: 'test-item-id', name: 'Test Item' },
+      error: null
+    })
+
+    // Mock sale ownership check
+    mockSupabaseClient.from().select().eq().eq().single.mockResolvedValue({
+      data: { id: 'test-sale-id', owner_id: 'test-user-id' },
+      error: null
+    })
   })
 
   describe('POST /api/sales', () => {
@@ -157,14 +174,6 @@ describe('Sales Image Fields Persistence', () => {
   })
 
   describe('POST /api/items', () => {
-    beforeEach(() => {
-      // Mock sale ownership check
-      mockSupabaseClient.from().select().eq().eq().single.mockResolvedValue({
-        data: { id: 'test-sale-id', owner_id: 'test-user-id' },
-        error: null
-      })
-    })
-
     it('should accept valid image_url', async () => {
       const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
       vi.mocked(isAllowedImageUrl).mockReturnValue(true)

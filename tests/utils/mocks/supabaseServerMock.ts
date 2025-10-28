@@ -11,7 +11,26 @@ export function makeSupabaseFromMock(map: Record<string, Array<{ data: any; erro
 
     // Builder chain object (will be returned by every method)
     const chain: any = {
-      select: vi.fn(() => chain),
+      select: vi.fn((columns?: string | string[], options?: any) => {
+        // Handle count queries with head: true
+        if (options?.count === 'exact' && options?.head === true) {
+          return {
+            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+            gte: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+            lte: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+            in: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+            or: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+            order: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+            range: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+            limit: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+            single: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+            maybeSingle: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+            then: (onFulfilled: any, onRejected: any) => Promise.resolve({ count: 0, error: null }).then(onFulfilled, onRejected),
+          }
+        }
+        // Regular select query - return the chain
+        return chain
+      }),
       eq: vi.fn(() => chain),
       gte: vi.fn(() => chain),
       lte: vi.fn(() => chain),

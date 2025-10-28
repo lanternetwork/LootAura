@@ -55,8 +55,7 @@
     "react-photoswipe-gallery": "^3.0.1",
     "react-share": "^5.1.0",
     "react-spinners": "^0.14.1",
-    "react-toastify": "^10.0.5",
-    "nodemailer": "^7.0.7"
+    "react-toastify": "^10.0.5"
   },
   "devDependencies": {
     "eslint-config-next": "^14.2.15",

@@ -116,6 +116,13 @@ vi.mock('@/lib/supabase/server', () => ({
       chain.update = vi.fn(() => chain)
       chain.delete = vi.fn(() => chain)
       chain.eq = vi.fn(() => chain)
+      chain.gte = vi.fn(() => chain)
+      chain.lte = vi.fn(() => chain)
+      chain.in = vi.fn(() => chain)
+      chain.or = vi.fn(() => chain)
+      chain.order = vi.fn(() => chain)
+      chain.range = vi.fn(() => Promise.resolve({ data: [], error: null }))
+      chain.limit = vi.fn(() => Promise.resolve({ data: [], error: null }))
       chain.single = vi.fn(async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
       return chain
     }),

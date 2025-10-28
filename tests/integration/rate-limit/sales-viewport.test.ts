@@ -83,66 +83,6 @@ vi.mock('@/lib/rateLimit/headers', () => ({
   applyRateHeaders: vi.fn((response) => response)
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => ({
-    from: vi.fn((tableName: string) => {
-      if (tableName === 'sales_v2') {
-        return {
-          select: vi.fn((columns: string | string[], options?: any) => {
-            if (options?.count === 'exact' && options?.head === true) {
-              // Count query
-              return {
-                eq: vi.fn().mockResolvedValue({
-                  count: 0,
-                  error: null
-                })
-              }
-            } else {
-              // Regular select query - return a properly mocked chain
-              const mockChain = {
-                gte: vi.fn().mockReturnThis(),
-                lte: vi.fn().mockReturnThis(),
-                in: vi.fn().mockReturnThis(),
-                or: vi.fn().mockReturnThis(),
-                order: vi.fn().mockReturnThis(),
-                range: vi.fn().mockResolvedValue({
-                  data: [],
-                  error: null
-                })
-              }
-              return mockChain
-            }
-          })
-        }
-      } else if (tableName === 'items_v2') {
-        return {
-          select: vi.fn(() => ({
-            limit: vi.fn().mockResolvedValue({
-              data: [],
-              error: null
-            }),
-            in: vi.fn().mockResolvedValue({
-              data: [],
-              error: null
-            })
-          }))
-        }
-      }
-      return {
-        select: vi.fn(() => ({
-          gte: vi.fn().mockReturnThis(),
-          lte: vi.fn().mockReturnThis(),
-          order: vi.fn().mockReturnThis(),
-          range: vi.fn().mockResolvedValue({
-            data: [],
-            error: null
-          })
-        }))
-      }
-    })
-  }))
-}))
-
 // Import after mocking
 import { GET } from '@/app/api/sales/route'
 import { check } from '@/lib/rateLimit/limiter'

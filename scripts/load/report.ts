@@ -1,6 +1,6 @@
 import { writeFileSync } from 'fs'
 import { join } from 'path'
-import { LoadTestResult } from '../scripts/load/harness'
+import { LoadTestResult } from './harness'
 import { getRateLimitStatus } from '@/lib/rateLimit/ops'
 
 export interface LoadTestReport {
@@ -91,11 +91,11 @@ function analyzeSalesViewportPolicy(results: LoadTestResult[]): string {
   const burstResult = salesResults.find(r => r.config.label === 'sales-burst')
   if (!burstResult) return 'No burst test data'
   
-  const first429 = burstResult.metrics.requests.find(r => r.status === 429)
+  const first429 = burstResult.metrics.requests.find((r: any) => r.status === 429)
   if (!first429) return 'No 429 responses observed'
   
   const timeTo429 = (first429.timestamp - burstResult.metrics.requests[0].timestamp) / 1000
-  const requestsBefore429 = burstResult.metrics.requests.filter(r => r.timestamp < first429.timestamp).length
+  const requestsBefore429 = burstResult.metrics.requests.filter((r: any) => r.timestamp < first429.timestamp).length
   
   return `${requestsBefore429} req before 429 at ${timeTo429.toFixed(1)}s`
 }
@@ -115,10 +115,10 @@ function analyzeGeoZipShortPolicy(results: LoadTestResult[]): string {
   const geoResult = results.find(r => r.config.label === 'geo-abuse')
   if (!geoResult) return 'No geocoding abuse test data'
   
-  const first429 = geoResult.metrics.requests.find(r => r.status === 429)
+  const first429 = geoResult.metrics.requests.find((r: any) => r.status === 429)
   if (!first429) return 'No 429 responses observed'
   
-  const requestsBefore429 = geoResult.metrics.requests.filter(r => r.timestamp < first429.timestamp).length
+  const requestsBefore429 = geoResult.metrics.requests.filter((r: any) => r.timestamp < first429.timestamp).length
   const timeTo429 = (first429.timestamp - geoResult.metrics.requests[0].timestamp) / 1000
   
   return `${requestsBefore429} req before 429 at ${timeTo429.toFixed(1)}s`
@@ -141,7 +141,7 @@ function analyzeAuthDefaultPolicy(results: LoadTestResult[]): string {
   const authResult = authResults.find(r => r.metrics.requests.includes(first429))
   if (!authResult) return 'No matching auth result'
   
-  const requestsBefore429 = authResult.metrics.requests.filter(r => r.timestamp < first429.timestamp).length
+  const requestsBefore429 = authResult.metrics.requests.filter((r: any) => r.timestamp < first429.timestamp).length
   const timeTo429 = (first429.timestamp - authResult.metrics.requests[0].timestamp) / 1000
   
   return `${requestsBefore429} req before 429 at ${timeTo429.toFixed(1)}s`
@@ -159,10 +159,10 @@ function analyzeMutationMinutePolicy(results: LoadTestResult[]): string {
   const mutationResult = results.find(r => r.config.label === 'mutation-sales')
   if (!mutationResult) return 'No mutation test data'
   
-  const first429 = mutationResult.metrics.requests.find(r => r.status === 429)
+  const first429 = mutationResult.metrics.requests.find((r: any) => r.status === 429)
   if (!first429) return 'No 429 responses observed'
   
-  const requestsBefore429 = mutationResult.metrics.requests.filter(r => r.timestamp < first429.timestamp).length
+  const requestsBefore429 = mutationResult.metrics.requests.filter((r: any) => r.timestamp < first429.timestamp).length
   const timeTo429 = (first429.timestamp - mutationResult.metrics.requests[0].timestamp) / 1000
   
   return `${requestsBefore429} req before 429 at ${timeTo429.toFixed(1)}s`
@@ -174,7 +174,7 @@ function generateFindings(results: LoadTestResult[]): string[] {
   // Check for soft limit behavior
   const salesBurst = results.find(r => r.config.label === 'sales-burst')
   if (salesBurst) {
-    const softLimitedRequests = salesBurst.metrics.requests.filter(r => 
+    const softLimitedRequests = salesBurst.metrics.requests.filter((r: any) => 
       r.status === 200 && r.rateLimitRemaining === '0' && !r.retryAfter
     )
     if (softLimitedRequests.length > 0) {
@@ -183,15 +183,15 @@ function generateFindings(results: LoadTestResult[]): string[] {
   }
   
   // Check Retry-After consistency
-  const all429s = results.flatMap(r => r.metrics.requests.filter(req => req.status === 429))
-  const withRetryAfter = all429s.filter(r => r.retryAfter)
+  const all429s = results.flatMap(r => r.metrics.requests.filter((req: any) => req.status === 429))
+  const withRetryAfter = all429s.filter((r: any) => r.retryAfter)
   if (withRetryAfter.length > 0) {
     findings.push(`✅ Retry-After headers present: ${withRetryAfter.length}/${all429s.length} 429 responses include Retry-After`)
   }
   
   // Check header consistency
   const allRequests = results.flatMap(r => r.metrics.requests)
-  const withRateLimitHeaders = allRequests.filter(r => r.rateLimitLimit && r.rateLimitRemaining)
+  const withRateLimitHeaders = allRequests.filter((r: any) => r.rateLimitLimit && r.rateLimitRemaining)
   if (withRateLimitHeaders.length > 0) {
     findings.push(`✅ Rate limit headers consistent: ${withRateLimitHeaders.length}/${allRequests.length} responses include X-RateLimit headers`)
   }

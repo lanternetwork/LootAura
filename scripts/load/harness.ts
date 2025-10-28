@@ -54,7 +54,6 @@ export class LoadTestHarness {
 
     // Calculate metrics
     const metrics: ScenarioMetrics = {
-      scenario: this.config.label,
       ...calculateMetrics(this.requests),
       requests: this.requests
     }

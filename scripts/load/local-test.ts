@@ -99,7 +99,7 @@ async function runLocalTest(options: LocalTestOptions): Promise<void> {
   // Set production-like environment
   const env = {
     ...process.env,
-    NODE_ENV: 'production',
+    NODE_ENV: 'production' as const,
     RATE_LIMITING_ENABLED: 'true'
   }
   
@@ -111,7 +111,7 @@ async function runLocalTest(options: LocalTestOptions): Promise<void> {
       env,
       stdio: 'inherit',
       cwd: process.cwd()
-    })
+    }) as ChildProcess
     
     child.on('close', (code) => {
       if (code === 0) {

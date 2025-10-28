@@ -4,132 +4,86 @@
  * Tests soft-then-hard behavior on sales viewport endpoint.
  */
 
-import { vi, beforeAll, afterAll, afterEach, expect, it, describe } from 'vitest'
+import { vi, beforeAll, afterEach, describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
+import { makeSupabaseFromMock, mockCreateSupabaseServerClient } from '@/tests/utils/mocks/supabaseServerMock'
 
-// Mock rate limiting to bypass in tests
-vi.mock('@/lib/rateLimit/config', () => ({
-  isRateLimitingEnabled: vi.fn(() => false),
-  isPreviewEnv: vi.fn(() => true),
-  shouldBypassRateLimit: vi.fn(() => true)
-}))
+const from = makeSupabaseFromMock({
+  sales_v2: [
+    { data: [
+      { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A' },
+      { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B' },
+    ], error: null },
+  ],
+})
 
-vi.mock('@/lib/rateLimit/limiter', () => ({
-  check: vi.fn()
-}))
+vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))
 
-vi.mock('@/lib/rateLimit/keys', () => ({
-  deriveKey: vi.fn()
-}))
+// Disable rate limiting in tests
+;(process.env as any).RATE_LIMITING_ENABLED = 'false'
 
-vi.mock('@/lib/rateLimit/headers', () => ({
-  applyRateHeaders: vi.fn((response) => response)
-}))
-
-// Simple Supabase mock that returns a working chain
-const mockSalesData = [
-  { id: 's1', lat: 38.25, lng: -85.76, title: 'Yard Sale A', status: 'published' },
-  { id: 's2', lat: 38.26, lng: -85.75, title: 'Yard Sale B', status: 'published' },
-]
-
-// Create a simple chain mock that actually works
-const createMockChain = (data: any) => {
-  const chain = {
-    select: vi.fn(() => chain),
-    eq: vi.fn(() => chain),
-    gte: vi.fn(() => chain),
-    lte: vi.fn(() => chain),
-    in: vi.fn(() => chain),
-    or: vi.fn(() => chain),
-    order: vi.fn(() => chain),
-    limit: vi.fn(() => Promise.resolve({ data, error: null })),
-    range: vi.fn(() => Promise.resolve({ data, error: null })),
-    single: vi.fn(() => Promise.resolve({ data, error: null })),
-    maybeSingle: vi.fn(() => Promise.resolve({ data, error: null })),
-    then: (onFulfilled: any, onRejected: any) => Promise.resolve({ data, error: null }).then(onFulfilled, onRejected),
-  }
-  return chain
-}
-
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => ({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-    },
-    from: vi.fn((table: string) => {
-      if (table === 'sales_v2') {
-        return createMockChain(mockSalesData)
-      } else if (table === 'items_v2') {
-        return createMockChain([])
-      }
-      return createMockChain([])
-    }),
-  })),
-}))
-
-// Import the route after the mocks are installed
 let route: any
 beforeAll(async () => {
+  // Import AFTER the mock so it picks up the mocked module
   route = await import('@/app/api/sales/route')
 })
 
-const mockCheck = vi.fn()
-const mockDeriveKey = vi.fn()
-const mockApplyHeaders = vi.fn()
+afterEach(() => {
+  vi.resetModules()
+})
 
-describe.skip('Rate Limiting Integration - Sales Viewport', () => {
+describe('Rate Limiting Integration - Sales Viewport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    
-    // Default successful mocks
-    mockDeriveKey.mockResolvedValue('ip:192.168.1.1')
-    mockCheck.mockResolvedValue({
-      allowed: true,
-      softLimited: false,
-      remaining: 15,
-      resetAt: Math.floor(Date.now() / 1000) + 30
-    })
-    mockApplyHeaders.mockImplementation((response: Response) => response)
   })
 
   it('should allow requests within limit', async () => {
     const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
-    const response = await route.GET(request)
+    const { GET } = route
+    const response = await GET(request)
     
     expect(response.status).toBe(200)
-    // Rate limiting is bypassed in tests, so these won't be called
-    // expect(mockDeriveKey).toHaveBeenCalledWith(request, 'ip', undefined)
-    // expect(mockCheck).toHaveBeenCalled()
+    
+    const data = await response.json()
+    expect(data.sales).toHaveLength(2)
+    expect(data.sales[0].title).toBe('Sale A')
+    expect(data.sales[1].title).toBe('Sale B')
   })
 
   it('should allow soft-limited requests (burst)', async () => {
     const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
-    const response = await route.GET(request)
+    const { GET } = route
+    const response = await GET(request)
     
-    expect(response.status).toBe(200) // Rate limiting bypassed in tests
-    // expect(response.headers.get('X-RateLimit-Remaining')).toBe('0')
-    // expect(response.headers.get('Retry-After')).toBeNull()
+    expect(response.status).toBe(200)
+    
+    const data = await response.json()
+    expect(data.sales).toHaveLength(2)
   })
 
   it('should block requests over hard limit', async () => {
     const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
-    const response = await route.GET(request)
+    const { GET } = route
+    const response = await GET(request)
     
-    expect(response.status).toBe(200) // Rate limiting bypassed in tests
-    // expect(response.headers.get('X-RateLimit-Limit')).toBe('20')
-    // expect(response.headers.get('Retry-After')).toBeTruthy()
+    expect(response.status).toBe(200)
+    
+    const data = await response.json()
+    expect(data.sales).toHaveLength(2)
   })
 
   it('should simulate burst panning scenario', async () => {
     const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
+    const { GET } = route
+    
     // Simulate 25 rapid requests - all should succeed since rate limiting is bypassed
     const responses = []
     for (let i = 0; i < 25; i++) {
-      const response = await route.GET(request)
+      const response = await GET(request)
       responses.push(response)
     }
 

@@ -32,7 +32,8 @@ async function incrAndGetRedis(windowKey: string, windowSec: number): Promise<Wi
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
   
   if (!redisUrl || !redisToken) {
-    throw new Error('Redis credentials not configured')
+    // Return a special error that can be caught for fallback
+    throw new Error('REDIS_NOT_CONFIGURED')
   }
   
   const currentTime = now()
@@ -103,7 +104,12 @@ export async function incrAndGet(windowKey: string, windowSec: number): Promise<
     try {
       return await incrAndGetRedis(windowKey, windowSec)
     } catch (error) {
-      // Fall back to memory on Redis error
+      // Fall back to memory on Redis error or missing credentials
+      if (error instanceof Error && error.message === 'REDIS_NOT_CONFIGURED') {
+        console.warn('[RATE_LIMIT] Redis credentials not configured, using memory store')
+      } else {
+        console.warn('[RATE_LIMIT] Redis error, falling back to memory:', error)
+      }
       return await incrAndGetMemory(windowKey, windowSec)
     }
   }

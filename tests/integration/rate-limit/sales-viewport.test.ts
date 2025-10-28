@@ -15,7 +15,57 @@ vi.mock('@/lib/rateLimit/config', () => ({
 }))
 
 vi.mock('@/lib/rateLimit/withRateLimit', () => ({
-  withRateLimit: vi.fn((handler) => handler) // Just pass through the handler for now
+  withRateLimit: vi.fn((handler, policies) => {
+    return async (req: any) => {
+      // Simulate rate limiting logic
+      const { deriveKey } = await import('@/lib/rateLimit/keys')
+      const { check } = await import('@/lib/rateLimit/limiter')
+      const { applyRateHeaders } = await import('@/lib/rateLimit/headers')
+
+      const userId = undefined
+      const results = []
+
+      for (const policy of policies) {
+        const key = await deriveKey(req, policy.scope, userId)
+        results.push(await check(policy, key))
+      }
+
+      // Find the most restrictive result
+      let mostRestrictive = results.find(r => !r.allowed) || results.find(r => r.softLimited) || results[0]
+
+      if (!mostRestrictive) {
+        return handler(req)
+      }
+
+      // Handle hard limit
+      if (!mostRestrictive.allowed) {
+        const { NextResponse } = await import('next/server')
+        const errorResponse = NextResponse.json(
+          { error: 'rate_limited', message: 'Too many requests. Please slow down.' },
+          { status: 429 }
+        )
+
+        return applyRateHeaders(
+          errorResponse,
+          mostRestrictive.policy,
+          mostRestrictive.remaining,
+          mostRestrictive.resetAt,
+          mostRestrictive.softLimited
+        )
+      }
+
+      // Call handler and apply headers
+      const response = await handler(req)
+
+      return applyRateHeaders(
+        response,
+        mostRestrictive.policy,
+        mostRestrictive.remaining,
+        mostRestrictive.resetAt,
+        mostRestrictive.softLimited
+      )
+    }
+  })
 }))
 
 vi.mock('@/lib/rateLimit/limiter', () => ({
@@ -45,27 +95,19 @@ vi.mock('@/lib/supabase/server', () => ({
                 })
               }
             } else {
-              // Regular select query - create a chainable mock
-              const createChainableMock = () => {
-                const mockFn = vi.fn(() => createChainableMock())
-                mockFn.mockResolvedValue = vi.fn(() => mockFn)
-                return mockFn
+              // Regular select query - return a properly mocked chain
+              const mockChain = {
+                gte: vi.fn().mockReturnThis(),
+                lte: vi.fn().mockReturnThis(),
+                in: vi.fn().mockReturnThis(),
+                or: vi.fn().mockReturnThis(),
+                order: vi.fn().mockReturnThis(),
+                range: vi.fn().mockResolvedValue({
+                  data: [],
+                  error: null
+                })
               }
-              
-              const chainableMock = createChainableMock()
-              chainableMock.mockResolvedValue({
-                data: [],
-                error: null
-              })
-              
-              return {
-                gte: chainableMock,
-                lte: chainableMock,
-                in: chainableMock,
-                or: chainableMock,
-                order: chainableMock,
-                range: chainableMock
-              }
+              return mockChain
             }
           })
         }

@@ -1,0 +1,63 @@
+name: Release on Tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  changelog-and-sentry:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate CHANGELOG.md
+        run: |
+          npx --yes conventional-changelog-cli -p angular -i CHANGELOG.md -s
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "chore(release): update CHANGELOG for ${GITHUB_REF_NAME}" || echo "No changes to commit"
+          git push || true
+
+      - name: Create Sentry release
+        if: env.SENTRY_AUTH_TOKEN && env.SENTRY_ORG && env.SENTRY_PROJECT
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: |
+          npx --yes @sentry/cli releases new "${GITHUB_REF_NAME}"
+          npx --yes @sentry/cli releases set-commits --auto "${GITHUB_REF_NAME}"
+          npx --yes @sentry/cli releases finalize "${GITHUB_REF_NAME}"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build
+        run: npm run build
+
+

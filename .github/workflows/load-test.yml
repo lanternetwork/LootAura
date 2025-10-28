@@ -1,0 +1,107 @@
+name: Load Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseURL:
+        description: "Target base URL (e.g., https://<preview>.vercel.app or http://localhost:3000 via tunnel)"
+        required: true
+        type: string
+      scenario:
+        description: "Scenario to run"
+        required: true
+        type: choice
+        options:
+          - all
+          - sales-baseline
+          - sales-burst
+          - sales-sustained
+          - geo-cache-warmup
+          - geo-abuse
+          - auth-signin
+          - auth-magic-link
+          - mutation-sales
+          - multi-ip-sales
+
+jobs:
+  run-load-tests:
+    name: Run Load Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: production
+      RATE_LIMITING_ENABLED: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Show inputs
+        run: |
+          echo "Base URL: ${{ inputs.baseURL }}"
+          echo "Scenario: ${{ inputs.scenario }}"
+
+      - name: Run load test(s)
+        id: run
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="${{ inputs.baseURL }}"
+          SCEN="${{ inputs.scenario }}"
+          mkdir -p load-results
+
+          run_scn() {
+            local SC="$1"
+            echo "::group::Running scenario: ${SC}"
+            # Use npx to run tsx without requiring a global install
+            # Pipe to tee to capture logs per scenario
+            npx --yes tsx scripts/load/cli.ts --scenario "${SC}" --baseURL "${BASE_URL}" \
+              | tee "load-results/${SC}.log"
+            echo "::endgroup::"
+          }
+
+          if [ "$SCEN" = "all" ]; then
+            for s in \
+              sales-baseline \
+              sales-burst \
+              sales-sustained \
+              geo-cache-warmup \
+              geo-abuse \
+              auth-signin \
+              auth-magic-link \
+              mutation-sales \
+              multi-ip-sales; do
+              run_scn "$s"
+            done
+          else
+            run_scn "$SCEN"
+          fi
+
+          echo "All requested scenarios completed." | tee load-results/summary.txt
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-results-${{ github.run_id }}
+          path: load-results/**
+          if-no-files-found: warn
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "# Load Test Summary";
+            echo "- Base URL: ${{ inputs.baseURL }}";
+            echo "- Scenario: ${{ inputs.scenario }}";
+            echo "- Logs: uploaded as artifact 'load-results-${{ github.run_id }}'";
+          } >> "$GITHUB_STEP_SUMMARY"
+
+

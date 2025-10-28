@@ -31,11 +31,14 @@ vi.mock('@/lib/rateLimit/withRateLimit', () => ({
       }
 
       // Find the most restrictive result
-      let mostRestrictive = results.find(r => !r.allowed) || results.find(r => r.softLimited) || results[0]
+      const mostRestrictive = results.find(r => !r.allowed) || results.find(r => r.softLimited) || results[0]
 
       if (!mostRestrictive) {
         return handler(req)
       }
+
+      // Get the policy for the most restrictive result
+      const mostRestrictivePolicy = policies[0] // Use first policy for simplicity
 
       // Handle hard limit
       if (!mostRestrictive.allowed) {
@@ -47,7 +50,7 @@ vi.mock('@/lib/rateLimit/withRateLimit', () => ({
 
         return applyRateHeaders(
           errorResponse,
-          mostRestrictive.policy,
+          mostRestrictivePolicy,
           mostRestrictive.remaining,
           mostRestrictive.resetAt,
           mostRestrictive.softLimited
@@ -59,7 +62,7 @@ vi.mock('@/lib/rateLimit/withRateLimit', () => ({
 
       return applyRateHeaders(
         response,
-        mostRestrictive.policy,
+        mostRestrictivePolicy,
         mostRestrictive.remaining,
         mostRestrictive.resetAt,
         mostRestrictive.softLimited

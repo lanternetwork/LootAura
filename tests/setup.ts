@@ -4,7 +4,7 @@ import { vi } from 'vitest'
 
 // Ensure rate limiting is bypassed in tests
 process.env.RATE_LIMITING_ENABLED = 'false'
-process.env.NODE_ENV = 'test'
+// NODE_ENV is read-only, but tests should run with bypass anyway
 
 // Minimal globals to satisfy failing tests
 // Functional ResizeObserver mock with simulation hook used by tests
@@ -103,8 +103,9 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
-// Supabase server mock used by tests
+// Supabase server mock used by tests - DISABLED to allow test-specific mocks
 // @ts-ignore vitest mock hoisting in test env
+/*
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => ({
     auth: {
@@ -173,6 +174,7 @@ vi.mock('@/lib/supabase/server', () => ({
     }),
   })),
 }))
+*/
 
 // Geocode mock ensuring non-null for valid addresses
 // @ts-ignore vitest mock hoisting in test env

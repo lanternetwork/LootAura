@@ -13,6 +13,14 @@ interface LoadTestRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // Disable load testing in production for security reasons
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'Load testing is disabled in production environment' },
+        { status: 403 }
+      )
+    }
+
     const body: LoadTestRequest = await request.json()
     const { scenario, baseURL = 'http://localhost:3000', ip, userToken } = body
 

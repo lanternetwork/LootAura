@@ -3,14 +3,18 @@ import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/admin/load-test/route'
 
 // Mock child_process to prevent actual process spawning
-vi.mock('child_process', () => ({
-  spawn: vi.fn(() => ({
-    on: vi.fn(),
-    stdout: { on: vi.fn() },
-    stderr: { on: vi.fn() },
-    kill: vi.fn()
-  }))
-}))
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual,
+    spawn: vi.fn(() => ({
+      on: vi.fn(),
+      stdout: { on: vi.fn() },
+      stderr: { on: vi.fn() },
+      kill: vi.fn()
+    }))
+  }
+})
 
 describe('Admin Load Test API', () => {
   beforeEach(() => {
@@ -21,8 +25,10 @@ describe('Admin Load Test API', () => {
     // Mock actual production environment
     const originalNodeEnv = process.env.NODE_ENV
     const originalVercelEnv = process.env.VERCEL_ENV
-    process.env.NODE_ENV = 'production'
-    process.env.VERCEL_ENV = 'production'
+    
+    // Use Object.defineProperty to override read-only properties
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', configurable: true })
+    Object.defineProperty(process.env, 'VERCEL_ENV', { value: 'production', configurable: true })
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -43,8 +49,8 @@ describe('Admin Load Test API', () => {
       expect(data.error).toBe('Load testing is disabled in production environment')
     } finally {
       // Restore original environment
-      process.env.NODE_ENV = originalNodeEnv
-      process.env.VERCEL_ENV = originalVercelEnv
+      Object.defineProperty(process.env, 'NODE_ENV', { value: originalNodeEnv, configurable: true })
+      Object.defineProperty(process.env, 'VERCEL_ENV', { value: originalVercelEnv, configurable: true })
     }
   })
 
@@ -52,8 +58,9 @@ describe('Admin Load Test API', () => {
     // Mock staging environment (production build but not production deployment)
     const originalNodeEnv = process.env.NODE_ENV
     const originalVercelEnv = process.env.VERCEL_ENV
-    process.env.NODE_ENV = 'production'
-    process.env.VERCEL_ENV = 'preview' // or 'development'
+    
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'production', configurable: true })
+    Object.defineProperty(process.env, 'VERCEL_ENV', { value: 'preview', configurable: true })
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -73,15 +80,15 @@ describe('Admin Load Test API', () => {
       expect(response.status).not.toBe(403)
     } finally {
       // Restore original environment
-      process.env.NODE_ENV = originalNodeEnv
-      process.env.VERCEL_ENV = originalVercelEnv
+      Object.defineProperty(process.env, 'NODE_ENV', { value: originalNodeEnv, configurable: true })
+      Object.defineProperty(process.env, 'VERCEL_ENV', { value: originalVercelEnv, configurable: true })
     }
   })
 
   it('should allow load testing in development environment', async () => {
     // Mock development environment
     const originalEnv = process.env.NODE_ENV
-    process.env.NODE_ENV = 'development'
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', configurable: true })
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -101,14 +108,14 @@ describe('Admin Load Test API', () => {
       expect(response.status).not.toBe(403)
     } finally {
       // Restore original environment
-      process.env.NODE_ENV = originalEnv
+      Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, configurable: true })
     }
   })
 
   it('should allow load testing in test environment', async () => {
     // Mock test environment
     const originalEnv = process.env.NODE_ENV
-    process.env.NODE_ENV = 'test'
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'test', configurable: true })
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -128,14 +135,14 @@ describe('Admin Load Test API', () => {
       expect(response.status).not.toBe(403)
     } finally {
       // Restore original environment
-      process.env.NODE_ENV = originalEnv
+      Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, configurable: true })
     }
   })
 
   it('should validate scenario parameter', async () => {
     // Mock development environment
     const originalEnv = process.env.NODE_ENV
-    process.env.NODE_ENV = 'development'
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', configurable: true })
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -157,14 +164,14 @@ describe('Admin Load Test API', () => {
       expect(data.validScenarios).toBeDefined()
     } finally {
       // Restore original environment
-      process.env.NODE_ENV = originalEnv
+      Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, configurable: true })
     }
   })
 
   it('should handle missing scenario parameter', async () => {
     // Mock development environment
     const originalEnv = process.env.NODE_ENV
-    process.env.NODE_ENV = 'development'
+    Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', configurable: true })
 
     try {
       const request = new NextRequest('http://localhost:3000/api/admin/load-test', {
@@ -184,7 +191,7 @@ describe('Admin Load Test API', () => {
       expect(data.error).toBe('Invalid scenario')
     } finally {
       // Restore original environment
-      process.env.NODE_ENV = originalEnv
+      Object.defineProperty(process.env, 'NODE_ENV', { value: originalEnv, configurable: true })
     }
   })
 })

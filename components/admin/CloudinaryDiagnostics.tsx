@@ -1,14 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-
-declare global {
-  interface Window {
-    cloudinary: {
-      createUploadWidget: (config: any, callback: (error: any, result: any) => void) => any
-    }
-  }
-}
+import { CheckCircleIcon, XCircleIcon, InformationCircleIcon } from '@heroicons/react/20/solid'
+import { ENV_PUBLIC } from '@/lib/env'
+import Image from 'next/image'
+import nextConfig from '../../../next.config.js' // Adjust path as needed
 
 interface CloudinaryStatus {
   cloudNamePresent: boolean
@@ -204,14 +200,3 @@ export default function CloudinaryDiagnostics() {
   )
 }
 
-declare global {
-  interface Window {
-    cloudinary: {
-      createUploadWidget: (config: any, callback: (error: any, result: any) => void) => {
-        open: () => void
-        close: () => void
-        destroy: () => void
-      }
-    }
-  }
-}

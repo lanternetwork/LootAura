@@ -117,6 +117,10 @@ vi.mock('@/lib/supabase/server', () => ({
       } else if (tableName === 'items_v2') {
         return {
           select: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue({
+              data: [],
+              error: null
+            }),
             in: vi.fn().mockResolvedValue({
               data: [],
               error: null

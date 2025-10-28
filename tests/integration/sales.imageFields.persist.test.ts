@@ -14,20 +14,29 @@ const mockSupabaseClient = {
   from: vi.fn(() => ({
     insert: vi.fn(() => ({
       select: vi.fn(() => ({
-        single: vi.fn()
+        single: vi.fn().mockResolvedValue({
+          data: { id: 'test-sale-id', title: 'Test Sale' },
+          error: null
+        })
       }))
     })),
     update: vi.fn(() => ({
       eq: vi.fn(() => ({
         select: vi.fn(() => ({
-          single: vi.fn()
+          single: vi.fn().mockResolvedValue({
+            data: { id: 'test-item-id', name: 'Test Item' },
+            error: null
+          })
         }))
       }))
     })),
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
         eq: vi.fn(() => ({
-          single: vi.fn()
+          single: vi.fn().mockResolvedValue({
+            data: { id: 'test-sale-id', owner_id: 'test-user-id' },
+            error: null
+          })
         }))
       }))
     }))
@@ -45,23 +54,6 @@ describe('Sales Image Fields Persistence', () => {
     // Mock authenticated user
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: { id: 'test-user-id' } },
-      error: null
-    })
-
-    // Mock successful insert/update responses
-    mockSupabaseClient.from().insert().select().single.mockResolvedValue({
-      data: { id: 'test-sale-id', title: 'Test Sale' },
-      error: null
-    })
-
-    mockSupabaseClient.from().update().eq().select().single.mockResolvedValue({
-      data: { id: 'test-item-id', name: 'Test Item' },
-      error: null
-    })
-
-    // Mock sale ownership check
-    mockSupabaseClient.from().select().eq().eq().single.mockResolvedValue({
-      data: { id: 'test-sale-id', owner_id: 'test-user-id' },
       error: null
     })
   })

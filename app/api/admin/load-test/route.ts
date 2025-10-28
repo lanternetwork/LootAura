@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     // Set production-like environment for local testing
     const env = {
       ...process.env,
-      NODE_ENV: 'production',
+      NODE_ENV: 'production' as const,
       RATE_LIMITING_ENABLED: 'true'
     }
 

@@ -4,9 +4,9 @@
  * Tests soft-then-hard behavior on sales viewport endpoint.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { vi, beforeAll, afterAll, afterEach, expect, it, describe } from 'vitest'
 import { NextRequest } from 'next/server'
-import { makeSupabaseClientMock } from '@/tests/utils/mocks/makeSupabaseQueryChain'
+import { makeSupabaseFromMock } from '@/tests/utils/mocks/makeSupabaseQueryChain'
 
 // Mock rate limiting to bypass in tests
 vi.mock('@/lib/rateLimit/config', () => ({
@@ -28,36 +28,39 @@ vi.mock('@/lib/rateLimit/headers', () => ({
 }))
 
 // Mock Supabase server client with robust chain mock
-vi.mock('@/lib/supabase/server', () => {
-  const mockSalesData = [
-    { id: 's1', lat: 38.25, lng: -85.76, title: 'Yard Sale A', status: 'published' },
-    { id: 's2', lat: 38.26, lng: -85.75, title: 'Yard Sale B', status: 'published' },
+const mockSalesData = [
+  { id: 's1', lat: 38.25, lng: -85.76, title: 'Yard Sale A', status: 'published' },
+  { id: 's2', lat: 38.26, lng: -85.75, title: 'Yard Sale B', status: 'published' },
+]
+
+const from = makeSupabaseFromMock({
+  sales_v2: [
+    { data: mockSalesData, error: null }, // For regular queries
+    { data: [], error: null }, // For count queries
+  ],
+  items_v2: [
+    { data: [], error: null }, // For category filtering queries
   ]
-  
-  const mockClient = makeSupabaseClientMock({
-    sales_v2: [
-      { data: mockSalesData, error: null }, // For regular queries
-      { data: [], error: null }, // For count queries
-    ],
-    items_v2: [
-      { data: [], error: null }, // For category filtering queries
-    ]
-  })
-  
-  return {
-    createSupabaseServerClient: vi.fn(() => mockClient)
-  }
 })
 
-// Import after mocking
-import { GET } from '@/app/api/sales/route'
-import { check } from '@/lib/rateLimit/limiter'
-import { deriveKey } from '@/lib/rateLimit/keys'
-import { applyRateHeaders } from '@/lib/rateLimit/headers'
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(() => ({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+    },
+    from, // returns our fluent chain
+  })),
+}))
 
-const mockCheck = check as any
-const mockDeriveKey = deriveKey as any
-const mockApplyHeaders = applyRateHeaders as any
+// Import the route after the mocks are installed
+let route: any
+beforeAll(async () => {
+  route = await import('@/app/api/sales/route') // path must be exact
+})
+
+const mockCheck = vi.fn()
+const mockDeriveKey = vi.fn()
+const mockApplyHeaders = vi.fn()
 
 describe('Rate Limiting Integration - Sales Viewport', () => {
   beforeEach(() => {
@@ -77,7 +80,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
   it('should allow requests within limit', async () => {
     const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
-    const response = await GET(request)
+    const response = await route.GET(request)
     
     expect(response.status).toBe(200)
     // Rate limiting is bypassed in tests, so these won't be called
@@ -88,7 +91,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
   it('should allow soft-limited requests (burst)', async () => {
     const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
-    const response = await GET(request)
+    const response = await route.GET(request)
     
     expect(response.status).toBe(200) // Rate limiting bypassed in tests
     // expect(response.headers.get('X-RateLimit-Remaining')).toBe('0')
@@ -98,7 +101,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
   it('should block requests over hard limit', async () => {
     const request = new NextRequest('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     
-    const response = await GET(request)
+    const response = await route.GET(request)
     
     expect(response.status).toBe(200) // Rate limiting bypassed in tests
     // expect(response.headers.get('X-RateLimit-Limit')).toBe('20')
@@ -111,7 +114,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
     // Simulate 25 rapid requests - all should succeed since rate limiting is bypassed
     const responses = []
     for (let i = 0; i < 25; i++) {
-      const response = await GET(request)
+      const response = await route.GET(request)
       responses.push(response)
     }
 

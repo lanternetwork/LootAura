@@ -10,8 +10,8 @@ import { makeSupabaseFromMock, mockCreateSupabaseServerClient } from '@/tests/ut
 
 const from = makeSupabaseFromMock({
   sales_v2: [
-    // First call: count query with head: true
-    { count: 2, error: null },
+    // First call: count query with head: true - this will be handled by the mock's count logic
+    { data: [], error: null },
     // Second call: items query for category filtering
     { data: [{ sale_id: 's1' }, { sale_id: 's2' }], error: null },
     // Third call: main sales query

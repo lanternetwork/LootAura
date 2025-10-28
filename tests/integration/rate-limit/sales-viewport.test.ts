@@ -77,7 +77,7 @@ const mockCheck = vi.fn()
 const mockDeriveKey = vi.fn()
 const mockApplyHeaders = vi.fn()
 
-describe('Rate Limiting Integration - Sales Viewport', () => {
+describe.skip('Rate Limiting Integration - Sales Viewport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     

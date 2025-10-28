@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { spawn } from 'child_process'
+import { spawn, ChildProcess } from 'child_process'
 import { join } from 'path'
 
 export const dynamic = 'force-dynamic'
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       RATE_LIMITING_ENABLED: 'true'
     }
 
-    return new Promise((resolve) => {
+    return new Promise<NextResponse>((resolve) => {
       const output: string[] = []
       let metrics: any = null
 
@@ -66,21 +66,21 @@ export async function POST(request: NextRequest) {
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: process.cwd()
-      })
+      }) as ChildProcess
 
       // Capture stdout
-      child.stdout?.on('data', (data) => {
+      child.stdout?.on('data', (data: Buffer) => {
         const lines = data.toString().split('\n').filter((line: string) => line.trim())
         output.push(...lines)
       })
 
       // Capture stderr
-      child.stderr?.on('data', (data) => {
+      child.stderr?.on('data', (data: Buffer) => {
         const lines = data.toString().split('\n').filter((line: string) => line.trim())
         output.push(...lines)
       })
 
-      child.on('close', (code) => {
+      child.on('close', (code: number | null) => {
         if (code === 0) {
           // Parse metrics from output
           const summaryLine = output.find(line => line.includes('Load Test Summary'))
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      child.on('error', (error) => {
+      child.on('error', (error: Error) => {
         resolve(NextResponse.json({
           success: false,
           scenario,

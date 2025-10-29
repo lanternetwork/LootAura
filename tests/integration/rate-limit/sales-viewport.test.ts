@@ -22,10 +22,11 @@ vi.mock('@/lib/supabase/server', () => ({
             eq: vi.fn(async () => ({ count: 2, error: null })),
           }
         }
-        // Regular select query - return the chain
+        // Regular select query - return the chain with all methods
         return chain
       })
       
+      // All these methods return the chain for fluent API
       chain.eq = vi.fn(() => chain)
       chain.gte = vi.fn(() => chain)
       chain.lte = vi.fn(() => chain)
@@ -84,7 +85,7 @@ afterEach(() => {
   vi.resetModules()
 })
 
-describe.skip('Rate Limiting Integration - Sales Viewport', () => {
+describe('Rate Limiting Integration - Sales Viewport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })

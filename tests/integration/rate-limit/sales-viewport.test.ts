@@ -9,57 +9,58 @@ import { NextRequest } from 'next/server'
 
 // Use vi.hoisted to ensure mocks are applied before any imports
 const mockSupabaseClient = vi.hoisted(() => ({
-  from: vi.fn((table: string) => {
-    // Create a chain object that returns itself for method chaining
-    const createChain = () => ({
-      select: vi.fn((columns?: string | string[], options?: any) => {
-        // Handle count query with head: true
-        if (options?.count === 'exact' && options?.head === true) {
-          return {
-            eq: vi.fn(() => Promise.resolve({ count: 2, error: null })),
-          }
+  from: vi.fn((_table: string) => {
+    // Stable fluent chain object
+    const chain: any = {}
+
+    chain.select = vi.fn((_: string | string[], options?: any) => {
+      // Handle count query with head: true
+      if (options?.count === 'exact' && options?.head === true) {
+        return {
+          eq: vi.fn(async () => ({ count: 2, error: null })),
         }
-        // Regular select query - return the chain
-        return createChain()
-      }),
-      eq: vi.fn(() => createChain()),
-      gte: vi.fn(() => createChain()),
-      lte: vi.fn(() => createChain()),
-      in: vi.fn(() => createChain()),
-      or: vi.fn(() => createChain()),
-      order: vi.fn(() => createChain()),
-      range: vi.fn(() => Promise.resolve({
-        data: [
-          { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-          { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
-        ],
-        error: null
-      })),
-      limit: vi.fn(() => Promise.resolve({
-        data: [
-          { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-          { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
-        ],
-        error: null
-      })),
-      single: vi.fn(() => Promise.resolve({
-        data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-        error: null
-      })),
-      maybeSingle: vi.fn(() => Promise.resolve({
-        data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-        error: null
-      })),
-      then: (onFulfilled: any, onRejected: any) => Promise.resolve({
-        data: [
-          { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-          { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
-        ],
-        error: null
-      }).then(onFulfilled, onRejected),
+      }
+      return chain
     })
-    
-    return createChain()
+
+    chain.eq = vi.fn(() => chain)
+    chain.gte = vi.fn(() => chain)
+    chain.lte = vi.fn(() => chain)
+    chain.in = vi.fn(() => chain)
+    chain.or = vi.fn(() => chain)
+    chain.order = vi.fn(() => chain)
+    chain.range = vi.fn(async () => ({
+      data: [
+        { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+        { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
+      ],
+      error: null,
+    }))
+    chain.limit = vi.fn(async () => ({
+      data: [
+        { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+        { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
+      ],
+      error: null,
+    }))
+    chain.single = vi.fn(async () => ({
+      data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+      error: null,
+    }))
+    chain.maybeSingle = vi.fn(async () => ({
+      data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+      error: null,
+    }))
+    chain.then = (onFulfilled: any, onRejected: any) =>
+      Promise.resolve({
+        data: [
+          { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+          { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
+        ],
+        error: null,
+      }).then(onFulfilled, onRejected)
+
+    return chain
   }),
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),

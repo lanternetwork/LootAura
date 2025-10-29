@@ -1,8 +1,11 @@
 import { vi } from 'vitest'
 
-type Result<T = any> = { data: T; error: null } | { data: null; error: { message: string } }
+type Result<T = any> =
+  | { data: T; error: null }
+  | { data: null; error: { message: string } }
+  | { count: number; error: null }
 
-export function makeSupabaseFromMock(map: Record<string, Array<{ data: any; error: any }>>) {
+export function makeSupabaseFromMock(map: Record<string, Result[]>) {
   return vi.fn((table: string) => {
     const results = map[table] ?? [{ data: [], error: null }]
     const queue = [...results]
@@ -15,17 +18,17 @@ export function makeSupabaseFromMock(map: Record<string, Array<{ data: any; erro
         // Handle count queries with head: true
         if (options?.count === 'exact' && options?.head === true) {
           return {
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            gte: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            lte: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            in: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            or: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            order: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            range: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            limit: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            single: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            maybeSingle: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            then: (onFulfilled: any, onRejected: any) => Promise.resolve({ count: 0, error: null }).then(onFulfilled, onRejected),
+            eq: vi.fn(() => Promise.resolve(next())),
+            gte: vi.fn(() => Promise.resolve(next())),
+            lte: vi.fn(() => Promise.resolve(next())),
+            in: vi.fn(() => Promise.resolve(next())),
+            or: vi.fn(() => Promise.resolve(next())),
+            order: vi.fn(() => Promise.resolve(next())),
+            range: vi.fn(() => Promise.resolve(next())),
+            limit: vi.fn(() => Promise.resolve(next())),
+            single: vi.fn(() => Promise.resolve(next())),
+            maybeSingle: vi.fn(() => Promise.resolve(next())),
+            then: (onFulfilled: any, onRejected: any) => Promise.resolve(next()).then(onFulfilled, onRejected),
           }
         }
         // Regular select query - return the chain

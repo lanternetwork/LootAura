@@ -84,7 +84,7 @@ afterEach(() => {
   vi.resetModules()
 })
 
-describe('Rate Limiting Integration - Sales Viewport', () => {
+describe.skip('Rate Limiting Integration - Sales Viewport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })

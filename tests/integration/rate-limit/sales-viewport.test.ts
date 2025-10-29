@@ -63,9 +63,8 @@ const saleData = [
 
 // Hoist Supabase server mock BEFORE importing the route
 const from = makeSupabaseFromMock({
-	// First call: count probe (head: true)
+	// First call: count probe (handled specially in mock and does not consume queue)
 	sales_v2: [
-		{ count: 2, error: null },
 		{ data: saleData, error: null },
 	],
 })

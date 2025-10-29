@@ -37,7 +37,6 @@ export function makeSupabaseFromMock(map: Record<string, any[]>) {
 						limit: vi.fn(() => Promise.resolve(next())),
 						single: vi.fn(() => Promise.resolve(next())),
 						maybeSingle: vi.fn(() => Promise.resolve(next())),
-						then: (onFulfilled: any, onRejected: any) => Promise.resolve(next()).then(onFulfilled, onRejected),
 					}
 				}
 				// Regular select query - return the chain
@@ -53,9 +52,6 @@ export function makeSupabaseFromMock(map: Record<string, any[]>) {
 			range: vi.fn(() => Promise.resolve(next())),
 			single: vi.fn(() => Promise.resolve(next())),
 			maybeSingle: vi.fn(() => Promise.resolve(next())),
-			// If the code sometimes directly awaits after .order or other methods with no terminal,
-			// make the chain thenable as a fallback:
-			then: (onFulfilled: any, onRejected: any) => Promise.resolve(next()).then(onFulfilled, onRejected),
 		}
 
 		return chain

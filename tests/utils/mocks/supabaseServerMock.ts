@@ -16,10 +16,12 @@ export function makeSupabaseFromMock(map: Record<string, any[]>) {
 	}
 
 	return vi.fn((table: string) => {
-		const results = map[table] ?? [{ data: [], error: null }]
-		const queue = [...results]
-
-		const next = () => (queue.length ? queue.shift()! : { data: [], error: null })
+		// Use shared per-table queue so multiple calls to from(table)
+		// consume results sequentially across the entire test
+		if (!tableToQueue.has(table)) {
+			tableToQueue.set(table, [...(map[table] ?? [{ data: [], error: null }])])
+		}
+		const next = () => getNextForTable(table)
 
 		// Builder chain object (will be returned by every method)
 		const chain: any = {

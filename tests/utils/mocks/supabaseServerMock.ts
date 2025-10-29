@@ -18,6 +18,8 @@ export function makeSupabaseFromMock(map: Record<string, Array<Result>>) {
 	}
 
 	return vi.fn((table: string) => {
+		const getResult = () => Promise.resolve(getNextForTable(table))
+		
 		const chain: any = {
 			select: vi.fn((columns?: string | string[], options?: any) => {
 				// For count queries with head: true, select() returns a special object
@@ -41,10 +43,12 @@ export function makeSupabaseFromMock(map: Record<string, Array<Result>>) {
 			or: vi.fn(() => chain),
 			order: vi.fn(() => chain),
 			// Terminal methods that actually return data
-			limit: vi.fn(() => Promise.resolve(getNextForTable(table))),
-			range: vi.fn(() => Promise.resolve(getNextForTable(table))),
-			single: vi.fn(() => Promise.resolve(getNextForTable(table))),
-			maybeSingle: vi.fn(() => Promise.resolve(getNextForTable(table))),
+			limit: vi.fn(() => getResult()),
+			range: vi.fn(() => getResult()),
+			single: vi.fn(() => getResult()),
+			maybeSingle: vi.fn(() => getResult()),
+			// Make chain thenable so it can be awaited directly
+			then: (onFulfilled: any, onRejected: any) => getResult().then(onFulfilled, onRejected),
 		}
 
 		return chain

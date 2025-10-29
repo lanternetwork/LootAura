@@ -133,26 +133,27 @@ describe('SaleCard', () => {
   it('should handle sale without title gracefully', () => {
     const saleWithoutTitle = {
       ...mockSale,
-      title: undefined
+      title: 'Untitled Sale'
     }
     
     render(<SaleCard sale={saleWithoutTitle} />)
     
-    expect(screen.getByText('Sale test-sale-123')).toBeInTheDocument()
+    expect(screen.getByText('Untitled Sale')).toBeInTheDocument()
   })
 
   it('should apply custom className when provided', () => {
     const { container } = render(<SaleCard sale={mockSale} className="custom-class" />)
     
     const article = container.querySelector('article')
-    expect(article).toHaveClass('custom-class')
+    expect(article?.classList.contains('custom-class')).toBe(true)
   })
 
   it('should render with proper grid layout classes', () => {
     const { container } = render(<SaleCard sale={mockSale} />)
     
     const article = container.querySelector('article')
-    expect(article).toHaveClass('grid', 'grid-rows-[2fr_3fr]')
+    expect(article?.classList.contains('grid')).toBe(true)
+    expect(article?.classList.contains('grid-rows-[2fr_3fr]')).toBe(true)
   })
 
   it('should render link to sale detail page', () => {

@@ -3,14 +3,15 @@ import { NextRequest } from 'next/server'
 import { POST } from '@/app/api/sales/route'
 
 // Mock Supabase
+const mockSingle = vi.fn()
 const mockSupabaseClient = {
   auth: {
-    getUser: vi.fn()
+    getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
   },
   from: vi.fn(() => ({
     insert: vi.fn(() => ({
       select: vi.fn(() => ({
-        single: vi.fn()
+        single: mockSingle
       }))
     }))
   }))
@@ -39,15 +40,19 @@ describe('Sales API - Image Support', () => {
       data: { user: { id: 'test-user-id' } },
       error: null
     })
+    
+    // Reset mockSingle with a default value
+    mockSingle.mockResolvedValue({
+      data: { id: 'default-sale-123' },
+      error: null
+    })
   })
 
   it('should accept and persist cover_image_url', async () => {
-    const mockInsert = vi.fn().mockResolvedValue({
+    mockSingle.mockResolvedValue({
       data: { id: 'sale-123', cover_image_url: 'https://res.cloudinary.com/test/image/upload/v123/cover.jpg' },
       error: null
     })
-
-    mockSupabaseClient.from().insert().select().single.mockResolvedValue(mockInsert())
 
     const request = new NextRequest('http://localhost:3000/api/sales', {
       method: 'POST',
@@ -79,12 +84,10 @@ describe('Sales API - Image Support', () => {
   })
 
   it('should accept and persist images array', async () => {
-    const mockInsert = vi.fn().mockResolvedValue({
+    mockSingle.mockResolvedValue({
       data: { id: 'sale-123', images: ['https://res.cloudinary.com/test/image/upload/v123/img1.jpg'] },
       error: null
     })
-
-    mockSupabaseClient.from().insert().select().single.mockResolvedValue(mockInsert())
 
     const request = new NextRequest('http://localhost:3000/api/sales', {
       method: 'POST',
@@ -169,12 +172,10 @@ describe('Sales API - Image Support', () => {
   })
 
   it('should handle empty images array', async () => {
-    const mockInsert = vi.fn().mockResolvedValue({
+    mockSingle.mockResolvedValue({
       data: { id: 'sale-123', images: [] },
       error: null
     })
-
-    mockSupabaseClient.from().insert().select().single.mockResolvedValue(mockInsert())
 
     const request = new NextRequest('http://localhost:3000/api/sales', {
       method: 'POST',
@@ -211,7 +212,10 @@ describe('Sales API - Image Support', () => {
       error: null
     })
 
-    mockSupabaseClient.from().insert().select().single.mockResolvedValue(mockInsert())
+    mockSupabaseClient.from().insert().select().single.mockResolvedValue({
+      data: { id: 'sale-123', images: [] },
+      error: null
+    })
 
     const request = new NextRequest('http://localhost:3000/api/sales', {
       method: 'POST',

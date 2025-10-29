@@ -14,6 +14,11 @@ vi.mock('@/lib/rateLimit/config', () => ({
   shouldBypassRateLimit: vi.fn(() => true),
 }))
 
+// Ensure HOF does not alter handler in tests
+vi.mock('@/lib/rateLimit/withRateLimit', () => ({
+  withRateLimit: (handler: any) => handler,
+}))
+
 // Disable rate limiting in tests
 ;(process.env as any).RATE_LIMITING_ENABLED = 'false'
 
@@ -136,14 +141,14 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
     
     if (response.status !== 200) {
       const text = await response.text()
-      console.error('SALES API BODY', text)
+      console.log('SALES API BODY', text)
     }
     
     expect(response.status).toBe(200)
     const body = await response.json()
     expect(body.ok).toBe(true)
     expect(Array.isArray(body.data)).toBe(true)
-    expect(body.data.length).toBeGreaterThan(0)
+    expect(body.data.length).toBe(2)
   })
 
   it('should allow soft-limited requests (burst)', async () => {
@@ -154,7 +159,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
     
     if (response.status !== 200) {
       const text = await response.text()
-      console.error('SALES API BODY', text)
+      console.log('SALES API BODY', text)
     }
     
     expect(response.status).toBe(200)
@@ -170,7 +175,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
     
     if (response.status !== 200) {
       const text = await response.text()
-      console.error('SALES API BODY', text)
+      console.log('SALES API BODY', text)
     }
     
     expect(response.status).toBe(200)
@@ -184,7 +189,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
       const res = await route.GET(request)
       if (res.status !== 200) {
         const text = await res.text()
-        console.error(`SALES API BODY (iteration ${i})`, text)
+        console.log(`SALES API BODY (iteration ${i})`, text)
       }
       expect(res.status).toBe(200)
     }

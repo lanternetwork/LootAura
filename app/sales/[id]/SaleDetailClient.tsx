@@ -2,9 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Sale } from '@/lib/types'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
+import { getSaleCoverUrl } from '@/lib/images/cover'
 
 interface SaleDetailClientProps {
   sale: Sale
@@ -14,6 +16,8 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
   const { location } = useLocationSearch()
   const [isFavorited, setIsFavorited] = useState(false)
   const [showFullDescription, setShowFullDescription] = useState(false)
+  
+  const cover = getSaleCoverUrl(sale)
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -185,6 +189,50 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Sale Images */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Photos</h2>
+            {cover ? (
+              <div className="relative h-64 rounded-lg overflow-hidden">
+                <Image
+                  src={cover.url}
+                  alt={cover.alt}
+                  fill
+                  sizes="(min-width:1024px) 66vw, 100vw"
+                  className="object-cover"
+                  priority={true}
+                />
+              </div>
+            ) : (
+              <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <svg width="64" height="64" viewBox="0 0 24 24" className="mx-auto mb-4 opacity-70">
+                    <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z" fill="currentColor"/>
+                  </svg>
+                  <p className="text-lg font-medium">No photos available</p>
+                  <p className="text-sm">Photos will appear here when added</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Image Gallery - placeholder for future implementation */}
+            {sale.images && sale.images.length > 1 && (
+              <div className="mt-4 grid grid-cols-4 gap-2">
+                {sale.images.slice(1).map((imageUrl, index) => (
+                  <div key={index} className="relative h-20 rounded-lg overflow-hidden">
+                    <Image
+                      src={imageUrl}
+                      alt={`${sale.title} photo ${index + 2}`}
+                      fill
+                      sizes="(min-width:1024px) 16vw, 25vw"
+                      className="object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Description */}

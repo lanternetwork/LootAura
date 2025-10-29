@@ -5,29 +5,43 @@
 import { describe, it, expect, vi } from 'vitest'
 
 // Mock Dexie to avoid IndexedDB issues in test environment
+// Dexie must be mockable as a class that can be extended
+const mockMarkersByTile = {
+  get: vi.fn().mockResolvedValue(null),
+  put: vi.fn().mockResolvedValue(undefined),
+  where: vi.fn().mockReturnValue({
+    below: vi.fn().mockReturnValue({
+      delete: vi.fn().mockResolvedValue(0)
+    })
+  }),
+  clear: vi.fn().mockResolvedValue(undefined),
+  count: vi.fn().mockResolvedValue(0),
+  toArray: vi.fn().mockResolvedValue([]),
+  delete: vi.fn().mockResolvedValue(undefined)
+}
+
+const mockMetadata = {
+  get: vi.fn().mockResolvedValue(null),
+  put: vi.fn().mockResolvedValue(undefined),
+  clear: vi.fn().mockResolvedValue(undefined)
+}
+
+class MockDexie {
+  markersByTile = mockMarkersByTile
+  metadata = mockMetadata
+
+  constructor(public name: string) {}
+
+  version(num: number) {
+    return {
+      stores: vi.fn().mockReturnThis()
+    }
+  }
+}
+
 vi.mock('dexie', () => ({
   __esModule: true,
-  default: vi.fn(() => ({
-    markersByTile: {
-      get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockResolvedValue(undefined),
-      where: vi.fn().mockReturnValue({
-        below: vi.fn().mockReturnValue({
-          delete: vi.fn().mockResolvedValue(0)
-        })
-      }),
-      clear: vi.fn().mockResolvedValue(undefined),
-      count: vi.fn().mockResolvedValue(0),
-      toArray: vi.fn().mockResolvedValue([])
-    },
-    metadata: {
-      get: vi.fn().mockResolvedValue(null),
-      put: vi.fn().mockResolvedValue(undefined),
-      clear: vi.fn().mockResolvedValue(undefined)
-    },
-    version: vi.fn().mockReturnThis(),
-    stores: vi.fn().mockReturnThis()
-  }))
+  default: MockDexie
 }))
 
 // Import after mocking

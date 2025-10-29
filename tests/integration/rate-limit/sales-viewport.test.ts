@@ -18,13 +18,18 @@ vi.mock('@/lib/rateLimit/config', () => ({
 // Provide sequential results for the mock server
 // Each request needs: count query result, then main query result
 // Provide enough results for all tests (4 tests × 2 calls = 8 results minimum, use 10 for safety)
+// 
+// Test bbox: north=38.1, south=38.0, east=-84.9, west=-85.0
+// Route expands by 50%: latBuffer=0.05, lngBuffer=0.05
+// Expanded bbox: minLat=37.95, maxLat=38.15, minLng=-85.05, maxLng=-84.85
+// Sale coordinates must be within this expanded bbox to pass .gte()/.lte() filters
 const salesResults = []
 const saleData = [
-  { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-  { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
+  { id: 's1', lat: 38.05, lng: -84.95, title: 'Sale A', status: 'published' }, // Within expanded bbox
+  { id: 's2', lat: 38.06, lng: -84.94, title: 'Sale B', status: 'published' }, // Within expanded bbox
 ]
 
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < 20; i++) {
   if (i % 2 === 0) {
     salesResults.push({ count: 2, error: null }) // Count query
   } else {

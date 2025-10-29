@@ -6,7 +6,6 @@
 
 import { vi, describe, it, expect, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
-import { makeSupabaseFromMock, mockCreateSupabaseServerClient } from '@/tests/utils/mocks/supabaseServerMock'
 
 // Always bypass rate limiting in this suite
 vi.mock('@/lib/rateLimit/config', () => ({
@@ -40,7 +39,7 @@ const saleData = [
     is_featured: false,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z'
-  }, // Within expanded bbox
+  },
   { 
     id: 's2', 
     lat: 38.06, 
@@ -58,18 +57,66 @@ const saleData = [
     is_featured: false,
     created_at: '2024-01-02T00:00:00Z',
     updated_at: '2024-01-02T00:00:00Z'
-  }, // Within expanded bbox
+  },
 ]
 
-// Hoist Supabase server mock BEFORE importing the route
-const from = makeSupabaseFromMock({
-	// First call: count probe (handled specially in mock and does not consume queue)
-	sales_v2: [
-		{ data: saleData, error: null },
-	],
-})
+// Inline Supabase server mock with fluent chain
+vi.mock('@/lib/supabase/server', () => {
+  const makeChain = (result: any) => {
+    const chain: any = {}
+    chain.select = vi.fn(() => chain)
+    chain.eq = vi.fn(() => chain)
+    chain.gte = vi.fn(() => chain)
+    chain.lte = vi.fn(() => chain)
+    chain.in = vi.fn(() => chain)
+    chain.or = vi.fn(() => chain)
+    chain.order = vi.fn(() => chain)
+    chain.range = vi.fn(() => Promise.resolve({ data: result, error: null }))
+    chain.limit = vi.fn(() => Promise.resolve({ data: result, error: null }))
+    chain.single = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
+    chain.maybeSingle = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
+    // For count probe: return an object resolving to count when awaited
+    const countProbe = { count: Array.isArray(result) ? result.length : 0, error: null }
+    // Make chain thenable so awaiting the chain without terminal still resolves
+    ;(chain as any).then = (onFulfilled: any, onRejected: any) => Promise.resolve({ data: result, error: null }).then(onFulfilled, onRejected)
+    return { chain, countProbe }
+  }
 
-vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))
+  const { chain, countProbe } = makeChain(saleData)
+
+  return {
+    createSupabaseServerClient: vi.fn(() => ({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'sales_v2') {
+          // Return a proxy that handles select(head: true) specially for count probe
+          const proxy: any = {
+            select: vi.fn((_cols?: any, opts?: any) => {
+              if (opts?.count === 'exact' && opts?.head === true) {
+                return { eq: vi.fn(() => Promise.resolve(countProbe)) }
+              }
+              return chain
+            }),
+            eq: chain.eq,
+            gte: chain.gte,
+            lte: chain.lte,
+            in: chain.in,
+            or: chain.or,
+            order: chain.order,
+            range: chain.range,
+            limit: chain.limit,
+            then: (onFulfilled: any, onRejected: any) => Promise.resolve({ data: saleData, error: null }).then(onFulfilled, onRejected),
+          }
+          return proxy
+        }
+        // default
+        return chain
+      }),
+    })),
+  }
+})
 
 let route: any
 beforeAll(async () => {
@@ -131,7 +178,6 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
     const url = new URL('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     const request = new NextRequest(url)
     
-    // Simulate 10 rapid requests - all should succeed since rate limiting is bypassed
     for (let i = 0; i < 10; i++) {
       const res = await route.GET(request)
       if (res.status !== 200) {

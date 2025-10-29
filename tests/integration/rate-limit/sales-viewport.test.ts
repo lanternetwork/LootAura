@@ -99,9 +99,9 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
     expect(response.status).toBe(200)
     
     const data = await response.json()
-    expect(data.sales).toHaveLength(2)
-    expect(data.sales[0].title).toBe('Sale A')
-    expect(data.sales[1].title).toBe('Sale B')
+    expect(data.data).toHaveLength(2)
+    expect(data.data[0].title).toBe('Sale A')
+    expect(data.data[1].title).toBe('Sale B')
   })
 
   it('should allow soft-limited requests (burst)', async () => {
@@ -113,7 +113,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
     expect(response.status).toBe(200)
     
     const data = await response.json()
-    expect(data.sales).toHaveLength(2)
+    expect(data.data).toHaveLength(2)
   })
 
   it('should block requests over hard limit', async () => {
@@ -125,7 +125,7 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
     expect(response.status).toBe(200)
     
     const data = await response.json()
-    expect(data.sales).toHaveLength(2)
+    expect(data.data).toHaveLength(2)
   })
 
   it('should simulate burst panning scenario', async () => {

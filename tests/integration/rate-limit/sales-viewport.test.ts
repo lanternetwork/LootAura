@@ -10,7 +10,8 @@ import { NextRequest } from 'next/server'
 // Mock the Supabase client with proper chaining
 const mockSupabaseClient = {
   from: vi.fn((table: string) => {
-    const chain = {
+    // Create a chain object that returns itself for method chaining
+    const createChain = () => ({
       select: vi.fn((columns?: string | string[], options?: any) => {
         // Handle count query with head: true
         if (options?.count === 'exact' && options?.head === true) {
@@ -19,14 +20,14 @@ const mockSupabaseClient = {
           }
         }
         // Regular select query - return the chain
-        return chain
+        return createChain()
       }),
-      eq: vi.fn(() => chain),
-      gte: vi.fn(() => chain),
-      lte: vi.fn(() => chain),
-      in: vi.fn(() => chain),
-      or: vi.fn(() => chain),
-      order: vi.fn(() => chain),
+      eq: vi.fn(() => createChain()),
+      gte: vi.fn(() => createChain()),
+      lte: vi.fn(() => createChain()),
+      in: vi.fn(() => createChain()),
+      or: vi.fn(() => createChain()),
+      order: vi.fn(() => createChain()),
       range: vi.fn(() => Promise.resolve({
         data: [
           { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
@@ -56,8 +57,9 @@ const mockSupabaseClient = {
         ],
         error: null
       }).then(onFulfilled, onRejected),
-    }
-    return chain
+    })
+    
+    return createChain()
   }),
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),

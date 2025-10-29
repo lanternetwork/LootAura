@@ -7,11 +7,11 @@
 import { vi, beforeAll, afterEach, describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 
-// Use vi.hoisted to ensure mocks are applied before any imports
-const mockSupabaseClient = vi.hoisted(() => ({
-  from: vi.fn((table: string) => {
-    // Create a chain object that returns itself for method chaining
-    const createChain = () => {
+// Mock Supabase server client before any imports
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: vi.fn(() => ({
+    from: vi.fn((table: string) => {
+      // Create a chain object that returns itself for method chaining
       const chain: any = {}
       
       // All query methods return the chain for fluent API
@@ -23,16 +23,16 @@ const mockSupabaseClient = vi.hoisted(() => ({
           }
         }
         // Regular select query - return the chain
-        return createChain()
+        return chain
       })
       
-      chain.eq = vi.fn(() => createChain())
-      chain.gte = vi.fn(() => createChain())
-      chain.lte = vi.fn(() => createChain())
-      chain.in = vi.fn(() => createChain())
-      chain.or = vi.fn(() => createChain())
-      chain.order = vi.fn(() => createChain())
-      chain.limit = vi.fn(() => createChain())
+      chain.eq = vi.fn(() => chain)
+      chain.gte = vi.fn(() => chain)
+      chain.lte = vi.fn(() => chain)
+      chain.in = vi.fn(() => chain)
+      chain.or = vi.fn(() => chain)
+      chain.order = vi.fn(() => chain)
+      chain.limit = vi.fn(() => chain)
       
       // These methods return promises with data
       chain.range = vi.fn(async () => ({
@@ -64,17 +64,11 @@ const mockSupabaseClient = vi.hoisted(() => ({
         }).then(onFulfilled, onRejected)
       
       return chain
-    }
-    
-    return createChain()
-  }),
-  auth: {
-    getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-  },
-}))
-
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => mockSupabaseClient),
+    }),
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+    },
+  })),
 }))
 
 // Disable rate limiting in tests

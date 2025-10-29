@@ -81,9 +81,7 @@ beforeAll(async () => {
   route = await import('@/app/api/sales/route')
 })
 
-afterEach(() => {
-  vi.resetModules()
-})
+// Removed resetModules to keep mocks intact across tests
 
 describe('Rate Limiting Integration - Sales Viewport', () => {
   beforeEach(() => {

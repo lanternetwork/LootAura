@@ -9,58 +9,64 @@ import { NextRequest } from 'next/server'
 
 // Use vi.hoisted to ensure mocks are applied before any imports
 const mockSupabaseClient = vi.hoisted(() => ({
-  from: vi.fn((_table: string) => {
-    // Stable fluent chain object
-    const chain: any = {}
-
-    chain.select = vi.fn((_: string | string[], options?: any) => {
-      // Handle count query with head: true
-      if (options?.count === 'exact' && options?.head === true) {
-        return {
-          eq: vi.fn(async () => ({ count: 2, error: null })),
+  from: vi.fn((table: string) => {
+    // Create a chain object that returns itself for method chaining
+    const createChain = () => {
+      const chain: any = {}
+      
+      // All query methods return the chain for fluent API
+      chain.select = vi.fn((columns?: string | string[], options?: any) => {
+        // Handle count query with head: true
+        if (options?.count === 'exact' && options?.head === true) {
+          return {
+            eq: vi.fn(async () => ({ count: 2, error: null })),
+          }
         }
-      }
-      return chain
-    })
-
-    chain.eq = vi.fn(() => chain)
-    chain.gte = vi.fn(() => chain)
-    chain.lte = vi.fn(() => chain)
-    chain.in = vi.fn(() => chain)
-    chain.or = vi.fn(() => chain)
-    chain.order = vi.fn(() => chain)
-    chain.range = vi.fn(async () => ({
-      data: [
-        { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-        { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
-      ],
-      error: null,
-    }))
-    chain.limit = vi.fn(async () => ({
-      data: [
-        { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-        { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
-      ],
-      error: null,
-    }))
-    chain.single = vi.fn(async () => ({
-      data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-      error: null,
-    }))
-    chain.maybeSingle = vi.fn(async () => ({
-      data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-      error: null,
-    }))
-    chain.then = (onFulfilled: any, onRejected: any) =>
-      Promise.resolve({
+        // Regular select query - return the chain
+        return createChain()
+      })
+      
+      chain.eq = vi.fn(() => createChain())
+      chain.gte = vi.fn(() => createChain())
+      chain.lte = vi.fn(() => createChain())
+      chain.in = vi.fn(() => createChain())
+      chain.or = vi.fn(() => createChain())
+      chain.order = vi.fn(() => createChain())
+      chain.limit = vi.fn(() => createChain())
+      
+      // These methods return promises with data
+      chain.range = vi.fn(async () => ({
         data: [
           { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
           { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
         ],
         error: null,
-      }).then(onFulfilled, onRejected)
-
-    return chain
+      }))
+      
+      chain.single = vi.fn(async () => ({
+        data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+        error: null,
+      }))
+      
+      chain.maybeSingle = vi.fn(async () => ({
+        data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+        error: null,
+      }))
+      
+      // Support for Promise.then() on the chain
+      chain.then = (onFulfilled: any, onRejected: any) =>
+        Promise.resolve({
+          data: [
+            { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+            { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
+          ],
+          error: null,
+        }).then(onFulfilled, onRejected)
+      
+      return chain
+    }
+    
+    return createChain()
   }),
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),

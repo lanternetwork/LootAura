@@ -8,6 +8,13 @@ import { vi, beforeAll, afterEach, describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 import { mockSupabaseServer } from '@/tests/utils/mocks/supabaseServerMock'
 
+// Always bypass rate limiting in this suite
+vi.mock('@/lib/rateLimit/config', () => ({
+  isRateLimitingEnabled: vi.fn(() => false),
+  isPreviewEnv: vi.fn(() => true),
+  shouldBypassRateLimit: vi.fn(() => true),
+}))
+
 // Provide table rows for the mock server
 mockSupabaseServer({
   sales_v2: [

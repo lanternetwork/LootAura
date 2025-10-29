@@ -4,9 +4,9 @@
  * Tests soft-then-hard behavior on sales viewport endpoint.
  */
 
-import { vi, beforeEach, describe, it, expect } from 'vitest'
+import { vi, describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
-import { mockSupabaseServer } from '@/tests/mocks/supabaseServer.mock'
+import { buildChain } from '@/tests/mocks/supabaseServer.mock'
 
 // Always bypass rate limiting in this suite
 vi.mock('@/lib/rateLimit/config', () => ({
@@ -61,15 +61,20 @@ const saleData = [
   }, // Within expanded bbox
 ]
 
+// Hoist Supabase server mock BEFORE importing the route
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: () => ({
+    from: (table: string) => buildChain(table === 'sales_v2' ? saleData : []),
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+      signInWithPassword: vi.fn(),
+      signUp: vi.fn(),
+      signOut: vi.fn(),
+    },
+  }),
+}))
+
 describe('Rate Limiting Integration - Sales Viewport', () => {
-  beforeEach(async () => {
-    vi.resetModules() // important: clear module cache
-    
-    mockSupabaseServer({
-      sales_v2: saleData,
-      items_v2: [],
-    })
-  })
 
   it('should allow requests within limit', async () => {
     const { GET } = await import('@/app/api/sales/route') // import after mock

@@ -3,15 +3,17 @@ import { vi } from 'vitest'
 export function makeSupabaseFromMock(map: Record<string, any[]>) {
 	// Maintain per-table queues so multiple calls consume sequentially
 	const tableToQueue = new Map<string, Array<any>>()
+	const tableToDefault = new Map<string, any>()
 
 	// Prime queues
 	for (const [table, results] of Object.entries(map)) {
 		tableToQueue.set(table, [...results])
+		tableToDefault.set(table, results.length > 0 ? results[results.length - 1] : { data: [], error: null })
 	}
 
 	const getNextForTable = (table: string): any => {
 		const q = tableToQueue.get(table) || []
-		if (q.length === 0) return { data: [], error: null }
+		if (q.length === 0) return tableToDefault.get(table) ?? { data: [], error: null }
 		return q.shift()
 	}
 
@@ -19,7 +21,9 @@ export function makeSupabaseFromMock(map: Record<string, any[]>) {
 		// Use shared per-table queue so multiple calls to from(table)
 		// consume results sequentially across the entire test
 		if (!tableToQueue.has(table)) {
-			tableToQueue.set(table, [...(map[table] ?? [{ data: [], error: null }])])
+			const initial = [...(map[table] ?? [{ data: [], error: null }])]
+			tableToQueue.set(table, initial)
+			tableToDefault.set(table, initial.length > 0 ? initial[initial.length - 1] : { data: [], error: null })
 		}
 		const next = () => getNextForTable(table)
 

@@ -2,8 +2,8 @@ import { vi } from 'vitest'
 
 type Row = Record<string, any>
 
-function buildChain(rows: Row[]) {
-  let filters: { col: string; op: 'eq' | 'gte' | 'lte' | 'in'; val: any; vals?: any[] }[] = []
+export function buildChain(rows: Row[]) {
+  const filters: { col: string; op: 'eq' | 'gte' | 'lte' | 'in'; val: any; vals?: any[] }[] = []
   let countMode = false
   let orderCol: string | null = null
   let orderAsc = true

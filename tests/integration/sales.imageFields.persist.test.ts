@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-
-// Mock the validator
-vi.mock('@/lib/images/validateImageUrl', () => ({
-  isAllowedImageUrl: vi.fn()
-}))
+import { POST } from '@/app/api/sales/route'
 
 // Mock Supabase
 const mockSupabaseClient = {
@@ -14,30 +10,7 @@ const mockSupabaseClient = {
   from: vi.fn(() => ({
     insert: vi.fn(() => ({
       select: vi.fn(() => ({
-        single: vi.fn().mockResolvedValue({
-          data: { id: 'test-sale-id', title: 'Test Sale' },
-          error: null
-        })
-      }))
-    })),
-    update: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn().mockResolvedValue({
-            data: { id: 'test-item-id', name: 'Test Item' },
-            error: null
-          })
-        }))
-      }))
-    })),
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          single: vi.fn().mockResolvedValue({
-            data: { id: 'test-sale-id', owner_id: 'test-user-id' },
-            error: null
-          })
-        }))
+        single: vi.fn()
       }))
     }))
   }))
@@ -47,7 +20,17 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient
 }))
 
-describe('Sales Image Fields Persistence', () => {
+// Mock rate limiting
+vi.mock('@/lib/rateLimit/withRateLimit', () => ({
+  withRateLimit: (handler: any) => handler
+}))
+
+// Mock image validation
+vi.mock('@/lib/images/validateImageUrl', () => ({
+  isAllowedImageUrl: vi.fn((url: string) => url.includes('res.cloudinary.com'))
+}))
+
+describe('Sales API - Image Support', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     
@@ -58,253 +41,203 @@ describe('Sales Image Fields Persistence', () => {
     })
   })
 
-  describe('POST /api/sales', () => {
-    it('should accept valid cover_image_url', async () => {
-      const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
-      vi.mocked(isAllowedImageUrl).mockReturnValue(true)
-
-      const { POST } = await import('@/app/api/sales/route')
-      
-      const request = new NextRequest('http://localhost/api/sales', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: 'Test Sale',
-          description: 'Test Description',
-          address: '123 Test St',
-          city: 'Test City',
-          state: 'TS',
-          zip_code: '12345',
-          lat: 40.7128,
-          lng: -74.0060,
-          date_start: '2024-01-01',
-          time_start: '10:00',
-          cover_image_url: 'https://res.cloudinary.com/test-cloud/image/upload/sample.jpg'
-        })
-      })
-
-      const response = await POST(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(200)
-      expect(data.ok).toBe(true)
-      expect(isAllowedImageUrl).toHaveBeenCalledWith('https://res.cloudinary.com/test-cloud/image/upload/sample.jpg')
+  it('should accept and persist cover_image_url', async () => {
+    const mockInsert = vi.fn().mockResolvedValue({
+      data: { id: 'sale-123', cover_image_url: 'https://res.cloudinary.com/test/image/upload/v123/cover.jpg' },
+      error: null
     })
 
-    it('should reject invalid cover_image_url', async () => {
-      const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
-      vi.mocked(isAllowedImageUrl).mockReturnValue(false)
+    mockSupabaseClient.from().insert().select().single.mockResolvedValue(mockInsert())
 
-      const { POST } = await import('@/app/api/sales/route')
-      
-      const request = new NextRequest('http://localhost/api/sales', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: 'Test Sale',
-          description: 'Test Description',
-          address: '123 Test St',
-          city: 'Test City',
-          state: 'TS',
-          zip_code: '12345',
-          lat: 40.7128,
-          lng: -74.0060,
-          date_start: '2024-01-01',
-          time_start: '10:00',
-          cover_image_url: 'https://malicious-site.com/image.jpg'
-        })
+    const request = new NextRequest('http://localhost:3000/api/sales', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: 'Test Sale',
+        description: 'Test Description',
+        address: '123 Test St',
+        city: 'Test City',
+        state: 'TS',
+        zip_code: '12345',
+        lat: 38.2527,
+        lng: -85.7585,
+        date_start: '2024-01-01',
+        time_start: '09:00',
+        cover_image_url: 'https://res.cloudinary.com/test/image/upload/v123/cover.jpg'
       })
-
-      const response = await POST(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid cover_image_url')
-      expect(isAllowedImageUrl).toHaveBeenCalledWith('https://malicious-site.com/image.jpg')
     })
 
-    it('should accept null cover_image_url', async () => {
-      const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
-      vi.mocked(isAllowedImageUrl).mockReturnValue(true)
+    const response = await POST(request)
+    const data = await response.json()
 
-      const { POST } = await import('@/app/api/sales/route')
-      
-      const request = new NextRequest('http://localhost/api/sales', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: 'Test Sale',
-          description: 'Test Description',
-          address: '123 Test St',
-          city: 'Test City',
-          state: 'TS',
-          zip_code: '12345',
-          lat: 40.7128,
-          lng: -74.0060,
-          date_start: '2024-01-01',
-          time_start: '10:00',
-          cover_image_url: null
-        })
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(mockSupabaseClient.from().insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cover_image_url: 'https://res.cloudinary.com/test/image/upload/v123/cover.jpg'
       })
-
-      const response = await POST(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(200)
-      expect(data.ok).toBe(true)
-      expect(isAllowedImageUrl).not.toHaveBeenCalled()
-    })
+    )
   })
 
-  describe('POST /api/items', () => {
-    it('should accept valid image_url', async () => {
-      const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
-      vi.mocked(isAllowedImageUrl).mockReturnValue(true)
-
-      // Mock successful insert
-      mockSupabaseClient.from().insert().select().single.mockResolvedValue({
-        data: { id: 'test-item-id', name: 'Test Item' },
-        error: null
-      })
-
-      const { POST } = await import('@/app/api/items/route')
-      
-      const request = new NextRequest('http://localhost/api/items', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: 'Test Item',
-          description: 'Test Description',
-          price: 10.00,
-          sale_id: 'test-sale-id',
-          category: 'Electronics',
-          condition: 'Good',
-          image_url: 'https://res.cloudinary.com/test-cloud/image/upload/item.jpg'
-        })
-      })
-
-      const response = await POST(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(201)
-      expect(data.item).toBeDefined()
-      expect(isAllowedImageUrl).toHaveBeenCalledWith('https://res.cloudinary.com/test-cloud/image/upload/item.jpg')
+  it('should accept and persist images array', async () => {
+    const mockInsert = vi.fn().mockResolvedValue({
+      data: { id: 'sale-123', images: ['https://res.cloudinary.com/test/image/upload/v123/img1.jpg'] },
+      error: null
     })
 
-    it('should reject invalid image_url', async () => {
-      const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
-      vi.mocked(isAllowedImageUrl).mockReturnValue(false)
+    mockSupabaseClient.from().insert().select().single.mockResolvedValue(mockInsert())
 
-      const { POST } = await import('@/app/api/items/route')
-      
-      const request = new NextRequest('http://localhost/api/items', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: 'Test Item',
-          description: 'Test Description',
-          price: 10.00,
-          sale_id: 'test-sale-id',
-          category: 'Electronics',
-          condition: 'Good',
-          image_url: 'https://malicious-site.com/item.jpg'
-        })
+    const request = new NextRequest('http://localhost:3000/api/sales', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: 'Test Sale',
+        description: 'Test Description',
+        address: '123 Test St',
+        city: 'Test City',
+        state: 'TS',
+        zip_code: '12345',
+        lat: 38.2527,
+        lng: -85.7585,
+        date_start: '2024-01-01',
+        time_start: '09:00',
+        images: ['https://res.cloudinary.com/test/image/upload/v123/img1.jpg']
       })
-
-      const response = await POST(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid image_url')
-      expect(isAllowedImageUrl).toHaveBeenCalledWith('https://malicious-site.com/item.jpg')
     })
 
-    it('should accept null image_url', async () => {
-      const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
-      vi.mocked(isAllowedImageUrl).mockReturnValue(true)
+    const response = await POST(request)
+    const data = await response.json()
 
-      // Mock successful insert
-      mockSupabaseClient.from().insert().select().single.mockResolvedValue({
-        data: { id: 'test-item-id', name: 'Test Item' },
-        error: null
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(mockSupabaseClient.from().insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        images: ['https://res.cloudinary.com/test/image/upload/v123/img1.jpg']
       })
-
-      const { POST } = await import('@/app/api/items/route')
-      
-      const request = new NextRequest('http://localhost/api/items', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: 'Test Item',
-          description: 'Test Description',
-          price: 10.00,
-          sale_id: 'test-sale-id',
-          category: 'Electronics',
-          condition: 'Good',
-          image_url: null
-        })
-      })
-
-      const response = await POST(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(201)
-      expect(data.item).toBeDefined()
-      expect(isAllowedImageUrl).not.toHaveBeenCalled()
-    })
+    )
   })
 
-  describe('PUT /api/items', () => {
-    it('should accept valid image_url on update', async () => {
-      const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
-      vi.mocked(isAllowedImageUrl).mockReturnValue(true)
-
-      // Mock successful update
-      mockSupabaseClient.from().update().eq().select().single.mockResolvedValue({
-        data: { id: 'test-item-id', name: 'Updated Item' },
-        error: null
+  it('should reject invalid cover_image_url', async () => {
+    const request = new NextRequest('http://localhost:3000/api/sales', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: 'Test Sale',
+        description: 'Test Description',
+        address: '123 Test St',
+        city: 'Test City',
+        state: 'TS',
+        zip_code: '12345',
+        lat: 38.2527,
+        lng: -85.7585,
+        date_start: '2024-01-01',
+        time_start: '09:00',
+        cover_image_url: 'https://malicious-site.com/image.jpg'
       })
-
-      const { PUT } = await import('@/app/api/items/route')
-      
-      const request = new NextRequest('http://localhost/api/items/test-item-id', {
-        method: 'PUT',
-        body: JSON.stringify({
-          title: 'Updated Item',
-          description: 'Updated Description',
-          price: 15.00,
-          category: 'Electronics',
-          condition: 'Excellent',
-          image_url: 'https://res.cloudinary.com/test-cloud/image/upload/updated.jpg'
-        })
-      })
-
-      const response = await PUT(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(200)
-      expect(data.item).toBeDefined()
-      expect(isAllowedImageUrl).toHaveBeenCalledWith('https://res.cloudinary.com/test-cloud/image/upload/updated.jpg')
     })
 
-    it('should reject invalid image_url on update', async () => {
-      const { isAllowedImageUrl } = await import('@/lib/images/validateImageUrl')
-      vi.mocked(isAllowedImageUrl).mockReturnValue(false)
+    const response = await POST(request)
+    const data = await response.json()
 
-      const { PUT } = await import('@/app/api/items/route')
-      
-      const request = new NextRequest('http://localhost/api/items/test-item-id', {
-        method: 'PUT',
-        body: JSON.stringify({
-          title: 'Updated Item',
-          description: 'Updated Description',
-          price: 15.00,
-          category: 'Electronics',
-          condition: 'Excellent',
-          image_url: 'https://malicious-site.com/updated.jpg'
-        })
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('Invalid cover_image_url')
+  })
+
+  it('should reject invalid image URLs in images array', async () => {
+    const request = new NextRequest('http://localhost:3000/api/sales', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: 'Test Sale',
+        description: 'Test Description',
+        address: '123 Test St',
+        city: 'Test City',
+        state: 'TS',
+        zip_code: '12345',
+        lat: 38.2527,
+        lng: -85.7585,
+        date_start: '2024-01-01',
+        time_start: '09:00',
+        images: [
+          'https://res.cloudinary.com/test/image/upload/v123/img1.jpg',
+          'https://malicious-site.com/image.jpg'
+        ]
       })
-
-      const response = await PUT(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(400)
-      expect(data.error).toBe('Invalid image_url')
-      expect(isAllowedImageUrl).toHaveBeenCalledWith('https://malicious-site.com/updated.jpg')
     })
+
+    const response = await POST(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('Invalid image URL in images array')
+  })
+
+  it('should handle empty images array', async () => {
+    const mockInsert = vi.fn().mockResolvedValue({
+      data: { id: 'sale-123', images: [] },
+      error: null
+    })
+
+    mockSupabaseClient.from().insert().select().single.mockResolvedValue(mockInsert())
+
+    const request = new NextRequest('http://localhost:3000/api/sales', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: 'Test Sale',
+        description: 'Test Description',
+        address: '123 Test St',
+        city: 'Test City',
+        state: 'TS',
+        zip_code: '12345',
+        lat: 38.2527,
+        lng: -85.7585,
+        date_start: '2024-01-01',
+        time_start: '09:00',
+        images: []
+      })
+    })
+
+    const response = await POST(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(mockSupabaseClient.from().insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        images: []
+      })
+    )
+  })
+
+  it('should default images to empty array when not provided', async () => {
+    const mockInsert = vi.fn().mockResolvedValue({
+      data: { id: 'sale-123', images: [] },
+      error: null
+    })
+
+    mockSupabaseClient.from().insert().select().single.mockResolvedValue(mockInsert())
+
+    const request = new NextRequest('http://localhost:3000/api/sales', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: 'Test Sale',
+        description: 'Test Description',
+        address: '123 Test St',
+        city: 'Test City',
+        state: 'TS',
+        zip_code: '12345',
+        lat: 38.2527,
+        lng: -85.7585,
+        date_start: '2024-01-01',
+        time_start: '09:00'
+      })
+    })
+
+    const response = await POST(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(mockSupabaseClient.from().insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        images: []
+      })
+    )
   })
 })

@@ -88,7 +88,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
         value: "default-src 'self'; " +
                    // Allow runtime scripts from self; keep eval for Next dev/runtime
-                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com; " +
+                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com; " +
                    // Allow Mapbox CSS
                    "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Some browsers use style-src-elem separately
@@ -100,7 +100,7 @@ const nextConfig = {
                    // Network connections
                    "connect-src 'self' https: https://api.cloudinary.com; " +
                    // Misc
-                   "frame-src https://widget.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self';",
+                   "frame-src https://widget.cloudinary.com https://upload-widget.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self';",
           },
         ],
       },

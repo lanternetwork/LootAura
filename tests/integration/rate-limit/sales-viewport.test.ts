@@ -14,12 +14,20 @@ import { mockSupabaseServer } from '@/tests/utils/mocks/supabaseServerMock'
 let route: any
 beforeEach(async () => {
   vi.resetModules()
-  mockSupabaseServer({
+  const from = makeSupabaseFromMock({
     sales_v2: [
-      { id: 's1', status: 'published', lat: 38.25, lng: -85.76, start_time: '2025-01-01T00:00:00Z' },
-      { id: 's2', status: 'published', lat: 38.26, lng: -85.75, start_time: '2025-01-02T00:00:00Z' },
+      // First call: count query with head: true
+      { count: 2, error: null },
+      // Second call: main sales query
+      { data: [
+        { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A' },
+        { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B' },
+      ], error: null },
     ],
-    items_v2: [],
+    items_v2: [
+      // Items query for category filtering
+      { data: [{ sale_id: 's1' }, { sale_id: 's2' }], error: null },
+    ],
   })
   route = await import('@/app/api/sales/route')
 })

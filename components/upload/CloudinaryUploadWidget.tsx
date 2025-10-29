@@ -52,6 +52,10 @@ export default function CloudinaryUploadWidget({
       try {
         await loadCloudinaryScript()
         
+        if (!window.cloudinary) {
+          throw new Error('Cloudinary widget not available')
+        }
+
         const widget = window.cloudinary.createUploadWidget(
           {
             cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,

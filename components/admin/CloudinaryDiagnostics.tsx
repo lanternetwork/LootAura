@@ -1,10 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircleIcon, XCircleIcon, InformationCircleIcon } from '@heroicons/react/20/solid'
-import { ENV_PUBLIC } from '@/lib/env'
-import Image from 'next/image'
-import nextConfig from '../../../next.config.js' // Adjust path as needed
 
 interface CloudinaryStatus {
   cloudNamePresent: boolean
@@ -38,7 +34,7 @@ export default function CloudinaryDiagnostics() {
     if (cloudName) {
       const sampleUrl = `https://res.cloudinary.com/${cloudName}/image/upload/w_100,h_100,c_fill/sample.jpg`
       
-      const img = new Image()
+      const img = new window.Image()
       img.onload = () => {
         setStatus(prev => ({ ...prev, sampleUrlHealth: 'success' }))
       }
@@ -91,6 +87,14 @@ export default function CloudinaryDiagnostics() {
     }
 
     try {
+      if (!window.cloudinary) {
+        setStatus(prev => ({ 
+          ...prev, 
+          lastWidgetError: 'Cloudinary widget not available' 
+        }))
+        return
+      }
+
       const widget = window.cloudinary.createUploadWidget(
         {
           cloudName,

@@ -2,19 +2,19 @@ import { vi } from 'vitest'
 
 type Result<T = any> = { data: T; error: null } | { data: null; error: { message: string } } | { count: number; error: null }
 
-export function makeSupabaseFromMock(map: Record<string, Array<{ data: any; error: any } | { count: number; error: null }>>) {
+export function makeSupabaseFromMock(map: Record<string, Array<Result>>) {
 	// Maintain per-table queues so multiple calls consume sequentially
-	const tableToQueue = new Map<string, Array<any>>()
+	const tableToQueue = new Map<string, Array<Result>>()
 
 	// Prime queues
 	for (const [table, results] of Object.entries(map)) {
 		tableToQueue.set(table, [...results])
 	}
 
-	const getNextForTable = (table: string) => {
+	const getNextForTable = (table: string): Result => {
 		const q = tableToQueue.get(table) || []
 		if (q.length === 0) return { data: [], error: null }
-		return q.shift()
+		return q.shift() as Result
 	}
 
 	return vi.fn((table: string) => {
@@ -67,4 +67,15 @@ export function mockCreateSupabaseServerClient(from: ReturnType<typeof makeSupab
 			},
 		})),
 	}
+}
+
+// Convenience helper expected by tests: installs a Supabase server mock with table data
+export function mockSupabaseServer(tables: Record<string, any[]>) {
+	const from = makeSupabaseFromMock(
+		Object.fromEntries(
+			Object.entries(tables).map(([table, rows]) => [table, [{ data: rows, error: null } as Result]])
+		)
+	) as any
+
+	vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))
 }

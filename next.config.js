@@ -7,6 +7,12 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: '*.supabase.co',
         port: '',
         pathname: '/storage/v1/object/public/**',
@@ -80,9 +86,9 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; " +
+        value: "default-src 'self'; " +
                    // Allow runtime scripts from self; keep eval for Next dev/runtime
-                   "script-src 'self' 'unsafe-eval' 'unsafe-inline'; " +
+                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com; " +
                    // Allow Mapbox CSS
                    "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Some browsers use style-src-elem separately
@@ -90,11 +96,11 @@ const nextConfig = {
                    // Permit WebWorkers (Mapbox GL uses blob workers)
                    "worker-src 'self' blob:; child-src blob:; " +
                    // Images and fonts
-                   "img-src 'self' data: https:; font-src 'self' data:; " +
+                   "img-src 'self' data: https: https://res.cloudinary.com; font-src 'self' data:; " +
                    // Network connections
-                   "connect-src 'self' https:; " +
+                   "connect-src 'self' https: https://api.cloudinary.com; " +
                    // Misc
-                   "frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';",
+                   "frame-src https://widget.cloudinary.com https://upload-widget.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self';",
           },
         ],
       },

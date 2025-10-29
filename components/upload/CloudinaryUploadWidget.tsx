@@ -2,25 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { FaCloudUploadAlt, FaSpinner, FaExclamationTriangle } from 'react-icons/fa'
+import { CloudinaryWidget } from '@/types/cloudinary'
 
 interface CloudinaryUploadWidgetProps {
   onUpload: (urls: string[]) => void
   maxFiles?: number
   className?: string
-}
-
-interface CloudinaryWidget {
-  open: () => void
-  close: () => void
-  destroy: () => void
-}
-
-declare global {
-  interface Window {
-    cloudinary: {
-      createUploadWidget: (config: any, callback: (error: any, result: any) => void) => CloudinaryWidget
-    }
-  }
 }
 
 export default function CloudinaryUploadWidget({ 
@@ -65,6 +52,10 @@ export default function CloudinaryUploadWidget({
       try {
         await loadCloudinaryScript()
         
+        if (!window.cloudinary) {
+          throw new Error('Cloudinary widget not available')
+        }
+
         const widget = window.cloudinary.createUploadWidget(
           {
             cloudName: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,

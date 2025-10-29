@@ -7,8 +7,8 @@
 import { vi, beforeAll, afterEach, describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 
-// Mock the Supabase client with proper chaining
-const mockSupabaseClient = {
+// Use vi.hoisted to ensure mocks are applied before any imports
+const mockSupabaseClient = vi.hoisted(() => ({
   from: vi.fn((table: string) => {
     // Create a chain object that returns itself for method chaining
     const createChain = () => ({
@@ -64,7 +64,7 @@ const mockSupabaseClient = {
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
   },
-}
+}))
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => mockSupabaseClient),

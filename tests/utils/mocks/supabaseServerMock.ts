@@ -4,7 +4,7 @@ type Row = Record<string, any>
 
 // New: make a per-table chain that always returns a fluent builder from select()
 function makeTableChain(rows: Row[], countValue = rows.length) {
-  let filters: Array<{ col: string; op: 'eq' | 'gte' | 'lte'; val: any }> = []
+  const filters: Array<{ col: string; op: 'eq' | 'gte' | 'lte'; val: any }> = []
   let countMode = false
   let start = 0
   let end: number | null = null

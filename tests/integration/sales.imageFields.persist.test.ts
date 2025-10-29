@@ -26,8 +26,9 @@ vi.mock('@/lib/rateLimit/withRateLimit', () => ({
 }))
 
 // Mock image validation
+const mockIsAllowedImageUrl = vi.fn((url: string) => url.includes('res.cloudinary.com'))
 vi.mock('@/lib/images/validateImageUrl', () => ({
-  isAllowedImageUrl: vi.fn((url: string) => url.includes('res.cloudinary.com'))
+  isAllowedImageUrl: mockIsAllowedImageUrl
 }))
 
 let POST: any
@@ -81,6 +82,7 @@ describe('Sales API - Image Support', () => {
 
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
+    expect(mockIsAllowedImageUrl).toHaveBeenCalledWith('https://res.cloudinary.com/test/image/upload/v123/cover.jpg')
     expect(mockSupabaseClient.from().insert).toHaveBeenCalledWith(
       expect.objectContaining({
         cover_image_url: 'https://res.cloudinary.com/test/image/upload/v123/cover.jpg'
@@ -88,9 +90,9 @@ describe('Sales API - Image Support', () => {
     )
   })
 
-  it('should accept and persist images array', async () => {
+  it('should accept and validate images array', async () => {
     mockSingle.mockResolvedValue({
-      data: { id: 'sale-123', images: ['https://res.cloudinary.com/test/image/upload/v123/img1.jpg'] },
+      data: { id: 'sale-123' },
       error: null
     })
 
@@ -116,9 +118,12 @@ describe('Sales API - Image Support', () => {
 
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
+    expect(mockIsAllowedImageUrl).toHaveBeenCalledWith('https://res.cloudinary.com/test/image/upload/v123/img1.jpg')
+    // Note: images array is validated but not stored in sales table
     expect(mockSupabaseClient.from().insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        images: ['https://res.cloudinary.com/test/image/upload/v123/img1.jpg']
+        title: 'Test Sale',
+        cover_image_url: null
       })
     )
   })
@@ -178,7 +183,7 @@ describe('Sales API - Image Support', () => {
 
   it('should handle empty images array', async () => {
     mockSingle.mockResolvedValue({
-      data: { id: 'sale-123', images: [] },
+      data: { id: 'sale-123' },
       error: null
     })
 
@@ -204,21 +209,19 @@ describe('Sales API - Image Support', () => {
 
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
+    // Empty images array should not call validation
+    expect(mockIsAllowedImageUrl).not.toHaveBeenCalled()
     expect(mockSupabaseClient.from().insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        images: []
+        title: 'Test Sale',
+        cover_image_url: null
       })
     )
   })
 
   it('should default images to empty array when not provided', async () => {
-    const mockInsert = vi.fn().mockResolvedValue({
-      data: { id: 'sale-123', images: [] },
-      error: null
-    })
-
-    mockSupabaseClient.from().insert().select().single.mockResolvedValue({
-      data: { id: 'sale-123', images: [] },
+    mockSingle.mockResolvedValue({
+      data: { id: 'sale-123' },
       error: null
     })
 
@@ -243,9 +246,12 @@ describe('Sales API - Image Support', () => {
 
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
+    // No images provided, so no validation calls
+    expect(mockIsAllowedImageUrl).not.toHaveBeenCalled()
     expect(mockSupabaseClient.from().insert).toHaveBeenCalledWith(
       expect.objectContaining({
-        images: []
+        title: 'Test Sale',
+        cover_image_url: null
       })
     )
   })

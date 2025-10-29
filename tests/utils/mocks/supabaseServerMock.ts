@@ -2,7 +2,7 @@ import { vi } from 'vitest'
 
 type Result<T = any> = { data: T; error: null } | { data: null; error: { message: string } } | { count: number; error: null }
 
-export function makeSupabaseFromMock(map: Record<string, Array<Result>>) {
+export function makeSupabaseFromMock(map: Record<string, Array<{ data: any; error: any }>>) {
 	// Maintain per-table queues so multiple calls consume sequentially
 	const tableToQueue = new Map<string, Array<Result>>()
 
@@ -18,22 +18,31 @@ export function makeSupabaseFromMock(map: Record<string, Array<Result>>) {
 	}
 
 	return vi.fn((table: string) => {
-		const getResult = () => Promise.resolve(getNextForTable(table))
-		
+		const results = map[table] ?? [{ data: [], error: null }]
+		const queue = [...results]
+
+		const next = () => (queue.length ? queue.shift()! : { data: [], error: null })
+
+		// Builder chain object (will be returned by every method)
 		const chain: any = {
 			select: vi.fn((columns?: string | string[], options?: any) => {
-				// For count queries with head: true, select() returns a special object
-				// where eq() directly returns a Promise (not a chain)
+				// Handle count queries with head: true
 				if (options?.count === 'exact' && options?.head === true) {
 					return {
-						eq: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						gte: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						lte: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						in: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						or: vi.fn(() => Promise.resolve(getNextForTable(table))),
+						eq: vi.fn(() => Promise.resolve(next())),
+						gte: vi.fn(() => Promise.resolve(next())),
+						lte: vi.fn(() => Promise.resolve(next())),
+						in: vi.fn(() => Promise.resolve(next())),
+						or: vi.fn(() => Promise.resolve(next())),
+						order: vi.fn(() => Promise.resolve(next())),
+						range: vi.fn(() => Promise.resolve(next())),
+						limit: vi.fn(() => Promise.resolve(next())),
+						single: vi.fn(() => Promise.resolve(next())),
+						maybeSingle: vi.fn(() => Promise.resolve(next())),
+						then: (onFulfilled: any, onRejected: any) => Promise.resolve(next()).then(onFulfilled, onRejected),
 					}
 				}
-				// Regular select - return the chain for further chaining
+				// Regular select query - return the chain
 				return chain
 			}),
 			eq: vi.fn(() => chain),
@@ -42,13 +51,13 @@ export function makeSupabaseFromMock(map: Record<string, Array<Result>>) {
 			in: vi.fn(() => chain),
 			or: vi.fn(() => chain),
 			order: vi.fn(() => chain),
-			// Terminal methods that actually return data
-			limit: vi.fn(() => getResult()),
-			range: vi.fn(() => getResult()),
-			single: vi.fn(() => getResult()),
-			maybeSingle: vi.fn(() => getResult()),
-			// Make chain thenable so it can be awaited directly
-			then: (onFulfilled: any, onRejected: any) => getResult().then(onFulfilled, onRejected),
+			limit: vi.fn(() => Promise.resolve(next())),
+			range: vi.fn(() => Promise.resolve(next())),
+			single: vi.fn(() => Promise.resolve(next())),
+			maybeSingle: vi.fn(() => Promise.resolve(next())),
+			// If the code sometimes directly awaits after .order or other methods with no terminal,
+			// make the chain thenable as a fallback:
+			then: (onFulfilled: any, onRejected: any) => Promise.resolve(next()).then(onFulfilled, onRejected),
 		}
 
 		return chain

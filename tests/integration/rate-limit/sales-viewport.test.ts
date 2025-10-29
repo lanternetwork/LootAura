@@ -63,11 +63,11 @@ const saleData = [
 
 // Hoist Supabase server mock BEFORE importing the route
 const from = makeSupabaseFromMock({
-  // First call: count probe (head: true)
-  sales_v2: [
-    { data: null, error: null },
-    { data: saleData, error: null },
-  ],
+	// First call: count probe (head: true)
+	sales_v2: [
+		{ count: 2, error: null },
+		{ data: saleData, error: null },
+	],
 })
 
 vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))

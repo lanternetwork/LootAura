@@ -4,7 +4,7 @@
  * Tests soft-then-hard behavior on sales viewport endpoint.
  */
 
-import { vi, describe, it, expect } from 'vitest'
+import { vi, describe, it, expect, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import { makeSupabaseFromMock, mockCreateSupabaseServerClient } from '@/tests/utils/mocks/supabaseServerMock'
 
@@ -72,14 +72,19 @@ const from = makeSupabaseFromMock({
 
 vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))
 
+let route: any
+beforeAll(async () => {
+  // Import AFTER the mock so it picks up the mocked module
+  route = await import('@/app/api/sales/route')
+})
+
 describe('Rate Limiting Integration - Sales Viewport', () => {
 
   it('should allow requests within limit', async () => {
-    const { GET } = await import('@/app/api/sales/route') // import after mock
     const url = new URL('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     const request = new NextRequest(url)
     
-    const response = await GET(request)
+    const response = await route.GET(request)
     
     if (response.status !== 200) {
       const text = await response.text()
@@ -94,11 +99,10 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
   })
 
   it('should allow soft-limited requests (burst)', async () => {
-    const { GET } = await import('@/app/api/sales/route') // import after mock
     const url = new URL('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     const request = new NextRequest(url)
     
-    const response = await GET(request)
+    const response = await route.GET(request)
     
     if (response.status !== 200) {
       const text = await response.text()
@@ -111,11 +115,10 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
   })
 
   it('should handle repeated calls without error', async () => {
-    const { GET } = await import('@/app/api/sales/route') // import after mock
     const url = new URL('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     const request = new NextRequest(url)
     
-    const response = await GET(request)
+    const response = await route.GET(request)
     
     if (response.status !== 200) {
       const text = await response.text()
@@ -126,13 +129,12 @@ describe('Rate Limiting Integration - Sales Viewport', () => {
   })
 
   it('should simulate burst panning scenario', async () => {
-    const { GET } = await import('@/app/api/sales/route') // import after mock
     const url = new URL('https://example.com/api/sales?north=38.1&south=38.0&east=-84.9&west=-85.0')
     const request = new NextRequest(url)
     
     // Simulate 10 rapid requests - all should succeed since rate limiting is bypassed
     for (let i = 0; i < 10; i++) {
-      const res = await GET(request)
+      const res = await route.GET(request)
       if (res.status !== 200) {
         const text = await res.text()
         console.error(`SALES API BODY (iteration ${i})`, text)

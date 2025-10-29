@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
-import { POST } from '@/app/api/sales/route'
 
 // Mock Supabase
 const mockSingle = vi.fn()
@@ -30,6 +29,12 @@ vi.mock('@/lib/rateLimit/withRateLimit', () => ({
 vi.mock('@/lib/images/validateImageUrl', () => ({
   isAllowedImageUrl: vi.fn((url: string) => url.includes('res.cloudinary.com'))
 }))
+
+let POST: any
+beforeAll(async () => {
+  const route = await import('@/app/api/sales/route')
+  POST = route.POST
+})
 
 describe('Sales API - Image Support', () => {
   beforeEach(() => {

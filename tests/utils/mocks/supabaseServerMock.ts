@@ -1,56 +1,80 @@
 import { vi } from 'vitest'
 
-type Result<T = any> =
-  | { data: T; error: null }
-  | { data: null; error: { message: string } }
-  | { count: number; error: null }
+type Row = Record<string, any>
 
-export function makeSupabaseFromMock(map: Record<string, Result[]>) {
-  return vi.fn((table: string) => {
-    const results = map[table] ?? [{ data: [], error: null }]
-    const queue = [...results]
+// New: make a per-table chain that always returns a fluent builder from select()
+function makeTableChain(rows: Row[], countValue = rows.length) {
+  let filters: Array<{ col: string; op: 'eq' | 'gte' | 'lte'; val: any }> = []
+  let countMode = false
+  let start = 0
+  let end: number | null = null
 
-    const next = () => (queue.length ? queue.shift()! : { data: [], error: null })
+  const applyFilters = () =>
+    rows.filter((r) =>
+      filters.every((f) => {
+        const v = r[f.col]
+        if (f.op === 'eq') return v === f.val
+        if (f.op === 'gte') return v >= f.val
+        if (f.op === 'lte') return v <= f.val
+        return true
+      })
+    )
 
-    // Builder chain object (will be returned by every method)
-    const chain: any = {
-      select: vi.fn((columns?: string | string[], options?: any) => {
-        // Handle count queries with head: true
-        if (options?.count === 'exact' && options?.head === true) {
-          return {
-            eq: vi.fn(() => Promise.resolve(next())),
-            gte: vi.fn(() => Promise.resolve(next())),
-            lte: vi.fn(() => Promise.resolve(next())),
-            in: vi.fn(() => Promise.resolve(next())),
-            or: vi.fn(() => Promise.resolve(next())),
-            order: vi.fn(() => Promise.resolve(next())),
-            range: vi.fn(() => Promise.resolve(next())),
-            limit: vi.fn(() => Promise.resolve(next())),
-            single: vi.fn(() => Promise.resolve(next())),
-            maybeSingle: vi.fn(() => Promise.resolve(next())),
-            then: (onFulfilled: any, onRejected: any) => Promise.resolve(next()).then(onFulfilled, onRejected),
-          }
-        }
-        // Regular select query - return the chain
-        return chain
-      }),
-      eq: vi.fn(() => chain),
-      gte: vi.fn(() => chain),
-      lte: vi.fn(() => chain),
-      in: vi.fn(() => chain),
-      or: vi.fn(() => chain),
-      order: vi.fn(() => chain),
-      limit: vi.fn(() => Promise.resolve(next())),
-      range: vi.fn(() => Promise.resolve(next())),
-      single: vi.fn(() => Promise.resolve(next())),
-      maybeSingle: vi.fn(() => Promise.resolve(next())),
-      // If the code sometimes directly awaits after .order or other methods with no terminal,
-      // make the chain thenable as a fallback:
-      then: (onFulfilled: any, onRejected: any) => Promise.resolve(next()).then(onFulfilled, onRejected),
-    }
+  const resolveRange = () => {
+    const filtered = applyFilters()
+    const sliced = end == null ? filtered.slice(start) : filtered.slice(start, end + 1)
+    return { data: sliced, count: filtered.length, error: null }
+  }
 
-    return chain
-  })
+  const chain: any = {
+    // Builder methods
+    select: (_sel?: string, opts?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) => {
+      countMode = !!opts?.count
+      return chain
+    },
+    eq: (col: string, val: any) => {
+      if (countMode) {
+        const out = Promise.resolve({ data: null, count: countValue, error: null })
+        countMode = false
+        return out
+      }
+      filters.push({ col, op: 'eq', val })
+      return chain
+    },
+    gte: (col: string, val: any) => {
+      filters.push({ col, op: 'gte', val })
+      return chain
+    },
+    lte: (col: string, val: any) => {
+      filters.push({ col, op: 'lte', val })
+      return chain
+    },
+    in: () => chain,
+    or: () => chain,
+    order: () => chain,
+
+    // Terminal methods
+    range: (s: number, e: number) => {
+      start = s
+      end = e
+      return Promise.resolve(resolveRange())
+    },
+    limit: (n: number) => {
+      start = 0
+      end = n - 1
+      return Promise.resolve(resolveRange())
+    },
+    single: () => Promise.resolve({ data: applyFilters()[0] ?? null, error: null }),
+    maybeSingle: () => Promise.resolve({ data: applyFilters()[0] ?? null, error: null }),
+  }
+
+  // Important: do NOT set chain.then to avoid accidental thenable behavior
+  return chain
+}
+
+// Back-compat: provide previous APIs, but implemented via table rows
+export function makeSupabaseFromMock(map: Record<string, Array<{ id?: string }>>) {
+  return vi.fn((table: string) => makeTableChain((map as any)[table] ?? [], ((map as any)[table] ?? []).length))
 }
 
 export function mockCreateSupabaseServerClient(from: ReturnType<typeof makeSupabaseFromMock>) {
@@ -65,4 +89,16 @@ export function mockCreateSupabaseServerClient(from: ReturnType<typeof makeSupab
       },
     })),
   }
+}
+
+// New: high-level helper to mock the server by table name → rows
+export function mockSupabaseServer(tables: Record<string, Row[]>) {
+  vi.mock('@/lib/supabase/server', () => ({
+    createSupabaseServerClient: () => ({
+      from: (table: string) => makeTableChain(tables[table] ?? [], (tables[table] ?? []).length),
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+      },
+    }),
+  }))
 }

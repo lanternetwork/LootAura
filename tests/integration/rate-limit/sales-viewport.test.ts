@@ -4,84 +4,25 @@
  * Tests soft-then-hard behavior on sales viewport endpoint.
  */
 
-import { vi, beforeAll, afterEach, describe, it, expect } from 'vitest'
+import { vi, beforeEach, describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
-
-// Mock Supabase server client before any imports
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => ({
-    from: vi.fn((table: string) => {
-      // Create a chain object that returns itself for method chaining
-      const chain: any = {}
-      
-      // All query methods return the chain for fluent API
-      chain.select = vi.fn((columns?: string | string[], options?: any) => {
-        // Handle count query with head: true
-        if (options?.count === 'exact' && options?.head === true) {
-          return {
-            eq: vi.fn(async () => ({ count: 2, error: null })),
-          }
-        }
-        // Regular select query - return the chain with all methods
-        return chain
-      })
-      
-      // All these methods return the chain for fluent API
-      chain.eq = vi.fn(() => chain)
-      chain.gte = vi.fn(() => chain)
-      chain.lte = vi.fn(() => chain)
-      chain.in = vi.fn(() => chain)
-      chain.or = vi.fn(() => chain)
-      chain.order = vi.fn(() => chain)
-      chain.limit = vi.fn(() => chain)
-      
-      // These methods return promises with data
-      chain.range = vi.fn(async () => ({
-        data: [
-          { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-          { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
-        ],
-        error: null,
-      }))
-      
-      chain.single = vi.fn(async () => ({
-        data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-        error: null,
-      }))
-      
-      chain.maybeSingle = vi.fn(async () => ({
-        data: { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-        error: null,
-      }))
-      
-      // Support for Promise.then() on the chain
-      chain.then = (onFulfilled: any, onRejected: any) =>
-        Promise.resolve({
-          data: [
-            { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-            { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
-          ],
-          error: null,
-        }).then(onFulfilled, onRejected)
-      
-      return chain
-    }),
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-    },
-  })),
-}))
+import { mockSupabaseServer } from '@/tests/utils/mocks/supabaseServerMock'
 
 // Disable rate limiting in tests
 ;(process.env as any).RATE_LIMITING_ENABLED = 'false'
 
 let route: any
-beforeAll(async () => {
-  // Import AFTER the mock so it picks up the mocked module
+beforeEach(async () => {
+  vi.resetModules()
+  mockSupabaseServer({
+    sales_v2: [
+      { id: 's1', status: 'published', lat: 38.25, lng: -85.76, start_time: '2025-01-01T00:00:00Z' },
+      { id: 's2', status: 'published', lat: 38.26, lng: -85.75, start_time: '2025-01-02T00:00:00Z' },
+    ],
+    items_v2: [],
+  })
   route = await import('@/app/api/sales/route')
 })
-
-// Removed resetModules to keep mocks intact across tests
 
 describe('Rate Limiting Integration - Sales Viewport', () => {
   beforeEach(() => {

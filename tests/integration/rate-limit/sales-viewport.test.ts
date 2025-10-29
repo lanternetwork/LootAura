@@ -62,60 +62,62 @@ const saleData = [
 
 // Inline Supabase server mock with fluent chain
 vi.mock('@/lib/supabase/server', () => {
-  const makeChain = (result: any) => {
-    const chain: any = {}
-    chain.select = vi.fn(() => chain)
-    chain.eq = vi.fn(() => chain)
-    chain.gte = vi.fn(() => chain)
-    chain.lte = vi.fn(() => chain)
-    chain.in = vi.fn(() => chain)
-    chain.or = vi.fn(() => chain)
-    chain.order = vi.fn(() => chain)
-    chain.range = vi.fn(() => Promise.resolve({ data: result, error: null }))
-    chain.limit = vi.fn(() => Promise.resolve({ data: result, error: null }))
-    chain.single = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
-    chain.maybeSingle = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
-    // For count probe: return an object resolving to count when awaited
-    const countProbe = { count: Array.isArray(result) ? result.length : 0, error: null }
-    // Make chain thenable so awaiting the chain without terminal still resolves
-    ;(chain as any).then = (onFulfilled: any, onRejected: any) => Promise.resolve({ data: result, error: null }).then(onFulfilled, onRejected)
-    return { chain, countProbe }
-  }
+	const makeChainWithCount = (result: any) => {
+		const chain: any = {}
+		chain.select = vi.fn((_cols?: any, opts?: any) => {
+			if (opts?.count === 'exact' && opts?.head === true) {
+				return {
+					eq: vi.fn(() => Promise.resolve({ count: Array.isArray(result) ? result.length : 0, error: null })),
+				}
+			}
+			return chain
+		})
+		chain.eq = vi.fn(() => chain)
+		chain.gte = vi.fn(() => chain)
+		chain.lte = vi.fn(() => chain)
+		chain.in = vi.fn(() => chain)
+		chain.or = vi.fn(() => chain)
+		chain.order = vi.fn(() => chain)
+		chain.range = vi.fn(() => Promise.resolve({ data: result, error: null }))
+		chain.limit = vi.fn(() => Promise.resolve({ data: result, error: null }))
+		chain.single = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
+		chain.maybeSingle = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
+		;(chain as any).then = (onFulfilled: any, onRejected: any) => Promise.resolve({ data: result, error: null }).then(onFulfilled, onRejected)
+		return chain
+	}
 
-  const { chain, countProbe } = makeChain(saleData)
+	const makeSimpleChain = (result: any) => {
+		const chain: any = {}
+		chain.select = vi.fn(() => chain)
+		chain.eq = vi.fn(() => chain)
+		chain.gte = vi.fn(() => chain)
+		chain.lte = vi.fn(() => chain)
+		chain.in = vi.fn(() => chain)
+		chain.or = vi.fn(() => chain)
+		chain.order = vi.fn(() => chain)
+		chain.range = vi.fn(() => Promise.resolve({ data: result, error: null }))
+		chain.limit = vi.fn(() => Promise.resolve({ data: result, error: null }))
+		chain.single = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
+		chain.maybeSingle = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
+		;(chain as any).then = (onFulfilled: any, onRejected: any) => Promise.resolve({ data: result, error: null }).then(onFulfilled, onRejected)
+		return chain
+	}
 
-  return {
-    createSupabaseServerClient: vi.fn(() => ({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-      },
-      from: vi.fn((table: string) => {
-        if (table === 'sales_v2') {
-          // Return a proxy that handles select(head: true) specially for count probe
-          const proxy: any = {
-            select: vi.fn((_cols?: any, opts?: any) => {
-              if (opts?.count === 'exact' && opts?.head === true) {
-                return { eq: vi.fn(() => Promise.resolve(countProbe)) }
-              }
-              return chain
-            }),
-            eq: chain.eq,
-            gte: chain.gte,
-            lte: chain.lte,
-            in: chain.in,
-            or: chain.or,
-            order: chain.order,
-            range: chain.range,
-            limit: chain.limit,
-            then: (onFulfilled: any, onRejected: any) => Promise.resolve({ data: saleData, error: null }).then(onFulfilled, onRejected),
-          }
-          return proxy
-        }
-        // default
-        return chain
-      }),
-    })),
-  }
+	const salesChain = makeChainWithCount(saleData)
+	const itemsChain = makeSimpleChain([])
+
+	return {
+		createSupabaseServerClient: vi.fn(() => ({
+			auth: {
+				getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+			},
+			from: vi.fn((table: string) => {
+				if (table === 'sales_v2') return salesChain
+				if (table === 'items_v2') return itemsChain
+				return makeSimpleChain([])
+			}),
+		})),
+	}
 })
 
 let route: any

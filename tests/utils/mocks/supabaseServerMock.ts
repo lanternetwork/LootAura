@@ -18,38 +18,45 @@ export function makeSupabaseFromMock(map: Record<string, Array<Result>>) {
 	}
 
 	return vi.fn((table: string) => {
-		// Builder chain object (returned by every method)
-		const chain: any = {
-			select: vi.fn((columns?: string | string[], options?: any) => {
-				// Handle count queries with head: true by returning a lightweight object
-				if (options?.count === 'exact' && options?.head === true) {
-					return {
-						eq: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						gte: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						lte: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						in: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						or: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						order: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						range: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						limit: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						single: vi.fn(() => Promise.resolve(getNextForTable(table))),
-						maybeSingle: vi.fn(() => Promise.resolve(getNextForTable(table))),
-					}
-				}
-				// Regular select query - return the chain for further chaining
-				return chain
-			}),
-			eq: vi.fn(() => chain),
-			gte: vi.fn(() => chain),
-			lte: vi.fn(() => chain),
-			in: vi.fn(() => chain),
-			or: vi.fn(() => chain),
-			order: vi.fn(() => chain),
-			limit: vi.fn(() => Promise.resolve(getNextForTable(table))),
-			range: vi.fn(() => Promise.resolve(getNextForTable(table))),
-			single: vi.fn(() => Promise.resolve(getNextForTable(table))),
-			maybeSingle: vi.fn(() => Promise.resolve(getNextForTable(table))),
+		// Create a reusable chain object that all methods return
+		const createChain = () => {
+			const ch: any = {
+				eq: vi.fn(() => ch),
+				gte: vi.fn(() => ch),
+				lte: vi.fn(() => ch),
+				in: vi.fn(() => ch),
+				or: vi.fn(() => ch),
+				order: vi.fn(() => ch),
+				limit: vi.fn(() => Promise.resolve(getNextForTable(table))),
+				range: vi.fn(() => Promise.resolve(getNextForTable(table))),
+				single: vi.fn(() => Promise.resolve(getNextForTable(table))),
+				maybeSingle: vi.fn(() => Promise.resolve(getNextForTable(table))),
+			}
+			return ch
 		}
+
+		const chain = createChain()
+
+		// Builder chain object (returned by every method)
+		chain.select = vi.fn((columns?: string | string[], options?: any) => {
+			// Handle count queries with head: true by returning a lightweight object
+			if (options?.count === 'exact' && options?.head === true) {
+				return {
+					eq: vi.fn(() => Promise.resolve(getNextForTable(table))),
+					gte: vi.fn(() => Promise.resolve(getNextForTable(table))),
+					lte: vi.fn(() => Promise.resolve(getNextForTable(table))),
+					in: vi.fn(() => Promise.resolve(getNextForTable(table))),
+					or: vi.fn(() => Promise.resolve(getNextForTable(table))),
+					order: vi.fn(() => Promise.resolve(getNextForTable(table))),
+					range: vi.fn(() => Promise.resolve(getNextForTable(table))),
+					limit: vi.fn(() => Promise.resolve(getNextForTable(table))),
+					single: vi.fn(() => Promise.resolve(getNextForTable(table))),
+					maybeSingle: vi.fn(() => Promise.resolve(getNextForTable(table))),
+				}
+			}
+			// Regular select query - return the chain for further chaining
+			return chain
+		})
 
 		return chain
 	})

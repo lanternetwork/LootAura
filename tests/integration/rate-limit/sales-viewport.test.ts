@@ -15,13 +15,26 @@ vi.mock('@/lib/rateLimit/config', () => ({
   shouldBypassRateLimit: vi.fn(() => true),
 }))
 
-// Provide table rows for the mock server
+// Provide sequential results for the mock server
+// Each request needs: count query result, then main query result
+// Provide enough results for all tests (4 tests × 2 calls = 8 results minimum, use 10 for safety)
+const salesResults = []
+const saleData = [
+  { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
+  { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
+]
+
+for (let i = 0; i < 10; i++) {
+  if (i % 2 === 0) {
+    salesResults.push({ count: 2, error: null }) // Count query
+  } else {
+    salesResults.push({ data: saleData, error: null }) // Main query
+  }
+}
+
 mockSupabaseServer({
-  sales_v2: [
-    { id: 's1', lat: 38.25, lng: -85.76, title: 'Sale A', status: 'published' },
-    { id: 's2', lat: 38.26, lng: -85.75, title: 'Sale B', status: 'published' },
-  ],
-  items_v2: [],
+  sales_v2: salesResults,
+  items_v2: [{ data: [], error: null }],
 })
 
 // Disable rate limiting in tests
@@ -33,9 +46,7 @@ beforeAll(async () => {
   route = await import('@/app/api/sales/route')
 })
 
-afterEach(() => {
-  vi.resetModules()
-})
+// Don't reset modules - hoisted mocks need to persist
 
 describe('Rate Limiting Integration - Sales Viewport', () => {
   beforeEach(() => {

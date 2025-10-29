@@ -70,10 +70,18 @@ export function mockCreateSupabaseServerClient(from: ReturnType<typeof makeSupab
 }
 
 // Convenience helper expected by tests: installs a Supabase server mock with table data
-export function mockSupabaseServer(tables: Record<string, any[]>) {
+// Accepts either row arrays (converted to { data: rows, error: null }) or Result arrays directly
+export function mockSupabaseServer(tables: Record<string, any[] | Result[]>) {
 	const from = makeSupabaseFromMock(
 		Object.fromEntries(
-			Object.entries(tables).map(([table, rows]) => [table, [{ data: rows, error: null } as Result]])
+			Object.entries(tables).map(([table, value]) => {
+				// If first element is a Result (has 'data' or 'count' property and 'error'), treat as Result[]
+				if (Array.isArray(value) && value.length > 0 && (typeof value[0] === 'object' && ('data' in value[0] || 'count' in value[0]))) {
+					return [table, value as Result[]]
+				}
+				// Otherwise treat as row array and wrap in { data: rows, error: null }
+				return [table, [{ data: value, error: null } as Result]]
+			})
 		)
 	) as any
 

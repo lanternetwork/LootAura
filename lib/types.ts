@@ -18,6 +18,8 @@ export type Sale = {
   status: 'draft' | 'published' | 'completed' | 'cancelled'
   privacy_mode: 'exact' | 'block_until_24h'
   is_featured: boolean
+  cover_image_url?: string | null
+  images?: string[] | null
   created_at: string
   updated_at: string
   // Computed properties added during API processing

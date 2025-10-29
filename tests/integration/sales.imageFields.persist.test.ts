@@ -1,19 +1,20 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 
-// Mock Supabase
+// Mock Supabase (stable chain object so spies are consistent across calls)
 const mockSingle = vi.fn()
+const fromChain = {
+  insert: vi.fn(() => ({
+    select: vi.fn(() => ({
+      single: mockSingle
+    }))
+  }))
+}
 const mockSupabaseClient = {
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
   },
-  from: vi.fn(() => ({
-    insert: vi.fn(() => ({
-      select: vi.fn(() => ({
-        single: mockSingle
-      }))
-    }))
-  }))
+  from: vi.fn(() => fromChain)
 }
 
 vi.mock('@/lib/supabase/server', () => ({

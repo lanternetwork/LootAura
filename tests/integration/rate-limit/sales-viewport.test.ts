@@ -6,7 +6,7 @@
 
 import { vi, describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
-import { buildChain } from '@/tests/mocks/supabaseServer.mock'
+import { makeSupabaseFromMock, mockCreateSupabaseServerClient } from '@/tests/utils/mocks/supabaseServerMock'
 
 // Always bypass rate limiting in this suite
 vi.mock('@/lib/rateLimit/config', () => ({
@@ -62,17 +62,15 @@ const saleData = [
 ]
 
 // Hoist Supabase server mock BEFORE importing the route
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: () => ({
-    from: (table: string) => buildChain(table === 'sales_v2' ? saleData : []),
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
-      signOut: vi.fn(),
-    },
-  }),
-}))
+const from = makeSupabaseFromMock({
+  // First call: count probe (head: true)
+  sales_v2: [
+    { data: null, error: null },
+    { data: saleData, error: null },
+  ],
+})
+
+vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))
 
 describe('Rate Limiting Integration - Sales Viewport', () => {
 

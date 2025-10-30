@@ -1,33 +1,47 @@
-// Minimal unsavory/profanity filter. Keep list small and maintainable.
-// Matches whole words case-insensitively; ignores punctuation boundaries.
+// Profanity/unsavory filter: case-insensitive and punctuation-intolerant.
+// Strategy: normalize input and check against a deny set (tokens and compact substrings).
 
-const UNSAVORY_WORDS = [
-  // Common profanities (redacted to first/last char to avoid poisoning logs)
-  'f[^\w]?u[^\w]?c[^\w]?k',
-  's[^\w]?h[^\w]?i[^\w]?t',
-  'b[^\w]?i[^\w]?t[^\w]?c[^\w]?h',
-  'a[^\w]?s[^\w]?s[^\w]?',
-  'd[^\w]?a[^\w]?m[^\w]?n',
-  'c[^\w]?r[^\w]?a[^\w]?p',
-  // Slurs/unsavory placeholders (keep general)
-  'slut', 'whore'
+const UNSAVORY_LIST = [
+  'fuck','shit','bitch','ass','asshole','bastard','dick','pussy','cunt','bollocks','bugger',
+  'damn','crap','prick','twat','wank','wanker','motherfucker','mf','fucker','douche','douchebag',
+  'slut','whore','skank','jackass','arse','arsehole','bloody','git','tosser','nob','knob',
+  'dildo','jerkoff','cum','cumshot','cums','jizz','spunk','blowjob','handjob','rimjob','buttfuck',
+  'buttsex','buttplug','tit','tits','titty','boobs','boob','nipple','nips','porn','porno',
+  'sperm','semen','fag','faggot','dyke','tranny','retard','retarded'
 ] as const
 
-const WORD_BOUNDARY = '(^|[^a-z0-9])'
+const UNSAVORY_SET = new Set<string>(UNSAVORY_LIST)
 
-const UNSAVORY_REGEX = new RegExp(
-  UNSAVORY_WORDS.map((w) => `${WORD_BOUNDARY}(${w})($|[^a-z0-9])`).join('|'),
-  'i'
-)
+function normalizeTokenized(input: string): string {
+  return input.toLowerCase().replace(/[^a-z]+/g, ' ').trim().replace(/\s+/g, ' ')
+}
+
+function normalizeCompact(input: string): string {
+  return input.toLowerCase().replace(/[^a-z]+/g, '')
+}
 
 export function containsUnsavory(text: string | undefined | null): { ok: boolean; match?: string } {
   if (!text) return { ok: true }
-  const m = text.match(UNSAVORY_REGEX)
-  if (m) {
-    // Find the first captured offending term
-    const captured = m.slice(2).find(Boolean)
-    return { ok: false, match: captured || m[0] }
+
+  const tokenized = normalizeTokenized(text)
+  const compact = normalizeCompact(text)
+
+  if (tokenized.length > 0) {
+    for (const token of tokenized.split(' ')) {
+      if (UNSAVORY_SET.has(token)) {
+        return { ok: false, match: token }
+      }
+    }
   }
+
+  if (compact.length > 0) {
+    for (const word of UNSAVORY_SET) {
+      if (word.length > 1 && compact.includes(word)) {
+        return { ok: false, match: word }
+      }
+    }
+  }
+
   return { ok: true }
 }
 

@@ -68,22 +68,65 @@ const saleData = [
 
 // Use shared queue-based server mock so multiple from('sales_v2') calls work in order
 // Need 2 results per test (count query + data query), and we have 4 tests, so need 8 total
-const from = makeSupabaseFromMock({
+const { from } = vi.hoisted(() => {
+  const saleDataForMock = [
+    { 
+      id: 's1', 
+      lat: 38.05, 
+      lng: -84.95, 
+      title: 'Sale A', 
+      description: 'Test sale',
+      address: '123 Test St',
+      city: 'Louisville',
+      state: 'KY',
+      zip_code: '40201',
+      status: 'published', 
+      date_start: '2024-01-01', 
+      time_start: '09:00',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z'
+    },
+    { 
+      id: 's2', 
+      lat: 38.06, 
+      lng: -84.94, 
+      title: 'Sale B', 
+      description: 'Another test sale',
+      address: '456 Test Ave',
+      city: 'Louisville',
+      state: 'KY',
+      zip_code: '40201',
+      status: 'published', 
+      date_start: '2024-01-02', 
+      time_start: '10:00',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: '2024-01-02T00:00:00Z',
+      updated_at: '2024-01-02T00:00:00Z'
+    },
+  ]
+  
+  const fromMock = makeSupabaseFromMock({
     sales_v2: [
-        // Test 1: count + data
-        { count: saleData.length, error: null },
-        { data: saleData, error: null },
-        // Test 2: count + data
-        { count: saleData.length, error: null },
-        { data: saleData, error: null },
-        // Test 3: count + data
-        { count: saleData.length, error: null },
-        { data: saleData, error: null },
-        // Test 4: count + data (10 iterations)
-        { count: saleData.length, error: null },
-        ...Array(10).fill({ data: saleData, error: null }),
+      // Test 1: count + data
+      { count: saleDataForMock.length, error: null },
+      { data: saleDataForMock, error: null },
+      // Test 2: count + data
+      { count: saleDataForMock.length, error: null },
+      { data: saleDataForMock, error: null },
+      // Test 3: count + data
+      { count: saleDataForMock.length, error: null },
+      { data: saleDataForMock, error: null },
+      // Test 4: count + data (10 iterations)
+      { count: saleDataForMock.length, error: null },
+      ...Array(10).fill({ data: saleDataForMock, error: null }),
     ],
     items_v2: Array(20).fill({ data: [], error: null }),
+  })
+  
+  return { from: fromMock }
 })
 
 vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))

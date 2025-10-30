@@ -18,7 +18,7 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
       data-card="sale"
       data-kind="sale-row"
     >
-      <div className="relative bg-gray-100 aspect-[16/6.75] md:aspect-[4/2.25] overflow-hidden">
+      <div className="relative bg-gray-100 aspect-[16/8] md:aspect-[4/2.7] overflow-hidden">
         {cover ? (
           <Image
             src={cover.url}

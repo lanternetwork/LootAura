@@ -30,7 +30,7 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 md:p-8">
-            <SalePlaceholder className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90" />
+            <SalePlaceholder className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90 scale-[1.3]" />
           </div>
         )}
       </div>

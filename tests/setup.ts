@@ -12,7 +12,7 @@ vi.mock('next/image', () => {
   return {
     __esModule: true,
     default: (props: any) => {
-      const { src, alt = '', fill: _fill, loader: _loader, placeholder: _ph, blurDataURL: _blur, unoptimized: _u, ...rest } = props || {}
+      const { src, alt = '', fill: _fill, loader: _loader, placeholder: _ph, blurDataURL: _blur, unoptimized: _u, priority: _priority, quality: _q, ...rest } = props || {}
       const resolved = typeof src === 'string' ? src : (src?.src || '')
       // Drop Next.js-specific boolean/unsupported attributes (e.g., fill) to avoid DOM warnings
       return React.createElement('img', { src: resolved, alt, ...rest })

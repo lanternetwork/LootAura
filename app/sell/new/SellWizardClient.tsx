@@ -246,7 +246,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const renderStep = () => {
     switch (currentStep) {
       case 0:
-        return <DetailsStep formData={formData} onChange={handleInputChange} />
+        return <DetailsStep formData={formData} onChange={handleInputChange} errors={errors} />
       case 1:
         return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
       case 2:
@@ -355,7 +355,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 }
 
 // Step Components
-function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void }) {
+function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void, errors?: Record<string, string> }) {
   return (
     <div className="space-y-6">
       <div>
@@ -370,8 +370,8 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           required
         />
-        {_errors?.title && (
-          <p className="mt-1 text-sm text-red-600">{_errors.title}</p>
+        {errors?.title && (
+          <p className="mt-1 text-sm text-red-600">{errors.title}</p>
         )}
       </div>
 
@@ -400,8 +400,8 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
-        {_errors?.date_start && (
-          <p className="mt-1 text-sm text-red-600">{_errors.date_start}</p>
+        {errors?.date_start && (
+          <p className="mt-1 text-sm text-red-600">{errors.date_start}</p>
         )}
         </div>
         <div>
@@ -415,8 +415,8 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
-        {_errors?.time_start && (
-          <p className="mt-1 text-sm text-red-600">{_errors.time_start}</p>
+        {errors?.time_start && (
+          <p className="mt-1 text-sm text-red-600">{errors.time_start}</p>
         )}
         </div>
       </div>
@@ -458,8 +458,8 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           required
         />
-        {_errors?.address && (
-          <p className="mt-1 text-sm text-red-600">{_errors.address}</p>
+        {errors?.address && (
+          <p className="mt-1 text-sm text-red-600">{errors.address}</p>
         )}
       </div>
 
@@ -476,8 +476,8 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
-        {_errors?.city && (
-          <p className="mt-1 text-sm text-red-600">{_errors.city}</p>
+        {errors?.city && (
+          <p className="mt-1 text-sm text-red-600">{errors.city}</p>
         )}
         </div>
         <div>
@@ -492,8 +492,8 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
-        {_errors?.state && (
-          <p className="mt-1 text-sm text-red-600">{_errors.state}</p>
+        {errors?.state && (
+          <p className="mt-1 text-sm text-red-600">{errors.state}</p>
         )}
         </div>
         <div>

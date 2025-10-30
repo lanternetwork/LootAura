@@ -59,7 +59,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const [photos, setPhotos] = useState<string[]>([])
   const [items, setItems] = useState<Array<{ name: string; price?: number; description?: string; image_url?: string }>>([])
   const [loading, setLoading] = useState(false)
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [_errors, setErrors] = useState<Record<string, string>>({})
 
   // Check authentication status
   useEffect(() => {

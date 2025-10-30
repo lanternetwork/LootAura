@@ -36,7 +36,7 @@ describe('v2 Sales API - images persistence', () => {
     const request = new NextRequest('http://localhost/api/v2/sales', {
       method: 'POST',
       body: JSON.stringify({
-        title: 'Test', city: 'X', state: 'YY', date_start: '2024-01-01', time_start: '09:00',
+        title: 'Test', address: '123 Main', city: 'X', state: 'YY', date_start: '2024-01-01', time_start: '09:00',
         cover_image_url: 'https://res.cloudinary.com/test/image/upload/v1/cover.jpg',
         images: ['https://res.cloudinary.com/test/image/upload/v1/a.jpg']
       }),
@@ -53,7 +53,7 @@ describe('v2 Sales API - images persistence', () => {
     const request = new NextRequest('http://localhost/api/v2/sales', {
       method: 'POST',
       body: JSON.stringify({
-        title: 'Test', city: 'X', state: 'YY', date_start: '2024-01-01', time_start: '09:00',
+        title: 'Test', address: '123 Main', city: 'X', state: 'YY', date_start: '2024-01-01', time_start: '09:00',
         images: ['https://malicious.site/x.jpg']
       }),
     })

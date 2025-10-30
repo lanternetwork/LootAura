@@ -170,9 +170,16 @@ export default function SalesClient({
     }
     
     // Only run clustering on visible sales
+    const clusterRadiusForZoom = (z: number): number => {
+      if (z >= 16) return 0.3 // fully zoomed-in, effectively disable clustering
+      if (z >= 14) return 12
+      if (z >= 12) return 20
+      if (z >= 10) return 28
+      return 36 // very zoomed out → stronger clustering to avoid overlap
+    }
     const result = createHybridPins(visibleSales, currentViewport, {
       coordinatePrecision: 6, // high precision to avoid accidental grouping
-      clusterRadius: 0.3, // px: ultra-conservative clustering
+      clusterRadius: clusterRadiusForZoom(currentViewport.zoom),
       minClusterSize: 2, // allow clustering for 2+ points
       maxZoom: 16,
       enableLocationGrouping: true,

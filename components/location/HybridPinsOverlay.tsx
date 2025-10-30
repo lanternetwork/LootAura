@@ -29,9 +29,16 @@ export default function HybridPinsOverlay({
   
   // Create hybrid pins using the two-stage process
   const hybridResult = useMemo((): HybridPinsResult => {
+    const clusterRadiusForZoom = (z: number): number => {
+      if (z >= 16) return 0.3
+      if (z >= 14) return 12
+      if (z >= 12) return 20
+      if (z >= 10) return 28
+      return 36
+    }
     return createHybridPins(sales, viewport, {
       coordinatePrecision: 6,
-      clusterRadius: 0.3,
+      clusterRadius: clusterRadiusForZoom(viewport.zoom),
       minClusterSize: 2,
       maxZoom: 16,
       enableLocationGrouping: true,

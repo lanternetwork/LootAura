@@ -105,8 +105,8 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8 md:p-10">
                   <img
-                    src="/images/house-placeholder.svg"
-                    alt="Placeholder house"
+                    src="/images/yard-sale-skeleton.svg"
+                    alt="Yard sale placeholder"
                     className="max-w-[60%] max-h-[60%] w-auto h-auto opacity-90"
                   />
                 </div>

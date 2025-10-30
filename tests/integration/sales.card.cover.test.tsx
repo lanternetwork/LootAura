@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import SaleCard from '@/components/SaleCard'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -33,10 +33,10 @@ describe('SaleCard cover rendering', () => {
       date_start: '2024-01-01',
       time_start: '09:00'
     }
-    renderWithProviders(<SaleCard sale={sale} />)
-    // Fallback renders an SVG placeholder in the top area
-    const placeholder = screen.getByTestId('sale-card') || screen.getByText(/View Details/)
-    expect(placeholder).toBeTruthy()
+    const { container } = renderWithProviders(<SaleCard sale={sale} />)
+    const scoped = within(container)
+    // Should NOT render an img when no image URLs are present
+    expect(scoped.queryByRole('img')).toBeNull()
   })
 })
 

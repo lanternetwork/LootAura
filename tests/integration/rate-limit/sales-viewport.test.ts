@@ -67,16 +67,23 @@ const saleData = [
 ]
 
 // Use shared queue-based server mock so multiple from('sales_v2') calls work in order
+// Need 2 results per test (count query + data query), and we have 4 tests, so need 8 total
 const from = makeSupabaseFromMock({
     sales_v2: [
-        // First call: count query result
+        // Test 1: count + data
         { count: saleData.length, error: null },
-        // Second call: main query data
         { data: saleData, error: null },
+        // Test 2: count + data
+        { count: saleData.length, error: null },
+        { data: saleData, error: null },
+        // Test 3: count + data
+        { count: saleData.length, error: null },
+        { data: saleData, error: null },
+        // Test 4: count + data (10 iterations)
+        { count: saleData.length, error: null },
+        ...Array(10).fill({ data: saleData, error: null }),
     ],
-    items_v2: [
-        { data: [], error: null },
-    ],
+    items_v2: Array(20).fill({ data: [], error: null }),
 })
 
 vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))

@@ -59,6 +59,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const [photos, setPhotos] = useState<string[]>([])
   const [items, setItems] = useState<Array<{ name: string; price?: number; description?: string; image_url?: string }>>([])
   const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   // Check authentication status
   useEffect(() => {
@@ -68,6 +69,19 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
     checkUser()
   }, [supabase.auth])
+
+  // Save draft to localStorage whenever form data changes
+  useEffect(() => {
+    // Ensure body scroll is unlocked on mount (in case a previous modal left it locked)
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = ''
+      }
+    }
+  }, [])
 
   // Save draft to localStorage whenever form data changes
   useEffect(() => {
@@ -115,6 +129,18 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }
 
   const handleSubmit = async () => {
+    // Client-side required validation
+    const nextErrors: Record<string, string> = {}
+    if (!formData.title) nextErrors.title = 'Title is required'
+    if (!formData.address) nextErrors.address = 'Address is required'
+    if (!formData.city) nextErrors.city = 'City is required'
+    if (!formData.state) nextErrors.state = 'State is required'
+    if (!formData.date_start) nextErrors.date_start = 'Start date is required'
+    if (!formData.time_start) nextErrors.time_start = 'Start time is required'
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) {
+      return
+    }
     // Check if user is authenticated
     if (!user) {
       // Save current draft and redirect to auth

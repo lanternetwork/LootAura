@@ -56,6 +56,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
+    // Basic required field validation
+    const required: Array<[keyof typeof body, string]> = [
+      ['title', 'Title is required'],
+      ['address', 'Address is required'],
+      ['city', 'City is required'],
+      ['state', 'State is required'],
+      ['date_start', 'Start date is required'],
+      ['time_start', 'Start time is required'],
+    ]
+    for (const [key, message] of required) {
+      if (!body[key]) {
+        return NextResponse.json({ error: message }, { status: 400 })
+      }
+    }
+
     // Validate images and cover URLs if provided
     if (body.cover_image_url && !isAllowedImageUrl(body.cover_image_url)) {
       return NextResponse.json({ error: 'Invalid cover_image_url' }, { status: 400 })

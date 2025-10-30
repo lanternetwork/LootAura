@@ -668,7 +668,7 @@ export default function SalesClient({
             )}
 
             {!loading && visibleSales.length > 0 && (
-              <SalesList sales={visibleSales} mode="grid" />
+              <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView.center, zoom: mapView.zoom }} />
             )}
           </div>
           </div>
@@ -725,7 +725,7 @@ export default function SalesClient({
           )}
 
           {!loading && visibleSales.length > 0 && (
-            <SalesList sales={visibleSales} mode="grid" />
+            <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView.center, zoom: mapView.zoom }} />
           )}
         </div>
       </div>

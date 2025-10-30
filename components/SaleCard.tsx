@@ -5,9 +5,20 @@ import FavoriteButton from './FavoriteButton'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 
-export default function SaleCard({ sale, className }: { sale: Sale; className?: string }) {
+interface SaleCardProps {
+  sale: Sale
+  className?: string
+  viewport?: { center: { lat: number; lng: number }; zoom: number } | null
+}
+
+export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   if (!sale) return null
   const cover = getSaleCoverUrl(sale)
+  
+  // Build detail page URL with viewport params to restore view on back
+  const detailUrl = viewport 
+    ? `/sales/${sale.id}?lat=${viewport.center.lat}&lng=${viewport.center.lng}&zoom=${viewport.zoom}`
+    : `/sales/${sale.id}`
 
   return (
     <article 
@@ -58,7 +69,7 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
         {sale?.id && (
           <Link 
             className="text-amber-600 font-medium hover:text-amber-700 text-sm" 
-            href={`/sales/${sale.id}`}
+            href={detailUrl}
           >
             View Details →
           </Link>

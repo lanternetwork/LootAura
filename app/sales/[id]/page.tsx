@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { getSaleById } from '@/lib/data'
 import SaleDetailClient from './SaleDetailClient'
@@ -20,7 +21,9 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <SaleDetailClient sale={sale} />
+      <Suspense fallback={<div className="p-4">Loading...</div>}>
+        <SaleDetailClient sale={sale} />
+      </Suspense>
     </div>
   )
 }

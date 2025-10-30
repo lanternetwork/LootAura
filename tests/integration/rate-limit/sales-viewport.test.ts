@@ -6,6 +6,7 @@
 
 import { vi, describe, it, expect, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
+import { makeSupabaseFromMock, mockCreateSupabaseServerClient } from '@/tests/utils/mocks/supabaseServerMock'
 
 // Always bypass rate limiting in this suite
 vi.mock('@/lib/rateLimit/config', () => ({
@@ -65,65 +66,20 @@ const saleData = [
   },
 ]
 
-// Inline Supabase server mock with fluent chain
-vi.mock('@/lib/supabase/server', () => {
-	const makeChainWithCount = (result: any) => {
-		const chain: any = {}
-		chain.select = vi.fn((_cols?: any, opts?: any) => {
-			if (opts?.count === 'exact' && opts?.head === true) {
-				return {
-					eq: vi.fn(() => Promise.resolve({ count: Array.isArray(result) ? result.length : 0, error: null })),
-				}
-			}
-			return chain
-		})
-		chain.eq = vi.fn(() => chain)
-		chain.gte = vi.fn(() => chain)
-		chain.lte = vi.fn(() => chain)
-		chain.in = vi.fn(() => chain)
-		chain.or = vi.fn(() => chain)
-		chain.order = vi.fn(() => chain)
-		chain.range = vi.fn(() => Promise.resolve({ data: result, error: null }))
-		chain.limit = vi.fn(() => Promise.resolve({ data: result, error: null }))
-		chain.single = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
-		chain.maybeSingle = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
-		;(chain as any).then = (onFulfilled: any, onRejected: any) => Promise.resolve({ data: result, error: null }).then(onFulfilled, onRejected)
-		return chain
-	}
-
-	const makeSimpleChain = (result: any) => {
-		const chain: any = {}
-		chain.select = vi.fn(() => chain)
-		chain.eq = vi.fn(() => chain)
-		chain.gte = vi.fn(() => chain)
-		chain.lte = vi.fn(() => chain)
-		chain.in = vi.fn(() => chain)
-		chain.or = vi.fn(() => chain)
-		chain.order = vi.fn(() => chain)
-		chain.range = vi.fn(() => Promise.resolve({ data: result, error: null }))
-		chain.limit = vi.fn(() => Promise.resolve({ data: result, error: null }))
-		chain.single = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
-		chain.maybeSingle = vi.fn(() => Promise.resolve({ data: result?.[0] ?? null, error: null }))
-		;(chain as any).then = (onFulfilled: any, onRejected: any) => Promise.resolve({ data: result, error: null }).then(onFulfilled, onRejected)
-		return chain
-	}
-
-	const salesChain = makeChainWithCount(saleData)
-	const itemsChain = makeSimpleChain([])
-
-	return {
-		createSupabaseServerClient: vi.fn(() => ({
-			auth: {
-				getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-			},
-			from: vi.fn((table: string) => {
-				if (table === 'sales_v2') return salesChain
-				if (table === 'items_v2') return itemsChain
-				return makeSimpleChain([])
-			}),
-		})),
-	}
+// Use shared queue-based server mock so multiple from('sales_v2') calls work in order
+const from = makeSupabaseFromMock({
+    sales_v2: [
+        // First call: count query result
+        { count: saleData.length, error: null },
+        // Second call: main query data
+        { data: saleData, error: null },
+    ],
+    items_v2: [
+        { data: [], error: null },
+    ],
 })
+
+vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))
 
 let route: any
 beforeAll(async () => {

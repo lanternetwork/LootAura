@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import * as ImageValidate from '@/lib/images/validateImageUrl'
 
+// Ensure Cloudinary validator recognizes the test cloud name
+;(process.env as any).NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'test'
+
 // Mock Supabase (stable chain object so spies are consistent across calls)
 const mockSingle = vi.fn()
 const fromChain = {

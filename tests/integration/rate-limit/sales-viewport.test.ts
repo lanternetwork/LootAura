@@ -6,7 +6,6 @@
 
 import { vi, describe, it, expect, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
-import { makeSupabaseFromMock, mockCreateSupabaseServerClient } from '@/tests/utils/mocks/supabaseServerMock'
 
 // Always bypass rate limiting in this suite
 vi.mock('@/lib/rateLimit/config', () => ({
@@ -68,7 +67,9 @@ const saleData = [
 
 // Use shared queue-based server mock so multiple from('sales_v2') calls work in order
 // Need 2 results per test (count query + data query), and we have 4 tests, so need 8 total
-const { from } = vi.hoisted(() => {
+const mockSetup = vi.hoisted(() => {
+  const { makeSupabaseFromMock, mockCreateSupabaseServerClient } = require('@/tests/utils/mocks/supabaseServerMock')
+  
   const saleDataForMock = [
     { 
       id: 's1', 
@@ -126,20 +127,14 @@ const { from } = vi.hoisted(() => {
     items_v2: Array(20).fill({ data: [], error: null }),
   })
   
-  return { from: fromMock }
+  return mockCreateSupabaseServerClient(fromMock)
 })
 
-vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))
+vi.mock('@/lib/supabase/server', () => mockSetup)
 
 let route: any
 beforeAll(async () => {
-  // Clear module cache to ensure fresh import with mocks
-  const moduleId = await import.meta.resolve('@/app/api/sales/route')
-  if (moduleId && typeof (globalThis as any).require !== 'undefined' && (globalThis as any).require.cache) {
-    delete (globalThis as any).require.cache[moduleId]
-  }
-  
-此事  // Import AFTER the mock so it picks up the mocked module
+  // Import AFTER the mock so it picks up the mocked module
   route = await import('@/app/api/sales/route')
 })
 

@@ -28,9 +28,14 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
             priority={false}
           />
         ) : (
-          <div className="h-full w-full bg-gray-100 grid place-items-center text-gray-400">
-            <svg width="44" height="44" viewBox="0 0 24 24" className="opacity-70"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
-          </div>
+          <Image
+            src="/images/house-placeholder.svg"
+            alt="Placeholder house"
+            fill
+            sizes="(min-width:1024px) 33vw, 100vw"
+            className="object-contain bg-gray-50"
+            priority={false}
+          />
         )}
       </div>
 

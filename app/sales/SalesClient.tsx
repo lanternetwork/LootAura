@@ -171,9 +171,9 @@ export default function SalesClient({
     
     // Only run clustering on visible sales
     const result = createHybridPins(visibleSales, currentViewport, {
-      coordinatePrecision: 5, // Increased to group sales within ~1m radius (more precise)
-      clusterRadius: 0.3, // Reduced cluster radius for less aggressive clustering
-      minClusterSize: 3, // Increased minimum cluster size
+      coordinatePrecision: 6, // high precision to avoid accidental grouping
+      clusterRadius: 50, // pixels; reasonable radius so nearby points cluster
+      minClusterSize: 2, // allow clustering for 2+ points
       maxZoom: 16,
       enableLocationGrouping: true,
       enableVisualClustering: true

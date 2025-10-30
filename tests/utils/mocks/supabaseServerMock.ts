@@ -32,17 +32,18 @@ export function makeSupabaseFromMock(map: Record<string, any[]>) {
 			select: vi.fn((columns?: string | string[], options?: any) => {
 				// Handle count queries with head: true
 				if (options?.count === 'exact' && options?.head === true) {
+					const countResult = { count: 0, error: null }
 					return {
-						eq: vi.fn(() => Promise.resolve(next())),
-						gte: vi.fn(() => Promise.resolve(next())),
-						lte: vi.fn(() => Promise.resolve(next())),
-						in: vi.fn(() => Promise.resolve(next())),
-						or: vi.fn(() => Promise.resolve(next())),
-						order: vi.fn(() => Promise.resolve(next())),
-						range: vi.fn(() => Promise.resolve(next())),
-						limit: vi.fn(() => Promise.resolve(next())),
-						single: vi.fn(() => Promise.resolve(next())),
-						maybeSingle: vi.fn(() => Promise.resolve(next())),
+						eq: vi.fn(() => Promise.resolve(countResult)),
+						gte: vi.fn(() => Promise.resolve(countResult)),
+						lte: vi.fn(() => Promise.resolve(countResult)),
+						in: vi.fn(() => Promise.resolve(countResult)),
+						or: vi.fn(() => Promise.resolve(countResult)),
+						order: vi.fn(() => Promise.resolve(countResult)),
+						range: vi.fn(() => Promise.resolve(countResult)),
+						limit: vi.fn(() => Promise.resolve(countResult)),
+						single: vi.fn(() => Promise.resolve(countResult)),
+						maybeSingle: vi.fn(() => Promise.resolve(countResult)),
 						// no thenable to avoid accidental awaiting of chains
 					}
 				}

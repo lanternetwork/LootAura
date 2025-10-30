@@ -18,7 +18,7 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
       data-card="sale"
       data-kind="sale-row"
     >
-      <div className="relative bg-gray-100 aspect-[16/9] md:aspect-[4/3] overflow-hidden">
+      <div className="relative bg-gray-100 aspect-[16/6.75] md:aspect-[4/2.25] overflow-hidden">
         {cover ? (
           <Image
             src={cover.url}
@@ -35,7 +35,7 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
         )}
       </div>
 
-      <div className="p-4 flex flex-col gap-2">
+      <div className="p-3 flex flex-col gap-1.5">
         <div className="flex justify-between items-start">
           <h3 className="text-lg font-semibold line-clamp-1">{sale?.title || `Sale ${sale?.id}`}</h3>
           {sale?.id && <FavoriteButton saleId={sale.id} initial={false} />}

@@ -145,20 +145,35 @@ export function applyVisualClustering(
     { radius: opts.clusterRadius, maxZoom: opts.maxZoom, minPoints: opts.minClusterSize }
   )
   const clusteredIds = getClusterMemberIds(indexForMembership, realClusters.map(c => c.id))
+  let colocatedClusterCount = 0
   locations.forEach(location => {
-    if (!clusteredIds.has(location.id)) {
+    if (clusteredIds.has(location.id)) {
+      return
+    }
+    if (location.totalSales >= 2) {
+      // Treat multiple sales at the exact same location as a cluster badge
       pins.push({
-        type: 'location' as const,
-        id: location.id,
+        type: 'cluster' as const,
+        id: `cluster-coloc-${location.id}`,
         lat: location.lat,
         lng: location.lng,
-        sales: location.sales
+        count: location.totalSales,
+        expandToZoom: opts.maxZoom
       })
+      colocatedClusterCount += 1
+      return
     }
+    pins.push({
+      type: 'location' as const,
+      id: location.id,
+      lat: location.lat,
+      lng: location.lng,
+      sales: location.sales
+    })
   })
   
   return {
-    type: realClusters.length > 0 ? 'clustered' : 'individual',
+    type: (realClusters.length + colocatedClusterCount) > 0 ? 'clustered' : 'individual',
     pins,
     locations,
     clusters: realClusters

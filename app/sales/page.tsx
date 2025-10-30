@@ -1,4 +1,3 @@
-import { Suspense } from 'react'
 import SalesClient from './SalesClient'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies, headers } from 'next/headers'
@@ -157,14 +156,11 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Bypass Suspense masking in MAP authority: keep a visible sentinel */}
-      <Suspense fallback={<div data-debug="sales-list-fallback" className="p-2 text-xs bg-yellow-100 text-yellow-800">Loading sales…</div>}>
-        <SalesClient 
-          initialSales={initialSales}
-          initialCenter={initialCenter}
-          user={user}
-        />
-      </Suspense>
+      <SalesClient 
+        initialSales={initialSales}
+        initialCenter={initialCenter}
+        user={user}
+      />
     </div>
   )
 }

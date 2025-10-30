@@ -4,7 +4,7 @@
 
 import { Sale } from '@/lib/types'
 import { LocationGroup, HybridPinsResult, HybridPin } from './types'
-import { buildClusterIndex, getClustersForViewport, isClusteringEnabled } from './clustering'
+import { buildClusterIndex, getClustersForViewport, getClusterMemberIds, isClusteringEnabled } from './clustering'
 
 export interface HybridClusteringOptions {
   coordinatePrecision: number
@@ -127,9 +127,8 @@ export function applyVisualClustering(
   const pins: HybridPin[] = []
 
   // Add clusters (defensive: only real clusters with count > 1)
-  clusters
-    .filter(c => (c.count || 0) > 1)
-    .forEach(cluster => {
+  const realClusters = clusters.filter(c => (c.count || 0) > 1)
+  realClusters.forEach(cluster => {
     pins.push({
       type: 'cluster',
       id: `cluster-${cluster.id}`,
@@ -138,19 +137,16 @@ export function applyVisualClustering(
       count: cluster.count,
       expandToZoom: cluster.expandToZoom
     })
-    })
+  })
   
-  // Add individual locations that aren't clustered
-  const _clusteredLocationIds = new Set<string>()
-  
-  // For each cluster, we need to determine which locations are included
-  // Since we don't have direct access to the cluster's children, we'll use a different approach:
-  // Only show individual pins if there are no clusters, or if the zoom level is high enough
-  const shouldShowIndividualPins = pins.length === 0 || viewport.zoom >= opts.maxZoom
-  
-  // Only add individual locations if we should show them
-  if (shouldShowIndividualPins) {
-    locations.forEach(location => {
+  // Add individual locations that aren't clustered at current zoom
+  const indexForMembership = buildClusterIndex(
+    locations.map(l => ({ id: l.id, lat: l.lat, lng: l.lng })),
+    { radius: opts.clusterRadius, maxZoom: opts.maxZoom, minPoints: opts.minClusterSize }
+  )
+  const clusteredIds = getClusterMemberIds(indexForMembership, realClusters.map(c => c.id))
+  locations.forEach(location => {
+    if (!clusteredIds.has(location.id)) {
       pins.push({
         type: 'location' as const,
         id: location.id,
@@ -158,14 +154,14 @@ export function applyVisualClustering(
         lng: location.lng,
         sales: location.sales
       })
-    })
-  }
+    }
+  })
   
   return {
-    type: clusters.length > 0 ? 'clustered' : 'individual',
+    type: realClusters.length > 0 ? 'clustered' : 'individual',
     pins,
     locations,
-    clusters
+    clusters: realClusters
   }
 }
 

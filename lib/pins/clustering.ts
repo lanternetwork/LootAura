@@ -74,6 +74,42 @@ export function getClustersForViewport(
 }
 
 /**
+ * Get the set of leaf point ids that belong to the provided clusters
+ */
+export function getClusterMemberIds(
+  index: SuperclusterIndex,
+  clusterIds: number[]
+): Set<string> {
+  const memberIds = new Set<string>()
+  clusterIds.forEach((clusterId) => {
+    try {
+      const leaves = (index as any).getLeaves?.(clusterId, Infinity) || []
+      leaves.forEach((leaf: any) => {
+        const id = leaf?.properties?.id
+        if (id) memberIds.add(String(id))
+      })
+    } catch {
+      // Fallback: traverse children when getLeaves is not available
+      const stack = [(clusterId as unknown) as number]
+      while (stack.length) {
+        const cid = stack.pop()!
+        const children = (index as any).getChildren?.(cid) || []
+        children.forEach((child: any) => {
+          const pc = child?.properties?.point_count
+          if (pc && pc > 0) {
+            if (typeof child.id === 'number') stack.push(child.id)
+          } else {
+            const id = child?.properties?.id
+            if (id) memberIds.add(String(id))
+          }
+        })
+      }
+    }
+  })
+  return memberIds
+}
+
+/**
  * Calculate the zoom level needed to expand a cluster
  */
 export function expandZoomForCluster(

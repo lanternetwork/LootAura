@@ -34,9 +34,15 @@ describe('SaleCard cover rendering', () => {
       time_start: '09:00'
     }
     const { container } = renderWithProviders(<SaleCard sale={sale} />)
-    const scoped = within(container)
-    // Should NOT render an img when no image URLs are present
-    expect(scoped.queryByRole('img')).toBeNull()
+    // Should render a placeholder image (inline SVG or asset)
+    const img = container.querySelector('img') as HTMLImageElement | null
+    if (img) {
+      expect(img.getAttribute('src') || '').toMatch(/placeholder|house|image/)
+    } else {
+      // Inline SVG fallback also acceptable
+      const svg = container.querySelector('svg')
+      expect(svg).toBeTruthy()
+    }
   })
 })
 

@@ -17,7 +17,7 @@ export interface HybridClusteringOptions {
 
 const DEFAULT_OPTIONS: HybridClusteringOptions = {
   coordinatePrecision: 6,
-  clusterRadius: 0.5,
+  clusterRadius: 0.3,
   minClusterSize: 2,
   maxZoom: 16,
   enableLocationGrouping: true,

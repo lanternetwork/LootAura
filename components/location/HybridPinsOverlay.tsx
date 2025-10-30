@@ -29,7 +29,7 @@ export default function HybridPinsOverlay({
   const hybridResult = useMemo((): HybridPinsResult => {
     return createHybridPins(sales, viewport, {
       coordinatePrecision: 6,
-      clusterRadius: 50, // pixels: cluster nearby points sensibly
+      clusterRadius: 0.3,
       minClusterSize: 2,
       maxZoom: 16,
       enableLocationGrouping: true,

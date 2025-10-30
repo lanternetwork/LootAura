@@ -10,7 +10,7 @@ export type { PinPoint, ClusterFeature }
 export type ClusterPoint = PinPoint
 
 const DEFAULT_OPTIONS: ClusterOptions = {
-  radius: 0.5, // Only cluster when pins are indistinguishable (0.5px)
+  radius: 0.3, // Ultra-conservative clustering radius (0.3px)
   maxZoom: 20,
   minPoints: 2
 }

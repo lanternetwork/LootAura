@@ -125,9 +125,11 @@ export function applyVisualClustering(
   
   // Create hybrid pins
   const pins: HybridPin[] = []
-  
-  // Add clusters
-  clusters.forEach(cluster => {
+
+  // Add clusters (defensive: only real clusters with count > 1)
+  clusters
+    .filter(c => (c.count || 0) > 1)
+    .forEach(cluster => {
     pins.push({
       type: 'cluster',
       id: `cluster-${cluster.id}`,
@@ -136,7 +138,7 @@ export function applyVisualClustering(
       count: cluster.count,
       expandToZoom: cluster.expandToZoom
     })
-  })
+    })
   
   // Add individual locations that aren't clustered
   const _clusteredLocationIds = new Set<string>()
@@ -144,7 +146,7 @@ export function applyVisualClustering(
   // For each cluster, we need to determine which locations are included
   // Since we don't have direct access to the cluster's children, we'll use a different approach:
   // Only show individual pins if there are no clusters, or if the zoom level is high enough
-  const shouldShowIndividualPins = clusters.length === 0 || viewport.zoom >= opts.maxZoom
+  const shouldShowIndividualPins = pins.length === 0 || viewport.zoom >= opts.maxZoom
   
   // Only add individual locations if we should show them
   if (shouldShowIndividualPins) {

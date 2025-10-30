@@ -11,14 +11,14 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
 
   return (
     <article 
-      className={`rounded-2xl overflow-hidden shadow-sm border bg-white transform-gpu scale-y-50 origin-top ${className ?? ''}`} 
+      className={`rounded-2xl overflow-hidden shadow-sm border bg-white ${className ?? ''}`} 
       data-testid="sale-card" 
       data-debug="sale-card" 
       data-sale-id={String(sale?.id || '')}
       data-card="sale"
       data-kind="sale-row"
     >
-      <div className="relative bg-gray-100 aspect-[16/8] md:aspect-[4/2.7] overflow-hidden">
+      <div className="relative bg-gray-100 aspect-[16/6.75] md:aspect-[4/2.25] overflow-hidden">
         {cover ? (
           <Image
             src={cover.url}

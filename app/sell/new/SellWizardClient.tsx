@@ -246,7 +246,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const renderStep = () => {
     switch (currentStep) {
       case 0:
-        return <DetailsStep formData={formData} onChange={handleInputChange} errors={errors} />
+        return <DetailsStep formData={formData} onChange={handleInputChange} errors={_errors} />
       case 1:
         return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
       case 2:

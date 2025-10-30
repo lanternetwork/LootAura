@@ -11,7 +11,7 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
 
   return (
     <article 
-      className={`rounded-2xl overflow-hidden shadow-sm border bg-white ${className ?? ''}`} 
+      className={`rounded-2xl overflow-hidden shadow-sm border bg-white transform-gpu scale-y-50 origin-top ${className ?? ''}`} 
       data-testid="sale-card" 
       data-debug="sale-card" 
       data-sale-id={String(sale?.id || '')}

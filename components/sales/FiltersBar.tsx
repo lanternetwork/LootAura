@@ -239,7 +239,7 @@ export default function FiltersBar({
             data-testid={zipInputTestId}
           />
           {zipError && (
-            <span className="text-red-500 text-xs">{zipError}</span>
+            <span className="text-red-500 text-xs leading-4 max-w-[160px] truncate whitespace-nowrap">{zipError}</span>
           )}
         </div>
 

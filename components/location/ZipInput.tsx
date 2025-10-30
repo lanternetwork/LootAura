@@ -127,9 +127,6 @@ export default function ZipInput({
           )}
         </button>
       </form>
-      {error && (
-        <div className="mt-1 text-sm text-red-600">{error}</div>
-      )}
     </div>
   )
 }

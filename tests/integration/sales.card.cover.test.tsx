@@ -1,6 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import SaleCard from '@/components/SaleCard'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const qc = new QueryClient()
+const renderWithProviders = (ui: React.ReactElement) =>
+  render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
 
 describe('SaleCard cover rendering', () => {
   it('renders Cloudinary image when cover_image_url is present', () => {
@@ -13,7 +18,7 @@ describe('SaleCard cover rendering', () => {
       time_start: '09:00',
       cover_image_url: 'https://res.cloudinary.com/test/image/upload/v1/cover.jpg'
     }
-    render(<SaleCard sale={sale} />)
+    renderWithProviders(<SaleCard sale={sale} />)
     const img = screen.getByRole('img') as HTMLImageElement
     expect(img).toBeTruthy()
     expect(img.getAttribute('src') || '').toContain('res.cloudinary.com')
@@ -28,7 +33,7 @@ describe('SaleCard cover rendering', () => {
       date_start: '2024-01-01',
       time_start: '09:00'
     }
-    render(<SaleCard sale={sale} />)
+    renderWithProviders(<SaleCard sale={sale} />)
     // Fallback renders an SVG placeholder in the top area
     const placeholder = screen.getByTestId('sale-card') || screen.getByText(/View Details/)
     expect(placeholder).toBeTruthy()

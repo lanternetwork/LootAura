@@ -5,6 +5,20 @@ import { vi } from 'vitest'
 // Ensure rate limiting is bypassed in tests
 ;(process.env as any).RATE_LIMITING_ENABLED = 'false'
 
+// Mock next/image to avoid optimization/config errors in JSDOM
+// @ts-ignore vitest mock hoisting in test env
+vi.mock('next/image', () => {
+  return {
+    __esModule: true,
+    default: (props: any) => {
+      const { src, alt = '', ...rest } = props || {}
+      // Render a plain img for testing
+      // eslint-disable-next-line @next/next/no-img-element
+      return <img src={typeof src === 'string' ? src : (src?.src || '')} alt={alt} {...rest} />
+    },
+  }
+})
+
 // Minimal globals to satisfy failing tests
 // Functional ResizeObserver mock with simulation hook used by tests
 {

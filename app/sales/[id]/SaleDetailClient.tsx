@@ -147,6 +147,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                 </button>
               </div>
             </div>
+            </div>
 
             {/* Sale Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

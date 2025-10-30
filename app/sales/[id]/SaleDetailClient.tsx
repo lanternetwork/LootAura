@@ -108,6 +108,12 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                     src="/images/YardSaleSkeleton.svg"
                     alt="Sale placeholder"
                     className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90"
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement
+                      if (img.src.endsWith('/images/YardSaleSkeleton.svg')) {
+                        img.src = '/placeholders/sale-placeholder.svg'
+                      }
+                    }}
                   />
                 </div>
               )}

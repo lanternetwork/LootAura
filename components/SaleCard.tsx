@@ -33,6 +33,12 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
               src="/images/YardSaleSkeleton.svg"
               alt="Sale placeholder"
               className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90"
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement
+                if (img.src.endsWith('/images/YardSaleSkeleton.svg')) {
+                  img.src = '/placeholders/sale-placeholder.svg'
+                }
+              }}
             />
           </div>
         )}

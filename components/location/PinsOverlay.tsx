@@ -120,10 +120,11 @@ export default function PinsOverlay({
 
   // Clustering path: render clusters when present; otherwise render individual pins
   if (isClusteringEnabled && mapRef.current?.getMap) {
-    if (_clusters.length > 0) {
+    const clustersOnly = _clusters.filter(c => c.count > 1)
+    if (clustersOnly.length > 0) {
       return (
         <>
-          {_clusters.map(cluster => (
+          {clustersOnly.map(cluster => (
             <ClusterMarker
               key={cluster.id}
               cluster={cluster}

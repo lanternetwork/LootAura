@@ -41,17 +41,18 @@ export default function ClusterMarker({
       <button
         className={`
           ${sizeClass}
-          bg-blue-600 hover:bg-blue-700 
+          bg-blue-600
           text-white font-semibold 
           rounded-full flex items-center justify-center
           shadow-sm select-none
-          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-          transition-all duration-200
+          /* remove focus/hover effects to prevent size/visibility thrash */
           cursor-pointer
         `}
         data-cluster-marker="true"
         data-cluster-id={cluster.id}
         onClick={handleClick}
+        onMouseEnter={(e) => { e.stopPropagation() }}
+        onMouseLeave={(e) => { e.stopPropagation() }}
         onKeyDown={handleKeyDown}
         tabIndex={0}
         aria-label={`Cluster of ${cluster.count} sales. Press Enter to zoom in.`}

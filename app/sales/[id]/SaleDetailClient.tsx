@@ -103,11 +103,11 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
               {cover ? (
                 <Image src={cover.url} alt={cover.alt} fill className="object-cover" sizes="(min-width:1024px) 66vw, 100vw" />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8 md:p-10">
                   <img
                     src="/images/house-placeholder.svg"
                     alt="Placeholder house"
-                    className="w-2/3 h-auto opacity-90"
+                    className="max-w-[60%] max-h-[60%] w-auto h-auto opacity-90"
                   />
                 </div>
               )}

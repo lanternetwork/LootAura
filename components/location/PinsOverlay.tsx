@@ -116,29 +116,39 @@ export default function PinsOverlay({
     })
   }
 
-  // Check if clustering is enabled and we have a valid map ref
-  if (isClusteringEnabled) {
-    if (mapRef.current?.getMap) {
-      // Use clustering logic
-      if (_clusters.length > 0) {
-        return (
-          <>
-            {_clusters.map(cluster => (
-              <ClusterMarker
-                key={cluster.id}
-                cluster={cluster}
-                onClick={_onClusterClick}
-              />
-            ))}
-          </>
-        )
-      }
+  // Clustering path: render clusters when present; otherwise render individual pins
+  if (isClusteringEnabled && mapRef.current?.getMap) {
+    if (_clusters.length > 0) {
+      return (
+        <>
+          {_clusters.map(cluster => (
+            <ClusterMarker
+              key={cluster.id}
+              cluster={cluster}
+              onClick={_onClusterClick}
+            />
+          ))}
+        </>
+      )
     }
-    // If clustering is enabled but no valid map ref, don't render anything
-    return null
+    // No clusters at current zoom → fall back to individual pins
+    return (
+      <>
+        {sales.map(sale => (
+          <PinMarker
+            key={sale.id}
+            id={sale.id}
+            lat={sale.lat}
+            lng={sale.lng}
+            isSelected={selectedId === sale.id}
+            onClick={onPinClick}
+          />
+        ))}
+      </>
+    )
   }
-  
-  // Render individual pins when clustering is disabled
+
+  // Clustering disabled: render individual pins
   return (
     <>
       {sales.map(sale => (

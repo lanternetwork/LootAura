@@ -63,15 +63,13 @@ export function getClustersForViewport(
   bounds: [number, number, number, number], // [west, south, east, north]
   zoom: number
 ): ClusterFeature[] {
-  const raw = index.getClusters(bounds, Math.floor(zoom))
-  // Only return true cluster features (point_count > 1). Single points are not clusters.
-  const clusters = raw.filter(f => (f.properties as any)?.point_count > 1)
-  return clusters.map(cluster => ({
-    id: cluster.id as number,
-    count: (cluster.properties as any).point_count,
-    lat: cluster.geometry.coordinates[1],
-    lng: cluster.geometry.coordinates[0],
-    expandToZoom: expandZoomForCluster(index, cluster.id as number, zoom)
+  const features = index.getClusters(bounds, Math.floor(zoom))
+  return features.map(feature => ({
+    id: (feature.id as number) ?? -1,
+    count: (feature.properties as any)?.point_count || 1,
+    lat: feature.geometry.coordinates[1],
+    lng: feature.geometry.coordinates[0],
+    expandToZoom: expandZoomForCluster(index, feature.id as number, zoom)
   }))
 }
 

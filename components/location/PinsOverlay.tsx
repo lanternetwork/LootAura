@@ -90,16 +90,18 @@ export default function PinsOverlay({
       debouncedViewport.bounds, 
       debouncedViewport.zoom
     )
+    // Only treat features with count > 1 as clusters
+    const clustersOnly = viewportClusters.filter(c => c.count > 1)
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[PINS] viewport clusters', { 
-        clusters: viewportClusters.length, 
+        clusters: clustersOnly.length, 
         singles: sales.length, 
         zoom: debouncedViewport.zoom 
       })
     }
     
-    return viewportClusters
+    return clustersOnly
   }, [clusterIndex, debouncedViewport, sales])
 
   // Early return if no sales to prevent unnecessary renders

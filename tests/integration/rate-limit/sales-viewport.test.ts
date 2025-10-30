@@ -133,7 +133,13 @@ vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))
 
 let route: any
 beforeAll(async () => {
-  // Import AFTER the mock so it picks up the mocked module
+  // Clear module cache to ensure fresh import with mocks
+  const moduleId = await import.meta.resolve('@/app/api/sales/route')
+  if (moduleId && typeof (globalThis as any).require !== 'undefined' && (globalThis as any).require.cache) {
+    delete (globalThis as any).require.cache[moduleId]
+  }
+  
+此事  // Import AFTER the mock so it picks up the mocked module
   route = await import('@/app/api/sales/route')
 })
 

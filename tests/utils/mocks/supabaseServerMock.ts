@@ -17,7 +17,7 @@ export function makeSupabaseFromMock(map: Record<string, any[]>) {
 		return q.shift()
 	}
 
-	return vi.fn((table: string) => {
+	const fromFn = vi.fn((table: string) => {
 		// Use shared per-table queue so multiple calls to from(table)
 		// consume results sequentially across the entire test
 		if (!tableToQueue.has(table)) {
@@ -43,6 +43,7 @@ export function makeSupabaseFromMock(map: Record<string, any[]>) {
 						limit: vi.fn(() => Promise.resolve(next())),
 						single: vi.fn(() => Promise.resolve(next())),
 						maybeSingle: vi.fn(() => Promise.resolve(next())),
+						then: (onFulfilled: any, onRejected: any) => Promise.resolve(next()).then(onFulfilled, onRejected),
 					}
 				}
 				// Regular select query - return the chain
@@ -58,10 +59,13 @@ export function makeSupabaseFromMock(map: Record<string, any[]>) {
 			range: vi.fn(() => Promise.resolve(next())),
 			single: vi.fn(() => Promise.resolve(next())),
 			maybeSingle: vi.fn(() => Promise.resolve(next())),
+			then: (onFulfilled: any, onRejected: any) => Promise.resolve(next()).then(onFulfilled, onRejected),
 		}
 
 		return chain
 	})
+	
+	return fromFn
 }
 
 export function mockCreateSupabaseServerClient(from: ReturnType<typeof makeSupabaseFromMock>) {

@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Sale } from '@/lib/types'
+import Image from 'next/image'
+import { getSaleCoverUrl } from '@/lib/images/cover'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
 
@@ -14,6 +16,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
   const { location } = useLocationSearch()
   const [isFavorited, setIsFavorited] = useState(false)
   const [showFullDescription, setShowFullDescription] = useState(false)
+  const cover = getSaleCoverUrl(sale)
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -95,7 +98,17 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
           {/* Sale Header */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="relative w-full h-[220px] overflow-hidden rounded-t-lg">
+              {cover ? (
+                <Image src={cover.url} alt={cover.alt} fill className="object-cover" sizes="(min-width:1024px) 66vw, 100vw" />
+              ) : (
+                <div className="h-full w-full bg-gray-100 grid place-items-center text-gray-400">
+                  <svg width="56" height="56" viewBox="0 0 24 24" className="opacity-70"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
+                </div>
+              )}
+            </div>
+            <div className="p-6">
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1">
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">{sale.title}</h1>

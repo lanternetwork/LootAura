@@ -6,6 +6,7 @@ import { SaleInput } from '@/lib/data'
 import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
 import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { containsUnsavory } from '@/lib/filters/profanity'
 
 interface WizardStep {
   id: string
@@ -124,6 +125,18 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     if (!formData.state) nextErrors.state = 'State is required'
     if (!formData.date_start) nextErrors.date_start = 'Start date is required'
     if (!formData.time_start) nextErrors.time_start = 'Start time is required'
+    // Unsavory language checks (client-side guard; server also validates)
+    const unsavoryFields: Array<[keyof SaleInput, string | undefined]> = [
+      ['title', formData.title],
+      ['description', formData.description],
+      ['address', formData.address],
+      ['city', formData.city],
+      ['state', formData.state],
+    ]
+    for (const [key, value] of unsavoryFields) {
+      const res = containsUnsavory(value || '')
+      if (!res.ok) nextErrors[key as string] = 'Please remove inappropriate language'
+    }
     return nextErrors
   }
 

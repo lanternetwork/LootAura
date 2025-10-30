@@ -160,7 +160,7 @@ export function applyVisualClustering(
   }
   
   return {
-    type: 'clustered',
+    type: clusters.length > 0 ? 'clustered' : 'individual',
     pins,
     locations,
     clusters

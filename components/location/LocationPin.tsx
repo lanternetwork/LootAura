@@ -29,8 +29,8 @@ export default function LocationPin({
       data-testid="location-marker"
     >
       <svg
-        width="16"
-        height="16"
+        width="12"
+        height="12"
         viewBox="0 0 16 16"
         style={{
           cursor: 'pointer',

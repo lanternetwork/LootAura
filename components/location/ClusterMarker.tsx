@@ -28,20 +28,8 @@ export default function ClusterMarker({
     }
   }, [cluster, onKeyDown])
 
-  // Determine size tier based on count
-  const getSizeTier = (count: number): 'S' | 'M' | 'L' => {
-    if (count >= 50) return 'L'
-    if (count >= 10) return 'M'
-    return 'S'
-  }
-
-  const sizeTier = getSizeTier(cluster.count)
-  
-  const sizeClasses = {
-    S: 'w-3 h-3 text-[8px]',
-    M: 'w-4 h-4 text-[9px]', 
-    L: 'w-5 h-5 text-[10px]'
-  }
+  // Fixed size to match individual pins (12px)
+  const sizeClass = 'w-3 h-3 text-[8px]'
 
   return (
     <Marker
@@ -52,7 +40,7 @@ export default function ClusterMarker({
     >
       <button
         className={`
-          ${sizeClasses[sizeTier]}
+          ${sizeClass}
           bg-blue-600 hover:bg-blue-700 
           text-white font-semibold 
           rounded-full flex items-center justify-center

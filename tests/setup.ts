@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest'
+import React from 'react'
 
 import { vi } from 'vitest'
 
@@ -12,9 +13,8 @@ vi.mock('next/image', () => {
     __esModule: true,
     default: (props: any) => {
       const { src, alt = '', ...rest } = props || {}
-      // Render a plain img for testing
-      // eslint-disable-next-line @next/next/no-img-element
-      return <img src={typeof src === 'string' ? src : (src?.src || '')} alt={alt} {...rest} />
+      const resolved = typeof src === 'string' ? src : (src?.src || '')
+      return React.createElement('img', { src: resolved, alt, ...rest })
     },
   }
 })

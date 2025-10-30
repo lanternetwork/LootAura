@@ -17,7 +17,7 @@ export interface HybridClusteringOptions {
 
 const DEFAULT_OPTIONS: HybridClusteringOptions = {
   coordinatePrecision: 6,
-  clusterRadius: 7, // px: touch-only default - cluster only when pins would visually overlap (pins are 12px diameter)
+  clusterRadius: 6, // px: touch-only default - cluster only when pins actually touch (pins are 12px diameter, 12px apart = edge-to-edge)
   minClusterSize: 2,
   maxZoom: 16,
   enableLocationGrouping: true,

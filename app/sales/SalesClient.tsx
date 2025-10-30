@@ -170,10 +170,10 @@ export default function SalesClient({
     }
     
     // Only run clustering on visible sales - touch-only clustering
-    // Pins are 12px diameter (6px radius), so cluster only when centers are within ~12-14px (pins would overlap/touch)
+    // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
     const result = createHybridPins(visibleSales, currentViewport, {
       coordinatePrecision: 6, // high precision to avoid accidental grouping
-      clusterRadius: 7, // px: touch-only - cluster only when pins would visually overlap
+      clusterRadius: 6, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
       minClusterSize: 2, // allow clustering for 2+ points
       maxZoom: 16,
       enableLocationGrouping: true,

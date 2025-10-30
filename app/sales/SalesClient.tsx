@@ -169,17 +169,11 @@ export default function SalesClient({
       console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', mapSales.length, 'total')
     }
     
-    // Only run clustering on visible sales
-    const clusterRadiusForZoom = (z: number): number => {
-      if (z >= 16) return 0.3 // fully zoomed-in, effectively disable clustering
-      if (z >= 14) return 12
-      if (z >= 12) return 20
-      if (z >= 10) return 28
-      return 36 // very zoomed out → stronger clustering to avoid overlap
-    }
+    // Only run clustering on visible sales - touch-only clustering
+    // Pins are 12px diameter (6px radius), so cluster only when centers are within ~12-14px (pins would overlap/touch)
     const result = createHybridPins(visibleSales, currentViewport, {
       coordinatePrecision: 6, // high precision to avoid accidental grouping
-      clusterRadius: clusterRadiusForZoom(currentViewport.zoom),
+      clusterRadius: 7, // px: touch-only - cluster only when pins would visually overlap
       minClusterSize: 2, // allow clustering for 2+ points
       maxZoom: 16,
       enableLocationGrouping: true,

@@ -27,18 +27,12 @@ export default function HybridPinsOverlay({
   viewport
 }: HybridPinsOverlayProps) {
   
-  // Create hybrid pins using the two-stage process
+  // Create hybrid pins using the two-stage process - touch-only clustering
+  // Pins are 12px diameter (6px radius), so cluster only when centers are within ~12-14px (pins would overlap/touch)
   const hybridResult = useMemo((): HybridPinsResult => {
-    const clusterRadiusForZoom = (z: number): number => {
-      if (z >= 16) return 0.3
-      if (z >= 14) return 12
-      if (z >= 12) return 20
-      if (z >= 10) return 28
-      return 36
-    }
     return createHybridPins(sales, viewport, {
       coordinatePrecision: 6,
-      clusterRadius: clusterRadiusForZoom(viewport.zoom),
+      clusterRadius: 7, // px: touch-only - cluster only when pins would visually overlap
       minClusterSize: 2,
       maxZoom: 16,
       enableLocationGrouping: true,

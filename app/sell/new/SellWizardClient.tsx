@@ -116,7 +116,26 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  const validateDetails = (): Record<string, string> => {
+    const nextErrors: Record<string, string> = {}
+    if (!formData.title) nextErrors.title = 'Title is required'
+    if (!formData.address) nextErrors.address = 'Address is required'
+    if (!formData.city) nextErrors.city = 'City is required'
+    if (!formData.state) nextErrors.state = 'State is required'
+    if (!formData.date_start) nextErrors.date_start = 'Start date is required'
+    if (!formData.time_start) nextErrors.time_start = 'Start time is required'
+    return nextErrors
+  }
+
   const handleNext = () => {
+    // Require core fields on the Details step before advancing
+    if (currentStep === 0) {
+      const nextErrors = validateDetails()
+      setErrors(nextErrors)
+      if (Object.keys(nextErrors).length > 0) {
+        return
+      }
+    }
     if (currentStep < WIZARD_STEPS.length - 1) {
       setCurrentStep(currentStep + 1)
     }
@@ -130,13 +149,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
   const handleSubmit = async () => {
     // Client-side required validation
-    const nextErrors: Record<string, string> = {}
-    if (!formData.title) nextErrors.title = 'Title is required'
-    if (!formData.address) nextErrors.address = 'Address is required'
-    if (!formData.city) nextErrors.city = 'City is required'
-    if (!formData.state) nextErrors.state = 'State is required'
-    if (!formData.date_start) nextErrors.date_start = 'Start date is required'
-    if (!formData.time_start) nextErrors.time_start = 'Start time is required'
+    const nextErrors = validateDetails()
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) {
       return
@@ -357,6 +370,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           required
         />
+        {_errors?.title && (
+          <p className="mt-1 text-sm text-red-600">{_errors.title}</p>
+        )}
       </div>
 
       <div>
@@ -384,6 +400,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
+        {_errors?.date_start && (
+          <p className="mt-1 text-sm text-red-600">{_errors.date_start}</p>
+        )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -396,6 +415,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
+        {_errors?.time_start && (
+          <p className="mt-1 text-sm text-red-600">{_errors.time_start}</p>
+        )}
         </div>
       </div>
 
@@ -436,6 +458,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           required
         />
+        {_errors?.address && (
+          <p className="mt-1 text-sm text-red-600">{_errors.address}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -451,6 +476,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
+        {_errors?.city && (
+          <p className="mt-1 text-sm text-red-600">{_errors.city}</p>
+        )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -464,6 +492,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
+        {_errors?.state && (
+          <p className="mt-1 text-sm text-red-600">{_errors.state}</p>
+        )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">

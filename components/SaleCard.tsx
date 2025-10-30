@@ -17,7 +17,7 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
       data-card="sale"
       data-kind="sale-row"
     >
-      <div className="relative bg-gray-200 aspect-[16/9] md:aspect-[4/3]">
+      <div className="relative bg-gray-100 aspect-[16/9] md:aspect-[4/3] overflow-hidden">
         {cover ? (
           <Image
             src={cover.url}
@@ -28,15 +28,8 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
             priority={false}
           />
         ) : (
-          <div className="absolute inset-0 grid place-items-center">
-            <Image
-              src="/images/house-placeholder.svg"
-              alt="Placeholder house"
-              fill
-              sizes="(min-width:1024px) 33vw, 100vw"
-              className="object-contain opacity-90"
-              priority={false}
-            />
+          <div className="absolute inset-0 grid place-items-center text-gray-400">
+            <svg width="56" height="56" viewBox="0 0 24 24" className="opacity-70"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
           </div>
         )}
       </div>

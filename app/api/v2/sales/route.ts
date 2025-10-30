@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { T } from '@/lib/supabase/tables'
 
 export async function GET(request: NextRequest) {
@@ -55,6 +56,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
+    // Validate images and cover URLs if provided
+    if (body.cover_image_url && !isAllowedImageUrl(body.cover_image_url)) {
+      return NextResponse.json({ error: 'Invalid cover_image_url' }, { status: 400 })
+    }
+    if (Array.isArray(body.images)) {
+      for (const url of body.images) {
+        if (url && !isAllowedImageUrl(url)) {
+          return NextResponse.json({ error: 'Invalid image URL in images[]' }, { status: 400 })
+        }
+      }
+    }
+
     const { data: sale, error } = await supabase
       .from(T.sales)
       .insert({
@@ -71,6 +84,8 @@ export async function POST(request: NextRequest) {
         time_start: body.time_start,
         date_end: body.date_end,
         time_end: body.time_end,
+        cover_image_url: body.cover_image_url ?? (Array.isArray(body.images) && body.images.length > 0 ? body.images[0] : null),
+        images: Array.isArray(body.images) ? body.images : null,
         status: body.status || 'draft',
         privacy_mode: body.privacy_mode || 'exact'
       })

@@ -32,7 +32,7 @@ export default function HybridPinsOverlay({
   const hybridResult = useMemo((): HybridPinsResult => {
     return createHybridPins(sales, viewport, {
       coordinatePrecision: 6,
-      clusterRadius: 6, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
+      clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
       minClusterSize: 2,
       maxZoom: 16,
       enableLocationGrouping: true,

@@ -173,7 +173,7 @@ export default function SalesClient({
     // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
     const result = createHybridPins(visibleSales, currentViewport, {
       coordinatePrecision: 6, // high precision to avoid accidental grouping
-      clusterRadius: 6, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
+      clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
       minClusterSize: 2, // allow clustering for 2+ points
       maxZoom: 16,
       enableLocationGrouping: true,

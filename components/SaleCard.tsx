@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import SalePlaceholder from './placeholders/SalePlaceholder'
 import FavoriteButton from './FavoriteButton'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
@@ -29,17 +30,7 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 md:p-8">
-            <img
-              src="/images/YardSaleSkeleton.svg"
-              alt="Sale placeholder"
-              className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90"
-              onError={(e) => {
-                const img = e.currentTarget as HTMLImageElement
-                if (img.src.endsWith('/images/YardSaleSkeleton.svg')) {
-                  img.src = '/placeholders/sale-placeholder.svg'
-                }
-              }}
-            />
+            <SalePlaceholder className="max-w-[100%] max-h-[100%] w-auto h-auto opacity-90" />
           </div>
         )}
       </div>

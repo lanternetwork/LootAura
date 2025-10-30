@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Sale } from '@/lib/types'
 import Image from 'next/image'
 import { getSaleCoverUrl } from '@/lib/images/cover'
+import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
 
@@ -104,17 +105,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                 <Image src={cover.url} alt={cover.alt} fill className="object-cover" sizes="(min-width:1024px) 66vw, 100vw" />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8 md:p-10">
-                  <img
-                    src="/images/YardSaleSkeleton.svg"
-                    alt="Sale placeholder"
-                    className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90"
-                    onError={(e) => {
-                      const img = e.currentTarget as HTMLImageElement
-                      if (img.src.endsWith('/images/YardSaleSkeleton.svg')) {
-                        img.src = '/placeholders/sale-placeholder.svg'
-                      }
-                    }}
-                  />
+                  <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90" />
                 </div>
               )}
             </div>

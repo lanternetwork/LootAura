@@ -29,11 +29,14 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-6 md:p-8">
-            <img
-              src="/images/yard-sale-skeleton.svg"
-              alt="Yard sale placeholder"
-              className="max-w-[70%] max-h-[70%] w-auto h-auto opacity-90"
-            />
+            <picture>
+              <source srcSet="/images/yard-sale-skeleton.png" type="image/png" />
+              <img
+                src="/images/yard-sale-skeleton.svg"
+                alt="Yard sale placeholder"
+                className="max-w-[80%] max-h-[80%] w-auto h-auto opacity-90"
+              />
+            </picture>
           </div>
         )}
       </div>

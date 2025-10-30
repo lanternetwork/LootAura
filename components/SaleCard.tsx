@@ -10,14 +10,14 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
 
   return (
     <article 
-      className={`rounded-2xl overflow-hidden shadow-sm border bg-white grid grid-rows-[2fr_3fr] ${className ?? ''}`} 
+      className={`rounded-2xl overflow-hidden shadow-sm border bg-white ${className ?? ''}`} 
       data-testid="sale-card" 
       data-debug="sale-card" 
       data-sale-id={String(sale?.id || '')}
       data-card="sale"
       data-kind="sale-row"
     >
-      <div className="relative min-h-[140px]">
+      <div className="relative bg-gray-200 aspect-[16/9] md:aspect-[4/3]">
         {cover ? (
           <Image
             src={cover.url}
@@ -28,14 +28,16 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
             priority={false}
           />
         ) : (
-          <Image
-            src="/images/house-placeholder.svg"
-            alt="Placeholder house"
-            fill
-            sizes="(min-width:1024px) 33vw, 100vw"
-            className="object-contain bg-gray-50"
-            priority={false}
-          />
+          <div className="absolute inset-0 grid place-items-center">
+            <Image
+              src="/images/house-placeholder.svg"
+              alt="Placeholder house"
+              fill
+              sizes="(min-width:1024px) 33vw, 100vw"
+              className="object-contain opacity-90"
+              priority={false}
+            />
+          </div>
         )}
       </div>
 

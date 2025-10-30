@@ -99,11 +99,11 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
         <div className="lg:col-span-2 space-y-8">
           {/* Sale Header */}
           <div className="bg-white rounded-lg shadow-sm">
-            <div className="relative w-full h-[220px] overflow-hidden rounded-t-lg">
+            <div className="relative w-full overflow-hidden rounded-t-lg bg-gray-200 aspect-[16/9] md:aspect-[4/3]">
               {cover ? (
                 <Image src={cover.url} alt={cover.alt} fill className="object-cover" sizes="(min-width:1024px) 66vw, 100vw" />
               ) : (
-                <Image src="/images/house-placeholder.svg" alt="Placeholder house" fill className="object-contain bg-gray-50" sizes="(min-width:1024px) 66vw, 100vw" />
+                <Image src="/images/house-placeholder.svg" alt="Placeholder house" fill className="object-contain opacity-90" sizes="(min-width:1024px) 66vw, 100vw" />
               )}
             </div>
             <div className="p-6">

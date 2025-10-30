@@ -53,8 +53,6 @@ export default function PinMarker({
           cy="8"
           r="6"
           fill={isSelected ? '#dc2626' : '#ef4444'}
-          stroke="white"
-          strokeWidth={isSelected ? '3' : '2'}
         />
       </svg>
     </Marker>

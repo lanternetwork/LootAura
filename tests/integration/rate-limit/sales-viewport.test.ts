@@ -6,7 +6,7 @@
 
 import { vi, describe, it, expect, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
-import { makeSupabaseFromMock, mockCreateSupabaseServerClient } from '@/tests/utils/mocks/supabaseServerMock'
+import { makeSupabaseFromMock } from '@/tests/utils/mocks/supabaseServerMock'
 
 // Always bypass rate limiting in this suite
 vi.mock('@/lib/rateLimit/config', () => ({
@@ -68,7 +68,7 @@ const saleData = [
 
 // Use shared queue-based server mock so multiple from('sales_v2') calls work in order
 // Need 2 results per test (count query + data query), and we have 4 tests, so need 8 total
-const mockSetup = (() => {
+const hoistedServerMock = vi.hoisted(() => {
   const saleDataForMock = [
     { 
       id: 's1', 
@@ -125,11 +125,20 @@ const mockSetup = (() => {
     ],
     items_v2: Array(20).fill({ data: [], error: null }),
   })
-  
-  return mockCreateSupabaseServerClient(fromMock)
-})()
+  return {
+    createSupabaseServerClient: vi.fn(() => ({
+      from: fromMock,
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+        signInWithPassword: vi.fn(),
+        signUp: vi.fn(),
+        signOut: vi.fn(),
+      },
+    })),
+  }
+})
 
-vi.mock('@/lib/supabase/server', () => mockSetup)
+vi.mock('@/lib/supabase/server', () => hoistedServerMock)
 
 let route: any
 beforeAll(async () => {

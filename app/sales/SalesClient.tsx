@@ -330,6 +330,11 @@ export default function SalesClient({
       }
     })
     
+    // If a single location is selected and the user moves the map, exit location view
+    if (selectedPinId) {
+      setSelectedPinId(null)
+    }
+
     // Update map view state
     setMapView(prev => ({
       ...prev,
@@ -370,7 +375,7 @@ export default function SalesClient({
       initialLoadRef.current = false // Mark initial load as complete
       fetchMapSales(bounds)
     }, 300)
-  }, [fetchMapSales])
+  }, [fetchMapSales, selectedPinId])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => {

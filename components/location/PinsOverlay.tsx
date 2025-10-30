@@ -151,19 +151,23 @@ export default function PinsOverlay({
     )
   }
 
-  // Clustering disabled: render individual pins
-  return (
-    <>
-      {sales.map(sale => (
-        <PinMarker
-          key={sale.id}
-          id={sale.id}
-          lat={sale.lat}
-          lng={sale.lng}
-          isSelected={selectedId === sale.id}
-          onClick={onPinClick}
-        />
-      ))}
-    </>
-  )
+  // Clustering disabled: render individual pins. If clustering is enabled but mapRef is invalid, render nothing.
+  if (!isClusteringEnabled) {
+    return (
+      <>
+        {sales.map(sale => (
+          <PinMarker
+            key={sale.id}
+            id={sale.id}
+            lat={sale.lat}
+            lng={sale.lng}
+            isSelected={selectedId === sale.id}
+            onClick={onPinClick}
+          />
+        ))}
+      </>
+    )
+  }
+
+  return null
 }

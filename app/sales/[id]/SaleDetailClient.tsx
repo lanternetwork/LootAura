@@ -103,9 +103,10 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
               {cover ? (
                 <Image src={cover.url} alt={cover.alt} fill className="object-cover" sizes="(min-width:1024px) 66vw, 100vw" />
               ) : (
-                <div className="absolute inset-0 grid place-items-center text-gray-400">
-                  <svg width="64" height="64" viewBox="0 0 24 24" className="opacity-70"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
-                </div>
+                <div
+                  className="absolute inset-0 bg-center bg-no-repeat bg-contain opacity-90"
+                  style={{ backgroundImage: "url('/images/house-placeholder.svg')" }}
+                />
               )}
             </div>
             <div className="p-6">

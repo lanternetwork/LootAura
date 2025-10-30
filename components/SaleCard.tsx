@@ -28,9 +28,10 @@ export default function SaleCard({ sale, className }: { sale: Sale; className?: 
             priority={false}
           />
         ) : (
-          <div className="absolute inset-0 grid place-items-center text-gray-400">
-            <svg width="56" height="56" viewBox="0 0 24 24" className="opacity-70"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg>
-          </div>
+          <div
+            className="absolute inset-0 bg-center bg-no-repeat bg-contain opacity-90"
+            style={{ backgroundImage: "url('/images/house-placeholder.svg')" }}
+          />
         )}
       </div>
 

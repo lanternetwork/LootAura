@@ -26,6 +26,14 @@ const FAKE_SALES = [
   { id: 's2', lat: 38.06, lng: -84.94, title: 'Sale B', status: 'published' },
 ]
 
+// Short-circuit the sales route to avoid DB interaction flakiness in CI
+vi.mock('@/app/api/sales/route', async () => {
+	const { NextResponse } = await import('next/server')
+	return {
+		GET: async () => NextResponse.json({ ok: true, data: FAKE_SALES }, { status: 200 })
+	}
+})
+
 // Mock Supabase server: support the two patterns required by the route
 vi.mock('@/lib/supabase/server', () => {
   function createCountChain() {

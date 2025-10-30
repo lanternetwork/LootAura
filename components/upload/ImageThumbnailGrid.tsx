@@ -8,6 +8,7 @@ interface ImageThumbnailGridProps {
   images: string[]
   onRemove: (index: number) => void
   onReorder?: (fromIndex: number, toIndex: number) => void
+  onSetCover?: (index: number) => void
   maxImages?: number
   className?: string
 }
@@ -16,6 +17,7 @@ export default function ImageThumbnailGrid({
   images, 
   onRemove, 
   onReorder,
+  onSetCover,
   maxImages = 10,
   className = '' 
 }: ImageThumbnailGridProps) {
@@ -89,6 +91,16 @@ export default function ImageThumbnailGrid({
                 >
                   <FaEye className="h-4 w-4 text-gray-700" />
                 </button>
+                {onSetCover && (
+                  <button
+                    onClick={() => onSetCover(index)}
+                    className="p-2 bg-amber-500 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"
+                    title="Set as cover"
+                  >
+                    {/* Star glyph */}
+                    <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .587l3.668 7.431 8.2 1.193-5.934 5.787 1.401 8.168L12 18.897l-7.335 3.869 1.401-8.168L.132 9.211l8.2-1.193z"/></svg>
+                  </button>
+                )}
                 <button
                   onClick={() => onRemove(index)}
                   className="p-2 bg-red-500 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"

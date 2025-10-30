@@ -167,6 +167,25 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setPhotos(prev => [...prev, ...urls])
   }
 
+  const handleReorderPhotos = (fromIndex: number, toIndex: number) => {
+    setPhotos(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+  }
+
+  const handleSetCover = (index: number) => {
+    setPhotos(prev => {
+      if (index <= 0 || index >= prev.length) return prev
+      const next = [...prev]
+      const [moved] = next.splice(index, 1)
+      next.unshift(moved)
+      return next
+    })
+  }
+
   const handleRemovePhoto = (index: number) => {
     setPhotos(prev => prev.filter((_, i) => i !== index))
   }
@@ -190,7 +209,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       case 0:
         return <DetailsStep formData={formData} onChange={handleInputChange} />
       case 1:
-        return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} />
+        return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
       case 2:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
       case 3:
@@ -483,10 +502,12 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
   )
 }
 
-function PhotosStep({ photos, onUpload, onRemove }: { 
+function PhotosStep({ photos, onUpload, onRemove, onReorder, onSetCover }: { 
   photos: string[], 
   onUpload: (urls: string[]) => void,
-  onRemove: (index: number) => void 
+  onRemove: (index: number) => void,
+  onReorder?: (fromIndex: number, toIndex: number) => void,
+  onSetCover?: (index: number) => void,
 }) {
   return (
     <div className="space-y-6">
@@ -513,6 +534,8 @@ function PhotosStep({ photos, onUpload, onRemove }: {
           <ImageThumbnailGrid 
             images={photos}
             onRemove={onRemove}
+            onReorder={onReorder}
+            onSetCover={onSetCover}
             maxImages={10}
           />
         </div>

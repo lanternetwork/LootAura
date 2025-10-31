@@ -8,6 +8,7 @@ jobs:
   run-on-success:
     # Only run on successful deployments to main to avoid branch noise
     if: github.event.deployment_status.state == 'success' && github.ref == 'refs/heads/main'
+    continue-on-error: ${{ github.ref != 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

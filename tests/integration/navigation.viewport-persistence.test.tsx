@@ -8,8 +8,8 @@
  */
 
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, cleanup } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import SaleCard from '@/components/SaleCard'
@@ -75,6 +75,10 @@ describe('Viewport Persistence Navigation', () => {
     vi.clearAllMocks()
   })
 
+  afterEach(() => {
+    cleanup()
+  })
+
   describe('SaleCard viewport URL generation', () => {
     it('should include viewport params in detail URL when viewport is provided', () => {
       const viewport = {
@@ -82,9 +86,9 @@ describe('Viewport Persistence Navigation', () => {
         zoom: 12
       }
 
-      renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
+      const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
-      const detailLink = screen.getByText('View Details →').closest('a')
+      const detailLink = container.querySelector('a[href*="test-sale-1"]')
       expect(detailLink).toBeInTheDocument()
       expect(detailLink?.getAttribute('href')).toBe(
         `/sales/test-sale-1?lat=38.2527&lng=-85.7585&zoom=12`
@@ -92,17 +96,17 @@ describe('Viewport Persistence Navigation', () => {
     })
 
     it('should not include viewport params when viewport is not provided', () => {
-      renderWithQueryClient(<SaleCard sale={mockSale} />)
+      const { container } = renderWithQueryClient(<SaleCard sale={mockSale} />)
 
-      const detailLink = screen.getByText('View Details →').closest('a')
+      const detailLink = container.querySelector('a[href*="test-sale-1"]')
       expect(detailLink).toBeInTheDocument()
       expect(detailLink?.getAttribute('href')).toBe('/sales/test-sale-1')
     })
 
     it('should handle null viewport gracefully', () => {
-      renderWithQueryClient(<SaleCard sale={mockSale} viewport={null} />)
+      const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={null} />)
 
-      const detailLink = screen.getByText('View Details →').closest('a')
+      const detailLink = container.querySelector('a[href*="test-sale-1"]')
       expect(detailLink).toBeInTheDocument()
       expect(detailLink?.getAttribute('href')).toBe('/sales/test-sale-1')
     })
@@ -113,9 +117,9 @@ describe('Viewport Persistence Navigation', () => {
         zoom: 15.5
       }
 
-      renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
+      const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
-      const detailLink = screen.getByText('View Details →').closest('a')
+      const detailLink = container.querySelector('a[href*="test-sale-1"]')
       const href = detailLink?.getAttribute('href')
       expect(href).toContain('lat=38.123456789')
       expect(href).toContain('lng=-85.987654321')
@@ -196,9 +200,9 @@ describe('Viewport Persistence Navigation', () => {
         zoom: 12
       }
 
-      renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
+      const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
-      const detailLink = screen.getByText('View Details →').closest('a')
+      const detailLink = container.querySelector('a[href*="test-sale-1"]')
       const href = detailLink?.getAttribute('href')
       
       // Verify URL can be parsed correctly
@@ -214,9 +218,9 @@ describe('Viewport Persistence Navigation', () => {
         zoom: 12
       }
 
-      renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
+      const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
-      const detailLink = screen.getByText('View Details →').closest('a')
+      const detailLink = container.querySelector('a[href*="test-sale-1"]')
       const href = detailLink?.getAttribute('href')
       
       expect(href).toContain('lng=-85.7585')
@@ -228,9 +232,9 @@ describe('Viewport Persistence Navigation', () => {
         zoom: 0
       }
 
-      renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
+      const { container } = renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
-      const detailLink = screen.getByText('View Details →').closest('a')
+      const detailLink = container.querySelector('a[href*="test-sale-1"]')
       const href = detailLink?.getAttribute('href')
       
       expect(href).toContain('zoom=0')

@@ -13,6 +13,8 @@ A modern web application for discovering and managing yard sales, garage sales, 
 - **Roadmap**: See [ROADMAP.md](ROADMAP.md) for development milestones
 - **What's New**: See [docs/CHANGELOG.md](docs/CHANGELOG.md) for latest updates and release notes
 - **Environment Setup**: See [docs/env-parity.md](docs/env-parity.md) for environment variable configuration
+- **Production ENV**: See [docs/PRODUCTION_ENV.md](docs/PRODUCTION_ENV.md) for production environment variables
+- **Image Hosting**: See [docs/IMAGES.md](docs/IMAGES.md) for Cloudinary image upload and management
 
 ## 🏗️ Architecture Invariants
 
@@ -156,12 +158,23 @@ LootAura includes comprehensive admin and debugging tools accessible at `/admin/
 ## Features
 
 - **Interactive Map View**: Find sales near you with an interactive Mapbox map
-- **List View**: Browse sales in a clean, organized list
+- **Image-First Cards**: Sale cards display with cover images prominently at the top (40% image / 60% info)
+- **Primary Image Flow**: Users can upload multiple images and select a cover image for their sale
+- **List View**: Browse sales in a clean, organized list with image-forward design
 - **User Authentication**: Sign up and manage your account
 - **Favorites**: Save sales you're interested in
 - **CSV Import/Export**: Import and export sales data
 - **Admin Tools**: Comprehensive debugging and development tools
 - **Responsive Design**: Works on desktop and mobile devices
+
+### Image Management
+
+- **Cloudinary Integration**: Images hosted on Cloudinary CDN for optimized delivery
+- **Cover Image Selection**: First uploaded image automatically becomes cover image
+- **Placeholder Fallback**: Sales without images display a neutral placeholder (not a runtime error)
+- **Image Validation**: All image URLs validated to ensure Cloudinary URLs only
+
+See [docs/IMAGES.md](docs/IMAGES.md) for complete image hosting and management documentation.
 
 ## Data Sources
 

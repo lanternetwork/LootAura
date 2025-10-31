@@ -62,6 +62,10 @@ export function withRateLimit(
     
     // Handle hard limit
     if (!mostRestrictive.allowed) {
+      // Log rate-limited requests for monitoring
+      const key = await deriveKey(req, mostRestrictive.policy.scope, opts.userId)
+      console.log(`[RATE_LIMIT] Request rate-limited: policy=${mostRestrictive.policy.name}, scope=${mostRestrictive.policy.scope}, key=${key}, remaining=${mostRestrictive.remaining}, resetAt=${new Date(mostRestrictive.resetAt).toISOString()}`)
+      
       const errorResponse = NextResponse.json(
         { error: 'rate_limited', message: 'Too many requests. Please slow down.' },
         { status: 429 }

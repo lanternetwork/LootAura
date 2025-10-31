@@ -661,9 +661,8 @@ async function postHandler(request: NextRequest) {
 
     // Validate optional cover image URL
     if (cover_image_url && !isAllowedImageUrl(cover_image_url)) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES] Rejected cover_image_url', cover_image_url)
-      }
+      // Log image validation failures for monitoring (production logging)
+      console.log(`[SALES][IMAGE_VALIDATION] Rejected cover_image_url: url=${cover_image_url}, user=${user.id}, reason=invalid_url_format`)
       return NextResponse.json({ error: 'Invalid cover_image_url' }, { status: 400 })
     }
 
@@ -671,9 +670,8 @@ async function postHandler(request: NextRequest) {
     if (images && Array.isArray(images)) {
       for (const imageUrl of images) {
         if (!isAllowedImageUrl(imageUrl)) {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SALES] Rejected image URL in images array', imageUrl)
-          }
+          // Log image validation failures for monitoring (production logging)
+          console.log(`[SALES][IMAGE_VALIDATION] Rejected image URL in images array: url=${imageUrl}, user=${user.id}, reason=invalid_url_format`)
           return NextResponse.json({ error: 'Invalid image URL in images array' }, { status: 400 })
         }
       }

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, cleanup } from '@testing-library/react'
 import React from 'react'
 import HowItWorksPage from '@/app/how-it-works/page'
 
@@ -11,53 +11,66 @@ vi.mock('next/link', () => ({
 }))
 
 describe('How It Works Page', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
   it('renders the main heading', () => {
-    render(<HowItWorksPage />)
-    expect(screen.getByText('How Loot Aura works')).toBeInTheDocument()
+    const { container } = render(<HowItWorksPage />)
+    const heading = container.querySelector('h1')
+    expect(heading).toHaveTextContent('How Loot Aura works')
   })
 
   it('renders all three sections', () => {
-    render(<HowItWorksPage />)
-    expect(screen.getByText('For shoppers')).toBeInTheDocument()
-    expect(screen.getByText('For hosts')).toBeInTheDocument()
-    expect(screen.getByText('Under the hood')).toBeInTheDocument()
+    const { container } = render(<HowItWorksPage />)
+    const headings = container.querySelectorAll('h2')
+    const sectionTexts = Array.from(headings).map(h => h.textContent)
+    expect(sectionTexts).toContain('For shoppers')
+    expect(sectionTexts).toContain('For hosts')
+    expect(sectionTexts).toContain('Under the hood')
   })
 
   it('renders CTAs with correct hrefs', () => {
-    render(<HowItWorksPage />)
+    const { container } = render(<HowItWorksPage />)
     
-    // Check hero CTAs
-    const browseLink = screen.getByText('Browse nearby sales').closest('a')
-    expect(browseLink).toHaveAttribute('href', '/sales')
+    // Check hero CTAs - use getAllByText and filter by href
+    const browseLinks = Array.from(container.querySelectorAll('a[href="/sales"]'))
+    expect(browseLinks.length).toBeGreaterThan(0)
+    expect(browseLinks[0]).toHaveTextContent('Browse nearby sales')
     
-    const hostLink = screen.getByText('Host a sale').closest('a')
-    expect(hostLink).toHaveAttribute('href', '/sell/new')
+    const hostLinks = Array.from(container.querySelectorAll('a[href="/sell/new"]'))
+    expect(hostLinks.length).toBeGreaterThan(0)
+    const hostLink = hostLinks.find(link => link.textContent?.includes('Host a sale'))
+    expect(hostLink).toBeDefined()
     
     // Check bottom CTAs
-    const viewSalesLink = screen.getByText('View sales').closest('a')
-    expect(viewSalesLink).toHaveAttribute('href', '/sales')
+    const viewSalesLinks = Array.from(container.querySelectorAll('a[href="/sales"]'))
+    const viewSalesLink = viewSalesLinks.find(link => link.textContent?.trim() === 'View sales')
+    expect(viewSalesLink).toBeDefined()
     
-    const postSaleLink = screen.getByText('Post a sale').closest('a')
-    expect(postSaleLink).toHaveAttribute('href', '/sell/new')
+    const postSaleLinks = Array.from(container.querySelectorAll('a[href="/sell/new"]'))
+    const postSaleLink = postSaleLinks.find(link => link.textContent?.trim() === 'Post a sale')
+    expect(postSaleLink).toBeDefined()
   })
 
   it('renders all step cards for each section', () => {
-    render(<HowItWorksPage />)
+    const { container } = render(<HowItWorksPage />)
     
-    // Shoppers steps
-    expect(screen.getByText('1. Set your location')).toBeInTheDocument()
-    expect(screen.getByText('2. Filter the map')).toBeInTheDocument()
-    expect(screen.getByText('3. Go shop')).toBeInTheDocument()
+    // Shoppers steps - query by h3 elements
+    const headings = Array.from(container.querySelectorAll('h3')).map(h => h.textContent)
+    expect(headings).toContain('1. Set your location')
+    expect(headings).toContain('2. Filter the map')
+    expect(headings).toContain('3. Go shop')
     
     // Hosts steps
-    expect(screen.getByText('1. Create a sale')).toBeInTheDocument()
-    expect(screen.getByText('2. Add photos')).toBeInTheDocument()
-    expect(screen.getByText('3. Publish')).toBeInTheDocument()
+    expect(headings).toContain('1. Create a sale')
+    expect(headings).toContain('2. Add photos')
+    expect(headings).toContain('3. Publish')
     
     // Admin steps
-    expect(screen.getByText('1. Map-centric')).toBeInTheDocument()
-    expect(screen.getByText('2. Protected data')).toBeInTheDocument()
-    expect(screen.getByText('3. Tools for cleanup')).toBeInTheDocument()
+    expect(headings).toContain('1. Map-centric')
+    expect(headings).toContain('2. Protected data')
+    expect(headings).toContain('3. Tools for cleanup')
   })
 })
 

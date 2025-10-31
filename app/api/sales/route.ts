@@ -429,6 +429,12 @@ async function salesHandler(request: NextRequest) {
         })
                 .sort((a, b) => {
                   if (!a || !b) return 0
+                  const now = new Date()
+                  const aPromo = a.is_promoted === true && (!a.promoted_until || new Date(a.promoted_until) > now)
+                  const bPromo = b.is_promoted === true && (!b.promoted_until || new Date(b.promoted_until) > now)
+                  if (aPromo !== bPromo) {
+                    return aPromo ? -1 : 1
+                  }
                   // Primary sort: distance
                   if ((a.distance_m || 0) !== (b.distance_m || 0)) {
                     return (a.distance_m || 0) - (b.distance_m || 0)

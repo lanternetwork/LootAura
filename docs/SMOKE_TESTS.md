@@ -27,6 +27,11 @@ Before running smoke tests, verify:
 
 **Expected Results**:
 - [ ] Page loads without errors
+- **Promoted Sale Flow**
+  - [ ] Create promotion intent: POST `/api/promotions/sales` with owned `saleId` → returns clientSecret
+  - [ ] Simulate webhook (Stripe Dashboard or test event) → sale becomes `is_promoted=true`
+  - [ ] GET `/api/sales?...bbox` shows promoted sale first within same viewport
+  - [ ] Verify expiration works (set short `PROMOTE_SALE_DURATION_HOURS` in staging)
 - [ ] Map displays correctly (no blank map)
 - [ ] Sale cards render with images on top (if sales have images)
 - [ ] Placeholder displays for sales without images (gray placeholder, not runtime error)

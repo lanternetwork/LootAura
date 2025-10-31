@@ -52,6 +52,10 @@ These variables are **never** exposed to the browser and must remain server-side
 | `NOMINATIM_APP_EMAIL` | ⚠️ Optional | Email for Nominatim geocoding fallback | Vercel dashboard → Environment Variables | **SERVER-ONLY** - For fallback geocoding politeness |
 | `MAPBOX_GEOCODING_ENDPOINT` | ⚠️ Optional | Mapbox geocoding endpoint override | Vercel dashboard → Environment Variables | **SERVER-ONLY** - Default: `https://api.mapbox.com/geocoding/v5/mapbox.places` |
 | `RATE_LIMITING_ENABLED` | ✅ Yes | Enable rate limiting | Vercel dashboard → Environment Variables | **SERVER-ONLY** - Set to `true` in production |
+| `STRIPE_SECRET_KEY` | ✅ Yes (if promotions) | Stripe secret key | Vercel dashboard → Environment Variables | **SERVER-ONLY** - Required for Stripe API |
+| `STRIPE_WEBHOOK_SECRET` | ✅ Yes (if promotions) | Stripe webhook signing secret | Vercel dashboard → Environment Variables | **SERVER-ONLY** - Webhook verification |
+| `PROMOTE_SALE_PRICE_CENTS` | ⚠️ Optional | Promotion price (cents) | Vercel dashboard → Environment Variables | Default 500 |
+| `PROMOTE_SALE_DURATION_HOURS` | ⚠️ Optional | Promotion duration (hours) | Vercel dashboard → Environment Variables | Default 72 |
 
 ## Production Checklist
 

@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import SimpleMap from '@/components/location/SimpleMap'
 import { Sale } from '@/lib/types'
-import { createHybridPins } from '@/lib/pins/hybridClustering'
 
 interface LocationState {
   zip?: string
@@ -159,7 +158,10 @@ export function MapPreviewSection() {
     sales,
     selectedId: null,
     onLocationClick: () => {}, // Disabled - no click handling on preview
-    viewport: mapView
+    viewport: {
+      bounds: [mapView.bounds.west, mapView.bounds.south, mapView.bounds.east, mapView.bounds.north],
+      zoom: mapView.zoom
+    }
   } : undefined
 
   return (

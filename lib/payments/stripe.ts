@@ -8,7 +8,7 @@ if (!stripeSecret && process.env.NODE_ENV === 'production') {
 
 export const stripe = stripeSecret
   ? new Stripe(stripeSecret, {
-      apiVersion: '2024-06-20'
+      apiVersion: '2023-10-16'
     })
   : null
 

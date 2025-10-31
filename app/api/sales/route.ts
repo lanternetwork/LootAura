@@ -47,8 +47,8 @@ async function salesHandler(request: NextRequest) {
     const east = searchParams.get('east')
     const west = searchParams.get('west')
     
-    let latitude: number
-    let longitude: number
+    let latitude: number | undefined
+    let longitude: number | undefined
     let distanceKm: number | undefined
     let actualBbox: any = null
     
@@ -279,6 +279,15 @@ async function salesHandler(request: NextRequest) {
           break
         }
       }
+    }
+    
+    // Ensure latitude and longitude are defined before use
+    if (latitude === undefined || longitude === undefined) {
+      console.error(`[SALES] Invalid state: latitude or longitude undefined`)
+      return NextResponse.json({
+        ok: false,
+        error: 'Invalid location: latitude or longitude not set'
+      }, { status: 400 })
     }
     
     console.log(`[SALES] Query params: lat=${latitude}, lng=${longitude}, km=${distanceKm}, start=${startDateParam}, end=${endDateParam}, categories=[${categories.join(',')}], q=${q}, limit=${limit}, offset=${offset}`)

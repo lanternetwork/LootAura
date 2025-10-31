@@ -5,23 +5,21 @@ import * as ImageValidate from '@/lib/images/validateImageUrl'
 // Ensure Cloudinary validator recognizes the test cloud name
 ;(process.env as any).NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'test'
 
-// Mock Supabase (stable chain object so spies are consistent across calls)
+// Mock Supabase (return fresh chain per call to avoid cleared mocks issues)
 const mockSingle = vi.fn()
-const mockSelect = vi.fn(() => ({
-	single: mockSingle
-}))
-const mockInsert = vi.fn(() => ({
-	select: mockSelect
-}))
-const fromChain = {
-	insert: mockInsert
-}
+const makeFromChain = () => ({
+	insert: (_rows: any) => ({
+		select: () => ({
+			single: mockSingle
+		})
+	})
+})
 const mockGetUser = vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 const mockSupabaseClient = {
 	auth: {
 		getUser: mockGetUser
 	},
-	from: vi.fn(() => fromChain)
+	from: vi.fn(() => makeFromChain())
 }
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -46,14 +44,8 @@ describe('Sales API - Image Support', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
 		
-		// Ensure mock structure is preserved
-		mockSupabaseClient.from.mockImplementation(() => fromChain)
-		mockInsert.mockReturnValue({
-			select: mockSelect
-		})
-		mockSelect.mockReturnValue({
-			single: mockSingle
-		})
+		// Ensure mock structure is preserved per-call
+		mockSupabaseClient.from.mockImplementation(() => makeFromChain())
 		
 		// Mock authenticated user - reset implementation after clearAllMocks
 		mockGetUser.mockResolvedValue({

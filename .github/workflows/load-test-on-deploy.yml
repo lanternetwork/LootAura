@@ -6,7 +6,8 @@ on:
 
 jobs:
   run-on-success:
-    if: github.event.deployment_status.state == 'success'
+    # Only run on successful deployments to main to avoid branch noise
+    if: github.event.deployment_status.state == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -19,8 +20,10 @@ jobs:
             URL="${{ github.event.deployment.payload?.web_url || github.event.deployment.target_url }}"
           fi
           if [ -z "$URL" ]; then
-            echo "::error::No deployment URL found; skipping"
-            exit 1
+            echo "::notice::No deployment URL found; skipping load tests"
+            # Do not fail the workflow when there's no URL (e.g., previewless deployments)
+            echo "url=" >> $GITHUB_OUTPUT
+            exit 0
           fi
           echo "url=$URL" >> $GITHUB_OUTPUT
 

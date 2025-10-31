@@ -15,48 +15,36 @@ export function WeekendStats() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        // Calculate this weekend's date range
         const now = new Date()
+        const saturday = new Date(now)
+        saturday.setDate(now.getDate() + (6 - now.getDay()))
+        const sunday = new Date(saturday)
+        sunday.setDate(saturday.getDate() + 1)
         
-        // Fetch ALL active sales near Louisville, KY (40204) - no date filter
-        // This gives us all published sales in the area, not just weekend ones
+        const startDate = saturday.toISOString().split('T')[0]
+        const endDate = sunday.toISOString().split('T')[0]
+
+        // Fetch sales near Louisville, KY (40204) for this weekend
         const zip = '40204'
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
           (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
         
-        // Fetch sales in batches to get accurate count (API has 200 limit per request)
-        const allSales: Sale[] = []
-        let offset = 0
-        const limit = 200 // API max limit
-        let hasMore = true
+        const url = `${baseUrl}/api/sales?near=1&zip=${zip}&radiusKm=25&from=${startDate}&to=${endDate}&limit=200`
         
-        while (hasMore) {
-          const url = `${baseUrl}/api/sales?near=1&zip=${zip}&radiusKm=25&limit=${limit}&offset=${offset}`
-          const res = await fetch(url)
-          const data = await res.json()
-          
-          // Handle different response formats
-          const sales: Sale[] = data.sales || data.data || []
-          allSales.push(...sales)
-          
-          // If we got fewer than the limit, we've reached the end
-          if (sales.length < limit) {
-            hasMore = false
-          } else {
-            offset += limit
-            // Safety limit: stop after fetching 2000 sales (10 pages)
-            if (allSales.length >= 2000) {
-              hasMore = false
-            }
-          }
-        }
+        const res = await fetch(url)
+        const data = await res.json()
         
-        // Count all active sales in the area
-        const activeSales = allSales.length
+        // Handle different response formats
+        const sales: Sale[] = data.sales || data.data || []
+        
+        // Count active sales for this weekend
+        const activeSales = sales.length
         
         // Calculate new this week (sales created in last 7 days)
         const weekAgo = new Date(now)
         weekAgo.setDate(now.getDate() - 7)
-        const newThisWeek = allSales.filter((sale) => {
+        const newThisWeek = sales.filter((sale) => {
           if (!sale.created_at) return false
           const created = new Date(sale.created_at)
           return created >= weekAgo

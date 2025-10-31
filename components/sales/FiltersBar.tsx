@@ -300,8 +300,24 @@ export default function FiltersBar({
           </ul>
         </div>
 
-        {/* Right: Distance + More */}
+        {/* Right: Date Range + Distance + More */}
         <div ref={rightRef} className="shrink-0 flex items-center gap-3 ml-auto">
+          {/* Date Range select */}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium whitespace-nowrap">Date:</label>
+            <select
+              value={dateRange}
+              onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
+              disabled={isLoading}
+              className={`px-2 py-1 border rounded text-sm min-w-[100px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <option value="any">Any Date</option>
+              <option value="today">Today</option>
+              <option value="weekend">This Weekend</option>
+              <option value="next_weekend">Next Weekend</option>
+            </select>
+          </div>
+
           {/* Search Area select */}
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium whitespace-nowrap">Search Area:</label>

@@ -35,9 +35,13 @@ async function salesHandler(request: NextRequest) {
     const supabase = createSupabaseServerClient()
     const { searchParams } = new URL(request.url)
     
+    // Check for near=1 parameter (location-scoped landing page queries)
+    const near = searchParams.get('near') === '1'
+    
     // 1. Parse & validate location (either lat/lng or bbox)
     const lat = searchParams.get('lat')
     const lng = searchParams.get('lng')
+    const zip = searchParams.get('zip')
     const north = searchParams.get('north')
     const south = searchParams.get('south')
     const east = searchParams.get('east')
@@ -48,63 +52,137 @@ async function salesHandler(request: NextRequest) {
     let distanceKm: number | undefined
     let actualBbox: any = null
     
-    // Check if bbox parameters are provided
-    if (north && south && east && west) {
-      try {
-        const bboxData = {
-          north: parseFloat(north),
-          south: parseFloat(south),
-          east: parseFloat(east),
-          west: parseFloat(west)
+    // Handle near=1 parameter
+    if (near) {
+      // If near=1 with zip, resolve zip to lat/lng first
+      if (zip && !lat && !lng) {
+        try {
+          // Use the geocoding API to get lat/lng from zip
+          const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+          const geoRes = await fetch(`${baseUrl}/api/geocoding/zip?zip=${encodeURIComponent(zip)}`)
+          const geoData = await geoRes.json()
+          
+          if (geoData.ok && geoData.lat && geoData.lng) {
+            latitude = parseFloat(geoData.lat)
+            longitude = parseFloat(geoData.lng)
+            console.log(`[SALES] near=1: resolved zip=${zip} to lat=${latitude}, lng=${longitude}`)
+          } else {
+            // ZIP not found - return empty result with 200
+            console.log(`[SALES] near=1: zip=${zip} not found, returning empty result`)
+            return NextResponse.json({
+              ok: true,
+              data: [],
+              sales: [],
+              count: 0,
+              durationMs: Date.now() - startedAt
+            })
+          }
+        } catch (error) {
+          console.error(`[SALES] near=1: failed to resolve zip=${zip}:`, error)
+          return NextResponse.json({
+            ok: true,
+            data: [],
+            sales: [],
+            count: 0,
+            durationMs: Date.now() - startedAt
+          })
         }
-        
-        const validatedBbox = bboxSchema.parse(bboxData)
-        console.log(`[API_SALES] bbox=${validatedBbox.north},${validatedBbox.south},${validatedBbox.east},${validatedBbox.west}`)
-        console.log(`[API_SALES] bbox range: lat=${validatedBbox.north - validatedBbox.south}, lng=${validatedBbox.east - validatedBbox.west}`)
-        console.log(`[API_SALES] bbox center: lat=${(validatedBbox.north + validatedBbox.south) / 2}, lng=${(validatedBbox.east + validatedBbox.west) / 2}`)
-        
-        // Calculate center and approximate distance from bbox
-        latitude = (validatedBbox.north + validatedBbox.south) / 2
-        longitude = (validatedBbox.east + validatedBbox.west) / 2
-        
-        // When using viewport bounds, still respect distance filter if provided
-        // Parse distance from URL parameters (DEPRECATED - will be ignored)
-        const distanceParam = searchParams.get('dist') || searchParams.get('distance')
-        distanceKm = distanceParam ? parseFloat(distanceParam) : 1000 // Default to unlimited if not specified
-        
-        // Log deprecation warning if distance parameter is provided
-        if (distanceParam) {
-          console.log('[API_SALES] DEPRECATION WARNING: distance parameter ignored. Use map viewport bounds instead.')
-        }
-        
-        // Store the actual bbox for proper filtering
-        actualBbox = validatedBbox
-        
-      } catch (error: any) {
-        console.log(`[SALES] Invalid bbox: ${error.message}`)
-        return NextResponse.json({ 
-          ok: false, 
-          error: `Invalid bbox: ${error.message}` 
-        }, { status: 400 })
+      } else if (lat && lng) {
+        // near=1 with lat/lng - use them directly
+        latitude = parseFloat(lat)
+        longitude = parseFloat(lng)
+      } else {
+        // near=1 but no location provided - return empty result with 200
+        console.log(`[SALES] near=1: no location provided, returning empty result`)
+        return NextResponse.json({
+          ok: true,
+          data: [],
+          sales: [],
+          count: 0,
+          durationMs: Date.now() - startedAt
+        })
       }
-    } else if (lat && lng) {
-      // Legacy lat/lng support
-      latitude = parseFloat(lat)
-      longitude = parseFloat(lng)
       
-      if (isNaN(latitude) || isNaN(longitude)) {
-        console.log(`[SALES] Invalid location: lat=${lat}, lng=${lng}`)
+      // Set default radius for near=1 queries (25km)
+      distanceKm = searchParams.get('radiusKm') 
+        ? parseFloat(searchParams.get('radiusKm') || '25')
+        : 25
+      
+      // Calculate bbox from lat/lng and distance
+      const latRange = distanceKm / 111.0 // 1 degree ≈ 111km
+      const lngRange = distanceKm / (111.0 * Math.cos(latitude * Math.PI / 180))
+      
+      actualBbox = {
+        north: latitude + latRange,
+        south: latitude - latRange,
+        east: longitude + lngRange,
+        west: longitude - lngRange
+      }
+      
+      console.log(`[SALES] near=1: calculated bbox from lat=${latitude}, lng=${longitude}, radius=${distanceKm}km`)
+    }
+    
+    // Normal location parsing (for non-near queries)
+    if (!near) {
+      // Check if bbox parameters are provided
+      if (north && south && east && west) {
+        try {
+          const bboxData = {
+            north: parseFloat(north),
+            south: parseFloat(south),
+            east: parseFloat(east),
+            west: parseFloat(west)
+          }
+          
+          const validatedBbox = bboxSchema.parse(bboxData)
+          console.log(`[API_SALES] bbox=${validatedBbox.north},${validatedBbox.south},${validatedBbox.east},${validatedBbox.west}`)
+          console.log(`[API_SALES] bbox range: lat=${validatedBbox.north - validatedBbox.south}, lng=${validatedBbox.east - validatedBbox.west}`)
+          console.log(`[API_SALES] bbox center: lat=${(validatedBbox.north + validatedBbox.south) / 2}, lng=${(validatedBbox.east + validatedBbox.west) / 2}`)
+          
+          // Calculate center and approximate distance from bbox
+          latitude = (validatedBbox.north + validatedBbox.south) / 2
+          longitude = (validatedBbox.east + validatedBbox.west) / 2
+          
+          // When using viewport bounds, still respect distance filter if provided
+          // Parse distance from URL parameters (DEPRECATED - will be ignored)
+          const distanceParam = searchParams.get('dist') || searchParams.get('distance')
+          distanceKm = distanceParam ? parseFloat(distanceParam) : 1000 // Default to unlimited if not specified
+          
+          // Log deprecation warning if distance parameter is provided
+          if (distanceParam) {
+            console.log('[API_SALES] DEPRECATION WARNING: distance parameter ignored. Use map viewport bounds instead.')
+          }
+          
+          // Store the actual bbox for proper filtering
+          actualBbox = validatedBbox
+          
+        } catch (error: any) {
+          console.log(`[SALES] Invalid bbox: ${error.message}`)
+          return NextResponse.json({ 
+            ok: false, 
+            error: `Invalid bbox: ${error.message}` 
+          }, { status: 400 })
+        }
+      } else if (lat && lng) {
+        // Legacy lat/lng support
+        latitude = parseFloat(lat)
+        longitude = parseFloat(lng)
+        
+        if (isNaN(latitude) || isNaN(longitude)) {
+          console.log(`[SALES] Invalid location: lat=${lat}, lng=${lng}`)
+          return NextResponse.json({ 
+            ok: false, 
+            error: 'Invalid location coordinates' 
+          }, { status: 400 })
+        }
+      } else {
+        console.log(`[SALES] Missing location: lat=${lat}, lng=${lng}, bbox=${north},${south},${east},${west}`)
         return NextResponse.json({ 
           ok: false, 
-          error: 'Invalid location coordinates' 
+          error: 'Missing location: lat/lng or bbox required' 
         }, { status: 400 })
       }
-    } else {
-      console.log(`[SALES] Missing location: lat=${lat}, lng=${lng}, bbox=${north},${south},${east},${west}`)
-      return NextResponse.json({ 
-        ok: false, 
-        error: 'Missing location: lat/lng or bbox required' 
-      }, { status: 400 })
     }
     
     // 2. Parse & validate other parameters

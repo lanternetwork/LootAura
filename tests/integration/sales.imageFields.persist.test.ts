@@ -1,30 +1,13 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import * as ImageValidate from '@/lib/images/validateImageUrl'
+import { mockSupabaseServer } from '@/tests/mocks/supabaseServer.mock'
 
 // Ensure Cloudinary validator recognizes the test cloud name
 ;(process.env as any).NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'test'
 
-// Mock Supabase (return fresh chain per call to avoid cleared mocks issues)
-const mockSingle = vi.fn()
-const makeFromChain = () => ({
-	insert: (_rows: any) => ({
-		select: () => ({
-			single: mockSingle
-		})
-	})
-})
-const mockGetUser = vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
-const mockSupabaseClient = {
-	auth: {
-		getUser: mockGetUser
-	},
-	from: vi.fn(() => makeFromChain())
-}
-
-vi.mock('@/lib/supabase/server', () => ({
-	createSupabaseServerClient: () => mockSupabaseClient
-}))
+// Use shared Supabase server mock with full insert/select/single support
+mockSupabaseServer({ sales_v2: [] })
 
 // Mock rate limiting
 vi.mock('@/lib/rateLimit/withRateLimit', () => ({
@@ -41,30 +24,12 @@ beforeAll(async () => {
 })
 
 describe('Sales API - Image Support', () => {
-	beforeEach(() => {
-		vi.clearAllMocks()
-		
-		// Ensure mock structure is preserved per-call
-		mockSupabaseClient.from.mockImplementation(() => makeFromChain())
-		
-		// Mock authenticated user - reset implementation after clearAllMocks
-		mockGetUser.mockResolvedValue({
-			data: { user: { id: 'test-user-id' } },
-			error: null
-		})
-		
-		// Reset mockSingle with a default value
-		mockSingle.mockResolvedValue({
-			data: { id: 'default-sale-123' },
-			error: null
-		})
-	})
+beforeEach(() => {
+	vi.clearAllMocks()
+})
 
 	it('should accept and persist cover_image_url', async () => {
-		mockSingle.mockResolvedValue({
-			data: { id: 'sale-123', cover_image_url: 'https://res.cloudinary.com/test/image/upload/v123/cover.jpg' },
-			error: null
-		})
+	// No-op: insert/select/single chain in shared mock will reflect payload
 
 		const request = new NextRequest('http://localhost:3000/api/sales', {
 			method: 'POST',
@@ -94,10 +59,7 @@ describe('Sales API - Image Support', () => {
 	})
 
 	it('should accept and validate images array', async () => {
-		mockSingle.mockResolvedValue({
-			data: { id: 'sale-123' },
-			error: null
-		})
+	// No-op: shared mock returns inserted row id
 
 		const request = new NextRequest('http://localhost:3000/api/sales', {
 			method: 'POST',
@@ -179,10 +141,7 @@ describe('Sales API - Image Support', () => {
 	})
 
 	it('should handle empty images array', async () => {
-		mockSingle.mockResolvedValue({
-			data: { id: 'sale-123' },
-			error: null
-		})
+	// No-op: shared mock returns inserted row id
 
 		const request = new NextRequest('http://localhost:3000/api/sales', {
 			method: 'POST',

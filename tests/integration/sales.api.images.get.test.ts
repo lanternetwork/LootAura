@@ -49,9 +49,19 @@ const mockSalesWithImages = [
 const mockSupabaseClient = {
   from: vi.fn(() => {
     const chain: any = {
-      select: vi.fn(() => chain),
+      select: vi.fn((columns: string, options?: any) => {
+        // Handle count query: select('*', { count: 'exact', head: true })
+        if (options?.count === 'exact' && options?.head === true) {
+          return Promise.resolve({ count: mockSalesWithImages.length, error: null })
+        }
+        // Regular select returns chain
+        return chain
+      }),
       gte: vi.fn(() => chain),
       lte: vi.fn(() => chain),
+      eq: vi.fn(() => chain),
+      in: vi.fn(() => chain),
+      or: vi.fn(() => chain),
       order: vi.fn(() => chain),
       range: vi.fn(() => Promise.resolve({ data: mockSalesWithImages, error: null }))
     }
@@ -84,6 +94,9 @@ describe('Sales API GET - Image Fields', () => {
     const response = await GET(request)
     const data = await response.json()
 
+    if (response.status !== 200) {
+      console.error('Response error:', data)
+    }
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
     expect(Array.isArray(data.data)).toBe(true)

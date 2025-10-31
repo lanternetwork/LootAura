@@ -24,6 +24,7 @@ interface SimpleMapProps {
   }) => void
   isTransitioning?: boolean
   transitionMessage?: string
+  interactive?: boolean // Disable all map interactions when false
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -37,7 +38,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   hybridPins,
   onViewportChange,
   isTransitioning = false,
-  transitionMessage = "Loading..."
+  transitionMessage = "Loading...",
+  interactive = true
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -279,6 +281,13 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
             })
           }
         }}
+        dragPan={interactive}
+        dragRotate={interactive}
+        scrollZoom={interactive}
+        doubleClickZoom={interactive}
+        touchZoom={interactive}
+        touchRotate={interactive}
+        keyboard={interactive}
       >
         {/* Custom pin rendering - no Mapbox Markers */}
         {hybridPins ? (

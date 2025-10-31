@@ -1,4 +1,5 @@
 import { HeroSearchBar } from './HeroSearchBar'
+import { WeekendStats } from './WeekendStats'
 
 export function Hero() {
   return (
@@ -21,11 +22,7 @@ export function Hero() {
 
           {/* Right column - desktop only */}
           <div className="hidden lg:block">
-            <div className="bg-white/70 backdrop-blur rounded-2xl border border-white/40 p-4">
-              <p className="text-sm text-[#3A2268]/70 mb-2">This weekend near</p>
-              <p className="text-lg font-semibold text-[#3A2268] mb-3">Louisville, KY</p>
-              <p className="text-base text-[#3A2268]">12 active sales</p>
-            </div>
+            <WeekendStats />
           </div>
         </div>
       </div>

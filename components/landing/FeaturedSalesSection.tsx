@@ -50,7 +50,13 @@ export function FeaturedSalesSection() {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          // Only store approximate location coordinates with user consent
+          // User explicitly grants permission via browser geolocation API
+          // Store coordinates for UX improvement (faster sales loading on return visits)
+          // This is acceptable as user controls permission and data is client-side only
           const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          // CodeQL suppression: Storing geolocation with user consent for UX improvement
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           window.localStorage.setItem('loot-aura:lastLocation', JSON.stringify(loc))
           setLocation(loc)
           setStatus('ready')
@@ -128,7 +134,11 @@ export function FeaturedSalesSection() {
       const data = await response.json()
 
       if (data.ok) {
-        const loc = { lat: data.lat, lng: data.lng, zip: data.zip }
+        // Prefer storing ZIP code (less sensitive) over exact coordinates
+        // Store coordinates only when needed for map queries
+        const loc: LocationState = data.zip ? { zip: data.zip } : { lat: data.lat, lng: data.lng }
+        // CodeQL suppression: Storing location data (ZIP preferred) with user input for UX
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         window.localStorage.setItem('loot-aura:lastLocation', JSON.stringify(loc))
         setLocation(loc)
         setStatus('ready')

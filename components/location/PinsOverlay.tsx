@@ -90,16 +90,18 @@ export default function PinsOverlay({
       debouncedViewport.bounds, 
       debouncedViewport.zoom
     )
+    // Only treat features with count > 1 as clusters
+    const clustersOnly = viewportClusters.filter(c => c.count > 1)
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[PINS] viewport clusters', { 
-        clusters: viewportClusters.length, 
+        clusters: clustersOnly.length, 
         singles: sales.length, 
         zoom: debouncedViewport.zoom 
       })
     }
     
-    return viewportClusters
+    return clustersOnly
   }, [clusterIndex, debouncedViewport, sales])
 
   // Early return if no sales to prevent unnecessary renders
@@ -116,41 +118,56 @@ export default function PinsOverlay({
     })
   }
 
-  // Check if clustering is enabled and we have a valid map ref
-  if (isClusteringEnabled) {
-    if (mapRef.current?.getMap) {
-      // Use clustering logic
-      if (_clusters.length > 0) {
-        return (
-          <>
-            {_clusters.map(cluster => (
-              <ClusterMarker
-                key={cluster.id}
-                cluster={cluster}
-                onClick={_onClusterClick}
-              />
-            ))}
-          </>
-        )
-      }
+  // Clustering path: render clusters when present; otherwise render individual pins
+  if (isClusteringEnabled && mapRef.current?.getMap) {
+    const clustersOnly = _clusters.filter(c => c.count > 1)
+    if (clustersOnly.length > 0) {
+      return (
+        <>
+          {clustersOnly.map(cluster => (
+            <ClusterMarker
+              key={cluster.id}
+              cluster={cluster}
+              onClick={_onClusterClick}
+            />
+          ))}
+        </>
+      )
     }
-    // If clustering is enabled but no valid map ref, don't render anything
-    return null
+    // No clusters at current zoom → fall back to individual pins
+    return (
+      <>
+        {sales.map(sale => (
+          <PinMarker
+            key={sale.id}
+            id={sale.id}
+            lat={sale.lat}
+            lng={sale.lng}
+            isSelected={selectedId === sale.id}
+            onClick={onPinClick}
+          />
+        ))}
+      </>
+    )
   }
-  
-  // Render individual pins when clustering is disabled
-  return (
-    <>
-      {sales.map(sale => (
-        <PinMarker
-          key={sale.id}
-          id={sale.id}
-          lat={sale.lat}
-          lng={sale.lng}
-          isSelected={selectedId === sale.id}
-          onClick={onPinClick}
-        />
-      ))}
-    </>
-  )
+
+  // Clustering disabled: render individual pins. If clustering is enabled but mapRef is invalid, render nothing.
+  if (!isClusteringEnabled) {
+    return (
+      <>
+        {sales.map(sale => (
+          <PinMarker
+            key={sale.id}
+            id={sale.id}
+            lat={sale.lat}
+            lng={sale.lng}
+            isSelected={selectedId === sale.id}
+            onClick={onPinClick}
+          />
+        ))}
+      </>
+    )
+  }
+
+  return null
 }

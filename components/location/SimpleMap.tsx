@@ -168,6 +168,22 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     pins?.onClusterClick?.(cluster)
   }, [pins])
 
+  // First-click-to-center, second-click-to-select for location pins
+  const centeredLocationRef = useRef<Record<string, boolean>>({})
+  const handleLocationClickWrapped = useCallback((locationId: string, lat?: number, lng?: number) => {
+    const alreadyCentered = centeredLocationRef.current[locationId]
+    if (!alreadyCentered && mapRef.current?.getMap) {
+      const map = mapRef.current.getMap()
+      if (map && typeof lat === 'number' && typeof lng === 'number') {
+        map.flyTo({ center: [lng, lat], duration: 400 })
+        centeredLocationRef.current[locationId] = true
+        return
+      }
+    }
+    // Second click (or if we couldn't center): bubble to parent to select location
+    hybridPins?.onLocationClick?.(locationId)
+  }, [hybridPins])
+
   // Handle fitBounds
   useEffect(() => {
     if (!loaded || !mapRef.current || !fitBounds) return
@@ -270,6 +286,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
             sales={hybridPins.sales}
             selectedId={hybridPins.selectedId}
             onLocationClick={hybridPins.onLocationClick}
+            onLocationClickWithCoords={(id, lat, lng) => handleLocationClickWrapped(id, lat, lng)}
             onClusterClick={handleClusterClick}
             mapRef={{ current: { getMap: () => mapRef.current?.getMap?.() } }}
             viewport={hybridPins.viewport}

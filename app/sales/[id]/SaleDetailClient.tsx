@@ -2,7 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Sale } from '@/lib/types'
+import Image from 'next/image'
+import { getSaleCoverUrl } from '@/lib/images/cover'
+import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
 
@@ -11,9 +15,21 @@ interface SaleDetailClientProps {
 }
 
 export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
+  const searchParams = useSearchParams()
+  
+  // Get viewport params from URL to preserve on back navigation
+  const lat = searchParams.get('lat')
+  const lng = searchParams.get('lng')
+  const zoom = searchParams.get('zoom')
+  
+  // Build back link with viewport params if they exist
+  const backUrl = lat && lng && zoom
+    ? `/sales?lat=${lat}&lng=${lng}&zoom=${zoom}`
+    : '/sales'
   const { location } = useLocationSearch()
   const [isFavorited, setIsFavorited] = useState(false)
   const [showFullDescription, setShowFullDescription] = useState(false)
+  const cover = getSaleCoverUrl(sale)
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -82,7 +98,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
           </li>
           <li>/</li>
           <li>
-            <Link href="/sales" className="hover:text-gray-700">
+            <Link href={backUrl} className="hover:text-gray-700">
               Sales
             </Link>
           </li>
@@ -95,7 +111,17 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
           {/* Sale Header */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white rounded-lg shadow-sm">
+            <div className="relative w-full overflow-hidden rounded-t-lg bg-gray-100 aspect-[16/9] md:aspect-[4/3]">
+              {cover ? (
+                <Image src={cover.url} alt={cover.alt} fill className="object-cover" sizes="(min-width:1024px) 66vw, 100vw" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8 md:p-10">
+                  <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
+                </div>
+              )}
+            </div>
+            <div className="p-6">
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1">
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">{sale.title}</h1>
@@ -133,6 +159,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                   Share
                 </button>
               </div>
+            </div>
             </div>
 
             {/* Sale Details */}

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="450" viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Yard sale placeholder">
+  <defs>
+    <style>
+      .stroke{stroke:#9ca3af;stroke-width:12;stroke-linecap:round;stroke-linejoin:round;fill:none}
+    </style>
+  </defs>
+
+  <!-- Background left intentionally transparent; UI provides bg -->
+
+  <!-- Clothes rack -->
+  <rect x="80" y="80" width="260" height="220" rx="24" class="stroke"/>
+  <path d="M140 110 l40 0 m40 0 l40 0" class="stroke"/>
+  <!-- Shirt 1 -->
+  <path d="M150 160 l30 -30 l30 30 v70 h-90 v-70 z" class="stroke"/>
+  <!-- Shirt 2 (behind) -->
+  <path d="M230 150 l26 -26 l26 26 v70 h-80 v-60" class="stroke"/>
+  <!-- Rack feet -->
+  <path d="M80 300 v30 m260 -30 v30" class="stroke"/>
+
+  <!-- Table -->
+  <rect x="420" y="210" width="260" height="26" rx="6" class="stroke"/>
+  <path d="M450 236 l-24 74 m226 -74 l24 74" class="stroke"/>
+  <!-- Lamp + vase on table -->
+  <path d="M480 210 c0-24 34-24 34 0 v0" class="stroke"/>
+  <path d="M620 168 c-18 0-24 38 0 56 c24 -18 18 -56 0 -56 z" class="stroke"/>
+
+  <!-- Boxes -->
+  <rect x="360" y="280" width="150" height="100" rx="8" class="stroke"/>
+  <rect x="520" y="280" width="170" height="110" rx="8" class="stroke"/>
+  <rect x="410" y="315" width="60" height="22" rx="4" class="stroke"/>
+  <rect x="575" y="315" width="60" height="22" rx="4" class="stroke"/>
+
+  <!-- Price tag -->
+  <path d="M690 330 l60 60 l-35 35 l-60 -60 z" class="stroke"/>
+  <path d="M705 350 c8 0 8 -12 0 -12 c-8 0 -8 12 0 12 z" class="stroke"/>
+  <path d="M720 375 c10 10 18 0 22 -5" class="stroke"/>
+</svg>
+

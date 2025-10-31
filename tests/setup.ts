@@ -1,9 +1,24 @@
 import '@testing-library/jest-dom/vitest'
+import React from 'react'
 
 import { vi } from 'vitest'
 
 // Ensure rate limiting is bypassed in tests
 ;(process.env as any).RATE_LIMITING_ENABLED = 'false'
+
+// Mock next/image to avoid optimization/config errors in JSDOM
+// @ts-ignore vitest mock hoisting in test env
+vi.mock('next/image', () => {
+  return {
+    __esModule: true,
+    default: (props: any) => {
+      const { src, alt = '', fill: _fill, loader: _loader, placeholder: _ph, blurDataURL: _blur, unoptimized: _u, priority: _priority, quality: _q, ...rest } = props || {}
+      const resolved = typeof src === 'string' ? src : (src?.src || '')
+      // Drop Next.js-specific boolean/unsupported attributes (e.g., fill) to avoid DOM warnings
+      return React.createElement('img', { src: resolved, alt, ...rest })
+    },
+  }
+})
 
 // Minimal globals to satisfy failing tests
 // Functional ResizeObserver mock with simulation hook used by tests
@@ -77,6 +92,10 @@ vi.mock('next/src/client/components/navigation', () => ({
 }))
 
 // Env for tests that expect defaults
+// Ensure required env vars are set before any modules import ENV_PUBLIC or ENV_SERVER
+process.env.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://test.supabase.co'
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'test-anon-key-min-10-chars'
+process.env.SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || 'test-service-role-min-10-chars'
 process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app'
 
 // Supabase client mock used by tests

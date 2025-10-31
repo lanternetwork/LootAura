@@ -35,6 +35,16 @@ describe('Clustering Index', () => {
       expect(index).toBeDefined()
     })
 
+    it('should build cluster index with production touch-only radius (6.5px)', () => {
+      const index = buildClusterIndex(testPoints, {
+        radius: 6.5, // Production touch-only clustering radius
+        maxZoom: 16,
+        minPoints: 2
+      })
+      expect(index).toBeDefined()
+      expect(typeof index.getClusters).toBe('function')
+    })
+
     it('should handle empty points array', () => {
       const index = buildClusterIndex([])
       expect(index).toBeDefined()

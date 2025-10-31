@@ -10,7 +10,7 @@ export type { PinPoint, ClusterFeature }
 export type ClusterPoint = PinPoint
 
 const DEFAULT_OPTIONS: ClusterOptions = {
-  radius: 0.5, // Only cluster when pins are indistinguishable (0.5px)
+  radius: 0.3, // Ultra-conservative clustering radius (0.3px)
   maxZoom: 20,
   minPoints: 2
 }
@@ -63,15 +63,50 @@ export function getClustersForViewport(
   bounds: [number, number, number, number], // [west, south, east, north]
   zoom: number
 ): ClusterFeature[] {
-  const clusters = index.getClusters(bounds, Math.floor(zoom))
-  
-  return clusters.map(cluster => ({
-    id: cluster.id as number,
-    count: (cluster.properties as any)?.point_count || 1,
-    lat: cluster.geometry.coordinates[1],
-    lng: cluster.geometry.coordinates[0],
-    expandToZoom: expandZoomForCluster(index, cluster.id as number, zoom)
+  const features = index.getClusters(bounds, Math.floor(zoom))
+  return features.map(feature => ({
+    id: (feature.id as number) ?? -1,
+    count: (feature.properties as any)?.point_count || 1,
+    lat: feature.geometry.coordinates[1],
+    lng: feature.geometry.coordinates[0],
+    expandToZoom: expandZoomForCluster(index, feature.id as number, zoom)
   }))
+}
+
+/**
+ * Get the set of leaf point ids that belong to the provided clusters
+ */
+export function getClusterMemberIds(
+  index: SuperclusterIndex,
+  clusterIds: number[]
+): Set<string> {
+  const memberIds = new Set<string>()
+  clusterIds.forEach((clusterId) => {
+    try {
+      const leaves = (index as any).getLeaves?.(clusterId, Infinity) || []
+      leaves.forEach((leaf: any) => {
+        const id = leaf?.properties?.id
+        if (id) memberIds.add(String(id))
+      })
+    } catch {
+      // Fallback: traverse children when getLeaves is not available
+      const stack = [(clusterId as unknown) as number]
+      while (stack.length) {
+        const cid = stack.pop()!
+        const children = (index as any).getChildren?.(cid) || []
+        children.forEach((child: any) => {
+          const pc = child?.properties?.point_count
+          if (pc && pc > 0) {
+            if (typeof child.id === 'number') stack.push(child.id)
+          } else {
+            const id = child?.properties?.id
+            if (id) memberIds.add(String(id))
+          }
+        })
+      }
+    }
+  })
+  return memberIds
 }
 
 /**

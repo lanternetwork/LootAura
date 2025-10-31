@@ -6,6 +6,7 @@ import { SaleInput } from '@/lib/data'
 import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
 import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { containsUnsavory } from '@/lib/filters/profanity'
 
 interface WizardStep {
   id: string
@@ -59,6 +60,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const [photos, setPhotos] = useState<string[]>([])
   const [items, setItems] = useState<Array<{ name: string; price?: number; description?: string; image_url?: string }>>([])
   const [loading, setLoading] = useState(false)
+  const [_errors, setErrors] = useState<Record<string, string>>({})
 
   // Check authentication status
   useEffect(() => {
@@ -68,6 +70,19 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
     checkUser()
   }, [supabase.auth])
+
+  // Save draft to localStorage whenever form data changes
+  useEffect(() => {
+    // Ensure body scroll is unlocked on mount (in case a previous modal left it locked)
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.style.overflow = ''
+      }
+    }
+  }, [])
 
   // Save draft to localStorage whenever form data changes
   useEffect(() => {
@@ -102,7 +117,38 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  const validateDetails = (): Record<string, string> => {
+    const nextErrors: Record<string, string> = {}
+    if (!formData.title) nextErrors.title = 'Title is required'
+    if (!formData.address) nextErrors.address = 'Address is required'
+    if (!formData.city) nextErrors.city = 'City is required'
+    if (!formData.state) nextErrors.state = 'State is required'
+    if (!formData.date_start) nextErrors.date_start = 'Start date is required'
+    if (!formData.time_start) nextErrors.time_start = 'Start time is required'
+    // Unsavory language checks (client-side guard; server also validates)
+    const unsavoryFields: Array<[keyof SaleInput, string | undefined]> = [
+      ['title', formData.title],
+      ['description', formData.description],
+      ['address', formData.address],
+      ['city', formData.city],
+      ['state', formData.state],
+    ]
+    for (const [key, value] of unsavoryFields) {
+      const res = containsUnsavory(value || '')
+      if (!res.ok) nextErrors[key as string] = 'Please remove inappropriate language'
+    }
+    return nextErrors
+  }
+
   const handleNext = () => {
+    // Require core fields on the Details step before advancing
+    if (currentStep === 0) {
+      const nextErrors = validateDetails()
+      setErrors(nextErrors)
+      if (Object.keys(nextErrors).length > 0) {
+        return
+      }
+    }
     if (currentStep < WIZARD_STEPS.length - 1) {
       setCurrentStep(currentStep + 1)
     }
@@ -115,6 +161,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }
 
   const handleSubmit = async () => {
+    // Client-side required validation
+    const nextErrors = validateDetails()
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) {
+      return
+    }
     // Check if user is authenticated
     if (!user) {
       // Save current draft and redirect to auth
@@ -167,6 +219,25 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setPhotos(prev => [...prev, ...urls])
   }
 
+  const handleReorderPhotos = (fromIndex: number, toIndex: number) => {
+    setPhotos(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+  }
+
+  const handleSetCover = (index: number) => {
+    setPhotos(prev => {
+      if (index <= 0 || index >= prev.length) return prev
+      const next = [...prev]
+      const [moved] = next.splice(index, 1)
+      next.unshift(moved)
+      return next
+    })
+  }
+
   const handleRemovePhoto = (index: number) => {
     setPhotos(prev => prev.filter((_, i) => i !== index))
   }
@@ -188,9 +259,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const renderStep = () => {
     switch (currentStep) {
       case 0:
-        return <DetailsStep formData={formData} onChange={handleInputChange} />
+        return <DetailsStep formData={formData} onChange={handleInputChange} errors={_errors} />
       case 1:
-        return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} />
+        return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
       case 2:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
       case 3:
@@ -297,7 +368,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 }
 
 // Step Components
-function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void }) {
+function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void, errors?: Record<string, string> }) {
   return (
     <div className="space-y-6">
       <div>
@@ -312,6 +383,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           required
         />
+        {errors?.title && (
+          <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+        )}
       </div>
 
       <div>
@@ -339,6 +413,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
+        {errors?.date_start && (
+          <p className="mt-1 text-sm text-red-600">{errors.date_start}</p>
+        )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -351,6 +428,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
+        {errors?.time_start && (
+          <p className="mt-1 text-sm text-red-600">{errors.time_start}</p>
+        )}
         </div>
       </div>
 
@@ -391,6 +471,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           required
         />
+        {errors?.address && (
+          <p className="mt-1 text-sm text-red-600">{errors.address}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -406,6 +489,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
+        {errors?.city && (
+          <p className="mt-1 text-sm text-red-600">{errors.city}</p>
+        )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -419,6 +505,9 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
           />
+        {errors?.state && (
+          <p className="mt-1 text-sm text-red-600">{errors.state}</p>
+        )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -483,10 +572,12 @@ function DetailsStep({ formData, onChange }: { formData: Partial<SaleInput>, onC
   )
 }
 
-function PhotosStep({ photos, onUpload, onRemove }: { 
+function PhotosStep({ photos, onUpload, onRemove, onReorder, onSetCover }: { 
   photos: string[], 
   onUpload: (urls: string[]) => void,
-  onRemove: (index: number) => void 
+  onRemove: (index: number) => void,
+  onReorder?: (fromIndex: number, toIndex: number) => void,
+  onSetCover?: (index: number) => void,
 }) {
   return (
     <div className="space-y-6">
@@ -513,6 +604,8 @@ function PhotosStep({ photos, onUpload, onRemove }: {
           <ImageThumbnailGrid 
             images={photos}
             onRemove={onRemove}
+            onReorder={onReorder}
+            onSetCover={onSetCover}
             maxImages={10}
           />
         </div>

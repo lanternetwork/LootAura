@@ -4,7 +4,7 @@
 
 import { Sale } from '@/lib/types'
 import { LocationGroup, HybridPinsResult, HybridPin } from './types'
-import { buildClusterIndex, getClustersForViewport, isClusteringEnabled } from './clustering'
+import { buildClusterIndex, getClustersForViewport, getClusterMemberIds, isClusteringEnabled } from './clustering'
 
 export interface HybridClusteringOptions {
   coordinatePrecision: number
@@ -17,7 +17,7 @@ export interface HybridClusteringOptions {
 
 const DEFAULT_OPTIONS: HybridClusteringOptions = {
   coordinatePrecision: 6,
-  clusterRadius: 0.5,
+  clusterRadius: 6.5, // px: touch-only default - cluster only when pins actually touch (pins are 12px diameter, 12px apart = edge-to-edge)
   minClusterSize: 2,
   maxZoom: 16,
   enableLocationGrouping: true,
@@ -125,9 +125,10 @@ export function applyVisualClustering(
   
   // Create hybrid pins
   const pins: HybridPin[] = []
-  
-  // Add clusters
-  clusters.forEach(cluster => {
+
+  // Add clusters (defensive: only real clusters with count > 1)
+  const realClusters = clusters.filter(c => (c.count || 0) > 1)
+  realClusters.forEach(cluster => {
     pins.push({
       type: 'cluster',
       id: `cluster-${cluster.id}`,
@@ -138,32 +139,44 @@ export function applyVisualClustering(
     })
   })
   
-  // Add individual locations that aren't clustered
-  const _clusteredLocationIds = new Set<string>()
-  
-  // For each cluster, we need to determine which locations are included
-  // Since we don't have direct access to the cluster's children, we'll use a different approach:
-  // Only show individual pins if there are no clusters, or if the zoom level is high enough
-  const shouldShowIndividualPins = clusters.length === 0 || viewport.zoom >= opts.maxZoom
-  
-  // Only add individual locations if we should show them
-  if (shouldShowIndividualPins) {
-    locations.forEach(location => {
+  // Add individual locations that aren't clustered at current zoom
+  const indexForMembership = buildClusterIndex(
+    locations.map(l => ({ id: l.id, lat: l.lat, lng: l.lng })),
+    { radius: opts.clusterRadius, maxZoom: opts.maxZoom, minPoints: opts.minClusterSize }
+  )
+  const clusteredIds = getClusterMemberIds(indexForMembership, realClusters.map(c => c.id))
+  let colocatedClusterCount = 0
+  locations.forEach(location => {
+    if (clusteredIds.has(location.id)) {
+      return
+    }
+    if (location.totalSales >= 2) {
+      // Treat multiple sales at the exact same location as a cluster badge
       pins.push({
-        type: 'location' as const,
-        id: location.id,
+        type: 'cluster' as const,
+        id: `cluster-coloc-${location.id}`,
         lat: location.lat,
         lng: location.lng,
-        sales: location.sales
+        count: location.totalSales,
+        expandToZoom: opts.maxZoom
       })
+      colocatedClusterCount += 1
+      return
+    }
+    pins.push({
+      type: 'location' as const,
+      id: location.id,
+      lat: location.lat,
+      lng: location.lng,
+      sales: location.sales
     })
-  }
+  })
   
   return {
-    type: 'clustered',
+    type: (realClusters.length + colocatedClusterCount) > 0 ? 'clustered' : 'individual',
     pins,
     locations,
-    clusters
+    clusters: realClusters
   }
 }
 

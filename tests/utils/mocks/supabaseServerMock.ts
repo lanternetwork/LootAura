@@ -1,65 +1,103 @@
 import { vi } from 'vitest'
 
-type Result<T = any> = { data: T; error: null } | { data: null; error: { message: string } }
+export function makeSupabaseFromMock(map: Record<string, any[]>) {
+	// Maintain per-table queues so multiple calls consume sequentially
+	const tableToQueue = new Map<string, Array<any>>()
+	const tableToDefault = new Map<string, any>()
 
-export function makeSupabaseFromMock(map: Record<string, Array<{ data: any; error: any }>>) {
-  return vi.fn((table: string) => {
-    const results = map[table] ?? [{ data: [], error: null }]
-    const queue = [...results]
+	// Prime queues
+	for (const [table, results] of Object.entries(map)) {
+		tableToQueue.set(table, [...results])
+		tableToDefault.set(table, results.length > 0 ? results[results.length - 1] : { data: [], error: null })
+	}
 
-    const next = () => (queue.length ? queue.shift()! : { data: [], error: null })
+	const getNextForTable = (table: string): any => {
+		const q = tableToQueue.get(table) || []
+		if (q.length === 0) return tableToDefault.get(table) ?? { data: [], error: null }
+		return q.shift()
+	}
 
-    // Builder chain object (will be returned by every method)
-    const chain: any = {
-      select: vi.fn((columns?: string | string[], options?: any) => {
-        // Handle count queries with head: true
-        if (options?.count === 'exact' && options?.head === true) {
-          return {
-            eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            gte: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            lte: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            in: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            or: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            order: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            range: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            limit: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            single: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            maybeSingle: vi.fn(() => Promise.resolve({ count: 0, error: null })),
-            then: (onFulfilled: any, onRejected: any) => Promise.resolve({ count: 0, error: null }).then(onFulfilled, onRejected),
-          }
-        }
-        // Regular select query - return the chain
-        return chain
-      }),
-      eq: vi.fn(() => chain),
-      gte: vi.fn(() => chain),
-      lte: vi.fn(() => chain),
-      in: vi.fn(() => chain),
-      or: vi.fn(() => chain),
-      order: vi.fn(() => chain),
-      limit: vi.fn(() => Promise.resolve(next())),
-      range: vi.fn(() => Promise.resolve(next())),
-      single: vi.fn(() => Promise.resolve(next())),
-      maybeSingle: vi.fn(() => Promise.resolve(next())),
-      // If the code sometimes directly awaits after .order or other methods with no terminal,
-      // make the chain thenable as a fallback:
-      then: (onFulfilled: any, onRejected: any) => Promise.resolve(next()).then(onFulfilled, onRejected),
-    }
+	const fromFn = vi.fn((table: string) => {
+		// Use shared per-table queue so multiple calls to from(table)
+		// consume results sequentially across the entire test
+		if (!tableToQueue.has(table)) {
+			const initial = [...(map[table] ?? [{ data: [], error: null }])]
+			tableToQueue.set(table, initial)
+			tableToDefault.set(table, initial.length > 0 ? initial[initial.length - 1] : { data: [], error: null })
+		}
+		const next = () => getNextForTable(table)
 
-    return chain
-  })
+		// Builder chain object (will be returned by every method)
+		const chain: any = {
+			select: vi.fn((columns?: string | string[], options?: any) => {
+				// Handle count queries with head: true
+				if (options?.count === 'exact' && options?.head === true) {
+					const countResult = { count: 0, error: null }
+					return {
+						eq: vi.fn(() => Promise.resolve(countResult)),
+						gte: vi.fn(() => Promise.resolve(countResult)),
+						lte: vi.fn(() => Promise.resolve(countResult)),
+						in: vi.fn(() => Promise.resolve(countResult)),
+						or: vi.fn(() => Promise.resolve(countResult)),
+						order: vi.fn(() => Promise.resolve(countResult)),
+						range: vi.fn(() => Promise.resolve(countResult)),
+						limit: vi.fn(() => Promise.resolve(countResult)),
+						single: vi.fn(() => Promise.resolve(countResult)),
+						maybeSingle: vi.fn(() => Promise.resolve(countResult)),
+						// no thenable to avoid accidental awaiting of chains
+					}
+				}
+				// Regular select query - return the chain
+				return chain
+			}),
+			eq: vi.fn(() => chain),
+			gte: vi.fn(() => chain),
+			lte: vi.fn(() => chain),
+			in: vi.fn(() => chain),
+			or: vi.fn(() => chain),
+			order: vi.fn(() => chain),
+			limit: vi.fn(() => Promise.resolve(next())),
+			range: vi.fn(() => Promise.resolve(next())),
+			single: vi.fn(() => Promise.resolve(next())),
+			maybeSingle: vi.fn(() => Promise.resolve(next())),
+				// no thenable to avoid accidental awaiting of chains
+		}
+
+		return chain
+	})
+	
+	return fromFn
 }
 
 export function mockCreateSupabaseServerClient(from: ReturnType<typeof makeSupabaseFromMock>) {
-  return {
-    createSupabaseServerClient: vi.fn(() => ({
-      from,
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-        signInWithPassword: vi.fn(),
-        signUp: vi.fn(),
-        signOut: vi.fn(),
-      },
-    })),
-  }
+	return {
+		createSupabaseServerClient: vi.fn(() => ({
+			from,
+			auth: {
+				getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+				signInWithPassword: vi.fn(),
+				signUp: vi.fn(),
+				signOut: vi.fn(),
+			},
+		})),
+	}
+}
+
+// Convenience helper expected by tests: installs a Supabase server mock with table data
+// Accepts either row arrays (converted to { data: rows, error: null }) or Result arrays directly
+export function mockSupabaseServer(tables: Record<string, any[]>) {
+	const from = makeSupabaseFromMock(
+		Object.fromEntries(
+			Object.entries(tables).map(([table, value]) => {
+				// If first element is a Result (has 'data' or 'count' property and 'error'), treat as Result[]
+				if (Array.isArray(value) && value.length > 0 && (typeof value[0] === 'object' && ('data' in value[0] || 'count' in value[0]))) {
+					return [table, value as any[]]
+				}
+				// Otherwise treat as row array and wrap in { data: rows, error: null }
+				return [table, [{ data: value, error: null } as any]]
+			})
+		)
+	) as any
+
+	vi.mock('@/lib/supabase/server', () => mockCreateSupabaseServerClient(from))
 }

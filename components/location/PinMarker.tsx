@@ -32,9 +32,9 @@ export default function PinMarker({
       data-testid="marker"
     >
       <svg
-        width="8"
-        height="8"
-        viewBox="0 0 8 8"
+        width="12"
+        height="12"
+        viewBox="0 0 16 16"
         style={{
           cursor: 'pointer',
           outline: 'none',
@@ -49,12 +49,10 @@ export default function PinMarker({
         aria-label={`Sale pin ${id}`}
       >
         <circle
-          cx="4"
-          cy="4"
-          r="3"
+          cx="8"
+          cy="8"
+          r="6"
           fill={isSelected ? '#dc2626' : '#ef4444'}
-          stroke="white"
-          strokeWidth={isSelected ? '2' : '1'}
         />
       </svg>
     </Marker>

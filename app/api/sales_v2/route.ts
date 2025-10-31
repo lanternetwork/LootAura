@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { assertNoUnsavory } from '@/lib/filters/profanity'
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,6 +67,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
     
+    // Reject unsavory words in free-text fields
+    const cleanCheck = assertNoUnsavory([
+      ['title', body.title],
+      ['description', body.description],
+      ['address', body.address],
+      ['city', body.city],
+      ['state', body.state],
+    ])
+    if (!cleanCheck.ok) {
+      return NextResponse.json({ error: `Inappropriate language in ${cleanCheck.field}` }, { status: 400 })
+    }
+
     const { data: sale, error } = await supabase
       .from('sales_v2')
       .insert({

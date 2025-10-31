@@ -657,7 +657,7 @@ async function postHandler(request: NextRequest) {
     
     const body = await request.json()
     
-    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url } = body
+    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images } = body
 
     // Validate optional cover image URL
     if (cover_image_url && !isAllowedImageUrl(cover_image_url)) {
@@ -665,6 +665,18 @@ async function postHandler(request: NextRequest) {
         console.log('[SALES] Rejected cover_image_url', cover_image_url)
       }
       return NextResponse.json({ error: 'Invalid cover_image_url' }, { status: 400 })
+    }
+
+    // Validate images array if provided
+    if (images && Array.isArray(images)) {
+      for (const imageUrl of images) {
+        if (!isAllowedImageUrl(imageUrl)) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SALES] Rejected image URL in images array', imageUrl)
+          }
+          return NextResponse.json({ error: 'Invalid image URL in images array' }, { status: 400 })
+        }
+      }
     }
     
     // Ensure owner_id is set server-side from authenticated user
@@ -685,6 +697,7 @@ async function postHandler(request: NextRequest) {
         date_end,
         time_end,
         cover_image_url: cover_image_url || null,
+        images: images || [],
         status: 'published',
         owner_id: user.id // Server-side binding - never trust client
       })

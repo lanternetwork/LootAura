@@ -169,11 +169,12 @@ export default function SalesClient({
       console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', mapSales.length, 'total')
     }
     
-    // Only run clustering on visible sales
+    // Only run clustering on visible sales - touch-only clustering
+    // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
     const result = createHybridPins(visibleSales, currentViewport, {
-      coordinatePrecision: 5, // Increased to group sales within ~1m radius (more precise)
-      clusterRadius: 0.3, // Reduced cluster radius for less aggressive clustering
-      minClusterSize: 3, // Increased minimum cluster size
+      coordinatePrecision: 6, // high precision to avoid accidental grouping
+      clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
+      minClusterSize: 2, // allow clustering for 2+ points
       maxZoom: 16,
       enableLocationGrouping: true,
       enableVisualClustering: true
@@ -330,6 +331,11 @@ export default function SalesClient({
       }
     })
     
+    // If a single location is selected and the user moves the map, exit location view
+    if (selectedPinId) {
+      setSelectedPinId(null)
+    }
+
     // Update map view state
     setMapView(prev => ({
       ...prev,
@@ -370,7 +376,7 @@ export default function SalesClient({
       initialLoadRef.current = false // Mark initial load as complete
       fetchMapSales(bounds)
     }, 300)
-  }, [fetchMapSales])
+  }, [fetchMapSales, selectedPinId])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => {
@@ -662,7 +668,7 @@ export default function SalesClient({
             )}
 
             {!loading && visibleSales.length > 0 && (
-              <SalesList sales={visibleSales} mode="grid" />
+              <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView.center, zoom: mapView.zoom }} />
             )}
           </div>
           </div>
@@ -719,7 +725,7 @@ export default function SalesClient({
           )}
 
           {!loading && visibleSales.length > 0 && (
-            <SalesList sales={visibleSales} mode="grid" />
+            <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView.center, zoom: mapView.zoom }} />
           )}
         </div>
       </div>

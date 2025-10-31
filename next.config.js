@@ -87,8 +87,8 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
         value: "default-src 'self'; " +
-                   // Allow runtime scripts from self; keep eval for Next dev/runtime
-                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com; " +
+                   // Allow runtime scripts from self; keep eval for Next dev/runtime; allow Vercel Live script in previews
+                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live; " +
                    // Allow Mapbox CSS
                    "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Some browsers use style-src-elem separately
@@ -98,7 +98,7 @@ const nextConfig = {
                    // Images and fonts
                    "img-src 'self' data: https: https://res.cloudinary.com; font-src 'self' data:; " +
                    // Network connections
-                   "connect-src 'self' https: https://api.cloudinary.com; " +
+                   "connect-src 'self' https: https://api.cloudinary.com https://vercel.live; " +
                    // Misc
                    "frame-src https://widget.cloudinary.com https://upload-widget.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self';",
           },

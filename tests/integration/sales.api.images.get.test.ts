@@ -14,7 +14,13 @@ import { NextRequest } from 'next/server'
 const mockSalesWithImages = [
   {
     id: 'sale-1',
+    owner_id: 'user-1',
     title: 'Sale with Cover Image',
+    description: 'Test description',
+    address: '123 Main St',
+    city: 'Louisville',
+    state: 'KY',
+    zip_code: '40204',
     cover_image_url: 'https://res.cloudinary.com/test/image/upload/v123/cover1.jpg',
     images: [
       'https://res.cloudinary.com/test/image/upload/v123/cover1.jpg',
@@ -22,50 +28,110 @@ const mockSalesWithImages = [
     ],
     lat: 38.2527,
     lng: -85.7585,
-    status: 'published'
+    date_start: '2025-01-15',
+    time_start: '10:00',
+    date_end: null,
+    time_end: null,
+    price: 100,
+    tags: [],
+    status: 'published',
+    privacy_mode: 'exact',
+    is_featured: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     id: 'sale-2',
+    owner_id: 'user-2',
     title: 'Sale without Images',
+    description: 'Test description',
+    address: '456 Oak Ave',
+    city: 'Louisville',
+    state: 'KY',
+    zip_code: '40205',
     cover_image_url: null,
     images: [],
     lat: 38.2530,
     lng: -85.7590,
-    status: 'published'
+    date_start: '2025-01-16',
+    time_start: '11:00',
+    date_end: null,
+    time_end: null,
+    price: 50,
+    tags: [],
+    status: 'published',
+    privacy_mode: 'exact',
+    is_featured: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     id: 'sale-3',
+    owner_id: 'user-3',
     title: 'Sale with Images Array Only',
+    description: 'Test description',
+    address: '789 Elm St',
+    city: 'Louisville',
+    state: 'KY',
+    zip_code: '40206',
     cover_image_url: null,
     images: [
       'https://res.cloudinary.com/test/image/upload/v123/img3.jpg'
     ],
     lat: 38.2540,
     lng: -85.7600,
-    status: 'published'
+    date_start: '2025-01-17',
+    time_start: '12:00',
+    date_end: null,
+    time_end: null,
+    price: 75,
+    tags: [],
+    status: 'published',
+    privacy_mode: 'exact',
+    is_featured: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ]
 
+const createQueryChain = (shouldReturnData: boolean = true) => {
+  const chain: any = {
+    select: vi.fn((columns: string, options?: any) => {
+      // Handle count query: select('*', { count: 'exact', head: true })
+      if (options?.count === 'exact' && options?.head === true) {
+        return Promise.resolve({ count: mockSalesWithImages.length, error: null })
+      }
+      // Regular select returns chain
+      return chain
+    }),
+    gte: vi.fn(() => chain),
+    lte: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    in: vi.fn(() => chain),
+    or: vi.fn(() => chain),
+    order: vi.fn(() => chain),
+    range: vi.fn(() => {
+      if (shouldReturnData) {
+        return Promise.resolve({ data: mockSalesWithImages, error: null })
+      }
+      return Promise.resolve({ data: [], error: null })
+    })
+  }
+  return chain
+}
+
 const mockSupabaseClient = {
-  from: vi.fn(() => {
-    const chain: any = {
-      select: vi.fn((columns: string, options?: any) => {
-        // Handle count query: select('*', { count: 'exact', head: true })
-        if (options?.count === 'exact' && options?.head === true) {
-          return Promise.resolve({ count: mockSalesWithImages.length, error: null })
-        }
-        // Regular select returns chain
-        return chain
-      }),
-      gte: vi.fn(() => chain),
-      lte: vi.fn(() => chain),
-      eq: vi.fn(() => chain),
-      in: vi.fn(() => chain),
-      or: vi.fn(() => chain),
-      order: vi.fn(() => chain),
-      range: vi.fn(() => Promise.resolve({ data: mockSalesWithImages, error: null }))
+  from: vi.fn((table: string) => {
+    if (table === 'items_v2') {
+      // Return empty array for items_v2 queries (no category filtering in tests)
+      return {
+        select: vi.fn(() => ({
+          in: vi.fn(() => Promise.resolve({ data: [], error: null }))
+        }))
+      }
     }
-    return chain
+    // For sales_v2 table
+    return createQueryChain(true)
   })
 }
 
@@ -95,15 +161,17 @@ describe('Sales API GET - Image Fields', () => {
     const data = await response.json()
 
     if (response.status !== 200) {
-      console.error('Response error:', data)
+      console.error('Response error:', JSON.stringify(data, null, 2))
     }
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
     expect(Array.isArray(data.data)).toBe(true)
+    expect(data.data.length).toBeGreaterThan(0)
     
     // Find sale with cover image
     const saleWithCover = data.data.find((s: any) => s.id === 'sale-1')
     expect(saleWithCover).toBeDefined()
+    expect(saleWithCover).toHaveProperty('cover_image_url')
     expect(saleWithCover.cover_image_url).toBe('https://res.cloudinary.com/test/image/upload/v123/cover1.jpg')
   })
 

@@ -430,8 +430,8 @@ async function salesHandler(request: NextRequest) {
                 .sort((a, b) => {
                   if (!a || !b) return 0
                   const now = new Date()
-                  const aPromo = a.is_promoted === true && (!a.promoted_until || new Date(a.promoted_until) > now)
-                  const bPromo = b.is_promoted === true && (!b.promoted_until || new Date(b.promoted_until) > now)
+                  const aPromo = (a as any).is_promoted === true && (!(a as any).promoted_until || new Date((a as any).promoted_until) > now)
+                  const bPromo = (b as any).is_promoted === true && (!(b as any).promoted_until || new Date((b as any).promoted_until) > now)
                   if (aPromo !== bPromo) {
                     return aPromo ? -1 : 1
                   }

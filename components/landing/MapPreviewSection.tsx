@@ -79,6 +79,16 @@ export function MapPreviewSection() {
     const fetchData = async () => {
       setLoading(true)
       try {
+        // Calculate this weekend's date range (matching WeekendStats)
+        const now = new Date()
+        const saturday = new Date(now)
+        saturday.setDate(now.getDate() + (6 - now.getDay()))
+        const sunday = new Date(saturday)
+        sunday.setDate(saturday.getDate() + 1)
+        
+        const startDate = saturday.toISOString().split('T')[0]
+        const endDate = sunday.toISOString().split('T')[0]
+
         // First, resolve ZIP to lat/lng if needed
         let finalLat = location.lat
         let finalLng = location.lng
@@ -122,8 +132,8 @@ export function MapPreviewSection() {
           bounds
         })
 
-        // Fetch sales for this location
-        const url = `/api/sales?near=1&lat=${finalLat}&lng=${finalLng}&radiusKm=${radiusKm}&limit=50`
+        // Fetch sales for this weekend only (matching WeekendStats)
+        const url = `/api/sales?near=1&lat=${finalLat}&lng=${finalLng}&radiusKm=${radiusKm}&from=${startDate}&to=${endDate}&limit=50`
         const res = await fetch(url)
         
         if (res.ok) {

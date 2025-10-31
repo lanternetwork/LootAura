@@ -32,8 +32,19 @@ export default {
   ],
   theme: { 
     extend: {
+      colors: {
+        aura: {
+          gold: '#F4B63A',
+          navy: '#3A2268',
+          cream: '#F9FFF2',
+        },
+      },
       fontFamily: {
+        // Keep existing default sans mapping
         sans: ['Poppins', 'sans-serif'],
+        // Brand font families
+        heading: ['var(--font-heading)', 'Poppins', 'ui-sans-serif', 'system-ui'],
+        body: ['var(--font-body)', 'Inter', 'ui-sans-serif', 'system-ui'],
       },
       gridTemplateColumns: {
         '70/30': '70% 28%',

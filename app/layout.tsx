@@ -8,6 +8,10 @@ import DebugToggle from '@/components/debug/DebugToggle'
 import { createHomepageStructuredData, createOrganizationStructuredData } from '@/lib/metadata'
 // Disable Mapbox telemetry at app startup
 import '@/lib/maps/telemetry'
+import { Inter, Poppins } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-body' })
+const poppins = Poppins({ subsets: ['latin'], weight: ['400','500','600','700'], display: 'swap', variable: '--font-heading' })
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -32,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#0b3d2e" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body className="min-h-screen bg-neutral-50 text-neutral-900">
+      <body className={`${inter.variable} ${poppins.variable} min-h-screen bg-aura-cream text-aura-navy`}>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(createHomepageStructuredData()) }}

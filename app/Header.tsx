@@ -7,9 +7,8 @@ export function Header() {
     <nav className="bg-white border-b">
       <div className="w-full px-4 py-3">
         <div className="flex justify-between items-center">
-          <Link href="/" className="flex items-center" aria-label="LootAura Home">
-            <img src="/sitelogo.svg" alt="LootAura" className="h-7 w-auto" />
-            <span className="sr-only">LootAura</span>
+          <Link href="/" className="text-2xl font-bold text-amber-600" aria-label="LootAura Home">
+            LootAura
           </Link>
           
           <div className="flex gap-6 items-center">

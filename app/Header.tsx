@@ -9,7 +9,7 @@ export function Header() {
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center" aria-label="LootAura Home">
             <img src="/brand/sitelogo.svg" alt="LootAura" className="h-14 w-auto" />
-            <span className="ml-1 text-2xl font-bold text-amber-600">LootAura</span>
+            <span className="ml-0.5 text-2xl font-bold text-amber-600">LootAura</span>
           </Link>
           
           <div className="flex gap-6 items-center">

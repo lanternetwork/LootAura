@@ -159,7 +159,7 @@ export function MapPreviewSection() {
     selectedId: null,
     onLocationClick: () => {}, // Disabled - no click handling on preview
     viewport: {
-      bounds: [mapView.bounds.west, mapView.bounds.south, mapView.bounds.east, mapView.bounds.north],
+      bounds: [mapView.bounds.west, mapView.bounds.south, mapView.bounds.east, mapView.bounds.north] as [number, number, number, number],
       zoom: mapView.zoom
     }
   } : undefined

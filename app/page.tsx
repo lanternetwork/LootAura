@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { TopNav } from '@/components/landing/TopNav'
 import { Hero } from '@/components/landing/Hero'
 import { CoreFlowsSection } from '@/components/landing/CoreFlowsSection'
@@ -10,7 +11,9 @@ export default function Home() {
       <TopNav />
       <Hero />
       <CoreFlowsSection />
-      <FeaturedSalesSection />
+      <Suspense fallback={<div className="py-12 bg-gray-50" />}>
+        <FeaturedSalesSection />
+      </Suspense>
       <section className="bg-gradient-to-b from-amber-50 to-gray-50 border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">

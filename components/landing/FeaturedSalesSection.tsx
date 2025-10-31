@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import SaleCard from '@/components/SaleCard'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
@@ -14,7 +14,6 @@ interface LocationState {
 }
 
 export function FeaturedSalesSection() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [location, setLocation] = useState<LocationState | null>(null)
   const [status, setStatus] = useState<'resolving' | 'ready' | 'error'>('resolving')

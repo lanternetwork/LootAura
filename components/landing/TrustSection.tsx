@@ -9,6 +9,7 @@ export function TrustSection() {
   return (
     <section className="py-12 bg-aura-cream">
       <div className="mx-auto max-w-6xl px-4 lg:px-8">
+        <h2 className="text-xl font-semibold text-aura-navy mb-6 text-center">Why choose LootAura?</h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {features.map((feature, i) => (
             <div key={i} className="text-center">

@@ -19,8 +19,39 @@ async function fetchFeaturedSales(): Promise<Sale[]> {
   }
 }
 
+function PlaceholderSaleCard({ index }: { index: number }) {
+  const placeholderSale: Sale = {
+    id: `placeholder-${index}`,
+    title: `Sample Yard Sale ${index + 1}`,
+    description: 'Browse furniture, electronics, and household items at this weekend sale.',
+    address: '123 Main St',
+    city: 'Louisville',
+    state: 'KY',
+    zip_code: '40202',
+    lat: 38.25,
+    lng: -85.75,
+    date_start: new Date().toISOString().split('T')[0],
+    time_start: '09:00',
+    status: 'published',
+    owner_id: 'placeholder',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }
+
+  return (
+    <div className="relative">
+      <div className="absolute top-2 right-2 z-10 rounded-full bg-aura-gold text-aura-navy px-3 py-1 text-xs font-semibold">
+        Sample listing
+      </div>
+      <SaleCard sale={placeholderSale} />
+    </div>
+  )
+}
+
 export async function FeaturedSalesSection() {
   const sales = await fetchFeaturedSales()
+  const displaySales = sales.length > 0 ? sales.slice(0, 6) : []
+  const placeholderCount = displaySales.length === 0 ? 6 : 0
 
   return (
     <section className="py-12 lg:py-16 bg-aura-cream">
@@ -31,20 +62,16 @@ export async function FeaturedSalesSection() {
             View all →
           </Link>
         </div>
-        {sales.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {sales.slice(0, 6).map((sale) => (
-              <SaleCard key={sale.id} sale={sale} />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12 text-aura-navy/60">
-            <p>No sales found. Be the first to post one!</p>
-            <Link href="/sell/new" className="inline-block mt-4 text-aura-gold hover:text-[#d39a2f] font-medium">
-              Post a sale →
-            </Link>
-          </div>
-        )}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {displaySales.map((sale) => (
+            <SaleCard key={sale.id} sale={sale} />
+          ))}
+          {placeholderCount > 0 && (
+            Array.from({ length: placeholderCount }).map((_, i) => (
+              <PlaceholderSaleCard key={`placeholder-${i}`} index={i} />
+            ))
+          )}
+        </div>
       </div>
     </section>
   )

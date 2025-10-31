@@ -4,9 +4,9 @@ import UserProfile from '@/components/UserProfile'
 
 export function Header() {
   return (
-    <nav className="bg-aura-cream border-b border-aura-navy/10">
+    <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-aura-navy/5">
       <div className="w-full px-4 py-3">
-        <div className="flex justify-between items-center">
+        <div className="mx-auto max-w-7xl flex justify-between items-center">
           <Link href="/" className="flex items-center gap-0.5" aria-label="LootAura Home">
             <img src="/brand/sitelogo.svg" alt="LootAura" className="h-14 w-auto" />
             <span className="text-2xl font-bold text-aura-navy">LootAura</span>
@@ -17,19 +17,13 @@ export function Header() {
               href="/sales" 
               className="text-aura-navy hover:text-aura-gold font-medium transition-colors"
             >
-              Browse Sales
-            </Link>
-            <Link 
-              href="/favorites" 
-              className="text-aura-navy hover:text-aura-gold font-medium transition-colors"
-            >
-              Favorites
+              Sales
             </Link>
             <Link 
               href="/sell/new" 
               className="text-aura-navy hover:text-aura-gold font-medium transition-colors"
             >
-              Post Your Sale
+              Post a sale
             </Link>
             <UserProfile />
           </div>

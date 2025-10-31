@@ -20,8 +20,10 @@ interface SaleImage {
 
 interface ImageStatsResponse {
   ok: boolean
-  stats: ImageStats
-  sales: SaleImage[]
+  stats?: ImageStats
+  sales?: SaleImage[]
+  error?: string
+  message?: string
 }
 
 export default function ImageStatsView() {
@@ -42,8 +44,8 @@ export default function ImageStatsView() {
       const response = await fetch('/api/admin/images-stats')
       const data: ImageStatsResponse = await response.json()
 
-      if (!data.ok) {
-        throw new Error(data.error || 'Failed to fetch image stats')
+      if (!data.ok || !data.stats || !data.sales) {
+        throw new Error(data.error || data.message || 'Failed to fetch image stats')
       }
 
       setStats(data.stats)

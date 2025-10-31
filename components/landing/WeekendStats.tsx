@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react'
 import { Sale } from '@/lib/types'
 
-interface WeekendStats {
+interface WeekendStatsData {
   activeSales: number
   newThisWeek: number
 }
 
 export function WeekendStats() {
-  const [stats, setStats] = useState<WeekendStats | null>(null)
+  const [stats, setStats] = useState<WeekendStatsData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

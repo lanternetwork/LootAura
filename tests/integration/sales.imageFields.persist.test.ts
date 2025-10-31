@@ -7,12 +7,14 @@ import * as ImageValidate from '@/lib/images/validateImageUrl'
 
 // Mock Supabase (stable chain object so spies are consistent across calls)
 const mockSingle = vi.fn()
+const mockSelect = vi.fn(() => ({
+	single: mockSingle
+}))
+const mockInsert = vi.fn(() => ({
+	select: mockSelect
+}))
 const fromChain = {
-	insert: vi.fn(() => ({
-		select: vi.fn(() => ({
-			single: mockSingle
-		}))
-	}))
+	insert: mockInsert
 }
 const mockSupabaseClient = {
 	auth: {
@@ -45,6 +47,12 @@ describe('Sales API - Image Support', () => {
 		
 		// Ensure mock structure is preserved
 		mockSupabaseClient.from.mockImplementation(() => fromChain)
+		mockInsert.mockReturnValue({
+			select: mockSelect
+		})
+		mockSelect.mockReturnValue({
+			single: mockSingle
+		})
 		
 		// Mock authenticated user
 		mockSupabaseClient.auth.getUser.mockResolvedValue({

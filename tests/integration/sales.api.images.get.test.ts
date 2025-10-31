@@ -95,28 +95,64 @@ const mockSalesWithImages = [
 ]
 
 const createQueryChain = (shouldReturnData: boolean = true) => {
-  const chain: any = {
-    select: vi.fn((columns: string, options?: any) => {
-      // Handle count query: select('*', { count: 'exact', head: true })
-      if (options?.count === 'exact' && options?.head === true) {
-        return Promise.resolve({ count: mockSalesWithImages.length, error: null })
+  // Create a chainable mock object that's also awaitable
+  let isCountQuery = false
+  
+  const createThenable = () => {
+    const thenable = {
+      then: (resolve: any, reject?: any) => {
+        if (isCountQuery) {
+          return Promise.resolve({ count: mockSalesWithImages.length, error: null }).then(resolve, reject)
+        }
+        if (shouldReturnData) {
+          return Promise.resolve({ data: mockSalesWithImages, error: null }).then(resolve, reject)
+        }
+        return Promise.resolve({ data: [], error: null }).then(resolve, reject)
+      },
+      catch: (reject: any) => {
+        return Promise.resolve({ data: [], error: null }).catch(reject)
       }
-      // Regular select returns chain
-      return chain
-    }),
-    gte: vi.fn(() => chain),
-    lte: vi.fn(() => chain),
-    eq: vi.fn(() => chain),
-    in: vi.fn(() => chain),
-    or: vi.fn(() => chain),
-    order: vi.fn(() => chain),
-    range: vi.fn(() => {
-      if (shouldReturnData) {
-        return Promise.resolve({ data: mockSalesWithImages, error: null })
-      }
-      return Promise.resolve({ data: [], error: null })
-    })
+    }
+    return thenable
   }
+  
+  const chain: any = createThenable()
+  
+  // Methods that return the chain itself for further chaining
+  chain.select = vi.fn((columns: string, options?: any) => {
+    // Track if this is a count query
+    if (options?.count === 'exact' && options?.head === true) {
+      isCountQuery = true
+    } else {
+      isCountQuery = false
+    }
+    // Return chain for further chaining
+    return chain
+  })
+  chain.gte = vi.fn(() => chain)
+  chain.lte = vi.fn(() => chain)
+  chain.eq = vi.fn(() => chain) // Chain continues, resolution happens on await
+  chain.in = vi.fn(() => chain)
+  chain.or = vi.fn(() => chain)
+  chain.order = vi.fn(() => chain)
+  chain.limit = vi.fn(() => chain)
+  
+  // Final method that returns data (not used for count queries)
+  chain.range = vi.fn(() => {
+    if (shouldReturnData) {
+      return Promise.resolve({ data: mockSalesWithImages, error: null })
+    }
+    return Promise.resolve({ data: [], error: null })
+  })
+  
+  return chain
+}
+
+const createItemsV2Chain = () => {
+  const chain: any = {}
+  chain.select = vi.fn(() => chain)
+  chain.in = vi.fn(() => Promise.resolve({ data: [], error: null }))
+  chain.limit = vi.fn(() => Promise.resolve({ data: [], error: null }))
   return chain
 }
 
@@ -126,12 +162,8 @@ const mockSupabaseClient = {
   },
   from: vi.fn((table: string) => {
     if (table === 'items_v2') {
-      // Return empty array for items_v2 queries (no category filtering in tests)
-      return {
-        select: vi.fn(() => ({
-          in: vi.fn(() => Promise.resolve({ data: [], error: null }))
-        }))
-      }
+      // Return chain for items_v2 queries (no category filtering in tests)
+      return createItemsV2Chain()
     }
     // For sales_v2 table
     return createQueryChain(true)
@@ -160,11 +192,7 @@ describe('Sales API GET - Image Fields', () => {
     // Ensure mock structure is preserved
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'items_v2') {
-        return {
-          select: vi.fn(() => ({
-            in: vi.fn(() => Promise.resolve({ data: [], error: null }))
-          }))
-        }
+        return createItemsV2Chain()
       }
       return createQueryChain(true)
     })

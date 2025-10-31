@@ -2,7 +2,7 @@ import "./globals.css"
 import { Metadata } from 'next'
 import { Providers } from './providers'
 import WebVitals from '@/components/WebVitals'
-import { Header } from './Header'
+import { ConditionalHeader } from '@/components/landing/ConditionalHeader'
 import { PWAComponents } from './PWAComponents'
 import DebugToggle from '@/components/debug/DebugToggle'
 import { createHomepageStructuredData, createOrganizationStructuredData } from '@/lib/metadata'
@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(createOrganizationStructuredData()) }}
         />
         <Providers>
-          <Header />
+          <ConditionalHeader />
           <WebVitals />
           {children}
           <PWAComponents />

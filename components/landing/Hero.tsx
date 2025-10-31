@@ -1,3 +1,5 @@
+import { HeroSearchBar } from './HeroSearchBar'
+
 export function Hero() {
   return (
     <section className="bg-gradient-to-b from-[#FFF8E7] to-[#F9F4E9]">
@@ -14,7 +16,7 @@ export function Hero() {
             <p className="text-base md:text-lg text-[#3A2268]/70">
               Search by ZIP, date, and category. Host your own in minutes.
             </p>
-            <div id="hero-search-slot" />
+            <HeroSearchBar />
           </div>
 
           {/* Right column - desktop only */}

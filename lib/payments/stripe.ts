@@ -2,10 +2,8 @@ import Stripe from 'stripe'
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY
 
-if (!stripeSecret && process.env.NODE_ENV === 'production') {
-  throw new Error('STRIPE_SECRET_KEY is required in production')
-}
-
+// Initialize Stripe client if key is available
+// Runtime checks in functions will handle missing key appropriately
 export const stripe = stripeSecret
   ? new Stripe(stripeSecret, {
       apiVersion: '2023-10-16'

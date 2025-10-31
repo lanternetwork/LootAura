@@ -4,30 +4,30 @@ import UserProfile from '@/components/UserProfile'
 
 export function Header() {
   return (
-    <nav className="bg-white border-b">
+    <nav className="bg-aura-cream border-b border-aura-navy/10">
       <div className="w-full px-4 py-3">
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center" aria-label="LootAura Home">
             <img src="/brand/sitelogo.svg" alt="LootAura" className="h-14 w-auto" />
-            <span className="ml-0.5 text-2xl font-bold text-amber-600">LootAura</span>
+            <span className="ml-0.5 text-2xl font-bold text-aura-gold">LootAura</span>
           </Link>
           
           <div className="flex gap-6 items-center">
             <Link 
               href="/sales" 
-              className="text-neutral-700 hover:text-amber-600 font-medium"
+              className="text-aura-navy hover:text-aura-gold font-medium transition-colors"
             >
               Browse Sales
             </Link>
             <Link 
               href="/favorites" 
-              className="text-neutral-700 hover:text-amber-600 font-medium"
+              className="text-aura-navy hover:text-aura-gold font-medium transition-colors"
             >
               Favorites
             </Link>
             <Link 
               href="/sell/new" 
-              className="text-neutral-700 hover:text-amber-600 font-medium"
+              className="text-aura-navy hover:text-aura-gold font-medium transition-colors"
             >
               Post Your Sale
             </Link>

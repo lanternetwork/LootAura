@@ -121,6 +121,9 @@ const createQueryChain = (shouldReturnData: boolean = true) => {
 }
 
 const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null })
+  },
   from: vi.fn((table: string) => {
     if (table === 'items_v2') {
       // Return empty array for items_v2 queries (no category filtering in tests)
@@ -134,6 +137,7 @@ const mockSupabaseClient = {
     return createQueryChain(true)
   })
 }
+
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient
@@ -153,6 +157,17 @@ beforeAll(async () => {
 describe('Sales API GET - Image Fields', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Ensure mock structure is preserved
+    mockSupabaseClient.from.mockImplementation((table: string) => {
+      if (table === 'items_v2') {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => Promise.resolve({ data: [], error: null }))
+          }))
+        }
+      }
+      return createQueryChain(true)
+    })
   })
 
   it('should return cover_image_url in GET response', async () => {

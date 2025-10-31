@@ -43,6 +43,9 @@ describe('Sales API - Image Support', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
 		
+		// Ensure mock structure is preserved
+		mockSupabaseClient.from.mockImplementation(() => fromChain)
+		
 		// Mock authenticated user
 		mockSupabaseClient.auth.getUser.mockResolvedValue({
 			data: { user: { id: 'test-user-id' } },

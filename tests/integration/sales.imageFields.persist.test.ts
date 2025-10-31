@@ -16,9 +16,10 @@ const mockInsert = vi.fn(() => ({
 const fromChain = {
 	insert: mockInsert
 }
+const mockGetUser = vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 const mockSupabaseClient = {
 	auth: {
-		getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
+		getUser: mockGetUser
 	},
 	from: vi.fn(() => fromChain)
 }
@@ -54,8 +55,8 @@ describe('Sales API - Image Support', () => {
 			single: mockSingle
 		})
 		
-		// Mock authenticated user - MUST be reset after clearAllMocks
-		mockSupabaseClient.auth.getUser = vi.fn().mockResolvedValue({
+		// Mock authenticated user - reset implementation after clearAllMocks
+		mockGetUser.mockResolvedValue({
 			data: { user: { id: 'test-user-id' } },
 			error: null
 		})

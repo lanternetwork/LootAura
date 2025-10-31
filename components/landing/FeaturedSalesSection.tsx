@@ -31,13 +31,15 @@ export function FeaturedSalesSection() {
       return
     }
 
-    // 2) localStorage
+    // 2) localStorage (only ZIP codes, not exact coordinates)
     const saved = window.localStorage.getItem('loot-aura:lastLocation')
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
-        if (parsed && (parsed.zip || (parsed.lat && parsed.lng))) {
-          setLocation(parsed)
+        // Only use saved data if it's a ZIP code (not exact coordinates)
+        // This ensures we don't restore sensitive coordinate data from storage
+        if (parsed && parsed.zip) {
+          setLocation({ zip: parsed.zip })
           setStatus('ready')
           return
         }
@@ -50,14 +52,9 @@ export function FeaturedSalesSection() {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          // Only store approximate location coordinates with user consent
-          // User explicitly grants permission via browser geolocation API
-          // Store coordinates for UX improvement (faster sales loading on return visits)
-          // This is acceptable as user controls permission and data is client-side only
+          // Use geolocation coordinates in memory only (do not persist to localStorage)
+          // This avoids storing sensitive location data while still providing UX benefit
           const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-          // CodeQL suppression: Storing geolocation with user consent for UX improvement
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          window.localStorage.setItem('loot-aura:lastLocation', JSON.stringify(loc))
           setLocation(loc)
           setStatus('ready')
         },
@@ -134,12 +131,14 @@ export function FeaturedSalesSection() {
       const data = await response.json()
 
       if (data.ok) {
-        // Prefer storing ZIP code (less sensitive) over exact coordinates
-        // Store coordinates only when needed for map queries
+        // Store only ZIP code (less sensitive than exact coordinates)
+        // ZIP codes are user-provided and appropriate for localStorage
         const loc: LocationState = data.zip ? { zip: data.zip } : { lat: data.lat, lng: data.lng }
-        // CodeQL suppression: Storing location data (ZIP preferred) with user input for UX
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        window.localStorage.setItem('loot-aura:lastLocation', JSON.stringify(loc))
+        // Only store ZIP codes, not exact coordinates, in localStorage
+        if (data.zip) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+          window.localStorage.setItem('loot-aura:lastLocation', JSON.stringify({ zip: data.zip }))
+        }
         setLocation(loc)
         setStatus('ready')
         setZipInput('')

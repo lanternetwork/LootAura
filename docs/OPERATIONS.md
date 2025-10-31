@@ -1,6 +1,6 @@
 # Operations Guide
 
-**Last updated: 2025-01-27 — Rate Limiting Operations**
+**Last updated: 2025-01-31**
 
 ## Rate Limiting Operations
 
@@ -102,9 +102,9 @@ curl -I https://your-domain.com/api/auth/signin
 - Shows: enabled/disabled, backend type, active policies, recent blocks
 
 **Log Monitoring:**
-```bash
-# Look for rate limit blocks in logs
-[RATE_LIMIT] block id=AUTH_DEFAULT key=ip:192.168.1.1 over_by=2
+Rate-limited requests are logged with the following format:
+```
+[RATE_LIMIT] Request rate-limited: policy=AUTH_DEFAULT, scope=ip, key=ip:192.168.1.1, remaining=0, resetAt=2025-01-31T12:00:00.000Z
 ```
 
 **Metrics Collection:**
@@ -179,3 +179,117 @@ curl -v https://your-domain.com/api/auth/signin \
 - Rate limiting disabled by default
 - Only enabled in production with explicit flag
 - Preview deployments bypass unless explicitly enabled
+
+## Image Monitoring
+
+### Image Validation Logging
+
+Image validation failures are logged when invalid image URLs are submitted:
+
+**Format:**
+```
+[SALES][IMAGE_VALIDATION] Rejected cover_image_url: url=https://example.com/image.jpg, user=user-id, reason=invalid_url_format
+[SALES][IMAGE_VALIDATION] Rejected image URL in images array: url=https://example.com/image.jpg, user=user-id, reason=invalid_url_format
+```
+
+**Monitoring:**
+- Logs include URL, user ID, and rejection reason
+- Can be filtered in log aggregation tools
+- Useful for identifying potential security issues or user errors
+
+**Common Reasons:**
+- `invalid_url_format`: URL is not a valid Cloudinary URL
+- URL does not match Cloudinary domain pattern
+- Malformed URL structure
+
+### Admin Tools Image Statistics
+
+**Location:** `/admin/tools` → "Image Statistics" section
+
+**Displays:**
+- Total sales count
+- Sales with cover images (count and percentage)
+- Sales with images array (count and percentage)
+- Sales using placeholders (count and percentage)
+- Last 10 sales with image details:
+  - Sale ID and title
+  - Cover image URL (if present)
+  - Images array count
+  - Placeholder usage status
+  - Display cover URL (actual URL used for rendering)
+
+**Use Cases:**
+- Monitor image adoption rate
+- Identify sales needing images
+- Track placeholder usage
+- Verify image URL correctness
+
+**API Endpoint:**
+- `/api/admin/images-stats`
+- Returns JSON with statistics and recent sales data
+- Requires admin access
+
+### Image Validation Rules
+
+All image URLs must:
+- Be valid Cloudinary URLs (`res.cloudinary.com`)
+- Match the configured Cloudinary cloud name
+- Use HTTPS protocol
+- Not contain external domains
+
+See [docs/IMAGES.md](docs/IMAGES.md) for complete image management documentation.
+
+## Sentry Monitoring
+
+### Sentry Setup
+
+1. **Get Sentry DSN:**
+   - Create project at [sentry.io](https://sentry.io)
+   - Copy DSN from project settings
+
+2. **Configure Environment Variable:**
+   ```bash
+   NEXT_PUBLIC_SENTRY_DSN=https://your-dsn@sentry.io/your-project-id
+   ```
+
+3. **Verify Integration:**
+   - Check Sentry dashboard for events
+   - Test error tracking by triggering an error
+
+### Monitoring
+
+**Error Tracking:**
+- Client-side errors automatically captured
+- Server-side errors in API routes captured
+- Source maps for better stack traces
+
+**Performance Monitoring:**
+- Page load times tracked
+- API response times monitored
+- User transaction tracing
+
+**Log Levels:**
+- Errors automatically sent to Sentry
+- Warnings and info logs only in debug mode
+- No PII in error reports
+
+## Debug Mode
+
+### Enabling Debug Mode
+
+Set `NEXT_PUBLIC_DEBUG=true` in environment variables to enable:
+- Detailed console logging
+- Admin tools access at `/admin/tools`
+- Extended error messages
+- Development diagnostics
+
+**Warning:** Debug mode should only be enabled in development/staging environments, not production.
+
+### Admin Tools
+
+Access debug tools at `/admin/tools` when debug mode is enabled:
+- Cloudinary diagnostics
+- Image statistics
+- Rate limiting status
+- Environment variable display
+- Health check links

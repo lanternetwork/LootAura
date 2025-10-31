@@ -8,8 +8,8 @@ export function Header() {
       <div className="w-full px-4 py-3">
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center" aria-label="LootAura Home">
-            <img src="/brand/sitelogo.svg" alt="LootAura" className="h-7 w-auto" />
-            <span className="sr-only">LootAura</span>
+            <img src="/brand/sitelogo.svg" alt="LootAura" className="h-14 w-auto" />
+            <span className="ml-2 text-2xl font-bold text-amber-600">LootAura</span>
           </Link>
           
           <div className="flex gap-6 items-center">

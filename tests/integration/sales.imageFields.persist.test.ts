@@ -54,8 +54,8 @@ describe('Sales API - Image Support', () => {
 			single: mockSingle
 		})
 		
-		// Mock authenticated user
-		mockSupabaseClient.auth.getUser.mockResolvedValue({
+		// Mock authenticated user - MUST be reset after clearAllMocks
+		mockSupabaseClient.auth.getUser = vi.fn().mockResolvedValue({
 			data: { user: { id: 'test-user-id' } },
 			error: null
 		})

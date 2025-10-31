@@ -194,17 +194,15 @@ export function MapPreviewSection() {
                 </div>
               ) : (
                 <>
-                  {/* Non-interactive map - pins disabled via pointer-events */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute inset-0 pointer-events-auto">
-                      <SimpleMap
-                        center={mapView.center}
-                        zoom={mapView.zoom}
-                        hybridPins={hybridPins}
-                        onViewportChange={() => {}} // Disabled - no viewport changes
-                        interactive={false} // Disable all map interactions
-                      />
-                    </div>
+                  {/* Non-interactive map */}
+                  <div className="absolute inset-0" style={{ pointerEvents: 'none' }}>
+                    <SimpleMap
+                      center={mapView.center}
+                      zoom={mapView.zoom}
+                      hybridPins={hybridPins}
+                      onViewportChange={() => {}} // Disabled - no viewport changes
+                      interactive={false} // Disable all map interactions
+                    />
                   </div>
                   
                   {/* Click overlay to make entire map clickable */}

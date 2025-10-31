@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Sale } from '@/lib/types'
 
 interface WeekendStats {
   activeSales: number
@@ -35,7 +36,7 @@ export function WeekendStats() {
         const data = await res.json()
         
         // Handle different response formats
-        const sales = data.sales || data.data || []
+        const sales: Sale[] = data.sales || data.data || []
         
         // Count active sales for this weekend
         const activeSales = sales.length
@@ -43,7 +44,7 @@ export function WeekendStats() {
         // Calculate new this week (sales created in last 7 days)
         const weekAgo = new Date(now)
         weekAgo.setDate(now.getDate() - 7)
-        const newThisWeek = sales.filter((sale: any) => {
+        const newThisWeek = sales.filter((sale) => {
           if (!sale.created_at) return false
           const created = new Date(sale.created_at)
           return created >= weekAgo

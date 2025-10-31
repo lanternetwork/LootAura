@@ -7,11 +7,25 @@
  * - SalesClient restores viewport from URL params when returning
  */
 
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import SaleCard from '@/components/SaleCard'
 import { Sale } from '@/lib/types'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+})
+
+const renderWithQueryClient = (ui: React.ReactElement) => {
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+}
 
 // Mock next/navigation
 vi.mock('next/navigation', () => ({
@@ -29,6 +43,11 @@ vi.mock('next/navigation', () => ({
 // Mock next/link
 vi.mock('next/link', () => ({
   default: ({ children, href }: any) => <a href={href}>{children}</a>,
+}))
+
+// Mock FavoriteButton to avoid QueryClient dependency
+vi.mock('@/components/FavoriteButton', () => ({
+  default: () => null,
 }))
 
 describe('Viewport Persistence Navigation', () => {
@@ -63,7 +82,7 @@ describe('Viewport Persistence Navigation', () => {
         zoom: 12
       }
 
-      render(<SaleCard sale={mockSale} viewport={viewport} />)
+      renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
       const detailLink = screen.getByText('View Details →').closest('a')
       expect(detailLink).toBeInTheDocument()
@@ -73,7 +92,7 @@ describe('Viewport Persistence Navigation', () => {
     })
 
     it('should not include viewport params when viewport is not provided', () => {
-      render(<SaleCard sale={mockSale} />)
+      renderWithQueryClient(<SaleCard sale={mockSale} />)
 
       const detailLink = screen.getByText('View Details →').closest('a')
       expect(detailLink).toBeInTheDocument()
@@ -81,7 +100,7 @@ describe('Viewport Persistence Navigation', () => {
     })
 
     it('should handle null viewport gracefully', () => {
-      render(<SaleCard sale={mockSale} viewport={null} />)
+      renderWithQueryClient(<SaleCard sale={mockSale} viewport={null} />)
 
       const detailLink = screen.getByText('View Details →').closest('a')
       expect(detailLink).toBeInTheDocument()
@@ -94,7 +113,7 @@ describe('Viewport Persistence Navigation', () => {
         zoom: 15.5
       }
 
-      render(<SaleCard sale={mockSale} viewport={viewport} />)
+      renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
       const detailLink = screen.getByText('View Details →').closest('a')
       const href = detailLink?.getAttribute('href')
@@ -177,7 +196,7 @@ describe('Viewport Persistence Navigation', () => {
         zoom: 12
       }
 
-      render(<SaleCard sale={mockSale} viewport={viewport} />)
+      renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
       const detailLink = screen.getByText('View Details →').closest('a')
       const href = detailLink?.getAttribute('href')
@@ -195,7 +214,7 @@ describe('Viewport Persistence Navigation', () => {
         zoom: 12
       }
 
-      render(<SaleCard sale={mockSale} viewport={viewport} />)
+      renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
       const detailLink = screen.getByText('View Details →').closest('a')
       const href = detailLink?.getAttribute('href')
@@ -209,7 +228,7 @@ describe('Viewport Persistence Navigation', () => {
         zoom: 0
       }
 
-      render(<SaleCard sale={mockSale} viewport={viewport} />)
+      renderWithQueryClient(<SaleCard sale={mockSale} viewport={viewport} />)
 
       const detailLink = screen.getByText('View Details →').closest('a')
       const href = detailLink?.getAttribute('href')

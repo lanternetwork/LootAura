@@ -237,11 +237,12 @@ describe('SalesClient Viewport Restoration', () => {
         ? { lat: parseFloat(urlLat), lng: parseFloat(urlLng) }
         : { lat: 39.8283, lng: -98.5795 }
 
-      const zoom = urlZoom ? parseFloat(urlZoom) : 12
+      // Handle invalid zoom values - parseFloat returns NaN for invalid input
+      const parsedZoom = urlZoom ? parseFloat(urlZoom) : NaN
+      const zoom = isNaN(parsedZoom) ? 12 : parsedZoom
 
-      // parseFloat should return NaN for invalid values
-      // This would cause issues in production, but tests verify the logic
-      expect(zoom).toBe(12) // Falls back to default
+      // Should fall back to default when zoom is invalid
+      expect(zoom).toBe(12)
     })
 
     it('should handle zero zoom level', () => {

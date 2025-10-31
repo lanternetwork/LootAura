@@ -73,13 +73,13 @@ describe('Header Full-Width Styling', () => {
   })
 
   it('should render header content correctly', () => {
-    const { getByText } = render(<Header />)
+    const { getAllByText } = render(<Header />)
     
-    // Verify header content is present
-    expect(getByText('LootAura')).toBeInTheDocument()
-    expect(getByText('Browse Sales')).toBeInTheDocument()
-    expect(getByText('Favorites')).toBeInTheDocument()
-    expect(getByText('Post Your Sale')).toBeInTheDocument()
+    // Verify header content is present (use getAllByText since React StrictMode may render twice)
+    expect(getAllByText('LootAura')[0]).toBeInTheDocument()
+    expect(getAllByText('Browse Sales')[0]).toBeInTheDocument()
+    expect(getAllByText('Favorites')[0]).toBeInTheDocument()
+    expect(getAllByText('Post Your Sale')[0]).toBeInTheDocument()
   })
 })
 

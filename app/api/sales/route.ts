@@ -651,13 +651,16 @@ async function postHandler(request: NextRequest) {
     const supabase = createSupabaseServerClient()
     
     // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const authResponse = await supabase.auth.getUser()
+    if (!authResponse || authResponse.error || !authResponse.data?.user) {
+      const authError = authResponse?.error
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[SALES] Auth failed:', { event: 'sales-create', status: 'fail', code: authError?.message })
       }
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
+    
+    const user = authResponse.data.user
     
     const body = await request.json()
     
@@ -711,6 +714,11 @@ async function postHandler(request: NextRequest) {
         console.log('[SALES] Insert failed:', { event: 'sales-create', status: 'fail', code: error.message })
       }
       console.error('Sales insert error:', error)
+      return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
+    }
+    
+    if (!data) {
+      console.error('Sales insert succeeded but returned no data')
       return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
     }
     

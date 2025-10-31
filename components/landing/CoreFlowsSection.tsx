@@ -40,7 +40,7 @@ export function CoreFlowsSection() {
 
           {/* How it works card */}
           <Link
-            href="/about"
+            href="/how-it-works"
             className="bg-white rounded-2xl border border-[#3A2268]/10 hover:shadow-sm transition p-5 text-[#3A2268] group"
           >
             <div className="text-3xl mb-3">❓</div>

@@ -26,7 +26,7 @@ export function TopNav() {
               Post a sale
             </Link>
             <Link
-              href="/#how-it-works"
+              href="/how-it-works"
               className="text-[#3A2268] hover:text-[#3A2268]/80 transition-colors"
             >
               How it works

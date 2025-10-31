@@ -85,12 +85,14 @@ export function FeaturedSalesSection() {
     const fetchSales = async () => {
       setLoading(true)
       try {
-        let url = '/api/sales?near=1&limit=6'
+        // Fetch more sales (20-30) to have enough for random selection
+        // Use a wider radius (50km) to ensure we get enough results
+        let url = '/api/sales?near=1&limit=30'
         
         if (location.lat && location.lng) {
-          url += `&lat=${location.lat}&lng=${location.lng}&radiusKm=25`
+          url += `&lat=${location.lat}&lng=${location.lng}&radiusKm=50`
         } else if (location.zip) {
-          url += `&zip=${encodeURIComponent(location.zip)}&radiusKm=25`
+          url += `&zip=${encodeURIComponent(location.zip)}&radiusKm=50`
         } else {
           // No valid location
           setLoading(false)
@@ -98,15 +100,35 @@ export function FeaturedSalesSection() {
         }
 
         const res = await fetch(url)
+        if (!res.ok) {
+          console.error('Failed to fetch sales:', res.status, res.statusText)
+          setSales([])
+          setLoading(false)
+          return
+        }
+        
         const data = await res.json()
         
         // Handle different response formats
-        if (data.sales) {
-          setSales(data.sales)
+        let allSales: Sale[] = []
+        if (data.sales && Array.isArray(data.sales)) {
+          allSales = data.sales
         } else if (data.data && Array.isArray(data.data)) {
-          setSales(data.data)
+          allSales = data.data
         } else if (Array.isArray(data)) {
-          setSales(data)
+          allSales = data
+        }
+        
+        // Randomly shuffle and take 6 sales
+        if (allSales.length > 0) {
+          // Fisher-Yates shuffle
+          const shuffled = [...allSales]
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1))
+            ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+          }
+          // Take first 6 random sales
+          setSales(shuffled.slice(0, 6))
         } else {
           setSales([])
         }
@@ -229,7 +251,8 @@ export function FeaturedSalesSection() {
   }
 
   // Location resolved - show sales
-  const displaySales = sales.slice(0, 6)
+  // Sales are already shuffled and limited to 6 in the fetch effect
+  const displaySales = sales
   const locationDisplay = location.zip || `${location.lat?.toFixed(2)}, ${location.lng?.toFixed(2)}`
 
   return (

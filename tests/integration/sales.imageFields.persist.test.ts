@@ -171,10 +171,7 @@ beforeEach(() => {
 	})
 
 	it('should default images to empty array when not provided', async () => {
-		mockSingle.mockResolvedValue({
-			data: { id: 'sale-123' },
-			error: null
-		})
+		// No-op: shared supabase mock will return inserted row with id
 
 		const request = new NextRequest('http://localhost:3000/api/sales', {
 			method: 'POST',

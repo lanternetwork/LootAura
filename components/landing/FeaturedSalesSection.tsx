@@ -85,42 +85,77 @@ export function FeaturedSalesSection() {
     const fetchSales = async () => {
       setLoading(true)
       try {
-        // Fetch more sales (20-30) to have enough for random selection
-        // Use a wider radius (50km) to ensure we get enough results
-        let url = '/api/sales?near=1&limit=30'
+        // First, try to resolve ZIP to lat/lng for better accuracy
+        let finalLat = location.lat
+        let finalLng = location.lng
         
-        if (location.lat && location.lng) {
-          url += `&lat=${location.lat}&lng=${location.lng}&radiusKm=50`
+        if (!finalLat || !finalLng) {
+          if (location.zip) {
+            try {
+              const geoRes = await fetch(`/api/geocoding/zip?zip=${encodeURIComponent(location.zip)}`)
+              const geoData = await geoRes.json()
+              if (geoData.ok && geoData.lat && geoData.lng) {
+                finalLat = parseFloat(geoData.lat)
+                finalLng = parseFloat(geoData.lng)
+                console.log('[FeaturedSales] Resolved ZIP to lat/lng:', finalLat, finalLng)
+              }
+            } catch (error) {
+              console.warn('[FeaturedSales] Failed to resolve ZIP, using ZIP in query:', error)
+            }
+          }
+        }
+        
+        // Build URL with resolved coordinates or fallback to ZIP
+        let url = '/api/sales?near=1&limit=30&radiusKm=50'
+        
+        if (finalLat && finalLng) {
+          url += `&lat=${finalLat}&lng=${finalLng}`
         } else if (location.zip) {
-          url += `&zip=${encodeURIComponent(location.zip)}&radiusKm=50`
+          url += `&zip=${encodeURIComponent(location.zip)}`
         } else {
           // No valid location
+          console.error('[FeaturedSales] No valid location available')
           setLoading(false)
           return
         }
 
+        console.log('[FeaturedSales] Fetching sales from:', url)
         const res = await fetch(url)
         if (!res.ok) {
-          console.error('Failed to fetch sales:', res.status, res.statusText)
+          console.error('[FeaturedSales] Failed to fetch sales:', res.status, res.statusText)
           setSales([])
           setLoading(false)
           return
         }
         
         const data = await res.json()
+        console.log('[FeaturedSales] API response:', { 
+          ok: data.ok, 
+          hasSales: !!data.sales, 
+          hasData: !!data.data,
+          salesCount: data.sales?.length || 0,
+          dataCount: data.data?.length || 0,
+          count: data.count || 0
+        })
         
         // Handle different response formats
         let allSales: Sale[] = []
         if (data.sales && Array.isArray(data.sales)) {
           allSales = data.sales
+          console.log('[FeaturedSales] Using data.sales:', allSales.length)
         } else if (data.data && Array.isArray(data.data)) {
           allSales = data.data
+          console.log('[FeaturedSales] Using data.data:', allSales.length)
         } else if (Array.isArray(data)) {
           allSales = data
+          console.log('[FeaturedSales] Using direct array:', allSales.length)
+        } else {
+          console.warn('[FeaturedSales] No sales found in response:', data)
         }
         
         // Randomly shuffle and take 6 sales
         if (allSales.length > 0) {
+          console.log('[FeaturedSales] Shuffling', allSales.length, 'sales')
           // Fisher-Yates shuffle
           const shuffled = [...allSales]
           for (let i = shuffled.length - 1; i > 0; i--) {
@@ -128,8 +163,11 @@ export function FeaturedSalesSection() {
             ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
           }
           // Take first 6 random sales
-          setSales(shuffled.slice(0, 6))
+          const selectedSales = shuffled.slice(0, 6)
+          console.log('[FeaturedSales] Selected', selectedSales.length, 'random sales')
+          setSales(selectedSales)
         } else {
+          console.warn('[FeaturedSales] No sales available, showing empty state')
           setSales([])
         }
       } catch (error) {

@@ -18,7 +18,7 @@ const steps = {
   hosts: [
     {
       title: '1. Create a sale',
-      body: 'Add title, description, dates, and your address. It's designed to be mobile-first.',
+      body: 'Add title, description, dates, and your address. It\'s designed to be mobile-first.',
     },
     {
       title: '2. Add photos',

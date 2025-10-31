@@ -1,0 +1,1 @@
+# Promoted Listings & Stripe Integration\n\n**Milestone Scope (tracking doc)**\n\n- Promoted Listings: purchase, ranking, labeling\n- Stripe Integration: checkout session, webhooks, entitlements\n- Admin: refunds, audits\n- Observability: logs, metrics, alerts\n\nThis PR will track implementation tasks and docs.

@@ -33,6 +33,8 @@ function PlaceholderSaleCard({ index }: { index: number }) {
     date_start: new Date().toISOString().split('T')[0],
     time_start: '09:00',
     status: 'published',
+    privacy_mode: 'exact',
+    is_featured: false,
     owner_id: 'placeholder',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

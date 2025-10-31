@@ -115,35 +115,9 @@ export default function SalesClient({
       }
     }
     
-    // Skip clustering during initial load to improve performance
-    if (loading) {
-      return {
-        type: 'individual' as const,
-        pins: [],
-        locations: [],
-        clusters: []
-      }
-    }
+    // Do not hide pins during fetch; always render using last-known mapSales
     
-    // Skip clustering for very small datasets to improve performance
-    if (mapSales.length < 3) {
-      return {
-        type: 'individual' as const,
-        pins: [],
-        locations: [],
-        clusters: []
-      }
-    }
-    
-    // Skip expensive clustering for small datasets
-    if (mapSales.length < 5) {
-      return {
-        type: 'individual' as const,
-        pins: [],
-        locations: [],
-        clusters: []
-      }
-    }
+    // Allow clustering regardless of small dataset size to prevent initial pin gaps
     
     // Filter sales to only those within the current viewport bounds
     const visibleSales = mapSales.filter(sale => {
@@ -358,17 +332,7 @@ export default function SalesClient({
         return
       }
       
-      // Check if bounds have changed significantly (more than 5% change)
-      const lastBounds = lastBoundsRef.current
-      if (lastBounds) {
-        const latChange = Math.abs(bounds.north - bounds.south - (lastBounds.north - lastBounds.south)) / (lastBounds.north - lastBounds.south)
-        const lngChange = Math.abs(bounds.east - bounds.west - (lastBounds.east - lastBounds.west)) / (lastBounds.east - lastBounds.west)
-        
-        if (latChange < 0.05 && lngChange < 0.05) {
-          console.log('[SALES] Bounds change too small, skipping fetch:', { latChange, lngChange })
-          return
-        }
-      }
+      // Always allow fetch on pan/zoom; debounce above prevents spam.
       
       console.log('[SALES] Debounced fetchMapSales called with bounds:', bounds)
       console.log('[SALES] Entry point: VIEWPORT_CHANGE - Single fetch verification')

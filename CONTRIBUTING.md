@@ -1,19 +1,8 @@
 # Contributing to LootAura
 
-**Last updated: 2025-01-27 — Map-Centric Architecture**
+**Last updated: 2025-01-31**
 
-Thank you for your interest in contributing to LootAura! This guide will help you get started with contributing to our map-centric yard sale discovery platform.
-
-## 🏗️ Architecture Overview
-
-LootAura uses a **map-centric architecture** where the map viewport is the single source of truth for all sales data. Key principles:
-
-- **Single Fetch Path**: Only 2 entry points to `fetchMapSales` (viewport changes, filter changes)
-- **Distance-to-Zoom Mapping**: Distance slider controls map zoom instead of API filtering
-- **Map-Centric Design**: Map viewport drives all data fetching and list display
-- **Single Source**: Both markers and list read from the same data source
-
-See [docs/architecture.md](docs/architecture.md) for detailed technical information.
+Thank you for your interest in contributing to LootAura! This guide will help you get started.
 
 ## 🚀 Getting Started
 
@@ -41,13 +30,15 @@ See [docs/architecture.md](docs/architecture.md) for detailed technical informat
    cp env.example .env.local
    # Edit .env.local with your configuration
    ```
+   
+   See [docs/PRODUCTION_ENV.md](docs/PRODUCTION_ENV.md) for all required variables.
 
 4. **Run the development server**
    ```bash
    npm run dev
    ```
 
-See [docs/dev-setup.md](docs/dev-setup.md) for detailed setup instructions.
+5. **Open [http://localhost:3000](http://localhost:3000)** in your browser
 
 ## 📝 Code Style Guidelines
 
@@ -62,32 +53,71 @@ See [docs/dev-setup.md](docs/dev-setup.md) for detailed setup instructions.
 ### React Components
 
 - Use **functional components** with hooks
-- Prefer **named exports** over default exports
+- Prefer **named exports** over default exports when possible
 - Use **TypeScript interfaces** for props
 - Follow **single responsibility principle**
 
 ### File Organization
 
+- Components: `components/`
+- Pages/Routes: `app/`
+- Utilities: `lib/`
+- Tests: `tests/`
+- Types: `lib/types.ts`
+
+## 🏗️ Architecture Principles
+
+LootAura uses a **map-centric architecture**:
+
+- **Map-Centric Design**: Map viewport drives all data fetching and list display
+- **Single Fetch Path**: Only 2 entry points to `fetchMapSales` (viewport changes, filter changes)
+- **Distance-to-Zoom Mapping**: Distance slider controls map zoom instead of API filtering
+- **Touch-Only Clustering**: Pins cluster only when they visually overlap (6.5px radius)
+- **Viewport Persistence**: Map viewport state preserved across navigation
+
+When making changes, ensure you maintain these principles.
+
+## 🧪 Testing
+
+### Writing Tests
+
+- **Unit Tests**: Test individual functions and utilities
+- **Integration Tests**: Test component interactions and data flow
+- **E2E Tests**: Test complete user flows with Playwright
+
+### Test Structure
+
+```typescript
+import { describe, it, expect } from 'vitest'
+
+describe('Feature Name', () => {
+  it('should do something', () => {
+    expect(actual).toBe(expected)
+  })
+})
 ```
-components/
-├── location/          # Map-related components
-├── sales/            # Sales list and cards
-├── filters/          # Filter components
-└── admin/            # Admin tools
 
-lib/
-├── pins/             # Pin and clustering logic
-├── hooks/            # Custom React hooks
-└── types/            # TypeScript type definitions
+### Supabase Mocking
+
+**Important**: Tests that interact with Supabase **must** use shared mock helpers:
+
+```typescript
+// ✅ DO: Use shared mock helper
+import { createSupabaseServerClientMock } from '@/tests/utils/mocks/supabaseServerMock'
+
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: () => createSupabaseServerClientMock({
+    // Configure mock behavior
+  })
+}))
+
+// ❌ DON'T: Create ad-hoc inline mocks
+vi.mock('@/lib/supabase/server', () => {
+  // Ad-hoc mock implementation...
+})
 ```
 
-## 🧪 Testing Requirements
-
-### Test Coverage
-
-- **Unit Tests**: All utility functions and hooks
-- **Integration Tests**: Component interactions
-- **E2E Tests**: Complete user flows
+See [docs/testing.md](docs/testing.md) for complete testing guidelines.
 
 ### Running Tests
 
@@ -100,153 +130,91 @@ npm run test:ui
 
 # Run E2E tests
 npm run test:e2e
-
-# Run linting
-npm run lint
-
-# Type checking
-npm run typecheck
 ```
 
-### Test Guidelines
+## 🔍 Code Review Process
 
-- **Map-Centric Testing**: Test viewport changes trigger correct API calls
-- **Single Fetch Path**: Verify only 2 entry points to `fetchMapSales`
-- **Distance-to-Zoom**: Test distance slider changes map zoom
-- **Console Discipline**: No unexpected `console.error` or `console.warn`
+1. **Create a branch** from `main`
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
 
-See [docs/testing.md](docs/testing.md) for detailed testing guidelines.
+2. **Make your changes** following code style guidelines
 
-## 🔄 Pull Request Process
+3. **Write tests** for new functionality
 
-### Before Submitting
+4. **Run tests** to ensure everything passes
+   ```bash
+   npm test
+   npm run typecheck
+   npm run lint
+   ```
 
-1. **Check existing issues** and pull requests
-2. **Create an issue** for significant changes
-3. **Fork the repository** and create a feature branch
-4. **Follow code style** guidelines
-5. **Write tests** for new functionality
-6. **Update documentation** as needed
+5. **Commit your changes**
+   ```bash
+   git add .
+   git commit -m "feat: add your feature description"
+   ```
 
-### Pull Request Guidelines
+6. **Push to your branch**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
 
-- **Clear title** describing the change
-- **Detailed description** of what was changed and why
-- **Reference issues** using `Fixes #123` or `Closes #123`
-- **Screenshots** for UI changes
-- **Test results** showing all tests pass
+7. **Create a Pull Request** on GitHub
 
-### Review Process
+### Commit Messages
 
-- **Automated checks** must pass (linting, tests, type checking)
-- **Code review** by maintainers
-- **Architecture compliance** with map-centric principles
-- **Performance impact** assessment
+Follow conventional commits format:
 
-## 🏗️ Map-Centric Architecture Guidelines
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `style:` - Code style changes (formatting, etc.)
+- `refactor:` - Code refactoring
+- `test:` - Adding or updating tests
+- `chore:` - Maintenance tasks
 
-### Data Fetching
+Example: `feat: add touch-only map clustering`
 
-- **Single Entry Points**: Only use `handleViewportChange` and `handleFiltersChange`
-- **No Direct API Calls**: Never call `fetchMapSales` directly
-- **Viewport-Driven**: All data fetching should be driven by map viewport
+## 📦 Pull Request Guidelines
 
-### Distance Handling
+- **Description**: Clearly describe what changes you made and why
+- **Tests**: Ensure all tests pass
+- **Type Checking**: Ensure TypeScript type checking passes
+- **Linting**: Ensure ESLint passes
+- **Documentation**: Update documentation if needed
 
-- **Zoom-Based**: Distance slider controls map zoom, not API filtering
-- **Mapping Function**: Use `distanceToZoom()` for distance-to-zoom conversion
-- **No Server Filtering**: Distance filtering is handled by map zoom level
+## 🐛 Reporting Bugs
 
-### State Management
+If you find a bug:
 
-- **Map State**: `mapView` is the single source of truth
-- **Sales State**: `mapSales` and `visibleSales` derived from map viewport
-- **Filter State**: Filters update URL and trigger appropriate fetches
+1. Check if it's already reported in issues
+2. Create a new issue with:
+   - Clear description of the bug
+   - Steps to reproduce
+   - Expected vs actual behavior
+   - Environment details (browser, OS, etc.)
 
-### Component Guidelines
+## 💡 Suggesting Features
 
-- **SimpleMap**: Use for all map rendering with `pins` prop
-- **LocationPin**: Use for individual sale pins
-- **FiltersBar**: Use for all filter controls
-- **SalesList**: Use for sales list display
+If you have a feature suggestion:
 
-## 🐛 Debugging
+1. Check if it's already requested in issues
+2. Create a new issue with:
+   - Clear description of the feature
+   - Use case and motivation
+   - Potential implementation approach (if applicable)
 
-### Debug Mode
+## 🔒 Security
 
-Enable debug mode for development:
+If you discover a security vulnerability, please see [SECURITY.md](SECURITY.md) for reporting guidelines.
 
-```bash
-NEXT_PUBLIC_DEBUG=true
-```
+## 📚 Additional Resources
 
-### Debug Tools
-
-- **Admin Tools**: Access at `/admin/tools`
-- **Console Logging**: Comprehensive logging when debug mode enabled
-- **Diagnostic Overlay**: Real-time fetch event monitoring
-
-See [docs/debug-guide.md](docs/debug-guide.md) for detailed debugging information.
-
-## 📚 Documentation
-
-### Required Documentation
-
-- **README updates** for significant changes
-- **API documentation** for new endpoints
-- **Architecture updates** for structural changes
-- **Changelog entries** for releases
-
-### Documentation Standards
-
-- **Markdown format** with clear headings
-- **Code examples** for complex functionality
-- **Links** to related documentation
-- **Version metadata** with last updated date
-
-## 🚨 Common Pitfalls
-
-### Architecture Violations
-
-- **Don't** create additional entry points to `fetchMapSales`
-- **Don't** bypass the map-centric data flow
-- **Don't** use distance parameters in API calls
-- **Don't** create competing data sources
-
-### Performance Issues
-
-- **Don't** make excessive API calls
-- **Don't** skip debouncing for viewport changes
-- **Don't** ignore the single fetch path principle
-- **Don't** create memory leaks in components
-
-### Testing Issues
-
-- **Don't** skip tests for new functionality
-- **Don't** ignore console guardrail failures
-- **Don't** create flaky tests
-- **Don't** test implementation details
-
-## 🤝 Community Guidelines
-
-### Code of Conduct
-
-- **Be respectful** and inclusive
-- **Be constructive** in feedback
-- **Be patient** with newcomers
-- **Be collaborative** in discussions
-
-### Getting Help
-
-- **GitHub Issues**: For bugs and feature requests
-- **Discussions**: For questions and general discussion
-- **Documentation**: Check existing docs first
-- **Debug Guide**: Use debug tools for troubleshooting
-
-## 📞 Contact
-
-- **Maintainers**: @lanternetwork
-- **Issues**: [GitHub Issues](https://github.com/lanternetwork/LootAura/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/lanternetwork/LootAura/discussions)
+- [Testing Guide](docs/testing.md)
+- [Production Environment Variables](docs/PRODUCTION_ENV.md)
+- [Operations Guide](docs/OPERATIONS.md)
+- [Image Management](docs/IMAGES.md)
 
 Thank you for contributing to LootAura! 🎉

@@ -9,6 +9,7 @@ export function buildChain(rows: Row[]) {
   let orderAsc = true
   let start = 0
   let end: number | null = null
+  let lastInserted: Row | null = null
 
   const applyFilters = () =>
     rows.filter(r =>
@@ -44,6 +45,17 @@ export function buildChain(rows: Row[]) {
     select: (_sel?: string, opts?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) => {
       countMode = !!opts?.count && !!opts?.head
       return chain
+    },
+
+    insert: (payload: Row | Row[]) => {
+      const row = Array.isArray(payload) ? (payload[0] ?? {}) : payload
+      // Minimal inserted row; mimic DB-generated id
+      lastInserted = { id: row.id ?? 'test-sale-id', ...row }
+      return {
+        select: () => ({
+          single: () => Promise.resolve({ data: lastInserted, error: null })
+        })
+      }
     },
 
     eq: (col: string, val: any) => {

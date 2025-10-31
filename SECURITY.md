@@ -1,6 +1,6 @@
 # Security Policy
 
-**Last updated: 2025-10-13 — Enterprise Documentation Alignment**
+**Last updated: 2025-01-31**
 
 ## Supported Versions
 
@@ -8,11 +8,67 @@ We currently support the following versions with security updates:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| 0.1.x   | ✅ Yes             |
 
-## Compliance & Standards
+## Reporting a Vulnerability
+
+If you discover a security vulnerability, please **do not** open a public issue. Instead, email security@lootaura.com with:
+
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Suggested fix (if applicable)
+
+We will respond within 48 hours and work with you to resolve the issue.
+
+## Security Best Practices
+
+### Authentication & Authorization
+
+- **Supabase Auth**: All authentication handled through Supabase Auth
+- **RLS Policies**: Row Level Security (RLS) policies enforce data access controls
+- **Owner-Based Access**: Users can only modify their own data
+- **Public Read**: Sales data readable by anonymous users for browsing
+
+### Input Validation
+
+- **Zod Schemas**: All user input validated with Zod schemas
+- **URL Validation**: Image URLs validated to ensure Cloudinary URLs only
+- **Parameterized Queries**: All database queries use parameterized inputs
+- **Sanitization**: User-generated content sanitized before display
+
+### Secrets Management
+
+- **Environment Variables**: All secrets stored in environment variables
+- **No Hardcoded Secrets**: No API keys or tokens in source code
+- **Vercel Integration**: Secrets managed via Vercel dashboard
+- **Access Control**: Least privilege access to production secrets
+
+### Rate Limiting
+
+- **Production-Grade**: Upstash Redis for distributed rate limiting
+- **IP-Based**: Rate limits applied per IP address
+- **User-Based**: Mutation limits applied per authenticated user
+- **Policy Tuning**: Rate limits configurable per endpoint
+
+See [docs/OPERATIONS.md](docs/OPERATIONS.md) for rate limiting details.
+
+### Image Security
+
+- **Cloudinary URLs Only**: All image URLs validated to ensure Cloudinary origin
+- **Upload Preset Restrictions**: Upload presets restrict folder, size, and format
+- **No External URLs**: External image URLs rejected
+- **Content Validation**: Image format and size validated on upload
+
+### Monitoring & Logging
+
+- **No PII in Logs**: No personally identifiable information logged
+- **Debug Gating**: All debug logs behind `NEXT_PUBLIC_DEBUG` flag
+- **Structured Logging**: Consistent structured logging format
+- **Sentry Integration**: Error tracking and monitoring via Sentry
 
 ### OWASP Top 10 Compliance
+
 - **A01: Broken Access Control**: RLS policies enforce owner-based access
 - **A02: Cryptographic Failures**: HTTPS enforced, secure session management
 - **A03: Injection**: Parameterized queries, input validation with Zod
@@ -24,81 +80,49 @@ We currently support the following versions with security updates:
 - **A09: Logging Failures**: Structured logging, security event monitoring
 - **A10: Server-Side Request Forgery**: URL validation, allowlist approach
 
-### Dependency Scanning
-- **Automated Scanning**: CI security audit job runs on every PR
-- **Vulnerability Alerts**: GitHub Dependabot for security updates
+### Dependencies
+
+- **Dependency Scanning**: Automated scanning via CI/CD
+- **Dependabot**: GitHub Dependabot for security updates
 - **License Compliance**: Automated license checking and approval
+- **Regular Updates**: Dependencies updated regularly
 
-### Secrets Management
-- **Centralized Vault**: Environment variables managed via Vercel
-- **No Hardcoded Secrets**: All sensitive data in environment variables
-- **Rotation Policy**: Regular rotation of API keys and tokens
-- **Access Control**: Least privilege access to production secrets
+### Deployment
 
-### RLS Posture
-- **Public Read**: Sales data readable by anonymous users for browsing
-- **Owner Write**: Only sale owners can modify their own sales
-- **Profile Access**: Users can only access their own profiles
-- **Filter Security**: Filters are not security controls - they are user preferences
+- **HTTPS Only**: All traffic over HTTPS
+- **Security Headers**: Security headers configured in Next.js
+- **Environment Isolation**: Development, staging, and production environments isolated
+- **Secret Rotation**: Regular rotation of API keys and tokens
 
-### Log Policy
-- **No PII**: No personally identifiable information in logs
-- **Debug Gating**: All debug logs behind `NEXT_PUBLIC_DEBUG` flag
-- **Structured Logging**: Use structured logging format for consistency
-- **Log Rotation**: Implement log rotation to prevent disk space issues
+## Security Headers
 
-### Rate Limiting & DDoS Protection
-- **Production-Grade Limiting**: Sliding window rate limiting with Redis backend
-- **Policy-Based Protection**: Different limits for auth, geocoding, viewport, and mutations
-- **Soft-Then-Hard**: Burst tolerance for legitimate usage patterns
-- **IP-Based Auth Protection**: Authentication endpoints always use IP-based limiting
-- **User-Based Mutations**: Creation/modification endpoints use user-based limiting
-- **Bypass Controls**: Disabled by default, only enabled in production with explicit flag
-- **Header Transparency**: All responses include rate limit status headers
+LootAura includes the following security headers:
 
-### Security Headers
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-XSS-Protection: 1; mode=block`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Content-Security-Policy`: Configured per environment
 
-If you discover a security vulnerability, please report it responsibly:
+## Known Security Considerations
 
-1. **DO NOT** create a public GitHub issue
-2. Email us at: security@lanternetwork.com
-3. Include as much detail as possible:
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
+### Public Read Access
 
-## Response Timeline
+Sales data is readable by anonymous users for browsing. This is by design to allow public discovery of yard sales. Sensitive information (email addresses, phone numbers) is not included in public data.
 
-- **Acknowledgment**: Within 48 hours
-- **Detailed Response**: Within 7 days
-- **Resolution**: Within 30 days for critical issues
-- **Updates**: Regular progress updates provided
+### Image Upload
 
-## Post-Incident Response
+Users can upload images via Cloudinary's unsigned upload preset. Security is enforced through:
+- Upload preset restrictions (folder, size, format)
+- Image URL validation (Cloudinary URLs only)
+- Content validation on upload
 
-### 48-Hour Acknowledgment SLA
-- **Critical Issues**: Immediate response within 4 hours
-- **High Priority**: Response within 24 hours
-- **Medium Priority**: Response within 48 hours
+### Rate Limiting
 
-### 7-Day Resolution SLA
-- **Critical Issues**: Resolution within 24 hours
-- **High Priority**: Resolution within 3 days
-- **Medium Priority**: Resolution within 7 days
+Rate limiting is optional and can be enabled via `RATE_LIMITING_ENABLED` environment variable. When enabled, uses Upstash Redis for distributed rate limiting.
 
-### Incident Communication
-1. **Immediate**: Acknowledge and assess impact
-2. **Hourly**: Status updates during active response
-3. **Daily**: Progress reports until resolution
-4. **Post-Incident**: Root cause analysis and prevention
+## Security Updates
 
-## Security Best Practices
+Security updates are released as needed. Critical vulnerabilities are addressed within 48 hours. Non-critical vulnerabilities are addressed in the next regular release cycle.
 
-- **Dependency Management**: Keep dependencies up to date
-- **Environment Security**: Use environment variables for sensitive data
-- **OWASP Guidelines**: Follow OWASP Top 10 and secure coding practices
-- **Monitoring**: Report suspicious activity immediately
-- **Training**: Regular security awareness training for team members
-
-Thank you for helping keep our project secure!
+For the latest security updates, monitor the repository for security advisories.

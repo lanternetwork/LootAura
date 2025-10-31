@@ -13,6 +13,50 @@ This guide covers testing strategies, requirements, and best practices for LootA
 3. **Viewport Synchronization**: Test map and list stay synchronized
 4. **Performance**: Test debouncing and bounds change detection
 
+### Supabase Mocking
+
+**Important**: Tests that interact with Supabase (e.g., sales-viewport tests) **must** use the shared Supabase mock helpers, not ad-hoc mocks.
+
+#### Shared Mock Helpers
+
+- **`tests/utils/mocks/supabaseServerMock.ts`**: Main Supabase server mock
+- **`tests/utils/mocks/makeSupabaseQueryChain.ts`**: Query chain builder
+- **`tests/mocks/supabaseServer.mock.ts`**: Alternative mock implementation
+
+#### Usage Example
+
+```typescript
+// ✅ DO: Use shared mock helper
+import { createSupabaseServerClientMock } from '@/tests/utils/mocks/supabaseServerMock'
+
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: () => createSupabaseServerClientMock({
+    // Configure mock behavior
+  })
+}))
+
+// ❌ DON'T: Create ad-hoc inline mocks
+vi.mock('@/lib/supabase/server', () => {
+  // Ad-hoc mock implementation
+  return {
+    createSupabaseServerClient: () => ({
+      from: () => ({
+        select: () => ({
+          // Inline mock chain...
+        })
+      })
+    })
+  }
+})
+```
+
+#### Why Use Shared Mocks
+
+- **Consistency**: All tests use the same mock structure
+- **Maintainability**: Changes to Supabase API only need updates in one place
+- **Reliability**: Shared mocks are tested and verified to work correctly
+- **Documentation**: Shared mocks serve as documentation for Supabase usage patterns
+
 ### Test Categories
 
 #### Unit Tests

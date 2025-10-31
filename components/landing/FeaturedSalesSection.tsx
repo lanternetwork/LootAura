@@ -32,20 +32,24 @@ export function FeaturedSalesSection() {
     }
 
     // 2) localStorage (only ZIP codes, not exact coordinates)
-    const saved = window.localStorage.getItem('loot-aura:lastLocation')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        // Only use saved data if it's a ZIP code (not exact coordinates)
-        // This ensures we don't restore sensitive coordinate data from storage
-        if (parsed && parsed.zip) {
-          setLocation({ zip: parsed.zip })
-          setStatus('ready')
-          return
+    try {
+      const saved = window.localStorage.getItem('loot-aura:lastLocation')
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          // Only use saved data if it's a ZIP code (not exact coordinates)
+          // This ensures we don't restore sensitive coordinate data from storage
+          if (parsed && parsed.zip) {
+            setLocation({ zip: parsed.zip })
+            setStatus('ready')
+            return
+          }
+        } catch {
+          // Invalid JSON, continue
         }
-      } catch {
-        // Invalid JSON, continue
       }
+    } catch {
+      // localStorage might be unavailable in some contexts
     }
 
     // 3) geolocation (non-blocking)
@@ -136,8 +140,12 @@ export function FeaturedSalesSection() {
         const loc: LocationState = data.zip ? { zip: data.zip } : { lat: data.lat, lng: data.lng }
         // Only store ZIP codes, not exact coordinates, in localStorage
         if (data.zip) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          window.localStorage.setItem('loot-aura:lastLocation', JSON.stringify({ zip: data.zip }))
+          try {
+            window.localStorage.setItem('loot-aura:lastLocation', JSON.stringify({ zip: data.zip }))
+          } catch (error) {
+            // localStorage might be unavailable in some contexts
+            console.warn('Failed to save location to localStorage:', error)
+          }
         }
         setLocation(loc)
         setStatus('ready')

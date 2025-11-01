@@ -43,9 +43,9 @@ describe('Header Full-Width Styling', () => {
     const nav = container.querySelector('nav')
     const innerContainer = nav?.querySelector('div')
     
-    // Should still have padding for spacing
+    // Should have responsive horizontal padding
     expect(innerContainer?.className).toContain('px-4')
-    expect(innerContainer?.className).toContain('py-3')
+    expect(innerContainer?.className).toContain('h-full')
   })
 
   it('should match full-width layout pattern', () => {
@@ -56,18 +56,20 @@ describe('Header Full-Width Styling', () => {
     
     // Full-width layout should use:
     // - w-full (full width)
-    // - px-4 (horizontal padding)
-    // - py-3 (vertical padding)
+    // - px-4 sm:px-6 lg:px-8 (responsive horizontal padding)
+    // - h-full (fills parent height)
     // - NOT max-w-* (max width constraints)
     // - NOT mx-auto (centering)
     
     const hasFullWidth = innerContainer?.className.includes('w-full')
     const hasPadding = innerContainer?.className.includes('px-4')
+    const hasHeight = innerContainer?.className.includes('h-full')
     const hasNoMaxWidth = !innerContainer?.className.includes('max-w-')
     const hasNoCentering = !innerContainer?.className.includes('mx-auto')
     
     expect(hasFullWidth).toBe(true)
     expect(hasPadding).toBe(true)
+    expect(hasHeight).toBe(true)
     expect(hasNoMaxWidth).toBe(true)
     expect(hasNoCentering).toBe(true)
   })
@@ -76,7 +78,7 @@ describe('Header Full-Width Styling', () => {
     const { getAllByText } = render(<Header />)
     
     // Verify header content is present (use getAllByText since React StrictMode may render twice)
-    expect(getAllByText('LootAura')[0]).toBeInTheDocument()
+    expect(getAllByText('Loot Aura')[0]).toBeInTheDocument()
     expect(getAllByText('Browse Sales')[0]).toBeInTheDocument()
     expect(getAllByText('Favorites')[0]).toBeInTheDocument()
     expect(getAllByText('Post Your Sale')[0]).toBeInTheDocument()

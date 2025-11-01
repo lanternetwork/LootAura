@@ -6,28 +6,29 @@ import * as ImageValidate from '@/lib/images/validateImageUrl'
 ;(process.env as any).NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'test'
 
 // Mock Supabase server with full insert/select/single support
+// Pattern similar to v2.sales.images.persist.test.ts
+const mockSingle = vi.fn()
+let lastInsertedPayload: any = null
+
+const fromChain = {
+  insert: vi.fn((payload: any) => {
+    // Store the payload so we can return it with the inserted row
+    lastInsertedPayload = payload
+    return {
+      select: vi.fn(() => ({
+        single: mockSingle
+      }))
+    }
+  }),
+}
+
 const mockSupabaseClient = {
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
   },
   from: vi.fn((table: string) => {
-    // Set up insert chain that returns data matching the inserted payload
     if (table === 'sales_v2') {
-      return {
-        insert: vi.fn((payload: any) => {
-          const inserted = {
-            id: 'test-sale-id',
-            ...payload,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-          return {
-            select: vi.fn(() => ({
-              single: vi.fn().mockResolvedValue({ data: inserted, error: null })
-            }))
-          }
-        })
-      }
+      return fromChain
     }
     // Return a default chain for other tables
     return {
@@ -60,11 +61,26 @@ beforeAll(async () => {
 
 describe('Sales API - Image Support', () => {
 beforeEach(() => {
+	// Clear all mocks but preserve implementations
 	vi.clearAllMocks()
+	lastInsertedPayload = null
 	// Reset auth mock to return user
 	mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 	// Reset image validator spy
 	mockIsAllowedImageUrl.mockReturnValue(true)
+	// Set up mockSingle to return inserted payload when available
+	mockSingle.mockImplementation(() => {
+		if (lastInsertedPayload) {
+			const inserted = {
+				id: 'test-sale-id',
+				...lastInsertedPayload,
+				created_at: new Date().toISOString(),
+				updated_at: new Date().toISOString()
+			}
+			return Promise.resolve({ data: inserted, error: null })
+		}
+		return Promise.resolve({ data: null, error: null })
+	})
 })
 
 	it('should accept and persist cover_image_url', async () => {

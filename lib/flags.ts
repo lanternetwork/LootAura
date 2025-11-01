@@ -36,3 +36,12 @@ export function isSavedPresetsEnabled(): boolean {
 export function isShareLinksEnabled(): boolean {
   return process.env.NEXT_PUBLIC_FLAG_SHARE_LINKS !== 'false'
 }
+
+/**
+ * Check if test/demo sales are enabled
+ * Browser-safe and server-safe
+ */
+export function isTestSalesEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_ENABLE_TEST_SALES === 'true' 
+    || process.env.ENABLE_TEST_SALES === 'true'
+}

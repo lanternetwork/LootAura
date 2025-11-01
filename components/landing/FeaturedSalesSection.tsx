@@ -6,6 +6,8 @@ import Link from 'next/link'
 import SaleCard from '@/components/SaleCard'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import { Sale } from '@/lib/types'
+import { isTestSalesEnabled } from '@/lib/flags'
+import { getDemoSales } from '@/lib/demo/demoSales'
 
 interface LocationState {
   zip?: string
@@ -153,19 +155,34 @@ export function FeaturedSalesSection() {
           console.warn('[FeaturedSales] No sales found in response:', data)
         }
         
-        // Randomly shuffle and take 6 sales
-        if (allSales.length > 0) {
-          console.log('[FeaturedSales] Shuffling', allSales.length, 'sales')
-          // Fisher-Yates shuffle
-          const shuffled = [...allSales]
+        // Combine real sales with demo sales if flag is enabled
+        // Keep order: real first, demo after
+        const realSales = allSales ?? []
+        let finalSales: Sale[] = []
+        
+        if (realSales.length > 0) {
+          // Shuffle real sales and take up to 6
+          const shuffled = [...realSales]
           for (let i = shuffled.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1))
             ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
           }
-          // Take first 6 random sales
-          const selectedSales = shuffled.slice(0, 6)
-          console.log('[FeaturedSales] Selected', selectedSales.length, 'random sales')
-          setSales(selectedSales)
+          finalSales = shuffled.slice(0, 6)
+          
+          // If we have fewer than 6 real sales and flag is enabled, add demo sales
+          if (isTestSalesEnabled() && finalSales.length < 6) {
+            const demoNeeded = 6 - finalSales.length
+            const demoSales = getDemoSales().slice(0, demoNeeded)
+            finalSales = [...finalSales, ...demoSales]
+          }
+        } else if (isTestSalesEnabled()) {
+          // No real sales, but flag enabled - show demo sales
+          finalSales = getDemoSales().slice(0, 6)
+        }
+        
+        if (finalSales.length > 0) {
+          console.log('[FeaturedSales] Displaying', finalSales.length, 'sales (real:', realSales.length, 'demo:', isTestSalesEnabled() ? getDemoSales().length : 0, ')')
+          setSales(finalSales)
         } else {
           console.warn('[FeaturedSales] No sales available, showing empty state')
           setSales([])

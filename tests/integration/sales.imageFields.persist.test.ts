@@ -60,17 +60,16 @@ describe('Sales API - Image Support', () => {
 		mockIsAllowedImageUrl.mockReturnValue(true)
 		// Ensure from() always returns the chain
 		mockSupabaseClient.from.mockImplementation(() => fromChain)
-		// Re-initialize fromChain.insert if it was cleared (clearAllMocks can clear it)
-		if (!fromChain.insert || typeof fromChain.insert !== 'function') {
-			fromChain.insert = vi.fn((payload: any) => {
-				lastInsertedPayload = payload
-				return {
-					select: vi.fn(() => ({
-						single: mockSingle
-					}))
-				}
-			})
-		}
+		// Always re-initialize fromChain.insert after clearAllMocks (it clears implementations)
+		// This ensures insert is always a callable function, not just a typeof check passing
+		fromChain.insert = vi.fn((payload: any) => {
+			lastInsertedPayload = payload
+			return {
+				select: vi.fn(() => ({
+					single: mockSingle
+				}))
+			}
+		})
 		// Set up mockSingle to return inserted payload when available
 		mockSingle.mockImplementation(() => {
 			if (lastInsertedPayload) {

@@ -40,8 +40,13 @@ export function isShareLinksEnabled(): boolean {
 /**
  * Check if test/demo sales are enabled
  * Browser-safe and server-safe
+ * Prioritizes NEXT_PUBLIC_ENABLE_TEST_SALES over ENABLE_TEST_SALES
  */
 export function isTestSalesEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_ENABLE_TEST_SALES === 'true' 
-    || process.env.ENABLE_TEST_SALES === 'true'
+  // Check NEXT_PUBLIC first (client-side flag)
+  if (process.env.NEXT_PUBLIC_ENABLE_TEST_SALES !== undefined) {
+    return process.env.NEXT_PUBLIC_ENABLE_TEST_SALES === 'true'
+  }
+  // Fall back to server-side flag
+  return process.env.ENABLE_TEST_SALES === 'true'
 }

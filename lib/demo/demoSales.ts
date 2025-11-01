@@ -4,7 +4,7 @@ import type { Sale } from '@/lib/types'
  * Returns demo/test sales for UI display only
  * These should NOT be injected into API responses or map pins
  */
-export function getDemoSales(): Sale[] {
+export function getDemoSales(): (Sale & { is_demo?: boolean })[] {
   const now = new Date()
   const today = now.toISOString().split('T')[0]
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -32,7 +32,6 @@ export function getDemoSales(): Sale[] {
       is_featured: false,
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
-      // @ts-ignore - is_demo is not in the main type yet
       is_demo: true,
     },
     {
@@ -57,7 +56,6 @@ export function getDemoSales(): Sale[] {
       is_featured: false,
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
-      // @ts-ignore - is_demo is not in the main type yet
       is_demo: true,
     },
   ]

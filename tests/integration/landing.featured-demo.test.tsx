@@ -1,16 +1,22 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, waitFor, cleanup, act } from '@testing-library/react'
+import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import { FeaturedSalesSection } from '@/components/landing/FeaturedSalesSection'
 import * as flagsModule from '@/lib/flags'
+import { useSearchParams } from 'next/navigation'
 
 // Mock the flags module
 vi.mock('@/lib/flags', () => ({
   isTestSalesEnabled: vi.fn(() => false),
 }))
 
-// Mock next/navigation
+// Mock next/navigation - use same pattern as other integration tests
+const mockSearchParams = new Map<string, string>()
+
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: vi.fn(() => ({
+    get: (key: string) => mockSearchParams.get(key) || null,
+    has: (key: string) => mockSearchParams.has(key),
+  })),
 }))
 
 // Mock localStorage
@@ -25,33 +31,41 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 })
 
-// Mock navigator.geolocation - provide a mock that rejects to trigger fallback
-// This way the 'geolocation' in navigator check passes, but getCurrentPosition rejects
-Object.defineProperty(navigator, 'geolocation', {
-  value: {
-    getCurrentPosition: vi.fn((success, error) => {
-      // Reject immediately to trigger fallback
-      if (error) {
-        error(new Error('Geolocation denied'))
-      }
-    }),
-    watchPosition: vi.fn(),
-    clearWatch: vi.fn(),
-  },
-  writable: true,
-  configurable: true,
-})
-
 describe('FeaturedSalesSection with demo sales', () => {
   let fetchMock: ReturnType<typeof vi.fn>
+  let geolocationMock: {
+    getCurrentPosition: ReturnType<typeof vi.fn>
+    watchPosition: ReturnType<typeof vi.fn>
+    clearWatch: ReturnType<typeof vi.fn>
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset search params
+    mockSearchParams.clear()
+    
     // Reset default mock to return false
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
     
     // Reset localStorage mock
     localStorageMock.getItem.mockReturnValue(null)
+    
+    // Setup geolocation mock - rejects to trigger fallback
+    geolocationMock = {
+      getCurrentPosition: vi.fn((success, error) => {
+        // Reject immediately to trigger fallback
+        if (error) {
+          setTimeout(() => error(new Error('Geolocation denied')), 0)
+        }
+      }),
+      watchPosition: vi.fn(),
+      clearWatch: vi.fn(),
+    }
+    Object.defineProperty(navigator, 'geolocation', {
+      value: geolocationMock,
+      writable: true,
+      configurable: true,
+    })
     
     // Setup fetch mock
     fetchMock = vi.fn((input: RequestInfo | URL) => {

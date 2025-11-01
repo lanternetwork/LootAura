@@ -6,12 +6,21 @@ import * as ImageValidate from '@/lib/images/validateImageUrl'
 ;(process.env as any).NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'test'
 
 // Mock Supabase server with full insert/select/single support
-// Pattern similar to v2.sales.images.persist.test.ts
+// Pattern exactly like v2.sales.images.persist.test.ts
 const mockSingle = vi.fn()
 let lastInsertedPayload: any = null
 
-// fromChain will be created fresh in beforeEach to avoid clearAllMocks() issues
-let fromChain: any
+const fromChain = {
+  insert: vi.fn((payload: any) => {
+    // Store the payload so we can return it with the inserted row
+    lastInsertedPayload = payload
+    return {
+      select: vi.fn(() => ({
+        single: mockSingle
+      }))
+    }
+  }),
+}
 
 const mockSupabaseClient = {
   auth: {
@@ -40,29 +49,16 @@ beforeAll(async () => {
 
 describe('Sales API - Image Support', () => {
 	beforeEach(() => {
-		// Match working test pattern: use clearAllMocks() but create fresh fromChain
+		// Match working test pattern exactly: use clearAllMocks() without recreating fromChain
 		vi.clearAllMocks()
 		
 		lastInsertedPayload = null
-		
-		// Create fresh fromChain to avoid clearAllMocks() clearing its properties
-		fromChain = {
-			insert: vi.fn((payload: any) => {
-				// Store the payload so we can return it with the inserted row
-				lastInsertedPayload = payload
-				return {
-					select: vi.fn(() => ({
-						single: mockSingle
-					}))
-				}
-			}),
-		}
 		
 		// Reset auth mock to return user
 		mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
-		// Ensure from() always returns the fresh chain
+		// Ensure from() always returns the chain (might be cleared by clearAllMocks)
 		mockSupabaseClient.from.mockImplementation(() => fromChain)
 		// Set up mockSingle to return inserted payload when available
 		mockSingle.mockImplementation(() => {

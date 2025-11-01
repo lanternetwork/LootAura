@@ -33,11 +33,6 @@ Object.defineProperty(window, 'localStorage', {
 
 describe('FeaturedSalesSection with demo sales', () => {
   let fetchMock: ReturnType<typeof vi.fn>
-  let geolocationMock: {
-    getCurrentPosition: ReturnType<typeof vi.fn>
-    watchPosition: ReturnType<typeof vi.fn>
-    clearWatch: ReturnType<typeof vi.fn>
-  }
 
   beforeEach(() => {
     vi.clearAllMocks()

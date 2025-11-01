@@ -211,8 +211,13 @@ export function WeekendStats() {
         }).length
 
         setStats({ activeSales, newThisWeek })
-        // Update location with city/state for display
-        setLocation(prev => prev ? { ...prev, city: cityName, state: stateCode } : null)
+        // Update location with city/state for display (only if not already set to prevent re-render loop)
+        setLocation(prev => {
+          if (prev?.city === cityName && prev?.state === stateCode) {
+            return prev // No change, don't update
+          }
+          return prev ? { ...prev, city: cityName, state: stateCode } : null
+        })
       } catch (error) {
         console.error('Failed to fetch weekend stats:', error)
         // Use fallback values
@@ -223,12 +228,25 @@ export function WeekendStats() {
     }
 
     fetchStats()
-  }, [status, location])
+    // Only depend on location.lat/lng/zip, not city/state changes to prevent re-render loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, location?.lat, location?.lng, location?.zip])
 
   // Show fallback values while loading or on error
   const displayStats = stats || { activeSales: 12, newThisWeek: 3 }
-  const displayLocation = location?.city 
-    ? `${location.city}${location.state ? `, ${location.state}` : ''}`
+  // Decode URL-encoded city name if present (safe decode)
+  const cityName = (() => {
+    if (!location?.city) return null
+    try {
+      // Try to decode URL-encoded strings (e.g., "Los%20Angeles" -> "Los Angeles")
+      return decodeURIComponent(location.city)
+    } catch {
+      // If not URL-encoded, return as-is
+      return location.city
+    }
+  })()
+  const displayLocation = cityName 
+    ? `${cityName}${location.state ? `, ${location.state}` : ''}`
     : 'your area'
 
   return (

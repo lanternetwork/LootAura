@@ -250,7 +250,9 @@ export function FeaturedSalesSection() {
     }
 
     fetchSales()
-  }, [status, location])
+    // Only depend on location.lat/lng/zip, not city/state changes to prevent re-render loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, location?.lat, location?.lng, location?.zip])
 
   const handleZipSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -362,7 +364,26 @@ export function FeaturedSalesSection() {
   // Location resolved - show sales
   // Sales are already shuffled and limited to 6 in the fetch effect
   const displaySales = sales
-  const locationDisplay = location.zip || `${location.lat?.toFixed(2)}, ${location.lng?.toFixed(2)}`
+  // Display location: prefer city/state, then zip, then coordinates
+  const locationDisplay = (() => {
+    if (location.city) {
+      // Safe decode of URL-encoded city names
+      let cityName = location.city
+      try {
+        cityName = decodeURIComponent(location.city)
+      } catch {
+        // If not URL-encoded, use as-is
+      }
+      return location.state ? `${cityName}, ${location.state}` : cityName
+    }
+    if (location.zip) {
+      return location.zip
+    }
+    if (location.lat && location.lng) {
+      return `${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`
+    }
+    return 'your area'
+  })()
 
   return (
     <section className="py-12 bg-gray-50">

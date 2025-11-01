@@ -63,8 +63,8 @@ describe('Sales API - Image Support', () => {
 		mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
-		// Ensure from() returns the chain
-		mockSupabaseClient.from.mockReturnValue(fromChain)
+		// Ensure from() always returns the chain (use mockImplementation to ensure it always works)
+		mockSupabaseClient.from.mockImplementation(() => fromChain)
 		// Set up mockSingle to return inserted payload when available
 		mockSingle.mockImplementation(() => {
 			if (lastInsertedPayload) {

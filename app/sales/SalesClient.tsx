@@ -21,7 +21,7 @@ interface MapViewState {
 
 interface SalesClientProps {
   initialSales: Sale[]
-  initialCenter: { lat: number; lng: number } | null
+  initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null
   user: User | null
 }
 

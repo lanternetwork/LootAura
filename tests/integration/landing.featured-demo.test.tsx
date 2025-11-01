@@ -50,19 +50,10 @@ describe('FeaturedSalesSection with demo sales', () => {
     // Reset localStorage mock
     localStorageMock.getItem.mockReturnValue(null)
     
-    // Setup geolocation mock - rejects to trigger fallback
-    geolocationMock = {
-      getCurrentPosition: vi.fn((success, error) => {
-        // Reject immediately to trigger fallback
-        if (error) {
-          setTimeout(() => error(new Error('Geolocation denied')), 0)
-        }
-      }),
-      watchPosition: vi.fn(),
-      clearWatch: vi.fn(),
-    }
+    // Make geolocation unavailable to trigger immediate fallback to default ZIP
+    // This avoids async callbacks that cause worker crashes
     Object.defineProperty(navigator, 'geolocation', {
-      value: geolocationMock,
+      value: undefined,
       writable: true,
       configurable: true,
     })

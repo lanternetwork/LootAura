@@ -19,6 +19,20 @@ vi.mock('next/navigation', () => ({
   })),
 }))
 
+// Mock next/link to avoid navigation issues in tests
+vi.mock('next/link', () => ({
+  default: ({ children, href, ...props }: any) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}))
+
+// Mock FavoriteButton to avoid auth/API dependencies
+vi.mock('@/components/FavoriteButton', () => ({
+  default: () => null,
+}))
+
 describe('FeaturedSalesSection with demo sales', () => {
   let fetchMock: ReturnType<typeof vi.fn>
   let originalFetch: typeof fetch

@@ -308,6 +308,10 @@ const ALLOWED_PATTERNS = [
   
   // Nested console guardrail errors (tests/setup.ts)
   /^Error: Unexpected console.error:/, // Nested console guardrail errors - tests/setup.ts
+  
+  // FeaturedSalesSection logging (components/landing/FeaturedSalesSection.tsx)
+  /^\[FeaturedSales\]/, // FeaturedSales debug logging - tests/integration/landing.featured-demo.test.tsx
+  /^Failed to fetch featured sales:/, // FeaturedSales error logging - tests/integration/landing.featured-demo.test.tsx
 ]
 
 const isAllowedMessage = (message: string): boolean => {

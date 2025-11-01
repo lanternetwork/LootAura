@@ -33,14 +33,54 @@ export function FeaturedSalesSection() {
       return
     }
 
-    // 2) localStorage (only ZIP codes, not exact coordinates)
+    // 2) geolocation (non-blocking) - check this BEFORE localStorage to avoid stale cached locations
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          // Use geolocation coordinates in memory only (do not persist to localStorage)
+          // This avoids storing sensitive location data while still providing UX benefit
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          setLocation(loc)
+          setStatus('ready')
+        },
+        () => {
+          // Geolocation failed - try localStorage as fallback
+          try {
+            const saved = window.localStorage.getItem('loot-aura:lastLocation')
+            if (saved) {
+              try {
+                const parsed = JSON.parse(saved)
+                // Only use saved data if it's a ZIP code (not exact coordinates)
+                if (parsed && parsed.zip) {
+                  setLocation({ zip: parsed.zip })
+                  setStatus('ready')
+                  return
+                }
+              } catch {
+                // Invalid JSON, continue
+              }
+            }
+          } catch {
+            // localStorage might be unavailable
+          }
+          
+          // 4) final fallback city (Louisville)
+          const fallback = { zip: '40204' }
+          setLocation(fallback)
+          setStatus('ready')
+        },
+        { enableHighAccuracy: false, timeout: 3500 }
+      )
+      return
+    }
+
+    // 3) localStorage (only if geolocation not available)
     try {
       const saved = window.localStorage.getItem('loot-aura:lastLocation')
       if (saved) {
         try {
           const parsed = JSON.parse(saved)
           // Only use saved data if it's a ZIP code (not exact coordinates)
-          // This ensures we don't restore sensitive coordinate data from storage
           if (parsed && parsed.zip) {
             setLocation({ zip: parsed.zip })
             setStatus('ready')
@@ -52,27 +92,6 @@ export function FeaturedSalesSection() {
       }
     } catch {
       // localStorage might be unavailable in some contexts
-    }
-
-    // 3) geolocation (non-blocking)
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          // Use geolocation coordinates in memory only (do not persist to localStorage)
-          // This avoids storing sensitive location data while still providing UX benefit
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-          setLocation(loc)
-          setStatus('ready')
-        },
-        () => {
-          // 4) fallback city
-          const fallback = { zip: '40204' }
-          setLocation(fallback)
-          setStatus('ready')
-        },
-        { enableHighAccuracy: false, timeout: 3500 }
-      )
-      return
     }
 
     // 4) final fallback

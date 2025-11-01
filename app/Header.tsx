@@ -1,6 +1,5 @@
 'use client'
 import Link from 'next/link'
-import Image from 'next/image'
 import UserProfile from '@/components/UserProfile'
 
 export function Header() {
@@ -9,11 +8,9 @@ export function Header() {
       <div className="w-full px-4 sm:px-6 lg:px-8 h-full">
         <div className="flex justify-between items-center h-full">
           <Link href="/" className="flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
-            <Image
+            <img
               src="/brand/sitelogo.svg"
               alt="Loot Aura Logo"
-              width={32}
-              height={32}
               className="w-6 h-6 sm:w-8 sm:h-8"
             />
             Loot Aura

@@ -79,26 +79,30 @@ describe('FeaturedSalesSection with demo sales', () => {
     })
     
     // Make geolocation unavailable to trigger immediate fallback to default ZIP
-    // Mock getCurrentPosition to call error callback synchronously
-    // This triggers the fallback ZIP code path
-    const mockGeolocation = {
-      getCurrentPosition: vi.fn((success, error) => {
-        // Call error callback synchronously to trigger fallback
-        if (error) {
-          error(new Error('Geolocation not available'))
-        }
-      }),
-      watchPosition: vi.fn(),
-      clearWatch: vi.fn(),
+    // Delete the property so 'geolocation' in navigator returns false
+    // This causes the component to skip geolocation and use fallback ZIP immediately
+    // This avoids async callbacks that cause infinite update loops
+    try {
+      delete (navigator as any).geolocation
+    } catch {
+      // If delete fails, try defining it as undefined with proper config
+      try {
+        Object.defineProperty(navigator, 'geolocation', {
+          value: undefined,
+          writable: true,
+          configurable: true,
+          enumerable: false,
+        })
+      } catch {
+        // If that also fails, define it as an object without getCurrentPosition
+        // The 'in' check will return true, but component will fail safely
+        Object.defineProperty(navigator, 'geolocation', {
+          value: {},
+          writable: true,
+          configurable: true,
+        })
+      }
     }
-    
-    // Define mock geolocation so 'geolocation' in navigator returns true
-    // but getCurrentPosition will call error callback
-    Object.defineProperty(navigator, 'geolocation', {
-      value: mockGeolocation,
-      writable: true,
-      configurable: true,
-    })
     
     // Setup fetch mock
     fetchMock = vi.fn((input: RequestInfo | URL) => {

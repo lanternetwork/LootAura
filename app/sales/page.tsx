@@ -31,6 +31,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   // Parse search parameters (for future use)
   const _lat = searchParams.lat ? parseFloat(searchParams.lat) : undefined
   const _lng = searchParams.lng ? parseFloat(searchParams.lng) : undefined
+  const _zip = searchParams.zip
   const _distanceKm = searchParams.distanceKm ? parseFloat(searchParams.distanceKm) : 25
   const _city = searchParams.city
   const _categories = searchParams.categories ? searchParams.categories.split(',') : undefined
@@ -49,6 +50,26 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   if (_lat && _lng) {
     initialCenter = { lat: _lat, lng: _lng }
     console.log(`[SALES_PAGE] Using URL parameters:`, initialCenter)
+  }
+  
+  // 0.5) ZIP code lookup (only if no lat/lng in URL)
+  if (!initialCenter && _zip && baseUrl) {
+    try {
+      const zipRes = await fetch(`${baseUrl}/api/geocoding/zip?zip=${encodeURIComponent(_zip)}`, { cache: 'no-store' })
+      if (zipRes.ok) {
+        const zipData = await zipRes.json()
+        if (zipData?.ok && zipData.lat && zipData.lng) {
+          initialCenter = { 
+            lat: zipData.lat, 
+            lng: zipData.lng, 
+            label: { zip: zipData.zip, city: zipData.city, state: zipData.state } 
+          }
+          console.log(`[SALES_PAGE] Using ZIP lookup from URL:`, initialCenter)
+        }
+      }
+    } catch (error) {
+      console.error(`[SALES_PAGE] ZIP lookup error:`, error)
+    }
   }
 
   // 1) la_loc cookie (only if no URL params)

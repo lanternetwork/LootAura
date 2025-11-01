@@ -448,13 +448,20 @@ export default function SalesClient({
   // Initial fetch will be triggered by map onLoad event with proper bounds
 
   // Restore ZIP from URL on page load only (not on every URL change)
+  // Skip if initialCenter already matches ZIP (server-side lookup succeeded)
   const [hasRestoredZip, setHasRestoredZip] = useState(false)
   useEffect(() => {
     if (hasRestoredZip) return // Only run once on mount
     
     const zipFromUrl = searchParams.get('zip')
-    // Only lookup ZIP if there's no lat/lng in URL (ZIP takes precedence over default center)
-    if (zipFromUrl && !urlLat && !urlLng) {
+    // Only lookup ZIP client-side if:
+    // 1. There's a ZIP in URL
+    // 2. No lat/lng in URL
+    // 3. InitialCenter doesn't already have the correct ZIP location (server-side lookup might have failed)
+    const needsClientSideLookup = zipFromUrl && !urlLat && !urlLng && 
+      (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== zipFromUrl.trim())
+    
+    if (needsClientSideLookup) {
       // Trigger ZIP lookup from URL
       console.log('[ZIP] Restoring from URL:', zipFromUrl)
       
@@ -493,8 +500,11 @@ export default function SalesClient({
     } else if (!zipFromUrl) {
       // No ZIP in URL, mark as processed
       setHasRestoredZip(true)
+    } else {
+      // ZIP in URL but already resolved server-side, mark as processed
+      setHasRestoredZip(true)
     }
-  }, [searchParams, hasRestoredZip, urlLat, urlLng, handleZipLocationFound, handleZipError])
+  }, [searchParams, hasRestoredZip, urlLat, urlLng, initialCenter, handleZipLocationFound, handleZipError])
 
   // Memoized visible sales - filtered by current viewport bounds to match map pins
   const visibleSales = useMemo(() => {

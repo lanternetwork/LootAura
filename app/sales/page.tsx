@@ -6,6 +6,7 @@ interface SalesPageProps {
   searchParams: {
     lat?: string
     lng?: string
+    zip?: string
     distanceKm?: string
     city?: string
     categories?: string

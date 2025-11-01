@@ -19,20 +19,17 @@ vi.mock('next/navigation', () => ({
   })),
 }))
 
-// Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(() => null),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-}
-Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock,
-  writable: true,
-})
-
 describe('FeaturedSalesSection with demo sales', () => {
   let fetchMock: ReturnType<typeof vi.fn>
+  let originalFetch: typeof fetch
+  let originalLocalStorage: Storage | undefined
+  let originalGeolocation: Geolocation | undefined
+  let localStorageMock: {
+    getItem: ReturnType<typeof vi.fn>
+    setItem: ReturnType<typeof vi.fn>
+    removeItem: ReturnType<typeof vi.fn>
+    clear: ReturnType<typeof vi.fn>
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -42,8 +39,23 @@ describe('FeaturedSalesSection with demo sales', () => {
     // Reset default mock to return false
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
     
-    // Reset localStorage mock
-    localStorageMock.getItem.mockReturnValue(null)
+    // Save original values
+    originalFetch = global.fetch
+    originalLocalStorage = window.localStorage
+    originalGeolocation = navigator.geolocation
+    
+    // Setup localStorage mock
+    localStorageMock = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    }
+    Object.defineProperty(window, 'localStorage', {
+      value: localStorageMock,
+      writable: true,
+      configurable: true,
+    })
     
     // Make geolocation unavailable to trigger immediate fallback to default ZIP
     // This avoids async callbacks that cause worker crashes
@@ -76,6 +88,23 @@ describe('FeaturedSalesSection with demo sales', () => {
   afterEach(() => {
     cleanup()
     vi.clearAllMocks()
+    
+    // Restore original values to avoid interfering with other tests
+    global.fetch = originalFetch
+    if (originalLocalStorage) {
+      Object.defineProperty(window, 'localStorage', {
+        value: originalLocalStorage,
+        writable: true,
+        configurable: true,
+      })
+    }
+    if (originalGeolocation !== undefined) {
+      Object.defineProperty(navigator, 'geolocation', {
+        value: originalGeolocation,
+        writable: true,
+        configurable: true,
+      })
+    }
   })
 
   it('shows demo sales when flag is enabled', async () => {

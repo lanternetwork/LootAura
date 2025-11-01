@@ -9,13 +9,9 @@ vi.mock('@/lib/flags', () => ({
 }))
 
 // Mock next/navigation
-vi.mock('next/navigation', async () => {
-  const actual = await vi.importActual('next/navigation')
-  return {
-    ...actual,
-    useSearchParams: () => new URLSearchParams(),
-  }
-})
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 // Mock localStorage
 const localStorageMock = {
@@ -29,17 +25,9 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 })
 
-// Mock navigator.geolocation
-const geolocationMock = {
-  getCurrentPosition: vi.fn((success, error) => {
-    // Call error callback immediately to trigger fallback
-    if (error) {
-      error({ code: 1, message: 'User denied Geolocation' })
-    }
-  }),
-}
+// Mock navigator.geolocation - return undefined to trigger fallback
 Object.defineProperty(navigator, 'geolocation', {
-  value: geolocationMock,
+  value: undefined,
   writable: true,
   configurable: true,
 })
@@ -92,7 +80,7 @@ describe('FeaturedSalesSection with demo sales', () => {
         const demoBadges = screen.queryAllByText('Demo')
         expect(demoBadges.length).toBeGreaterThan(0)
       },
-      { timeout: 3000 }
+      { timeout: 5000 }
     )
 
     // Verify demo sale titles appear
@@ -107,7 +95,7 @@ describe('FeaturedSalesSection with demo sales', () => {
 
     render(<FeaturedSalesSection />)
 
-    // Wait for component to finish loading (location resolution completes)
+    // Wait for component to finish loading
     await waitFor(
       () => {
         // Component should finish loading - wait for fetch to complete

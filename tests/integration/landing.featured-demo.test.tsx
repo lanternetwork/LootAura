@@ -9,11 +9,11 @@ vi.mock('@/lib/flags', () => ({
 }))
 
 // Mock next/navigation
-const mockSearchParams = new Map<string, string>()
+const mockSearchParams = vi.fn()
 vi.mock('next/navigation', () => ({
   useSearchParams: () => ({
-    get: (key: string) => mockSearchParams.get(key) || null,
-    has: (key: string) => mockSearchParams.has(key),
+    get: mockSearchParams,
+    has: vi.fn(),
   }),
 }))
 
@@ -47,8 +47,8 @@ describe('FeaturedSalesSection with demo sales', () => {
     // Reset default mock to return false
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
     
-    // Clear search params
-    mockSearchParams.clear()
+    // Reset search params mock
+    mockSearchParams.mockReturnValue(null)
     
     // Reset localStorage mock
     localStorageMock.getItem.mockReturnValue(null)
@@ -74,24 +74,28 @@ describe('FeaturedSalesSection with demo sales', () => {
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(true)
 
     // Set up ZIP in URL to avoid geolocation
-    mockSearchParams.set('zip', '40204')
+    mockSearchParams.mockImplementation((key: string) => {
+      if (key === 'zip' || key === 'postal') return '40204'
+      return null
+    })
 
     // Mock geocoding and sales API calls
-    global.fetch = vi.fn((url: string) => {
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
       if (url.includes('/api/geocoding/zip')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({ ok: true, lat: '38.2527', lng: '-85.7585', zip: '40204' }),
-        })
+        } as Response)
       }
       if (url.includes('/api/sales')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({ sales: [] }),
-        })
+        } as Response)
       }
       return Promise.reject(new Error(`Unexpected fetch call: ${url}`))
-    })
+    }) as typeof fetch
 
     render(<FeaturedSalesSection />)
 
@@ -110,24 +114,28 @@ describe('FeaturedSalesSection with demo sales', () => {
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
 
     // Set up ZIP in URL to avoid geolocation
-    mockSearchParams.set('zip', '40204')
+    mockSearchParams.mockImplementation((key: string) => {
+      if (key === 'zip' || key === 'postal') return '40204'
+      return null
+    })
 
     // Mock API calls
-    global.fetch = vi.fn((url: string) => {
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
       if (url.includes('/api/geocoding/zip')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({ ok: true, lat: '38.2527', lng: '-85.7585', zip: '40204' }),
-        })
+        } as Response)
       }
       if (url.includes('/api/sales')) {
         return Promise.resolve({
           ok: true,
           json: async () => ({ sales: [] }),
-        })
+        } as Response)
       }
       return Promise.reject(new Error(`Unexpected fetch call: ${url}`))
-    })
+    }) as typeof fetch
 
     render(<FeaturedSalesSection />)
 

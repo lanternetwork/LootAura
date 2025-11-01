@@ -56,6 +56,15 @@ describe('Sales API - Image Support', () => {
 		mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
+		// Re-initialize insert function (clearAllMocks might clear it)
+		fromChain.insert = vi.fn((payload: any) => {
+			lastInsertedPayload = payload
+			return {
+				select: vi.fn(() => ({
+					single: mockSingle
+				}))
+			}
+		})
 		// Ensure from() returns the chain after clearAllMocks
 		mockSupabaseClient.from.mockReturnValue(fromChain)
 		// Set up mockSingle to return inserted payload when available

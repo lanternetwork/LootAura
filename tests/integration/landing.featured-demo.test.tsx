@@ -9,9 +9,37 @@ vi.mock('@/lib/flags', () => ({
 }))
 
 // Mock next/navigation
+const mockSearchParams = new Map<string, string>()
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => ({
+    get: (key: string) => mockSearchParams.get(key) || null,
+    has: (key: string) => mockSearchParams.has(key),
+  }),
 }))
+
+// Mock localStorage
+const localStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+}
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+})
+
+// Mock navigator.geolocation
+const geolocationMock = {
+  getCurrentPosition: vi.fn((success, error) => {
+    // Default to fallback (error callback)
+    if (error) {
+      error()
+    }
+  }),
+}
+Object.defineProperty(navigator, 'geolocation', {
+  value: geolocationMock,
+})
 
 // Mock fetch
 global.fetch = vi.fn()
@@ -21,16 +49,39 @@ describe('FeaturedSalesSection with demo sales', () => {
     vi.clearAllMocks()
     // Reset default mock to return false
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
+    
+    // Clear search params
+    mockSearchParams.clear()
+    
+    // Reset localStorage mock
+    localStorageMock.getItem.mockReturnValue(null)
+    
+    // Reset geolocation mock to fallback behavior
+    geolocationMock.getCurrentPosition.mockImplementation((success, error) => {
+      if (error) error()
+    })
   })
 
   it('shows demo sales when flag is enabled', async () => {
     // Enable the flag
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(true)
 
-    // Mock fetch to return empty array (no real sales)
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ sales: [] }),
+    // Mock geocoding API call
+    global.fetch = vi.fn((url: string) => {
+      if (url.includes('/api/geocoding/zip')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ ok: true, lat: '38.2527', lng: '-85.7585', zip: '40204' }),
+        })
+      }
+      // Mock sales API call
+      if (url.includes('/api/sales')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ sales: [] }),
+        })
+      }
+      return Promise.reject(new Error(`Unexpected fetch call: ${url}`))
     })
 
     render(<FeaturedSalesSection />)
@@ -41,7 +92,7 @@ describe('FeaturedSalesSection with demo sales', () => {
         const demoBadges = screen.queryAllByText('Demo')
         expect(demoBadges.length).toBeGreaterThan(0)
       },
-      { timeout: 3000 }
+      { timeout: 5000 }
     )
   })
 
@@ -49,10 +100,22 @@ describe('FeaturedSalesSection with demo sales', () => {
     // Disable the flag
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
 
-    // Mock fetch to return empty array
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ sales: [] }),
+    // Mock geocoding API call
+    global.fetch = vi.fn((url: string) => {
+      if (url.includes('/api/geocoding/zip')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ ok: true, lat: '38.2527', lng: '-85.7585', zip: '40204' }),
+        })
+      }
+      // Mock sales API call
+      if (url.includes('/api/sales')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ sales: [] }),
+        })
+      }
+      return Promise.reject(new Error(`Unexpected fetch call: ${url}`))
     })
 
     render(<FeaturedSalesSection />)
@@ -64,7 +127,7 @@ describe('FeaturedSalesSection with demo sales', () => {
         const demoBadges = screen.queryAllByText('Demo')
         expect(demoBadges.length).toBe(0)
       },
-      { timeout: 3000 }
+      { timeout: 5000 }
     )
   })
 
@@ -72,10 +135,22 @@ describe('FeaturedSalesSection with demo sales', () => {
     // Enable the flag
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(true)
 
-    // Mock fetch to return empty array
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ sales: [] }),
+    // Mock geocoding API call
+    global.fetch = vi.fn((url: string) => {
+      if (url.includes('/api/geocoding/zip')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ ok: true, lat: '38.2527', lng: '-85.7585', zip: '40204' }),
+        })
+      }
+      // Mock sales API call
+      if (url.includes('/api/sales')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ sales: [] }),
+        })
+      }
+      return Promise.reject(new Error(`Unexpected fetch call: ${url}`))
     })
 
     render(<FeaturedSalesSection />)
@@ -92,7 +167,7 @@ describe('FeaturedSalesSection with demo sales', () => {
         const demoBadges = screen.queryAllByText('Demo')
         expect(demoBadges.length).toBeGreaterThan(0)
       },
-      { timeout: 3000 }
+      { timeout: 5000 }
     )
   })
 })

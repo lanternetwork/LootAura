@@ -25,9 +25,19 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 })
 
-// Mock navigator.geolocation - return undefined to trigger fallback
+// Mock navigator.geolocation - provide a mock that rejects to trigger fallback
+// This way the 'geolocation' in navigator check passes, but getCurrentPosition rejects
 Object.defineProperty(navigator, 'geolocation', {
-  value: undefined,
+  value: {
+    getCurrentPosition: vi.fn((success, error) => {
+      // Reject immediately to trigger fallback
+      if (error) {
+        error(new Error('Geolocation denied'))
+      }
+    }),
+    watchPosition: vi.fn(),
+    clearWatch: vi.fn(),
+  },
   writable: true,
   configurable: true,
 })

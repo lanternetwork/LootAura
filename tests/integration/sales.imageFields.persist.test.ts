@@ -49,7 +49,7 @@ beforeAll(async () => {
 
 describe('Sales API - Image Support', () => {
 	beforeEach(() => {
-		// Match working test pattern: use clearAllMocks() but ensure fromChain.insert remains callable
+		// Match working test pattern exactly - use clearAllMocks() like v2 test
 		vi.clearAllMocks()
 		
 		lastInsertedPayload = null
@@ -58,17 +58,6 @@ describe('Sales API - Image Support', () => {
 		mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
-		// CRITICAL: Re-initialize from() to return fromChain after clearAllMocks() clears it
-		mockSupabaseClient.from.mockImplementation(() => fromChain)
-		// CRITICAL: Re-initialize fromChain.insert after clearAllMocks() clears its implementation
-		fromChain.insert = vi.fn((payload: any) => {
-			lastInsertedPayload = payload
-			return {
-				select: vi.fn(() => ({
-					single: mockSingle
-				}))
-			}
-		})
 		// Set up mockSingle to return inserted payload when available
 		mockSingle.mockImplementation(() => {
 			if (lastInsertedPayload) {
@@ -82,6 +71,9 @@ describe('Sales API - Image Support', () => {
 			}
 			return Promise.resolve({ data: { id: 'test-sale-id' }, error: null })
 		})
+		// Note: from() and fromChain.insert are NOT re-initialized after clearAllMocks()
+		// because clearAllMocks() should NOT clear implementations on const objects
+		// If this fails, the issue is that clearAllMocks() is clearing const object properties
 	})
 
 	it('should accept and persist cover_image_url', async () => {

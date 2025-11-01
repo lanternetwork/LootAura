@@ -10,17 +10,8 @@ import * as ImageValidate from '@/lib/images/validateImageUrl'
 const mockSingle = vi.fn()
 let lastInsertedPayload: any = null
 
-const fromChain = {
-  insert: vi.fn((payload: any) => {
-    // Store the payload so we can return it with the inserted row
-    lastInsertedPayload = payload
-    return {
-      select: vi.fn(() => ({
-        single: mockSingle
-      }))
-    }
-  }),
-}
+// fromChain will be created fresh in beforeEach to avoid clearAllMocks() issues
+let fromChain: any
 
 const mockSupabaseClient = {
   auth: {
@@ -49,27 +40,30 @@ beforeAll(async () => {
 
 describe('Sales API - Image Support', () => {
 	beforeEach(() => {
-		// Match working test pattern: use clearAllMocks() but preserve fromChain.insert
+		// Match working test pattern: use clearAllMocks() but create fresh fromChain
 		vi.clearAllMocks()
 		
 		lastInsertedPayload = null
+		
+		// Create fresh fromChain to avoid clearAllMocks() clearing its properties
+		fromChain = {
+			insert: vi.fn((payload: any) => {
+				// Store the payload so we can return it with the inserted row
+				lastInsertedPayload = payload
+				return {
+					select: vi.fn(() => ({
+						single: mockSingle
+					}))
+				}
+			}),
+		}
 		
 		// Reset auth mock to return user
 		mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
-		// Ensure from() always returns the chain
+		// Ensure from() always returns the fresh chain
 		mockSupabaseClient.from.mockImplementation(() => fromChain)
-		// Always re-initialize fromChain.insert after clearAllMocks (it clears implementations)
-		// This ensures insert is always a callable function, not just a typeof check passing
-		fromChain.insert = vi.fn((payload: any) => {
-			lastInsertedPayload = payload
-			return {
-				select: vi.fn(() => ({
-					single: mockSingle
-				}))
-			}
-		})
 		// Set up mockSingle to return inserted payload when available
 		mockSingle.mockImplementation(() => {
 			if (lastInsertedPayload) {

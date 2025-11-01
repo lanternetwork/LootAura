@@ -50,12 +50,12 @@ beforeAll(async () => {
 describe('Sales API - Image Support', () => {
 	beforeEach(() => {
 		// Clear call history without clearing implementations
-		// Use mockClear() instead of clearAllMocks() to preserve function implementations
+		// Don't clear fromChain.insert - we need it to remain a function for the route's typeof check
 		mockSupabaseClient.from.mockClear()
 		mockSupabaseClient.auth.getUser.mockClear()
 		mockIsAllowedImageUrl.mockClear()
 		mockSingle.mockClear()
-		fromChain.insert.mockClear()
+		// Note: We intentionally don't clear fromChain.insert to preserve its function implementation
 		
 		lastInsertedPayload = null
 		

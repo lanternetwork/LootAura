@@ -4,7 +4,7 @@ import { WeekendStats } from './WeekendStats'
 
 export function Hero() {
   return (
-    <section className="relative min-h-[500px] md:min-h-[600px] overflow-hidden">
+    <section className="relative min-h-[375px] md:min-h-[450px] overflow-hidden">
       {/* Background Image */}
       <Image
         src="/brand/HeroImage1.png"

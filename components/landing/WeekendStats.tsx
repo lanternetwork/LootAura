@@ -34,70 +34,105 @@ export function WeekendStats() {
       return
     }
 
-    // 2) geolocation (non-blocking) - check this BEFORE localStorage to avoid stale cached locations
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          // Use geolocation coordinates in memory only (do not persist to localStorage)
-          // This avoids storing sensitive location data while still providing UX benefit
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-          setLocation(loc)
-          setStatus('ready')
-        },
-        () => {
-          // Geolocation failed - try localStorage as fallback
-          try {
-            const saved = window.localStorage.getItem('loot-aura:lastLocation')
-            if (saved) {
-              try {
-                const parsed = JSON.parse(saved)
-                // Only use saved data if it's a ZIP code (not exact coordinates)
-                if (parsed && parsed.zip) {
-                  setLocation({ zip: parsed.zip })
-                  setStatus('ready')
-                  return
-                }
-              } catch {
-                // Invalid JSON, continue
-              }
+    // 2) Try IP-based geolocation first (works with VPNs and doesn't require permission)
+    // This should be the PRIMARY method since it respects VPN location
+    const tryIPGeolocation = async () => {
+      try {
+        const ipRes = await fetch('/api/geolocation/ip')
+        if (ipRes.ok) {
+          const ipData = await ipRes.json()
+          if (ipData.lat && ipData.lng) {
+            console.log('[WeekendStats] Using IP geolocation:', ipData)
+            const loc = { 
+              lat: ipData.lat, 
+              lng: ipData.lng,
+              city: ipData.city,
+              state: ipData.state
             }
-          } catch {
-            // localStorage might be unavailable
-          }
-          
-          // 4) final fallback city (Louisville as last resort)
-          const fallback = { zip: '40204', city: 'Louisville', state: 'KY' }
-          setLocation(fallback)
-          setStatus('ready')
-        },
-        { enableHighAccuracy: false, timeout: 3500 }
-      )
-      return
-    }
-
-    // 3) localStorage (only if geolocation not available)
-    try {
-      const saved = window.localStorage.getItem('loot-aura:lastLocation')
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved)
-          // Only use saved data if it's a ZIP code (not exact coordinates)
-          if (parsed && parsed.zip) {
-            setLocation({ zip: parsed.zip })
+            setLocation(loc)
             setStatus('ready')
-            return
+            return true
+          }
+        }
+      } catch (error) {
+        console.warn('[WeekendStats] IP geolocation failed:', error)
+      }
+      return false
+    }
+    
+    // Try IP geolocation first (respects VPN location)
+    tryIPGeolocation().then((ipSuccess) => {
+      if (ipSuccess) {
+        return // IP geolocation succeeded - use it
+      }
+      
+      // IP geolocation failed - try browser geolocation (but it won't change with VPN)
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            // Use geolocation coordinates in memory only (do not persist to localStorage)
+            // This avoids storing sensitive location data while still providing UX benefit
+            const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+            console.log('[WeekendStats] Using browser geolocation:', loc)
+            setLocation(loc)
+            setStatus('ready')
+          },
+          () => {
+            // Browser geolocation failed - try localStorage as fallback
+            try {
+              const saved = window.localStorage.getItem('loot-aura:lastLocation')
+              if (saved) {
+                try {
+                  const parsed = JSON.parse(saved)
+                  // Only use saved data if it's a ZIP code (not exact coordinates)
+                  if (parsed && parsed.zip) {
+                    console.log('[WeekendStats] Using localStorage ZIP:', parsed.zip)
+                    setLocation({ zip: parsed.zip })
+                    setStatus('ready')
+                    return
+                  }
+                } catch {
+                  // Invalid JSON, continue
+                }
+              }
+            } catch {
+              // localStorage might be unavailable
+            }
+            
+            // Final fallback city (Louisville as last resort)
+            console.log('[WeekendStats] Using fallback Louisville')
+            const fallback = { zip: '40204', city: 'Louisville', state: 'KY' }
+            setLocation(fallback)
+            setStatus('ready')
+          },
+          { enableHighAccuracy: false, timeout: 3500 }
+        )
+      } else {
+        // No geolocation API - try localStorage
+        try {
+          const saved = window.localStorage.getItem('loot-aura:lastLocation')
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved)
+              // Only use saved data if it's a ZIP code (not exact coordinates)
+              if (parsed && parsed.zip) {
+                setLocation({ zip: parsed.zip })
+                setStatus('ready')
+                return
+              }
+            } catch {
+              // Invalid JSON, continue
+            }
           }
         } catch {
-          // Invalid JSON, continue
+          // localStorage might be unavailable
         }
+        
+        // Final fallback
+        setLocation({ zip: '40204', city: 'Louisville', state: 'KY' })
+        setStatus('ready')
       }
-    } catch {
-      // localStorage might be unavailable in some contexts
-    }
-
-    // 4) final fallback
-    setLocation({ zip: '40204', city: 'Louisville', state: 'KY' })
-    setStatus('ready')
+    })
   }, [searchParams])
 
   // Fetch stats when location is ready

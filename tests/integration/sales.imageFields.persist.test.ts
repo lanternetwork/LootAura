@@ -1,13 +1,48 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import * as ImageValidate from '@/lib/images/validateImageUrl'
-import { mockSupabaseServer } from '@/tests/mocks/supabaseServer.mock'
 
 // Ensure Cloudinary validator recognizes the test cloud name
 ;(process.env as any).NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'test'
 
-// Use shared Supabase server mock with full insert/select/single support
-mockSupabaseServer({ sales_v2: [] })
+// Mock Supabase server with full insert/select/single support
+const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
+  },
+  from: vi.fn((table: string) => {
+    // Set up insert chain that returns data matching the inserted payload
+    if (table === 'sales_v2') {
+      return {
+        insert: vi.fn((payload: any) => {
+          const inserted = {
+            id: 'test-sale-id',
+            ...payload,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+          return {
+            select: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: inserted, error: null })
+            }))
+          }
+        })
+      }
+    }
+    // Return a default chain for other tables
+    return {
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn().mockResolvedValue({ data: null, error: null })
+        }))
+      }))
+    }
+  })
+}
+
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: () => mockSupabaseClient,
+}))
 
 // Mock rate limiting
 vi.mock('@/lib/rateLimit/withRateLimit', () => ({
@@ -26,6 +61,10 @@ beforeAll(async () => {
 describe('Sales API - Image Support', () => {
 beforeEach(() => {
 	vi.clearAllMocks()
+	// Reset auth mock to return user
+	mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
+	// Reset image validator spy
+	mockIsAllowedImageUrl.mockReturnValue(true)
 })
 
 	it('should accept and persist cover_image_url', async () => {

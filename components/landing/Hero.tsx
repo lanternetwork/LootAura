@@ -6,7 +6,7 @@ export function Hero() {
     <section 
       className="relative bg-cover bg-center bg-no-repeat"
       style={{
-        backgroundImage: 'url(/brand/HeroImage.png)'
+        backgroundImage: 'url(/brand/HeroImage1.png)'
       }}
     >
       {/* Overlay for text readability */}

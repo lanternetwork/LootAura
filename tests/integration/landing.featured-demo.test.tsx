@@ -132,28 +132,39 @@ describe('FeaturedSalesSection with demo sales', () => {
     // Enable the flag
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(true)
 
-    render(<FeaturedSalesSection />)
+    const { unmount } = render(<FeaturedSalesSection />)
 
-    // Wait for demo sales to appear
+    // Wait for demo sales to appear - component should resolve location and fetch
+    await waitFor(
+      () => {
+        expect(fetchMock).toHaveBeenCalled()
+      },
+      { timeout: 3000 }
+    )
+
+    // Wait a bit more for demo sales to render
     await waitFor(
       () => {
         const demoBadges = screen.queryAllByText('Demo')
         expect(demoBadges.length).toBeGreaterThan(0)
       },
-      { timeout: 5000 }
+      { timeout: 2000 }
     )
 
     // Verify demo sale titles appear
     const demoTitle1 = screen.queryByText(/Demo: Neighborhood Yard Sale/i)
     const demoTitle2 = screen.queryByText(/Demo: Multi-family Sale/i)
     expect(demoTitle1 || demoTitle2).toBeTruthy()
+
+    // Clean up component before test ends
+    unmount()
   })
 
   it('does not show demo sales when flag is disabled', async () => {
     // Keep flag disabled
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
 
-    render(<FeaturedSalesSection />)
+    const { unmount } = render(<FeaturedSalesSection />)
 
     // Wait for component to finish loading
     await waitFor(
@@ -164,9 +175,17 @@ describe('FeaturedSalesSection with demo sales', () => {
       { timeout: 3000 }
     )
 
-    // Verify no demo badges appear
-    const demoBadges = screen.queryAllByText('Demo')
-    expect(demoBadges.length).toBe(0)
+    // Wait a bit for component to render and verify no demo badges appear
+    await waitFor(
+      () => {
+        const demoBadges = screen.queryAllByText('Demo')
+        expect(demoBadges.length).toBe(0)
+      },
+      { timeout: 1000 }
+    )
+
+    // Clean up component before test ends
+    unmount()
   })
 })
 

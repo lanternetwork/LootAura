@@ -9,12 +9,22 @@ vi.mock('@/lib/flags', () => ({
 }))
 
 // Mock next/navigation
-const mockSearchParams = vi.fn()
+const mockSearchParamsGet = vi.fn()
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => ({
-    get: mockSearchParams,
-    has: vi.fn(),
-  }),
+  useSearchParams: () => {
+    const searchParams = new URLSearchParams()
+    // Create a mock ReadonlyURLSearchParams-like object
+    return {
+      get: mockSearchParamsGet,
+      has: vi.fn(),
+      toString: vi.fn(() => searchParams.toString()),
+      entries: vi.fn(() => searchParams.entries()),
+      keys: vi.fn(() => searchParams.keys()),
+      values: vi.fn(() => searchParams.values()),
+      forEach: vi.fn((callback) => searchParams.forEach(callback)),
+      [Symbol.iterator]: vi.fn(() => searchParams[Symbol.iterator]()),
+    } as any
+  },
 }))
 
 // Mock localStorage
@@ -48,7 +58,7 @@ describe('FeaturedSalesSection with demo sales', () => {
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
     
     // Reset search params mock
-    mockSearchParams.mockReturnValue(null)
+    mockSearchParamsGet.mockReturnValue(null)
     
     // Reset localStorage mock
     localStorageMock.getItem.mockReturnValue(null)
@@ -74,7 +84,7 @@ describe('FeaturedSalesSection with demo sales', () => {
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(true)
 
     // Set up ZIP in URL to avoid geolocation
-    mockSearchParams.mockImplementation((key: string) => {
+    mockSearchParamsGet.mockImplementation((key: string) => {
       if (key === 'zip' || key === 'postal') return '40204'
       return null
     })
@@ -114,7 +124,7 @@ describe('FeaturedSalesSection with demo sales', () => {
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
 
     // Set up ZIP in URL to avoid geolocation
-    mockSearchParams.mockImplementation((key: string) => {
+    mockSearchParamsGet.mockImplementation((key: string) => {
       if (key === 'zip' || key === 'postal') return '40204'
       return null
     })

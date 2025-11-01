@@ -49,26 +49,22 @@ beforeAll(async () => {
 
 describe('Sales API - Image Support', () => {
 	beforeEach(() => {
-		// Match working test pattern exactly: use clearAllMocks() without recreating fromChain
-		vi.clearAllMocks()
-		
+		// Don't use clearAllMocks() as it clears implementations, breaking fromChain.insert
+		// Instead, reset only what we need
 		lastInsertedPayload = null
+		
+		// Reset call history but preserve implementations
+		mockSupabaseClient.from.mockClear()
+		mockSupabaseClient.auth.getUser.mockClear()
+		mockIsAllowedImageUrl.mockClear()
+		mockSingle.mockClear()
 		
 		// Reset auth mock to return user
 		mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
-		// Ensure from() always returns the chain (re-setup after clearAllMocks might have cleared it)
+		// Ensure from() always returns the chain
 		mockSupabaseClient.from.mockImplementation(() => fromChain)
-		// Re-initialize fromChain.insert after clearAllMocks (it might clear implementations)
-		fromChain.insert = vi.fn((payload: any) => {
-			lastInsertedPayload = payload
-			return {
-				select: vi.fn(() => ({
-					single: mockSingle
-				}))
-			}
-		})
 		// Set up mockSingle to return inserted payload when available
 		mockSingle.mockImplementation(() => {
 			if (lastInsertedPayload) {

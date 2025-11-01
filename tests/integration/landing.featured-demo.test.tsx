@@ -8,12 +8,18 @@ vi.mock('@/lib/flags', () => ({
   isTestSalesEnabled: vi.fn(() => false),
 }))
 
-// Note: useSearchParams is already mocked globally in tests/setup.ts
-// We rely on that global mock and don't override it here to avoid React conflicts
+// Mock next/navigation
+vi.mock('next/navigation', async () => {
+  const actual = await vi.importActual('next/navigation')
+  return {
+    ...actual,
+    useSearchParams: () => new URLSearchParams(),
+  }
+})
 
 // Mock localStorage
 const localStorageMock = {
-  getItem: vi.fn(),
+  getItem: vi.fn(() => null),
   setItem: vi.fn(),
   removeItem: vi.fn(),
   clear: vi.fn(),
@@ -25,14 +31,22 @@ Object.defineProperty(window, 'localStorage', {
 
 // Mock navigator.geolocation
 const geolocationMock = {
-  getCurrentPosition: vi.fn(),
+  getCurrentPosition: vi.fn((success, error) => {
+    // Call error callback immediately to trigger fallback
+    if (error) {
+      error({ code: 1, message: 'User denied Geolocation' })
+    }
+  }),
 }
 Object.defineProperty(navigator, 'geolocation', {
   value: geolocationMock,
   writable: true,
+  configurable: true,
 })
 
 describe('FeaturedSalesSection with demo sales', () => {
+  let fetchMock: ReturnType<typeof vi.fn>
+
   beforeEach(() => {
     vi.clearAllMocks()
     // Reset default mock to return false
@@ -41,17 +55,9 @@ describe('FeaturedSalesSection with demo sales', () => {
     // Reset localStorage mock
     localStorageMock.getItem.mockReturnValue(null)
     
-    // Reset geolocation mock - don't provide geolocation, will fallback to default ZIP
-    geolocationMock.getCurrentPosition.mockImplementation((success, error) => {
-      // Immediately call error callback to trigger fallback to 40204
-      if (error) {
-        setTimeout(() => error(new Error('Geolocation denied')), 0)
-      }
-    })
-    
-    // Mock fetch to avoid network calls
-    global.fetch = vi.fn((input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+    // Setup fetch mock
+    fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url
       if (url.includes('/api/geocoding/zip')) {
         return Promise.resolve({
           ok: true,
@@ -65,11 +71,13 @@ describe('FeaturedSalesSection with demo sales', () => {
         } as Response)
       }
       return Promise.reject(new Error(`Unexpected fetch call: ${url}`))
-    }) as typeof fetch
+    })
+    global.fetch = fetchMock as typeof fetch
   })
 
   afterEach(() => {
     cleanup()
+    vi.clearAllMocks()
   })
 
   it('shows demo sales when flag is enabled', async () => {
@@ -78,31 +86,39 @@ describe('FeaturedSalesSection with demo sales', () => {
 
     render(<FeaturedSalesSection />)
 
-    // Wait for demo sales to appear (component will fallback to 40204, fetch sales, then add demos)
+    // Wait for demo sales to appear
     await waitFor(
       () => {
         const demoBadges = screen.queryAllByText('Demo')
         expect(demoBadges.length).toBeGreaterThan(0)
       },
-      { timeout: 5000 }
+      { timeout: 3000 }
     )
+
+    // Verify demo sale titles appear
+    const demoTitle1 = screen.queryByText(/Demo: Neighborhood Yard Sale/i)
+    const demoTitle2 = screen.queryByText(/Demo: Multi-family Sale/i)
+    expect(demoTitle1 || demoTitle2).toBeTruthy()
   })
 
   it('does not show demo sales when flag is disabled', async () => {
-    // Keep flag disabled (default)
+    // Keep flag disabled
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
 
     render(<FeaturedSalesSection />)
 
-    // Wait for component to finish loading
+    // Wait for component to finish loading (location resolution completes)
     await waitFor(
       () => {
-        // Should not show demo badges when flag is disabled
-        const demoBadges = screen.queryAllByText('Demo')
-        expect(demoBadges.length).toBe(0)
+        // Component should finish loading - wait for fetch to complete
+        expect(fetchMock).toHaveBeenCalled()
       },
-      { timeout: 5000 }
+      { timeout: 3000 }
     )
+
+    // Verify no demo badges appear
+    const demoBadges = screen.queryAllByText('Demo')
+    expect(demoBadges.length).toBe(0)
   })
 })
 

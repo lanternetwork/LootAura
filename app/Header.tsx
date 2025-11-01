@@ -7,26 +7,26 @@ export function Header() {
     <nav className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm h-16">
       <div className="w-full px-4 sm:px-6 lg:px-8 h-full">
         <div className="flex justify-between items-center h-full">
-          <Link href="/" className="text-xl font-bold text-[#3A2268]">
+          <Link href="/" className="text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
             Loot Aura
           </Link>
           
-          <div className="flex gap-6 items-center">
+          <div className="flex gap-3 sm:gap-6 items-center">
             <Link 
               href="/sales" 
-              className="text-[#3A2268] hover:text-[#3A2268]/80 transition-colors"
+              className="hidden sm:block text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 transition-colors whitespace-nowrap"
             >
               Browse Sales
             </Link>
             <Link 
               href="/favorites" 
-              className="text-[#3A2268] hover:text-[#3A2268]/80 transition-colors"
+              className="hidden md:block text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 transition-colors whitespace-nowrap"
             >
               Favorites
             </Link>
             <Link 
               href="/sell/new" 
-              className="text-[#3A2268] hover:text-[#3A2268]/80 transition-colors"
+              className="text-xs sm:text-sm md:text-base text-[#3A2268] hover:text-[#3A2268]/80 transition-colors whitespace-nowrap"
             >
               Post Your Sale
             </Link>

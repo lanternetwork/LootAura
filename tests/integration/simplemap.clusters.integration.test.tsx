@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import SimpleMap from '@/components/location/SimpleMap'
 import { PinPoint } from '@/lib/pins/types'
 
@@ -81,11 +81,11 @@ vi.mock('@/components/location/PinMarker', () => ({
 
 describe('SimpleMap Clusters Integration', () => {
   beforeEach(() => {
-    cleanup()
+    // Note: cleanup() is automatically handled by @testing-library/react
   })
 
   afterEach(() => {
-    cleanup()
+    // Note: cleanup() is automatically handled by @testing-library/react
   })
 
   const testSales: PinPoint[] = [

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { screen, waitFor, cleanup } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { renderWithProviders } from '../utils/renderWithProviders'
 import { createMockSupabaseClient, getAddressFixtures } from '@/tests/utils/mocks'
@@ -75,7 +75,7 @@ describe('Add Sale Integration', () => {
 
   afterEach(() => {
     // Clean up mocks and reset state
-    cleanup()
+    // Note: cleanup() is automatically handled by @testing-library/react
     vi.clearAllMocks()
   })
 

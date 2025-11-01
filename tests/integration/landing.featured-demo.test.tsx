@@ -90,9 +90,7 @@ describe('FeaturedSalesSection with demo sales', () => {
     })
 
     // Mock geocoding and sales API calls
-    let fetchCallCount = 0
     global.fetch = vi.fn((input: RequestInfo | URL) => {
-      fetchCallCount++
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
       if (url.includes('/api/geocoding/zip')) {
         return Promise.resolve({

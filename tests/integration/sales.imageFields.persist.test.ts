@@ -49,13 +49,8 @@ beforeAll(async () => {
 
 describe('Sales API - Image Support', () => {
 	beforeEach(() => {
-		// Clear call history without clearing implementations
-		// Don't clear fromChain.insert - we need it to remain a function for the route's typeof check
-		mockSupabaseClient.from.mockClear()
-		mockSupabaseClient.auth.getUser.mockClear()
-		mockIsAllowedImageUrl.mockClear()
-		mockSingle.mockClear()
-		// Note: We intentionally don't clear fromChain.insert to preserve its function implementation
+		// Match working test pattern: use clearAllMocks() but preserve fromChain.insert
+		vi.clearAllMocks()
 		
 		lastInsertedPayload = null
 		
@@ -63,8 +58,19 @@ describe('Sales API - Image Support', () => {
 		mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
-		// Ensure from() always returns the chain (use mockImplementation to ensure it always works)
+		// Ensure from() always returns the chain
 		mockSupabaseClient.from.mockImplementation(() => fromChain)
+		// Re-initialize fromChain.insert if it was cleared (clearAllMocks can clear it)
+		if (!fromChain.insert || typeof fromChain.insert !== 'function') {
+			fromChain.insert = vi.fn((payload: any) => {
+				lastInsertedPayload = payload
+				return {
+					select: vi.fn(() => ({
+						single: mockSingle
+					}))
+				}
+			})
+		}
 		// Set up mockSingle to return inserted payload when available
 		mockSingle.mockImplementation(() => {
 			if (lastInsertedPayload) {

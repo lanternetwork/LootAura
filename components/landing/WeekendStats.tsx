@@ -242,11 +242,11 @@ export function WeekendStats() {
       return decodeURIComponent(location.city)
     } catch {
       // If not URL-encoded, return as-is
-      return location.city
+      return location?.city ?? null
     }
   })()
   const displayLocation = cityName 
-    ? `${cityName}${location.state ? `, ${location.state}` : ''}`
+    ? `${cityName}${location?.state ? `, ${location.state}` : ''}`
     : 'your area'
 
   return (

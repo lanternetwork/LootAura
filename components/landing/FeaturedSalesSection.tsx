@@ -13,6 +13,8 @@ interface LocationState {
   zip?: string
   lat?: number
   lng?: number
+  city?: string
+  state?: string
 }
 
 export function FeaturedSalesSection() {

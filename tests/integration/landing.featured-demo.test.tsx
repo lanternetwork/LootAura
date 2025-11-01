@@ -33,6 +33,11 @@ vi.mock('@/components/FavoriteButton', () => ({
   default: () => null,
 }))
 
+// Mock SaleCardSkeleton to simplify rendering
+vi.mock('@/components/SaleCardSkeleton', () => ({
+  default: () => <div data-testid="sale-card-skeleton">Loading...</div>,
+}))
+
 describe('FeaturedSalesSection with demo sales', () => {
   let fetchMock: ReturnType<typeof vi.fn>
   let originalFetch: typeof fetch
@@ -53,10 +58,12 @@ describe('FeaturedSalesSection with demo sales', () => {
     // Reset default mock to return false
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
     
-    // Save original values
+    // Save original values (safely)
     originalFetch = global.fetch
-    originalLocalStorage = window.localStorage
-    originalGeolocation = navigator.geolocation
+    originalLocalStorage = typeof window !== 'undefined' ? window.localStorage : undefined
+    originalGeolocation = typeof navigator !== 'undefined' && 'geolocation' in navigator 
+      ? navigator.geolocation 
+      : undefined
     
     // Setup localStorage mock
     localStorageMock = {

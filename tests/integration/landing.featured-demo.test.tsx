@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import { FeaturedSalesSection } from '@/components/landing/FeaturedSalesSection'
 import * as flagsModule from '@/lib/flags'
 import { useSearchParams } from 'next/navigation'
@@ -79,9 +79,23 @@ describe('FeaturedSalesSection with demo sales', () => {
     })
     
     // Make geolocation unavailable to trigger immediate fallback to default ZIP
-    // This avoids async callbacks that cause worker crashes
+    // Mock getCurrentPosition to call error callback synchronously
+    // This triggers the fallback ZIP code path
+    const mockGeolocation = {
+      getCurrentPosition: vi.fn((success, error) => {
+        // Call error callback synchronously to trigger fallback
+        if (error) {
+          error(new Error('Geolocation not available'))
+        }
+      }),
+      watchPosition: vi.fn(),
+      clearWatch: vi.fn(),
+    }
+    
+    // Define mock geolocation so 'geolocation' in navigator returns true
+    // but getCurrentPosition will call error callback
     Object.defineProperty(navigator, 'geolocation', {
-      value: undefined,
+      value: mockGeolocation,
       writable: true,
       configurable: true,
     })
@@ -107,7 +121,7 @@ describe('FeaturedSalesSection with demo sales', () => {
   })
 
   afterEach(() => {
-    // Note: cleanup() is automatically handled by @testing-library/react
+    cleanup()
     vi.clearAllMocks()
     
     // Restore original values to avoid interfering with other tests
@@ -119,12 +133,20 @@ describe('FeaturedSalesSection with demo sales', () => {
         configurable: true,
       })
     }
+    // Restore geolocation if it existed
     if (originalGeolocation !== undefined) {
       Object.defineProperty(navigator, 'geolocation', {
         value: originalGeolocation,
         writable: true,
         configurable: true,
       })
+    } else {
+      // If it didn't exist, try to delete it
+      try {
+        delete (navigator as any).geolocation
+      } catch {
+        // Ignore if delete fails
+      }
     }
   })
 
@@ -132,7 +154,7 @@ describe('FeaturedSalesSection with demo sales', () => {
     // Enable the flag
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(true)
 
-    const { unmount } = render(<FeaturedSalesSection />)
+    render(<FeaturedSalesSection />)
 
     // Wait for demo sales to appear - component should resolve location and fetch
     await waitFor(
@@ -155,16 +177,13 @@ describe('FeaturedSalesSection with demo sales', () => {
     const demoTitle1 = screen.queryByText(/Demo: Neighborhood Yard Sale/i)
     const demoTitle2 = screen.queryByText(/Demo: Multi-family Sale/i)
     expect(demoTitle1 || demoTitle2).toBeTruthy()
-
-    // Clean up component before test ends
-    unmount()
   })
 
   it('does not show demo sales when flag is disabled', async () => {
     // Keep flag disabled
     vi.mocked(flagsModule.isTestSalesEnabled).mockReturnValue(false)
 
-    const { unmount } = render(<FeaturedSalesSection />)
+    render(<FeaturedSalesSection />)
 
     // Wait for component to finish loading
     await waitFor(
@@ -183,9 +202,6 @@ describe('FeaturedSalesSection with demo sales', () => {
       },
       { timeout: 1000 }
     )
-
-    // Clean up component before test ends
-    unmount()
   })
 })
 

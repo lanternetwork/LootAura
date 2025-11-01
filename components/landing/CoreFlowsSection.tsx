@@ -7,7 +7,7 @@ export function CoreFlowsSection() {
         <h2 className="text-2xl md:text-3xl font-semibold text-[#3A2268] mb-6">
           What do you want to do today?
         </h2>
-        <div className="grid gap-5 md:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2">
           {/* Browse sales card */}
           <Link
             href="/sales"
@@ -35,21 +35,6 @@ export function CoreFlowsSection() {
             </p>
             <span className="text-sm font-medium text-[#3A2268] group-hover:underline inline-flex items-center gap-1">
               Post your sale →
-            </span>
-          </Link>
-
-          {/* How it works card */}
-          <Link
-            href="/how-it-works"
-            className="bg-white rounded-2xl border border-[#3A2268]/10 hover:shadow-sm transition p-5 text-[#3A2268] group"
-          >
-            <div className="text-3xl mb-3">❓</div>
-            <h3 className="text-lg font-semibold mb-2">How it works</h3>
-            <p className="text-sm text-[#3A2268]/70 mb-3">
-              Learn how to find great deals and host your own sale.
-            </p>
-            <span className="text-sm font-medium text-[#3A2268] group-hover:underline inline-flex items-center gap-1">
-              How it works →
             </span>
           </Link>
         </div>

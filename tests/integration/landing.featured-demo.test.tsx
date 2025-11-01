@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, waitFor, cleanup, act } from '@testing-library/react'
 import { FeaturedSalesSection } from '@/components/landing/FeaturedSalesSection'
 import * as flagsModule from '@/lib/flags'
 
@@ -90,7 +90,9 @@ describe('FeaturedSalesSection with demo sales', () => {
     })
 
     // Mock geocoding and sales API calls
+    let fetchCallCount = 0
     global.fetch = vi.fn((input: RequestInfo | URL) => {
+      fetchCallCount++
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
       if (url.includes('/api/geocoding/zip')) {
         return Promise.resolve({
@@ -107,9 +109,11 @@ describe('FeaturedSalesSection with demo sales', () => {
       return Promise.reject(new Error(`Unexpected fetch call: ${url}`))
     }) as typeof fetch
 
-    render(<FeaturedSalesSection />)
+    await act(async () => {
+      render(<FeaturedSalesSection />)
+    })
 
-    // Wait for demo sales to appear
+    // Wait for all async operations to complete and demo sales to appear
     await waitFor(
       () => {
         const demoBadges = screen.queryAllByText('Demo')
@@ -147,9 +151,11 @@ describe('FeaturedSalesSection with demo sales', () => {
       return Promise.reject(new Error(`Unexpected fetch call: ${url}`))
     }) as typeof fetch
 
-    render(<FeaturedSalesSection />)
+    await act(async () => {
+      render(<FeaturedSalesSection />)
+    })
 
-    // Wait for component to render
+    // Wait for component to render and all async operations to complete
     await waitFor(
       () => {
         // Should show empty state, not demo sales

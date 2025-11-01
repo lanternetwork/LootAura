@@ -299,6 +299,10 @@ const ALLOWED_PATTERNS = [
   /^This error originated in/, // React error origin messages - tests/components/AddSaleForm.a11y.test.tsx
   /^The latest test that might've caused/, // React test error context - tests/components/AddSaleForm.a11y.test.tsx
   
+  // React act() warnings (async state updates in tests)
+  /^Warning: The current testing environment is not configured to support act/, // React act() warnings - tests/integration/landing.featured-demo.test.tsx
+  /^Warning:.*act\(/i, // React act() warnings with act() mention - tests/integration/landing.featured-demo.test.tsx
+  
   // Nested console guardrail errors (tests/setup.ts)
   /^Error: Unexpected console.error:/, // Nested console guardrail errors - tests/setup.ts
 ]

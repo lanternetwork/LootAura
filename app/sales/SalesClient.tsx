@@ -643,6 +643,7 @@ export default function SalesClient({
         md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40
         transform transition-transform duration-300 ease-in-out
         ${isMobileDrawerOpen ? 'translate-y-0' : 'translate-y-full'}
+        ${!isMobileDrawerOpen ? 'pointer-events-none invisible' : 'visible'}
       `}>
         <div className="flex-shrink-0 p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">

@@ -1,0 +1,45 @@
+import Image from 'next/image'
+import { HeroSearchBar } from './HeroSearchBar'
+import { WeekendStats } from './WeekendStats'
+
+export function Hero() {
+  return (
+    <section className="relative min-h-[375px] md:min-h-[450px] overflow-hidden flex items-center">
+      {/* Background Image */}
+      <Image
+        src="/brand/HeroImage1.png"
+        alt="Yard sale scene"
+        fill
+        className="object-cover"
+        priority
+        sizes="100vw"
+      />
+      {/* Overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-r from-white/70 via-white/60 to-white/50 z-10"></div>
+      
+      <div className="relative z-20 max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-10 md:py-14 h-full flex items-center">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+          {/* Left column */}
+          <div className="space-y-4">
+            <p className="inline-block rounded-full bg-white/60 px-4 py-1 text-xs font-medium text-[#3A2268]/70">
+              New · Map-first yard sale finder
+            </p>
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-semibold leading-tight text-[#3A2268]">
+              Find local yard sales on the map.
+            </h1>
+            <p className="text-base md:text-lg text-[#3A2268]/70">
+              Search by ZIP, date, and category. Host your own in minutes.
+            </p>
+            <HeroSearchBar />
+          </div>
+
+          {/* Right column - desktop only */}
+          <div className="hidden lg:block">
+            <WeekendStats />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+

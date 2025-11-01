@@ -303,6 +303,9 @@ const ALLOWED_PATTERNS = [
   /^Warning: The current testing environment is not configured to support act/, // React act() warnings - tests/integration/landing.featured-demo.test.tsx
   /^Warning:.*act\(/i, // React act() warnings with act() mention - tests/integration/landing.featured-demo.test.tsx
   
+  // React unmount warnings (component cleanup in tests)
+  /^Warning: Attempted to synchronously unmount a root while React was already rendering/, // React unmount race condition - tests/integration/landing.featured-demo.test.tsx
+  
   // Nested console guardrail errors (tests/setup.ts)
   /^Error: Unexpected console.error:/, // Nested console guardrail errors - tests/setup.ts
 ]

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, waitFor, cleanup, act } from '@testing-library/react'
 import { FeaturedSalesSection } from '@/components/landing/FeaturedSalesSection'
 import * as flagsModule from '@/lib/flags'
 

@@ -10,13 +10,15 @@ vi.mock('@/lib/flags', () => ({
 }))
 
 // Mock next/navigation - use same pattern as other integration tests
+// Create stable reference to avoid infinite loops
 const mockSearchParams = new Map<string, string>()
+const stableSearchParams = {
+  get: (key: string) => mockSearchParams.get(key) || null,
+  has: (key: string) => mockSearchParams.has(key),
+}
 
 vi.mock('next/navigation', () => ({
-  useSearchParams: vi.fn(() => ({
-    get: (key: string) => mockSearchParams.get(key) || null,
-    has: (key: string) => mockSearchParams.has(key),
-  })),
+  useSearchParams: vi.fn(() => stableSearchParams),
 }))
 
 // Mock next/link to avoid navigation issues in tests

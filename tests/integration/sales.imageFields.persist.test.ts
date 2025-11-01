@@ -10,7 +10,8 @@ import * as ImageValidate from '@/lib/images/validateImageUrl'
 const mockSingle = vi.fn()
 let lastInsertedPayload: any = null
 
-const fromChain = {
+// Create a function that returns the fromChain with insert
+const createFromChain = () => ({
   insert: vi.fn((payload: any) => {
     // Store the payload so we can return it with the inserted row
     lastInsertedPayload = payload
@@ -20,13 +21,13 @@ const fromChain = {
       }))
     }
   }),
-}
+})
 
 const mockSupabaseClient = {
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
   },
-  from: vi.fn(() => fromChain)
+  from: vi.fn(() => createFromChain())
 }
 
 vi.mock('@/lib/supabase/server', () => ({

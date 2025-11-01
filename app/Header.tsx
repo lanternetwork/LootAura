@@ -11,7 +11,8 @@ export function Header() {
             <img
               src="/brand/sitelogo.svg"
               alt="Loot Aura Logo"
-              className="w-6 h-6 sm:w-8 sm:h-8"
+              className="w-[30px] h-[30px] sm:w-10 sm:h-10"
+              style={{ backgroundColor: 'transparent', objectFit: 'contain' }}
             />
             Loot Aura
           </Link>

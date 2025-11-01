@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import SimpleMap from '@/components/location/SimpleMap'
 import { PinPoint } from '@/lib/pins/types'
 
@@ -81,11 +81,13 @@ vi.mock('@/components/location/PinMarker', () => ({
 
 describe('SimpleMap Clusters Integration', () => {
   beforeEach(() => {
-    // Note: cleanup() is automatically handled by @testing-library/react
+    cleanup()
+    vi.clearAllMocks()
   })
 
   afterEach(() => {
-    // Note: cleanup() is automatically handled by @testing-library/react
+    cleanup()
+    vi.clearAllMocks()
   })
 
   const testSales: PinPoint[] = [
@@ -108,9 +110,6 @@ describe('SimpleMap Clusters Integration', () => {
     onViewportChange: vi.fn()
   }
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
 
   describe('clustering behavior', () => {
     it('should render map when clustering is enabled', async () => {
@@ -118,10 +117,13 @@ describe('SimpleMap Clusters Integration', () => {
       const originalEnv = process.env.NEXT_PUBLIC_FEATURE_CLUSTERING
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'true'
 
-      render(<SimpleMap {...defaultProps} />)
+      const { unmount } = render(<SimpleMap {...defaultProps} />)
 
       // Check that map renders (clustering behavior tested in unit tests)
       expect(screen.getAllByTestId('map')[0]).toBeInTheDocument()
+
+      unmount()
+      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -132,12 +134,15 @@ describe('SimpleMap Clusters Integration', () => {
       const originalEnv = process.env.NEXT_PUBLIC_FEATURE_CLUSTERING
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'false'
 
-      render(<SimpleMap {...defaultProps} />)
+      const { unmount } = render(<SimpleMap {...defaultProps} />)
 
       await waitFor(() => {
         const pinMarkers = screen.getAllByTestId('marker')
         expect(pinMarkers).toHaveLength(testSales.length)
       }, { timeout: 10000 })
+
+      unmount()
+      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -150,10 +155,13 @@ describe('SimpleMap Clusters Integration', () => {
       const originalEnv = process.env.NEXT_PUBLIC_FEATURE_CLUSTERING
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'true'
 
-      render(<SimpleMap {...defaultProps} pins={{ ...defaultProps.pins, onClusterClick }} />)
+      const { unmount } = render(<SimpleMap {...defaultProps} pins={{ ...defaultProps.pins, onClusterClick }} />)
 
       // Just verify the component renders with the callback (actual clustering tested in unit tests)
       expect(screen.getAllByTestId('map')[0]).toBeInTheDocument()
+
+      unmount()
+      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -164,7 +172,7 @@ describe('SimpleMap Clusters Integration', () => {
       const originalEnv = process.env.NEXT_PUBLIC_FEATURE_CLUSTERING
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = 'false'
 
-      render(<SimpleMap {...defaultProps} pins={{ ...defaultProps.pins, onPinClick }} />)
+      const { unmount } = render(<SimpleMap {...defaultProps} pins={{ ...defaultProps.pins, onPinClick }} />)
 
       await waitFor(() => {
         const pinMarkers = screen.getAllByTestId('marker')
@@ -177,6 +185,9 @@ describe('SimpleMap Clusters Integration', () => {
 
       expect(onPinClick).toHaveBeenCalledWith(testSales[0].id)
 
+      unmount()
+      cleanup()
+
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
     })
@@ -185,7 +196,7 @@ describe('SimpleMap Clusters Integration', () => {
   describe('viewport changes', () => {
     it('should call onViewportChange when viewport changes', async () => {
       const onViewportChange = vi.fn()
-      render(<SimpleMap {...defaultProps} onViewportChange={onViewportChange} />)
+      const { unmount } = render(<SimpleMap {...defaultProps} onViewportChange={onViewportChange} />)
 
       // Simulate viewport change
       const map = screen.getAllByTestId('map')[0]
@@ -194,6 +205,9 @@ describe('SimpleMap Clusters Integration', () => {
       // The onMoveEnd handler should be called
       // This is tested implicitly through the component behavior
       expect(onViewportChange).toBeDefined()
+
+      unmount()
+      cleanup()
     })
   })
 
@@ -220,7 +234,7 @@ describe('SimpleMap Clusters Integration', () => {
         }
       ]
 
-      render(
+      const { unmount } = render(
         <SimpleMap 
           {...defaultProps} 
           pins={undefined}
@@ -232,6 +246,9 @@ describe('SimpleMap Clusters Integration', () => {
       // Should render legacy sales markers
       const markers = screen.getAllByTestId('marker')
       expect(markers.length).toBeGreaterThan(0)
+
+      unmount()
+      cleanup()
     })
   })
 
@@ -240,11 +257,14 @@ describe('SimpleMap Clusters Integration', () => {
       const originalEnv = process.env.NEXT_PUBLIC_DEBUG
       process.env.NEXT_PUBLIC_DEBUG = 'true'
 
-      render(<SimpleMap {...defaultProps} />)
+      const { unmount } = render(<SimpleMap {...defaultProps} />)
 
       // Debug overlay should be present
       const debugOverlay = screen.getByText(/Container:/)
       expect(debugOverlay).toBeInTheDocument()
+
+      unmount()
+      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_DEBUG = originalEnv
@@ -254,11 +274,14 @@ describe('SimpleMap Clusters Integration', () => {
       const originalEnv = process.env.NEXT_PUBLIC_DEBUG
       process.env.NEXT_PUBLIC_DEBUG = 'false'
 
-      render(<SimpleMap {...defaultProps} />)
+      const { unmount } = render(<SimpleMap {...defaultProps} />)
 
       // Debug overlay should not be present
       const debugOverlay = screen.queryByText(/Container:/)
       expect(debugOverlay).not.toBeInTheDocument()
+
+      unmount()
+      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_DEBUG = originalEnv

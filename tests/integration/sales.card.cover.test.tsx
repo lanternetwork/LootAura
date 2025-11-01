@@ -1,13 +1,30 @@
-import { render, screen, within } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import React from 'react'
+import { render, screen, cleanup } from '@testing-library/react'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import SaleCard from '@/components/SaleCard'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
-const qc = new QueryClient()
-const renderWithProviders = (ui: React.ReactElement) =>
-  render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
-
 describe('SaleCard cover rendering', () => {
+  let queryClient: QueryClient
+
+  beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+    queryClient.clear()
+  })
+
+  const renderWithProviders = (ui: React.ReactElement) =>
+    render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+
   it('renders Cloudinary image when cover_image_url is present', () => {
     const sale: any = {
       id: 's1',

@@ -41,7 +41,9 @@ async function generateHardcodedList(limit: number = 500, outputFile?: string) {
   try {
     // Query ZIP codes ordered by city/state (prioritize populated areas)
     // You could also order by usage if you track that
-    const { data, error } = await adminSupabase
+    // Type assertion needed because placeholder client during build lacks schema types
+    const client = adminSupabase as any
+    const { data, error } = await client
       .from('lootaura_v2.zipcodes')
       .select('zip, city, state, lat, lng')
       .not('city', 'is', null)
@@ -62,7 +64,9 @@ async function generateHardcodedList(limit: number = 500, outputFile?: string) {
     console.log(`📝 Generating hardcoded list...\n`)
     
     // Transform to hardcoded format
-    const hardcoded: HardcodedZip[] = data
+    // Type assertion needed because data type is inferred as never during build
+    const typedData = (data || []) as Array<{ zip: string; city: string; state: string; lat: number; lng: number }>
+    const hardcoded: HardcodedZip[] = typedData
       .filter((zip): zip is ZipCode => 
         zip.zip != null && 
         zip.city != null && 

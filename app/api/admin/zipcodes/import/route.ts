@@ -144,7 +144,9 @@ async function importFromPath(csvFilePath: string) {
 }
 
 async function insertBatch(batch: ZipCodeRow[]) {
-  const { error } = await adminSupabase
+  // Type assertion needed because placeholder client during build lacks schema types
+  const client = adminSupabase as any
+  const { error } = await client
     .from('lootaura_v2.zipcodes')
     .upsert(batch, {
       onConflict: 'zip',

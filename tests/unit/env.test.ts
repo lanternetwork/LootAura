@@ -98,7 +98,10 @@ describe('Environment Validation', () => {
     await expect(async () => {
       const { ENV_SERVER } = await import('@/lib/env')
       // Access NOMINATIM_APP_EMAIL to trigger lazy validation
-      void ENV_SERVER.NOMINATIM_APP_EMAIL
+      // This will call getEnvServer() which validates and throws on invalid email
+      const email = ENV_SERVER.NOMINATIM_APP_EMAIL
+      // Access the email variable to ensure evaluation happens
+      if (email) email.toString()
     }).rejects.toThrow('Invalid email')
   })
 

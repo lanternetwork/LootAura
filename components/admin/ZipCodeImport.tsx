@@ -62,7 +62,33 @@ export default function ZipCodeImport() {
         })
       }
 
-      const data = await response.json()
+      // Get response text first (can only be read once)
+      const responseText = await response.text()
+      
+      // Handle 413 (Payload Too Large) with helpful message
+      if (response.status === 413) {
+        throw new Error('File is too large. Vercel has a 4.5 MB request body limit. For large files, please: 1) Use the "Server Path (Local Dev Only)" option if running locally, 2) Split the CSV into smaller files (< 4.5 MB each), or 3) Compress the file before uploading.')
+      }
+
+      // Try to parse JSON response, but handle non-JSON errors gracefully
+      let data
+      try {
+        // If response is empty, handle gracefully
+        if (!responseText || responseText.trim() === '') {
+          throw new Error(`HTTP ${response.status}: ${response.statusText || 'Import failed - empty response'}`)
+        }
+        
+        // Try to parse as JSON
+        try {
+          data = JSON.parse(responseText)
+        } catch (jsonError) {
+          // Response is not valid JSON - show first 200 chars of error
+          throw new Error(`HTTP ${response.status}: ${responseText.substring(0, 200) || response.statusText || 'Invalid response format'}`)
+        }
+      } catch (parseError) {
+        // If we couldn't parse the response, use the error message
+        throw parseError instanceof Error ? parseError : new Error(`HTTP ${response.status}: ${response.statusText || 'Failed to parse response'}`)
+      }
 
       if (!response.ok) {
         throw new Error(data.error || `HTTP ${response.status}: Import failed`)

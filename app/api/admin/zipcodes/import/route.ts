@@ -8,6 +8,10 @@ import { adminSupabase } from '@/lib/supabase/admin'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes for large imports
 
+// Note: Vercel has a 4.5MB request body limit for App Router routes.
+// For larger files, use the server-side file path option in local development,
+// or split the CSV into smaller batches.
+
 interface ZipCodeRow {
   zip: string
   city: string | null

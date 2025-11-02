@@ -189,18 +189,36 @@ async function importFromPath(csvFilePath: string) {
 }
 
 async function insertBatch(batch: ZipCodeRow[]) {
-  // Type assertion needed because placeholder client during build lacks schema types
-  // Use full schema.table notation to access lootaura_v2.zipcodes
-  const client = adminSupabase as any
-    const { error } = await client
-    .from('lootaura_v2.zipcodes')
-    .upsert(batch, {
-      onConflict: 'zip_code',
-      ignoreDuplicates: false
-    })
+  // Supabase JS client doesn't support schema-qualified table names
+  // Use REST API directly to access lootaura_v2.zipcodes
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE || ENV_SERVER.SUPABASE_SERVICE_ROLE
   
-  if (error) {
-    throw error
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase credentials')
+  }
+  
+  const response = await fetch(`${supabaseUrl}/rest/v1/lootaura_v2.zipcodes`, {
+    method: 'POST',
+    headers: {
+      'apikey': serviceRoleKey,
+      'Authorization': `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates'
+    },
+    body: JSON.stringify(batch)
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+    try {
+      const errorJson = JSON.parse(errorText)
+      errorMessage = errorJson.message || errorJson.error || errorMessage
+    } catch {
+      errorMessage = errorText || errorMessage
+    }
+    throw new Error(errorMessage)
   }
 }
 

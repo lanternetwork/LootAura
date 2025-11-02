@@ -22,6 +22,9 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
+          } else if (args.length === 1 && (args[0] instanceof originalDate || args[0] instanceof Date)) {
+            // Handle copy constructor: new Date(dateObject)
+            super((args[0] as Date).getTime())
           } else if (args.length === 1 && typeof args[0] === 'number') {
             super(args[0])
           } else if (args.length === 1 && typeof args[0] === 'string') {
@@ -52,6 +55,9 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
+          } else if (args.length === 1 && (args[0] instanceof originalDate || args[0] instanceof Date)) {
+            // Handle copy constructor: new Date(dateObject)
+            super((args[0] as Date).getTime())
           } else if (args.length === 1 && typeof args[0] === 'number') {
             super(args[0])
           } else if (args.length === 1 && typeof args[0] === 'string') {
@@ -81,9 +87,9 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
-          } else if (args.length === 1 && args[0] instanceof originalDate) {
-            // Handle new Date(date) - copy constructor
-            super(args[0].getTime())
+          } else if (args.length === 1 && (args[0] instanceof originalDate || args[0] instanceof Date)) {
+            // Handle copy constructor: new Date(dateObject)
+            super((args[0] as Date).getTime())
           } else if (args.length === 1 && typeof args[0] === 'number') {
             super(args[0])
           } else if (args.length === 1 && typeof args[0] === 'string') {
@@ -114,9 +120,9 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
-          } else if (args.length === 1 && args[0] instanceof originalDate) {
-            // Handle new Date(date) - copy constructor
-            super(args[0].getTime())
+          } else if (args.length === 1 && (args[0] instanceof originalDate || args[0] instanceof Date)) {
+            // Handle copy constructor: new Date(dateObject)
+            super((args[0] as Date).getTime())
           } else if (args.length === 1 && typeof args[0] === 'number') {
             super(args[0])
           } else if (args.length === 1 && typeof args[0] === 'string') {
@@ -143,6 +149,9 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
+          } else if (args.length === 1 && (args[0] instanceof originalDate || args[0] instanceof Date)) {
+            // Handle copy constructor: new Date(dateObject)
+            super((args[0] as Date).getTime())
           } else if (args.length === 1 && typeof args[0] === 'number') {
             super(args[0])
           } else if (args.length === 1 && typeof args[0] === 'string') {

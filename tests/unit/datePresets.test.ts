@@ -22,8 +22,13 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
+          } else if (args.length === 1 && typeof args[0] === 'number') {
+            super(args[0])
+          } else if (args.length === 1 && typeof args[0] === 'string') {
+            super(args[0])
           } else {
-            super(...args)
+            // Multiple args - use new Date(year, month, date, ...) form
+            super(args[0] as number, args[1] as number, args[2] as number, args[3] as number | undefined, args[4] as number | undefined, args[5] as number | undefined, args[6] as number | undefined)
           }
         }
         static now = () => mockDate.getTime()
@@ -47,8 +52,13 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
+          } else if (args.length === 1 && typeof args[0] === 'number') {
+            super(args[0])
+          } else if (args.length === 1 && typeof args[0] === 'string') {
+            super(args[0])
           } else {
-            super(...args)
+            // Multiple args - use new Date(year, month, date, ...) form
+            super(args[0] as number, args[1] as number, args[2] as number, args[3] as number | undefined, args[4] as number | undefined, args[5] as number | undefined, args[6] as number | undefined)
           }
         }
         static now = () => mockDate.getTime()
@@ -117,8 +127,13 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
+          } else if (args.length === 1 && typeof args[0] === 'number') {
+            super(args[0])
+          } else if (args.length === 1 && typeof args[0] === 'string') {
+            super(args[0])
           } else {
-            super(...args)
+            // Multiple args - use new Date(year, month, date, ...) form
+            super(args[0] as number, args[1] as number, args[2] as number, args[3] as number | undefined, args[4] as number | undefined, args[5] as number | undefined, args[6] as number | undefined)
           }
         }
         static now = () => mockDate.getTime()

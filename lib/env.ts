@@ -4,12 +4,34 @@ const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url('NEXT_PUBLIC_SUPABASE_URL must be a valid URL'),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(10, 'NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 10 characters'),
   NEXT_PUBLIC_SITE_URL: z.preprocess(
-    (val) => (val === '' ? undefined : val),
+    (val) => {
+      // Handle empty strings, whitespace, or invalid values during build
+      if (!val || typeof val !== 'string' || val.trim() === '') {
+        return undefined
+      }
+      // If it's a valid URL string, return it; otherwise return undefined to allow optional
+      try {
+        new URL(val)
+        return val
+      } catch {
+        return undefined
+      }
+    },
     z.string().url().optional()
   ),
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().min(10).optional(),
   NEXT_PUBLIC_SENTRY_DSN: z.preprocess(
-    (val) => (val === '' ? undefined : val),
+    (val) => {
+      if (!val || typeof val !== 'string' || val.trim() === '') {
+        return undefined
+      }
+      try {
+        new URL(val)
+        return val
+      } catch {
+        return undefined
+      }
+    },
     z.string().url().optional()
   ),
   NEXT_PUBLIC_SUPABASE_SCHEMA: z.string().optional(),

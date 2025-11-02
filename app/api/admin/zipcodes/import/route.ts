@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createReadStream } from 'fs'
 import { createInterface } from 'readline'
+import { resolve, normalize } from 'path'
 import { adminSupabase } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
@@ -75,7 +76,31 @@ function normalizeZip(zip: string): string | null {
 }
 
 async function importFromPath(csvFilePath: string) {
-  const fileStream = createReadStream(csvFilePath, { encoding: 'utf-8' })
+  // Validate and sanitize file path to prevent path traversal attacks
+  if (!csvFilePath || typeof csvFilePath !== 'string' || csvFilePath.trim() === '') {
+    throw new Error('Invalid file path')
+  }
+  
+  // Check for dangerous path traversal sequences
+  // This catches attempts like '../etc/passwd', '../../secret', etc.
+  if (csvFilePath.includes('..')) {
+    throw new Error('Invalid file path: path traversal detected')
+  }
+  
+  // Normalize the path to handle redundant separators
+  const normalizedPath = normalize(csvFilePath)
+  
+  // Additional safety check: ensure normalized path doesn't still contain traversal
+  if (normalizedPath.includes('..')) {
+    throw new Error('Invalid file path: path traversal detected after normalization')
+  }
+  
+  // Resolve to absolute path
+  // Note: In production, consider restricting to a specific allowed directory
+  // For example: restrict to a specific uploads/imports directory
+  const resolvedPath = resolve(normalizedPath)
+  
+  const fileStream = createReadStream(resolvedPath, { encoding: 'utf-8' })
   const rl = createInterface({
     input: fileStream,
     crlfDelay: Infinity

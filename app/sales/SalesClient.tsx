@@ -693,7 +693,7 @@ export default function SalesClient({
             {mapView ? (
               <SimpleMap
                 center={mapCenter}
-                zoom={mapZoom}
+                zoom={pendingBounds ? undefined : mapZoom}
                 fitBounds={pendingBounds}
                 fitBoundsOptions={pendingBounds ? { 
                   padding: 20, 

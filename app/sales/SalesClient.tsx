@@ -412,7 +412,7 @@ export default function SalesClient({
         const newView: MapViewState = {
           center: { lat, lng },
           bounds: calculatedBounds,
-          zoom: 12 // Slightly more zoomed in to compensate for fitBounds padding
+          zoom: 10 // Lower zoom to better match 10-mile radius (will be adjusted by fitBounds)
         }
         console.log('[ZIP] New map view:', newView)
         
@@ -432,7 +432,7 @@ export default function SalesClient({
         ...prev,
         center: { lat, lng },
         bounds: calculatedBounds,
-        zoom: 12 // Slightly more zoomed in to compensate for fitBounds padding
+        zoom: 10 // Lower zoom to better match 10-mile radius (will be adjusted by fitBounds)
       }
       console.log('[ZIP] New map view:', newView)
       

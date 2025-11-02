@@ -208,6 +208,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   }, [fitBounds, fitBoundsOptions, loaded])
 
   // Handle center/zoom changes
+  // Skip center/zoom updates when fitBounds is active to prevent zoom flash
   useEffect(() => {
     if (!loaded || !mapRef.current || fitBounds) return
     

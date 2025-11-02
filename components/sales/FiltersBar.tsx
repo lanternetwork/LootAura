@@ -327,9 +327,26 @@ export default function FiltersBar({
 
         {/* Right: Date Range + Distance + More */}
         <div ref={rightRef} className="shrink-0 flex items-center gap-2 lg:gap-3 min-w-0">
-          {/* Date Range chips - show Thu/Fri/Sat/Sun/This weekend */}
-          <div className="flex items-center gap-1.5 lg:gap-2 min-w-0 max-w-[300px] md:max-w-[350px] lg:max-w-none overflow-x-auto scrollbar-hide">
-            <ul className="flex items-center gap-1.5 lg:gap-2 min-w-0">
+          {/* Date Range dropdown - Tablet (md to lg-1) */}
+          <div className="md:block lg:hidden">
+            <select
+              value={dateRange === 'weekend' ? 'this_weekend' : dateRange}
+              onChange={(e) => onDateRangeChange(e.target.value as any)}
+              disabled={isLoading}
+              className={`px-2 py-1 border rounded text-xs min-w-[100px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <option value="any">Any Date</option>
+              {datePresets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Range chips - Desktop (lg+) */}
+          <div className="hidden lg:flex items-center gap-2 min-w-0 overflow-x-auto scrollbar-hide">
+            <ul className="flex items-center gap-2 min-w-0">
               {datePresets.map((preset: DatePreset) => {
                 // Normalize value: 'weekend' -> 'this_weekend', 'this_weekend' -> 'this_weekend'
                 const normalizedValue = dateRange === 'weekend' ? 'this_weekend' : dateRange
@@ -340,7 +357,7 @@ export default function FiltersBar({
                       onClick={() => handleDateToggle(preset.id)}
                       disabled={isLoading}
                       className={`
-                        shrink-0 inline-flex items-center gap-1 px-2.5 lg:px-3 py-1.5 rounded-full text-xs lg:text-sm font-medium transition-colors whitespace-nowrap
+                        shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
                         ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
                         ${isSelected 
                           ? 'bg-blue-100 text-blue-800 border border-blue-200' 
@@ -350,7 +367,7 @@ export default function FiltersBar({
                     >
                       {preset.label}
                       {isSelected && (
-                        <span className="ml-0.5 lg:ml-1 text-blue-600">×</span>
+                        <span className="ml-1 text-blue-600">×</span>
                       )}
                     </button>
                   </li>

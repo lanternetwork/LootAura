@@ -229,6 +229,15 @@ export default function FiltersBar({
     }
   }, [showOverflowMenu])
 
+  // Date presets - only show Thu/Fri/Sat/Sun/This weekend (skip Today)
+  const datePresets = useMemo(() => {
+    const allPresets = buildDatePresets()
+    // Filter to only show: thursday, friday, saturday, sunday, this_weekend
+    return allPresets.filter(p => 
+      ['thursday', 'friday', 'saturday', 'sunday', 'this_weekend'].includes(p.id)
+    )
+  }, [])
+
   return (
     <div className="border-b bg-white">
       {/* Desktop/Tablet Layout - 3 Column Grid */}
@@ -306,20 +315,33 @@ export default function FiltersBar({
 
         {/* Right: Date Range + Distance + More */}
         <div ref={rightRef} className="shrink-0 flex items-center gap-3 ml-auto">
-          {/* Date Range select */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium whitespace-nowrap">Date:</label>
-            <select
-              value={dateRange}
-              onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
-              disabled={isLoading}
-              className={`px-2 py-1 border rounded text-sm min-w-[100px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              <option value="any">Any Date</option>
-              <option value="today">Today</option>
-              <option value="weekend">This Weekend</option>
-              <option value="next_weekend">Next Weekend</option>
-            </select>
+          {/* Date Range chips - show Thu/Fri/Sat/Sun/This weekend */}
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            <ul className="flex items-center gap-2">
+              {datePresets.map((preset) => {
+                // Normalize value: 'weekend' -> 'this_weekend', 'this_weekend' -> 'this_weekend'
+                const normalizedValue = dateRange === 'weekend' ? 'this_weekend' : dateRange
+                const isSelected = normalizedValue === preset.id
+                return (
+                  <li key={preset.id}>
+                    <button
+                      onClick={() => onDateRangeChange(preset.id as any)}
+                      disabled={isLoading}
+                      className={`
+                        shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
+                        ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                        ${isSelected 
+                          ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                          : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                        }
+                      `}
+                    >
+                      {preset.label}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
           </div>
 
           {/* Search Area select */}
@@ -465,14 +487,16 @@ export default function FiltersBar({
                   <label className="block text-sm font-medium mb-2">Date Range</label>
                   <select
                     value={dateRange}
-                    onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
+                    onChange={(e) => onDateRangeChange(e.target.value as any)}
                     disabled={isLoading}
                     className={`w-full px-3 py-2 border rounded-md ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <option value="any">Any Date</option>
-                    <option value="today">Today</option>
-                    <option value="weekend">This Weekend</option>
-                    <option value="next_weekend">Next Weekend</option>
+                    {datePresets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

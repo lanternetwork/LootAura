@@ -253,31 +253,12 @@ async function salesHandler(request: NextRequest) {
     
     // If no explicit dates, compute from dateRange presets
     if (!startDateParam && !endDateParam && dateRange !== 'any') {
-      const now = new Date()
-      switch (dateRange) {
-        case 'today': {
-          startDateParam = now.toISOString().split('T')[0]
-          endDateParam = now.toISOString().split('T')[0]
-          break
-        }
-        case 'weekend': {
-          const saturday = new Date(now)
-          saturday.setDate(now.getDate() + (6 - now.getDay()))
-          const sunday = new Date(saturday)
-          sunday.setDate(saturday.getDate() + 1)
-          startDateParam = saturday.toISOString().split('T')[0]
-          endDateParam = sunday.toISOString().split('T')[0]
-          break
-        }
-        case 'next_weekend': {
-          const nextSaturday = new Date(now)
-          nextSaturday.setDate(now.getDate() + (6 - now.getDay()) + 7)
-          const nextSunday = new Date(nextSaturday)
-          nextSunday.setDate(nextSaturday.getDate() + 1)
-          startDateParam = nextSaturday.toISOString().split('T')[0]
-          endDateParam = nextSunday.toISOString().split('T')[0]
-          break
-        }
+      // Use resolveDatePreset for preset handling (supports new day presets)
+      const { resolveDatePreset } = await import('@/lib/shared/resolveDatePreset')
+      const resolved = resolveDatePreset(dateRange as any, new Date())
+      if (resolved) {
+        startDateParam = resolved.from || null
+        endDateParam = resolved.to || null
       }
     }
     

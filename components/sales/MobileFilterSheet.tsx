@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
+import { buildDatePresets } from '@/lib/shared/datePresets'
 
 // Category data
 const CATEGORY_DATA = [
@@ -19,8 +20,8 @@ const CATEGORY_DATA = [
 type MobileFilterSheetProps = {
   isOpen: boolean
   onClose: () => void
-  dateRange: 'today' | 'weekend' | 'next_weekend' | 'any'
-  onDateRangeChange: (dateRange: 'today' | 'weekend' | 'next_weekend' | 'any') => void
+  dateRange: 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any'
+  onDateRangeChange: (dateRange: 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any') => void
   categories: string[]
   onCategoriesChange: (categories: string[]) => void
   distance: number

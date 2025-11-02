@@ -326,10 +326,10 @@ export default function FiltersBar({
         </div>
 
         {/* Right: Date Range + Distance + More */}
-        <div ref={rightRef} className="shrink-0 flex items-center gap-3 ml-auto">
+        <div ref={rightRef} className="shrink-0 flex items-center gap-2 lg:gap-3 ml-auto">
           {/* Date Range chips - show Thu/Fri/Sat/Sun/This weekend */}
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-            <ul className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 lg:gap-2 max-w-[400px] lg:max-w-none overflow-x-auto scrollbar-hide">
+            <ul className="flex items-center gap-1.5 lg:gap-2">
               {datePresets.map((preset: DatePreset) => {
                 // Normalize value: 'weekend' -> 'this_weekend', 'this_weekend' -> 'this_weekend'
                 const normalizedValue = dateRange === 'weekend' ? 'this_weekend' : dateRange
@@ -340,7 +340,7 @@ export default function FiltersBar({
                       onClick={() => handleDateToggle(preset.id)}
                       disabled={isLoading}
                       className={`
-                        shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
+                        shrink-0 inline-flex items-center gap-1 px-2.5 lg:px-3 py-1.5 rounded-full text-xs lg:text-sm font-medium transition-colors whitespace-nowrap
                         ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
                         ${isSelected 
                           ? 'bg-blue-100 text-blue-800 border border-blue-200' 
@@ -350,7 +350,7 @@ export default function FiltersBar({
                     >
                       {preset.label}
                       {isSelected && (
-                        <span className="ml-1 text-blue-600">×</span>
+                        <span className="ml-0.5 lg:ml-1 text-blue-600">×</span>
                       )}
                     </button>
                   </li>
@@ -360,13 +360,13 @@ export default function FiltersBar({
           </div>
 
           {/* Search Area select */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium whitespace-nowrap">Search Area:</label>
+          <div className="flex items-center gap-1.5 lg:gap-2">
+            <label className="hidden lg:inline text-sm font-medium whitespace-nowrap">Search Area:</label>
             <select
               value={distance}
               onChange={(e) => onDistanceChange(Number(e.target.value))}
               disabled={isLoading}
-              className={`px-2 py-1 border rounded text-sm min-w-[80px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`px-2 py-1 border rounded text-xs lg:text-sm min-w-[70px] lg:min-w-[80px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <option value={2}>2 mi</option>
               <option value={5}>5 mi</option>

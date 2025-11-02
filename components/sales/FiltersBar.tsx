@@ -326,10 +326,10 @@ export default function FiltersBar({
         </div>
 
         {/* Right: Date Range + Distance + More */}
-        <div ref={rightRef} className="shrink-0 flex items-center gap-2 lg:gap-3 ml-auto">
+        <div ref={rightRef} className="shrink-0 flex items-center gap-2 lg:gap-3 min-w-0">
           {/* Date Range chips - show Thu/Fri/Sat/Sun/This weekend */}
-          <div className="flex items-center gap-1.5 lg:gap-2 max-w-[400px] lg:max-w-none overflow-x-auto scrollbar-hide">
-            <ul className="flex items-center gap-1.5 lg:gap-2">
+          <div className="flex items-center gap-1.5 lg:gap-2 min-w-0 max-w-[300px] md:max-w-[350px] lg:max-w-none overflow-x-auto scrollbar-hide">
+            <ul className="flex items-center gap-1.5 lg:gap-2 min-w-0">
               {datePresets.map((preset: DatePreset) => {
                 // Normalize value: 'weekend' -> 'this_weekend', 'this_weekend' -> 'this_weekend'
                 const normalizedValue = dateRange === 'weekend' ? 'this_weekend' : dateRange

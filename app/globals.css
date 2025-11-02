@@ -6,6 +6,15 @@
 @import 'mapbox-gl/dist/mapbox-gl.css';
 body { min-height: 100vh; }
 
+/* Hide scrollbar but allow scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
 /* Completely eliminate blue circles on map markers */
 .mapboxgl-marker,
 .mapboxgl-marker *,

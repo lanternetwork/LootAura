@@ -10,7 +10,7 @@ import HybridPinsOverlay from "./HybridPinsOverlay"
 
 interface SimpleMapProps {
   center: { lat: number; lng: number }
-  zoom?: number
+  zoom?: number | undefined // undefined means let fitBounds or map determine zoom
   fitBounds?: { west: number; south: number; east: number; north: number } | null
   fitBoundsOptions?: { padding?: number; duration?: number } // Allow custom fitBounds options
   sales?: Sale[]

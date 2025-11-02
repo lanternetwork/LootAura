@@ -25,6 +25,7 @@ function getAdminSupabase(): ReturnType<typeof createClient> {
     
     if (serviceRoleFromEnv) {
       // Use service role from process.env directly (available at runtime)
+      // Type assertion needed because createClient types may not include db.schema
       _adminSupabase = createClient(
         ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_URL,
         serviceRoleFromEnv,
@@ -37,7 +38,7 @@ function getAdminSupabase(): ReturnType<typeof createClient> {
           db: { 
             schema: 'lootaura_v2' 
           }
-        }
+        } as any
       )
     } else {
       // During build time or if not in process.env, try ENV_SERVER
@@ -48,6 +49,7 @@ function getAdminSupabase(): ReturnType<typeof createClient> {
           throw new Error('Missing SUPABASE_SERVICE_ROLE for admin client')
         }
         
+        // Type assertion needed because createClient types may not include db.schema
         _adminSupabase = createClient(
           ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_URL,
           envServiceRole,
@@ -60,7 +62,7 @@ function getAdminSupabase(): ReturnType<typeof createClient> {
             db: { 
               schema: 'lootaura_v2' 
             }
-          }
+          } as any
         )
       } catch {
         // During build, create placeholder client just for TypeScript type checking

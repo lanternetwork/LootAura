@@ -291,14 +291,14 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
             ownerStats={sale.owner_stats}
           />
 
-          {/* Safety Tips */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <h4 className="font-medium text-yellow-800 mb-2">Safety Tips</h4>
-            <ul className="text-sm text-yellow-700 space-y-1">
-              <li>• Meet in a public place</li>
-              <li>• Bring a friend if possible</li>
-              <li>• Trust your instincts</li>
-              <li>• Verify items before purchasing</li>
+          {/* Shopping Tips */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-medium text-blue-800 mb-2">Shopping Tips</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• Bring cash — many sales are cash only</li>
+              <li>• Arrive early for the best selection</li>
+              <li>• Check items before purchasing</li>
+              <li>• Negotiate politely — many prices are flexible</li>
             </ul>
           </div>
         </div>

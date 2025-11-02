@@ -8,7 +8,7 @@ import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import SalesList from '@/components/SalesList'
 import FiltersBar from '@/components/sales/FiltersBar'
 import MobileFilterSheet from '@/components/sales/MobileFilterSheet'
-import { useFilters } from '@/lib/hooks/useFilters'
+import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
@@ -773,8 +773,8 @@ export default function SalesClient({
         onZipLocationFound={handleZipLocationFound}
         onZipError={handleZipError}
         zipError={zipError}
-        dateRange={filters.dateRange}
-        onDateRangeChange={(dateRange) => handleFiltersChange({ ...filters, dateRange })}
+        dateRange={filters.dateRange as 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any'}
+        onDateRangeChange={(dateRange: DateRangeType) => handleFiltersChange({ ...filters, dateRange })}
         categories={filters.categories}
         onCategoriesChange={(categories) => handleFiltersChange({ ...filters, categories })}
         distance={filters.distance}
@@ -966,8 +966,8 @@ export default function SalesClient({
       <MobileFilterSheet
         isOpen={isMobileFilterSheetOpen}
         onClose={closeFilterSheet}
-        dateRange={filters.dateRange}
-        onDateRangeChange={(dateRange) => handleFiltersChange({ ...filters, dateRange })}
+        dateRange={filters.dateRange as 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any'}
+        onDateRangeChange={(dateRange: DateRangeType) => handleFiltersChange({ ...filters, dateRange })}
         categories={filters.categories}
         onCategoriesChange={(categories) => handleFiltersChange({ ...filters, categories })}
         distance={filters.distance}

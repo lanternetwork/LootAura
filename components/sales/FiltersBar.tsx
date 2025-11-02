@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import ZipInput from '@/components/location/ZipInput'
+import { buildDatePresets } from '@/lib/shared/datePresets'
+import type { DatePreset } from '@/lib/shared/datePresets'
 
 type FiltersBarProps = {
   // ZIP Search
@@ -233,7 +235,7 @@ export default function FiltersBar({
   const datePresets = useMemo(() => {
     const allPresets = buildDatePresets()
     // Filter to only show: thursday, friday, saturday, sunday, this_weekend
-    return allPresets.filter(p => 
+    return allPresets.filter((p: DatePreset) => 
       ['thursday', 'friday', 'saturday', 'sunday', 'this_weekend'].includes(p.id)
     )
   }, [])
@@ -318,7 +320,7 @@ export default function FiltersBar({
           {/* Date Range chips - show Thu/Fri/Sat/Sun/This weekend */}
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
             <ul className="flex items-center gap-2">
-              {datePresets.map((preset) => {
+              {datePresets.map((preset: DatePreset) => {
                 // Normalize value: 'weekend' -> 'this_weekend', 'this_weekend' -> 'this_weekend'
                 const normalizedValue = dateRange === 'weekend' ? 'this_weekend' : dateRange
                 const isSelected = normalizedValue === preset.id

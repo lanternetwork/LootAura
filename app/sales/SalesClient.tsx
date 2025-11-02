@@ -374,7 +374,7 @@ export default function SalesClient({
   }, [fetchMapSales, selectedPinId])
 
   // Handle ZIP search with bbox support
-  const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => {
+  const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {
     setZipError(null)
     setIsZipSearching(true) // Prevent map view changes from overriding ZIP search
     // Don't show transition overlay - just update map directly

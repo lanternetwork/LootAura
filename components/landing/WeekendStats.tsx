@@ -118,23 +118,23 @@ export function WeekendStats() {
         // Set limit to match map behavior (200 is max)
         params.set('limit', '200')
 
-        // Get this weekend's date range using the shared date preset function
-        // This ensures consistency with the sales page filter
+        // Use dateRange=this_weekend to match exactly what the sales page filter uses
+        // This ensures both the hero card and sales page use the same API query
+        params.set('dateRange', 'this_weekend')
+
+        // Get the preset for logging/debugging only
         const now = new Date()
         const weekendPreset = getDatePresetById('this_weekend', now)
         if (!weekendPreset) {
           throw new Error('Failed to resolve weekend date preset')
         }
 
-        // Use 'from' and 'to' parameters for explicit date range (API supports this)
-        // This matches exactly what the sales page uses when dateRange=this_weekend
-        params.set('from', weekendPreset.start)
-        params.set('to', weekendPreset.end)
-
-        console.log('[WeekendStats] Weekend date range:', {
+        console.log('[WeekendStats] Using dateRange=this_weekend (same as sales page filter)')
+        console.log('[WeekendStats] Weekend preset details:', {
+          presetId: weekendPreset.id,
+          presetLabel: weekendPreset.label,
           start: weekendPreset.start,
-          end: weekendPreset.end,
-          preset: weekendPreset
+          end: weekendPreset.end
         })
 
         // Get this week's date range (last 7 days)
@@ -157,7 +157,8 @@ export function WeekendStats() {
           ok: weekendRes.ok,
           count: weekendSales.length,
           totalInResponse: weekendData.count || weekendData.data?.length || 0,
-          sampleIds: weekendSales.slice(0, 3).map(s => s.id)
+          sampleIds: weekendSales.slice(0, 3).map(s => s.id),
+          fullResponse: weekendData
         })
 
         // Fetch sales from this week
@@ -178,14 +179,22 @@ export function WeekendStats() {
           ok: weekRes.ok,
           count: weekSales.length,
           totalInResponse: weekData.count || weekData.data?.length || 0,
-          dateRange: { from: thisWeekStart, to: thisWeekEnd }
+          dateRange: { from: thisWeekStart, to: thisWeekEnd },
+          fullResponse: weekData
         })
 
         // Calculate stats
         const activeSales = weekendSales.length
         const newThisWeek = weekSales.length
 
-        console.log('[WeekendStats] Calculated stats:', { activeSales, newThisWeek })
+        console.log('[WeekendStats] Calculated stats:', { 
+          activeSales, 
+          newThisWeek,
+          weekendSalesCount: weekendSales.length,
+          weekSalesCount: weekSales.length,
+          weekendSalesIds: weekendSales.map(s => s.id),
+          weekSalesIds: weekSales.map(s => s.id)
+        })
         setStats({ activeSales, newThisWeek })
       } catch (error) {
         console.error('[WeekendStats] Error fetching stats:', error)

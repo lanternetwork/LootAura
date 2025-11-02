@@ -76,52 +76,11 @@ function getAdminSupabase(): ReturnType<typeof createClient> {
   return _adminSupabase
 }
 
-// Check if we're in a build context - Next.js sets NEXT_PHASE during build
-const isBuildTime = typeof process !== 'undefined' && 
-  (process.env.NEXT_PHASE === 'phase-production-build' || 
-   process.env.NEXT_PHASE === 'phase-development-build')
-
-// During build, create a stub client just for type checking
-// This allows TypeScript to infer types correctly without validating env vars
-const stubClient = isBuildTime ? createClient(
-  ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
-  'build-time-stub-key',
-  { 
-    auth: { 
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false
-    }
-  }
-) : null
-
-// Create a Proxy that uses stub during build and lazy initialization at runtime
-const adminSupabaseProxy = new Proxy(
-  (stubClient || {}) as ReturnType<typeof createClient>,
-  {
-    get(_target, prop) {
-      // During build, return properties from stub client
-      if (stubClient && isBuildTime) {
-        const value = (stubClient as any)[prop]
-        if (typeof value === 'function') {
-          return value.bind(stubClient)
-        }
-        return value
-      }
-      
-      // At runtime, get the real client lazily
-      const client = getAdminSupabase()
-      const value = (client as any)[prop]
-      if (typeof value === 'function') {
-        return value.bind(client)
-      }
-      return value
-    }
-  }
-)
-
-// Export - during build TypeScript sees the stub client type, at runtime uses Proxy
-export const adminSupabase = adminSupabaseProxy
+// Export client directly - initialization happens lazily via getAdminSupabase()
+// During build, getAdminSupabase() will create a placeholder client
+// At runtime, it will create the real client with proper validation
+// TypeScript can infer types correctly because we're exporting the actual client, not a Proxy
+export const adminSupabase = getAdminSupabase()
 
 // Note: Admin client uses the schema configuration from the client creation
 // No need for separate schema helpers since the client is configured with the schema

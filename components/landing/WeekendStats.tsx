@@ -137,7 +137,9 @@ export function WeekendStats() {
         }
 
         const formatDate = (d: Date) => d.toISOString().slice(0, 10)
-        params.set('dateRange', `${formatDate(saturday)},${formatDate(sunday)}`)
+        // Use 'from' and 'to' parameters for explicit date range (API supports this)
+        params.set('from', formatDate(saturday))
+        params.set('to', formatDate(sunday))
 
         // Get this week's date range (last 7 days)
         const weekAgo = new Date(now)
@@ -155,7 +157,10 @@ export function WeekendStats() {
 
         // Fetch sales from this week
         const weekParams = new URLSearchParams(params.toString())
-        weekParams.set('dateRange', `${thisWeekStart},${thisWeekEnd}`)
+        weekParams.set('from', thisWeekStart)
+        weekParams.set('to', thisWeekEnd)
+        // Remove dateRange if it exists
+        weekParams.delete('dateRange')
         const weekRes = await fetch(`/api/sales?${weekParams.toString()}`)
         if (!weekRes.ok) {
           throw new Error('Failed to fetch weekly sales')

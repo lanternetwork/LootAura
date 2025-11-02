@@ -682,20 +682,11 @@ export default function SalesClient({
 
       {/* Main Content - Responsive Layout */}
       <div 
-        className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_628px] lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] gap-0 min-h-0 min-w-0 overflow-hidden"
+        className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
         style={{ height: MAIN_CONTENT_HEIGHT }}
       >
-        {/* Map - Left Side (Dominant) */}
-        <div className="relative min-h-0 min-w-0 bg-gray-100 md:h-full min-h-[50vh] md:min-h-0" style={{ height: '100%' }}>
-          {/* Mobile Toggle Button */}
-          <button
-            onClick={toggleMobileDrawer}
-            className="md:hidden fixed top-20 right-4 z-50 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg shadow-lg transition-colors"
-            aria-label="Toggle sales panel"
-          >
-            {isMobileDrawerOpen ? 'Hide Sales' : 'Show Sales'}
-          </button>
-          
+        {/* Map - Top on mobile, Left on desktop */}
+        <div className="relative min-h-[50vh] lg:h-full lg:min-h-0 bg-gray-100 flex-shrink-0">
           <div className="w-full h-full">
             {mapView ? (
               <SimpleMap
@@ -722,11 +713,11 @@ export default function SalesClient({
                 onViewportChange={handleViewportChange}
               />
             ) : null}
-            </div>
           </div>
+        </div>
 
-        {/* Sales List - Right Panel */}
-        <div className="bg-white border-l border-gray-200 flex flex-col min-h-0 min-w-0 md:h-full overflow-y-auto">
+        {/* Sales List - Below map on mobile, Right panel on desktop */}
+        <div className="hidden lg:flex bg-white border-l border-gray-200 flex-col min-h-0 min-w-0 h-full overflow-y-auto">
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
@@ -778,13 +769,8 @@ export default function SalesClient({
           </div>
         </div>
 
-      {/* Mobile Sales Drawer */}
-      <div className={`
-        md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40
-        transform transition-transform duration-300 ease-in-out
-        ${isMobileDrawerOpen ? 'translate-y-0' : 'translate-y-full'}
-        ${!isMobileDrawerOpen ? 'pointer-events-none invisible' : 'visible'}
-      `}>
+      {/* Mobile Sales List - Always visible below map on mobile */}
+      <div className="lg:hidden flex flex-col bg-white border-t border-gray-200 flex-1 overflow-hidden min-h-0">
         <div className="flex-shrink-0 p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
@@ -806,7 +792,7 @@ export default function SalesClient({
           </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 max-h-[50vh]">
+        <div className="flex-1 overflow-y-auto p-4">
           {loading && (
             <div className="grid grid-cols-1 gap-3">
               {Array.from({ length: 4 }).map((_, i) => (

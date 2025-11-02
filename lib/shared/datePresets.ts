@@ -55,31 +55,39 @@ export function buildDatePresets(now: Date = new Date()): DatePreset[] {
   })
   
   // 2. Thursday (4)
+  const thursday = nextWeekday(now, 4)
   presets.push({
     id: 'thursday',
     label: 'Thursday',
-    ...nextWeekday(now, 4)
+    start: thursday.start,
+    end: thursday.end
   })
   
   // 3. Friday (5)
+  const friday = nextWeekday(now, 5)
   presets.push({
     id: 'friday',
     label: 'Friday',
-    ...nextWeekday(now, 5)
+    start: friday.start,
+    end: friday.end
   })
   
   // 4. Saturday (6)
+  const saturday = nextWeekday(now, 6)
   presets.push({
     id: 'saturday',
     label: 'Saturday',
-    ...nextWeekday(now, 6)
+    start: saturday.start,
+    end: saturday.end
   })
   
   // 5. Sunday (0)
+  const sunday = nextWeekday(now, 0)
   presets.push({
     id: 'sunday',
     label: 'Sunday',
-    ...nextWeekday(now, 0)
+    start: sunday.start,
+    end: sunday.end
   })
   
   // 6. This weekend (Saturday-Sunday)

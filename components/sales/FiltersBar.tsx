@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import ZipInput from '@/components/location/ZipInput'
-import { buildDatePresets } from '@/lib/shared/datePresets'
-import type { DatePreset } from '@/lib/shared/datePresets'
+import { buildDatePresets, type DatePreset } from '@/lib/shared/datePresets'
 
 type FiltersBarProps = {
   // ZIP Search

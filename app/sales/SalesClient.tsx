@@ -789,12 +789,12 @@ export default function SalesClient({
 
       {/* Main Content - Responsive Layout */}
       <div 
-        className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
+        className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_628px] lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
         style={{ height: MAIN_CONTENT_HEIGHT }}
       >
         {/* Map - Top on mobile, Left on desktop */}
         <div 
-          className="relative lg:h-full lg:min-h-0 bg-gray-100 flex-shrink-0" 
+          className="relative md:h-full md:min-h-0 bg-gray-100 flex-shrink-0" 
           style={{ 
             height: isMobile 
               ? `calc(100vh - ${FILTERS_HEIGHT}px)` 
@@ -831,7 +831,7 @@ export default function SalesClient({
         </div>
 
         {/* Sales List - Below map on mobile, Right panel on desktop */}
-        <div className="hidden lg:flex bg-white border-l border-gray-200 flex-col min-h-0 min-w-0 h-full overflow-y-auto">
+        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 min-w-0 h-full overflow-y-auto">
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">

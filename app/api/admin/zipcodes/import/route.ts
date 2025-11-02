@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createReadStream, existsSync } from 'fs'
 import { createInterface } from 'readline'
 import { resolve, normalize, relative } from 'path'
-import { adminSupabase } from '@/lib/supabase/admin'
+import { ENV_SERVER } from '@/lib/env'
 import { ENV_SERVER } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -192,7 +192,7 @@ async function importFromPath(csvFilePath: string) {
 async function insertBatch(batch: ZipCodeRow[]) {
   // Supabase JS client doesn't support schema-qualified table names
   // Use REST API directly to access lootaura_v2.zipcodes
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE || ENV_SERVER.SUPABASE_SERVICE_ROLE
   
   if (!supabaseUrl || !serviceRoleKey) {

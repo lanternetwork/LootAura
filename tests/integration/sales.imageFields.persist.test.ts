@@ -144,6 +144,9 @@ describe('Sales API - Image Support', () => {
 	})
 
 	it('should reject invalid cover_image_url', async () => {
+		// Set mock to return false for invalid URLs in this test
+		mockIsAllowedImageUrl.mockReturnValue(false)
+		
 		const request = new NextRequest('http://localhost:3000/api/sales', {
 			method: 'POST',
 			body: JSON.stringify({
@@ -169,6 +172,11 @@ describe('Sales API - Image Support', () => {
 	})
 
 	it('should reject invalid image URLs in images array', async () => {
+		// Set mock to return false for the malicious URL
+		mockIsAllowedImageUrl.mockImplementation((url: string) => {
+			return url.includes('res.cloudinary.com/test')
+		})
+		
 		const request = new NextRequest('http://localhost:3000/api/sales', {
 			method: 'POST',
 			body: JSON.stringify({

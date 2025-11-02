@@ -69,16 +69,17 @@ function getAdminSupabase(): ReturnType<typeof createClient> {
               detectSessionInUrl: false
             }
           }
-        ) as ReturnType<typeof createClient>
+        )
       }
     }
   }
   return _adminSupabase
 }
 
-// Directly export the lazy client - TypeScript will infer types correctly
-// We need to initialize it immediately for type checking, but it will use placeholder during build
-export const adminSupabase: ReturnType<typeof createClient> = getAdminSupabase()
+// Export the client directly - initialization happens lazily on first access
+// The placeholder client created during build has the correct type structure
+// so TypeScript can infer types correctly for method chaining
+export const adminSupabase = getAdminSupabase()
 
 // Note: Admin client uses the schema configuration from the client creation
 // No need for separate schema helpers since the client is configured with the schema

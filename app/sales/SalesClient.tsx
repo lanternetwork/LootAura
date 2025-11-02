@@ -773,7 +773,7 @@ export default function SalesClient({
         onZipLocationFound={handleZipLocationFound}
         onZipError={handleZipError}
         zipError={zipError}
-        dateRange={filters.dateRange as 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any'}
+        dateRange={filters.dateRange}
         onDateRangeChange={(dateRange: DateRangeType) => handleFiltersChange({ ...filters, dateRange })}
         categories={filters.categories}
         onCategoriesChange={(categories) => handleFiltersChange({ ...filters, categories })}
@@ -966,7 +966,7 @@ export default function SalesClient({
       <MobileFilterSheet
         isOpen={isMobileFilterSheetOpen}
         onClose={closeFilterSheet}
-        dateRange={filters.dateRange as 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any'}
+        dateRange={filters.dateRange}
         onDateRangeChange={(dateRange: DateRangeType) => handleFiltersChange({ ...filters, dateRange })}
         categories={filters.categories}
         onCategoriesChange={(categories) => handleFiltersChange({ ...filters, categories })}

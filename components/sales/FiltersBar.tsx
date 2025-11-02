@@ -11,8 +11,8 @@ type FiltersBarProps = {
   zipError?: string | null
   
   // Date Filter
-  dateRange: 'today' | 'weekend' | 'next_weekend' | 'any'
-  onDateRangeChange: (dateRange: 'today' | 'weekend' | 'next_weekend' | 'any') => void
+  dateRange: 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any'
+  onDateRangeChange: (dateRange: 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any') => void
   
   // Category Filter
   categories: string[]

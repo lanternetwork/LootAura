@@ -74,7 +74,7 @@ describe('Add Sale Integration', () => {
   })
 
   afterEach(() => {
-    // Clean up mocks and reset state
+    // Clean up rendered components and reset mocks
     cleanup()
     vi.clearAllMocks()
   })

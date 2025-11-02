@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { cleanup, renderHook, act } from '@testing-library/react'
 import { usePresets } from '@/lib/hooks/usePresets'
 
 // Mock localStorage
@@ -34,6 +34,7 @@ describe('Local Preset Management', () => {
   })
 
   afterEach(() => {
+    cleanup()
     localStorageMock.clear()
   })
 

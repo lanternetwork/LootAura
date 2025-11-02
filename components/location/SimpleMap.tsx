@@ -10,8 +10,9 @@ import HybridPinsOverlay from "./HybridPinsOverlay"
 
 interface SimpleMapProps {
   center: { lat: number; lng: number }
-  zoom?: number
+  zoom?: number | undefined // undefined means let fitBounds or map determine zoom
   fitBounds?: { west: number; south: number; east: number; north: number } | null
+  fitBoundsOptions?: { padding?: number; duration?: number } // Allow custom fitBounds options
   sales?: Sale[]
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string
@@ -30,7 +31,8 @@ interface SimpleMapProps {
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
   center, 
   zoom = 11, 
-  fitBounds, 
+  fitBounds,
+  fitBoundsOptions = { padding: 20, duration: 400 },
   sales = [],
   onSaleClick,
   selectedSaleId,
@@ -193,19 +195,20 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const boundsKey = `${fitBounds.west}|${fitBounds.south}|${fitBounds.east}|${fitBounds.north}`
     
     if (boundsKey !== lastBoundsKey.current) {
-      console.log('[MAP] fitBounds:', fitBounds)
+      console.log('[MAP] fitBounds:', fitBounds, 'options:', fitBoundsOptions)
       const map = mapRef.current.getMap()
       if (map) {
         map.fitBounds(
           [[fitBounds.west, fitBounds.south], [fitBounds.east, fitBounds.north]], 
-          { padding: 40, duration: 600 }
+          fitBoundsOptions
         )
         lastBoundsKey.current = boundsKey
       }
     }
-  }, [fitBounds, loaded])
+  }, [fitBounds, fitBoundsOptions, loaded])
 
   // Handle center/zoom changes
+  // Skip center/zoom updates when fitBounds is active to prevent zoom flash
   useEffect(() => {
     if (!loaded || !mapRef.current || fitBounds) return
     

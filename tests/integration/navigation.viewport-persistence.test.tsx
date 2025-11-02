@@ -9,7 +9,7 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import SaleCard from '@/components/SaleCard'
@@ -76,7 +76,7 @@ describe('Viewport Persistence Navigation', () => {
   })
 
   afterEach(() => {
-    cleanup()
+    // Note: cleanup() is automatically handled by @testing-library/react
   })
 
   describe('SaleCard viewport URL generation', () => {

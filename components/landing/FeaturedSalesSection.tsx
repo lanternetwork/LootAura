@@ -6,11 +6,15 @@ import Link from 'next/link'
 import SaleCard from '@/components/SaleCard'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import { Sale } from '@/lib/types'
+import { isTestSalesEnabled } from '@/lib/flags'
+import { getDemoSales } from '@/lib/demo/demoSales'
 
 interface LocationState {
   zip?: string
   lat?: number
   lng?: number
+  city?: string
+  state?: string
 }
 
 export function FeaturedSalesSection() {
@@ -31,51 +35,105 @@ export function FeaturedSalesSection() {
       return
     }
 
-    // 2) localStorage (only ZIP codes, not exact coordinates)
-    try {
-      const saved = window.localStorage.getItem('loot-aura:lastLocation')
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved)
-          // Only use saved data if it's a ZIP code (not exact coordinates)
-          // This ensures we don't restore sensitive coordinate data from storage
-          if (parsed && parsed.zip) {
-            setLocation({ zip: parsed.zip })
+    // 2) Try IP-based geolocation first (works with VPNs and doesn't require permission)
+    // This should be the PRIMARY method since it respects VPN location
+    const tryIPGeolocation = async () => {
+      try {
+        const ipRes = await fetch('/api/geolocation/ip')
+        if (ipRes.ok) {
+          const ipData = await ipRes.json()
+          if (ipData.lat && ipData.lng) {
+            console.log('[FeaturedSales] Using IP geolocation:', ipData)
+            const loc = { 
+              lat: ipData.lat, 
+              lng: ipData.lng,
+              city: ipData.city,
+              state: ipData.state
+            }
+            setLocation(loc)
             setStatus('ready')
-            return
+            return true
+          }
+        }
+      } catch (error) {
+        console.warn('[FeaturedSales] IP geolocation failed:', error)
+      }
+      return false
+    }
+    
+    // Try IP geolocation first (respects VPN location)
+    tryIPGeolocation().then((ipSuccess) => {
+      if (ipSuccess) {
+        return // IP geolocation succeeded - use it
+      }
+      
+      // IP geolocation failed - try browser geolocation (but it won't change with VPN)
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            // Use geolocation coordinates in memory only (do not persist to localStorage)
+            // This avoids storing sensitive location data while still providing UX benefit
+            const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+            console.log('[FeaturedSales] Using browser geolocation:', loc)
+            setLocation(loc)
+            setStatus('ready')
+          },
+          () => {
+            // Browser geolocation failed - try localStorage as fallback
+            try {
+              const saved = window.localStorage.getItem('loot-aura:lastLocation')
+              if (saved) {
+                try {
+                  const parsed = JSON.parse(saved)
+                  // Only use saved data if it's a ZIP code (not exact coordinates)
+                  if (parsed && parsed.zip) {
+                    console.log('[FeaturedSales] Using localStorage ZIP:', parsed.zip)
+                    setLocation({ zip: parsed.zip })
+                    setStatus('ready')
+                    return
+                  }
+                } catch {
+                  // Invalid JSON, continue
+                }
+              }
+            } catch {
+              // localStorage might be unavailable
+            }
+            
+            // Final fallback city (Louisville)
+            console.log('[FeaturedSales] Using fallback Louisville')
+            const fallback = { zip: '40204' }
+            setLocation(fallback)
+            setStatus('ready')
+          },
+          { enableHighAccuracy: false, timeout: 3500 }
+        )
+      } else {
+        // No geolocation API - try localStorage
+        try {
+          const saved = window.localStorage.getItem('loot-aura:lastLocation')
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved)
+              // Only use saved data if it's a ZIP code (not exact coordinates)
+              if (parsed && parsed.zip) {
+                setLocation({ zip: parsed.zip })
+                setStatus('ready')
+                return
+              }
+            } catch {
+              // Invalid JSON, continue
+            }
           }
         } catch {
-          // Invalid JSON, continue
+          // localStorage might be unavailable
         }
+        
+        // Final fallback
+        setLocation({ zip: '40204' })
+        setStatus('ready')
       }
-    } catch {
-      // localStorage might be unavailable in some contexts
-    }
-
-    // 3) geolocation (non-blocking)
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          // Use geolocation coordinates in memory only (do not persist to localStorage)
-          // This avoids storing sensitive location data while still providing UX benefit
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-          setLocation(loc)
-          setStatus('ready')
-        },
-        () => {
-          // 4) fallback city
-          const fallback = { zip: '40204' }
-          setLocation(fallback)
-          setStatus('ready')
-        },
-        { enableHighAccuracy: false, timeout: 3500 }
-      )
-      return
-    }
-
-    // 4) final fallback
-    setLocation({ zip: '40204' })
-    setStatus('ready')
+    })
   }, [searchParams])
 
   // Fetch sales when location is ready
@@ -153,19 +211,34 @@ export function FeaturedSalesSection() {
           console.warn('[FeaturedSales] No sales found in response:', data)
         }
         
-        // Randomly shuffle and take 6 sales
-        if (allSales.length > 0) {
-          console.log('[FeaturedSales] Shuffling', allSales.length, 'sales')
-          // Fisher-Yates shuffle
-          const shuffled = [...allSales]
+        // Combine real sales with demo sales if flag is enabled
+        // Keep order: real first, demo after
+        const realSales = allSales ?? []
+        let finalSales: Sale[] = []
+        
+        if (realSales.length > 0) {
+          // Shuffle real sales and take up to 6
+          const shuffled = [...realSales]
           for (let i = shuffled.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1))
             ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
           }
-          // Take first 6 random sales
-          const selectedSales = shuffled.slice(0, 6)
-          console.log('[FeaturedSales] Selected', selectedSales.length, 'random sales')
-          setSales(selectedSales)
+          finalSales = shuffled.slice(0, 6)
+          
+          // If we have fewer than 6 real sales and flag is enabled, add demo sales
+          if (isTestSalesEnabled() && finalSales.length < 6) {
+            const demoNeeded = 6 - finalSales.length
+            const demoSales = getDemoSales().slice(0, demoNeeded)
+            finalSales = [...finalSales, ...demoSales]
+          }
+        } else if (isTestSalesEnabled()) {
+          // No real sales, but flag enabled - show demo sales
+          finalSales = getDemoSales().slice(0, 6)
+        }
+        
+        if (finalSales.length > 0) {
+          console.log('[FeaturedSales] Displaying', finalSales.length, 'sales (real:', realSales.length, 'demo:', isTestSalesEnabled() ? getDemoSales().length : 0, ')')
+          setSales(finalSales)
         } else {
           console.warn('[FeaturedSales] No sales available, showing empty state')
           setSales([])
@@ -179,7 +252,9 @@ export function FeaturedSalesSection() {
     }
 
     fetchSales()
-  }, [status, location])
+    // Only depend on location.lat/lng/zip, not city/state changes to prevent re-render loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, location?.lat, location?.lng, location?.zip])
 
   const handleZipSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -291,7 +366,26 @@ export function FeaturedSalesSection() {
   // Location resolved - show sales
   // Sales are already shuffled and limited to 6 in the fetch effect
   const displaySales = sales
-  const locationDisplay = location.zip || `${location.lat?.toFixed(2)}, ${location.lng?.toFixed(2)}`
+  // Display location: prefer city/state, then zip, then coordinates
+  const locationDisplay = (() => {
+    if (location.city) {
+      // Safe decode of URL-encoded city names
+      let cityName = location.city
+      try {
+        cityName = decodeURIComponent(location.city)
+      } catch {
+        // If not URL-encoded, use as-is
+      }
+      return location.state ? `${cityName}, ${location.state}` : cityName
+    }
+    if (location.zip) {
+      return location.zip
+    }
+    if (location.lat && location.lng) {
+      return `${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}`
+    }
+    return 'your area'
+  })()
 
   return (
     <section className="py-12 bg-gray-50">

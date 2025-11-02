@@ -33,43 +33,95 @@ export function MapPreviewSection() {
       return
     }
 
-    // 2) localStorage (only ZIP codes)
-    try {
-      const saved = window.localStorage.getItem('loot-aura:lastLocation')
-      if (saved) {
+    // 2) Try IP-based geolocation first (works with VPNs and doesn't require permission)
+    // This should be the PRIMARY method since it respects VPN location
+    const tryIPGeolocation = async () => {
+      try {
+        const ipRes = await fetch('/api/geolocation/ip')
+        if (ipRes.ok) {
+          const ipData = await ipRes.json()
+          if (ipData.lat && ipData.lng) {
+            console.log('[MapPreview] Using IP geolocation:', ipData)
+            const loc = { 
+              lat: ipData.lat, 
+              lng: ipData.lng,
+              city: ipData.city,
+              state: ipData.state
+            }
+            setLocation(loc)
+            return true
+          }
+        }
+      } catch (error) {
+        console.warn('[MapPreview] IP geolocation failed:', error)
+      }
+      return false
+    }
+    
+    // Try IP geolocation first (respects VPN location)
+    tryIPGeolocation().then((ipSuccess) => {
+      if (ipSuccess) {
+        return // IP geolocation succeeded - use it
+      }
+      
+      // IP geolocation failed - try browser geolocation (but it won't change with VPN)
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+            console.log('[MapPreview] Using browser geolocation:', loc)
+            setLocation(loc)
+          },
+          () => {
+            // Browser geolocation failed - try localStorage as fallback
+            try {
+              const saved = window.localStorage.getItem('loot-aura:lastLocation')
+              if (saved) {
+                try {
+                  const parsed = JSON.parse(saved)
+                  if (parsed && parsed.zip) {
+                    console.log('[MapPreview] Using localStorage ZIP:', parsed.zip)
+                    setLocation({ zip: parsed.zip })
+                    return
+                  }
+                } catch {
+                  // Invalid JSON, continue
+                }
+              }
+            } catch {
+              // localStorage might be unavailable
+            }
+            
+            // Final fallback city
+            console.log('[MapPreview] Using fallback Louisville')
+            const fallback = { zip: '40204' }
+            setLocation(fallback)
+          },
+          { enableHighAccuracy: false, timeout: 3500 }
+        )
+      } else {
+        // No geolocation API - try localStorage
         try {
-          const parsed = JSON.parse(saved)
-          if (parsed && parsed.zip) {
-            setLocation({ zip: parsed.zip })
-            return
+          const saved = window.localStorage.getItem('loot-aura:lastLocation')
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved)
+              if (parsed && parsed.zip) {
+                setLocation({ zip: parsed.zip })
+                return
+              }
+            } catch {
+              // Invalid JSON, continue
+            }
           }
         } catch {
-          // Invalid JSON, continue
+          // localStorage might be unavailable
         }
+        
+        // Final fallback
+        setLocation({ zip: '40204' })
       }
-    } catch {
-      // localStorage might be unavailable
-    }
-
-    // 3) geolocation (non-blocking)
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-          setLocation(loc)
-        },
-        () => {
-          // 4) fallback city
-          const fallback = { zip: '40204' }
-          setLocation(fallback)
-        },
-        { enableHighAccuracy: false, timeout: 3500 }
-      )
-      return
-    }
-
-    // 4) final fallback
-    setLocation({ zip: '40204' })
+    })
   }, [searchParams])
 
   // Fetch sales and resolve location
@@ -113,8 +165,8 @@ export function MapPreviewSection() {
           return
         }
 
-        // Calculate default bounds for preview (25km radius)
-        const radiusKm = 25
+        // Calculate default bounds for preview (10 mile radius = ~16.09 km)
+        const radiusKm = 16.09 // 10 miles in kilometers
         const latRange = radiusKm / 111.0
         const lngRange = radiusKm / (111.0 * Math.cos(finalLat * Math.PI / 180))
         
@@ -125,10 +177,10 @@ export function MapPreviewSection() {
           north: finalLat + latRange
         }
 
-        // Set map view
+        // Set map view - zoom level 10 shows approximately 10-mile radius
         setMapView({
           center: { lat: finalLat, lng: finalLng },
-          zoom: 11,
+          zoom: 10,
           bounds
         })
 

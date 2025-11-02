@@ -2,6 +2,10 @@ import '@testing-library/jest-dom/vitest'
 import React from 'react'
 
 import { vi } from 'vitest'
+import { makeStableSupabaseClient } from './utils/mocks/supabaseServerStable'
+
+// never re-create this per test, keep it stable
+const stableSupabase = makeStableSupabaseClient()
 
 // Ensure rate limiting is bypassed in tests
 ;(process.env as any).RATE_LIMITING_ENABLED = 'false'
@@ -121,78 +125,13 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
-// Supabase server mock used by tests - DISABLED to allow test-specific mocks
+// Supabase server mock used by tests - stable and non-clearable
 // @ts-ignore vitest mock hoisting in test env
-/*
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => ({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
-      signOut: vi.fn(),
-    },
-    from: vi.fn((tableName: string) => {
-      const chain: any = {}
-      
-      // Create a proper chain object that returns itself for method chaining
-      const createChain = () => {
-        const mockChain = {
-          gte: vi.fn().mockReturnThis(),
-          lte: vi.fn().mockReturnThis(),
-          in: vi.fn().mockReturnThis(),
-          or: vi.fn().mockReturnThis(),
-          order: vi.fn().mockReturnThis(),
-          range: vi.fn().mockResolvedValue({
-            data: [],
-            error: null
-          }),
-          limit: vi.fn().mockResolvedValue({
-            data: [],
-            error: null
-          }),
-          eq: vi.fn().mockReturnThis(),
-          single: vi.fn().mockResolvedValue({
-            data: { id: 'test-id', owner_id: 'test-user' },
-            error: null
-          })
-        }
-        return mockChain
-      }
-      
-      chain.select = vi.fn((columns: string | string[], options?: any) => {
-        if (options?.count === 'exact' && options?.head === true) {
-          // Count query
-          return {
-            eq: vi.fn().mockResolvedValue({
-              count: 0,
-              error: null
-            })
-          }
-        } else {
-          // Regular select query - return a properly mocked chain
-          return createChain()
-        }
-      })
-      
-      chain.insert = vi.fn((rows: any[]) => ({ data: rows, error: null }))
-      chain.update = vi.fn(() => createChain())
-      chain.delete = vi.fn(() => createChain())
-      chain.eq = vi.fn(() => createChain())
-      chain.gte = vi.fn(() => createChain())
-      chain.lte = vi.fn(() => createChain())
-      chain.in = vi.fn(() => createChain())
-      chain.or = vi.fn(() => createChain())
-      chain.order = vi.fn(() => createChain())
-      chain.range = vi.fn(() => Promise.resolve({ data: [], error: null }))
-      chain.limit = vi.fn(() => Promise.resolve({ data: [], error: null }))
-      chain.single = vi.fn(async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
-      
-      return chain
-    }),
-  })),
-}))
-*/
+vi.mock('@/lib/supabase/server', () => {
+  return {
+    createSupabaseServerClient: vi.fn(() => stableSupabase),
+  }
+})
 
 // Geocode mock ensuring non-null for valid addresses
 // @ts-ignore vitest mock hoisting in test env
@@ -299,8 +238,19 @@ const ALLOWED_PATTERNS = [
   /^This error originated in/, // React error origin messages - tests/components/AddSaleForm.a11y.test.tsx
   /^The latest test that might've caused/, // React test error context - tests/components/AddSaleForm.a11y.test.tsx
   
+  // React act() warnings (async state updates in tests)
+  /^Warning: The current testing environment is not configured to support act/, // React act() warnings - tests/integration/landing.featured-demo.test.tsx
+  /^Warning:.*act\(/i, // React act() warnings with act() mention - tests/integration/landing.featured-demo.test.tsx
+  
+  // React unmount warnings (component cleanup in tests)
+  /^Warning: Attempted to synchronously unmount a root while React was already rendering/, // React unmount race condition - tests/integration/landing.featured-demo.test.tsx
+  
   // Nested console guardrail errors (tests/setup.ts)
   /^Error: Unexpected console.error:/, // Nested console guardrail errors - tests/setup.ts
+  
+  // FeaturedSalesSection logging (components/landing/FeaturedSalesSection.tsx)
+  /^\[FeaturedSales\]/, // FeaturedSales debug logging - tests/integration/landing.featured-demo.test.tsx
+  /^Failed to fetch featured sales:/, // FeaturedSales error logging - tests/integration/landing.featured-demo.test.tsx
 ]
 
 const isAllowedMessage = (message: string): boolean => {

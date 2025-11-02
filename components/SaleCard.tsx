@@ -47,8 +47,17 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
       </div>
 
       <div className="p-2 flex flex-col gap-1">
-        <div className="flex justify-between items-start">
-          <h3 className="text-base font-semibold line-clamp-1">{sale?.title || `Sale ${sale?.id}`}</h3>
+        <div className="flex justify-between items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              {((sale as any).is_demo === true || sale?.id?.startsWith?.('demo-')) && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-medium whitespace-nowrap">
+                  Demo
+                </span>
+              )}
+            </div>
+            <h3 className="text-base font-semibold line-clamp-1">{sale?.title || `Sale ${sale?.id}`}</h3>
+          </div>
           {sale?.id && <FavoriteButton saleId={sale.id} initial={false} />}
         </div>
         {sale?.description && <p className="text-xs text-neutral-600 line-clamp-1">{sale.description}</p>}

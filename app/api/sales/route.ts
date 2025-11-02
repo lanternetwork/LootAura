@@ -444,10 +444,9 @@ async function salesHandler(request: NextRequest) {
         .filter((sale) => {
           if (!sale) return false
           if (!windowStart && !windowEnd) return true
-          // Build sale start/end - use UTC to match window dates
-          // Parse date_start/time_start as if they're in UTC (date-only filtering assumes UTC)
-          const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}Z`) : null
-          const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}Z`) : null
+          // Build sale start/end
+          const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null
+          const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
           // If a date window is set, exclude rows with no date information to avoid always passing
           if ((windowStart || windowEnd) && !saleStart && !saleEnd) return false
           const s = saleStart || saleEnd
@@ -552,12 +551,12 @@ async function salesHandler(request: NextRequest) {
       if (windowStart && windowEnd) {
         const salesBeforeDateFilter = (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number')
         const salesAfterDateFilter = salesBeforeDateFilter.filter((sale: Sale) => {
-          const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}Z`) : null
-          const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}Z`) : null
+          const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null
+          const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
           if (!saleStart && !saleEnd) return true
           const s = saleStart || saleEnd
           const e = saleEnd || saleStart
-          if (!s || !e) return false
+          if (!s || !e) return true
           const startOk = !windowEnd || s <= windowEnd
           const endOk = !windowStart || e >= windowStart
           return startOk && endOk
@@ -584,8 +583,8 @@ async function salesHandler(request: NextRequest) {
           // date window overlap (exclude undated when window set)
           .filter((row: any) => {
             if (!windowStart && !windowEnd) return true
-            const saleStart = row.date_start ? new Date(`${row.date_start}T${row.time_start || '00:00:00'}Z`) : null
-            const saleEnd = row.date_end ? new Date(`${row.date_end}T${row.time_end || '23:59:59'}Z`) : null
+            const saleStart = row.date_start ? new Date(`${row.date_start}T${row.time_start || '00:00:00'}`) : null
+            const saleEnd = row.date_end ? new Date(`${row.date_end}T${row.time_end || '23:59:59'}`) : null
             if (!saleStart && !saleEnd) return false
             const s = saleStart || saleEnd
             const e = saleEnd || saleStart

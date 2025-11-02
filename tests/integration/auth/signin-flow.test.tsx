@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 // Mock Next.js hooks
@@ -51,6 +51,10 @@ describe('Sign In Page Integration', () => {
     // Dynamic import to avoid module resolution issues
     const module = await import('@/app/auth/signin/page')
     SignIn = module.default
+  })
+
+  afterEach(() => {
+    cleanup()
   })
 
   describe('Email/Password Sign In', () => {

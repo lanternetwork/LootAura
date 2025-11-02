@@ -1,13 +1,37 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import * as ImageValidate from '@/lib/images/validateImageUrl'
-import { mockSupabaseServer } from '@/tests/mocks/supabaseServer.mock'
 
 // Ensure Cloudinary validator recognizes the test cloud name
 ;(process.env as any).NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'test'
 
-// Use shared Supabase server mock with full insert/select/single support
-mockSupabaseServer({ sales_v2: [] })
+// Mock Supabase server with full insert/select/single support
+// Pattern exactly like v2.sales.images.persist.test.ts
+const mockSingle = vi.fn()
+let lastInsertedPayload: any = null
+
+const fromChain = {
+  insert: vi.fn((payload: any) => {
+    // Store the payload so we can return it with the inserted row
+    lastInsertedPayload = payload
+    return {
+      select: vi.fn(() => ({
+        single: mockSingle
+      }))
+    }
+  }),
+}
+
+const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
+  },
+  from: vi.fn(() => fromChain)
+}
+
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: () => mockSupabaseClient,
+}))
 
 // Mock rate limiting
 vi.mock('@/lib/rateLimit/withRateLimit', () => ({
@@ -24,9 +48,41 @@ beforeAll(async () => {
 })
 
 describe('Sales API - Image Support', () => {
-beforeEach(() => {
-	vi.clearAllMocks()
-})
+	beforeEach(() => {
+		// Match working test pattern exactly - use clearAllMocks() like v2 test
+		vi.clearAllMocks()
+		
+		lastInsertedPayload = null
+		
+		// Reset auth mock to return user
+		mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
+		// Reset image validator spy
+		mockIsAllowedImageUrl.mockReturnValue(true)
+		// CRITICAL: Re-initialize from() and fromChain.insert after clearAllMocks()
+		// clearAllMocks() clears implementations of ALL vi.fn() mocks, including fromChain.insert
+		mockSupabaseClient.from.mockImplementation(() => fromChain)
+		fromChain.insert = vi.fn((payload: any) => {
+			lastInsertedPayload = payload
+			return {
+				select: vi.fn(() => ({
+					single: mockSingle
+				}))
+			}
+		})
+		// Set up mockSingle to return inserted payload when available
+		mockSingle.mockImplementation(() => {
+			if (lastInsertedPayload) {
+				const inserted = {
+					id: 'test-sale-id',
+					...lastInsertedPayload,
+					created_at: new Date().toISOString(),
+					updated_at: new Date().toISOString()
+				}
+				return Promise.resolve({ data: inserted, error: null })
+			}
+			return Promise.resolve({ data: { id: 'test-sale-id' }, error: null })
+		})
+	})
 
 	it('should accept and persist cover_image_url', async () => {
 	// No-op: insert/select/single chain in shared mock will reflect payload
@@ -88,6 +144,9 @@ beforeEach(() => {
 	})
 
 	it('should reject invalid cover_image_url', async () => {
+		// Set mock to return false for invalid URLs in this test
+		mockIsAllowedImageUrl.mockReturnValue(false)
+		
 		const request = new NextRequest('http://localhost:3000/api/sales', {
 			method: 'POST',
 			body: JSON.stringify({
@@ -113,6 +172,11 @@ beforeEach(() => {
 	})
 
 	it('should reject invalid image URLs in images array', async () => {
+		// Set mock to return false for the malicious URL
+		mockIsAllowedImageUrl.mockImplementation((url: string) => {
+			return url.includes('res.cloudinary.com/test')
+		})
+		
 		const request = new NextRequest('http://localhost:3000/api/sales', {
 			method: 'POST',
 			body: JSON.stringify({

@@ -21,7 +21,7 @@ interface MapViewState {
 
 interface SalesClientProps {
   initialSales: Sale[]
-  initialCenter: { lat: number; lng: number } | null
+  initialCenter: { lat: number; lng: number; label?: { zip?: string; city?: string; state?: string } } | null
   user: User | null
 }
 
@@ -343,7 +343,7 @@ export default function SalesClient({
   }, [fetchMapSales, selectedPinId])
 
   // Handle ZIP search with bbox support
-  const handleZipLocationFound = (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => {
+  const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => {
     setZipError(null)
     setIsZipSearching(true) // Prevent map view changes from overriding ZIP search
     setIsMapTransitioning(true) // Show loading overlay
@@ -397,11 +397,11 @@ export default function SalesClient({
     setTimeout(() => {
       setIsZipSearching(false)
     }, 1000)
-  }
+  }, [searchParams, router])
 
-  const handleZipError = (error: string) => {
+  const handleZipError = useCallback((error: string) => {
     setZipError(error)
-  }
+  }, [])
 
   // Distance to zoom level mapping (miles to zoom level)
   const distanceToZoom = (distance: number): number => {
@@ -448,19 +448,63 @@ export default function SalesClient({
   // Initial fetch will be triggered by map onLoad event with proper bounds
 
   // Restore ZIP from URL on page load only (not on every URL change)
+  // Skip if initialCenter already matches ZIP (server-side lookup succeeded)
   const [hasRestoredZip, setHasRestoredZip] = useState(false)
   useEffect(() => {
     if (hasRestoredZip) return // Only run once on mount
     
     const zipFromUrl = searchParams.get('zip')
-    if (zipFromUrl) {
+    // Only lookup ZIP client-side if:
+    // 1. There's a ZIP in URL
+    // 2. No lat/lng in URL
+    // 3. InitialCenter doesn't already have the correct ZIP location (server-side lookup might have failed)
+    const needsClientSideLookup = zipFromUrl && !urlLat && !urlLng && 
+      (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== zipFromUrl.trim())
+    
+    if (needsClientSideLookup) {
       // Trigger ZIP lookup from URL
       console.log('[ZIP] Restoring from URL:', zipFromUrl)
-      // This would need to be implemented with a ZIP lookup service
-      // For now, we'll just log it
+      
+      const performZipLookup = async () => {
+        const trimmedZip = zipFromUrl.trim()
+        const zipRegex = /^\d{5}(-\d{4})?$/
+        
+        if (!zipRegex.test(trimmedZip)) {
+          console.warn('[ZIP] Invalid ZIP format from URL:', trimmedZip)
+          setHasRestoredZip(true)
+          return
+        }
+        
+        try {
+          const response = await fetch(`/api/geocoding/zip?zip=${encodeURIComponent(trimmedZip)}`)
+          const data = await response.json()
+          
+          if (data.ok && data.lat && data.lng) {
+            console.log('[ZIP] Lookup success from URL:', { zip: trimmedZip, lat: data.lat, lng: data.lng })
+            
+            // Use the same handler as manual ZIP input
+            const bbox = data.bbox ? [data.bbox[0], data.bbox[1], data.bbox[2], data.bbox[3]] as [number, number, number, number] : undefined
+            handleZipLocationFound(data.lat, data.lng, data.city, data.state, data.zip, bbox)
+          } else {
+            console.warn('[ZIP] Lookup failed from URL:', trimmedZip, data.error)
+            handleZipError(data.error || 'ZIP code not found')
+          }
+        } catch (error) {
+          console.error('[ZIP] Lookup error from URL:', trimmedZip, error)
+          handleZipError('Failed to lookup ZIP code')
+        }
+      }
+      
+      performZipLookup()
       setHasRestoredZip(true) // Mark as restored
+    } else if (!zipFromUrl) {
+      // No ZIP in URL, mark as processed
+      setHasRestoredZip(true)
+    } else {
+      // ZIP in URL but already resolved server-side, mark as processed
+      setHasRestoredZip(true)
     }
-  }, [searchParams, hasRestoredZip])
+  }, [searchParams, hasRestoredZip, urlLat, urlLng, initialCenter, handleZipLocationFound, handleZipError])
 
   // Memoized visible sales - filtered by current viewport bounds to match map pins
   const visibleSales = useMemo(() => {

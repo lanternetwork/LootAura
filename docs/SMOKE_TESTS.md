@@ -139,6 +139,25 @@ Before running smoke tests, verify:
 
 ---
 
+### 8. Test/Demo Sales Flag
+
+**Test**: Verify demo sales behavior on landing page
+
+**Expected Results**:
+- [ ] When `NEXT_PUBLIC_ENABLE_TEST_SALES=false` (default): No demo sales appear on landing page
+- [ ] When `NEXT_PUBLIC_ENABLE_TEST_SALES=true`: Demo sales appear on landing page "Featured sales" section
+- [ ] Demo sales show "Demo" badge on sale cards
+- [ ] Demo sales do NOT appear in `/sales` map or list view
+- [ ] Demo sales do NOT appear in API responses (`/api/sales`)
+
+**Common Issues**:
+- Demo sales appearing everywhere → Verify flag is only checked in `components/landing/FeaturedSalesSection.tsx`
+- Landing page empty when flag enabled → Check `lib/demo/demoSales.ts` returns valid demo data
+
+**Note**: Setting `NEXT_PUBLIC_ENABLE_TEST_SALES=true` will make the landing page look populated even if the database is empty. This is intended for demos and staging environments.
+
+---
+
 ## Post-Deployment Checklist
 
 After completing smoke tests:

@@ -35,7 +35,9 @@
     "load:suite": "tsx scripts/load/suite.ts",
     "load:suite:staging": "tsx scripts/load/suite.ts --baseURL https://staging.lootaura.com",
     "load:local": "tsx scripts/load/local-test.ts",
-    "load:local:burst": "tsx scripts/load/local-test.ts --scenario sales-burst"
+    "load:local:burst": "tsx scripts/load/local-test.ts --scenario sales-burst",
+    "import:zipcodes": "tsx scripts/import-zipcodes.ts",
+    "generate:hardcoded-zips": "tsx scripts/generate-hardcoded-zips.ts"
   },
   "dependencies": {
     "next": "^14.2.15",

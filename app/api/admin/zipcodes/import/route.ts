@@ -250,6 +250,29 @@ async function createUpsertZipcodesFunction(client: any) {
   // Create the upsert_zipcodes function if it doesn't exist
   // This allows the import to work even if the migration hasn't been applied
   const createFunctionSQL = `
+    -- First, fix the trigger function to handle zipcodes table correctly
+    CREATE OR REPLACE FUNCTION lootaura_v2.set_geom_from_coords()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        IF NEW.lat IS NOT NULL AND NEW.lng IS NOT NULL THEN
+            NEW.geom = ST_SetSRID(ST_MakePoint(NEW.lng, NEW.lat), 4326);
+        END IF;
+        
+        -- Only populate starts_at for sales table (which has date_start and time_start)
+        -- For zipcodes table, skip this logic
+        IF TG_TABLE_NAME = 'sales' THEN
+            IF NEW.date_start IS NOT NULL AND NEW.time_start IS NOT NULL THEN
+                NEW.starts_at = (NEW.date_start + NEW.time_start)::TIMESTAMPTZ;
+            ELSIF NEW.date_start IS NOT NULL THEN
+                NEW.starts_at = NEW.date_start::TIMESTAMPTZ;
+            END IF;
+        END IF;
+        
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    -- Now create the upsert function
     CREATE OR REPLACE FUNCTION public.upsert_zipcodes(
         zipcodes_json JSONB
     )

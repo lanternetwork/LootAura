@@ -137,12 +137,15 @@ export function WeekendStats() {
           end: weekendPreset.end
         })
 
-        // Get this week's date range (last 7 days)
+        // Get this week's date range (last 7 days, excluding today)
+        // If today is Nov 2, we want Oct 26 - Nov 1 (7 days, not including today)
         const formatDate = (d: Date) => d.toISOString().slice(0, 10)
-        const weekAgo = new Date(now)
-        weekAgo.setDate(now.getDate() - 7)
-        const thisWeekStart = formatDate(weekAgo)
-        const thisWeekEnd = formatDate(now)
+        const yesterday = new Date(now)
+        yesterday.setDate(now.getDate() - 1)
+        const sevenDaysAgo = new Date(yesterday)
+        sevenDaysAgo.setDate(yesterday.getDate() - 6) // 7 days total: from 7 days ago to yesterday
+        const thisWeekStart = formatDate(sevenDaysAgo)
+        const thisWeekEnd = formatDate(yesterday) // Exclude today
 
         // Fetch weekend sales
         const weekendUrl = `/api/sales?${params.toString()}`
@@ -178,7 +181,15 @@ export function WeekendStats() {
         }
         const weekData = await weekRes.json()
         const weekSales: Sale[] = weekData.data || []
-        const weekCount = weekSales.length
+        
+        // Filter out weekend sales - "New this week" should only count weekday sales
+        // Weekend sales are already counted in "Active sales"
+        const weekendDates = new Set([weekendPreset.start, weekendPreset.end])
+        const weekdaySales = weekSales.filter(sale => {
+          const saleDate = sale.date_start || sale.date_end
+          return saleDate && !weekendDates.has(saleDate)
+        })
+        const weekCount = weekdaySales.length
         console.log('[WeekendStats] Weekly sales response:', {
           ok: weekRes.ok,
           count: weekCount,

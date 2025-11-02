@@ -131,6 +131,12 @@ export function WeekendStats() {
         params.set('from', weekendPreset.start)
         params.set('to', weekendPreset.end)
 
+        console.log('[WeekendStats] Weekend date range:', {
+          start: weekendPreset.start,
+          end: weekendPreset.end,
+          preset: weekendPreset
+        })
+
         // Get this week's date range (last 7 days)
         const formatDate = (d: Date) => d.toISOString().slice(0, 10)
         const weekAgo = new Date(now)
@@ -139,12 +145,20 @@ export function WeekendStats() {
         const thisWeekEnd = formatDate(now)
 
         // Fetch weekend sales
-        const weekendRes = await fetch(`/api/sales?${params.toString()}`)
+        const weekendUrl = `/api/sales?${params.toString()}`
+        console.log('[WeekendStats] Fetching weekend sales:', weekendUrl)
+        const weekendRes = await fetch(weekendUrl)
         if (!weekendRes.ok) {
-          throw new Error('Failed to fetch weekend sales')
+          throw new Error(`Failed to fetch weekend sales: ${weekendRes.status}`)
         }
         const weekendData = await weekendRes.json()
         const weekendSales: Sale[] = weekendData.data || []
+        console.log('[WeekendStats] Weekend sales response:', {
+          ok: weekendRes.ok,
+          count: weekendSales.length,
+          totalInResponse: weekendData.count || weekendData.data?.length || 0,
+          sampleIds: weekendSales.slice(0, 3).map(s => s.id)
+        })
 
         // Fetch sales from this week
         const weekParams = new URLSearchParams(params.toString())
@@ -152,17 +166,26 @@ export function WeekendStats() {
         weekParams.set('to', thisWeekEnd)
         // Remove dateRange if it exists
         weekParams.delete('dateRange')
-        const weekRes = await fetch(`/api/sales?${weekParams.toString()}`)
+        const weekUrl = `/api/sales?${weekParams.toString()}`
+        console.log('[WeekendStats] Fetching weekly sales:', weekUrl)
+        const weekRes = await fetch(weekUrl)
         if (!weekRes.ok) {
-          throw new Error('Failed to fetch weekly sales')
+          throw new Error(`Failed to fetch weekly sales: ${weekRes.status}`)
         }
         const weekData = await weekRes.json()
         const weekSales: Sale[] = weekData.data || []
+        console.log('[WeekendStats] Weekly sales response:', {
+          ok: weekRes.ok,
+          count: weekSales.length,
+          totalInResponse: weekData.count || weekData.data?.length || 0,
+          dateRange: { from: thisWeekStart, to: thisWeekEnd }
+        })
 
         // Calculate stats
         const activeSales = weekendSales.length
         const newThisWeek = weekSales.length
 
+        console.log('[WeekendStats] Calculated stats:', { activeSales, newThisWeek })
         setStats({ activeSales, newThisWeek })
       } catch (error) {
         console.error('[WeekendStats] Error fetching stats:', error)

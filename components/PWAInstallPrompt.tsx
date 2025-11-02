@@ -1,21 +1,53 @@
 'use client'
+
 import { useState, useEffect } from 'react'
 
 interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>
+  prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
+
+const DISMISSED_KEY = 'pwa-install-dismissed'
+const DISMISS_DURATION_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [showInstallPrompt, setShowInstallPrompt] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    // Check if mobile device
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     // Check if app is already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true)
       return
+    }
+
+    // Don't show on desktop
+    if (!isMobile) {
+      return
+    }
+
+    // Check if dismissed within last 24 hours
+    const dismissedTimestamp = localStorage.getItem(DISMISSED_KEY)
+    if (dismissedTimestamp) {
+      const dismissedTime = parseInt(dismissedTimestamp, 10)
+      const now = Date.now()
+      if (now - dismissedTime < DISMISS_DURATION_MS) {
+        return // Still within 24 hour window
+      }
+      // 24 hours passed, remove the key to allow showing again
+      localStorage.removeItem(DISMISSED_KEY)
     }
 
     // Listen for the beforeinstallprompt event
@@ -30,6 +62,7 @@ export default function PWAInstallPrompt() {
       setIsInstalled(true)
       setShowInstallPrompt(false)
       setDeferredPrompt(null)
+      localStorage.removeItem(DISMISSED_KEY)
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
@@ -39,7 +72,7 @@ export default function PWAInstallPrompt() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
       window.removeEventListener('appinstalled', handleAppInstalled)
     }
-  }, [])
+  }, [isMobile])
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return
@@ -49,12 +82,14 @@ export default function PWAInstallPrompt() {
       const { outcome } = await deferredPrompt.userChoice
       
       if (outcome === 'accepted') {
-        console.log('User accepted the install prompt')
+        console.log('[PWA] User accepted the install prompt')
       } else {
-        console.log('User dismissed the install prompt')
+        console.log('[PWA] User dismissed the install prompt')
+        // Save dismissal timestamp
+        localStorage.setItem(DISMISSED_KEY, Date.now().toString())
       }
     } catch (error) {
-      console.error('Error showing install prompt:', error)
+      console.error('[PWA] Error showing install prompt:', error)
     } finally {
       setDeferredPrompt(null)
       setShowInstallPrompt(false)
@@ -63,57 +98,41 @@ export default function PWAInstallPrompt() {
 
   const handleDismiss = () => {
     setShowInstallPrompt(false)
-    // Don't show again for this session
-    sessionStorage.setItem('pwa-install-dismissed', 'true')
+    // Save dismissal timestamp for 24h reminder
+    localStorage.setItem(DISMISSED_KEY, Date.now().toString())
   }
 
-  // Don't show if already installed or dismissed this session
-  if (isInstalled || !showInstallPrompt || sessionStorage.getItem('pwa-install-dismissed')) {
+  // Don't show if already installed, not mobile, or no prompt
+  if (isInstalled || !isMobile || !showInstallPrompt || !deferredPrompt) {
     return null
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:max-w-sm">
-      <div className="bg-white border border-neutral-200 rounded-lg shadow-lg p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0">
-            <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">🏠</span>
-            </div>
-          </div>
-          
+    <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+      <div className="bg-white border-t border-gray-200 shadow-lg px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-neutral-900">
-              Install YardSaleFinder
-            </h3>
-            <p className="text-xs text-neutral-600 mt-1">
-              Get quick access to yard sales on your home screen
+            <p className="text-sm font-medium text-gray-900">
+              Add Loot Aura to your home screen
             </p>
           </div>
-          
-          <button
-            onClick={handleDismiss}
-            className="flex-shrink-0 text-neutral-400 hover:text-neutral-600"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </div>
-        
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={handleInstallClick}
-            className="flex-1 px-3 py-2 bg-amber-500 text-white text-sm font-medium rounded hover:bg-amber-600"
-          >
-            Install
-          </button>
-          <button
-            onClick={handleDismiss}
-            className="px-3 py-2 text-neutral-600 text-sm font-medium rounded hover:bg-neutral-100"
-          >
-            Not now
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={handleInstallClick}
+              className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Install
+            </button>
+            <button
+              onClick={handleDismiss}
+              className="text-gray-500 hover:text-gray-700 p-1"
+              aria-label="Dismiss"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -304,26 +304,25 @@ export async function POST(request: NextRequest) {
     
     // Handle JSON body (file content or file path)
     const body = await request.json()
+    
+    if (body.fileContent) {
+      // Direct file content
+      const result = await importFromContent(body.fileContent)
       
-      if (body.fileContent) {
-        // Direct file content
-        const result = await importFromContent(body.fileContent)
-        
-        return NextResponse.json({
-          success: true,
-          ...result
-        })
-      } else if (body.filePath) {
-        // Server-side file path (for local development)
-        const result = await importFromPath(body.filePath)
-        
-        return NextResponse.json({
-          success: true,
-          ...result
-        })
-      } else {
-        return NextResponse.json({ error: 'file, fileContent, or filePath is required' }, { status: 400 })
-      }
+      return NextResponse.json({
+        success: true,
+        ...result
+      })
+    } else if (body.filePath) {
+      // Server-side file path (for local development)
+      const result = await importFromPath(body.filePath)
+      
+      return NextResponse.json({
+        success: true,
+        ...result
+      })
+    } else {
+      return NextResponse.json({ error: 'file, fileContent, or filePath is required' }, { status: 400 })
     }
     
   } catch (error: any) {

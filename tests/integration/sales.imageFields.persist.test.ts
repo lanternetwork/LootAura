@@ -58,6 +58,8 @@ describe('Sales API - Image Support', () => {
 		mockSupabaseClient.auth.getUser.mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
 		// Reset image validator spy
 		mockIsAllowedImageUrl.mockReturnValue(true)
+		// Re-initialize from() after clearAllMocks() (it clears mock implementations)
+		mockSupabaseClient.from.mockImplementation(() => fromChain)
 		// Set up mockSingle to return inserted payload when available
 		mockSingle.mockImplementation(() => {
 			if (lastInsertedPayload) {
@@ -71,9 +73,8 @@ describe('Sales API - Image Support', () => {
 			}
 			return Promise.resolve({ data: { id: 'test-sale-id' }, error: null })
 		})
-		// Note: from() and fromChain.insert are NOT re-initialized after clearAllMocks()
-		// because clearAllMocks() should NOT clear implementations on const objects
-		// If this fails, the issue is that clearAllMocks() is clearing const object properties
+		// Note: fromChain.insert is NOT re-initialized because it's on a const object
+		// clearAllMocks() shouldn't clear properties of const objects, only vi.fn() implementations
 	})
 
 	it('should accept and persist cover_image_url', async () => {

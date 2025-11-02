@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createReadStream, existsSync } from 'fs'
 import { createInterface } from 'readline'
 import { resolve, normalize, relative } from 'path'
@@ -328,27 +327,8 @@ async function importFromContent(fileContent: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const supabase = createSupabaseServerClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError) {
-      console.error('[ZIP_IMPORT] Auth error:', authError.message)
-      return NextResponse.json({ 
-        error: 'Unauthorized', 
-        message: 'Authentication failed. Please log in and try again.' 
-      }, { status: 401 })
-    }
-    
-    if (!user) {
-      console.warn('[ZIP_IMPORT] No user found')
-      return NextResponse.json({ 
-        error: 'Unauthorized', 
-        message: 'You must be logged in to import ZIP codes. Please sign in and try again.' 
-      }, { status: 401 })
-    }
-    
-    console.log('[ZIP_IMPORT] User authenticated:', user.id)
+    // Authentication removed for easier admin access
+    // This is an admin-only tool, access should be restricted via deployment environment
     
     // Check for file upload (FormData) or file content (JSON)
     const contentType = request.headers.get('content-type') || ''

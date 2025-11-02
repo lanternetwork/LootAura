@@ -8,4 +8,5 @@ export type {
   GetSalesParams,
   SaleInput,
   ItemInput,
+  SaleWithOwnerInfo,
 } from './sales'

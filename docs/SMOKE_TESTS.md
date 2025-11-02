@@ -158,6 +158,26 @@ Before running smoke tests, verify:
 
 ---
 
+### 9. PWA Installation
+
+**Test**: Run Lighthouse PWA audit on mobile device or Chrome DevTools mobile emulation
+
+**Expected Results**:
+- [ ] PWA install prompt appears on mobile devices (bottom bar/toast)
+- [ ] Install button calls `promptEvent.prompt()` correctly
+- [ ] Dismissing the prompt prevents showing again for 24 hours (localStorage)
+- [ ] Prompt does not appear on desktop (>= 768px width)
+- [ ] Lighthouse PWA score is 90+ (installable, service worker, manifest, etc.)
+
+**Common Issues**:
+- Prompt not appearing → Check `beforeinstallprompt` event listener and mobile detection
+- Prompt showing on desktop → Verify `md:hidden` class and `isMobile` check
+- Prompt not respecting 24h dismissal → Check localStorage key `pwa-install-dismissed` timestamp
+
+**Note**: To test PWA installation, use Chrome DevTools → Lighthouse → PWA audit, or test on an actual mobile device. The install prompt will only appear when the app meets PWA criteria (HTTPS, manifest, service worker, etc.).
+
+---
+
 ## Post-Deployment Checklist
 
 After completing smoke tests:

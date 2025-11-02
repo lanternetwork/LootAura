@@ -4,11 +4,22 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { normalizeCategoryParams, normalizeCategories } from '@/lib/shared/categoryNormalizer'
 
+export type DateRangeType = 
+  | 'today' 
+  | 'thursday' 
+  | 'friday' 
+  | 'saturday' 
+  | 'sunday' 
+  | 'this_weekend'
+  | 'weekend' // Legacy alias
+  | 'next_weekend' // Legacy
+  | 'any'
+
 export interface FilterState {
   lat?: number
   lng?: number
   distance: number
-  dateRange: 'today' | 'weekend' | 'next_weekend' | 'any'
+  dateRange: DateRangeType
   categories: string[]
   city?: string
 }

@@ -1,7 +1,17 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { resolveDatePreset, dateRangesEqual } from '@/lib/shared/resolveDatePreset'
 
 describe('resolveDatePreset', () => {
+  let originalDate: DateConstructor
+
+  beforeEach(() => {
+    originalDate = global.Date
+  })
+
+  afterEach(() => {
+    global.Date = originalDate
+  })
+
   describe('with fixed dates for testing', () => {
     it('should resolve today correctly', () => {
       const fixedDate = new Date('2025-10-10T12:00:00Z') // Friday

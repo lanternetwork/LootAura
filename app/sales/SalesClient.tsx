@@ -7,9 +7,11 @@ import SimpleMap from '@/components/location/SimpleMap'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import SalesList from '@/components/SalesList'
 import FiltersBar from '@/components/sales/FiltersBar'
-import { useFilters } from '@/lib/hooks/useFilters'
+import MobileFilterSheet from '@/components/sales/MobileFilterSheet'
+import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
+import { useMobileFilter } from '@/contexts/MobileFilterContext'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -80,7 +82,26 @@ export default function SalesClient({
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [_isZipSearching, setIsZipSearching] = useState(false)
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
-  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
+  const [_isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
+  
+  // Bottom sheet state for mobile (<768px only)
+  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'mid' | 'expanded'>('mid')
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStartY, setDragStartY] = useState(0)
+  const [dragStartHeight, setDragStartHeight] = useState<string>('40vh')
+  
+  // Track window width for mobile detection
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  
+  const isMobile = windowWidth < 768
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
@@ -643,14 +664,106 @@ export default function SalesClient({
 
   const mapZoom = mapView?.zoom || 10
 
-  // Mobile drawer toggle
-  const toggleMobileDrawer = useCallback(() => {
+  // Mobile drawer toggle - no longer needed, sales list always visible on mobile
+  // Keeping state for potential future use but not using it currently
+  const _toggleMobileDrawer = useCallback(() => {
     setIsMobileDrawerOpen(prev => !prev)
   }, [])
 
   // Constants for layout calculations
   const FILTERS_HEIGHT = 56 // px - filters bar height
   const MAIN_CONTENT_HEIGHT = `calc(100vh - ${FILTERS_HEIGHT}px)`
+
+  // Use mobile filter context
+  const { isOpen: isMobileFilterSheetOpen, closeFilterSheet } = useMobileFilter()
+  
+  // Mobile filter button handler (no longer needed - handled by context)
+  const handleMobileFilterClick = useCallback(() => {
+    // Handled by context
+  }, [])
+
+  // Bottom sheet height calculations
+  const getBottomSheetHeight = useCallback((state: 'collapsed' | 'mid' | 'expanded'): string => {
+    switch (state) {
+      case 'collapsed':
+        return '48px'
+      case 'mid':
+        return '40vh'
+      case 'expanded':
+        return '75vh'
+      default:
+        return '40vh'
+    }
+  }, [])
+
+  // Bottom sheet drag handlers
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    setIsDragging(true)
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    setDragStartY(clientY)
+    setDragStartHeight(getBottomSheetHeight(bottomSheetState))
+  }, [bottomSheetState, getBottomSheetHeight])
+
+  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!isDragging) return
+    
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    const deltaY = dragStartY - clientY // Positive = dragging up (expanding)
+    const windowHeight = window.innerHeight
+    
+    // Calculate current height based on start height and drag distance
+    let currentHeightPx: number
+    if (dragStartHeight.includes('vh')) {
+      const vhPercent = parseFloat(dragStartHeight) / 100
+      currentHeightPx = windowHeight * vhPercent + deltaY
+    } else {
+      currentHeightPx = parseFloat(dragStartHeight) + deltaY
+    }
+    
+    currentHeightPx = Math.max(48, Math.min(windowHeight * 0.75, currentHeightPx))
+    
+    // Snap to nearest state based on current height
+    const collapsedThreshold = 100
+    const _midThreshold = windowHeight * 0.35
+    const expandedThreshold = windowHeight * 0.65
+    
+    if (currentHeightPx < collapsedThreshold) {
+      setBottomSheetState('collapsed')
+    } else if (currentHeightPx < expandedThreshold) {
+      setBottomSheetState('mid')
+    } else {
+      setBottomSheetState('expanded')
+    }
+  }, [isDragging, dragStartY, dragStartHeight])
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false)
+  }, [])
+
+  // Setup drag listeners
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMouseMove = (e: MouseEvent) => handleDragMove(e)
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault()
+      handleDragMove(e)
+    }
+    const handleMouseUp = () => handleDragEnd()
+    const handleTouchEnd = () => handleDragEnd()
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('touchmove', handleTouchMove, { passive: false })
+    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('touchend', handleTouchEnd)
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('touchmove', handleTouchMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [isDragging, handleDragMove, handleDragEnd])
 
   return (
     <div className="flex flex-col h-screen">
@@ -661,7 +774,7 @@ export default function SalesClient({
         onZipError={handleZipError}
         zipError={zipError}
         dateRange={filters.dateRange}
-        onDateRangeChange={(dateRange) => handleFiltersChange({ ...filters, dateRange })}
+        onDateRangeChange={(dateRange: DateRangeType) => handleFiltersChange({ ...filters, dateRange })}
         categories={filters.categories}
         onCategoriesChange={(categories) => handleFiltersChange({ ...filters, categories })}
         distance={filters.distance}
@@ -671,24 +784,23 @@ export default function SalesClient({
         zipInputTestId="zip-input"
         filtersCenterTestId="filters-center"
         filtersMoreTestId="filters-more"
+        onMobileFilterClick={handleMobileFilterClick}
       />
 
       {/* Main Content - Responsive Layout */}
       <div 
-        className="grid grid-cols-[minmax(0,1fr)_628px] lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] max-lg:grid-cols-1 gap-0 min-h-0 min-w-0 overflow-hidden"
+        className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_628px] lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
         style={{ height: MAIN_CONTENT_HEIGHT }}
       >
-        {/* Map - Left Side (Dominant) */}
-        <div className="relative min-h-0 min-w-0 bg-gray-100 max-lg:h-[60vh] max-md:h-[70vh]" style={{ height: '100%' }}>
-          {/* Mobile Toggle Button */}
-          <button
-            onClick={toggleMobileDrawer}
-            className="md:hidden fixed top-20 right-4 z-50 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg shadow-lg transition-colors"
-            aria-label="Toggle sales panel"
-          >
-            {isMobileDrawerOpen ? 'Hide Sales' : 'Show Sales'}
-          </button>
-          
+        {/* Map - Top on mobile, Left on desktop */}
+        <div 
+          className="relative md:h-full md:min-h-0 bg-gray-100 flex-shrink-0" 
+          style={{ 
+            height: isMobile 
+              ? `calc(100vh - ${FILTERS_HEIGHT}px)` 
+              : '100%' 
+          }}
+        >
           <div className="w-full h-full">
             {mapView ? (
               <SimpleMap
@@ -715,11 +827,11 @@ export default function SalesClient({
                 onViewportChange={handleViewportChange}
               />
             ) : null}
-            </div>
           </div>
+        </div>
 
-        {/* Sales List - Right Panel */}
-        <div className="bg-white border-l border-gray-200 flex flex-col min-h-0 min-w-0 max-lg:h-[40vh] max-md:h-[30vh]">
+        {/* Sales List - Below map on mobile, Right panel on desktop */}
+        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 min-w-0 h-full overflow-y-auto">
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
@@ -771,62 +883,98 @@ export default function SalesClient({
           </div>
         </div>
 
-      {/* Mobile Sales Drawer */}
-      <div className={`
-        md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40
-        transform transition-transform duration-300 ease-in-out
-        ${isMobileDrawerOpen ? 'translate-y-0' : 'translate-y-full'}
-        ${!isMobileDrawerOpen ? 'pointer-events-none invisible' : 'visible'}
-      `}>
-        <div className="flex-shrink-0 p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">
-              Sales ({visibleSales.length})
+      {/* Mobile Bottom Sheet - Only on mobile (<768px) */}
+      {isMobile && (
+        <div
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 rounded-t-2xl shadow-lg z-30 transition-all duration-300 ease-out"
+          style={{
+            height: getBottomSheetHeight(bottomSheetState),
+          }}
+        >
+          {/* Drag Handle */}
+          <div
+            className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none"
+            onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
+          >
+            <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
+          </div>
+
+          {/* Sheet Header */}
+          <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold">
+                Results near you ({visibleSales.length})
+              </h2>
               {selectedPinId && (
-                <span className="text-sm text-blue-600 ml-2">
-                  (Location selected)
-                </span>
+                <button
+                  onClick={() => setSelectedPinId(null)}
+                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                >
+                  Show All
+                </button>
               )}
-            </h2>
-            {selectedPinId && (
-              <button
-                onClick={() => setSelectedPinId(null)}
-                className="text-sm text-blue-600 hover:text-blue-800 underline"
-              >
-                Show All Sales
-              </button>
+            </div>
+          </div>
+
+          {/* Sheet Content */}
+          <div 
+            className="overflow-y-auto"
+            style={{ 
+              height: bottomSheetState === 'collapsed' 
+                ? '0px' 
+                : `calc(${getBottomSheetHeight(bottomSheetState)} - 96px)`,
+              overflowY: bottomSheetState === 'collapsed' ? 'hidden' : 'auto'
+            }}
+          >
+            {bottomSheetState !== 'collapsed' && (
+              <>
+                {loading && (
+                  <div className="grid grid-cols-1 gap-3 p-4">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <SaleCardSkeleton key={i} />
+                    ))}
+                  </div>
+                )}
+
+                {!loading && visibleSales.length === 0 && (
+                  <div className="text-center py-8 px-4">
+                    <div className="text-gray-500 mb-4">
+                      No sales found in this area
+                    </div>
+                    <button
+                      onClick={() => handleFiltersChange({ ...filters, distance: Math.min(25, filters.distance + 5) })}
+                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      Increase Distance
+                    </button>
+                  </div>
+                )}
+
+                {!loading && visibleSales.length > 0 && (
+                  <div className="p-4">
+                    <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-4 max-h-[50vh]">
-          {loading && (
-            <div className="grid grid-cols-1 gap-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <SaleCardSkeleton key={i} />
-              ))}
-            </div>
-          )}
+      )}
 
-          {!loading && visibleSales.length === 0 && (
-            <div className="text-center py-8">
-              <div className="text-gray-500 mb-4">
-                No sales found in this area
-              </div>
-              <button
-                onClick={() => handleFiltersChange({ ...filters, distance: Math.min(25, filters.distance + 5) })}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                Increase Distance
-              </button>
-            </div>
-          )}
-
-          {!loading && visibleSales.length > 0 && (
-            <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
-          )}
-        </div>
-      </div>
+      {/* Mobile Filter Sheet */}
+      <MobileFilterSheet
+        isOpen={isMobileFilterSheetOpen}
+        onClose={closeFilterSheet}
+        dateRange={filters.dateRange}
+        onDateRangeChange={(dateRange: DateRangeType) => handleFiltersChange({ ...filters, dateRange })}
+        categories={filters.categories}
+        onCategoriesChange={(categories) => handleFiltersChange({ ...filters, categories })}
+        distance={filters.distance}
+        onDistanceChange={(distance) => handleFiltersChange({ ...filters, distance })}
+        hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
+        isLoading={loading}
+      />
 
     </div>
   )

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import ZipInput from '@/components/location/ZipInput'
+import { buildDatePresets, type DatePreset } from '@/lib/shared/datePresets'
 
 type FiltersBarProps = {
   // ZIP Search
@@ -10,8 +11,8 @@ type FiltersBarProps = {
   zipError?: string | null
   
   // Date Filter
-  dateRange: 'today' | 'weekend' | 'next_weekend' | 'any'
-  onDateRangeChange: (dateRange: 'today' | 'weekend' | 'next_weekend' | 'any') => void
+  dateRange: 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any'
+  onDateRangeChange: (dateRange: 'today' | 'thursday' | 'friday' | 'saturday' | 'sunday' | 'this_weekend' | 'weekend' | 'next_weekend' | 'any') => void
   
   // Category Filter
   categories: string[]
@@ -31,6 +32,9 @@ type FiltersBarProps = {
   zipInputTestId?: string
   filtersCenterTestId?: string
   filtersMoreTestId?: string
+  
+  // Mobile filter button callback
+  onMobileFilterClick?: () => void
 }
 
 // Category data with priority for overflow management
@@ -177,7 +181,8 @@ export default function FiltersBar({
   isLoading = false,
   zipInputTestId = "zip-input",
   filtersCenterTestId = "filters-center",
-  filtersMoreTestId = "filters-more"
+  filtersMoreTestId = "filters-more",
+  onMobileFilterClick: _onMobileFilterClick
 }: FiltersBarProps) {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [showOverflowMenu, setShowOverflowMenu] = useState(false)
@@ -197,6 +202,17 @@ export default function FiltersBar({
       onCategoriesChange(categories.filter(c => c !== categoryId))
     } else {
       onCategoriesChange([...categories, categoryId])
+    }
+  }
+
+  const handleDateToggle = (presetId: string) => {
+    // Normalize value: 'weekend' -> 'this_weekend'
+    const normalizedCurrent = dateRange === 'weekend' ? 'this_weekend' : dateRange
+    // If already selected, deselect to 'any', otherwise select
+    if (normalizedCurrent === presetId) {
+      onDateRangeChange('any')
+    } else {
+      onDateRangeChange(presetId as any)
     }
   }
 
@@ -224,6 +240,15 @@ export default function FiltersBar({
       document.removeEventListener('keydown', handleEscape)
     }
   }, [showOverflowMenu])
+
+  // Date presets - only show Thu/Fri/Sat/Sun/This weekend (skip Today)
+  const datePresets = useMemo(() => {
+    const allPresets = buildDatePresets()
+    // Filter to only show: thursday, friday, saturday, sunday, this_weekend
+    return allPresets.filter((p: DatePreset) => 
+      ['thursday', 'friday', 'saturday', 'sunday', 'this_weekend'].includes(p.id)
+    )
+  }, [])
 
   return (
     <div className="border-b bg-white">
@@ -301,31 +326,64 @@ export default function FiltersBar({
         </div>
 
         {/* Right: Date Range + Distance + More */}
-        <div ref={rightRef} className="shrink-0 flex items-center gap-3 ml-auto">
-          {/* Date Range select */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium whitespace-nowrap">Date:</label>
+        <div ref={rightRef} className="shrink-0 flex items-center gap-2 lg:gap-3 min-w-0">
+          {/* Date Range dropdown - Tablet (md to lg-1) */}
+          <div className="md:block lg:hidden">
             <select
-              value={dateRange}
-              onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
+              value={dateRange === 'weekend' ? 'this_weekend' : dateRange}
+              onChange={(e) => onDateRangeChange(e.target.value as any)}
               disabled={isLoading}
-              className={`px-2 py-1 border rounded text-sm min-w-[100px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`px-2 py-1 border rounded text-xs min-w-[100px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <option value="any">Any Date</option>
-              <option value="today">Today</option>
-              <option value="weekend">This Weekend</option>
-              <option value="next_weekend">Next Weekend</option>
+              {datePresets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
             </select>
           </div>
 
+          {/* Date Range chips - Desktop (lg+) */}
+          <div className="hidden lg:flex items-center gap-2 min-w-0 overflow-x-auto scrollbar-hide">
+            <ul className="flex items-center gap-2 min-w-0">
+              {datePresets.map((preset: DatePreset) => {
+                // Normalize value: 'weekend' -> 'this_weekend', 'this_weekend' -> 'this_weekend'
+                const normalizedValue = dateRange === 'weekend' ? 'this_weekend' : dateRange
+                const isSelected = normalizedValue === preset.id
+                return (
+                  <li key={preset.id}>
+                    <button
+                      onClick={() => handleDateToggle(preset.id)}
+                      disabled={isLoading}
+                      className={`
+                        shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
+                        ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                        ${isSelected 
+                          ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                          : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                        }
+                      `}
+                    >
+                      {preset.label}
+                      {isSelected && (
+                        <span className="ml-1 text-blue-600">×</span>
+                      )}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+
           {/* Search Area select */}
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium whitespace-nowrap">Search Area:</label>
+          <div className="flex items-center gap-1.5 lg:gap-2">
+            <label className="hidden lg:inline text-sm font-medium whitespace-nowrap">Search Area:</label>
             <select
               value={distance}
               onChange={(e) => onDistanceChange(Number(e.target.value))}
               disabled={isLoading}
-              className={`px-2 py-1 border rounded text-sm min-w-[80px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`px-2 py-1 border rounded text-xs lg:text-sm min-w-[70px] lg:min-w-[80px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <option value={2}>2 mi</option>
               <option value={5}>5 mi</option>
@@ -399,17 +457,19 @@ export default function FiltersBar({
             )}
           </div>
 
-          {/* Date Dropdown - Compact */}
+          {/* Date Dropdown - Compact - Show presets */}
           <select
             value={dateRange}
-            onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
+            onChange={(e) => onDateRangeChange(e.target.value as any)}
             disabled={isLoading}
-            className={`px-2 py-1 border rounded text-xs min-w-[80px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`px-2 py-1 border rounded text-xs min-w-[100px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <option value="any">Any</option>
-            <option value="today">Today</option>
-            <option value="weekend">Weekend</option>
-            <option value="next_weekend">Next</option>
+            {datePresets.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
           </select>
 
           {/* Search Area - Compact */}
@@ -461,14 +521,16 @@ export default function FiltersBar({
                   <label className="block text-sm font-medium mb-2">Date Range</label>
                   <select
                     value={dateRange}
-                    onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
+                    onChange={(e) => onDateRangeChange(e.target.value as any)}
                     disabled={isLoading}
                     className={`w-full px-3 py-2 border rounded-md ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <option value="any">Any Date</option>
-                    <option value="today">Today</option>
-                    <option value="weekend">This Weekend</option>
-                    <option value="next_weekend">Next Weekend</option>
+                    {datePresets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

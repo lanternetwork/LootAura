@@ -3,97 +3,85 @@
  * Single source of truth for date preset conversion
  */
 
+import { getDatePresetById, isKnownPreset } from './datePresets'
+
 export interface ResolvedDateRange {
   from?: string  // YYYY-MM-DD format
   to?: string    // YYYY-MM-DD format
 }
 
 /**
+ * Date preset type - includes legacy presets for backward compatibility
+ */
+export type DatePresetType = 
+  | 'today' 
+  | 'thursday' 
+  | 'friday' 
+  | 'saturday' 
+  | 'sunday' 
+  | 'this_weekend'
+  | 'weekend' // Legacy alias for 'this_weekend'
+  | 'next_weekend' // Legacy, kept for backward compatibility
+  | 'any'
+
+/**
  * Resolve a date preset to concrete from/to dates
- * @param preset - The preset type ('today', 'weekend', 'next_weekend', 'any')
+ * @param preset - The preset type (supports new day presets and legacy presets)
  * @param now - Current date (defaults to new Date())
  * @returns Resolved date range or null for 'any'
  */
 export function resolveDatePreset(
-  preset: 'today' | 'weekend' | 'next_weekend' | 'any' | undefined,
+  preset: DatePresetType | undefined,
   now: Date = new Date()
 ): ResolvedDateRange | null {
   if (!preset || preset === 'any') {
     return null
   }
 
-  const toISO = (d: Date) => d.toISOString().slice(0, 10)
-
-  switch (preset) {
-    case 'today': {
-      const today = new Date(now)
-      return {
-        from: toISO(today),
-        to: toISO(today)
-      }
-    }
-
-    case 'weekend': {
-      const dayOfWeek = now.getDay()
-      // Find this weekend (Saturday-Sunday)
-      let saturday, sunday
-      
-      if (dayOfWeek === 0) { // Sunday
-        // Previous Saturday to today (Sunday)
-        saturday = new Date(now)
-        saturday.setDate(now.getDate() - 1) // Yesterday (Saturday)
-        sunday = new Date(now) // Today (Sunday)
-      } else if (dayOfWeek === 6) { // Saturday
-        // Today (Saturday) to tomorrow (Sunday)
-        saturday = new Date(now) // Today (Saturday)
-        sunday = new Date(now)
-        sunday.setDate(now.getDate() + 1) // Tomorrow (Sunday)
-      } else { // Monday-Friday
-        // This coming Saturday and Sunday
-        const daysToSaturday = 6 - dayOfWeek
-        const daysToSunday = 7 - dayOfWeek
-        
-        saturday = new Date(now)
-        saturday.setDate(now.getDate() + daysToSaturday)
-        
-        sunday = new Date(now)
-        sunday.setDate(now.getDate() + daysToSunday)
-      }
-      
-      return {
-        from: toISO(saturday),
-        to: toISO(sunday)
-      }
-    }
-
-    case 'next_weekend': {
-      const dayOfWeek = now.getDay()
-      // Find the next weekend (Saturday-Sunday) after the current week
-      // If we're already in the weekend, go to next week's weekend
-      let daysToNextSaturday
-      if (dayOfWeek === 0) { // Sunday
-        daysToNextSaturday = 6 // Next Saturday
-      } else if (dayOfWeek === 6) { // Saturday
-        daysToNextSaturday = 7 // Next Saturday
-      } else { // Monday-Friday
-        daysToNextSaturday = 6 - dayOfWeek + 7 // Next Saturday
-      }
-      
-      const saturday = new Date(now)
-      saturday.setDate(now.getDate() + daysToNextSaturday)
-      
-      const sunday = new Date(now)
-      sunday.setDate(now.getDate() + daysToNextSaturday + 1)
-      
-      return {
-        from: toISO(saturday),
-        to: toISO(sunday)
-      }
-    }
-
-    default:
-      return null
+  // Handle legacy 'weekend' as alias for 'this_weekend'
+  if (preset === 'weekend') {
+    preset = 'this_weekend'
   }
+
+  // Use new preset system if it's a known preset
+  if (isKnownPreset(preset)) {
+    const datePreset = getDatePresetById(preset, now)
+    if (datePreset) {
+      return {
+        from: datePreset.start,
+        to: datePreset.end
+      }
+    }
+  }
+
+  // Legacy 'next_weekend' support (kept for backward compatibility)
+  if (preset === 'next_weekend') {
+    const toISO = (d: Date) => d.toISOString().slice(0, 10)
+    const dayOfWeek = now.getDay()
+    // Find the next weekend (Saturday-Sunday) after the current week
+    // If we're already in the weekend, go to next week's weekend
+    let daysToNextSaturday
+    if (dayOfWeek === 0) { // Sunday
+      daysToNextSaturday = 6 // Next Saturday
+    } else if (dayOfWeek === 6) { // Saturday
+      daysToNextSaturday = 7 // Next Saturday
+    } else { // Monday-Friday
+      daysToNextSaturday = 6 - dayOfWeek + 7 // Next Saturday
+    }
+    
+    const saturday = new Date(now)
+    saturday.setDate(now.getDate() + daysToNextSaturday)
+    
+    const sunday = new Date(now)
+    sunday.setDate(now.getDate() + daysToNextSaturday + 1)
+    
+    return {
+      from: toISO(saturday),
+      to: toISO(sunday)
+    }
+  }
+
+  return null
 }
 
 /**

@@ -22,14 +22,14 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
 
   return (
     <article 
-      className={`rounded-2xl overflow-hidden shadow-sm border bg-white ${className ?? ''}`} 
+      className={`w-full rounded-2xl overflow-hidden shadow-sm border bg-white ${className ?? ''}`} 
       data-testid="sale-card" 
       data-debug="sale-card" 
       data-sale-id={String(sale?.id || '')}
       data-card="sale"
       data-kind="sale-row"
     >
-      <div className="relative bg-gray-100 aspect-[16/6.75] md:aspect-[4/2.25] overflow-hidden">
+      <div className="relative bg-gray-100 h-40 sm:h-44 md:h-[160px] overflow-hidden">
         {cover ? (
           <Image
             src={cover.url}
@@ -46,7 +46,7 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
         )}
       </div>
 
-      <div className="p-2 flex flex-col gap-1">
+      <div className="p-3 md:p-4 flex flex-col gap-1">
         <div className="flex justify-between items-start gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">

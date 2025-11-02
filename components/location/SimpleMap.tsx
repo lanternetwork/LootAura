@@ -195,7 +195,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const boundsKey = `${fitBounds.west}|${fitBounds.south}|${fitBounds.east}|${fitBounds.north}`
     
     if (boundsKey !== lastBoundsKey.current) {
-      console.log('[MAP] fitBounds:', fitBounds)
+      console.log('[MAP] fitBounds:', fitBounds, 'options:', fitBoundsOptions)
       const map = mapRef.current.getMap()
       if (map) {
         map.fitBounds(
@@ -205,7 +205,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         lastBoundsKey.current = boundsKey
       }
     }
-  }, [fitBounds, loaded])
+  }, [fitBounds, fitBoundsOptions, loaded])
 
   // Handle center/zoom changes
   useEffect(() => {

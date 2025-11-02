@@ -189,8 +189,11 @@ async function importFromPath(csvFilePath: string) {
 }
 
 async function insertBatch(batch: ZipCodeRow[]) {
-  // Supabase JS client doesn't support schema-qualified table names
-  // Use REST API directly with Accept-Profile header to access lootaura_v2 schema
+  // Try multiple approaches to ensure it works:
+  // 1. First try using the public view (zipcodes_v2) if it supports inserts
+  // 2. Fall back to direct schema access via REST API with Accept-Profile
+  // 3. Last resort: Use PostgREST schema search path
+  
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE || ENV_SERVER.SUPABASE_SERVICE_ROLE
   
@@ -198,19 +201,47 @@ async function insertBatch(batch: ZipCodeRow[]) {
     throw new Error('Missing Supabase credentials')
   }
   
-  // Use Accept-Profile header to specify the schema
-  // Then use just 'zipcodes' as the table name
-  const response = await fetch(`${supabaseUrl}/rest/v1/zipcodes`, {
+  // Try approach 1: Use public view zipcodes_v2 (should map to lootaura_v2.zipcodes)
+  let response = await fetch(`${supabaseUrl}/rest/v1/zipcodes_v2`, {
     method: 'POST',
     headers: {
       'apikey': serviceRoleKey,
       'Authorization': `Bearer ${serviceRoleKey}`,
       'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates',
-      'Accept-Profile': 'lootaura_v2'  // Specify schema via header
+      'Prefer': 'resolution=merge-duplicates'
     },
     body: JSON.stringify(batch)
   })
+  
+  // If that fails, try approach 2: Direct schema access with Accept-Profile
+  if (!response.ok) {
+    response = await fetch(`${supabaseUrl}/rest/v1/zipcodes`, {
+      method: 'POST',
+      headers: {
+        'apikey': serviceRoleKey,
+        'Authorization': `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates',
+        'Accept-Profile': 'lootaura_v2'
+      },
+      body: JSON.stringify(batch)
+    })
+  }
+  
+  // If still failing, try approach 3: URL-encoded schema path
+  if (!response.ok) {
+    const encodedSchema = encodeURIComponent('lootaura_v2')
+    response = await fetch(`${supabaseUrl}/rest/v1/${encodedSchema}.zipcodes`, {
+      method: 'POST',
+      headers: {
+        'apikey': serviceRoleKey,
+        'Authorization': `Bearer ${serviceRoleKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify(batch)
+    })
+  }
   
   if (!response.ok) {
     const errorText = await response.text()
@@ -221,7 +252,7 @@ async function insertBatch(batch: ZipCodeRow[]) {
     } catch {
       errorMessage = errorText || errorMessage
     }
-    throw new Error(errorMessage)
+    throw new Error(`Failed to insert ZIP codes: ${errorMessage}`)
   }
 }
 

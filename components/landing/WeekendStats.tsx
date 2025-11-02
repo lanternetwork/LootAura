@@ -144,12 +144,6 @@ export function WeekendStats() {
         params.set('from', formatDate(saturday))
         params.set('to', formatDate(sunday))
 
-        // Get this week's date range (last 7 days)
-        const weekAgo = new Date(now)
-        weekAgo.setDate(now.getDate() - 7)
-        const thisWeekStart = formatDate(weekAgo)
-        const thisWeekEnd = formatDate(now)
-
         // Fetch weekend sales
         const weekendRes = await fetch(`/api/sales?${params.toString()}`)
         if (!weekendRes.ok) {
@@ -158,34 +152,25 @@ export function WeekendStats() {
         const weekendData = await weekendRes.json()
         const weekendSales: Sale[] = weekendData.data || []
 
-        // Fetch all sales in the area (without date filtering)
-        // We'll filter client-side by created_at to count "new this week"
-        const allParams = new URLSearchParams(params.toString())
-        // Remove date filtering - we want all sales in the area
-        allParams.delete('from')
-        allParams.delete('to')
-        allParams.delete('dateRange')
-        const allRes = await fetch(`/api/sales?${allParams.toString()}`)
-        if (!allRes.ok) {
-          throw new Error('Failed to fetch sales')
+        // Fetch sales from this week
+        // Get this week's date range (last 7 days)
+        const weekAgo = new Date(now)
+        weekAgo.setDate(now.getDate() - 7)
+        const weekParams = new URLSearchParams(params.toString())
+        weekParams.set('from', formatDate(weekAgo))
+        weekParams.set('to', formatDate(now))
+        // Remove dateRange if it exists
+        weekParams.delete('dateRange')
+        const weekRes = await fetch(`/api/sales?${weekParams.toString()}`)
+        if (!weekRes.ok) {
+          throw new Error('Failed to fetch weekly sales')
         }
-        const allData = await allRes.json()
-        const allSales: Sale[] = allData.data || []
+        const weekData = await weekRes.json()
+        const weekSales: Sale[] = weekData.data || []
 
         // Calculate stats
         const activeSales = weekendSales.length
-        
-        // Count sales created this week (based on created_at, not date_start)
-        const weekStart = new Date(weekAgo)
-        weekStart.setHours(0, 0, 0, 0)
-        const weekEnd = new Date(now)
-        weekEnd.setHours(23, 59, 59, 999)
-        
-        const newThisWeek = allSales.filter((sale) => {
-          if (!sale.created_at) return false
-          const createdAt = new Date(sale.created_at)
-          return createdAt >= weekStart && createdAt <= weekEnd
-        }).length
+        const newThisWeek = weekSales.length
 
         setStats({ activeSales, newThisWeek })
       } catch (error) {

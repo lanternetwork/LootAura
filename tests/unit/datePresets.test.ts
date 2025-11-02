@@ -22,9 +22,6 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
-          } else if (args.length === 1 && args[0] instanceof originalDate) {
-            // Handle Date object being passed
-            super(args[0].getTime())
           } else if (args.length === 1 && typeof args[0] === 'number') {
             super(args[0])
           } else if (args.length === 1 && typeof args[0] === 'string') {
@@ -55,9 +52,6 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
-          } else if (args.length === 1 && args[0] instanceof originalDate) {
-            // Handle Date object being passed
-            super(args[0].getTime())
           } else if (args.length === 1 && typeof args[0] === 'number') {
             super(args[0])
           } else if (args.length === 1 && typeof args[0] === 'string') {
@@ -87,9 +81,6 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
-          } else if (args.length === 1 && args[0] instanceof originalDate) {
-            // Handle Date object being passed
-            super(args[0].getTime())
           } else if (args.length === 1 && typeof args[0] === 'number') {
             super(args[0])
           } else if (args.length === 1 && typeof args[0] === 'string') {
@@ -120,9 +111,6 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
-          } else if (args.length === 1 && args[0] instanceof originalDate) {
-            // Handle Date object being passed
-            super(args[0].getTime())
           } else if (args.length === 1 && typeof args[0] === 'number') {
             super(args[0])
           } else if (args.length === 1 && typeof args[0] === 'string') {
@@ -149,9 +137,6 @@ describe('datePresets', () => {
         constructor(...args: any[]) {
           if (args.length === 0) {
             super(mockDate.getTime())
-          } else if (args.length === 1 && args[0] instanceof originalDate) {
-            // Handle Date object being passed
-            super(args[0].getTime())
           } else if (args.length === 1 && typeof args[0] === 'number') {
             super(args[0])
           } else if (args.length === 1 && typeof args[0] === 'string') {

@@ -3,9 +3,15 @@ import { z } from 'zod'
 const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url('NEXT_PUBLIC_SUPABASE_URL must be a valid URL'),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(10, 'NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 10 characters'),
-  NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
+  NEXT_PUBLIC_SITE_URL: z.preprocess(
+    (val) => (val === '' ? undefined : val),
+    z.string().url().optional()
+  ),
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().min(10).optional(),
-  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
+  NEXT_PUBLIC_SENTRY_DSN: z.preprocess(
+    (val) => (val === '' ? undefined : val),
+    z.string().url().optional()
+  ),
   NEXT_PUBLIC_SUPABASE_SCHEMA: z.string().optional(),
   NEXT_PUBLIC_GOOGLE_ENABLED: z.string().optional(),
 })
@@ -13,7 +19,10 @@ const publicSchema = z.object({
 const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE: z.string().min(10, 'SUPABASE_SERVICE_ROLE must be at least 10 characters'),
   VAPID_PRIVATE_KEY: z.string().min(10).optional(),
-  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_URL: z.preprocess(
+    (val) => (val === '' ? undefined : val),
+    z.string().url().optional()
+  ),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(10).optional(),
   NOMINATIM_APP_EMAIL: z.string().email().optional(),
 })

@@ -378,13 +378,10 @@ export default function SalesClient({
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => {
     setZipError(null)
     setIsZipSearching(true) // Prevent map view changes from overriding ZIP search
-    setIsMapTransitioning(true) // Show loading overlay
+    // Don't show transition overlay - just update map directly
     
     console.log('[ZIP] Updating map center to:', { lat, lng, zip, city, state })
-    console.log('[ZIP] Received coordinates:', { lat, lng, type: typeof lat, type_lng: typeof lng })
-    console.log('[ZIP] Actual lat value:', lat)
-    console.log('[ZIP] Actual lng value:', lng)
-    console.log('[ZIP] Expected ZIP 40204 coordinates: 38.2380249, -85.7246945')
+    console.log('[ZIP] Received coordinates:', { lat, lng })
     
     // Calculate bounds for ZIP location (10 mile radius)
     const radiusKm = 16.09 // 10 miles in kilometers
@@ -440,10 +437,7 @@ export default function SalesClient({
       setTimeout(() => setPendingBounds(null), 0)
     }
     
-    // Hide transition overlay after map has time to load
-    setTimeout(() => {
-      setIsMapTransitioning(false)
-    }, 1500) // Give map time to load new tiles
+    // Map will update directly without transition overlay
 
     // Sales will be fetched automatically when the map viewport updates
     

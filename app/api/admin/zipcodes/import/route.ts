@@ -189,68 +189,39 @@ async function importFromPath(csvFilePath: string) {
 }
 
 async function insertBatch(batch: ZipCodeRow[]) {
-  // Try using admin client upsert on zipcodes_v2 view first
-  // This should work if the view has INSERT support
+  // Use dedicated RPC function to insert directly into lootaura_v2.zipcodes
+  // This bypasses all REST API schema limitations
   const client = adminSupabase as any
   
+  // Convert batch to JSON array for the RPC function
+  const zipcodesJson = batch.map(row => ({
+    zip_code: row.zip_code || '',
+    city: row.city || null,
+    state: row.state || null,
+    lat: row.lat ?? null,
+    lng: row.lng ?? null
+  }))
+  
   try {
-    const { error } = await client
-      .from('zipcodes_v2')
-      .upsert(batch.map(row => ({
-        zip_code: row.zip_code,
-        city: row.city,
-        state: row.state,
-        lat: row.lat,
-        lng: row.lng
-      })), {
-        onConflict: 'zip_code',
-        ignoreDuplicates: false
-      })
+    // Call the upsert_zipcodes RPC function
+    const { data, error } = await client.rpc('upsert_zipcodes', {
+      zipcodes_json: zipcodesJson
+    })
     
-    if (!error) {
-      return
+    if (error) {
+      throw error
     }
     
-    // If view doesn't support inserts, use RPC exec with raw SQL
-    throw error
-  } catch (viewError: any) {
-    // Fallback: Use RPC exec function with raw SQL to insert into lootaura_v2.zipcodes
-    // Build the VALUES clause using proper JSON escaping
-    const values = batch.map(row => {
-      const zipCode = JSON.stringify(row.zip_code || '')
-      const city = row.city ? JSON.stringify(row.city) : 'null'
-      const state = row.state ? JSON.stringify(row.state) : 'null'
-      const lat = row.lat ?? 'null'
-      const lng = row.lng ?? 'null'
-      
-      return `(${zipCode}, ${city}, ${state}, ${lat}, ${lng})`
-    }).join(', ')
-    
-    const sql = `
-      INSERT INTO lootaura_v2.zipcodes (zip_code, city, state, lat, lng)
-      VALUES ${values}
-      ON CONFLICT (zip_code) 
-      DO UPDATE SET
-        city = EXCLUDED.city,
-        state = EXCLUDED.state,
-        lat = EXCLUDED.lat,
-        lng = EXCLUDED.lng,
-        updated_at = NOW()
-    `
-    
-    try {
-      const { error: rpcError } = await client.rpc('exec', { sql })
-      
-      if (!rpcError) {
-        return
-      }
-      
-      throw rpcError
-    } catch (rpcError: any) {
-      // Final error: Provide helpful message
-      const errorMessage = viewError?.message || rpcError?.message || 'Unknown error'
-      throw new Error(`Failed to insert ZIP codes: ${errorMessage}. The exec RPC function may not be available or the zipcodes_v2 view may not support inserts.`)
+    // Check if the result indicates success
+    if (data && !data.success) {
+      throw new Error(data.error || 'Failed to insert ZIP codes')
     }
+    
+    return
+  } catch (error: any) {
+    // Provide helpful error message
+    const errorMessage = error?.message || 'Unknown error'
+    throw new Error(`Failed to insert ZIP codes: ${errorMessage}. Make sure migration 053_insert_zipcodes_rpc.sql has been applied.`)
   }
 }
 

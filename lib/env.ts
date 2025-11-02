@@ -38,13 +38,27 @@ export const ENV_PUBLIC = publicSchema.parse({
   NEXT_PUBLIC_GOOGLE_ENABLED: process.env.NEXT_PUBLIC_GOOGLE_ENABLED,
 })
 
-// Validate server environment variables (only in server context)
-export const ENV_SERVER = serverSchema.parse({
-  SUPABASE_SERVICE_ROLE: process.env.SUPABASE_SERVICE_ROLE,
-  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
-  UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
-  UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
-  NOMINATIM_APP_EMAIL: process.env.NOMINATIM_APP_EMAIL,
+// Validate server environment variables (only in server context, lazy to avoid build-time validation)
+let _ENV_SERVER: z.infer<typeof serverSchema> | null = null
+
+function getEnvServer() {
+  if (!_ENV_SERVER) {
+    _ENV_SERVER = serverSchema.parse({
+      SUPABASE_SERVICE_ROLE: process.env.SUPABASE_SERVICE_ROLE,
+      VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
+      UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+      UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+      NOMINATIM_APP_EMAIL: process.env.NOMINATIM_APP_EMAIL,
+    })
+  }
+  return _ENV_SERVER
+}
+
+// Use Proxy to make ENV_SERVER appear as a normal object but validate lazily
+export const ENV_SERVER = new Proxy({} as z.infer<typeof serverSchema>, {
+  get(_target, prop) {
+    return getEnvServer()[prop as keyof z.infer<typeof serverSchema>]
+  }
 })
 
 // Type exports for better TypeScript support

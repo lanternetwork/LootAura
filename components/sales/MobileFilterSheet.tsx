@@ -127,14 +127,16 @@ export default function MobileFilterSheet({
             <label className="block text-sm font-medium mb-3">Date Range</label>
             <select
               value={tempDateRange}
-              onChange={(e) => setTempDateRange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
+              onChange={(e) => setTempDateRange(e.target.value as any)}
               disabled={isLoading}
               className={`w-full px-3 py-2 border rounded-md ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <option value="any">Any Date</option>
-              <option value="today">Today</option>
-              <option value="weekend">This Weekend</option>
-              <option value="next_weekend">Next Weekend</option>
+              {datePresets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
             </select>
           </div>
 

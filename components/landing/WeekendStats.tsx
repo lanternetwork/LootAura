@@ -153,13 +153,16 @@ export function WeekendStats() {
         }
         const weekendData = await weekendRes.json()
         const weekendSales: Sale[] = weekendData.data || []
+        const weekendCount = weekendSales.length
         console.log('[WeekendStats] Weekend sales response:', {
           ok: weekendRes.ok,
-          count: weekendSales.length,
+          count: weekendCount,
           totalInResponse: weekendData.count || weekendData.data?.length || 0,
           sampleIds: weekendSales.slice(0, 3).map(s => s.id),
           fullResponse: weekendData
         })
+        console.log('[WeekendStats] Weekend count:', weekendCount, 'sales')
+        console.log('[WeekendStats] Weekend data:', JSON.stringify(weekendData, null, 2))
 
         // Fetch sales from this week
         const weekParams = new URLSearchParams(params.toString())
@@ -175,26 +178,30 @@ export function WeekendStats() {
         }
         const weekData = await weekRes.json()
         const weekSales: Sale[] = weekData.data || []
+        const weekCount = weekSales.length
         console.log('[WeekendStats] Weekly sales response:', {
           ok: weekRes.ok,
-          count: weekSales.length,
+          count: weekCount,
           totalInResponse: weekData.count || weekData.data?.length || 0,
           dateRange: { from: thisWeekStart, to: thisWeekEnd },
           fullResponse: weekData
         })
+        console.log('[WeekendStats] Weekly count:', weekCount, 'sales')
+        console.log('[WeekendStats] Weekly data:', JSON.stringify(weekData, null, 2))
 
         // Calculate stats
-        const activeSales = weekendSales.length
-        const newThisWeek = weekSales.length
+        const activeSales = weekendCount
+        const newThisWeek = weekCount
 
         console.log('[WeekendStats] Calculated stats:', { 
           activeSales, 
           newThisWeek,
-          weekendSalesCount: weekendSales.length,
-          weekSalesCount: weekSales.length,
+          weekendSalesCount: weekendCount,
+          weekSalesCount: weekCount,
           weekendSalesIds: weekendSales.map(s => s.id),
           weekSalesIds: weekSales.map(s => s.id)
         })
+        console.log('[WeekendStats] FINAL STATS - Active sales:', activeSales, '| New this week:', newThisWeek)
         setStats({ activeSales, newThisWeek })
       } catch (error) {
         console.error('[WeekendStats] Error fetching stats:', error)

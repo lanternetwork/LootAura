@@ -92,35 +92,35 @@ export function buildDatePresets(now: Date = new Date()): DatePreset[] {
   
   // 6. This weekend (Saturday-Sunday)
   const dayOfWeek = now.getDay()
-  let saturday: Date, sunday: Date
+  let weekendSaturday: Date, weekendSunday: Date
   
   if (dayOfWeek === 0) { // Sunday
     // Previous Saturday to today (Sunday)
-    saturday = new Date(now)
-    saturday.setDate(now.getDate() - 1) // Yesterday (Saturday)
-    sunday = new Date(now) // Today (Sunday)
+    weekendSaturday = new Date(now)
+    weekendSaturday.setDate(now.getDate() - 1) // Yesterday (Saturday)
+    weekendSunday = new Date(now) // Today (Sunday)
   } else if (dayOfWeek === 6) { // Saturday
     // Today (Saturday) to tomorrow (Sunday)
-    saturday = new Date(now) // Today (Saturday)
-    sunday = new Date(now)
-    sunday.setDate(now.getDate() + 1) // Tomorrow (Sunday)
+    weekendSaturday = new Date(now) // Today (Saturday)
+    weekendSunday = new Date(now)
+    weekendSunday.setDate(now.getDate() + 1) // Tomorrow (Sunday)
   } else { // Monday-Friday
     // This coming Saturday and Sunday
     const daysToSaturday = 6 - dayOfWeek
     const daysToSunday = 7 - dayOfWeek
     
-    saturday = new Date(now)
-    saturday.setDate(now.getDate() + daysToSaturday)
+    weekendSaturday = new Date(now)
+    weekendSaturday.setDate(now.getDate() + daysToSaturday)
     
-    sunday = new Date(now)
-    sunday.setDate(now.getDate() + daysToSunday)
+    weekendSunday = new Date(now)
+    weekendSunday.setDate(now.getDate() + daysToSunday)
   }
   
   presets.push({
     id: 'this_weekend',
     label: 'This weekend',
-    start: toISO(saturday),
-    end: toISO(sunday)
+    start: toISO(weekendSaturday),
+    end: toISO(weekendSunday)
   })
   
   return presets

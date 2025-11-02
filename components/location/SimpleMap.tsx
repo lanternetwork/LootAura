@@ -198,7 +198,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       if (map) {
         map.fitBounds(
           [[fitBounds.west, fitBounds.south], [fitBounds.east, fitBounds.north]], 
-          { padding: 40, duration: 600 }
+          { padding: 20, duration: 400 } // Reduced padding to prevent zoom out, faster animation
         )
         lastBoundsKey.current = boundsKey
       }

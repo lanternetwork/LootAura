@@ -395,22 +395,26 @@ export default function SalesClient({
       north: lat + latRange
     }
     
-    // Use fitBounds to ensure exactly 10-mile radius is visible
-    // This is more accurate than using a fixed zoom level
-    setPendingBounds(calculatedBounds)
-    
     // Initialize or update map center - handle null prev state
     setMapView(prev => {
       if (!prev) {
         // Create new map view with ZIP location
-        // Zoom will be determined by fitBounds, so use approximate zoom
-        // Zoom 11 typically shows ~20-25 mile diameter, which is close to our 20-mile diameter (10-mile radius)
+        // Calculate zoom level for 10-mile radius
+        // For 10 miles radius (20 miles diameter), zoom 11-12 is appropriate
+        // We'll use fitBounds with minimal padding to ensure exact bounds
         const newView: MapViewState = {
           center: { lat, lng },
           bounds: calculatedBounds,
-          zoom: 11 // Approximate - fitBounds will override this
+          zoom: 12 // Slightly more zoomed in to compensate for fitBounds padding
         }
         console.log('[ZIP] New map view:', newView)
+        
+        // Use fitBounds to ensure exactly 10-mile radius is visible
+        // Set bounds immediately after setting mapView
+        setTimeout(() => {
+          setPendingBounds(calculatedBounds)
+        }, 50) // Small delay to ensure mapView state is set first
+        
         return newView
       }
       
@@ -419,9 +423,13 @@ export default function SalesClient({
         ...prev,
         center: { lat, lng },
         bounds: calculatedBounds,
-        zoom: 11 // Approximate - fitBounds will override this
+        zoom: 12 // Slightly more zoomed in to compensate for fitBounds padding
       }
       console.log('[ZIP] New map view:', newView)
+      
+      // Use fitBounds to ensure exactly 10-mile radius is visible
+      setPendingBounds(calculatedBounds)
+      
       return newView
     })
 
@@ -434,8 +442,8 @@ export default function SalesClient({
     }
     router.replace(`/sales?${currentParams.toString()}`, { scroll: false })
 
-    // Clear bounds after map fits to them (fitBounds will adjust zoom automatically)
-    setTimeout(() => setPendingBounds(null), 600) // Clear after animation completes
+    // Don't clear bounds immediately - let them persist to maintain the exact 10-mile radius
+    // Only clear if user manually pans/zooms (handled by handleViewportChange)
     
     // Map will update directly without transition overlay
 

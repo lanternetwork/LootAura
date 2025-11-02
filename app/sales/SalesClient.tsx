@@ -694,8 +694,6 @@ export default function SalesClient({
                   viewport: currentViewport!
                 }}
                 onViewportChange={handleViewportChange}
-                isTransitioning={isMapTransitioning}
-                transitionMessage="Loading new location..."
               />
             )}
             </div>

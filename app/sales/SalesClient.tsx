@@ -46,16 +46,30 @@ export default function SalesClient({
     ? { lat: parseFloat(urlLat), lng: parseFloat(urlLng) }
     : initialCenter
 
+  // Check if ZIP in URL needs client-side resolution
+  const urlZip = searchParams.get('zip')
+  const zipNeedsResolution = urlZip && !urlLat && !urlLng && 
+    (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== urlZip.trim())
+  
   // Map view state - single source of truth
-  const [mapView, setMapView] = useState<MapViewState>({
-    center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
-    bounds: { 
-      west: (effectiveCenter?.lng || -98.5795) - 1.0, 
-      south: (effectiveCenter?.lat || 39.8283) - 1.0, 
-      east: (effectiveCenter?.lng || -98.5795) + 1.0, 
-      north: (effectiveCenter?.lat || 39.8283) + 1.0 
-    },
-    zoom: urlZoom ? parseFloat(urlZoom) : 12
+  // If ZIP needs resolution, wait before initializing map view to avoid showing wrong location
+  // Otherwise, use effectiveCenter which should have been resolved server-side
+  const [mapView, setMapView] = useState<MapViewState | null>(() => {
+    if (zipNeedsResolution) {
+      // ZIP needs client-side resolution - don't show map yet
+      return null
+    }
+    // ZIP already resolved server-side or no ZIP - show map with correct location
+    return {
+      center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
+      bounds: { 
+        west: (effectiveCenter?.lng || -98.5795) - 1.0, 
+        south: (effectiveCenter?.lat || 39.8283) - 1.0, 
+        east: (effectiveCenter?.lng || -98.5795) + 1.0, 
+        north: (effectiveCenter?.lat || 39.8283) + 1.0 
+      },
+      zoom: urlZoom ? parseFloat(urlZoom) : 12
+    }
   })
 
   // Sales data state - map is source of truth
@@ -90,7 +104,7 @@ export default function SalesClient({
 
   // Hybrid system: Get current viewport for clustering
   const currentViewport = useMemo(() => {
-    if (!mapView.bounds) return null
+    if (!mapView || !mapView.bounds) return null
     
         return {
       bounds: [
@@ -101,7 +115,7 @@ export default function SalesClient({
       ] as [number, number, number, number],
       zoom: mapView.zoom
     }
-  }, [mapView.bounds, mapView.zoom])
+  }, [mapView?.bounds, mapView?.zoom])
 
   // Hybrid system: Create location groups and apply clustering
   const hybridResult = useMemo(() => {
@@ -354,10 +368,26 @@ export default function SalesClient({
     console.log('[ZIP] Actual lng value:', lng)
     console.log('[ZIP] Expected ZIP 40204 coordinates: 38.2380249, -85.7246945')
     
-    // Update map center
+    // Calculate bounds for ZIP location (10 mile radius)
+    const radiusKm = 16.09 // 10 miles in kilometers
+    const latRange = radiusKm / 111.0
+    const lngRange = radiusKm / (111.0 * Math.cos(lat * Math.PI / 180))
+    
+    // Initialize or update map center - handle null prev state
     setMapView(prev => {
+      const baseView = prev || {
+        center: { lat, lng },
+        bounds: {
+          west: lng - lngRange,
+          south: lat - latRange,
+          east: lng + lngRange,
+          north: lat + latRange
+        },
+        zoom: 12 // More zoomed in to focus on specific ZIP area
+      }
+      
       const newView = {
-        ...prev,
+        ...baseView,
         center: { lat, lng },
         zoom: 12 // More zoomed in to focus on specific ZIP area
       }
@@ -437,7 +467,7 @@ export default function SalesClient({
     
     // For other filter changes, trigger single fetch with current bounds
     updateFilters(newFilters) // Keep URL update for filter state
-    if (mapView.bounds) {
+    if (mapView?.bounds) {
       console.log('[FILTERS] Triggering single fetch with new filters:', newFilters)
       console.log('[FILTERS] Entry point: FILTER_CHANGE - Single fetch verification')
       setLoading(true) // Show loading state immediately
@@ -553,10 +583,10 @@ export default function SalesClient({
 
   // Memoized map center
   const mapCenter = useMemo(() => {
-    return mapView.center
-  }, [mapView.center])
+    return mapView?.center || { lat: 39.8283, lng: -98.5795 }
+  }, [mapView?.center])
 
-  const mapZoom = mapView.zoom
+  const mapZoom = mapView?.zoom || 10
 
   // Mobile drawer toggle
   const toggleMobileDrawer = useCallback(() => {
@@ -605,27 +635,36 @@ export default function SalesClient({
           </button>
           
           <div className="w-full h-full">
-            <SimpleMap
-              center={mapCenter}
-              zoom={mapZoom}
-              fitBounds={pendingBounds}
-              hybridPins={{
-                sales: mapSales,
-                selectedId: selectedPinId,
-                onLocationClick: (locationId) => {
-                  console.log('[SALES] Location clicked:', locationId)
-                  setSelectedPinId(selectedPinId === locationId ? null : locationId)
-                },
-                onClusterClick: ({ lat, lng, expandToZoom }) => {
-                  console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
-                  // Note: map flyTo is handled in SimpleMap; we just rely on viewport→fetch debounce already in place
-                },
-                viewport: currentViewport!
-              }}
-              onViewportChange={handleViewportChange}
-              isTransitioning={isMapTransitioning}
-              transitionMessage="Loading new location..."
+            {!mapView && zipNeedsResolution ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                <div className="text-center text-gray-500">
+                  <div className="text-4xl mb-2">🗺️</div>
+                  <p className="text-sm font-medium">Resolving location...</p>
+                </div>
+              </div>
+            ) : (
+              <SimpleMap
+                center={mapCenter}
+                zoom={mapZoom}
+                fitBounds={pendingBounds}
+                hybridPins={{
+                  sales: mapSales,
+                  selectedId: selectedPinId,
+                  onLocationClick: (locationId) => {
+                    console.log('[SALES] Location clicked:', locationId)
+                    setSelectedPinId(selectedPinId === locationId ? null : locationId)
+                  },
+                  onClusterClick: ({ lat, lng, expandToZoom }) => {
+                    console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
+                    // Note: map flyTo is handled in SimpleMap; we just rely on viewport→fetch debounce already in place
+                  },
+                  viewport: currentViewport!
+                }}
+                onViewportChange={handleViewportChange}
+                isTransitioning={isMapTransitioning}
+                transitionMessage="Loading new location..."
               />
+            )}
             </div>
           </div>
 
@@ -676,7 +715,7 @@ export default function SalesClient({
             )}
 
             {!loading && visibleSales.length > 0 && (
-              <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView.center, zoom: mapView.zoom }} />
+              <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
             )}
           </div>
           </div>
@@ -734,7 +773,7 @@ export default function SalesClient({
           )}
 
           {!loading && visibleSales.length > 0 && (
-            <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView.center, zoom: mapView.zoom }} />
+            <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
           )}
         </div>
       </div>

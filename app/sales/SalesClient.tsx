@@ -395,6 +395,13 @@ export default function SalesClient({
       north: lat + latRange
     }
     
+    // Prefetch sales data for this ZIP location immediately
+    // This ensures pins appear as soon as possible
+    console.log('[ZIP] Prefetching sales for ZIP location:', { lat, lng, bounds: calculatedBounds })
+    fetchMapSales(calculatedBounds).catch(err => {
+      console.error('[ZIP] Failed to prefetch sales:', err)
+    })
+    
     // Initialize or update map center - handle null prev state
     setMapView(prev => {
       if (!prev) {
@@ -454,13 +461,13 @@ export default function SalesClient({
     
     // Map will update directly without transition overlay
 
-    // Sales will be fetched automatically when the map viewport updates
+    // Sales are already prefetched above, viewport change will refetch if needed
     
     // Clear the ZIP search flag after a delay to allow map to settle
     setTimeout(() => {
       setIsZipSearching(false)
     }, 1000)
-  }, [searchParams, router])
+  }, [searchParams, router, fetchMapSales])
 
   const handleZipError = useCallback((error: string) => {
     setZipError(error)

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createReadStream, existsSync } from 'fs'
 import { createInterface } from 'readline'
 import { resolve, normalize, relative } from 'path'
-import { ENV_PUBLIC, ENV_SERVER } from '@/lib/env'
 import { adminSupabase } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'

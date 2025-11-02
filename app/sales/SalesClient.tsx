@@ -81,7 +81,6 @@ export default function SalesClient({
   const [_isZipSearching, setIsZipSearching] = useState(false)
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
-  const [isMapTransitioning, setIsMapTransitioning] = useState(false)
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {

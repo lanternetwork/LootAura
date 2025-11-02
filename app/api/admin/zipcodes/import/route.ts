@@ -166,7 +166,7 @@ async function importFromPath(csvFilePath: string) {
     }
     
     batch.push({
-      zip,
+      zip_code: zip,  // Use zip_code to match table column
       city: city || null,
       state: state || null,
       lat: coords.lat,
@@ -252,7 +252,7 @@ async function importFromContent(fileContent: string) {
     }
     
     batch.push({
-      zip,
+      zip_code: zip,  // Use zip_code to match table column
       city: city || null,
       state: state || null,
       lat: coords.lat,

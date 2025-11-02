@@ -668,13 +668,8 @@ export default function SalesClient({
           
           <div className="w-full h-full">
             {!mapView && zipNeedsResolution ? (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-                <div className="text-center text-gray-500">
-                  <div className="text-4xl mb-2">🗺️</div>
-                  <p className="text-sm font-medium">Resolving location...</p>
-                </div>
-              </div>
-            ) : (
+              null // Don't show anything while ZIP is being resolved
+            ) : mapView ? (
               <SimpleMap
                 center={mapCenter}
                 zoom={mapZoom}

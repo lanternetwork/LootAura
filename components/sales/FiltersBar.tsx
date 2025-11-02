@@ -205,6 +205,17 @@ export default function FiltersBar({
     }
   }
 
+  const handleDateToggle = (presetId: string) => {
+    // Normalize value: 'weekend' -> 'this_weekend'
+    const normalizedCurrent = dateRange === 'weekend' ? 'this_weekend' : dateRange
+    // If already selected, deselect to 'any', otherwise select
+    if (normalizedCurrent === presetId) {
+      onDateRangeChange('any')
+    } else {
+      onDateRangeChange(presetId as any)
+    }
+  }
+
   // Close overflow menu on outside click or escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -326,10 +337,10 @@ export default function FiltersBar({
                 return (
                   <li key={preset.id}>
                     <button
-                      onClick={() => onDateRangeChange(preset.id as any)}
+                      onClick={() => handleDateToggle(preset.id)}
                       disabled={isLoading}
                       className={`
-                        shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
+                        shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
                         ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
                         ${isSelected 
                           ? 'bg-blue-100 text-blue-800 border border-blue-200' 
@@ -338,6 +349,9 @@ export default function FiltersBar({
                       `}
                     >
                       {preset.label}
+                      {isSelected && (
+                        <span className="ml-1 text-blue-600">×</span>
+                      )}
                     </button>
                   </li>
                 )

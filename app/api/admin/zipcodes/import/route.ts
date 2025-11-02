@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createReadStream } from 'fs'
 import { createInterface } from 'readline'
-import { resolve, normalize } from 'path'
+import { resolve, normalize, relative } from 'path'
+import { existsSync } from 'fs'
 import { adminSupabase } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
@@ -81,24 +82,40 @@ async function importFromPath(csvFilePath: string) {
     throw new Error('Invalid file path')
   }
   
+  // Define allowed base directory for imports
+  // Restrict to a safe directory to prevent path traversal
+  const ALLOWED_BASE_DIR = process.env.IMPORT_BASE_DIR || process.cwd()
+  const allowedBaseDir = resolve(ALLOWED_BASE_DIR)
+  
   // Check for dangerous path traversal sequences
-  // This catches attempts like '../etc/passwd', '../../secret', etc.
-  if (csvFilePath.includes('..')) {
+  if (csvFilePath.includes('..') || csvFilePath.includes('~')) {
     throw new Error('Invalid file path: path traversal detected')
   }
   
   // Normalize the path to handle redundant separators
-  const normalizedPath = normalize(csvFilePath)
+  // Remove leading slashes to prevent absolute path attacks
+  const sanitizedPath = csvFilePath.replace(/^[/\\]+/, '')
+  const normalizedPath = normalize(sanitizedPath)
   
-  // Additional safety check: ensure normalized path doesn't still contain traversal
-  if (normalizedPath.includes('..')) {
+  // Additional safety check: ensure normalized path doesn't contain traversal
+  if (normalizedPath.includes('..') || normalizedPath.includes('~')) {
     throw new Error('Invalid file path: path traversal detected after normalization')
   }
   
-  // Resolve to absolute path
-  // Note: In production, consider restricting to a specific allowed directory
-  // For example: restrict to a specific uploads/imports directory
-  const resolvedPath = resolve(normalizedPath)
+  // Resolve relative to allowed base directory
+  const resolvedPath = resolve(allowedBaseDir, normalizedPath)
+  
+  // Security check: ensure resolved path is within allowed base directory
+  // Use relative() to check if the resolved path is inside the base directory
+  const relativePath = relative(allowedBaseDir, resolvedPath)
+  if (relativePath.startsWith('..') || relativePath.includes('..')) {
+    throw new Error('Invalid file path: resolved path outside allowed directory')
+  }
+  
+  // Verify the file exists before attempting to read
+  if (!existsSync(resolvedPath)) {
+    throw new Error(`File not found: ${resolvedPath}`)
+  }
   
   const fileStream = createReadStream(resolvedPath, { encoding: 'utf-8' })
   const rl = createInterface({

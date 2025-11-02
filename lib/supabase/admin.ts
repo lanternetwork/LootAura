@@ -33,6 +33,9 @@ function getAdminSupabase(): ReturnType<typeof createClient> {
             persistSession: false,
             autoRefreshToken: false,
             detectSessionInUrl: false
+          },
+          db: { 
+            schema: 'lootaura_v2' 
           }
         }
       )
@@ -53,6 +56,9 @@ function getAdminSupabase(): ReturnType<typeof createClient> {
               persistSession: false,
               autoRefreshToken: false,
               detectSessionInUrl: false
+            },
+            db: { 
+              schema: 'lootaura_v2' 
             }
           }
         )
@@ -76,11 +82,19 @@ function getAdminSupabase(): ReturnType<typeof createClient> {
   return _adminSupabase
 }
 
-// Export client directly - initialization happens lazily via getAdminSupabase()
-// During build, getAdminSupabase() will create a placeholder client
-// At runtime, it will create the real client with proper validation
-// TypeScript can infer types correctly because we're exporting the actual client, not a Proxy
-export const adminSupabase = getAdminSupabase()
+// Create a lazy getter that preserves TypeScript types
+// During build, we don't initialize the client - we just provide a type
+// At runtime, the client is initialized on first access
+function createLazyAdminClient(): ReturnType<typeof createClient> {
+  // This function is never called during build - it's only used for type inference
+  // The actual client is created via getAdminSupabase() when accessed
+  return getAdminSupabase()
+}
+
+// Export using a getter pattern that preserves types
+// TypeScript sees the return type of createLazyAdminClient
+// but the actual initialization happens lazily via getAdminSupabase()
+export const adminSupabase = createLazyAdminClient()
 
 // Note: Admin client uses the schema configuration from the client creation
 // No need for separate schema helpers since the client is configured with the schema

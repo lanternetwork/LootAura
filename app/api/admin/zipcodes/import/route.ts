@@ -190,9 +190,10 @@ async function importFromPath(csvFilePath: string) {
 
 async function insertBatch(batch: ZipCodeRow[]) {
   // Type assertion needed because placeholder client during build lacks schema types
+  // Admin client is configured with lootaura_v2 schema, so use just 'zipcodes'
   const client = adminSupabase as any
   const { error } = await client
-    .from('lootaura_v2.zipcodes')
+    .from('zipcodes')
     .upsert(batch, {
       onConflict: 'zip',
       ignoreDuplicates: false

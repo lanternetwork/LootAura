@@ -13,7 +13,7 @@ export const maxDuration = 300 // 5 minutes for large imports
 // or split the CSV into smaller batches.
 
 interface ZipCodeRow {
-  zip: string
+  zip_code: string  // Table uses zip_code, not zip
   city: string | null
   state: string | null
   lat: number
@@ -192,10 +192,10 @@ async function insertBatch(batch: ZipCodeRow[]) {
   // Type assertion needed because placeholder client during build lacks schema types
   // Use full schema.table notation to access lootaura_v2.zipcodes
   const client = adminSupabase as any
-  const { error } = await client
+    const { error } = await client
     .from('lootaura_v2.zipcodes')
     .upsert(batch, {
-      onConflict: 'zip',
+      onConflict: 'zip_code',
       ignoreDuplicates: false
     })
   

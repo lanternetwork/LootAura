@@ -3,6 +3,7 @@ import { createReadStream, existsSync } from 'fs'
 import { createInterface } from 'readline'
 import { resolve, normalize, relative } from 'path'
 import { ENV_PUBLIC, ENV_SERVER } from '@/lib/env'
+import { adminSupabase } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes for large imports
@@ -188,70 +189,68 @@ async function importFromPath(csvFilePath: string) {
 }
 
 async function insertBatch(batch: ZipCodeRow[]) {
-  // Try multiple approaches to ensure it works:
-  // 1. First try using the public view (zipcodes_v2) if it supports inserts
-  // 2. Fall back to direct schema access via REST API with Accept-Profile
-  // 3. Last resort: Use PostgREST schema search path
+  // Try using admin client upsert on zipcodes_v2 view first
+  // This should work if the view has INSERT support
+  const client = adminSupabase as any
   
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE || ENV_SERVER.SUPABASE_SERVICE_ROLE
-  
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Missing Supabase credentials')
-  }
-  
-  // Try approach 1: Use public view zipcodes_v2 (should map to lootaura_v2.zipcodes)
-  let response = await fetch(`${supabaseUrl}/rest/v1/zipcodes_v2`, {
-    method: 'POST',
-    headers: {
-      'apikey': serviceRoleKey,
-      'Authorization': `Bearer ${serviceRoleKey}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates'
-    },
-    body: JSON.stringify(batch)
-  })
-  
-  // If that fails, try approach 2: Direct schema access with Accept-Profile
-  if (!response.ok) {
-    response = await fetch(`${supabaseUrl}/rest/v1/zipcodes`, {
-      method: 'POST',
-      headers: {
-        'apikey': serviceRoleKey,
-        'Authorization': `Bearer ${serviceRoleKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates',
-        'Accept-Profile': 'lootaura_v2'
-      },
-      body: JSON.stringify(batch)
-    })
-  }
-  
-  // If still failing, try approach 3: URL-encoded schema path
-  if (!response.ok) {
-    const encodedSchema = encodeURIComponent('lootaura_v2')
-    response = await fetch(`${supabaseUrl}/rest/v1/${encodedSchema}.zipcodes`, {
-      method: 'POST',
-      headers: {
-        'apikey': serviceRoleKey,
-        'Authorization': `Bearer ${serviceRoleKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
-      },
-      body: JSON.stringify(batch)
-    })
-  }
-  
-  if (!response.ok) {
-    const errorText = await response.text()
-    let errorMessage = `HTTP ${response.status}: ${response.statusText}`
-    try {
-      const errorJson = JSON.parse(errorText)
-      errorMessage = errorJson.message || errorJson.error || errorMessage
-    } catch {
-      errorMessage = errorText || errorMessage
+  try {
+    const { error } = await client
+      .from('zipcodes_v2')
+      .upsert(batch.map(row => ({
+        zip_code: row.zip_code,
+        city: row.city,
+        state: row.state,
+        lat: row.lat,
+        lng: row.lng
+      })), {
+        onConflict: 'zip_code',
+        ignoreDuplicates: false
+      })
+    
+    if (!error) {
+      return
     }
-    throw new Error(`Failed to insert ZIP codes: ${errorMessage}`)
+    
+    // If view doesn't support inserts, use RPC exec with raw SQL
+    throw error
+  } catch (viewError: any) {
+    // Fallback: Use RPC exec function with raw SQL to insert into lootaura_v2.zipcodes
+    // Build the VALUES clause using proper JSON escaping
+    const values = batch.map(row => {
+      const zipCode = JSON.stringify(row.zip_code || '')
+      const city = row.city ? JSON.stringify(row.city) : 'null'
+      const state = row.state ? JSON.stringify(row.state) : 'null'
+      const lat = row.lat ?? 'null'
+      const lng = row.lng ?? 'null'
+      
+      return `(${zipCode}, ${city}, ${state}, ${lat}, ${lng})`
+    }).join(', ')
+    
+    const sql = `
+      INSERT INTO lootaura_v2.zipcodes (zip_code, city, state, lat, lng)
+      VALUES ${values}
+      ON CONFLICT (zip_code) 
+      DO UPDATE SET
+        city = EXCLUDED.city,
+        state = EXCLUDED.state,
+        lat = EXCLUDED.lat,
+        lng = EXCLUDED.lng,
+        updated_at = NOW()
+    `
+    
+    try {
+      const { error: rpcError } = await client.rpc('exec', { sql })
+      
+      if (!rpcError) {
+        return
+      }
+      
+      throw rpcError
+    } catch (rpcError: any) {
+      // Final error: Provide helpful message
+      const errorMessage = viewError?.message || rpcError?.message || 'Unknown error'
+      throw new Error(`Failed to insert ZIP codes: ${errorMessage}. The exec RPC function may not be available or the zipcodes_v2 view may not support inserts.`)
+    }
   }
 }
 

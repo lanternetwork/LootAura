@@ -158,22 +158,34 @@ export function WeekendStats() {
         const weekendData = await weekendRes.json()
         const weekendSales: Sale[] = weekendData.data || []
 
-        // Fetch sales from this week
-        const weekParams = new URLSearchParams(params.toString())
-        weekParams.set('from', thisWeekStart)
-        weekParams.set('to', thisWeekEnd)
-        // Remove dateRange if it exists
-        weekParams.delete('dateRange')
-        const weekRes = await fetch(`/api/sales?${weekParams.toString()}`)
-        if (!weekRes.ok) {
-          throw new Error('Failed to fetch weekly sales')
+        // Fetch all sales in the area (without date filtering)
+        // We'll filter client-side by created_at to count "new this week"
+        const allParams = new URLSearchParams(params.toString())
+        // Remove date filtering - we want all sales in the area
+        allParams.delete('from')
+        allParams.delete('to')
+        allParams.delete('dateRange')
+        const allRes = await fetch(`/api/sales?${allParams.toString()}`)
+        if (!allRes.ok) {
+          throw new Error('Failed to fetch sales')
         }
-        const weekData = await weekRes.json()
-        const weekSales: Sale[] = weekData.data || []
+        const allData = await allRes.json()
+        const allSales: Sale[] = allData.data || []
 
         // Calculate stats
         const activeSales = weekendSales.length
-        const newThisWeek = weekSales.length
+        
+        // Count sales created this week (based on created_at, not date_start)
+        const weekStart = new Date(weekAgo)
+        weekStart.setHours(0, 0, 0, 0)
+        const weekEnd = new Date(now)
+        weekEnd.setHours(23, 59, 59, 999)
+        
+        const newThisWeek = allSales.filter((sale) => {
+          if (!sale.created_at) return false
+          const createdAt = new Date(sale.created_at)
+          return createdAt >= weekStart && createdAt <= weekEnd
+        }).length
 
         setStats({ activeSales, newThisWeek })
       } catch (error) {

@@ -674,9 +674,12 @@ export default function SalesClient({
   const FILTERS_HEIGHT = 56 // px - filters bar height
   const MAIN_CONTENT_HEIGHT = `calc(100vh - ${FILTERS_HEIGHT}px)`
 
-  // Mobile filter button handler
+  // Use mobile filter context
+  const { isOpen: isMobileFilterSheetOpen, closeFilterSheet } = useMobileFilter()
+  
+  // Mobile filter button handler (no longer needed - handled by context)
   const handleMobileFilterClick = useCallback(() => {
-    console.log('[MOBILE_FILTER] Filter button clicked - will open sheet')
+    // Handled by context
   }, [])
 
   // Bottom sheet height calculations
@@ -958,6 +961,20 @@ export default function SalesClient({
           </div>
         </div>
       )}
+
+      {/* Mobile Filter Sheet */}
+      <MobileFilterSheet
+        isOpen={isMobileFilterSheetOpen}
+        onClose={closeFilterSheet}
+        dateRange={filters.dateRange}
+        onDateRangeChange={(dateRange) => handleFiltersChange({ ...filters, dateRange })}
+        categories={filters.categories}
+        onCategoriesChange={(categories) => handleFiltersChange({ ...filters, categories })}
+        distance={filters.distance}
+        onDistanceChange={(distance) => handleFiltersChange({ ...filters, distance })}
+        hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
+        isLoading={loading}
+      />
 
     </div>
   )

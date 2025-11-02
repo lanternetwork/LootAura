@@ -8,7 +8,6 @@ import { getDatePresetById } from '@/lib/shared/datePresets'
 
 interface WeekendStatsData {
   activeSales: number
-  newThisWeek: number
 }
 
 interface LocationState {
@@ -137,16 +136,6 @@ export function WeekendStats() {
           end: weekendPreset.end
         })
 
-        // Get this week's date range (last 7 days, excluding today)
-        // If today is Nov 2, we want Oct 26 - Nov 1 (7 days, not including today)
-        const formatDate = (d: Date) => d.toISOString().slice(0, 10)
-        const yesterday = new Date(now)
-        yesterday.setDate(now.getDate() - 1)
-        const sevenDaysAgo = new Date(yesterday)
-        sevenDaysAgo.setDate(yesterday.getDate() - 6) // 7 days total: from 7 days ago to yesterday
-        const thisWeekStart = formatDate(sevenDaysAgo)
-        const thisWeekEnd = formatDate(yesterday) // Exclude today
-
         // Fetch weekend sales
         const weekendUrl = `/api/sales?${params.toString()}`
         console.log('[WeekendStats] Fetching weekend sales:', weekendUrl)
@@ -165,47 +154,12 @@ export function WeekendStats() {
           fullResponse: weekendData
         })
         console.log('[WeekendStats] Weekend count:', weekendCount, 'sales')
-        console.log('[WeekendStats] Weekend data:', JSON.stringify(weekendData, null, 2))
-
-        // Fetch sales from this week
-        const weekParams = new URLSearchParams(params.toString())
-        weekParams.set('from', thisWeekStart)
-        weekParams.set('to', thisWeekEnd)
-        // Remove dateRange if it exists
-        weekParams.delete('dateRange')
-        const weekUrl = `/api/sales?${weekParams.toString()}`
-        console.log('[WeekendStats] Fetching weekly sales:', weekUrl)
-        const weekRes = await fetch(weekUrl)
-        if (!weekRes.ok) {
-          throw new Error(`Failed to fetch weekly sales: ${weekRes.status}`)
-        }
-        const weekData = await weekRes.json()
-        const weekSales: Sale[] = weekData.data || []
-        const weekCount = weekSales.length
-        console.log('[WeekendStats] Weekly sales response:', {
-          ok: weekRes.ok,
-          count: weekCount,
-          totalInResponse: weekData.count || weekData.data?.length || 0,
-          dateRange: { from: thisWeekStart, to: thisWeekEnd },
-          fullResponse: weekData
-        })
-        console.log('[WeekendStats] Weekly count:', weekCount, 'sales')
-        console.log('[WeekendStats] Weekly data:', JSON.stringify(weekData, null, 2))
 
         // Calculate stats
         const activeSales = weekendCount
-        const newThisWeek = weekCount
 
-        console.log('[WeekendStats] Calculated stats:', { 
-          activeSales, 
-          newThisWeek,
-          weekendSalesCount: weekendCount,
-          weekSalesCount: weekCount,
-          weekendSalesIds: weekendSales.map(s => s.id),
-          weekSalesIds: weekSales.map(s => s.id)
-        })
-        console.log('[WeekendStats] FINAL STATS - Active sales:', activeSales, '| New this week:', newThisWeek)
-        setStats({ activeSales, newThisWeek })
+        console.log('[WeekendStats] FINAL STATS - Active sales:', activeSales)
+        setStats({ activeSales })
       } catch (error) {
         console.error('[WeekendStats] Error fetching stats:', error)
         setStats(null)
@@ -220,7 +174,7 @@ export function WeekendStats() {
   }, [status, location?.lat, location?.lng, location?.zip])
 
   // Show fallback values while loading or on error
-  const displayStats = stats || { activeSales: 12, newThisWeek: 3 }
+  const displayStats = stats || { activeSales: 12 }
   
   // Decode URL-encoded city name if present (safe decode)
   const cityName = (() => {
@@ -264,20 +218,12 @@ export function WeekendStats() {
         </div>
       </div>
 
-      {/* Body - 2 mini stat cards side by side */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white/50 rounded-xl p-3 border border-white/30">
-          <p className="text-xs text-[#3A2268]/60 mb-1">Active sales</p>
-          <p className="text-lg font-semibold text-[#3A2268]">
-            {loading ? '...' : displayStats.activeSales}
-          </p>
-        </div>
-        <div className="bg-white/50 rounded-xl p-3 border border-white/30">
-          <p className="text-xs text-[#3A2268]/60 mb-1">New this week</p>
-          <p className="text-lg font-semibold text-[#3A2268]">
-            {loading ? '...' : displayStats.newThisWeek}
-          </p>
-        </div>
+      {/* Body - Active sales stat */}
+      <div className="bg-white/50 rounded-xl p-4 border border-white/30">
+        <p className="text-xs text-[#3A2268]/60 mb-2">Active sales</p>
+        <p className="text-2xl font-semibold text-[#3A2268]">
+          {loading ? '...' : displayStats.activeSales}
+        </p>
       </div>
 
       {/* Footer */}

@@ -94,8 +94,11 @@ describe('Environment Validation', () => {
     process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
     process.env.NOMINATIM_APP_EMAIL = 'invalid-email'
 
+    // ENV_SERVER validation is lazy - access ENV_SERVER to trigger validation
     await expect(async () => {
-      await import('@/lib/env')
+      const { ENV_SERVER } = await import('@/lib/env')
+      // Access NOMINATIM_APP_EMAIL to trigger lazy validation
+      void ENV_SERVER.NOMINATIM_APP_EMAIL
     }).rejects.toThrow('Invalid email')
   })
 

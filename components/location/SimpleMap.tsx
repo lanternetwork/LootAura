@@ -12,6 +12,7 @@ interface SimpleMapProps {
   center: { lat: number; lng: number }
   zoom?: number
   fitBounds?: { west: number; south: number; east: number; north: number } | null
+  fitBoundsOptions?: { padding?: number; duration?: number } // Allow custom fitBounds options
   sales?: Sale[]
   onSaleClick?: (sale: Sale) => void
   selectedSaleId?: string
@@ -30,7 +31,8 @@ interface SimpleMapProps {
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
   center, 
   zoom = 11, 
-  fitBounds, 
+  fitBounds,
+  fitBoundsOptions = { padding: 20, duration: 400 },
   sales = [],
   onSaleClick,
   selectedSaleId,
@@ -198,7 +200,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       if (map) {
         map.fitBounds(
           [[fitBounds.west, fitBounds.south], [fitBounds.east, fitBounds.north]], 
-          { padding: 20, duration: 400 } // Reduced padding to prevent zoom out, faster animation
+          fitBoundsOptions
         )
         lastBoundsKey.current = boundsKey
       }

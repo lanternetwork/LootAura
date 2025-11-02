@@ -7,9 +7,11 @@ import SimpleMap from '@/components/location/SimpleMap'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import SalesList from '@/components/SalesList'
 import FiltersBar from '@/components/sales/FiltersBar'
+import MobileFilterSheet from '@/components/sales/MobileFilterSheet'
 import { useFilters } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
+import { useMobileFilter } from '@/contexts/MobileFilterContext'
 
 // Simplified map-as-source types
 interface MapViewState {

@@ -2,14 +2,18 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import UserProfile from '@/components/UserProfile'
+import { useMobileFilter } from '@/contexts/MobileFilterContext'
 
 export function Header() {
   const pathname = usePathname()
   const isSalesPage = pathname === '/sales'
+  const { openFilterSheet } = useMobileFilter()
   
   // Mobile filter button handler
   const handleMobileFilterClick = () => {
-    console.log('[MOBILE_FILTER] Filter button clicked - will open sheet')
+    if (isSalesPage) {
+      openFilterSheet()
+    }
   }
   
   return (

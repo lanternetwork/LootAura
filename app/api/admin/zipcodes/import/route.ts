@@ -190,7 +190,7 @@ async function importFromPath(csvFilePath: string) {
 
 async function insertBatch(batch: ZipCodeRow[]) {
   // Supabase JS client doesn't support schema-qualified table names
-  // Use REST API directly to access lootaura_v2.zipcodes
+  // Use REST API directly with Accept-Profile header to access lootaura_v2 schema
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE || ENV_SERVER.SUPABASE_SERVICE_ROLE
   
@@ -198,13 +198,16 @@ async function insertBatch(batch: ZipCodeRow[]) {
     throw new Error('Missing Supabase credentials')
   }
   
-  const response = await fetch(`${supabaseUrl}/rest/v1/lootaura_v2.zipcodes`, {
+  // Use Accept-Profile header to specify the schema
+  // Then use just 'zipcodes' as the table name
+  const response = await fetch(`${supabaseUrl}/rest/v1/zipcodes`, {
     method: 'POST',
     headers: {
       'apikey': serviceRoleKey,
       'Authorization': `Bearer ${serviceRoleKey}`,
       'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates'
+      'Prefer': 'resolution=merge-duplicates',
+      'Accept-Profile': 'lootaura_v2'  // Specify schema via header
     },
     body: JSON.stringify(batch)
   })

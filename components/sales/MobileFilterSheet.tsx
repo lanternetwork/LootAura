@@ -38,7 +38,7 @@ export default function MobileFilterSheet({
   onCategoriesChange,
   distance,
   onDistanceChange,
-  hasActiveFilters,
+  hasActiveFilters: _hasActiveFilters,
   isLoading = false
 }: MobileFilterSheetProps) {
   const [tempDateRange, setTempDateRange] = useState(dateRange)

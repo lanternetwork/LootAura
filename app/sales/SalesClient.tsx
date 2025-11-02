@@ -82,7 +82,7 @@ export default function SalesClient({
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
   const [_isZipSearching, setIsZipSearching] = useState(false)
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
-  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
+  const [_isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
   
   // Bottom sheet state for mobile (<768px only)
   const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'mid' | 'expanded'>('mid')

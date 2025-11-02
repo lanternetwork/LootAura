@@ -181,7 +181,7 @@ export default function FiltersBar({
   zipInputTestId = "zip-input",
   filtersCenterTestId = "filters-center",
   filtersMoreTestId = "filters-more",
-  onMobileFilterClick
+  onMobileFilterClick: _onMobileFilterClick
 }: FiltersBarProps) {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [showOverflowMenu, setShowOverflowMenu] = useState(false)

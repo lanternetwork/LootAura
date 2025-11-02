@@ -81,6 +81,25 @@ export default function SalesClient({
   const [_isZipSearching, setIsZipSearching] = useState(false)
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false)
+  
+  // Bottom sheet state for mobile (<768px only)
+  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'mid' | 'expanded'>('mid')
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStartY, setDragStartY] = useState(0)
+  const [dragStartHeight, setDragStartHeight] = useState<string>('40vh')
+  
+  // Track window width for mobile detection
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  
+  const isMobile = windowWidth < 768
 
   // Deduplicate sales by canonical sale ID
   const deduplicateSales = useCallback((sales: Sale[]): Sale[] => {
@@ -686,7 +705,14 @@ export default function SalesClient({
         style={{ height: MAIN_CONTENT_HEIGHT }}
       >
         {/* Map - Top on mobile, Left on desktop */}
-        <div className="relative min-h-[50vh] lg:h-full lg:min-h-0 bg-gray-100 flex-shrink-0">
+        <div 
+          className="relative lg:h-full lg:min-h-0 bg-gray-100 flex-shrink-0" 
+          style={{ 
+            height: isMobile 
+              ? `calc(100vh - ${FILTERS_HEIGHT}px)` 
+              : '100%' 
+          }}
+        >
           <div className="w-full h-full">
             {mapView ? (
               <SimpleMap

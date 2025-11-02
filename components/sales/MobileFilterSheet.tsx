@@ -46,13 +46,13 @@ export default function MobileFilterSheet({
   const [tempDistance, setTempDistance] = useState(distance)
 
   // Sync temp state when sheet opens or props change
-  useState(() => {
+  useEffect(() => {
     if (isOpen) {
       setTempDateRange(dateRange)
       setTempCategories(categories)
       setTempDistance(distance)
     }
-  })
+  }, [isOpen, dateRange, categories, distance])
 
   const handleCategoryToggle = useCallback((categoryId: string) => {
     if (tempCategories.includes(categoryId)) {

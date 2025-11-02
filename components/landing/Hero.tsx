@@ -33,8 +33,8 @@ export function Hero() {
             <HeroSearchBar />
           </div>
 
-          {/* Right column - desktop only */}
-          <div className="hidden lg:block">
+          {/* Right column - desktop: centered card, mobile: stacked below */}
+          <div className="w-full max-w-md lg:max-w-sm lg:ml-auto">
             <WeekendStats />
           </div>
         </div>

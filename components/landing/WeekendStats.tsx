@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Sale } from '@/lib/types'
+import { getDatePresetById } from '@/lib/shared/datePresets'
 
 interface WeekendStatsData {
   activeSales: number
@@ -117,32 +118,25 @@ export function WeekendStats() {
         // Set limit to match map behavior (200 is max)
         params.set('limit', '200')
 
-        // Get this weekend's date range
+        // Get this weekend's date range using the shared date preset function
+        // This ensures consistency with the sales page filter
         const now = new Date()
-        const dayOfWeek = now.getDay()
-        let saturday: Date, sunday: Date
-        
-        if (dayOfWeek === 0) { // Sunday
-          saturday = new Date(now)
-          saturday.setDate(now.getDate() - 1) // Yesterday (Saturday)
-          sunday = new Date(now) // Today (Sunday)
-        } else if (dayOfWeek === 6) { // Saturday
-          saturday = new Date(now) // Today (Saturday)
-          sunday = new Date(now)
-          sunday.setDate(now.getDate() + 1) // Tomorrow (Sunday)
-        } else { // Monday-Friday
-          const daysToSaturday = 6 - dayOfWeek
-          const daysToSunday = 7 - dayOfWeek
-          saturday = new Date(now)
-          saturday.setDate(now.getDate() + daysToSaturday)
-          sunday = new Date(now)
-          sunday.setDate(now.getDate() + daysToSunday)
+        const weekendPreset = getDatePresetById('this_weekend', now)
+        if (!weekendPreset) {
+          throw new Error('Failed to resolve weekend date preset')
         }
 
-        const formatDate = (d: Date) => d.toISOString().slice(0, 10)
         // Use 'from' and 'to' parameters for explicit date range (API supports this)
-        params.set('from', formatDate(saturday))
-        params.set('to', formatDate(sunday))
+        // This matches exactly what the sales page uses when dateRange=this_weekend
+        params.set('from', weekendPreset.start)
+        params.set('to', weekendPreset.end)
+
+        // Get this week's date range (last 7 days)
+        const formatDate = (d: Date) => d.toISOString().slice(0, 10)
+        const weekAgo = new Date(now)
+        weekAgo.setDate(now.getDate() - 7)
+        const thisWeekStart = formatDate(weekAgo)
+        const thisWeekEnd = formatDate(now)
 
         // Fetch weekend sales
         const weekendRes = await fetch(`/api/sales?${params.toString()}`)
@@ -153,12 +147,9 @@ export function WeekendStats() {
         const weekendSales: Sale[] = weekendData.data || []
 
         // Fetch sales from this week
-        // Get this week's date range (last 7 days)
-        const weekAgo = new Date(now)
-        weekAgo.setDate(now.getDate() - 7)
         const weekParams = new URLSearchParams(params.toString())
-        weekParams.set('from', formatDate(weekAgo))
-        weekParams.set('to', formatDate(now))
+        weekParams.set('from', thisWeekStart)
+        weekParams.set('to', thisWeekEnd)
         // Remove dateRange if it exists
         weekParams.delete('dateRange')
         const weekRes = await fetch(`/api/sales?${weekParams.toString()}`)

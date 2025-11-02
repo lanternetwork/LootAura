@@ -691,6 +691,10 @@ export default function SalesClient({
                 center={mapCenter}
                 zoom={mapZoom}
                 fitBounds={pendingBounds}
+                fitBoundsOptions={pendingBounds ? { 
+                  padding: 20, 
+                  duration: 0 // No animation for ZIP search - instant positioning
+                } : undefined}
                 hybridPins={{
                   sales: mapSales,
                   selectedId: selectedPinId,

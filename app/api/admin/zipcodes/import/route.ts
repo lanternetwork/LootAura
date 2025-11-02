@@ -301,6 +301,7 @@ export async function POST(request: NextRequest) {
     const contentType = request.headers.get('content-type') || ''
     
     // Try FormData first if content-type suggests it or if it's not JSON
+    // IMPORTANT: Once we read formData or json, the body is consumed and can't be read again
     if (contentType.includes('multipart/form-data') || (!contentType.includes('application/json') && contentType !== '')) {
       try {
         const formData = await request.formData()
@@ -314,34 +315,49 @@ export async function POST(request: NextRequest) {
             success: true,
             ...result
           })
+        } else {
+          // No file in FormData
+          return NextResponse.json({ error: 'No file provided in FormData' }, { status: 400 })
         }
-        // No file in FormData, fall through to JSON
-      } catch {
-        // Not FormData or parse failed, continue to JSON parsing
+      } catch (error: any) {
+        // If FormData parsing fails, don't try to read JSON (body already consumed)
+        console.error('[ZIP_IMPORT] FormData parsing error:', error.message)
+        return NextResponse.json({ 
+          error: 'Failed to parse FormData', 
+          message: error.message || 'Invalid file upload format' 
+        }, { status: 400 })
       }
     }
     
-    // Handle JSON body (file content or file path)
-    const body = await request.json()
-    
-    if (body.fileContent) {
-      // Direct file content
-      const result = await importFromContent(body.fileContent)
+    // Handle JSON body (file content or file path) - only if not FormData
+    try {
+      const body = await request.json()
       
-      return NextResponse.json({
-        success: true,
-        ...result
-      })
-    } else if (body.filePath) {
-      // Server-side file path (for local development)
-      const result = await importFromPath(body.filePath)
-      
-      return NextResponse.json({
-        success: true,
-        ...result
-      })
-    } else {
-      return NextResponse.json({ error: 'file, fileContent, or filePath is required' }, { status: 400 })
+      if (body.fileContent) {
+        // Direct file content
+        const result = await importFromContent(body.fileContent)
+        
+        return NextResponse.json({
+          success: true,
+          ...result
+        })
+      } else if (body.filePath) {
+        // Server-side file path (for local development)
+        const result = await importFromPath(body.filePath)
+        
+        return NextResponse.json({
+          success: true,
+          ...result
+        })
+      } else {
+        return NextResponse.json({ error: 'file, fileContent, or filePath is required' }, { status: 400 })
+      }
+    } catch (error: any) {
+      console.error('[ZIP_IMPORT] JSON parsing error:', error.message)
+      return NextResponse.json({ 
+        error: 'Invalid request body', 
+        message: 'Request must be FormData with file or JSON with fileContent/filePath' 
+      }, { status: 400 })
     }
     
   } catch (error: any) {

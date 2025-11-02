@@ -375,19 +375,25 @@ export default function SalesClient({
     
     // Initialize or update map center - handle null prev state
     setMapView(prev => {
-      const baseView = prev || {
-        center: { lat, lng },
-        bounds: {
-          west: lng - lngRange,
-          south: lat - latRange,
-          east: lng + lngRange,
-          north: lat + latRange
-        },
-        zoom: 12 // More zoomed in to focus on specific ZIP area
+      if (!prev) {
+        // Create new map view with ZIP location
+        const newView: MapViewState = {
+          center: { lat, lng },
+          bounds: {
+            west: lng - lngRange,
+            south: lat - latRange,
+            east: lng + lngRange,
+            north: lat + latRange
+          },
+          zoom: 12 // More zoomed in to focus on specific ZIP area
+        }
+        console.log('[ZIP] New map view:', newView)
+        return newView
       }
       
-      const newView = {
-        ...baseView,
+      // Update existing map view
+      const newView: MapViewState = {
+        ...prev,
         center: { lat, lng },
         zoom: 12 // More zoomed in to focus on specific ZIP area
       }

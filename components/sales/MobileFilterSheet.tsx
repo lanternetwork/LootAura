@@ -46,6 +46,15 @@ export default function MobileFilterSheet({
   const [tempCategories, setTempCategories] = useState(categories)
   const [tempDistance, setTempDistance] = useState(distance)
 
+  // Date presets - only show Thu/Fri/Sat/Sun/This weekend (skip Today)
+  const datePresets = useMemo(() => {
+    const allPresets = buildDatePresets()
+    // Filter to only show: thursday, friday, saturday, sunday, this_weekend
+    return allPresets.filter(p => 
+      ['thursday', 'friday', 'saturday', 'sunday', 'this_weekend'].includes(p.id)
+    )
+  }, [])
+
   // Sync temp state when sheet opens or props change
   useEffect(() => {
     if (isOpen) {

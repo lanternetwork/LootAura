@@ -425,17 +425,19 @@ export default function FiltersBar({
             )}
           </div>
 
-          {/* Date Dropdown - Compact */}
+          {/* Date Dropdown - Compact - Show presets */}
           <select
             value={dateRange}
-            onChange={(e) => onDateRangeChange(e.target.value as 'today' | 'weekend' | 'next_weekend' | 'any')}
+            onChange={(e) => onDateRangeChange(e.target.value as any)}
             disabled={isLoading}
-            className={`px-2 py-1 border rounded text-xs min-w-[80px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`px-2 py-1 border rounded text-xs min-w-[100px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <option value="any">Any</option>
-            <option value="today">Today</option>
-            <option value="weekend">Weekend</option>
-            <option value="next_weekend">Next</option>
+            {datePresets.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
           </select>
 
           {/* Search Area - Compact */}

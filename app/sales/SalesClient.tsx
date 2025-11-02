@@ -387,19 +387,28 @@ export default function SalesClient({
     const latRange = radiusKm / 111.0
     const lngRange = radiusKm / (111.0 * Math.cos(lat * Math.PI / 180))
     
+    // Calculate exact 10-mile radius bounds
+    const calculatedBounds = {
+      west: lng - lngRange,
+      south: lat - latRange,
+      east: lng + lngRange,
+      north: lat + latRange
+    }
+    
+    // Use fitBounds to ensure exactly 10-mile radius is visible
+    // This is more accurate than using a fixed zoom level
+    setPendingBounds(calculatedBounds)
+    
     // Initialize or update map center - handle null prev state
     setMapView(prev => {
       if (!prev) {
         // Create new map view with ZIP location
+        // Zoom will be determined by fitBounds, so use approximate zoom
+        // Zoom 11 typically shows ~20-25 mile diameter, which is close to our 20-mile diameter (10-mile radius)
         const newView: MapViewState = {
           center: { lat, lng },
-          bounds: {
-            west: lng - lngRange,
-            south: lat - latRange,
-            east: lng + lngRange,
-            north: lat + latRange
-          },
-          zoom: 12 // More zoomed in to focus on specific ZIP area
+          bounds: calculatedBounds,
+          zoom: 11 // Approximate - fitBounds will override this
         }
         console.log('[ZIP] New map view:', newView)
         return newView
@@ -409,7 +418,8 @@ export default function SalesClient({
       const newView: MapViewState = {
         ...prev,
         center: { lat, lng },
-        zoom: 12 // More zoomed in to focus on specific ZIP area
+        bounds: calculatedBounds,
+        zoom: 11 // Approximate - fitBounds will override this
       }
       console.log('[ZIP] New map view:', newView)
       return newView
@@ -424,17 +434,8 @@ export default function SalesClient({
     }
     router.replace(`/sales?${currentParams.toString()}`, { scroll: false })
 
-    // If bbox is available, use fitBounds; otherwise use center/zoom
-    if (bbox) {
-      setPendingBounds({
-        west: bbox[0],
-        south: bbox[1], 
-        east: bbox[2],
-        north: bbox[3]
-      })
-      // Clear bounds after one use
-      setTimeout(() => setPendingBounds(null), 0)
-    }
+    // Clear bounds after map fits to them (fitBounds will adjust zoom automatically)
+    setTimeout(() => setPendingBounds(null), 600) // Clear after animation completes
     
     // Map will update directly without transition overlay
 

@@ -60,17 +60,22 @@ describe('SalesList Integration', () => {
     vi.clearAllMocks()
   })
 
-  it('should render sales list with proper grid layout', () => {
+  it('should render sales list with proper responsive layout', () => {
     renderWithProviders(<SalesList sales={mockSales} />)
 
     // Check that sales are rendered
     expect(screen.getAllByText('Vintage Chair')).toHaveLength(1)
     expect(screen.getByText('Power Tools')).toBeInTheDocument()
     
-    // Check grid container exists
+    // Check container exists with responsive layout classes
     const gridContainer = screen.getByTestId('sales-list')
     expect(gridContainer).toBeInTheDocument()
-    expect(gridContainer).toHaveClass('grid')
+    // Mobile: flex flex-col, Desktop: md:grid
+    expect(gridContainer).toHaveClass('flex')
+    expect(gridContainer).toHaveClass('flex-col')
+    expect(gridContainer).toHaveClass('md:grid')
+    expect(gridContainer).toHaveClass('md:grid-cols-2')
+    expect(gridContainer).toHaveClass('lg:grid-cols-3')
   })
 
   it('should handle empty sales list', () => {

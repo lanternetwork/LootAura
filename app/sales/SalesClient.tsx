@@ -724,7 +724,7 @@ export default function SalesClient({
     
     // Snap to nearest state based on current height
     const collapsedThreshold = 100
-    const midThreshold = windowHeight * 0.35
+    const _midThreshold = windowHeight * 0.35
     const expandedThreshold = windowHeight * 0.65
     
     if (currentHeightPx < collapsedThreshold) {

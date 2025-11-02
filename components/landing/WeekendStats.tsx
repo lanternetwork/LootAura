@@ -181,15 +181,7 @@ export function WeekendStats() {
         }
         const weekData = await weekRes.json()
         const weekSales: Sale[] = weekData.data || []
-        
-        // Filter out weekend sales - "New this week" should only count weekday sales
-        // Weekend sales are already counted in "Active sales"
-        const weekendDates = new Set([weekendPreset.start, weekendPreset.end])
-        const weekdaySales = weekSales.filter(sale => {
-          const saleDate = sale.date_start || sale.date_end
-          return saleDate && !weekendDates.has(saleDate)
-        })
-        const weekCount = weekdaySales.length
+        const weekCount = weekSales.length
         console.log('[WeekendStats] Weekly sales response:', {
           ok: weekRes.ok,
           count: weekCount,

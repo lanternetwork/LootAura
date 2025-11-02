@@ -643,14 +643,20 @@ export default function SalesClient({
 
   const mapZoom = mapView?.zoom || 10
 
-  // Mobile drawer toggle
-  const toggleMobileDrawer = useCallback(() => {
+  // Mobile drawer toggle - no longer needed, sales list always visible on mobile
+  // Keeping state for potential future use but not using it currently
+  const _toggleMobileDrawer = useCallback(() => {
     setIsMobileDrawerOpen(prev => !prev)
   }, [])
 
   // Constants for layout calculations
   const FILTERS_HEIGHT = 56 // px - filters bar height
   const MAIN_CONTENT_HEIGHT = `calc(100vh - ${FILTERS_HEIGHT}px)`
+
+  // Mobile filter button handler
+  const handleMobileFilterClick = useCallback(() => {
+    console.log('[MOBILE_FILTER] Filter button clicked - will open sheet')
+  }, [])
 
   return (
     <div className="flex flex-col h-screen">
@@ -671,15 +677,16 @@ export default function SalesClient({
         zipInputTestId="zip-input"
         filtersCenterTestId="filters-center"
         filtersMoreTestId="filters-more"
+        onMobileFilterClick={handleMobileFilterClick}
       />
 
       {/* Main Content - Responsive Layout */}
       <div 
-        className="grid grid-cols-[minmax(0,1fr)_628px] lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] max-lg:grid-cols-1 gap-0 min-h-0 min-w-0 overflow-hidden"
+        className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_628px] lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] gap-0 min-h-0 min-w-0 overflow-hidden"
         style={{ height: MAIN_CONTENT_HEIGHT }}
       >
         {/* Map - Left Side (Dominant) */}
-        <div className="relative min-h-0 min-w-0 bg-gray-100 max-lg:h-[60vh] max-md:h-[70vh]" style={{ height: '100%' }}>
+        <div className="relative min-h-0 min-w-0 bg-gray-100 md:h-full min-h-[50vh] md:min-h-0" style={{ height: '100%' }}>
           {/* Mobile Toggle Button */}
           <button
             onClick={toggleMobileDrawer}
@@ -719,7 +726,7 @@ export default function SalesClient({
           </div>
 
         {/* Sales List - Right Panel */}
-        <div className="bg-white border-l border-gray-200 flex flex-col min-h-0 min-w-0 max-lg:h-[40vh] max-md:h-[30vh]">
+        <div className="bg-white border-l border-gray-200 flex flex-col min-h-0 min-w-0 md:h-full overflow-y-auto">
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">

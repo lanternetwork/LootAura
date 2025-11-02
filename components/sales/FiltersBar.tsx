@@ -31,6 +31,9 @@ type FiltersBarProps = {
   zipInputTestId?: string
   filtersCenterTestId?: string
   filtersMoreTestId?: string
+  
+  // Mobile filter button callback
+  onMobileFilterClick?: () => void
 }
 
 // Category data with priority for overflow management
@@ -177,7 +180,8 @@ export default function FiltersBar({
   isLoading = false,
   zipInputTestId = "zip-input",
   filtersCenterTestId = "filters-center",
-  filtersMoreTestId = "filters-more"
+  filtersMoreTestId = "filters-more",
+  onMobileFilterClick
 }: FiltersBarProps) {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [showOverflowMenu, setShowOverflowMenu] = useState(false)

@@ -165,8 +165,8 @@ export function MapPreviewSection() {
           return
         }
 
-        // Calculate default bounds for preview (25km radius)
-        const radiusKm = 25
+        // Calculate default bounds for preview (10 mile radius = ~16.09 km)
+        const radiusKm = 16.09 // 10 miles in kilometers
         const latRange = radiusKm / 111.0
         const lngRange = radiusKm / (111.0 * Math.cos(finalLat * Math.PI / 180))
         
@@ -177,10 +177,10 @@ export function MapPreviewSection() {
           north: finalLat + latRange
         }
 
-        // Set map view
+        // Set map view - zoom level 10 shows approximately 10-mile radius
         setMapView({
           center: { lat: finalLat, lng: finalLng },
-          zoom: 11,
+          zoom: 10,
           bounds
         })
 

@@ -12,7 +12,6 @@ describe('resolveDatePreset', () => {
     global.Date = originalDate
   })
 
-describe('resolveDatePreset', () => {
   describe('with fixed dates for testing', () => {
     it('should resolve today correctly', () => {
       const fixedDate = new Date('2025-10-10T12:00:00Z') // Friday

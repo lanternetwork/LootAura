@@ -410,14 +410,12 @@ export default function SalesClient({
         console.log('[ZIP] New map view:', newView)
         
         // Use fitBounds to ensure exactly 10-mile radius is visible
-        // Set bounds immediately after setting mapView with no animation for initial load
+        // Set bounds immediately - map will apply when loaded (no animation)
+        setPendingBounds(calculatedBounds)
+        // Clear after a longer delay to ensure map has time to apply bounds
         setTimeout(() => {
-          setPendingBounds(calculatedBounds)
-          // After map fits to bounds, allow normal interactions
-          setTimeout(() => {
-            setPendingBounds(null)
-          }, 100) // Clear very quickly to prevent zoom animation
-        }, 50) // Small delay to ensure mapView state is set first
+          setPendingBounds(null)
+        }, 500) // Give map time to apply bounds before clearing
         
         return newView
       }
@@ -432,11 +430,12 @@ export default function SalesClient({
       console.log('[ZIP] New map view:', newView)
       
       // Use fitBounds to ensure exactly 10-mile radius is visible
-      // Clear quickly to prevent animation on update
+      // Set bounds - map will apply when ready (no animation)
       setPendingBounds(calculatedBounds)
+      // Clear after delay to ensure map applies bounds
       setTimeout(() => {
         setPendingBounds(null)
-      }, 100) // Clear quickly after fitBounds applies
+      }, 500) // Give map time to apply bounds before clearing
       
       return newView
     })
@@ -684,9 +683,7 @@ export default function SalesClient({
           </button>
           
           <div className="w-full h-full">
-            {!mapView && zipNeedsResolution ? (
-              null // Don't show anything while ZIP is being resolved
-            ) : mapView ? (
+            {mapView ? (
               <SimpleMap
                 center={mapCenter}
                 zoom={mapZoom}

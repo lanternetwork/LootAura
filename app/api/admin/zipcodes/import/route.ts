@@ -3,8 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createReadStream, existsSync } from 'fs'
 import { createInterface } from 'readline'
 import { resolve, normalize, relative } from 'path'
-import { ENV_SERVER } from '@/lib/env'
-import { ENV_SERVER } from '@/lib/env'
+import { ENV_PUBLIC, ENV_SERVER } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes for large imports

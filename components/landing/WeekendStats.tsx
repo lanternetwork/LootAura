@@ -113,6 +113,9 @@ export function WeekendStats() {
           setLoading(false)
           return
         }
+        
+        // Set limit to match map behavior (200 is max)
+        params.set('limit', '200')
 
         // Get this weekend's date range
         const now = new Date()

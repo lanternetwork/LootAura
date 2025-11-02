@@ -65,9 +65,10 @@ async function generateHardcodedList(limit: number = 500, outputFile?: string) {
     
     // Transform to hardcoded format
     // Type assertion needed because data type is inferred as never during build
-    const typedData = (data || []) as Array<{ zip: string; city: string; state: string; lat: number; lng: number }>
+    // Use ZipCode type which has nullable fields matching the database
+    const typedData = (data || []) as ZipCode[]
     const hardcoded: HardcodedZip[] = typedData
-      .filter((zip): zip is ZipCode => 
+      .filter((zip): zip is ZipCode & { city: string; state: string } => 
         zip.zip != null && 
         zip.city != null && 
         zip.state != null &&
@@ -78,8 +79,8 @@ async function generateHardcodedList(limit: number = 500, outputFile?: string) {
         zip: zip.zip,
         lat: zip.lat,
         lng: zip.lng,
-        city: zip.city!,
-        state: zip.state!
+        city: zip.city,
+        state: zip.state
       }))
     
     // Group by city/state for better organization

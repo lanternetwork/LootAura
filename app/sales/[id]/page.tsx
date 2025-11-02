@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
-import { getSaleById, type SaleWithOwnerInfo } from '@/lib/data'
+import { getSaleById } from '@/lib/data'
 import SaleDetailClient from './SaleDetailClient'
 import { createSaleMetadata } from '@/lib/metadata'
 

@@ -88,8 +88,25 @@ describe('Sale Detail API - Owner Stats', () => {
   it('should return default stats when owner_stats is missing', async () => {
     // Override mock for this test to return null for profile and stats
     mockSupabaseClient.from.mockImplementation((table: string) => {
-      if (table === 'profiles_v2' || table === 'owner_stats') {
-        return createMockFrom(table, undefined, null, null)
+      if (table === 'profiles_v2') {
+        const chain: any = {}
+        chain.select = vi.fn(() => chain)
+        chain.eq = vi.fn(() => chain)
+        chain.maybeSingle = vi.fn().mockResolvedValue({
+          data: null,
+          error: null,
+        })
+        return chain
+      }
+      if (table === 'owner_stats') {
+        const chain: any = {}
+        chain.select = vi.fn(() => chain)
+        chain.eq = vi.fn(() => chain)
+        chain.maybeSingle = vi.fn().mockResolvedValue({
+          data: null,
+          error: null,
+        })
+        return chain
       }
       return createMockFrom(table)
     })

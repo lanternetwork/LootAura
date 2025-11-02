@@ -19,7 +19,9 @@ const DEFAULT_CSV_PATH = "C:\\Users\\jw831\\Downloads\\zips\\georef-united-state
 export default function ZipCodeImport() {
   const [status, setStatus] = useState<ImportStatus>({ status: 'idle' })
   const [filePath, setFilePath] = useState(DEFAULT_CSV_PATH)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isImporting, setIsImporting] = useState(false)
+  const [useFileUpload, setUseFileUpload] = useState(true)
 
   const startImport = async () => {
     if (isImporting) return
@@ -36,15 +38,29 @@ export default function ZipCodeImport() {
     })
 
     try {
-      const response = await fetch('/api/admin/zipcodes/import', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filePath: filePath
+      let response: Response
+
+      if (useFileUpload && selectedFile) {
+        // Upload file via FormData
+        const formData = new FormData()
+        formData.append('file', selectedFile)
+
+        response = await fetch('/api/admin/zipcodes/import', {
+          method: 'POST',
+          body: formData
         })
-      })
+      } else {
+        // Use server-side file path (for local development only)
+        response = await fetch('/api/admin/zipcodes/import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            filePath: filePath
+          })
+        })
+      }
 
       const data = await response.json()
 
@@ -97,33 +113,83 @@ export default function ZipCodeImport() {
       <h3 className="text-lg font-semibold mb-4">ZIP Code Import</h3>
       
       <div className="space-y-4">
-        {/* File Path Input */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            CSV File Path (Server-side)
+        {/* Mode Toggle */}
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              checked={useFileUpload}
+              onChange={() => setUseFileUpload(true)}
+              disabled={isImporting}
+              className="cursor-pointer"
+            />
+            <span className="text-sm font-medium">Upload File</span>
           </label>
-          <input
-            type="text"
-            value={filePath}
-            onChange={(e) => setFilePath(e.target.value)}
-            disabled={isImporting}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            placeholder="C:\\path\\to\\georef-united-states-of-america-zc-point.csv"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Path must be accessible from the server. Default uses the file you provided.
-          </p>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              checked={!useFileUpload}
+              onChange={() => setUseFileUpload(false)}
+              disabled={isImporting}
+              className="cursor-pointer"
+            />
+            <span className="text-sm font-medium">Server Path (Local Dev Only)</span>
+          </label>
         </div>
+
+        {/* File Upload */}
+        {useFileUpload && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              CSV File
+            </label>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+              disabled={isImporting}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            />
+            {selectedFile && (
+              <p className="mt-1 text-xs text-gray-600">
+                Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+              </p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Upload a semicolon-delimited CSV file with ZIP code data.
+            </p>
+          </div>
+        )}
+
+        {/* File Path Input (for local development) */}
+        {!useFileUpload && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              CSV File Path (Server-side)
+            </label>
+            <input
+              type="text"
+              value={filePath}
+              onChange={(e) => setFilePath(e.target.value)}
+              disabled={isImporting}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              placeholder="C:\\path\\to\\georef-united-states-of-america-zc-point.csv"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Path must be accessible from the server. Only works in local development.
+            </p>
+          </div>
+        )}
 
         {/* Import Button */}
         <button
           onClick={startImport}
-          disabled={isImporting || !filePath}
+          disabled={isImporting || (useFileUpload ? !selectedFile : !filePath)}
           className={`px-4 py-2 rounded-md font-medium ${
             isImporting
               ? 'bg-gray-400 cursor-not-allowed'
               : 'bg-blue-600 hover:bg-blue-700'
-          } text-white`}
+          } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           {isImporting ? 'Importing...' : 'Start Import'}
         </button>

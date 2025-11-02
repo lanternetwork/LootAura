@@ -199,6 +199,76 @@ async function insertBatch(batch: ZipCodeRow[]) {
   }
 }
 
+// Import from uploaded file content
+async function importFromContent(fileContent: string) {
+  const lines = fileContent.split(/\r?\n/).filter(line => line.trim() !== '')
+  
+  if (lines.length === 0) {
+    throw new Error('File is empty')
+  }
+  
+  let header: string[] | null = null
+  let rowCount = 0
+  let validCount = 0
+  let skippedCount = 0
+  let batch: ZipCodeRow[] = []
+  const BATCH_SIZE = 1000
+  
+  for (const line of lines) {
+    const columns = parseCSVLine(line)
+    
+    if (!header) {
+      header = columns
+      continue
+    }
+    
+    rowCount++
+    
+    const row: Record<string, string> = {}
+    header.forEach((col, idx) => {
+      row[col] = columns[idx] || ''
+    })
+    
+    const rawZip = row['Zip Code']
+    const city = row['Official USPS city name'] || null
+    const state = row['Official USPS State Code'] || null
+    const geoPoint = row['Geo Point'] || ''
+    
+    const zip = normalizeZip(rawZip)
+    if (!zip) {
+      skippedCount++
+      continue
+    }
+    
+    const coords = parseGeoPoint(geoPoint)
+    if (!coords) {
+      skippedCount++
+      continue
+    }
+    
+    batch.push({
+      zip,
+      city: city || null,
+      state: state || null,
+      lat: coords.lat,
+      lng: coords.lng
+    })
+    
+    validCount++
+    
+    if (batch.length >= BATCH_SIZE) {
+      await insertBatch(batch)
+      batch = []
+    }
+  }
+  
+  if (batch.length > 0) {
+    await insertBatch(batch)
+  }
+  
+  return { rowCount, validCount, skippedCount }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Check authentication
@@ -208,20 +278,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const body = await request.json()
-    const { filePath } = body
+    // Check for file upload (FormData) or file content (JSON)
+    const contentType = request.headers.get('content-type') || ''
     
-    if (!filePath) {
-      return NextResponse.json({ error: 'filePath is required' }, { status: 400 })
+    // Try FormData first if content-type suggests it or if it's not JSON
+    if (contentType.includes('multipart/form-data') || (!contentType.includes('application/json') && contentType !== '')) {
+      try {
+        const formData = await request.formData()
+        const file = formData.get('file') as File | null
+        
+        if (file) {
+          const fileContent = await file.text()
+          const result = await importFromContent(fileContent)
+          
+          return NextResponse.json({
+            success: true,
+            ...result
+          })
+        }
+        // No file in FormData, fall through to JSON
+      } catch {
+        // Not FormData or parse failed, continue to JSON parsing
+      }
     }
     
-    // Import ZIP codes
-    const result = await importFromPath(filePath)
-    
-    return NextResponse.json({
-      success: true,
-      ...result
-    })
+    // Handle JSON body (file content or file path)
+    const body = await request.json()
+      
+      if (body.fileContent) {
+        // Direct file content
+        const result = await importFromContent(body.fileContent)
+        
+        return NextResponse.json({
+          success: true,
+          ...result
+        })
+      } else if (body.filePath) {
+        // Server-side file path (for local development)
+        const result = await importFromPath(body.filePath)
+        
+        return NextResponse.json({
+          success: true,
+          ...result
+        })
+      } else {
+        return NextResponse.json({ error: 'file, fileContent, or filePath is required' }, { status: 400 })
+      }
+    }
     
   } catch (error: any) {
     console.error('[ZIP_IMPORT] Error:', error)

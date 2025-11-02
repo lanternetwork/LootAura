@@ -1,10 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import SalesList from '@/components/SalesList'
 import { makeSales } from '../_helpers/factories'
 
 // Mock SaleCard to simplify test
-import { vi } from 'vitest'
 vi.mock('@/components/SaleCard', () => ({
   __esModule: true,
   default: function MockSaleCard({ sale }: { sale: any }) {

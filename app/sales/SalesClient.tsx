@@ -694,7 +694,7 @@ export default function SalesClient({
                 }}
                 onViewportChange={handleViewportChange}
               />
-            )}
+            ) : null}
             </div>
           </div>
 

@@ -21,6 +21,7 @@ const SaleInputSchema = z.object({
   status: z.enum(['draft', 'published', 'completed', 'cancelled']).default('draft'),
   privacy_mode: z.enum(['exact', 'block_until_24h']).default('exact'),
   is_featured: z.boolean().default(false),
+  pricing_mode: z.enum(['negotiable', 'firm', 'best_offer', 'ask']).optional(),
 })
 
 const ItemInputSchema = z.object({
@@ -256,7 +257,10 @@ export async function getSaleById(id: string): Promise<SaleWithOwnerInfo | null>
     const ownerId = sale.owner_id
 
     // Fetch owner profile and stats in parallel
-    // Note: profiles_v2 view has id (references auth.users.id), so use id not user_id
+    // Note: profiles_v2 view has id (references auth.users.id directly), so use id
+    // Note: We need to check if profiles_v2 has user_id or if we need to query lootaura_v2.profiles directly
+    // Based on migration 034, profiles_v2 has: id, username, full_name, avatar_url, home_zip, preferences, created_at, updated_at
+    // The id in profiles_v2 is the same as auth.users.id, so we can query by id
     const [profileRes, statsRes] = await Promise.all([
       supabase
         .from('profiles_v2')
@@ -310,6 +314,7 @@ export async function createSale(input: SaleInput): Promise<Sale> {
       .insert({
         owner_id: user.id,
         ...validatedInput,
+        pricing_mode: validatedInput.pricing_mode || 'negotiable',
       })
       .select()
       .single()
@@ -339,7 +344,10 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
 
     const { data, error } = await supabase
       .from('sales')
-      .update(validatedInput)
+      .update({
+        ...validatedInput,
+        pricing_mode: validatedInput.pricing_mode || 'negotiable',
+      })
       .eq('id', id)
       .eq('owner_id', user.id) // Ensure user owns the sale
       .select()

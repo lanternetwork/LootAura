@@ -736,7 +736,7 @@ async function postHandler(request: NextRequest) {
     
     const body = await request.json()
     
-    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images } = body
+    const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images, pricing_mode } = body
 
     // Validate optional cover image URL
     if (cover_image_url && !isAllowedImageUrl(cover_image_url)) {
@@ -779,6 +779,7 @@ async function postHandler(request: NextRequest) {
         time_end: time_end ?? null,
         cover_image_url: cover_image_url || null,
         images: images || [],
+        pricing_mode: pricing_mode || 'negotiable',
         status: 'published',
         owner_id: user!.id
       }
@@ -801,6 +802,7 @@ async function postHandler(request: NextRequest) {
         time_end,
         cover_image_url: cover_image_url || null,
         images: images || [],
+        pricing_mode: pricing_mode || 'negotiable',
         status: 'published',
         owner_id: user!.id // Server-side binding - never trust client
       })

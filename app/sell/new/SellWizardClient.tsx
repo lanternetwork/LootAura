@@ -55,6 +55,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     time_end: initialData?.time_end || '',
     price: initialData?.price,
     tags: initialData?.tags || [],
+    pricing_mode: initialData?.pricing_mode || 'negotiable',
     status: initialData?.status || 'draft'
   })
   const [photos, setPhotos] = useState<string[]>([])
@@ -521,6 +522,25 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Pricing Policy
+        </label>
+        <select
+          value={formData.pricing_mode || 'negotiable'}
+          onChange={(e) => onChange('pricing_mode', e.target.value)}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="negotiable">Prices negotiable</option>
+          <option value="firm">Prices as marked / Firm</option>
+          <option value="best_offer">Best offer</option>
+          <option value="ask">Prices not set / Ask seller</option>
+        </select>
+        <p className="mt-1 text-xs text-gray-500">
+          Let buyers know your pricing expectations
+        </p>
       </div>
 
       <div>

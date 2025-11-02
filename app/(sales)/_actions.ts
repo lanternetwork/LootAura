@@ -19,6 +19,7 @@ const SaleInputSchema = z.object({
   zip: z.string().optional(),
   categories: z.array(z.string()).optional(),
   cover_image_url: z.string().url().optional(),
+  pricing_mode: z.enum(['negotiable', 'firm', 'best_offer', 'ask']).optional(),
 })
 
 const ItemInputSchema = z.object({
@@ -74,6 +75,7 @@ export async function createSale(input: SaleInput): Promise<ActionResult> {
         state: validatedInput.state,
         zip_code: validatedInput.zip,
         tags: validatedInput.categories,
+        pricing_mode: validatedInput.pricing_mode || 'negotiable',
         status: 'draft',
         privacy_mode: 'exact',
         is_featured: false,
@@ -130,6 +132,7 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
         state: validatedInput.state,
         zip_code: validatedInput.zip,
         tags: validatedInput.categories,
+        pricing_mode: validatedInput.pricing_mode || 'negotiable',
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)

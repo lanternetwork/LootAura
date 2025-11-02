@@ -168,6 +168,21 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
               <div className="space-y-4">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Date & Time</h3>
+                  {sale.pricing_mode && sale.pricing_mode !== 'negotiable' && (
+                    <div className="mb-3">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                        sale.pricing_mode === 'firm' 
+                          ? 'bg-green-100 text-green-800'
+                          : sale.pricing_mode === 'best_offer'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {sale.pricing_mode === 'firm' && 'Prices as marked'}
+                        {sale.pricing_mode === 'best_offer' && 'Best offer'}
+                        {sale.pricing_mode === 'ask' && 'Ask about pricing'}
+                      </span>
+                    </div>
+                  )}
                   <div className="space-y-2 pl-0">
                     <div className="flex items-center">
                       <svg className="w-5 h-5 mr-3 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -298,7 +313,15 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
               <li>• Bring cash — many sales are cash only</li>
               <li>• Arrive early for the best selection</li>
               <li>• Check items before purchasing</li>
-              <li>• Negotiate politely — many prices are flexible</li>
+              {sale.pricing_mode === 'firm' ? (
+                <li>• Prices are as marked</li>
+              ) : sale.pricing_mode === 'best_offer' ? (
+                <li>• Make your best offer — seller is accepting offers</li>
+              ) : sale.pricing_mode === 'ask' ? (
+                <li>• Ask seller about pricing</li>
+              ) : (
+                <li>• Negotiate politely — prices may be flexible</li>
+              )}
             </ul>
           </div>
         </div>

@@ -91,7 +91,12 @@ export default function ZipCodeImport() {
       }
 
       if (!response.ok) {
-        throw new Error(data.error || `HTTP ${response.status}: Import failed`)
+        // Provide more helpful error messages
+        if (response.status === 401) {
+          const errorMsg = data.message || data.error || 'You must be logged in to import ZIP codes. Please sign in and try again.'
+          throw new Error(errorMsg)
+        }
+        throw new Error(data.message || data.error || `HTTP ${response.status}: Import failed`)
       }
 
       const endTime = Date.now()

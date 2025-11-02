@@ -325,12 +325,30 @@ export default function SalesClient({
     }
 
     // Update map view state
-    setMapView(prev => ({
-      ...prev,
-      center,
-      zoom,
-      bounds
-    }))
+    setMapView(prev => {
+      if (!prev) {
+        // If mapView is null, create a new view with the provided center
+        const radiusKm = 16.09 // 10 miles
+        const latRange = radiusKm / 111.0
+        const lngRange = radiusKm / (111.0 * Math.cos(center.lat * Math.PI / 180))
+        return {
+          center,
+          bounds: {
+            west: center.lng - lngRange,
+            south: center.lat - latRange,
+            east: center.lng + lngRange,
+            north: center.lat + latRange
+          },
+          zoom
+        }
+      }
+      return {
+        ...prev,
+        center,
+        zoom,
+        bounds
+      }
+    })
 
     // Clear existing timer
     if (debounceTimerRef.current) {
@@ -462,10 +480,25 @@ export default function SalesClient({
       
       // Change map zoom instead of triggering API call
       const newZoom = distanceToZoom(newFilters.distance)
-      setMapView(prev => ({
-        ...prev,
-        zoom: newZoom
-      }))
+      setMapView(prev => {
+        if (!prev) {
+          // If mapView is null, create a default view
+          return {
+            center: { lat: 39.8283, lng: -98.5795 },
+            bounds: {
+              west: -98.5795 - 1.0,
+              south: 39.8283 - 1.0,
+              east: -98.5795 + 1.0,
+              north: 39.8283 + 1.0
+            },
+            zoom: newZoom
+          }
+        }
+        return {
+          ...prev,
+          zoom: newZoom
+        }
+      })
       
       // No direct API call - let viewport change trigger the fetch
       return

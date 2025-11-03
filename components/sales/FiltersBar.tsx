@@ -267,7 +267,7 @@ export default function FiltersBar({
         </div>
 
         {/* Center: category chips (fluid) */}
-        <div ref={centerRef} data-testid={filtersCenterTestId} className="min-w-0 overflow-hidden">
+        <div ref={centerRef} data-testid={filtersCenterTestId} className="min-w-0 overflow-hidden pl-2">
           <ul ref={chipsRailRef} className="flex items-center gap-2">
             {visible.map((category) => {
               const isSelected = categories.includes(category.id)

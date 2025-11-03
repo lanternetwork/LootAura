@@ -165,50 +165,8 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
 
             {/* Sale Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Date & Time</h3>
-                  {sale.pricing_mode && sale.pricing_mode !== 'negotiable' && (
-                    <div className="mb-3">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                        sale.pricing_mode === 'firm' 
-                          ? 'bg-green-100 text-green-800'
-                          : sale.pricing_mode === 'best_offer'
-                          ? 'bg-purple-100 text-purple-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {sale.pricing_mode === 'firm' && 'Prices as marked'}
-                        {sale.pricing_mode === 'best_offer' && 'Best offer'}
-                        {sale.pricing_mode === 'ask' && 'Ask about pricing'}
-                      </span>
-                    </div>
-                  )}
-                  <div className="space-y-4">
-                    <div className="flex gap-3">
-                      <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <div>
-                        <div className="font-medium text-gray-900">{formatDate(sale.date_start)}</div>
-                        <div className="text-sm text-gray-600 mt-1">{formatTime(sale.time_start)}</div>
-                      </div>
-                    </div>
-                    
-                    {sale.date_end && sale.time_end && (
-                      <div className="flex gap-3">
-                        <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div>
-                          <div className="font-medium text-gray-900">Ends: {formatDate(sale.date_end)}</div>
-                          <div className="text-sm text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-              </div>
+              {/* Left column intentionally blank while we verify card spacing */}
+              <div />
 
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Categories</h3>

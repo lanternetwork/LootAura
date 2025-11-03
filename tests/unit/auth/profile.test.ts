@@ -295,7 +295,8 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.profile).toEqual(mockProfile)
+      expect(data.ok).toBe(true)
+      expect(data.data).toEqual(mockProfile)
     })
 
     it('should return 404 when profile not found', async () => {

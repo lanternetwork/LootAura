@@ -6,6 +6,7 @@ import Link from 'next/link'
 
 type IdentityCardProps = {
   profile: {
+    id?: string | null
     displayName?: string | null
     username?: string | null
     avatarUrl?: string | null

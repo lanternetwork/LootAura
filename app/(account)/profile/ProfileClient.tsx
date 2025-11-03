@@ -240,6 +240,7 @@ export default function ProfileClient() {
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <IdentityCard
         profile={{
+          id: profile.id,
           displayName: profile.display_name,
           username: profile.username,
           avatarUrl: profile.avatar_url,

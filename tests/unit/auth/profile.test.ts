@@ -63,19 +63,35 @@ describe('Profile Management', () => {
         error: null,
       })
 
-      // Mock profile doesn't exist
-      const mockFrom = vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
-          })),
-        })),
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn().mockResolvedValueOnce({ data: mockNewProfile, error: null }),
-          })),
-        })),
-      }))
+      // Mock profile doesn't exist, then insert, then fetch from profiles_v2
+      let callCount = 0
+      const mockFrom = vi.fn(() => {
+        callCount++
+        if (callCount === 1) {
+          // First call: check if profile exists
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
+              })),
+            })),
+          }
+        } else if (callCount === 2) {
+          // Second call: insert into profiles table
+          return {
+            insert: vi.fn().mockResolvedValueOnce({ error: null }),
+          }
+        } else {
+          // Third call: fetch from profiles_v2
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValueOnce({ data: mockNewProfile, error: null }),
+              })),
+            })),
+          }
+        }
+      })
       
       mockSupabaseClient.from = mockFrom
 
@@ -88,8 +104,9 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
+      expect(data.ok).toBe(true)
       expect(data.created).toBe(true)
-      expect(data.profile).toEqual(mockNewProfile)
+      expect(data.data).toEqual(mockNewProfile)
       expect(data.message).toBe('Profile created successfully')
     })
 
@@ -135,8 +152,9 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
+      expect(data.ok).toBe(true)
       expect(data.created).toBe(false)
-      expect(data.profile).toEqual(mockExistingProfile)
+      expect(data.data).toEqual(mockExistingProfile)
       expect(data.message).toBe('Profile already exists')
     })
 
@@ -154,6 +172,7 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(401)
+      expect(data.ok).toBe(false)
       expect(data.error).toBe('Unauthorized')
     })
 
@@ -171,21 +190,27 @@ describe('Profile Management', () => {
       })
 
       // Mock profile doesn't exist but creation fails
-      const mockFrom = vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
-          })),
-        })),
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn().mockResolvedValueOnce({ 
-              data: null, 
+      let callCount = 0
+      const mockFrom = vi.fn(() => {
+        callCount++
+        if (callCount === 1) {
+          // First call: check if profile exists
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
+              })),
+            })),
+          }
+        } else {
+          // Second call: insert fails
+          return {
+            insert: vi.fn().mockResolvedValueOnce({ 
               error: { message: 'Database error' } 
             }),
-          })),
-        })),
-      }))
+          }
+        }
+      })
       
       mockSupabaseClient.from = mockFrom
 
@@ -198,6 +223,7 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(500)
+      expect(data.ok).toBe(false)
       expect(data.error).toBe('Failed to create profile')
       
       consoleSpy.mockRestore()
@@ -217,21 +243,37 @@ describe('Profile Management', () => {
         error: null,
       })
 
-      const mockFrom = vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
-          })),
-        })),
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn().mockResolvedValueOnce({ 
-              data: { id: 'user123' }, 
-              error: null 
-            }),
-          })),
-        })),
-      }))
+      let callCount = 0
+      const mockFrom = vi.fn(() => {
+        callCount++
+        if (callCount === 1) {
+          // First call: check if profile exists
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
+              })),
+            })),
+          }
+        } else if (callCount === 2) {
+          // Second call: insert into profiles table
+          return {
+            insert: vi.fn().mockResolvedValueOnce({ error: null }),
+          }
+        } else {
+          // Third call: fetch from profiles_v2
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValueOnce({ 
+                  data: { id: 'user123' }, 
+                  error: null 
+                }),
+              })),
+            })),
+          }
+        }
+      })
       
       mockSupabaseClient.from = mockFrom
 
@@ -295,7 +337,8 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.profile).toEqual(mockProfile)
+      expect(data.ok).toBe(true)
+      expect(data.data).toEqual(mockProfile)
     })
 
     it('should return 404 when profile not found', async () => {
@@ -331,6 +374,7 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(404)
+      expect(data.ok).toBe(false)
       expect(data.error).toBe('Profile not found')
     })
   })

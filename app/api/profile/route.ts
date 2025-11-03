@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ProfileUpdateSchema } from '@/lib/validators/profile'
 import { isAllowedAvatarUrl } from '@/lib/cloudinary'
 
-export async function GET(_req?: NextRequest) {
+export async function GET(_req: NextRequest) {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
@@ -70,6 +70,10 @@ export async function POST(_request: NextRequest) {
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   // Check existing
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('🔄 [AUTH FLOW] profile-creation → start: start', { userId: user.id })
+  }
+
   const { data: existing, error: fetchError } = await supabase
     .from('profiles_v2')
     .select('id, display_name, avatar_url, home_zip, preferences')
@@ -77,6 +81,9 @@ export async function POST(_request: NextRequest) {
     .maybeSingle()
   if (fetchError) return NextResponse.json({ error: 'Failed to check existing profile' }, { status: 500 })
   if (existing) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('✅ [AUTH FLOW] profile-creation → exists: success', { userId: user.id })
+    }
     return NextResponse.json({ profile: existing, created: false, message: 'Profile already exists' })
   }
 
@@ -93,5 +100,8 @@ export async function POST(_request: NextRequest) {
     .select('id, display_name, avatar_url, home_zip, preferences')
     .single()
   if (createError) return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 })
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('✅ [AUTH FLOW] profile-creation → created: success', { userId: user.id, profileId: inserted.id })
+  }
   return NextResponse.json({ profile: inserted, created: true, message: 'Profile created successfully' })
 }

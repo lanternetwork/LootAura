@@ -106,7 +106,7 @@ export default function ZipInput({
 
   return (
     <div className={className}>
-      <form onSubmit={handleSubmit} className="flex items-center gap-2">
+      <form onSubmit={handleSubmit} className="flex gap-2">
         <input
           type="text"
           value={zip}
@@ -126,7 +126,7 @@ export default function ZipInput({
         <button
           type="submit"
           disabled={loading || !zip || (zip.length < 5)}
-          className={`px-3 py-1 rounded-md min-h-[30px] h-[30px] w-[38px] text-sm flex items-center justify-center appearance-none disabled:cursor-not-allowed ${
+          className={`px-4 py-2 rounded-md min-h-[40px] w-[40px] flex items-center justify-center appearance-none disabled:cursor-not-allowed ${
             invalidFlash 
               ? 'border border-red-600 text-red-600 bg-transparent hover:bg-[rgba(220,38,38,0.06)]' 
               : 'btn-accent'

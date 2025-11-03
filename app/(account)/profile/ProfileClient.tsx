@@ -47,17 +47,17 @@ export default function ProfileClient() {
     <div className="max-w-3xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-semibold mb-6">Profile</h1>
       <div className="flex gap-2 mb-6">
-        <button className={`px-3 py-1.5 rounded border ${tab==='account' ? 'btn-accent' : ''}`} onClick={() => setTab('account')}>Account</button>
-        <button className={`px-3 py-1.5 rounded border ${tab==='avatar' ? 'btn-accent' : ''}`} onClick={() => setTab('avatar')}>Avatar</button>
-        <button className={`px-3 py-1.5 rounded border ${tab==='preferences' ? 'btn-accent' : ''}`} onClick={() => setTab('preferences')}>Preferences</button>
+        <button type="button" className={`px-3 py-1.5 rounded border ${tab==='account' ? 'btn-accent' : ''}`} onClick={() => setTab('account')}>Account</button>
+        <button type="button" className={`px-3 py-1.5 rounded border ${tab==='avatar' ? 'btn-accent' : ''}`} onClick={() => setTab('avatar')}>Avatar</button>
+        <button type="button" className={`px-3 py-1.5 rounded border ${tab==='preferences' ? 'btn-accent' : ''}`} onClick={() => setTab('preferences')}>Preferences</button>
       </div>
       {loading && <div className="text-neutral-600">Loading…</div>}
       {error && <div className="text-red-600">{error}</div>}
-      {!loading && !error && profile && (
+      {!loading && (
         <div className="space-y-6">
-          {tab==='account' && <AccountForm initial={profile} onUpdated={setProfile} />}
-          {tab==='avatar' && <AvatarUploader initialUrl={profile.avatar_url || undefined} onUpdated={(u) => setProfile({ ...profile, avatar_url: u })} />}
-          {tab==='preferences' && <PreferencesForm initial={profile.preferences} />}
+          {tab==='account' && profile && <AccountForm initial={profile} onUpdated={setProfile} />}
+          {tab==='avatar' && <AvatarUploader initialUrl={profile?.avatar_url || undefined} onUpdated={(u) => profile && setProfile({ ...profile, avatar_url: u })} />}
+          {tab==='preferences' && <PreferencesForm initial={profile?.preferences} />}
         </div>
       )}
     </div>

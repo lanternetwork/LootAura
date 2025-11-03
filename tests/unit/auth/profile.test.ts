@@ -79,7 +79,7 @@ describe('Profile Management', () => {
             insert: vi.fn(),
           }
         } else if (callCount === 2) {
-          // Second call: insert into profiles_v2 view
+          // Second call: insert into profiles table
           return {
             select: vi.fn(),
             insert: vi.fn(() => ({
@@ -275,7 +275,7 @@ describe('Profile Management', () => {
             insert: vi.fn(),
           }
         } else if (callCount === 2) {
-          // Second call: insert into profiles_v2 view
+          // Second call: insert into profiles table
           return {
             select: vi.fn(),
             insert: vi.fn(() => ({

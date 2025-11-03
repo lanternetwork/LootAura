@@ -174,32 +174,12 @@ export function useToggleFavorite() {
   const { data: user } = useAuth()
 
   return useMutation({
-    mutationFn: async ({ saleId, isFavorited }: { saleId: string; isFavorited: boolean }) => {
-      if (!user) {
-        throw new Error('Please sign in to save favorites')
-      }
-
-      // Always target public view, which forwards to base table via rules
-      const favoritesTable = 'favorites_v2'
-
-      if (isFavorited) {
-        const { error } = await sb
-          .from(favoritesTable)
-          .delete()
-          .eq('user_id', user.id)
-          .eq('sale_id', saleId)
-
-        if (error) {
-          throw new Error(error.message)
-        }
-      } else {
-        const { error } = await sb
-          .from(favoritesTable)
-          .insert({ user_id: user.id, sale_id: saleId })
-
-        if (error) {
-          throw new Error(error.message)
-        }
+    mutationFn: async ({ saleId }: { saleId: string; isFavorited: boolean }) => {
+      if (!user) throw new Error('Please sign in to save favorites')
+      const res = await fetch(`/api/sales/${saleId}/favorite`, { method: 'POST' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error || `Favorite toggle failed (${res.status})`)
       }
     },
     onSuccess: () => {

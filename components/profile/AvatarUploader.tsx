@@ -46,13 +46,15 @@ export function AvatarUploader({ initialUrl, onUpdated, onClose }: AvatarUploade
       }
       
       // Upload to Cloudinary
+      // IMPORTANT: Form fields must be in the same order as signed params
+      // Signed params order: eager, folder, timestamp (alphabetical)
       const form = new FormData()
       form.append('file', file)
-      form.append('timestamp', String(sig.data.timestamp))
       form.append('api_key', sig.data.api_key)
-      form.append('signature', sig.data.signature)
+      form.append('eager', sig.data.eager)
       form.append('folder', sig.data.folder)
-      if (sig.data.eager) form.append('eager', sig.data.eager)
+      form.append('timestamp', String(sig.data.timestamp))
+      form.append('signature', sig.data.signature)
       
       const cloudUrl = `https://api.cloudinary.com/v1_1/${sig.data.cloud_name}/image/upload`
       const uploadRes = await fetch(cloudUrl, { method: 'POST', body: form })

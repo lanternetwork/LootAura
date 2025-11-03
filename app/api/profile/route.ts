@@ -37,31 +37,32 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: 'Avatar host not allowed' }, { status: 400 })
   }
 
-  // Update using lootaura_v2.profiles directly (profiles_v2 is a view, may not support UPDATE)
-  const { data, error } = await sb
-    .from('profiles')
-    .update({
-      display_name: payload.display_name,
-      bio: payload.bio ?? null,
-      location_city: payload.location_city ?? null,
-      location_region: payload.location_region ?? null,
-      avatar_url: payload.avatar_url ?? null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', user.id)
-    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
-    .maybeSingle()
+  // Update using RPC function to access lootaura_v2.profiles
+  const { data, error } = await sb.rpc('update_profile_v2', {
+    p_user_id: user.id,
+    p_display_name: payload.display_name ?? null,
+    p_bio: payload.bio ?? null,
+    p_location_city: payload.location_city ?? null,
+    p_location_region: payload.location_region ?? null,
+    p_avatar_url: payload.avatar_url ?? null,
+  })
+  
+  const result = data && data.length > 0 ? data[0] : null
 
   if (error) {
     const status = error.code === '42501' ? 403 : 500
     return NextResponse.json({ ok: false, error: error.message }, { status })
   }
 
+  if (!result) {
+    return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+  }
+
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[PROFILE] update profile success')
   }
 
-  return NextResponse.json({ ok: true, data })
+  return NextResponse.json({ ok: true, data: result })
 }
 
 // Legacy handlers removed to avoid duplicate exports and name collisions

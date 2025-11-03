@@ -75,12 +75,12 @@ export async function POST(_request: NextRequest) {
     console.log('🔄 [AUTH FLOW] profile-creation → start: start', { userId: user.id })
   }
 
-  const { data: existing, error: fetchError } = await supabase
+  const { data: existing, error: checkError } = await supabase
     .from('profiles_v2')
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .eq('id', user.id)
     .maybeSingle()
-  if (fetchError) return NextResponse.json({ ok: false, error: 'Failed to check existing profile', details: fetchError.message }, { status: 500 })
+  if (checkError) return NextResponse.json({ ok: false, error: 'Failed to check existing profile', details: checkError.message }, { status: 500 })
   if (existing) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('✅ [AUTH FLOW] profile-creation → exists: success', { userId: user.id })
@@ -96,11 +96,9 @@ export async function POST(_request: NextRequest) {
     home_zip: null,
     preferences: { notifications: { email: true, push: false }, privacy: { show_email: false, show_phone: false } },
   }
-  const { data: inserted, error: createError } = await supabase
+  const { error: createError } = await supabase
     .from('profiles')
     .insert(defaultProfile)
-    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
-    .single()
   if (createError) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.error('❌ [AUTH FLOW] profile-creation → error:', createError)

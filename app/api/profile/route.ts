@@ -89,11 +89,12 @@ export async function POST(_request: NextRequest) {
   }
 
   // Insert into profiles table directly (profiles_v2 is a view, cannot insert into it)
-  const defaultProfile = {
+  // Only include base columns that exist in the table structure
+  // Use full_name instead of display_name for initial insert (display_name is computed in view)
+  const defaultProfile: Record<string, any> = {
     id: user.id,
-    display_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+    full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
     avatar_url: user.user_metadata?.avatar_url || null,
-    home_zip: null,
     preferences: { notifications: { email: true, push: false }, privacy: { show_email: false, show_phone: false } },
   }
   const { error: createError, data: insertedData } = await supabase

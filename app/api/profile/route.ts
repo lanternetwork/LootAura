@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest) {
 
   const { data, error } = await sb
     .from('profiles_v2')
-    .select('id, display_name, avatar_url, home_zip, preferences')
+    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .eq('id', user.id)
     .maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -76,7 +76,7 @@ export async function POST(_request: NextRequest) {
 
   const { data: existing, error: fetchError } = await supabase
     .from('profiles_v2')
-    .select('id, display_name, avatar_url, home_zip, preferences')
+    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .eq('id', user.id)
     .maybeSingle()
   if (fetchError) return NextResponse.json({ error: 'Failed to check existing profile' }, { status: 500 })
@@ -97,7 +97,7 @@ export async function POST(_request: NextRequest) {
   const { data: inserted, error: createError } = await supabase
     .from('profiles_v2')
     .insert(defaultProfile)
-    .select('id, display_name, avatar_url, home_zip, preferences')
+    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .single()
   if (createError) return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 })
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

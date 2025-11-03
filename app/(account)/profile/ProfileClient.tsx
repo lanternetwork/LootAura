@@ -1,38 +1,120 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { IdentityCard } from '@/components/profile/IdentityCard'
+import { AboutCard } from '@/components/profile/AboutCard'
+import { PreferredCategories } from '@/components/profile/PreferredCategories'
+import { OwnerMetrics } from '@/components/profile/OwnerMetrics'
+import { OwnerListingsTabs } from '@/components/profile/OwnerListingsTabs'
+import { PreferencesCard } from '@/components/profile/PreferencesCard'
 
 type Profile = {
   id: string
+  username?: string | null
   display_name?: string | null
   avatar_url?: string | null
-  home_zip?: string | null
-  preferences?: any
+  bio?: string | null
+  location_city?: string | null
+  location_region?: string | null
+  created_at?: string | null
+  verified?: boolean | null
+}
+
+type Listing = {
+  id: string
+  title: string
+  cover_url?: string | null
+  address?: string | null
+  status: string
+}
+
+type Metrics = {
+  views7d?: number
+  saves7d?: number
+  ctr7d?: number
+  salesFulfilled?: number
 }
 
 export default function ProfileClient() {
-  const [tab, setTab] = useState<'account' | 'avatar' | 'preferences'>('account')
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [preferredCategories, setPreferredCategories] = useState<string[]>([])
+  const [metrics, setMetrics] = useState<Metrics | null>(null)
+  const [listings, setListings] = useState<{ active: Listing[]; drafts: Listing[]; archived: Listing[] }>({
+    active: [],
+    drafts: [],
+    archived: [],
+  })
   const [error, setError] = useState<string | null>(null)
+  const [showAvatarUploader, setShowAvatarUploader] = useState(false)
 
   useEffect(() => {
     let mounted = true
     const load = async () => {
       try {
         setLoading(true)
+        // Load profile
         const profRes = await fetch('/api/profile')
-        let p = await profRes.json()
-        // If profile not found, try to create a default one
+        let p: any = null
         if (profRes.status === 404) {
           const createRes = await fetch('/api/profile', { method: 'POST' })
           p = await createRes.json()
+        } else {
+          p = await profRes.json()
         }
-        const prefs = await fetch('/api/preferences').then(r => r.json())
         if (!mounted) return
-        if (p?.profile) setProfile(p.profile)
-        // merge prefs into profile.preferences for display
-        setProfile(prev => prev ? { ...prev, preferences: prefs?.data ?? prev.preferences } : prev)
+        const profileData = p?.profile || p?.data || (p?.id ? p : null)
+        if (profileData) {
+          setProfile(profileData)
+          // Load preferred categories via API
+          try {
+            const catsRes = await fetch(`/api/public/profile?username=${encodeURIComponent(profileData.id)}`)
+            if (catsRes.ok) {
+              const catsData = await catsRes.json()
+              setPreferredCategories(catsData.preferred || [])
+            }
+          } catch (e) {
+            console.error('Failed to load categories:', e)
+          }
+        } else {
+          setProfile({ id: 'me' } as Profile)
+        }
+
+        // Load preferences
+        const prefsRes = await fetch('/api/preferences')
+        const prefs = await prefsRes.json().catch(() => ({}))
+        if (prefs?.data) {
+          setProfile((prev) => (prev ? { ...prev, preferences: prefs.data } : prev))
+        }
+
+        // Load metrics
+        try {
+          const metricsRes = await fetch('/api/profile/metrics')
+          if (metricsRes.ok) {
+            const metricsData = await metricsRes.json()
+            setMetrics(metricsData)
+          }
+        } catch (e) {
+          console.error('Failed to load metrics:', e)
+        }
+
+        // Load listings (active, drafts, archived)
+        try {
+          const [activeRes, draftsRes, archivedRes] = await Promise.all([
+            fetch('/api/profile/listings?status=active&limit=50').catch(() => null),
+            fetch('/api/profile/listings?status=draft&limit=50').catch(() => null),
+            fetch('/api/profile/listings?status=archived&limit=50').catch(() => null),
+          ])
+          const active = activeRes?.ok ? await activeRes.json().then((r: any) => r.items || []) : []
+          const drafts = draftsRes?.ok ? await draftsRes.json().then((r: any) => r.items || []) : []
+          const archived = archivedRes?.ok ? await archivedRes.json().then((r: any) => r.items || []) : []
+          setListings({ active, drafts, archived })
+        } catch (e) {
+          console.error('Failed to load listings:', e)
+        }
       } catch (e) {
         setError('Failed to load profile')
       } finally {
@@ -40,81 +122,145 @@ export default function ProfileClient() {
       }
     }
     load()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+    }
   }, [])
 
-  return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">Profile</h1>
-      <div className="flex gap-2 mb-6">
-        <button type="button" className={`px-3 py-1.5 rounded border ${tab==='account' ? 'btn-accent' : ''}`} onClick={() => setTab('account')}>Account</button>
-        <button type="button" className={`px-3 py-1.5 rounded border ${tab==='avatar' ? 'btn-accent' : ''}`} onClick={() => setTab('avatar')}>Avatar</button>
-        <button type="button" className={`px-3 py-1.5 rounded border ${tab==='preferences' ? 'btn-accent' : ''}`} onClick={() => setTab('preferences')}>Preferences</button>
+  const handleBioSave = async (bio: string) => {
+    const res = await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bio }),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      throw new Error(j?.error || 'Failed to save')
+    }
+    const j = await res.json()
+    if (j?.data) setProfile((prev) => (prev ? { ...prev, bio } : null))
+  }
+
+  const handlePreferencesSave = async (theme: string, units: string) => {
+    const res = await fetch('/api/preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme, units }),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      throw new Error(j?.error || 'Failed to save')
+    }
+  }
+
+  const handleAvatarChange = () => {
+    setShowAvatarUploader(true)
+  }
+
+  const handleViewPublic = () => {
+    if (profile?.username) {
+      router.push(`/u/${profile.username}`)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="text-neutral-600">Loading profile...</div>
       </div>
-      {loading && <div className="text-neutral-600">Loading…</div>}
-      {error && <div className="text-red-600">{error}</div>}
-      {!loading && (
-        <div className="space-y-6">
-          {tab==='account' && profile && <AccountForm initial={profile} onUpdated={setProfile} />}
-          {tab==='avatar' && <AvatarUploader initialUrl={profile?.avatar_url || undefined} onUpdated={(u) => profile && setProfile({ ...profile, avatar_url: u })} />}
-          {tab==='preferences' && <PreferencesForm initial={profile?.preferences} />}
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="text-red-600">{error}</div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        <div className="text-neutral-600">Profile not found</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+      <IdentityCard
+        displayName={profile.display_name}
+        username={profile.username || undefined}
+        avatarUrl={profile.avatar_url || undefined}
+        locationCity={profile.location_city || undefined}
+        locationRegion={profile.location_region || undefined}
+        createdAt={profile.created_at || undefined}
+        verified={profile.verified || false}
+        isOwner={true}
+        onAvatarChange={handleAvatarChange}
+        onViewPublic={handleViewPublic}
+      />
+
+      {showAvatarUploader && (
+        <div className="card">
+          <div className="card-body-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="card-title">Change Avatar</h2>
+              <button
+                type="button"
+                onClick={() => setShowAvatarUploader(false)}
+                className="text-sm text-neutral-600 hover:text-neutral-900"
+              >
+                Close
+              </button>
+            </div>
+            <AvatarUploader
+              initialUrl={profile.avatar_url || undefined}
+              onUpdated={(url) => {
+                setProfile((prev) => (prev ? { ...prev, avatar_url: url } : null))
+                setShowAvatarUploader(false)
+              }}
+            />
+          </div>
         </div>
       )}
+
+      <AboutCard bio={profile.bio || undefined} isEditable={true} onSave={handleBioSave} />
+
+      {preferredCategories.length > 0 && <PreferredCategories categories={preferredCategories} />}
+
+      {metrics && <OwnerMetrics {...metrics} loading={false} />}
+
+      <OwnerListingsTabs
+        active={listings.active}
+        drafts={listings.drafts}
+        archived={listings.archived}
+        onEdit={(id) => router.push(`/sell/edit/${id}`)}
+        onArchive={(id) => {
+          // TODO: Implement archive
+          console.log('Archive:', id)
+        }}
+        onUnarchive={(id) => {
+          // TODO: Implement unarchive
+          console.log('Unarchive:', id)
+        }}
+        onDelete={(id) => {
+          // TODO: Implement delete
+          console.log('Delete:', id)
+        }}
+      />
+
+      <PreferencesCard
+        theme={(profile as any).preferences?.theme || 'system'}
+        units={(profile as any).preferences?.units || 'imperial'}
+        onSave={handlePreferencesSave}
+      />
     </div>
   )
 }
 
-function AccountForm({ initial, onUpdated }: { initial: Profile; onUpdated: (p: Profile) => void }) {
-  const [displayName, setDisplayName] = useState(initial.display_name || '')
-  const [bio, setBio] = useState('')
-  const [city, setCity] = useState('')
-  const [region, setRegion] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErr(null)
-    setSaving(true)
-    const res = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_name: displayName, bio, location_city: city, location_region: region }) })
-    const j = await res.json()
-    setSaving(false)
-    if (!res.ok) { setErr(j?.error || 'Failed to save'); return }
-    if (j?.data) onUpdated(j.data)
-  }
-
-  return (
-    <form className="card" onSubmit={onSubmit}>
-      <div className="card-body-lg space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Display name</label>
-          <input className="w-full px-3 py-2 border rounded" value={displayName} onChange={e=>setDisplayName(e.target.value)} required maxLength={60} />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Bio</label>
-          <textarea className="w-full px-3 py-2 border rounded" value={bio} onChange={e=>setBio(e.target.value)} maxLength={500} rows={3} />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">City</label>
-            <input className="w-full px-3 py-2 border rounded" value={city} onChange={e=>setCity(e.target.value)} maxLength={80} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Region/State</label>
-            <input className="w-full px-3 py-2 border rounded" value={region} onChange={e=>setRegion(e.target.value)} maxLength={80} />
-          </div>
-        </div>
-        {err && <div className="text-red-600 text-sm">{err}</div>}
-        <div className="flex gap-2">
-          <button type="submit" className="btn-accent" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-          <button type="button" className="rounded px-4 py-2 border" onClick={()=>{ setDisplayName(initial.display_name || ''); setBio(''); setCity(''); setRegion('') }}>Reset</button>
-        </div>
-      </div>
-    </form>
-  )
-}
-
-function AvatarUploader({ initialUrl, onUpdated }: { initialUrl?: string; onUpdated: (url: string|null)=>void }) {
+function AvatarUploader({ initialUrl, onUpdated }: { initialUrl?: string; onUpdated: (url: string | null) => void }) {
   const [preview, setPreview] = useState<string | undefined>(initialUrl)
   const [uploading, setUploading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -125,7 +271,7 @@ function AvatarUploader({ initialUrl, onUpdated }: { initialUrl?: string; onUpda
     setErr(null)
     setUploading(true)
     try {
-      const sig = await fetch('/api/profile/avatar', { method: 'POST' }).then(r => r.json())
+      const sig = await fetch('/api/profile/avatar', { method: 'POST' }).then((r) => r.json())
       if (!sig?.ok) throw new Error(sig?.error || 'Failed to get signature')
       const form = new FormData()
       form.append('file', file)
@@ -140,9 +286,13 @@ function AvatarUploader({ initialUrl, onUpdated }: { initialUrl?: string; onUpda
       if (!up.ok) throw new Error(uj?.error?.message || 'Upload failed')
       setPreview(uj.secure_url)
       // persist to profile
-      const res = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_name: '', avatar_url: uj.secure_url }) })
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: uj.secure_url }),
+      })
       if (res.ok) onUpdated(uj.secure_url)
-    } catch (e:any) {
+    } catch (e: any) {
       setErr(e?.message || 'Upload failed')
     } finally {
       setUploading(false)
@@ -151,90 +301,38 @@ function AvatarUploader({ initialUrl, onUpdated }: { initialUrl?: string; onUpda
 
   const onRemove = async () => {
     setUploading(true)
-    await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_name: '', avatar_url: null }) })
+    await fetch('/api/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avatar_url: null }),
+    })
     setPreview(undefined)
     onUpdated(null)
     setUploading(false)
   }
 
   return (
-    <div className="card">
-      <div className="card-body-lg space-y-4">
-        {preview ? (
-          <div className="w-32 h-32 rounded-full" style={{ backgroundImage: `url(${preview})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-        ) : (
-          <div className="w-32 h-32 rounded-full bg-neutral-200" />
+    <div className="space-y-4">
+      {preview ? (
+        <div
+          className="w-32 h-32 rounded-full mx-auto"
+          style={{ backgroundImage: `url(${preview})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+        />
+      ) : (
+        <div className="w-32 h-32 rounded-full bg-neutral-200 mx-auto" />
+      )}
+      <div className="flex gap-2 items-center justify-center">
+        <label className="btn-accent cursor-pointer">
+          <input type="file" accept="image/*" className="hidden" onChange={onUpload} disabled={uploading} />
+          {uploading ? 'Uploading…' : 'Upload'}
+        </label>
+        {preview && (
+          <button type="button" className="rounded px-4 py-2 border" onClick={onRemove} disabled={uploading}>
+            Remove
+          </button>
         )}
-        <div className="flex gap-2 items-center">
-          <label className="btn-accent cursor-pointer">
-            <input type="file" accept="image/*" className="hidden" onChange={onUpload} />
-            {uploading ? 'Uploading…' : 'Upload'}
-          </label>
-          {preview && <button type="button" className="rounded px-4 py-2 border" onClick={onRemove} disabled={uploading}>Remove</button>}
-        </div>
-        {err && <div className="text-red-600 text-sm">{err}</div>}
       </div>
+      {err && <div className="text-red-600 text-sm text-center">{err}</div>}
     </div>
   )
 }
-
-function PreferencesForm({ initial }: { initial: any }) {
-  const [theme, setTheme] = useState<string>(initial?.theme ?? 'system')
-  const [units, setUnits] = useState<string>(initial?.units ?? 'imperial')
-  const [radius, setRadius] = useState<number>(initial?.discovery_radius_km ?? 10)
-  const [email, setEmail] = useState<boolean>(Boolean(initial?.email_opt_in))
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErr(null)
-    if (radius < 1 || radius > 50) { setErr('Radius must be 1–50'); return }
-    setSaving(true)
-    const res = await fetch('/api/preferences', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme, units, discovery_radius_km: radius, email_opt_in: email }) })
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
-      setErr(j?.error || 'Failed to save preferences')
-    }
-    setSaving(false)
-  }
-
-  return (
-    <form className="card" onSubmit={onSubmit}>
-      <div className="card-body-lg space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Theme</label>
-            <select className="w-full px-3 py-2 border rounded" value={theme} onChange={e=>setTheme(e.target.value)}>
-              <option value="system">System</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Units</label>
-            <select className="w-full px-3 py-2 border rounded" value={units} onChange={e=>setUnits(e.target.value)}>
-              <option value="imperial">Imperial</option>
-              <option value="metric">Metric</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Discovery radius (km): {radius}</label>
-          <input type="range" min={1} max={50} value={radius} onChange={e=>setRadius(Number(e.target.value))} className="w-full" />
-        </div>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={email} onChange={e=>setEmail(e.target.checked)} className="rounded border-gray-300" />
-          <span>Email opt-in</span>
-        </label>
-        {err && <div className="text-red-600 text-sm">{err}</div>}
-        <div className="flex gap-2">
-          <button type="submit" className="btn-accent" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-          <button type="button" className="rounded px-4 py-2 border" onClick={()=>{ setTheme(initial?.theme ?? 'system'); setUnits(initial?.units ?? 'imperial'); setRadius(initial?.discovery_radius_km ?? 10); setEmail(Boolean(initial?.email_opt_in)) }}>Reset</button>
-        </div>
-      </div>
-    </form>
-  )
-}
-
-

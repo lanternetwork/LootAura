@@ -168,13 +168,13 @@ export default function ProfileClient() {
       throw new Error(j?.error || 'Failed to save')
     }
     const j = await res.json()
-    if (j?.data) {
+    if (j?.ok && j?.data) {
       setProfile((prev) => (prev ? {
         ...prev,
-        display_name: data.displayName ?? prev.display_name,
-        bio: data.bio ?? prev.bio,
-        location_city: data.locationCity ?? prev.location_city,
-        location_region: data.locationRegion ?? prev.location_region,
+        display_name: j.data.display_name ?? data.displayName ?? prev.display_name,
+        bio: j.data.bio ?? data.bio ?? prev.bio,
+        location_city: j.data.location_city ?? data.locationCity ?? prev.location_city,
+        location_region: j.data.location_region ?? data.locationRegion ?? prev.location_region,
       } : null))
       
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

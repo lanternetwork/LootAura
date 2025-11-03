@@ -17,9 +17,9 @@ export async function GET(_req: NextRequest) {
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .eq('id', user.id)
     .maybeSingle()
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  if (!data) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-  return NextResponse.json({ profile: data })
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  if (!data) return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+  return NextResponse.json({ ok: true, data })
 }
 
 export async function PUT(req: Request) {

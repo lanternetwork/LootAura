@@ -146,6 +146,7 @@ export default async function PublicProfilePage({ params, searchParams }: Public
       <Suspense fallback={<ProfileSkeleton />}>
         <IdentityCard
           profile={{
+            id: profile.id,
             displayName: profile.display_name,
             username: profile.username,
             avatarUrl: profile.avatar_url,

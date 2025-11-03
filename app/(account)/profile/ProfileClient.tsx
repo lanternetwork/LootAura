@@ -131,8 +131,10 @@ export default function ProfileClient() {
         } catch (e) {
           console.error('Failed to load listings:', e)
         }
-      } catch (e) {
-        setError('Failed to load profile')
+      } catch (e: any) {
+        const errorMsg = e?.message || 'Failed to load profile'
+        setError(errorMsg)
+        console.error('[PROFILE] Load error:', e)
       } finally {
         setLoading(false)
       }

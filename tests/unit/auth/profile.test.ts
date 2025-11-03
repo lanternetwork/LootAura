@@ -73,12 +73,15 @@ describe('Profile Management', () => {
             select: vi.fn(() => ({
               eq: vi.fn(() => ({
                 maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
+                single: vi.fn(),
               })),
             })),
+            insert: vi.fn(),
           }
         } else if (callCount === 2) {
           // Second call: insert into profiles table
           return {
+            select: vi.fn(),
             insert: vi.fn().mockResolvedValueOnce({ error: null }),
           }
         } else {
@@ -87,8 +90,10 @@ describe('Profile Management', () => {
             select: vi.fn(() => ({
               eq: vi.fn(() => ({
                 maybeSingle: vi.fn().mockResolvedValueOnce({ data: mockNewProfile, error: null }),
+                single: vi.fn(),
               })),
             })),
+            insert: vi.fn(),
           }
         }
       })
@@ -199,12 +204,15 @@ describe('Profile Management', () => {
             select: vi.fn(() => ({
               eq: vi.fn(() => ({
                 maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
+                single: vi.fn(),
               })),
             })),
+            insert: vi.fn(),
           }
         } else {
           // Second call: insert fails
           return {
+            select: vi.fn(),
             insert: vi.fn().mockResolvedValueOnce({ 
               error: { message: 'Database error' } 
             }),
@@ -252,12 +260,15 @@ describe('Profile Management', () => {
             select: vi.fn(() => ({
               eq: vi.fn(() => ({
                 maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
+                single: vi.fn(),
               })),
             })),
+            insert: vi.fn(),
           }
         } else if (callCount === 2) {
           // Second call: insert into profiles table
           return {
+            select: vi.fn(),
             insert: vi.fn().mockResolvedValueOnce({ error: null }),
           }
         } else {
@@ -269,8 +280,10 @@ describe('Profile Management', () => {
                   data: { id: 'user123' }, 
                   error: null 
                 }),
+                single: vi.fn(),
               })),
             })),
+            insert: vi.fn(),
           }
         }
       })

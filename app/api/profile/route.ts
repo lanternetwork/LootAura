@@ -68,7 +68,7 @@ export async function PUT(req: Request) {
 export async function POST(_request: NextRequest) {
   const supabase = createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
   // Check existing
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

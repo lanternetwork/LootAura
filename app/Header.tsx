@@ -3,13 +3,18 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import UserProfile from '@/components/UserProfile'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
-import { useAuth } from '@/lib/hooks/useAuth'
+import { useEffect, useState } from 'react'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 export function Header() {
   const pathname = usePathname()
   const isSalesPage = pathname === '/sales'
   const { openFilterSheet } = useMobileFilter()
-  const { data: user } = useAuth()
+  const [hasUser, setHasUser] = useState(false)
+  useEffect(() => {
+    const sb = createSupabaseBrowserClient()
+    sb.auth.getUser().then(({ data }) => setHasUser(!!data.user)).catch(() => setHasUser(false))
+  }, [])
   
   // Mobile filter button handler
   const handleMobileFilterClick = () => {
@@ -45,7 +50,7 @@ export function Header() {
             >
               Favorites
             </Link>
-            {user && (
+            {hasUser && (
               <Link 
                 href="/dashboard" 
                 className="hidden md:block text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 transition-colors whitespace-nowrap"

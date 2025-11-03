@@ -25,6 +25,7 @@ export default function ZipInput({
   const [zip, setZip] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [invalidFlash, setInvalidFlash] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,6 +50,9 @@ export default function ZipInput({
       const errorMsg = 'Please enter a valid ZIP code (5 digits or ZIP+4)'
       console.log('[ZIP_INPUT] Invalid zip format:', trimmedZip)
       setError(errorMsg)
+      // Flash the button with a red X to indicate invalid
+      setInvalidFlash(true)
+      setTimeout(() => setInvalidFlash(false), 800)
       onError(errorMsg)
       return
     }
@@ -84,12 +88,16 @@ export default function ZipInput({
         const errorMsg = data.error || 'ZIP code not found'
         console.log('[ZIP_INPUT] Request fail for:', trimmedZip, errorMsg)
         setError(errorMsg)
+        setInvalidFlash(true)
+        setTimeout(() => setInvalidFlash(false), 800)
         onError(errorMsg)
       }
     } catch (error) {
       const errorMsg = 'Failed to lookup ZIP code'
       console.error('[ZIP_INPUT] Request error for:', trimmedZip, error)
       setError(errorMsg)
+      setInvalidFlash(true)
+      setTimeout(() => setInvalidFlash(false), 800)
       onError(errorMsg)
     } finally {
       setLoading(false)
@@ -118,12 +126,18 @@ export default function ZipInput({
         <button
           type="submit"
           disabled={loading || !zip || (zip.length < 5)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px] w-[40px] flex items-center justify-center"
+          className={`px-4 py-2 rounded-md min-h-[40px] w-[40px] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed ${
+            invalidFlash ? 'bg-red-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'
+          }`}
         >
           {loading ? (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
           ) : (
-            <span>Set</span>
+            invalidFlash ? (
+              <span aria-label="Invalid" className="font-bold">×</span>
+            ) : (
+              <span>Set</span>
+            )
           )}
         </button>
       </form>

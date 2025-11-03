@@ -263,9 +263,7 @@ export default function FiltersBar({
             className="flex-1"
             data-testid={zipInputTestId}
           />
-          {zipError && (
-            <span className="text-red-500 text-xs leading-4 max-w-[160px] truncate whitespace-nowrap">{zipError}</span>
-          )}
+          {/* Visual invalid feedback now handled by ZipInput button flash; no text here */}
         </div>
 
         {/* Center: category chips (fluid) */}

@@ -200,9 +200,16 @@ export default function ProfileClient() {
   }
 
   const handleViewPublic = () => {
-    if (profile?.username) {
-      router.push(`/u/${profile.username}`)
+    if (!profile) return
+    
+    // Use username if available, otherwise fallback to user_id
+    const slug = profile.username || profile.id
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[PROFILE] navigate to public profile:', `/u/${slug}`)
     }
+    
+    router.push(`/u/${slug}`)
   }
 
   if (loading) {

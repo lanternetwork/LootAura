@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest) {
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] fetch profile for uid')
+    console.log('[PROFILE] schema check profiles.bio')
   }
 
   const { data, error } = await sb
@@ -37,6 +37,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: 'Avatar host not allowed' }, { status: 400 })
   }
 
+  // Update using lootaura_v2.profiles directly (profiles_v2 is a view, may not support UPDATE)
   const { data, error } = await sb
     .from('profiles')
     .update({
@@ -48,7 +49,7 @@ export async function PUT(req: Request) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', user.id)
-    .select('*')
+    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .maybeSingle()
 
   if (error) {

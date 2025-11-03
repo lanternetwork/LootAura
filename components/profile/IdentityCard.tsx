@@ -118,7 +118,13 @@ export function IdentityCard({ profile, mode, onAvatarChange, onViewPublic }: Id
           )}
           {mode === 'owner' && onViewPublic && (
             <div className="flex gap-2">
-              <button type="button" onClick={onViewPublic} className="btn-accent text-sm">
+              <button
+                type="button"
+                onClick={onViewPublic}
+                disabled={!profile.username && !profile.id}
+                className="btn-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title={!profile.username && !profile.id ? 'Profile ID required' : 'View your public profile'}
+              >
                 View Public Profile
               </button>
             </div>

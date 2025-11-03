@@ -144,23 +144,26 @@ export function useFavorites() {
     queryFn: async () => {
       if (!user) return []
 
-      // Use schema-aware table name
-      const schema = process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'
-      const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
-
-      const { data, error } = await sb
-        .from(favoritesTable)
-        .select(`
-          sale_id,
-          sales:sale_id (*)
-        `)
+      // Step 1: get favorite sale_ids from public view
+      const { data: favRows, error: favErr } = await sb
+        .from('favorites_v2')
+        .select('sale_id')
         .eq('user_id', user.id)
 
-      if (error) {
-        throw new Error(error.message)
-      }
+      if (favErr) throw new Error(favErr.message)
 
-      return data?.map((fav: any) => fav.sales).filter(Boolean) as Sale[] || []
+      const ids = (favRows || []).map((r: any) => r.sale_id)
+      if (ids.length === 0) return []
+
+      // Step 2: fetch sales from public view
+      const { data: salesRows, error: salesErr } = await sb
+        .from('sales_v2')
+        .select('*')
+        .in('id', ids)
+
+      if (salesErr) throw new Error(salesErr.message)
+
+      return salesRows as Sale[]
     },
     enabled: !!user,
   })
@@ -172,32 +175,24 @@ export function useToggleFavorite() {
 
   return useMutation({
     mutationFn: async ({ saleId, isFavorited }: { saleId: string; isFavorited: boolean }) => {
-      if (!user) {
-        throw new Error('Please sign in to save favorites')
-      }
+      if (!user) throw new Error('Please sign in to save favorites')
 
-      // Use schema-aware table name
-      const schema = process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'
-      const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
-
+      // Work directly against Supabase from the browser to avoid server-session 401s
       if (isFavorited) {
         const { error } = await sb
-          .from(favoritesTable)
+          .from('favorites_v2')
           .delete()
           .eq('user_id', user.id)
           .eq('sale_id', saleId)
 
-        if (error) {
-          throw new Error(error.message)
-        }
+        if (error) throw new Error(error.message)
       } else {
         const { error } = await sb
-          .from(favoritesTable)
-          .insert({ user_id: user.id, sale_id: saleId })
+          .from('favorites_v2')
+          // upsert to avoid 409 conflict on rapid clicks
+          .upsert({ user_id: user.id, sale_id: saleId }, { onConflict: 'user_id,sale_id', ignoreDuplicates: true })
 
-        if (error) {
-          throw new Error(error.message)
-        }
+        if (error) throw new Error(error.message)
       }
     },
     onSuccess: () => {

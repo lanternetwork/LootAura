@@ -365,7 +365,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       {isTransitioning && (
         <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 transition-opacity duration-300">
           <div className="bg-white rounded-lg shadow-lg p-4 flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-[var(--accent-primary)] border-t-transparent"></div>
             <span className="text-gray-700 font-medium">{transitionMessage}</span>
           </div>
         </div>

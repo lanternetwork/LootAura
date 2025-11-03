@@ -20,6 +20,7 @@ export type Sale = {
   status: 'draft' | 'published' | 'completed' | 'cancelled'
   privacy_mode: 'exact' | 'block_until_24h'
   is_featured: boolean
+  pricing_mode?: 'negotiable' | 'firm' | 'best_offer' | 'ask'
   created_at: string
   updated_at: string
   // Computed properties added during API processing

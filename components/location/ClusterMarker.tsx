@@ -41,7 +41,7 @@ export default function ClusterMarker({
       <button
         className={`
           ${sizeClass}
-          bg-blue-600
+          bg-[var(--accent-primary)]
           text-white font-semibold 
           rounded-full flex items-center justify-center
           shadow-sm select-none

@@ -21,6 +21,7 @@ const SaleInputSchema = z.object({
   status: z.enum(['draft', 'published', 'completed', 'cancelled']).default('draft'),
   privacy_mode: z.enum(['exact', 'block_until_24h']).default('exact'),
   is_featured: z.boolean().default(false),
+  pricing_mode: z.enum(['negotiable', 'firm', 'best_offer', 'ask']).optional(),
 })
 
 const ItemInputSchema = z.object({
@@ -206,27 +207,93 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
   }
 }
 
-export async function getSaleById(id: string): Promise<Sale | null> {
+export interface SaleWithOwnerInfo extends Sale {
+  owner_profile?: {
+    id?: string
+    created_at?: string | null
+    full_name?: string | null
+  } | null
+  owner_stats?: {
+    user_id?: string
+    total_sales?: number | null
+    last_sale_at?: string | null
+    avg_rating?: number | null
+    ratings_count?: number | null
+  } | null
+}
+
+export async function getSaleById(id: string): Promise<SaleWithOwnerInfo | null> {
   try {
     const supabase = createSupabaseServerClient()
     
-    const { data, error } = await supabase
+    const { data: sale, error: saleError } = await supabase
       .from('sales_v2')
       .select('*')
       .eq('id', id)
       .single()
 
-    if (error) {
-      if (error.code === 'PGRST116') {
+    if (saleError) {
+      if (saleError.code === 'PGRST116') {
         return null // No rows returned
       }
-      console.error('Error fetching sale:', error)
+      console.error('[SALES] Error fetching sale:', saleError)
       throw new Error('Failed to fetch sale')
     }
 
-    return data as Sale
+    if (!sale || !sale.owner_id) {
+      console.error('[SALES] Sale found but missing owner_id')
+      return {
+        ...sale,
+        owner_profile: null,
+        owner_stats: {
+          total_sales: 0,
+          avg_rating: 5.0,
+          ratings_count: 0,
+          last_sale_at: null,
+        },
+      } as SaleWithOwnerInfo
+    }
+
+    const ownerId = sale.owner_id
+
+    // Fetch owner profile and stats in parallel
+    // Note: profiles_v2 view has id (references auth.users.id directly), so use id
+    // Note: We need to check if profiles_v2 has user_id or if we need to query lootaura_v2.profiles directly
+    // Based on migration 034, profiles_v2 has: id, username, full_name, avatar_url, home_zip, preferences, created_at, updated_at
+    // The id in profiles_v2 is the same as auth.users.id, so we can query by id
+    const [profileRes, statsRes] = await Promise.all([
+      supabase
+        .from('profiles_v2')
+        .select('id, created_at, full_name')
+        .eq('id', ownerId)
+        .maybeSingle(),
+      supabase
+        .from('owner_stats')
+        .select('user_id, total_sales, last_sale_at, avg_rating, ratings_count')
+        .eq('user_id', ownerId)
+        .maybeSingle(),
+    ])
+
+    // Log errors but don't fail - return with defaults
+    if (profileRes.error) {
+      console.error('[SALES] Error fetching owner profile:', profileRes.error)
+    }
+    if (statsRes.error) {
+      console.error('[SALES] Error fetching owner stats:', statsRes.error)
+    }
+
+    return {
+      ...sale,
+      owner_profile: profileRes.data ?? null,
+      owner_stats: statsRes.data ?? {
+        total_sales: 0,
+        avg_rating: 5.0,
+        ratings_count: 0,
+        last_sale_at: null,
+      },
+    } as SaleWithOwnerInfo
   } catch (error) {
-    console.error('Error in getSaleById:', error)
+    console.error('[SALES] Error in getSaleById:', error)
     throw error
   }
 }
@@ -247,6 +314,7 @@ export async function createSale(input: SaleInput): Promise<Sale> {
       .insert({
         owner_id: user.id,
         ...validatedInput,
+        pricing_mode: validatedInput.pricing_mode || 'negotiable',
       })
       .select()
       .single()
@@ -276,7 +344,10 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
 
     const { data, error } = await supabase
       .from('sales')
-      .update(validatedInput)
+      .update({
+        ...validatedInput,
+        pricing_mode: validatedInput.pricing_mode || 'negotiable',
+      })
       .eq('id', id)
       .eq('owner_id', user.id) // Ensure user owns the sale
       .select()

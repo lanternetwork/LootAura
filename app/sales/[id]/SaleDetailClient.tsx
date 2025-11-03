@@ -3,15 +3,17 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Sale } from '@/lib/types'
 import Image from 'next/image'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
+import { useAuth, useFavorites } from '@/lib/hooks/useAuth'
+import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
+import type { SaleWithOwnerInfo } from '@/lib/data'
 
 interface SaleDetailClientProps {
-  sale: Sale
+  sale: SaleWithOwnerInfo
 }
 
 export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
@@ -28,6 +30,8 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
     : '/sales'
   const { location } = useLocationSearch()
   const [isFavorited, setIsFavorited] = useState(false)
+  const { data: currentUser } = useAuth()
+  const { data: favoriteSales = [] } = useFavorites()
   const [showFullDescription, setShowFullDescription] = useState(false)
   const cover = getSaleCoverUrl(sale)
 
@@ -50,8 +54,19 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
   }
 
 
+  // Keep local favorite state in sync with favorites list
+  // (simple check each render; list is small)
+  const fromList = Array.isArray(favoriteSales) && favoriteSales.some((s: any) => s?.id === sale.id)
+  if (fromList !== isFavorited) {
+    setIsFavorited(fromList)
+  }
+
   const handleFavoriteToggle = async () => {
     try {
+      if (!currentUser) {
+        window.location.href = `/auth/signin?redirectTo=${encodeURIComponent(window.location.pathname)}`
+        return
+      }
       const response = await fetch(`/api/sales/${sale.id}/favorite`, {
         method: 'POST',
         headers: {
@@ -151,7 +166,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                 
                 <button
                   onClick={handleShare}
-                  className="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 transition-colors min-h-[44px]"
+                  className="inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors min-h-[44px] bg-[rgba(147,51,234,0.15)] text-[#3A2268] hover:bg-[rgba(147,51,234,0.25)]"
                 >
                   <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
@@ -164,37 +179,36 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
 
             {/* Sale Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Date & Time</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 mr-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              {/* Left: Date & Time */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Date & Time</h3>
+                <div className="space-y-4">
+                  <div className="flex gap-3">
+                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <div>
+                      <div className="font-medium text-gray-900">{formatDate(sale.date_start)}</div>
+                      <div className="text-sm text-gray-600 mt-1">{formatTime(sale.time_start)}</div>
+                    </div>
+                  </div>
+
+                  {sale.date_end && sale.time_end && (
+                    <div className="flex gap-3">
+                      <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <div>
-                        <div className="font-medium">{formatDate(sale.date_start)}</div>
-                        <div className="text-sm text-gray-600">{formatTime(sale.time_start)}</div>
+                        <div className="font-medium text-gray-900">Ends: {formatDate(sale.date_end)}</div>
+                        <div className="text-sm text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
                       </div>
                     </div>
-                    
-                    {sale.date_end && sale.time_end && (
-                      <div className="flex items-center">
-                        <svg className="w-5 h-5 mr-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div>
-                          <div className="font-medium">Ends: {formatDate(sale.date_end)}</div>
-                          <div className="text-sm text-gray-600">{formatTime(sale.time_end)}</div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
-
               </div>
 
-              <div>
+              {/* Right: Categories */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Categories</h3>
                 {sale.tags && sale.tags.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
@@ -225,7 +239,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                 {sale.description.length > 200 && (
                   <button
                     onClick={() => setShowFullDescription(!showFullDescription)}
-                    className="mt-2 text-blue-600 hover:text-blue-800 font-medium"
+                    className="mt-2 link-accent font-medium"
                   >
                     {showFullDescription ? 'Show less' : 'Show more'}
                   </button>
@@ -284,46 +298,28 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
             </div>
           </div>
 
-          {/* Seller Card */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Seller</h3>
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <div>
-                <div className="font-medium text-gray-900">John Doe</div>
-                <div className="text-sm text-gray-500">Verified Seller</div>
-              </div>
-            </div>
-            
-            <div className="mt-4 space-y-2">
-              <button className="w-full inline-flex items-center justify-center px-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors min-h-[44px]">
-                <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                Contact Seller
-              </button>
-              
-              <button className="w-full inline-flex items-center justify-center px-4 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors min-h-[44px]">
-                <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-                Call Seller
-              </button>
-            </div>
-          </div>
+          {/* Seller Activity Card */}
+          <SellerActivityCard
+            ownerProfile={sale.owner_profile}
+            ownerStats={sale.owner_stats}
+          />
 
-          {/* Safety Tips */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <h4 className="font-medium text-yellow-800 mb-2">Safety Tips</h4>
-            <ul className="text-sm text-yellow-700 space-y-1">
-              <li>• Meet in a public place</li>
-              <li>• Bring a friend if possible</li>
-              <li>• Trust your instincts</li>
-              <li>• Verify items before purchasing</li>
+          {/* Shopping Tips */}
+          <div className="bg-[rgba(147,51,234,0.08)] border border-purple-200 rounded-lg p-4">
+            <h4 className="font-medium text-[#3A2268] mb-2">Shopping Tips</h4>
+            <ul className="text-sm text-[#3A2268] space-y-1">
+              <li>• Bring cash — many sales are cash only</li>
+              <li>• Arrive early for the best selection</li>
+              <li>• Check items before purchasing</li>
+              {sale.pricing_mode === 'firm' ? (
+                <li>• Prices are as marked</li>
+              ) : sale.pricing_mode === 'best_offer' ? (
+                <li>• Make your best offer — seller is accepting offers</li>
+              ) : sale.pricing_mode === 'ask' ? (
+                <li>• Ask seller about pricing</li>
+              ) : (
+                <li>• Negotiate politely — prices may be flexible</li>
+              )}
             </ul>
           </div>
         </div>

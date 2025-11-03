@@ -2,6 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --accent-primary: #4C1D95;
+  --accent-secondary: #FACC15;
+  --accent-hover: #3B0764;
+  --accent-secondary-hover: #EAB308;
+  --bg-neutral: #F8FAFC;
+  --text-neutral: #0f172a;
+  /* Card tokens */
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb; /* slate-200 */
+  --card-radius: 0.75rem; /* rounded-xl */
+  --card-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+}
+
+.dark {
+  --accent-primary: #6B21A8;
+  --accent-secondary: #FACC15;
+  --accent-hover: #4C1D95;
+  --accent-secondary-hover: #EAB308;
+  --bg-neutral: #0b1020;
+  --text-neutral: #e5e7eb;
+  /* Card tokens (dark) */
+  --card-bg: #111827; /* slate-800 */
+  --card-border: #1f2937; /* slate-700 */
+  --card-radius: 0.75rem;
+  --card-shadow: 0 1px 2px 0 rgba(0,0,0,0.4);
+}
+
+@layer components {
+  .btn-accent {
+    @apply rounded-md px-4 py-2 inline-flex items-center justify-center font-medium transition-colors;
+    color: var(--accent-primary);
+    background-color: transparent;
+    border: 1.5px solid var(--accent-primary);
+  }
+  .btn-accent:hover {
+    color: var(--accent-hover);
+    border-color: var(--accent-hover);
+    background-color: rgba(59, 7, 100, 0.06); /* subtle tint using hover color */
+  }
+
+  .btn-accent-secondary {
+    @apply rounded-md px-4 py-2 inline-flex items-center justify-center font-medium transition-colors;
+    color: #3A2268;
+    background-color: var(--accent-secondary);
+  }
+  .btn-accent-secondary:hover { background-color: var(--accent-secondary-hover); }
+
+  .link-accent { color: var(--accent-primary); }
+  .link-accent:hover { color: var(--accent-hover); }
+  .link-accent:visited { color: var(--accent-primary); }
+
+  .badge-accent {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    color: var(--accent-hover);
+    background-color: rgba(76, 29, 149, 0.15);
+  }
+
+  /* Card utilities */
+  .card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+  }
+  .card-hover:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .card-body { @apply p-4; }
+  .card-body-lg { @apply p-6; }
+  .card-header { @apply flex items-center justify-between; }
+  .card-title { @apply text-base font-semibold; }
+  .card-subtitle { @apply text-sm text-gray-600; }
+}
+
 /* Mapbox GL CSS - imported once globally */
 @import 'mapbox-gl/dist/mapbox-gl.css';
 body { min-height: 100vh; }

@@ -17,7 +17,7 @@ export function Hero() {
       {/* Overlay for text readability */}
       <div className="absolute inset-0 bg-gradient-to-r from-white/70 via-white/60 to-white/50 z-10"></div>
       
-      <div className="relative z-20 max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-10 md:py-14 h-full flex items-center">
+      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14 h-full flex items-center">
         <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
           {/* Left column */}
           <div className="space-y-4">

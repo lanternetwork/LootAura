@@ -1,7 +1,6 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
-import { getSchema } from './schema';
 
 export function createSupabaseBrowserClient() {
   // Validate required environment variables
@@ -20,6 +19,6 @@ export function createSupabaseBrowserClient() {
     throw new Error(error);
   }
 
-  const schema = getSchema();
-  return createBrowserClient(url, anon, { db: { schema } });
+  // Force public schema for REST access; PostgREST only exposes public/graphql_public
+  return createBrowserClient(url, anon, { db: { schema: 'public' } });
 }

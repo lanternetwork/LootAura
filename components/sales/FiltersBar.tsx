@@ -255,7 +255,7 @@ export default function FiltersBar({
       {/* Desktop/Tablet Layout - 3 Column Grid */}
       <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3 px-4 h-12 hidden md:grid">
         {/* Left: ZIP */}
-        <div ref={zipRef} className="shrink-0 flex items-center gap-2 w-[260px] md:w-[320px]">
+        <div ref={zipRef} className="shrink-0 flex items-center gap-2 w-[220px] md:w-[260px]">
           <ZipInput
             onLocationFound={onZipLocationFound}
             onError={onZipError}
@@ -263,13 +263,11 @@ export default function FiltersBar({
             className="flex-1"
             data-testid={zipInputTestId}
           />
-          {zipError && (
-            <span className="text-red-500 text-xs leading-4 max-w-[160px] truncate whitespace-nowrap">{zipError}</span>
-          )}
+          {/* Visual invalid feedback now handled by ZipInput button flash; no text here */}
         </div>
 
         {/* Center: category chips (fluid) */}
-        <div ref={centerRef} data-testid={filtersCenterTestId} className="min-w-0 overflow-hidden">
+        <div ref={centerRef} data-testid={filtersCenterTestId} className="min-w-0 overflow-hidden pl-2">
           <ul ref={chipsRailRef} className="flex items-center gap-2">
             {visible.map((category) => {
               const isSelected = categories.includes(category.id)
@@ -285,7 +283,7 @@ export default function FiltersBar({
                         : ''
                       }
                       ${isSelected 
-                        ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                        ? 'bg-[rgba(147,51,234,0.15)] text-[#3A2268] border border-purple-200' 
                         : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
                       }
                     `}
@@ -299,7 +297,7 @@ export default function FiltersBar({
                       <>
                         {category.label}
                         {isSelected && (
-                          <span className="ml-1 text-blue-600">×</span>
+                          <span className="ml-1 text-[var(--accent-primary)]">×</span>
                         )}
                       </>
                     )}

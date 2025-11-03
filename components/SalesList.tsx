@@ -18,7 +18,7 @@ export default function SalesList({ sales, mode, viewport }: SalesListProps) {
         cta={
           <a 
             href="/explore?tab=add" 
-            className="text-amber-600 hover:text-amber-700 font-medium"
+            className="link-accent font-medium"
           >
             Post the first sale →
           </a>

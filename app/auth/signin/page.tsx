@@ -83,7 +83,7 @@ export default function SignIn() {
             </div>
             <button
               onClick={() => setMagicLinkSent(false)}
-              className="text-amber-600 hover:text-amber-700 font-medium"
+              className="link-accent font-medium"
             >
               ← Back to sign in
             </button>
@@ -102,7 +102,7 @@ export default function SignIn() {
                 <input 
                   id="email"
                   type="email"
-                  className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
+                  className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent" 
                   value={email} 
                   onChange={e => setEmail(e.target.value)} 
                   placeholder="your@email.com"
@@ -115,7 +115,7 @@ export default function SignIn() {
                 <input 
                   id="password"
                   type="password" 
-                  className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
+                  className="w-full rounded border px-3 py-2 focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent" 
                   value={password} 
                   onChange={e => setPassword(e.target.value)} 
                   placeholder="••••••••"
@@ -127,7 +127,7 @@ export default function SignIn() {
                 <button 
                   type="submit"
                   disabled={isLoading}
-                  className="w-full rounded bg-amber-500 px-4 py-2 text-white font-medium hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded px-4 py-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed btn-accent"
                 >
                   {isLoading ? 'Signing in...' : 'Sign In'}
                 </button>
@@ -136,7 +136,7 @@ export default function SignIn() {
                   type="button"
                   onClick={onMagicLinkSubmit}
                   disabled={magicLinkLoading || !email}
-                  className="w-full rounded border border-amber-500 px-4 py-2 text-amber-600 font-medium hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded border px-4 py-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[rgba(126,34,206,0.08)]"
                 >
                   {magicLinkLoading ? 'Sending...' : 'Send Magic Link'}
                 </button>
@@ -144,7 +144,7 @@ export default function SignIn() {
                 <div className="text-center">
                   <Link 
                     href="/auth/forgot-password"
-                    className="text-sm text-amber-600 hover:text-amber-700"
+                    className="text-sm link-accent"
                   >
                     Forgot your password?
                   </Link>
@@ -167,7 +167,7 @@ export default function SignIn() {
 
         <Link 
           href="/auth/signup"
-          className="block text-center w-full rounded border border-amber-500 px-4 py-2 text-amber-600 font-medium hover:bg-amber-50"
+          className="block text-center w-full rounded border px-4 py-2 font-medium border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[rgba(126,34,206,0.08)]"
         >
           Create Account
         </Link>
@@ -175,7 +175,7 @@ export default function SignIn() {
         <div className="text-center">
           <Link
             href="/"
-            className="text-amber-600 hover:text-amber-700 font-medium"
+            className="link-accent font-medium"
           >
             ← Back to home
           </Link>

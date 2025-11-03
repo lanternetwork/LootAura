@@ -106,7 +106,7 @@ export default function ZipInput({
 
   return (
     <div className={className}>
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <input
           type="text"
           value={zip}

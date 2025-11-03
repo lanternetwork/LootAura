@@ -2,6 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --accent-primary: #9333EA;
+  --accent-secondary: #FACC15;
+  --accent-hover: #7E22CE;
+  --accent-secondary-hover: #EAB308;
+  --bg-neutral: #F8FAFC;
+  --text-neutral: #0f172a;
+}
+
+.dark {
+  --accent-primary: #A855F7;
+  --accent-secondary: #FACC15;
+  --accent-hover: #7E22CE;
+  --accent-secondary-hover: #EAB308;
+  --bg-neutral: #0b1020;
+  --text-neutral: #e5e7eb;
+}
+
+@layer components {
+  .btn-accent {
+    @apply text-white rounded-md px-4 py-2 inline-flex items-center justify-center transition-colors;
+    background-color: var(--accent-primary);
+  }
+  .btn-accent:hover { background-color: var(--accent-hover); }
+
+  .btn-accent-secondary {
+    @apply rounded-md px-4 py-2 inline-flex items-center justify-center font-medium transition-colors;
+    color: #3A2268;
+    background-color: var(--accent-secondary);
+  }
+  .btn-accent-secondary:hover { background-color: var(--accent-secondary-hover); }
+
+  .link-accent { color: var(--accent-primary); }
+  .link-accent:hover { color: var(--accent-hover); }
+
+  .badge-accent {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    color: var(--accent-hover);
+    background-color: rgba(147, 51, 234, 0.15);
+  }
+}
+
 /* Mapbox GL CSS - imported once globally */
 @import 'mapbox-gl/dist/mapbox-gl.css';
 body { min-height: 100vh; }

@@ -229,7 +229,7 @@ export function WeekendStats() {
       {/* Footer */}
       <Link
         href={salesUrl}
-        className="text-sm font-medium text-[#3A2268] hover:text-[#3A2268]/80 transition-colors text-left"
+        className="text-sm font-medium link-accent transition-colors text-left"
       >
         View on map →
       </Link>

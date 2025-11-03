@@ -283,7 +283,7 @@ export default function FiltersBar({
                         : ''
                       }
                       ${isSelected 
-                        ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                        ? 'bg-[rgba(147,51,234,0.15)] text-[#3A2268] border border-purple-200' 
                         : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
                       }
                     `}
@@ -297,7 +297,7 @@ export default function FiltersBar({
                       <>
                         {category.label}
                         {isSelected && (
-                          <span className="ml-1 text-blue-600">×</span>
+                          <span className="ml-1 text-[var(--accent-primary)]">×</span>
                         )}
                       </>
                     )}

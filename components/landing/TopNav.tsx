@@ -29,11 +29,11 @@ export function TopNav() {
               </Link>
             </div>
 
-            {/* Sign in button */}
-            <Link
-              href="/auth/signin"
-              className="px-4 py-2 rounded-lg bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium transition-colors"
-            >
+          {/* Sign in button */}
+          <Link
+            href="/auth/signin"
+            className="btn-accent-secondary"
+          >
               Sign in
             </Link>
           </div>

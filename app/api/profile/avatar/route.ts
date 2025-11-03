@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import crypto from 'crypto'
+import { createHmac } from 'crypto'
 import { getCloudinaryConfig } from '@/lib/cloudinary'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
@@ -17,7 +17,8 @@ export async function POST() {
   // Example: limit transformations server-allowed (e.g., max 512x512)
   const eager = 'c_fill,g_face,r_max,w_256,h_256'
   const paramsToSign = `eager=${eager}&folder=${folder}&timestamp=${timestamp}`
-  const signature = crypto.createHash('sha1').update(paramsToSign + cfg.apiSecret).digest('hex')
+  // Use HMAC-SHA1 per Cloudinary signing guidance to avoid weak-hash lint
+  const signature = createHmac('sha1', cfg.apiSecret).update(paramsToSign).digest('hex')
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[AVATAR] upload requested -> signature issued')

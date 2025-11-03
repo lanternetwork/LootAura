@@ -52,6 +52,14 @@ export function Header() {
             </Link>
             {hasUser && (
               <Link 
+                href="/profile" 
+                className="hidden md:block text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 transition-colors whitespace-nowrap"
+              >
+                Profile
+              </Link>
+            )}
+            {hasUser && (
+              <Link 
                 href="/dashboard" 
                 className="hidden md:block text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 transition-colors whitespace-nowrap"
               >

@@ -64,12 +64,18 @@ export default function ProfileClient() {
           const createRes = await fetch('/api/profile', { method: 'POST' })
           if (!createRes.ok) {
             const err = await createRes.json().catch(() => ({ error: 'Failed to create profile' }))
-            throw new Error(err?.error || 'Failed to create profile')
+            const errorMsg = err?.error || 'Failed to create profile'
+            const details = err?.details ? `: ${err.details}` : ''
+            console.error('[PROFILE] Create failed:', errorMsg, details)
+            throw new Error(`${errorMsg}${details}`)
           }
           p = await createRes.json()
         } else if (!profRes.ok) {
           const err = await profRes.json().catch(() => ({ error: 'Failed to load profile' }))
-          throw new Error(err?.error || 'Failed to load profile')
+          const errorMsg = err?.error || 'Failed to load profile'
+          const details = err?.details ? `: ${err.details}` : ''
+          console.error('[PROFILE] Load failed:', errorMsg, details)
+          throw new Error(`${errorMsg}${details}`)
         } else {
           p = await profRes.json()
         }

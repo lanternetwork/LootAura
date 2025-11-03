@@ -88,7 +88,7 @@ export async function POST(_request: NextRequest) {
     return NextResponse.json({ ok: true, data: existing, created: false, message: 'Profile already exists' })
   }
 
-  // Insert into the underlying profiles table (not the view)
+  // Insert into profiles_v2 view (which has INSERT permissions and forwards to lootaura_v2.profiles)
   const defaultProfile = {
     id: user.id,
     display_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
@@ -96,17 +96,19 @@ export async function POST(_request: NextRequest) {
     home_zip: null,
     preferences: { notifications: { email: true, push: false }, privacy: { show_email: false, show_phone: false } },
   }
-  const { error: createError } = await supabase
-    .from('profiles')
+  const { error: createError, data: insertedData } = await supabase
+    .from('profiles_v2')
     .insert(defaultProfile)
+    .select()
+    .single()
   if (createError) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.error('❌ [AUTH FLOW] profile-creation → error:', createError)
+      console.error('❌ [AUTH FLOW] profile-creation → insert error:', createError)
     }
     return NextResponse.json({ ok: false, error: 'Failed to create profile', details: createError.message }, { status: 500 })
   }
   
-  // Fetch the created profile from the view to get all computed fields
+  // Fetch the created profile from the view to get all computed fields (username, etc.)
   const { data: profileData, error: fetchError } = await supabase
     .from('profiles_v2')
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
@@ -117,7 +119,27 @@ export async function POST(_request: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.error('❌ [AUTH FLOW] profile-creation → fetch error:', fetchError)
     }
-    return NextResponse.json({ ok: false, error: 'Profile created but failed to fetch' }, { status: 500 })
+    // If fetch fails but insert succeeded, try to construct a basic profile from inserted data
+    if (insertedData) {
+      const basicProfile = {
+        id: insertedData.id,
+        username: null,
+        display_name: insertedData.display_name || defaultProfile.display_name,
+        avatar_url: insertedData.avatar_url || null,
+        bio: null,
+        location_city: null,
+        location_region: null,
+        created_at: insertedData.created_at || new Date().toISOString(),
+        verified: false,
+        home_zip: insertedData.home_zip || null,
+        preferences: insertedData.preferences || defaultProfile.preferences,
+      }
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('✅ [AUTH FLOW] profile-creation → created: success (fallback)', { userId: user.id, profileId: basicProfile.id })
+      }
+      return NextResponse.json({ ok: true, data: basicProfile, created: true, message: 'Profile created successfully' })
+    }
+    return NextResponse.json({ ok: false, error: 'Profile created but failed to fetch', details: fetchError?.message }, { status: 500 })
   }
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

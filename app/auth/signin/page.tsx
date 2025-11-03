@@ -127,7 +127,7 @@ export default function SignIn() {
                 <button 
                   type="submit"
                   disabled={isLoading}
-                  className="w-full rounded px-4 py-2 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed btn-accent"
+                  className="w-full rounded px-4 py-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed btn-accent"
                 >
                   {isLoading ? 'Signing in...' : 'Sign In'}
                 </button>

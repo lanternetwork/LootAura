@@ -88,7 +88,7 @@ export async function POST(_request: NextRequest) {
     return NextResponse.json({ ok: true, data: existing, created: false, message: 'Profile already exists' })
   }
 
-  // Insert into profiles_v2 view (which has INSERT permissions and forwards to lootaura_v2.profiles)
+  // Insert into profiles table directly (profiles_v2 is a view, cannot insert into it)
   const defaultProfile = {
     id: user.id,
     display_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
@@ -97,7 +97,7 @@ export async function POST(_request: NextRequest) {
     preferences: { notifications: { email: true, push: false }, privacy: { show_email: false, show_phone: false } },
   }
   const { error: createError, data: insertedData } = await supabase
-    .from('profiles_v2')
+    .from('profiles')
     .insert(defaultProfile)
     .select()
     .single()

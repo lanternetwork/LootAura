@@ -126,8 +126,10 @@ export default function ZipInput({
         <button
           type="submit"
           disabled={loading || !zip || (zip.length < 5)}
-          className={`px-4 py-2 rounded-md min-h-[40px] w-[40px] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed ${
-            invalidFlash ? 'bg-red-500 text-white' : 'btn-accent'
+          className={`px-4 py-2 rounded-md min-h-[40px] w-[40px] flex items-center justify-center appearance-none disabled:cursor-not-allowed ${
+            invalidFlash 
+              ? '!bg-red-500 !text-white' 
+              : '!bg-[var(--accent-primary)] !text-white hover:!bg-[var(--accent-hover)]'
           }`}
         >
           {loading ? (

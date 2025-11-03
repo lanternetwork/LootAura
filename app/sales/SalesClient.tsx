@@ -864,16 +864,10 @@ export default function SalesClient({
                   
             {!loading && visibleSales.length === 0 && (
               <div className="text-center py-8">
-                <div className="text-gray-500 mb-4">
+                <div className="text-gray-500">
                   No sales found in this area
-                    </div>
-                          <button
-                  onClick={() => handleFiltersChange({ ...filters, distance: Math.min(25, filters.distance + 5) })}
-                  className="px-4 py-2 rounded btn-accent"
-                          >
-                  Increase Distance
-                          </button>
-                        </div>
+                </div>
+              </div>
             )}
 
             {!loading && visibleSales.length > 0 && (
@@ -939,15 +933,9 @@ export default function SalesClient({
 
                 {!loading && visibleSales.length === 0 && (
                   <div className="text-center py-8 px-4">
-                    <div className="text-gray-500 mb-4">
+                    <div className="text-gray-500">
                       No sales found in this area
                     </div>
-                    <button
-                      onClick={() => handleFiltersChange({ ...filters, distance: Math.min(25, filters.distance + 5) })}
-                      className="px-4 py-2 rounded btn-accent"
-                    >
-                      Increase Distance
-                    </button>
                   </div>
                 )}
 

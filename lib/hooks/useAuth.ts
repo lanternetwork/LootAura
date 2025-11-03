@@ -174,12 +174,25 @@ export function useToggleFavorite() {
   const { data: user } = useAuth()
 
   return useMutation({
-    mutationFn: async ({ saleId }: { saleId: string; isFavorited: boolean }) => {
+    mutationFn: async ({ saleId, isFavorited }: { saleId: string; isFavorited: boolean }) => {
       if (!user) throw new Error('Please sign in to save favorites')
-      const res = await fetch(`/api/sales/${saleId}/favorite`, { method: 'POST' })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body?.error || `Favorite toggle failed (${res.status})`)
+
+      // Work directly against Supabase from the browser to avoid server-session 401s
+      if (isFavorited) {
+        const { error } = await sb
+          .from('favorites_v2')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('sale_id', saleId)
+
+        if (error) throw new Error(error.message)
+      } else {
+        const { error } = await sb
+          .from('favorites_v2')
+          // upsert to avoid 409 conflict on rapid clicks
+          .upsert({ user_id: user.id, sale_id: saleId }, { onConflict: 'user_id,sale_id', ignoreDuplicates: true })
+
+        if (error) throw new Error(error.message)
       }
     },
     onSuccess: () => {

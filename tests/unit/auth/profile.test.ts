@@ -79,10 +79,14 @@ describe('Profile Management', () => {
             insert: vi.fn(),
           }
         } else if (callCount === 2) {
-          // Second call: insert into profiles table
+          // Second call: insert into profiles_v2 view
           return {
             select: vi.fn(),
-            insert: vi.fn().mockResolvedValueOnce({ error: null }),
+            insert: vi.fn(() => ({
+              select: vi.fn(() => ({
+                single: vi.fn().mockResolvedValueOnce({ data: mockNewProfile, error: null }),
+              })),
+            })),
           }
         } else {
           // Third call: fetch from profiles_v2
@@ -213,9 +217,14 @@ describe('Profile Management', () => {
           // Second call: insert fails
           return {
             select: vi.fn(),
-            insert: vi.fn().mockResolvedValueOnce({ 
-              error: { message: 'Database error' } 
-            }),
+            insert: vi.fn(() => ({
+              select: vi.fn(() => ({
+                single: vi.fn().mockResolvedValueOnce({ 
+                  data: null,
+                  error: { message: 'Database error' } 
+                }),
+              })),
+            })),
           }
         }
       })
@@ -266,10 +275,14 @@ describe('Profile Management', () => {
             insert: vi.fn(),
           }
         } else if (callCount === 2) {
-          // Second call: insert into profiles table
+          // Second call: insert into profiles_v2 view
           return {
             select: vi.fn(),
-            insert: vi.fn().mockResolvedValueOnce({ error: null }),
+            insert: vi.fn(() => ({
+              select: vi.fn(() => ({
+                single: vi.fn().mockResolvedValueOnce({ data: { id: 'user123' }, error: null }),
+              })),
+            })),
           }
         } else {
           // Third call: fetch from profiles_v2

@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ProfileUpdateSchema } from '@/lib/validators/profile'
 import { isAllowedAvatarUrl } from '@/lib/cloudinary'
 
-export async function GET() {
+export async function GET(_req?: NextRequest) {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
@@ -12,9 +12,14 @@ export async function GET() {
     console.log('[PROFILE] fetch profile for uid')
   }
 
-  const { data, error } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle()
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, data: data ?? { id: user.id } })
+  const { data, error } = await sb
+    .from('profiles_v2')
+    .select('id, display_name, avatar_url, home_zip, preferences')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data) return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
+  return NextResponse.json({ profile: data })
 }
 
 export async function PUT(req: Request) {
@@ -59,3 +64,34 @@ export async function PUT(req: Request) {
 }
 
 // Legacy handlers removed to avoid duplicate exports and name collisions
+export async function POST(_request: NextRequest) {
+  const supabase = createSupabaseServerClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Check existing
+  const { data: existing, error: fetchError } = await supabase
+    .from('profiles_v2')
+    .select('id, display_name, avatar_url, home_zip, preferences')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (fetchError) return NextResponse.json({ error: 'Failed to check existing profile' }, { status: 500 })
+  if (existing) {
+    return NextResponse.json({ profile: existing, created: false, message: 'Profile already exists' })
+  }
+
+  const defaultProfile = {
+    id: user.id,
+    display_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+    avatar_url: user.user_metadata?.avatar_url || null,
+    home_zip: null,
+    preferences: { notifications: { email: true, push: false }, privacy: { show_email: false, show_phone: false } },
+  }
+  const { data: inserted, error: createError } = await supabase
+    .from('profiles_v2')
+    .insert(defaultProfile)
+    .select('id, display_name, avatar_url, home_zip, preferences')
+    .single()
+  if (createError) return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 })
+  return NextResponse.json({ profile: inserted, created: true, message: 'Profile created successfully' })
+}

@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type Listing = { id: string; title: string; updated_at?: string | null; status?: string | null; cover_url?: string | null }
 
 export default function DashboardClient({ initialListings }: { initialListings: Listing[] }) {
   const [tab, setTab] = useState<'listings' | 'settings' | 'analytics'>('listings')
-  const [listings, setListings] = useState<Listing[]>(initialListings)
+  const [listings, _setListings] = useState<Listing[]>(initialListings)
   const [saving, setSaving] = useState(false)
   const [emailOptIn, setEmailOptIn] = useState(false)
   const [defaultRadiusKm, setDefaultRadiusKm] = useState<number>(10)
@@ -34,8 +34,7 @@ export default function DashboardClient({ initialListings }: { initialListings: 
           <div key={l.id} className="card card-hover">
             <div className="card-body">
               {l.cover_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={l.cover_url} alt="cover" className="w-full h-32 object-cover rounded mb-3" />
+                <div className="w-full h-32 rounded mb-3" style={{ backgroundImage: `url(${l.cover_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
               ) : null}
               <div className="flex items-center justify-between">
                 <div>

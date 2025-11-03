@@ -37,32 +37,31 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: 'Avatar host not allowed' }, { status: 400 })
   }
 
-  // Update using RPC function to access lootaura_v2.profiles
-  const { data, error } = await sb.rpc('update_profile_v2', {
-    p_user_id: user.id,
-    p_display_name: payload.display_name ?? null,
-    p_bio: payload.bio ?? null,
-    p_location_city: payload.location_city ?? null,
-    p_location_region: payload.location_region ?? null,
-    p_avatar_url: payload.avatar_url ?? null,
-  })
-  
-  const result = data && data.length > 0 ? data[0] : null
+  // Update using lootaura_v2.profiles directly (profiles_v2 is a view, may not support UPDATE)
+  const { data, error } = await sb
+    .from('profiles')
+    .update({
+      display_name: payload.display_name,
+      bio: payload.bio ?? null,
+      location_city: payload.location_city ?? null,
+      location_region: payload.location_region ?? null,
+      avatar_url: payload.avatar_url ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', user.id)
+    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+    .maybeSingle()
 
   if (error) {
     const status = error.code === '42501' ? 403 : 500
     return NextResponse.json({ ok: false, error: error.message }, { status })
   }
 
-  if (!result) {
-    return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
-  }
-
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[PROFILE] update profile success')
   }
 
-  return NextResponse.json({ ok: true, data: result })
+  return NextResponse.json({ ok: true, data })
 }
 
 // Legacy handlers removed to avoid duplicate exports and name collisions
@@ -81,14 +80,15 @@ export async function POST(_request: NextRequest) {
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .eq('id', user.id)
     .maybeSingle()
-  if (fetchError) return NextResponse.json({ error: 'Failed to check existing profile' }, { status: 500 })
+  if (fetchError) return NextResponse.json({ ok: false, error: 'Failed to check existing profile', details: fetchError.message }, { status: 500 })
   if (existing) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('✅ [AUTH FLOW] profile-creation → exists: success', { userId: user.id })
     }
-    return NextResponse.json({ profile: existing, created: false, message: 'Profile already exists' })
+    return NextResponse.json({ ok: true, data: existing, created: false, message: 'Profile already exists' })
   }
 
+  // Insert into the underlying profiles table (not the view)
   const defaultProfile = {
     id: user.id,
     display_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
@@ -97,13 +97,33 @@ export async function POST(_request: NextRequest) {
     preferences: { notifications: { email: true, push: false }, privacy: { show_email: false, show_phone: false } },
   }
   const { data: inserted, error: createError } = await supabase
-    .from('profiles_v2')
+    .from('profiles')
     .insert(defaultProfile)
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .single()
-  if (createError) return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 })
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('✅ [AUTH FLOW] profile-creation → created: success', { userId: user.id, profileId: inserted.id })
+  if (createError) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('❌ [AUTH FLOW] profile-creation → error:', createError)
+    }
+    return NextResponse.json({ ok: false, error: 'Failed to create profile', details: createError.message }, { status: 500 })
   }
-  return NextResponse.json({ profile: inserted, created: true, message: 'Profile created successfully' })
+  
+  // Fetch the created profile from the view to get all computed fields
+  const { data: profileData, error: fetchError } = await supabase
+    .from('profiles_v2')
+    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+    .eq('id', user.id)
+    .maybeSingle()
+  
+  if (fetchError || !profileData) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('❌ [AUTH FLOW] profile-creation → fetch error:', fetchError)
+    }
+    return NextResponse.json({ ok: false, error: 'Profile created but failed to fetch' }, { status: 500 })
+  }
+  
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('✅ [AUTH FLOW] profile-creation → created: success', { userId: user.id, profileId: profileData.id })
+  }
+  return NextResponse.json({ ok: true, data: profileData, created: true, message: 'Profile created successfully' })
 }

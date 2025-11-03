@@ -23,7 +23,7 @@ export default function UserProfile() {
     return (
       <a 
         href="/auth/signin" 
-        className="btn-accent text-sm"
+        className="btn-accent-secondary text-sm"
       >
         Sign In
       </a>

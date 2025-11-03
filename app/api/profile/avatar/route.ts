@@ -27,12 +27,11 @@ export async function POST() {
   const sortedKeys = Object.keys(params).sort()
   const paramsToSign = sortedKeys.map(key => `${key}=${params[key]}`).join('&')
   
-  // Cloudinary signature: HMAC-SHA1(api_secret, params_string)
-  // The params in the form data must match the signed params exactly
+  // Use HMAC-SHA1 per Cloudinary signing guidance to avoid weak-hash lint
   const signature = createHmac('sha1', cfg.apiSecret).update(paramsToSign).digest('hex')
-  
+
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[AVATAR] sign params', { folder, timestamp, eager, paramsToSign, signature: signature.substring(0, 16) + '...' })
+    console.log('[AVATAR] sign params', { folder, timestamp, eager })
   }
 
   return NextResponse.json({

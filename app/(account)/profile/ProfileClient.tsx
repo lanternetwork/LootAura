@@ -60,13 +60,23 @@ export default function ProfileClient() {
         const profRes = await fetch('/api/profile')
         let p: any = null
         if (profRes.status === 404) {
+          // Profile doesn't exist, create it
           const createRes = await fetch('/api/profile', { method: 'POST' })
+          if (!createRes.ok) {
+            const err = await createRes.json().catch(() => ({ error: 'Failed to create profile' }))
+            throw new Error(err?.error || 'Failed to create profile')
+          }
           p = await createRes.json()
+        } else if (!profRes.ok) {
+          const err = await profRes.json().catch(() => ({ error: 'Failed to load profile' }))
+          throw new Error(err?.error || 'Failed to load profile')
         } else {
           p = await profRes.json()
         }
         if (!mounted) return
-        const profileData = p?.profile || p?.data || (p?.id ? p : null)
+        
+        // Handle both old and new response formats
+        const profileData = p?.ok === true ? p.data : (p?.profile || p?.data || (p?.id ? p : null))
         if (profileData) {
           setProfile(profileData)
           // Load preferred categories via API
@@ -80,7 +90,7 @@ export default function ProfileClient() {
             console.error('Failed to load categories:', e)
           }
         } else {
-          setProfile({ id: 'me' } as Profile)
+          setError('Profile data not found')
         }
 
         // Load preferences

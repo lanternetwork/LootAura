@@ -97,7 +97,7 @@ export function IdentityCard({ profile, mode, onAvatarChange, onViewPublic }: Id
                   Message Seller
                 </Link>
               ) : (
-                <Link href={`/auth/signin?redirectTo=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`} className="btn-accent text-sm">
+                <Link href={`/auth/signin?redirectTo=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`} className="btn-accent-secondary text-sm">
                   Message Seller
                 </Link>
               )}
@@ -138,7 +138,7 @@ export function IdentityCard({ profile, mode, onAvatarChange, onViewPublic }: Id
                 Message Seller
               </Link>
             ) : (
-              <Link href={`/auth/signin?redirectTo=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`} className="btn-accent text-sm flex-1 text-center">
+              <Link href={`/auth/signin?redirectTo=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`} className="btn-accent-secondary text-sm flex-1 text-center">
                 Message Seller
               </Link>
             )}

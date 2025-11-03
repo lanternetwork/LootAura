@@ -21,10 +21,14 @@ export default function ProfileClient() {
     const load = async () => {
       try {
         setLoading(true)
-        const [p, prefs] = await Promise.all([
-          fetch('/api/profile').then(r => r.json()),
-          fetch('/api/preferences').then(r => r.json()),
-        ])
+        const profRes = await fetch('/api/profile')
+        let p = await profRes.json()
+        // If profile not found, try to create a default one
+        if (profRes.status === 404) {
+          const createRes = await fetch('/api/profile', { method: 'POST' })
+          p = await createRes.json()
+        }
+        const prefs = await fetch('/api/preferences').then(r => r.json())
         if (!mounted) return
         if (p?.profile) setProfile(p.profile)
         // merge prefs into profile.preferences for display

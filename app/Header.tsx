@@ -85,6 +85,8 @@ export function Header() {
               <Link href="/favorites" className="hidden md:block text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Favorites</Link>
               <Link href="/sell/new" className="text-xs sm:text-sm md:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Post Your Sale</Link>
             </div>
+            {/* Visual divider between clusters (desktop only) */}
+            <div className={`${isCollapsed ? 'hidden' : 'hidden md:block'} h-6 w-px bg-slate-200`} aria-hidden="true"></div>
             {/* Admin links cluster */}
             <div ref={adminRef} className={`${isCollapsed ? 'hidden' : 'hidden md:flex'} items-center gap-3`} aria-label="Account">
               {hasUser && <Link href="/profile" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Profile</Link>}

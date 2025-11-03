@@ -47,7 +47,7 @@ export default function UserProfile() {
     return (
       <a 
         href="/auth/signin" 
-        className="text-neutral-700 hover:text-amber-600 font-medium"
+        className="btn-accent text-sm"
       >
         Sign In
       </a>

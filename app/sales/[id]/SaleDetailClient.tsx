@@ -183,24 +183,24 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                       </span>
                     </div>
                   )}
-                  <div className="space-y-2">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 mr-3 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      <div>
-                        <div className="font-medium">{formatDate(sale.date_start)}</div>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{formatDate(sale.date_start)}</div>
                         <div className="text-sm text-gray-600">{formatTime(sale.time_start)}</div>
                       </div>
                     </div>
                     
                     {sale.date_end && sale.time_end && (
-                      <div className="flex items-center">
-                        <svg className="w-5 h-5 mr-3 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <div>
-                          <div className="font-medium">Ends: {formatDate(sale.date_end)}</div>
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">Ends: {formatDate(sale.date_end)}</div>
                           <div className="text-sm text-gray-600">{formatTime(sale.time_end)}</div>
                         </div>
                       </div>

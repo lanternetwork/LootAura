@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { IdentityCard } from '@/components/profile/IdentityCard'
 import { AboutCard } from '@/components/profile/AboutCard'
 import { PreferredCategories } from '@/components/profile/PreferredCategories'
@@ -105,7 +104,7 @@ export default function ProfileClient() {
         try {
           const [activeRes, draftsRes, archivedRes] = await Promise.all([
             fetch('/api/profile/listings?status=active&limit=50').catch(() => null),
-            fetch('/api/profile/listings?status=draft&limit=50').catch(() => null),
+            fetch('/api/profile/listings?status=drafts&limit=50').catch(() => null),
             fetch('/api/profile/listings?status=archived&limit=50').catch(() => null),
           ])
           const active = activeRes?.ok ? await activeRes.json().then((r: any) => r.items || []) : []

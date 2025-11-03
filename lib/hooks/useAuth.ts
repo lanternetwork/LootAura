@@ -144,23 +144,26 @@ export function useFavorites() {
     queryFn: async () => {
       if (!user) return []
 
-      // Use schema-aware table name
-      const schema = process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'
-      const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
-
-      const { data, error } = await sb
-        .from(favoritesTable)
-        .select(`
-          sale_id,
-          sales:sale_id (*)
-        `)
+      // Step 1: get favorite sale_ids from public view
+      const { data: favRows, error: favErr } = await sb
+        .from('favorites_v2')
+        .select('sale_id')
         .eq('user_id', user.id)
 
-      if (error) {
-        throw new Error(error.message)
-      }
+      if (favErr) throw new Error(favErr.message)
 
-      return data?.map((fav: any) => fav.sales).filter(Boolean) as Sale[] || []
+      const ids = (favRows || []).map((r: any) => r.sale_id)
+      if (ids.length === 0) return []
+
+      // Step 2: fetch sales from public view
+      const { data: salesRows, error: salesErr } = await sb
+        .from('sales_v2')
+        .select('*')
+        .in('id', ids)
+
+      if (salesErr) throw new Error(salesErr.message)
+
+      return salesRows as Sale[]
     },
     enabled: !!user,
   })
@@ -176,9 +179,8 @@ export function useToggleFavorite() {
         throw new Error('Please sign in to save favorites')
       }
 
-      // Use schema-aware table name
-      const schema = process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'
-      const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
+      // Always target public view, which forwards to base table via rules
+      const favoritesTable = 'favorites_v2'
 
       if (isFavorited) {
         const { error } = await sb

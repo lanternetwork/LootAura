@@ -42,6 +42,10 @@ export function OwnerListingsTabs({
   const handleDeleteConfirm = () => {
     if (deleteConfirmId && onDelete) {
       onDelete(deleteConfirmId)
+      // Emit cache revalidation event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'delete', id: deleteConfirmId } }))
+      }
       setDeleteConfirmId(null)
     }
   }
@@ -62,16 +66,6 @@ export function OwnerListingsTabs({
       // Emit cache revalidation event
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'unarchive', id } }))
-      }
-    }
-  }
-  
-  const handleDelete = (id: string) => {
-    if (onDelete) {
-      onDelete(id)
-      // Emit cache revalidation event
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'delete', id } }))
       }
     }
   }

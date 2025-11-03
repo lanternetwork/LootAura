@@ -58,15 +58,18 @@ async function fetchProfileData(username: string) {
   const profile = prof.data
   if (!profile) return null
   
-  const [preferred, ownerStats] = await Promise.all([
+  const [preferred, ownerStatsResult] = await Promise.all([
     deriveCategories(profile.id).catch(() => []),
     supabase
       .from('owner_stats')
       .select('avg_rating, ratings_count, total_sales')
       .eq('user_id', profile.id)
-      .maybeSingle()
-      .catch(() => ({ data: null })),
+      .maybeSingle(),
   ])
+  
+  const ownerStats = ownerStatsResult.error || !ownerStatsResult.data
+    ? { avg_rating: null, ratings_count: null, total_sales: null }
+    : ownerStatsResult.data
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[PROFILE] public page fetch end', { username, hasProfile: !!profile, categoriesCount: preferred.length })
@@ -75,7 +78,7 @@ async function fetchProfileData(username: string) {
   return {
     profile,
     preferred,
-    ownerStats: ownerStats.data || { avg_rating: null, ratings_count: null, total_sales: null },
+    ownerStats,
   }
 }
 

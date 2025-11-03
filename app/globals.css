@@ -3,18 +3,18 @@
 @tailwind utilities;
 
 :root {
-  --accent-primary: #6B21A8;
+  --accent-primary: #4C1D95;
   --accent-secondary: #FACC15;
-  --accent-hover: #581C87;
+  --accent-hover: #3B0764;
   --accent-secondary-hover: #EAB308;
   --bg-neutral: #F8FAFC;
   --text-neutral: #0f172a;
 }
 
 .dark {
-  --accent-primary: #7E22CE;
+  --accent-primary: #6B21A8;
   --accent-secondary: #FACC15;
-  --accent-hover: #6B21A8;
+  --accent-hover: #4C1D95;
   --accent-secondary-hover: #EAB308;
   --bg-neutral: #0b1020;
   --text-neutral: #e5e7eb;
@@ -41,7 +41,7 @@
   .badge-accent {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
     color: var(--accent-hover);
-    background-color: rgba(107, 33, 168, 0.15);
+    background-color: rgba(76, 29, 149, 0.15);
   }
 }
 

@@ -36,6 +36,7 @@
 
   .link-accent { color: var(--accent-primary); }
   .link-accent:hover { color: var(--accent-hover); }
+  .link-accent:visited { color: var(--accent-primary); }
 
   .badge-accent {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;

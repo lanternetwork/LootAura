@@ -77,7 +77,7 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
         )}
         {sale?.id && (
           <Link 
-            className="link-accent font-medium text-sm" 
+            className="link-accent hover:text-[var(--accent-hover)] font-medium text-sm" 
             href={detailUrl}
           >
             View Details →

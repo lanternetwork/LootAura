@@ -128,8 +128,8 @@ export default function ZipInput({
           disabled={loading || !zip || (zip.length < 5)}
           className={`px-4 py-2 rounded-md min-h-[40px] w-[40px] flex items-center justify-center appearance-none disabled:cursor-not-allowed ${
             invalidFlash 
-              ? '!bg-red-500 !text-white' 
-              : '!bg-[var(--accent-primary)] !text-white hover:!bg-[var(--accent-hover)]'
+              ? 'border border-red-600 text-red-600 bg-transparent hover:bg-[rgba(220,38,38,0.06)]' 
+              : 'btn-accent'
           }`}
         >
           {loading ? (

@@ -32,10 +32,16 @@
 
 @layer components {
   .btn-accent {
-    @apply text-white rounded-md px-4 py-2 inline-flex items-center justify-center transition-colors;
-    background-color: var(--accent-primary);
+    @apply rounded-md px-4 py-2 inline-flex items-center justify-center font-medium transition-colors;
+    color: var(--accent-primary);
+    background-color: transparent;
+    border: 1.5px solid var(--accent-primary);
   }
-  .btn-accent:hover { background-color: var(--accent-hover); }
+  .btn-accent:hover {
+    color: var(--accent-hover);
+    border-color: var(--accent-hover);
+    background-color: rgba(59, 7, 100, 0.06); /* subtle tint using hover color */
+  }
 
   .btn-accent-secondary {
     @apply rounded-md px-4 py-2 inline-flex items-center justify-center font-medium transition-colors;

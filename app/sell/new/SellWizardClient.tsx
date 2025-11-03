@@ -289,14 +289,14 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
               <div key={step.id} className="flex items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                   index <= currentStep
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-[var(--accent-primary)] text-white'
                     : 'bg-gray-200 text-gray-500'
                 }`}>
                   {index + 1}
                 </div>
                 {index < WIZARD_STEPS.length - 1 && (
                   <div className={`w-12 h-0.5 mx-2 ${
-                    index < currentStep ? 'bg-blue-600' : 'bg-gray-200'
+                    index < currentStep ? 'bg-[var(--accent-primary)]' : 'bg-gray-200'
                   }`} />
                 )}
               </div>
@@ -335,7 +335,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         {currentStep < WIZARD_STEPS.length - 1 ? (
           <button
             onClick={handleNext}
-            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors min-h-[44px]"
+            className="inline-flex items-center px-6 py-3 btn-accent min-h-[44px]"
           >
             Next
             <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -381,7 +381,7 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           value={formData.title || ''}
           onChange={(e) => onChange('title', e.target.value)}
           placeholder="e.g., Huge Yard Sale with Antiques"
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
           required
         />
         {errors?.title && (
@@ -398,7 +398,7 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           onChange={(e) => onChange('description', e.target.value)}
           placeholder="Describe your sale and what items you're selling..."
           rows={4}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
         />
       </div>
 
@@ -411,7 +411,7 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
             type="date"
             value={formData.date_start || ''}
             onChange={(e) => onChange('date_start', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
             required
           />
         {errors?.date_start && (
@@ -426,7 +426,7 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
             type="time"
             value={formData.time_start || ''}
             onChange={(e) => onChange('time_start', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
             required
           />
         {errors?.time_start && (
@@ -444,7 +444,7 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
             type="date"
             value={formData.date_end || ''}
             onChange={(e) => onChange('date_end', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
           />
         </div>
         <div>
@@ -455,7 +455,7 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
             type="time"
             value={formData.time_end || ''}
             onChange={(e) => onChange('time_end', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
           />
         </div>
       </div>
@@ -487,7 +487,7 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
             value={formData.city || ''}
             onChange={(e) => onChange('city', e.target.value)}
             placeholder="City"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
             required
           />
         {errors?.city && (
@@ -531,7 +531,7 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
         <select
           value={formData.pricing_mode || 'negotiable'}
           onChange={(e) => onChange('pricing_mode', e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
         >
           <option value="negotiable">Prices negotiable</option>
           <option value="firm">Prices as marked / Firm</option>
@@ -581,7 +581,7 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
                     onChange('tags', currentTags.filter(tag => tag !== category))
                   }
                 }}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
               />
               <span className="text-sm text-gray-700">{category}</span>
             </label>
@@ -646,7 +646,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
         <h3 className="text-lg font-medium text-gray-900">Items for Sale</h3>
         <button
           onClick={onAdd}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors min-h-[44px]"
+          className="inline-flex items-center px-4 py-2 btn-accent min-h-[44px]"
         >
           <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -688,7 +688,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
                     value={item.name}
                     onChange={(e) => onUpdate(index, 'name', e.target.value)}
                     placeholder="e.g., Vintage Coffee Table"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
                     required
                   />
                 </div>
@@ -704,7 +704,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
                     placeholder="0.00"
                     min="0"
                     step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
                   />
                 </div>
               </div>
@@ -718,7 +718,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
                   onChange={(e) => onUpdate(index, 'description', e.target.value)}
                   placeholder="Describe the item's condition, age, etc."
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
                 />
               </div>
 
@@ -835,14 +835,14 @@ function ReviewStep({ formData, photos, items }: {
         )}
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
         <div className="flex">
-          <svg className="w-5 h-5 text-blue-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-5 h-5 text-purple-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <div>
-            <h4 className="font-medium text-blue-800">Ready to publish?</h4>
-            <p className="text-sm text-blue-700 mt-1">
+            <h4 className="font-medium text-purple-800">Ready to publish?</h4>
+            <p className="text-sm text-purple-700 mt-1">
               Your sale will be visible to buyers in your area. You can edit it later from your account.
             </p>
           </div>

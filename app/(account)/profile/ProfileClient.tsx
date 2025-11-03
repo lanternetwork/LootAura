@@ -8,6 +8,7 @@ import { PreferredCategories } from '@/components/profile/PreferredCategories'
 import { OwnerMetrics } from '@/components/profile/OwnerMetrics'
 import { OwnerListingsTabs } from '@/components/profile/OwnerListingsTabs'
 import { PreferencesCard } from '@/components/profile/PreferencesCard'
+import { AvatarUploader as AvatarUploaderComponent } from '@/components/profile/AvatarUploader'
 
 type Profile = {
   id: string
@@ -125,19 +126,61 @@ export default function ProfileClient() {
       mounted = false
     }
   }, [])
+  
+  // Listen for cache revalidation events
+  useEffect(() => {
+    const handleSalesMutated = async () => {
+      // Reload listings when sales are mutated
+      try {
+        const [activeRes, draftsRes, archivedRes] = await Promise.all([
+          fetch('/api/profile/listings?status=active&limit=50'),
+          fetch('/api/profile/listings?status=drafts&limit=50'),
+          fetch('/api/profile/listings?status=archived&limit=50'),
+        ])
+        const active = activeRes.ok ? await activeRes.json().then((r: any) => r.items || []) : []
+        const drafts = draftsRes.ok ? await draftsRes.json().then((r: any) => r.items || []) : []
+        const archived = archivedRes.ok ? await archivedRes.json().then((r: any) => r.items || []) : []
+        setListings({ active, drafts, archived })
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
+    window.addEventListener('sales:mutated', handleSalesMutated)
+    return () => {
+      window.removeEventListener('sales:mutated', handleSalesMutated)
+    }
+  }, [])
 
-  const handleBioSave = async (bio: string) => {
+  const handleAboutSave = async (data: { displayName?: string; bio?: string; locationCity?: string; locationRegion?: string }) => {
     const res = await fetch('/api/profile', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bio }),
+      body: JSON.stringify({
+        display_name: data.displayName,
+        bio: data.bio,
+        location_city: data.locationCity,
+        location_region: data.locationRegion,
+      }),
     })
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
       throw new Error(j?.error || 'Failed to save')
     }
     const j = await res.json()
-    if (j?.data) setProfile((prev) => (prev ? { ...prev, bio } : null))
+    if (j?.data) {
+      setProfile((prev) => (prev ? {
+        ...prev,
+        display_name: data.displayName ?? prev.display_name,
+        bio: data.bio ?? prev.bio,
+        location_city: data.locationCity ?? prev.location_city,
+        location_region: data.locationRegion ?? prev.location_region,
+      } : null))
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[PROFILE] owner update success')
+      }
+    }
   }
 
   const handlePreferencesSave = async (theme: string, units: string) => {
@@ -189,14 +232,16 @@ export default function ProfileClient() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <IdentityCard
-        displayName={profile.display_name}
-        username={profile.username || undefined}
-        avatarUrl={profile.avatar_url || undefined}
-        locationCity={profile.location_city || undefined}
-        locationRegion={profile.location_region || undefined}
-        createdAt={profile.created_at || undefined}
-        verified={profile.verified || false}
-        isOwner={true}
+        profile={{
+          displayName: profile.display_name,
+          username: profile.username,
+          avatarUrl: profile.avatar_url,
+          locationCity: profile.location_city,
+          locationRegion: profile.location_region,
+          createdAt: profile.created_at,
+          verified: profile.verified,
+        }}
+        mode="owner"
         onAvatarChange={handleAvatarChange}
         onViewPublic={handleViewPublic}
       />
@@ -214,18 +259,26 @@ export default function ProfileClient() {
                 Close
               </button>
             </div>
-            <AvatarUploader
+            <AvatarUploaderComponent
               initialUrl={profile.avatar_url || undefined}
               onUpdated={(url) => {
                 setProfile((prev) => (prev ? { ...prev, avatar_url: url } : null))
                 setShowAvatarUploader(false)
               }}
+              onClose={() => setShowAvatarUploader(false)}
             />
           </div>
         </div>
       )}
 
-      <AboutCard bio={profile.bio || undefined} isEditable={true} onSave={handleBioSave} />
+      <AboutCard
+        bio={profile.bio || undefined}
+        displayName={profile.display_name || undefined}
+        locationCity={profile.location_city || undefined}
+        locationRegion={profile.location_region || undefined}
+        isEditable={true}
+        onSave={handleAboutSave}
+      />
 
       {preferredCategories.length > 0 && <PreferredCategories categories={preferredCategories} />}
 
@@ -236,17 +289,66 @@ export default function ProfileClient() {
         drafts={listings.drafts}
         archived={listings.archived}
         onEdit={(id) => router.push(`/sell/edit/${id}`)}
-        onArchive={(id) => {
-          // TODO: Implement archive
-          console.log('Archive:', id)
+        onArchive={async (id) => {
+          try {
+            const res = await fetch(`/api/sales/${id}/archive`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'completed' }),
+            })
+            if (res.ok) {
+              // Reload listings
+              const [activeRes, archivedRes] = await Promise.all([
+                fetch('/api/profile/listings?status=active&limit=50'),
+                fetch('/api/profile/listings?status=archived&limit=50'),
+              ])
+              const active = activeRes.ok ? await activeRes.json().then((r: any) => r.items || []) : []
+              const archived = archivedRes.ok ? await archivedRes.json().then((r: any) => r.items || []) : []
+              setListings((prev) => ({ ...prev, active, archived }))
+            }
+          } catch (e) {
+            console.error('Failed to archive:', e)
+          }
         }}
-        onUnarchive={(id) => {
-          // TODO: Implement unarchive
-          console.log('Unarchive:', id)
+        onUnarchive={async (id) => {
+          try {
+            const res = await fetch(`/api/sales/${id}/archive`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'published' }),
+            })
+            if (res.ok) {
+              // Reload listings
+              const [activeRes, archivedRes] = await Promise.all([
+                fetch('/api/profile/listings?status=active&limit=50'),
+                fetch('/api/profile/listings?status=archived&limit=50'),
+              ])
+              const active = activeRes.ok ? await activeRes.json().then((r: any) => r.items || []) : []
+              const archived = archivedRes.ok ? await archivedRes.json().then((r: any) => r.items || []) : []
+              setListings((prev) => ({ ...prev, active, archived }))
+            }
+          } catch (e) {
+            console.error('Failed to unarchive:', e)
+          }
         }}
-        onDelete={(id) => {
-          // TODO: Implement delete
-          console.log('Delete:', id)
+        onDelete={async (id) => {
+          try {
+            const res = await fetch(`/api/sales/${id}/delete`, { method: 'DELETE' })
+            if (res.ok) {
+              // Reload listings
+              const [activeRes, draftsRes, archivedRes] = await Promise.all([
+                fetch('/api/profile/listings?status=active&limit=50'),
+                fetch('/api/profile/listings?status=drafts&limit=50'),
+                fetch('/api/profile/listings?status=archived&limit=50'),
+              ])
+              const active = activeRes.ok ? await activeRes.json().then((r: any) => r.items || []) : []
+              const drafts = draftsRes.ok ? await draftsRes.json().then((r: any) => r.items || []) : []
+              const archived = archivedRes.ok ? await archivedRes.json().then((r: any) => r.items || []) : []
+              setListings({ active, drafts, archived })
+            }
+          } catch (e) {
+            console.error('Failed to delete:', e)
+          }
         }}
       />
 
@@ -255,83 +357,6 @@ export default function ProfileClient() {
         units={(profile as any).preferences?.units || 'imperial'}
         onSave={handlePreferencesSave}
       />
-    </div>
-  )
-}
-
-function AvatarUploader({ initialUrl, onUpdated }: { initialUrl?: string; onUpdated: (url: string | null) => void }) {
-  const [preview, setPreview] = useState<string | undefined>(initialUrl)
-  const [uploading, setUploading] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setErr(null)
-    setUploading(true)
-    try {
-      const sig = await fetch('/api/profile/avatar', { method: 'POST' }).then((r) => r.json())
-      if (!sig?.ok) throw new Error(sig?.error || 'Failed to get signature')
-      const form = new FormData()
-      form.append('file', file)
-      form.append('timestamp', String(sig.data.timestamp))
-      form.append('api_key', sig.data.api_key)
-      form.append('signature', sig.data.signature)
-      form.append('folder', sig.data.folder)
-      if (sig.data.eager) form.append('eager', sig.data.eager)
-      const cloudUrl = `https://api.cloudinary.com/v1_1/${sig.data.cloud_name}/image/upload`
-      const up = await fetch(cloudUrl, { method: 'POST', body: form })
-      const uj = await up.json()
-      if (!up.ok) throw new Error(uj?.error?.message || 'Upload failed')
-      setPreview(uj.secure_url)
-      // persist to profile
-      const res = await fetch('/api/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatar_url: uj.secure_url }),
-      })
-      if (res.ok) onUpdated(uj.secure_url)
-    } catch (e: any) {
-      setErr(e?.message || 'Upload failed')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const onRemove = async () => {
-    setUploading(true)
-    await fetch('/api/profile', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ avatar_url: null }),
-    })
-    setPreview(undefined)
-    onUpdated(null)
-    setUploading(false)
-  }
-
-  return (
-    <div className="space-y-4">
-      {preview ? (
-        <div
-          className="w-32 h-32 rounded-full mx-auto"
-          style={{ backgroundImage: `url(${preview})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-        />
-      ) : (
-        <div className="w-32 h-32 rounded-full bg-neutral-200 mx-auto" />
-      )}
-      <div className="flex gap-2 items-center justify-center">
-        <label className="btn-accent cursor-pointer">
-          <input type="file" accept="image/*" className="hidden" onChange={onUpload} disabled={uploading} />
-          {uploading ? 'Uploading…' : 'Upload'}
-        </label>
-        {preview && (
-          <button type="button" className="rounded px-4 py-2 border" onClick={onRemove} disabled={uploading}>
-            Remove
-          </button>
-        )}
-      </div>
-      {err && <div className="text-red-600 text-sm text-center">{err}</div>}
     </div>
   )
 }

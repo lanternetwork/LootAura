@@ -31,8 +31,50 @@ export function OwnerListingsTabs({
   onDelete,
 }: OwnerListingsTabsProps) {
   const [tab, setTab] = useState<'active' | 'drafts' | 'archived'>('active')
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
   const currentListings = tab === 'active' ? active : tab === 'drafts' ? drafts : archived
+  
+  const handleDeleteClick = (id: string) => {
+    setDeleteConfirmId(id)
+  }
+  
+  const handleDeleteConfirm = () => {
+    if (deleteConfirmId && onDelete) {
+      onDelete(deleteConfirmId)
+      setDeleteConfirmId(null)
+    }
+  }
+  
+  const handleArchive = (id: string) => {
+    if (onArchive) {
+      onArchive(id)
+      // Emit cache revalidation event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'archive', id } }))
+      }
+    }
+  }
+  
+  const handleUnarchive = (id: string) => {
+    if (onUnarchive) {
+      onUnarchive(id)
+      // Emit cache revalidation event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'unarchive', id } }))
+      }
+    }
+  }
+  
+  const handleDelete = (id: string) => {
+    if (onDelete) {
+      onDelete(id)
+      // Emit cache revalidation event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'delete', id } }))
+      }
+    }
+  }
 
   return (
     <div className="card">
@@ -90,17 +132,17 @@ export function OwnerListingsTabs({
                       </button>
                     )}
                     {tab === 'active' && onArchive && (
-                      <button type="button" onClick={() => onArchive(listing.id)} className="text-sm text-neutral-600 hover:text-neutral-900">
+                      <button type="button" onClick={() => handleArchive(listing.id)} className="text-sm text-neutral-600 hover:text-neutral-900">
                         Archive
                       </button>
                     )}
                     {tab === 'archived' && onUnarchive && (
-                      <button type="button" onClick={() => onUnarchive(listing.id)} className="text-sm text-neutral-600 hover:text-neutral-900">
+                      <button type="button" onClick={() => handleUnarchive(listing.id)} className="text-sm text-neutral-600 hover:text-neutral-900">
                         Unarchive
                       </button>
                     )}
                     {onDelete && (
-                      <button type="button" onClick={() => onDelete(listing.id)} className="text-sm text-red-600 hover:text-red-700">
+                      <button type="button" onClick={() => handleDeleteClick(listing.id)} className="text-sm text-red-600 hover:text-red-700">
                         Delete
                       </button>
                     )}
@@ -111,6 +153,33 @@ export function OwnerListingsTabs({
           </div>
         )}
       </div>
+      
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setDeleteConfirmId(null)}>
+          <div className="bg-white rounded-lg p-6 w-96 max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-medium mb-4">Delete Listing</h3>
+            <p className="text-sm text-neutral-600 mb-4">
+              Are you sure you want to delete this listing? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                className="rounded px-4 py-2 border text-sm hover:bg-neutral-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                className="btn-accent text-sm bg-red-600 hover:bg-red-700 border-red-600 hover:border-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

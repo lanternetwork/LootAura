@@ -5,22 +5,38 @@ export async function GET(req: Request) {
   const supabase = createSupabaseServerClient()
   const { data: user } = await supabase.auth.getUser()
   if (!user?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-
-  const url = new URL(req.url)
-  const status = url.searchParams.get('status') || 'active'
-  const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit') || '50')))
-
-  const from = 0
-  const to = limit - 1
-
-  const q = await supabase
+  
+  const { searchParams } = new URL(req.url)
+  const status = searchParams.get('status') || 'active'
+  const limit = parseInt(searchParams.get('limit') || '50', 10)
+  const page = parseInt(searchParams.get('page') || '1', 10)
+  const from = (page - 1) * limit
+  const to = from + limit - 1
+  
+  // Map status to database values: 'active' -> 'published', 'archived' -> 'completed', 'drafts' -> 'draft'
+  const statusMap: Record<string, string> = {
+    active: 'published',
+    archived: 'completed',
+    drafts: 'draft',
+  }
+  const dbStatus = statusMap[status] || status
+  
+  const { data, error, count } = await supabase
     .from('sales_v2')
-    .select('id, title, cover_url, address, status, owner_id')
+    .select('id, title, cover_url, address, status, owner_id', { count: 'exact' })
     .eq('owner_id', user.user.id)
-    .eq('status', status)
+    .eq('status', dbStatus)
+    .order('created_at', { ascending: false })
     .range(from, to)
-
-  const items = q.data || []
-  return NextResponse.json({ items })
+  
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  
+  return NextResponse.json({
+    items: data || [],
+    total: count || 0,
+    page,
+    hasMore: to + 1 < (count || 0),
+  })
 }
-

@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     .from('sales_v2')
     .select('id, title, cover_url, address, status, owner_id', { count: 'exact' })
     .eq('owner_id', userId)
-    .eq('status', 'active')
+    .eq('status', 'published')
     .range(from, to)
 
   const items = q.data || []

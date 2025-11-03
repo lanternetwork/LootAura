@@ -43,12 +43,12 @@ export default async function PublicProfilePage({ params }: { params: { username
         </div>
       </div>
 
-      {pData?.preferred && pData.preferred.length > 0 && (
+      {preferred && preferred.length > 0 && (
         <div className="card">
           <div className="card-body">
             <div className="text-sm text-neutral-600 mb-2">Preferred categories (auto‑derived)</div>
             <div className="flex flex-wrap gap-2">
-              {pData.preferred.map((c: string) => (
+              {preferred.map((c: string) => (
                 <span key={c} className="badge-accent">{c}</span>
               ))}
             </div>

@@ -1,7 +1,6 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
-import { getSchema } from './schema';
 
 export function createSupabaseBrowserClient() {
   // Validate required environment variables

@@ -63,7 +63,7 @@ export default function UserProfile() {
 
       {/* User info */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-neutral-700">
+        <span className="text-sm font-medium text-neutral-700 max-w-[140px] truncate hidden lg:inline">
           {profile?.display_name || user.email}
         </span>
         

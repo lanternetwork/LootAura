@@ -17,6 +17,7 @@ export function Header() {
   const logoRef = useRef<HTMLAnchorElement | null>(null)
   const mainRef = useRef<HTMLDivElement | null>(null)
   const adminRef = useRef<HTMLDivElement | null>(null)
+  const userRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const sb = createSupabaseBrowserClient()
     sb.auth.getUser().then(({ data }) => setHasUser(!!data.user)).catch(() => setHasUser(false))
@@ -33,8 +34,9 @@ export function Header() {
       const lw = logoRef.current?.clientWidth ?? 0
       const mw = mainRef.current?.scrollWidth ?? 0
       const aw = adminRef.current?.scrollWidth ?? 0
-      const gaps = 24
-      const need = lw + mw + aw + gaps
+      const uw = userRef.current?.scrollWidth ?? 0
+      const gaps = 64 // larger safety margin to avoid visual collision
+      const need = lw + mw + aw + uw + gaps
       const collapsed = need > cw
       if (collapsed !== last) {
         last = collapsed
@@ -50,6 +52,7 @@ export function Header() {
     if (logoRef.current) ro.observe(logoRef.current)
     if (mainRef.current) ro.observe(mainRef.current)
     if (adminRef.current) ro.observe(adminRef.current)
+    if (userRef.current) ro.observe(userRef.current)
     compute()
     return () => { cancelAnimationFrame(raf); ro.disconnect() }
   }, [])
@@ -111,7 +114,9 @@ export function Header() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <UserProfile />
+            <div ref={userRef} className="flex items-center">
+              <UserProfile />
+            </div>
           </div>
         </div>
       </div>

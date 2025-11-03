@@ -97,9 +97,6 @@ export function PreferencesCard({ theme = 'system', units = 'imperial', onSave }
               </label>
             </div>
           </div>
-          <div className="text-sm text-neutral-600">
-            Location from session; default search radius 25 miles.
-          </div>
           {error && <div className="text-red-600 text-sm">{error}</div>}
           <div className="flex gap-2">
             <button

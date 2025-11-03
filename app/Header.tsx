@@ -3,11 +3,13 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import UserProfile from '@/components/UserProfile'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
+import { useAuth } from '@/lib/hooks/useAuth'
 
 export function Header() {
   const pathname = usePathname()
   const isSalesPage = pathname === '/sales'
   const { openFilterSheet } = useMobileFilter()
+  const { data: user } = useAuth()
   
   // Mobile filter button handler
   const handleMobileFilterClick = () => {
@@ -43,6 +45,14 @@ export function Header() {
             >
               Favorites
             </Link>
+            {user && (
+              <Link 
+                href="/dashboard" 
+                className="hidden md:block text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 transition-colors whitespace-nowrap"
+              >
+                Dashboard
+              </Link>
+            )}
             <Link 
               href="/sell/new" 
               className="text-xs sm:text-sm md:text-base text-[#3A2268] hover:text-[#3A2268]/80 transition-colors whitespace-nowrap"

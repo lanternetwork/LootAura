@@ -11,29 +11,32 @@ export function TopNav() {
             Loot Aura
           </Link>
 
-          {/* Center links - hidden on mobile */}
-          <div className="hidden md:flex items-center gap-6">
+          {/* Right side - links and sign in button */}
+          <div className="flex items-center gap-4 md:gap-6">
+            {/* Browse sales and Post a sale links */}
+            <div className="hidden md:flex items-center gap-6">
+              <Link
+                href="/sales"
+                className="text-[#3A2268] hover:text-[#3A2268]/80 transition-colors"
+              >
+                Browse sales
+              </Link>
+              <Link
+                href="/sell/new"
+                className="text-[#3A2268] hover:text-[#3A2268]/80 transition-colors"
+              >
+                Post a sale
+              </Link>
+            </div>
+
+            {/* Sign in button */}
             <Link
-              href="/sales"
-              className="text-[#3A2268] hover:text-[#3A2268]/80 transition-colors"
+              href="/auth/signin"
+              className="px-4 py-2 rounded-lg bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium transition-colors"
             >
-              Browse sales
-            </Link>
-            <Link
-              href="/sell/new"
-              className="text-[#3A2268] hover:text-[#3A2268]/80 transition-colors"
-            >
-              Post a sale
+              Sign in
             </Link>
           </div>
-
-          {/* Sign in button */}
-          <Link
-            href="/auth/signin"
-            className="px-4 py-2 rounded-lg bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium transition-colors"
-          >
-            Sign in
-          </Link>
         </div>
       </div>
     </nav>

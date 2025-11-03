@@ -13,7 +13,7 @@
   --card-bg: #ffffff;
   --card-border: #e5e7eb; /* slate-200 */
   --card-radius: 0.75rem; /* rounded-xl */
-  --card-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  --card-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
 }
 
 .dark {
@@ -27,7 +27,7 @@
   --card-bg: #111827; /* slate-800 */
   --card-border: #1f2937; /* slate-700 */
   --card-radius: 0.75rem;
-  --card-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  --card-shadow: 0 1px 2px 0 rgba(0,0,0,0.4);
 }
 
 @layer components {

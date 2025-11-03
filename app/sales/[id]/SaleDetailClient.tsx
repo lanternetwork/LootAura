@@ -8,6 +8,7 @@ import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
+import { useAuth, useFavorites } from '@/lib/hooks/useAuth'
 import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
 import type { SaleWithOwnerInfo } from '@/lib/data'
 
@@ -29,6 +30,8 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
     : '/sales'
   const { location } = useLocationSearch()
   const [isFavorited, setIsFavorited] = useState(false)
+  const { data: currentUser } = useAuth()
+  const { data: favoriteSales = [] } = useFavorites()
   const [showFullDescription, setShowFullDescription] = useState(false)
   const cover = getSaleCoverUrl(sale)
 
@@ -51,8 +54,19 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
   }
 
 
+  // Keep local favorite state in sync with favorites list
+  // (simple check each render; list is small)
+  const fromList = Array.isArray(favoriteSales) && favoriteSales.some((s: any) => s?.id === sale.id)
+  if (fromList !== isFavorited) {
+    setIsFavorited(fromList)
+  }
+
   const handleFavoriteToggle = async () => {
     try {
+      if (!currentUser) {
+        window.location.href = `/auth/signin?redirectTo=${encodeURIComponent(window.location.pathname)}`
+        return
+      }
       const response = await fetch(`/api/sales/${sale.id}/favorite`, {
         method: 'POST',
         headers: {

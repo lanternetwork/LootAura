@@ -34,9 +34,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ ok: true, favorited: false })
   }
 
+  // Insert with upsert to avoid duplicate conflicts if called twice rapidly
   const { error } = await supabase
     .from('favorites_v2')
-    .insert({ user_id: user.id, sale_id: saleId })
+    .upsert({ user_id: user.id, sale_id: saleId }, { onConflict: 'user_id,sale_id', ignoreDuplicates: true })
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 })

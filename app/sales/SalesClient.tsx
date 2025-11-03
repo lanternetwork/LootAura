@@ -869,7 +869,7 @@ export default function SalesClient({
                     </div>
                           <button
                   onClick={() => handleFiltersChange({ ...filters, distance: Math.min(25, filters.distance + 5) })}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  className="px-4 py-2 rounded btn-accent"
                           >
                   Increase Distance
                           </button>
@@ -909,7 +909,7 @@ export default function SalesClient({
               {selectedPinId && (
                 <button
                   onClick={() => setSelectedPinId(null)}
-                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                  className="text-sm link-accent underline"
                 >
                   Show All
                 </button>
@@ -944,7 +944,7 @@ export default function SalesClient({
                     </div>
                     <button
                       onClick={() => handleFiltersChange({ ...filters, distance: Math.min(25, filters.distance + 5) })}
-                      className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      className="px-4 py-2 rounded btn-accent"
                     >
                       Increase Distance
                     </button>

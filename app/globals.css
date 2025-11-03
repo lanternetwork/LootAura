@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 :root {
-  --accent-primary: #9333EA;
+  --accent-primary: #7E22CE;
   --accent-secondary: #FACC15;
-  --accent-hover: #7E22CE;
+  --accent-hover: #6B21A8;
   --accent-secondary-hover: #EAB308;
   --bg-neutral: #F8FAFC;
   --text-neutral: #0f172a;

@@ -9,6 +9,11 @@
   --accent-secondary-hover: #EAB308;
   --bg-neutral: #F8FAFC;
   --text-neutral: #0f172a;
+  /* Card tokens */
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb; /* slate-200 */
+  --card-radius: 0.75rem; /* rounded-xl */
+  --card-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 
 .dark {
@@ -18,6 +23,11 @@
   --accent-secondary-hover: #EAB308;
   --bg-neutral: #0b1020;
   --text-neutral: #e5e7eb;
+  /* Card tokens (dark) */
+  --card-bg: #111827; /* slate-800 */
+  --card-border: #1f2937; /* slate-700 */
+  --card-radius: 0.75rem;
+  --card-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 
 @layer components {
@@ -43,6 +53,22 @@
     color: var(--accent-hover);
     background-color: rgba(76, 29, 149, 0.15);
   }
+
+  /* Card utilities */
+  .card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+  }
+  .card-hover:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .card-body { @apply p-4; }
+  .card-body-lg { @apply p-6; }
+  .card-header { @apply flex items-center justify-between; }
+  .card-title { @apply text-base font-semibold; }
+  .card-subtitle { @apply text-sm text-gray-600; }
 }
 
 /* Mapbox GL CSS - imported once globally */

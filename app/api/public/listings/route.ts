@@ -9,9 +9,9 @@ export async function GET(req: Request) {
   if (!userParam) return NextResponse.json({ error: 'user required' }, { status: 400 })
   const supabase = createSupabaseServerClient()
   // Resolve userParam to user id via profiles_v2 if needed
-  let userId = userParam
   const prof = await supabase.from('profiles_v2').select('id, username').or(`id.eq.${userParam},username.eq.${userParam}`).maybeSingle()
-  if (prof.data?.id) userId = prof.data.id
+  if (!prof.data?.id) return NextResponse.json({ error: 'user not found' }, { status: 404 })
+  const userId = prof.data.id
 
   const from = (page - 1) * limit
   const to = from + limit - 1

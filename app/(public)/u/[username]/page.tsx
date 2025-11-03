@@ -1,18 +1,27 @@
 import Link from 'next/link'
-
-async function fetchJSON(url: string) {
-  const res = await fetch(url, { cache: 'no-store' })
-  return { ok: res.ok, status: res.status, data: await res.json().catch(() => ({})) }
-}
+import { notFound } from 'next/navigation'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { deriveCategories } from '@/lib/profile/deriveCategories'
 
 export default async function PublicProfilePage({ params }: { params: { username: string } }) {
   const username = decodeURIComponent(params.username)
-  const [{ ok: pOK, data: pData }, { ok: lOK, data: lData }] = await Promise.all([
-    fetchJSON(`${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/public/profile?username=${encodeURIComponent(username)}`),
-    fetchJSON(`${process.env.NEXT_PUBLIC_SITE_URL || ''}/api/public/listings?user=${encodeURIComponent(username)}&page=1&limit=12`),
-  ])
-  const profile = pData?.profile
-  const items = lData?.items || []
+  const supabase = createSupabaseServerClient()
+  // Resolve profile by username or id
+  const prof = await supabase
+    .from('profiles_v2')
+    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+    .or(`username.eq.${username},id.eq.${username}`)
+    .maybeSingle()
+  const profile = prof.data
+  if (!profile) return notFound()
+  const preferred = await deriveCategories(profile.id)
+  const listings = await supabase
+    .from('sales_v2')
+    .select('id, title, cover_url, address, status, owner_id')
+    .eq('owner_id', profile.id)
+    .eq('status', 'active')
+    .range(0, 11)
+  const items = listings.data || []
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <div className="card">

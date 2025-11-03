@@ -166,7 +166,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                 
                 <button
                   onClick={handleShare}
-                  className="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 transition-colors min-h-[44px]"
+                  className="inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors min-h-[44px] bg-[rgba(147,51,234,0.15)] text-[#3A2268] hover:bg-[rgba(147,51,234,0.25)]"
                 >
                   <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
@@ -239,7 +239,7 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
                 {sale.description.length > 200 && (
                   <button
                     onClick={() => setShowFullDescription(!showFullDescription)}
-                    className="mt-2 text-blue-600 hover:text-blue-800 font-medium"
+                    className="mt-2 link-accent font-medium"
                   >
                     {showFullDescription ? 'Show less' : 'Show more'}
                   </button>
@@ -305,9 +305,9 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
           />
 
           {/* Shopping Tips */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-800 mb-2">Shopping Tips</h4>
-            <ul className="text-sm text-blue-700 space-y-1">
+          <div className="bg-[rgba(147,51,234,0.08)] border border-purple-200 rounded-lg p-4">
+            <h4 className="font-medium text-[#3A2268] mb-2">Shopping Tips</h4>
+            <ul className="text-sm text-[#3A2268] space-y-1">
               <li>• Bring cash — many sales are cash only</li>
               <li>• Arrive early for the best selection</li>
               <li>• Check items before purchasing</li>

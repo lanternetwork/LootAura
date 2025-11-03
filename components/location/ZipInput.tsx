@@ -118,7 +118,7 @@ export default function ZipInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           maxLength={10}
-          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[40px] ${
+          className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent min-h-[40px] ${
             error ? 'border-red-300' : 'border-gray-300'
           }`}
           disabled={loading}
@@ -127,7 +127,7 @@ export default function ZipInput({
           type="submit"
           disabled={loading || !zip || (zip.length < 5)}
           className={`px-4 py-2 rounded-md min-h-[40px] w-[40px] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed ${
-            invalidFlash ? 'bg-red-500 text-white' : 'bg-blue-500 text-white hover:bg-blue-600'
+            invalidFlash ? 'bg-red-500 text-white' : 'btn-accent'
           }`}
         >
           {loading ? (

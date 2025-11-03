@@ -155,13 +155,13 @@ export default function MobileFilterSheet({
                       px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap
                       ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
                       ${isSelected 
-                        ? 'bg-blue-100 text-blue-800 border border-blue-200' 
+                        ? 'bg-[rgba(147,51,234,0.15)] text-[#3A2268] border border-purple-200' 
                         : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
                       }
                     `}
                   >
                     {category.label}
-                    {isSelected && <span className="ml-1 text-blue-600">×</span>}
+                    {isSelected && <span className="ml-1 text-[var(--accent-primary)]">×</span>}
                   </button>
                 )
               })}
@@ -199,8 +199,8 @@ export default function MobileFilterSheet({
           <button
             onClick={handleApply}
             disabled={isLoading}
-            className={`flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors ${
-              isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
+            className={`flex-1 rounded-lg text-sm font-medium transition-colors ${
+              isLoading ? 'opacity-50 cursor-not-allowed btn-accent' : 'btn-accent'
             }`}
           >
             Apply Filters

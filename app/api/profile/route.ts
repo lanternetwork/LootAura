@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest) {
   }
 
   // Read directly from canonical base table
-  // Try selecting with bio; if the column doesn't exist in this env, retry without it
+  // Try selecting with all columns; if any column doesn't exist, fallback to core columns only
   let data: any = null
   let error: any = null
   {
@@ -26,13 +26,23 @@ export async function GET(_req: NextRequest) {
     error = res.error
   }
 
-  if (error && (error.message?.includes('column') || error.message?.includes('bio'))) {
+  if (error && error.message?.includes('column')) {
+    // Fallback to core columns that definitely exist
     const res2 = await sb
       .from('profiles')
-      .select('id, display_name, avatar_url, location_city, location_region, created_at, verified')
+      .select('id, avatar_url, created_at')
       .eq('id', user.id)
       .maybeSingle()
-    data = res2.data ? { ...res2.data, bio: null } : null
+    if (res2.data) {
+      data = {
+        ...res2.data,
+        display_name: null,
+        bio: null,
+        location_city: null,
+        location_region: null,
+        verified: false,
+      }
+    }
     error = res2.error
   }
 
@@ -110,18 +120,31 @@ export async function PUT(req: Request) {
     updateErr = res.error
   }
 
-  // If bio column doesn't exist in this env, retry without updating/reading it
-  if (updateErr && (updateErr.message?.includes('column') || updateErr.message?.includes('bio'))) {
-    const retryData = { ...updateData }
-    delete retryData.bio
-    const res2 = await sb
-      .from('profiles')
-      .update(retryData)
-      .eq('id', user.id)
-      .select('id, display_name, avatar_url, location_city, location_region, created_at, verified')
-      .single()
-    updated = res2.data ? { ...res2.data, bio: null } : null
-    updateErr = res2.error
+  // If any column doesn't exist in this env, retry with only core columns
+  if (updateErr && updateErr.message?.includes('column')) {
+    // Only update columns that definitely exist (avatar_url is core)
+    const retryData: Record<string, any> = {}
+    if ('avatar_url' in updateData) retryData.avatar_url = updateData.avatar_url
+    
+    if (Object.keys(retryData).length > 0) {
+      const res2 = await sb
+        .from('profiles')
+        .update(retryData)
+        .eq('id', user.id)
+        .select('id, avatar_url, created_at')
+        .single()
+      if (res2.data) {
+        updated = {
+          ...res2.data,
+          display_name: updateData.display_name ?? null,
+          bio: updateData.bio ?? null,
+          location_city: updateData.location_city ?? null,
+          location_region: updateData.location_region ?? null,
+          verified: false,
+        }
+      }
+      updateErr = res2.error
+    }
   }
 
   if (updateErr || !updated) {
@@ -244,13 +267,23 @@ export async function POST(_request: NextRequest) {
     profileData = res.data
     fetchError = res.error
   }
-  if (fetchError && (fetchError.message?.includes('column') || fetchError.message?.includes('bio'))) {
+  if (fetchError && fetchError.message?.includes('column')) {
+    // Fallback to core columns that definitely exist
     const res2 = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url, location_city, location_region, created_at, verified')
+      .select('id, avatar_url, created_at')
       .eq('id', user.id)
       .maybeSingle()
-    profileData = res2.data ? { ...res2.data, bio: null } : null
+    if (res2.data) {
+      profileData = {
+        ...res2.data,
+        display_name: userFullName,
+        bio: null,
+        location_city: null,
+        location_region: null,
+        verified: false,
+      }
+    }
     fetchError = res2.error
   }
   

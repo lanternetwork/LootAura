@@ -104,7 +104,7 @@ export async function PUT(req: Request) {
   updateData.updated_at = new Date().toISOString()
   
   // Try to update all fields first
-  const { data, error } = await sb
+  const { error } = await sb
     .from('profiles')
     .update(updateData)
     .eq('id', user.id)

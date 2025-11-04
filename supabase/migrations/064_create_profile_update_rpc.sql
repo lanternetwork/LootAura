@@ -152,18 +152,10 @@ BEGIN
   FROM lootaura_v2.profiles p
   WHERE p.id = p_user_id;
   
-  -- If base table query returned null, synthesize minimal profile
+  -- If base table query returned null, this is a critical error
+  -- The profile should exist since we just updated it
   IF v_result IS NULL THEN
-    v_result := jsonb_build_object(
-      'id', p_user_id,
-      'display_name', p_display_name,
-      'bio', p_bio,
-      'location_city', p_location_city,
-      'location_region', p_location_region,
-      'avatar_url', p_avatar_url,
-      'created_at', now(),
-      'updated_at', now()
-    );
+    RAISE EXCEPTION 'Profile not found after update: %', p_user_id;
   END IF;
   
   RETURN v_result;

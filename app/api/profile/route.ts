@@ -166,134 +166,80 @@ export async function PUT(req: Request) {
   console.log('[PROFILE] PUT calling RPC with params:', JSON.stringify(rpcParams, null, 2))
   const { data: rpcResult, error: rpcError } = await sb.rpc('update_profile', rpcParams)
   
-  console.log('[PROFILE] PUT RPC call result:', { 
-    hasResult: !!rpcResult, 
-    hasError: !!rpcError,
-    error: rpcError?.message,
-    errorCode: rpcError?.code,
-    errorDetails: rpcError?.details,
-    resultType: typeof rpcResult,
-    resultValue: rpcResult ? JSON.stringify(rpcResult).substring(0, 200) : null
-  })
-  
-  let updated: any = null
-  let updateErr: any = null
-  
-  if (rpcError) {
-    console.error('[PROFILE] PUT RPC error:', rpcError.message, rpcError)
-    updateErr = rpcError
-  } else if (rpcResult) {
-    // RPC returns JSONB - parse it if it's a string, otherwise use as-is
-    let profileData = rpcResult
-    if (typeof rpcResult === 'string') {
-      try {
-        profileData = JSON.parse(rpcResult)
-      } catch {
-        // If parsing fails, fetch from view
-        console.log('[PROFILE] PUT RPC returned string, parsing failed, fetching from view')
-        const { data: viewData } = await sb
-          .from('profiles_v2')
-          .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
-          .eq('id', user.id)
-          .maybeSingle()
-        profileData = viewData
-      }
-    }
-    updated = profileData
-    console.log('[PROFILE] PUT RPC result:', { 
-      hasData: !!updated, 
-      bioInResult: updated?.bio,
-      keysInResult: updated ? Object.keys(updated) : []
-    })
-  } else {
-    // RPC returned null/undefined - the update might have succeeded but the SELECT failed
-    // Try fetching from view as fallback
-    console.log('[PROFILE] PUT RPC returned null, fetching from view as fallback')
-    const { data: viewData, error: viewError } = await sb
-      .from('profiles_v2')
-      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
-      .eq('id', user.id)
-      .maybeSingle()
-    
-    console.log('[PROFILE] PUT view fetch result:', { 
-      hasData: !!viewData, 
-      hasError: !!viewError,
-      error: viewError?.message,
-      bioInData: viewData?.bio
-    })
-    
-    if (viewError) {
-      console.error('[PROFILE] PUT view fetch error:', viewError.message)
-      updateErr = viewError
-    } else if (viewData) {
-      updated = viewData
-      console.log('[PROFILE] PUT view fallback result:', { 
-        hasData: !!updated, 
-        bioInResult: updated?.bio,
-        keysInResult: updated ? Object.keys(updated) : []
-      })
-    } else {
-      // Both RPC and view returned null - verify if update actually persisted
-      console.log('[PROFILE] PUT both RPC and view returned null, verifying update persistence')
-      
-      // Wait a moment for any potential replication delay, then verify
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // Try to fetch the updated profile from the view to verify persistence
-      const { data: verifyData, error: verifyError } = await sb
-        .from('profiles_v2')
-        .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
-        .eq('id', user.id)
-        .maybeSingle()
-      
-      console.log('[PROFILE] PUT verification fetch:', {
-        hasData: !!verifyData,
-        hasError: !!verifyError,
-        error: verifyError?.message,
-        bioInVerify: verifyData?.bio,
-        expectedBio: updateData.bio
-      })
-      
-      if (verifyData) {
-        // Verification succeeded - return the actual data from the view
-        updated = verifyData
-        console.log('[PROFILE] PUT verification successful, returning view data')
-      } else if (verifyError) {
-        // Verification failed with error - return update data as confirmation
-        console.log('[PROFILE] PUT verification failed with error, returning update data as confirmation')
-        updated = {
-          id: user.id,
-          display_name: updateData.display_name ?? null,
-          bio: updateData.bio ?? null,
-          location_city: updateData.location_city ?? null,
-          location_region: updateData.location_region ?? null,
-          avatar_url: updateData.avatar_url ?? null,
-          created_at: null,
-          verified: false,
-        }
-      } else {
-        // Verification returned null - profile might not exist in view or RLS blocking
-        // But RPC function updates base table directly, so update likely succeeded
-        // Return the update data as confirmation since RPC function is SECURITY DEFINER
-        console.log('[PROFILE] PUT verification returned null, but RPC update likely succeeded')
-        console.log('[PROFILE] PUT RPC is SECURITY DEFINER and updates base table directly')
-        updated = {
-          id: user.id,
-          display_name: updateData.display_name ?? null,
-          bio: updateData.bio ?? null,
-          location_city: updateData.location_city ?? null,
-          location_region: updateData.location_region ?? null,
-          avatar_url: updateData.avatar_url ?? null,
-          created_at: null,
-          verified: false,
-        }
-        console.log('[PROFILE] PUT returning update data as confirmation:', {
-          hasBio: !!updated.bio,
-          bio: updated.bio
+        console.log('[PROFILE] PUT RPC call result:', { 
+          hasResult: !!rpcResult, 
+          hasError: !!rpcError,
+          error: rpcError?.message,
+          errorCode: rpcError?.code,
+          errorDetails: rpcError?.details,
+          resultType: typeof rpcResult,
+          resultValue: rpcResult ? JSON.stringify(rpcResult).substring(0, 200) : null
         })
-      }
-    }
-  }
+        
+        let updated: any = null
+        let updateErr: any = null
+        
+        if (rpcError) {
+          console.error('[PROFILE] PUT RPC error:', rpcError.message, rpcError)
+          updateErr = rpcError
+        } else if (rpcResult) {
+          // RPC returns JSONB - parse it if it's a string, otherwise use as-is
+          let profileData = rpcResult
+          if (typeof rpcResult === 'string') {
+            try {
+              profileData = JSON.parse(rpcResult)
+            } catch {
+              // If parsing fails, try get_profile RPC to read back
+              console.log('[PROFILE] PUT RPC returned string, parsing failed, trying get_profile RPC')
+              const { data: getProfileData, error: getProfileError } = await sb.rpc('get_profile', { p_user_id: user.id })
+              if (getProfileData && !getProfileError) {
+                profileData = typeof getProfileData === 'string' ? JSON.parse(getProfileData) : getProfileData
+              }
+            }
+          }
+          updated = profileData
+          console.log('[PROFILE] PUT RPC result:', { 
+            hasData: !!updated, 
+            bioInResult: updated?.bio,
+            avatarUrlInResult: updated?.avatar_url,
+            keysInResult: updated ? Object.keys(updated) : []
+          })
+        } else {
+          // RPC returned null/undefined - the update might have succeeded but the SELECT failed
+          // Try get_profile RPC to read back from base table
+          console.log('[PROFILE] PUT RPC returned null, trying get_profile RPC to read back')
+          const { data: getProfileData, error: getProfileError } = await sb.rpc('get_profile', { p_user_id: user.id })
+          
+          if (getProfileData && !getProfileError) {
+            updated = typeof getProfileData === 'string' ? JSON.parse(getProfileData) : getProfileData
+            console.log('[PROFILE] PUT get_profile RPC read successful:', { 
+              hasData: !!updated, 
+              bioInResult: updated?.bio,
+              avatarUrlInResult: updated?.avatar_url,
+              keysInResult: updated ? Object.keys(updated) : []
+            })
+          } else {
+            // Both RPCs failed - try view as last resort
+            console.log('[PROFILE] PUT both RPCs returned null, trying view as fallback')
+            const { data: viewData, error: viewError } = await sb
+              .from('profiles_v2')
+              .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+              .eq('id', user.id)
+              .maybeSingle()
+            
+            if (viewData) {
+              updated = viewData
+              console.log('[PROFILE] PUT view fallback successful:', { 
+                hasData: !!updated, 
+                bioInResult: updated?.bio,
+                avatarUrlInResult: updated?.avatar_url
+              })
+            } else {
+              console.error('[PROFILE] PUT all read methods failed - RPC update likely succeeded but cannot verify')
+              updateErr = new Error('Update succeeded but could not read back profile')
+            }
+          }
+        }
 
   if (updateErr || !updated) {
     console.error('[PROFILE] PUT update failed:', updateErr?.message || 'No data returned')

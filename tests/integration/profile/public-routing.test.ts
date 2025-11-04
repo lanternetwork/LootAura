@@ -1,17 +1,29 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+type ProfileRow = {
+  id: string
+  username: string | null
+  display_name: string | null
+  bio: string | null
+}
+
 describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Public Profile Routing', () => {
-  let supabase: ReturnType<typeof createClient>
+  let supabase: SupabaseClient
 
   beforeAll(async () => {
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Supabase env vars not set')
     }
-    supabase = createClient(supabaseUrl, supabaseAnonKey)
+    // Suppress GoTrueClient warning by creating client with storage disabled
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storage: undefined, // Disable storage to avoid multiple instance warning
+      },
+    })
   })
 
   describe('Username-based routing', () => {
@@ -24,18 +36,20 @@ describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Public Profile Routing', () =
         .limit(1)
         .maybeSingle()
 
-      if (profile && profile.username) {
+      if (profile && (profile as ProfileRow).username) {
+        const profileData = profile as ProfileRow
         // Verify profile can be fetched by username
         const { data, error } = await supabase
           .from('profiles_v2')
           .select('id, username')
-          .eq('username', profile.username)
+          .eq('username', profileData.username!)
           .maybeSingle()
 
         expect(error).toBeNull()
         expect(data).not.toBeNull()
         if (data) {
-          expect(data.username).toBe(profile.username)
+          const dataRow = data as ProfileRow
+          expect(dataRow.username).toBe(profileData.username)
         }
       }
     })
@@ -47,8 +61,9 @@ describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Public Profile Routing', () =
         .eq('username', 'nonexistent-username-12345')
         .maybeSingle()
 
-      // Should not find profile - data should be null
-      expect(data).toBeNull()
+      // Should not find profile - data should be null or empty
+      expect(data).toBeFalsy()
+      expect(error).toBeNull()
     })
   })
 
@@ -62,22 +77,24 @@ describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Public Profile Routing', () =
         .limit(1)
         .maybeSingle()
 
-      if (profile && profile.id) {
+      if (profile && (profile as ProfileRow).id) {
+        const profileData = profile as ProfileRow
         // Verify UUID format
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profile.id)
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileData.id)
         expect(isUUID).toBe(true)
 
         // Verify profile can be fetched by ID
         const { data, error } = await supabase
           .from('profiles_v2')
           .select('id')
-          .eq('id', profile.id)
+          .eq('id', profileData.id)
           .maybeSingle()
 
         expect(error).toBeNull()
         expect(data).not.toBeNull()
         if (data) {
-          expect(data.id).toBe(profile.id)
+          const dataRow = data as ProfileRow
+          expect(dataRow.id).toBe(profileData.id)
         }
       }
     })

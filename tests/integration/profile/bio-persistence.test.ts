@@ -1,12 +1,18 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+type ProfileRow = {
+  id: string
+  username: string | null
+  bio: string | null
+}
+
 describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Profile Bio Persistence', () => {
   let testUserId: string
-  let supabase: ReturnType<typeof createClient>
+  let supabase: SupabaseClient
 
   beforeAll(async () => {
     // Create a test user session (this would need to be done via auth API in real tests)
@@ -14,7 +20,12 @@ describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Profile Bio Persistence', () 
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Supabase env vars not set')
     }
-    supabase = createClient(supabaseUrl, supabaseAnonKey)
+    // Suppress GoTrueClient warning by creating client with storage disabled
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storage: undefined, // Disable storage to avoid multiple instance warning
+      },
+    })
     
     // In a real test, you'd create a test user via auth API
     // For now, we'll assume a test user exists
@@ -53,8 +64,11 @@ describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Profile Bio Persistence', () 
       .maybeSingle()
 
     // Verify bio is returned (if authenticated and profile exists)
-    if (!error && data && data.bio !== null) {
-      expect(data.bio).toBe('hello')
+    if (!error && data) {
+      const profileData = data as ProfileRow
+      if (profileData.bio !== null) {
+        expect(profileData.bio).toBe('hello')
+      }
     }
   })
 
@@ -67,9 +81,12 @@ describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Profile Bio Persistence', () 
       .eq('id', testUserId)
       .maybeSingle()
 
-    if (!error && data && data.username && data.bio !== null) {
-      // Verify bio is accessible via public view
-      expect(data.bio).toBe('hello')
+    if (!error && data) {
+      const profileData = data as ProfileRow
+      if (profileData.username && profileData.bio !== null) {
+        // Verify bio is accessible via public view
+        expect(profileData.bio).toBe('hello')
+      }
     }
   })
 })

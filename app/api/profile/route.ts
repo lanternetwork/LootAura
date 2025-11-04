@@ -89,14 +89,20 @@ export async function POST(_request: NextRequest) {
   }
 
   // Insert into profiles table directly (profiles_v2 is a view, cannot insert into it)
-  // Only include base columns that exist in the table structure
-  // Use full_name instead of display_name for initial insert (display_name is computed in view)
+  // Only include the required id field - let database defaults handle the rest
+  // This avoids schema cache issues when the table is in lootaura_v2 schema but client uses public schema
   const defaultProfile: Record<string, any> = {
     id: user.id,
-    full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-    avatar_url: user.user_metadata?.avatar_url || null,
-    preferences: { notifications: { email: true, push: false }, privacy: { show_email: false, show_phone: false } },
   }
+  
+  // Try to add optional fields if they exist, but don't fail if they don't
+  // These will be added via UPDATE after successful insert if needed
+  const userFullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User'
+  const userAvatarUrl = user.user_metadata?.avatar_url || null
+  const userPreferences = { notifications: { email: true, push: false }, privacy: { show_email: false, show_phone: false } }
+  
+  // Only add fields that we know exist - let the database handle defaults
+  // Insert with just id first, then update with values
   const { error: createError, data: insertedData } = await supabase
     .from('profiles')
     .insert(defaultProfile)
@@ -107,6 +113,33 @@ export async function POST(_request: NextRequest) {
       console.error('❌ [AUTH FLOW] profile-creation → insert error:', createError)
     }
     return NextResponse.json({ ok: false, error: 'Failed to create profile', details: createError.message }, { status: 500 })
+  }
+  
+  // Now update the profile with the actual values we want
+  // Use the same pattern as PUT handler which works
+  const updateData: Record<string, any> = {}
+  if (userFullName) {
+    // Try both full_name and display_name (whichever exists)
+    updateData.full_name = userFullName
+    updateData.display_name = userFullName
+  }
+  if (userAvatarUrl) {
+    updateData.avatar_url = userAvatarUrl
+  }
+  if (userPreferences) {
+    updateData.preferences = userPreferences
+  }
+  
+  // Update the profile if we have fields to set
+  if (Object.keys(updateData).length > 0) {
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .eq('id', user.id)
+    if (updateError && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.warn('⚠️ [AUTH FLOW] profile-creation → update warning:', updateError)
+      // Don't fail if update fails - the profile was created successfully
+    }
   }
   
   // Fetch the created profile from the view to get all computed fields (username, etc.)
@@ -125,15 +158,15 @@ export async function POST(_request: NextRequest) {
       const basicProfile = {
         id: insertedData.id,
         username: null,
-        display_name: insertedData.display_name || defaultProfile.display_name,
-        avatar_url: insertedData.avatar_url || null,
+        display_name: userFullName,
+        avatar_url: userAvatarUrl,
         bio: null,
         location_city: null,
         location_region: null,
         created_at: insertedData.created_at || new Date().toISOString(),
         verified: false,
-        home_zip: insertedData.home_zip || null,
-        preferences: insertedData.preferences || defaultProfile.preferences,
+        home_zip: null,
+        preferences: userPreferences,
       }
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('✅ [AUTH FLOW] profile-creation → created: success (fallback)', { userId: user.id, profileId: basicProfile.id })

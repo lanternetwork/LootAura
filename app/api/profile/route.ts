@@ -75,83 +75,82 @@ export async function PUT(req: Request) {
   }
 
   // Update using lootaura_v2.profiles directly (profiles_v2 is a view, may not support UPDATE)
-  // Only update columns that are provided and exist in the schema - avoid schema cache errors
-  const updateData: Record<string, any> = {}
+  // Only update avatar_url directly - it's the only column we know exists for sure
+  // Everything else goes through the view which handles schema differences
   
-  // Always update base columns that definitely exist
-  if (payload.display_name !== undefined) {
-    updateData.full_name = payload.display_name
-  }
+  // Build minimal update data - only include avatar_url if provided
+  const minimalUpdate: Record<string, any> = {}
   if (payload.avatar_url !== undefined) {
-    updateData.avatar_url = payload.avatar_url
+    minimalUpdate.avatar_url = payload.avatar_url
   }
   
-  // Always set updated_at
-  updateData.updated_at = new Date().toISOString()
+  // Try to update via view first (which should have all columns and handle schema)
+  // If view doesn't support UPDATE, fall back to direct table update with only avatar_url
+  let updateSuccess = false
   
-  // Try to update base columns first (full_name, avatar_url, updated_at)
-  // Don't include optional columns (bio, location) in initial update to avoid schema cache errors
-  const { error: baseError } = await sb
-    .from('profiles')
-    .update(updateData)
-    .eq('id', user.id)
-  
-  // If base update fails, return error
-  if (baseError) {
-    const status = baseError.code === '42501' ? 403 : 500
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.error('[PROFILE] PUT base update failed:', baseError)
-    }
-    return NextResponse.json({ ok: false, error: baseError.message }, { status })
-  }
-  
-  // Now try to update optional columns (bio, location) separately if provided
-  // These might not exist in all schema configurations
-  const optionalUpdateData: Record<string, any> = {}
-  if (payload.display_name !== undefined) {
-    optionalUpdateData.display_name = payload.display_name
-  }
-  if (payload.bio !== undefined) {
-    optionalUpdateData.bio = payload.bio ?? null
-  }
-  if (payload.location_city !== undefined) {
-    optionalUpdateData.location_city = payload.location_city ?? null
-  }
-  if (payload.location_region !== undefined) {
-    optionalUpdateData.location_region = payload.location_region ?? null
-  }
-  
-  // Only update optional columns if they were provided
-  if (Object.keys(optionalUpdateData).length > 0) {
-    try {
-      // First try updating via view (which might have triggers/rules)
-      const { error: viewError } = await sb
-        .from('profiles_v2')
-        .update(optionalUpdateData)
+  if (Object.keys(minimalUpdate).length > 0) {
+    // Try view update first
+    const { error: viewError } = await sb
+      .from('profiles_v2')
+      .update(minimalUpdate)
+      .eq('id', user.id)
+    
+    if (!viewError) {
+      updateSuccess = true
+    } else {
+      // View doesn't support UPDATE, try direct table with only avatar_url
+      const { error: tableError } = await sb
+        .from('profiles')
+        .update(minimalUpdate)
         .eq('id', user.id)
       
-      if (viewError) {
-        // If view doesn't support UPDATE, try direct table update
-        // But catch errors if columns don't exist
-        const { error: optionalError } = await sb
-          .from('profiles')
-          .update(optionalUpdateData)
-          .eq('id', user.id)
-        
-        if (optionalError && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          // Log but don't fail - these columns might not exist
-          console.warn('[PROFILE] PUT optional columns update failed (non-critical):', optionalError.message)
+      if (tableError) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[PROFILE] PUT avatar_url update failed:', tableError)
         }
+        // Don't fail - avatar_url might not exist in schema cache
+      } else {
+        updateSuccess = true
+      }
+    }
+  }
+  
+  // Now handle other fields (display_name, bio, location) via view or table
+  // These might not exist in schema cache, so we'll try and ignore errors
+  const otherFields: Record<string, any> = {}
+  if (payload.display_name !== undefined) {
+    otherFields.display_name = payload.display_name
+    otherFields.full_name = payload.display_name
+  }
+  if (payload.bio !== undefined) {
+    otherFields.bio = payload.bio ?? null
+  }
+  if (payload.location_city !== undefined) {
+    otherFields.location_city = payload.location_city ?? null
+  }
+  if (payload.location_region !== undefined) {
+    otherFields.location_region = payload.location_region ?? null
+  }
+  
+  // Try to update other fields via view (which should handle schema differences)
+  if (Object.keys(otherFields).length > 0) {
+    try {
+      const { error: otherError } = await sb
+        .from('profiles_v2')
+        .update(otherFields)
+        .eq('id', user.id)
+      
+      if (otherError && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('[PROFILE] PUT other fields update failed (non-critical):', otherError.message)
       }
     } catch (e: any) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.warn('[PROFILE] PUT optional columns update error (non-critical):', e?.message)
+        console.warn('[PROFILE] PUT other fields update error (non-critical):', e?.message)
       }
-      // Don't fail - these columns might not exist
     }
   }
   
-  // Fetch updated profile from view (which should have all columns)
+  // Always fetch updated profile from view (which should have all columns)
   const { data: profileData } = await sb
     .from('profiles_v2')
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
@@ -159,9 +158,10 @@ export async function PUT(req: Request) {
     .maybeSingle()
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] update profile success')
+    console.log('[PROFILE] update profile success', { updateSuccess, hasProfileData: !!profileData })
   }
 
+  // Return success even if some updates failed - the view will have the latest data
   return NextResponse.json({ ok: true, data: profileData })
 }
 

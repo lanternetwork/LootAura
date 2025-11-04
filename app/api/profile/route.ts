@@ -79,8 +79,24 @@ export async function GET(_req: NextRequest) {
 
   if (!data) {
     console.log('[PROFILE] GET profile not found in view or via RPC', { userId: user.id })
-    // Profile doesn't exist - client should create it
-    return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+    // Profile doesn't exist - try one more time with update_profile RPC to create it
+    console.log('[PROFILE] GET attempting to create profile via update_profile RPC')
+    try {
+      const { data: createRpcData, error: createRpcError } = await sb.rpc('update_profile', { p_user_id: user.id })
+      if (!createRpcError && createRpcData) {
+        const profileData = typeof createRpcData === 'string' ? JSON.parse(createRpcData) : createRpcData
+        console.log('[PROFILE] GET update_profile RPC created profile successfully')
+        data = profileData
+      } else {
+        console.log('[PROFILE] GET update_profile RPC failed:', createRpcError?.message)
+        // Profile doesn't exist and couldn't create it - return 404
+        return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+      }
+    } catch (e: any) {
+      console.log('[PROFILE] GET update_profile RPC exception:', e?.message || e)
+      // Profile doesn't exist and couldn't create it - return 404
+      return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+    }
   }
 
   console.log('[PROFILE] GET /api/profile returned keys:', Object.keys(data))

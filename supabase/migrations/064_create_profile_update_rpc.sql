@@ -85,24 +85,56 @@ BEGIN
   END IF;
   
   -- Update location_city if provided (allows NULL to clear)
-  BEGIN
-    UPDATE lootaura_v2.profiles
-    SET location_city = p_location_city
-    WHERE id = p_user_id;
-  EXCEPTION WHEN undefined_column THEN
-    -- Column doesn't exist, skip it
-    NULL;
-  END;
+  IF p_location_city IS NOT NULL OR (p_location_city IS NULL AND EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'lootaura_v2' 
+    AND table_name = 'profiles' 
+    AND column_name = 'location_city'
+  )) THEN
+    BEGIN
+      -- Ensure column exists
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' 
+        AND table_name = 'profiles' 
+        AND column_name = 'location_city'
+      ) THEN
+        ALTER TABLE lootaura_v2.profiles ADD COLUMN location_city text;
+      END IF;
+      
+      UPDATE lootaura_v2.profiles
+      SET location_city = p_location_city
+      WHERE id = p_user_id;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'Failed to update location_city: %', SQLERRM;
+    END;
+  END IF;
   
   -- Update location_region if provided (allows NULL to clear)
-  BEGIN
-    UPDATE lootaura_v2.profiles
-    SET location_region = p_location_region
-    WHERE id = p_user_id;
-  EXCEPTION WHEN undefined_column THEN
-    -- Column doesn't exist, skip it
-    NULL;
-  END;
+  IF p_location_region IS NOT NULL OR (p_location_region IS NULL AND EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'lootaura_v2' 
+    AND table_name = 'profiles' 
+    AND column_name = 'location_region'
+  )) THEN
+    BEGIN
+      -- Ensure column exists
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' 
+        AND table_name = 'profiles' 
+        AND column_name = 'location_region'
+      ) THEN
+        ALTER TABLE lootaura_v2.profiles ADD COLUMN location_region text;
+      END IF;
+      
+      UPDATE lootaura_v2.profiles
+      SET location_region = p_location_region
+      WHERE id = p_user_id;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'Failed to update location_region: %', SQLERRM;
+    END;
+  END IF;
   
   -- Always update updated_at (this should exist, but wrap in try-catch just in case)
   BEGIN

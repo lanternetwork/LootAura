@@ -124,14 +124,17 @@ export async function PUT(req: Request) {
   
   console.log('[PROFILE] PUT RPC params:', rpcParams)
   
+  console.log('[PROFILE] PUT calling RPC with params:', JSON.stringify(rpcParams, null, 2))
   const { data: rpcResult, error: rpcError } = await sb.rpc('update_profile', rpcParams)
   
   console.log('[PROFILE] PUT RPC call result:', { 
     hasResult: !!rpcResult, 
     hasError: !!rpcError,
     error: rpcError?.message,
+    errorCode: rpcError?.code,
+    errorDetails: rpcError?.details,
     resultType: typeof rpcResult,
-    resultValue: rpcResult
+    resultValue: rpcResult ? JSON.stringify(rpcResult).substring(0, 200) : null
   })
   
   let updated: any = null

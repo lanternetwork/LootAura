@@ -118,18 +118,11 @@ export async function PUT(req: Request) {
     .eq('id', user.id)
     .maybeSingle()
   
-  const data = profileData
-
-  if (error) {
-    const status = error.code === '42501' ? 403 : 500
-    return NextResponse.json({ ok: false, error: error.message }, { status })
-  }
-
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[PROFILE] update profile success')
   }
 
-  return NextResponse.json({ ok: true, data })
+  return NextResponse.json({ ok: true, data: profileData })
 }
 
 // Legacy handlers removed to avoid duplicate exports and name collisions

@@ -11,6 +11,26 @@ export async function POST() {
   const cfg = getCloudinaryConfig()
   if (!cfg) return NextResponse.json({ ok: false, error: 'Cloudinary not configured' }, { status: 501 })
 
+  // Check if unsigned upload preset is available (preferred method)
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+  
+  if (uploadPreset) {
+    // Use unsigned upload preset (simpler, no signature needed)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[AVATAR] using unsigned upload preset:', uploadPreset)
+    }
+    return NextResponse.json({
+      ok: true,
+      data: {
+        cloud_name: cfg.cloudName,
+        upload_preset: uploadPreset,
+        folder: `avatars/${user.id}`,
+        eager: 'c_fill,g_face,r_max,w_256,h_256',
+      },
+    })
+  }
+
+  // Fallback to signed upload (requires API secret)
   // Cloudinary signed upload signature generation
   // All parameters EXCEPT file, api_key, and signature must be included in signature
   // Parameters must be sorted lexicographically

@@ -42,29 +42,46 @@ export function AvatarUploader({ initialUrl, onUpdated, onClose }: AvatarUploade
       }
       
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AVATAR] signature issued')
+        console.log('[AVATAR] signature issued', { hasPreset: !!sig.data.upload_preset, hasSignature: !!sig.data.signature })
       }
       
       // Upload to Cloudinary
-      // IMPORTANT: Parameters must be sent in the same order as signed
-      // For signed uploads, Cloudinary expects: eager, folder, timestamp (lexicographically sorted)
       const form = new FormData()
       form.append('file', file)
-      // Add parameters in lexicographic order to match signature
-      form.append('eager', sig.data.eager)
-      form.append('folder', sig.data.folder)
-      form.append('timestamp', String(sig.data.timestamp))
-      form.append('api_key', sig.data.api_key)
-      form.append('signature', sig.data.signature)
       
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AVATAR] uploading with params:', {
-          eager: sig.data.eager,
-          folder: sig.data.folder,
-          timestamp: sig.data.timestamp,
-          api_key: sig.data.api_key,
-          signature: sig.data.signature,
-        })
+      // Check if using unsigned preset (preferred) or signed upload
+      if (sig.data.upload_preset) {
+        // Unsigned upload preset (simpler, no signature needed)
+        form.append('upload_preset', sig.data.upload_preset)
+        if (sig.data.folder) form.append('folder', sig.data.folder)
+        if (sig.data.eager) form.append('eager', sig.data.eager)
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[AVATAR] uploading with unsigned preset:', {
+            upload_preset: sig.data.upload_preset,
+            folder: sig.data.folder,
+            eager: sig.data.eager,
+          })
+        }
+      } else {
+        // Signed upload (fallback)
+        // IMPORTANT: Parameters must be sent in the same order as signed
+        // For signed uploads, Cloudinary expects: eager, folder, timestamp (lexicographically sorted)
+        form.append('eager', sig.data.eager)
+        form.append('folder', sig.data.folder)
+        form.append('timestamp', String(sig.data.timestamp))
+        form.append('api_key', sig.data.api_key)
+        form.append('signature', sig.data.signature)
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[AVATAR] uploading with signed params:', {
+            eager: sig.data.eager,
+            folder: sig.data.folder,
+            timestamp: sig.data.timestamp,
+            api_key: sig.data.api_key,
+            signature: sig.data.signature,
+          })
+        }
       }
       
       const cloudUrl = `https://api.cloudinary.com/v1_1/${sig.data.cloud_name}/image/upload`

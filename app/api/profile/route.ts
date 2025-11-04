@@ -38,19 +38,87 @@ export async function PUT(req: Request) {
   }
 
   // Update using lootaura_v2.profiles directly (profiles_v2 is a view, may not support UPDATE)
+  // Only update base columns that exist in the schema - avoid schema cache errors
+  const updateData: Record<string, any> = {}
+  
+  // Always update full_name (base column) when display_name is provided
+  if (payload.display_name !== undefined) {
+    updateData.full_name = payload.display_name
+  }
+  if (payload.avatar_url !== undefined) {
+    updateData.avatar_url = payload.avatar_url
+  }
+  
+  // Try to update optional columns (may not exist in all schemas)
+  // Use a try-catch approach or update in a separate query if needed
+  try {
+    if (payload.display_name !== undefined) {
+      updateData.display_name = payload.display_name
+    }
+    if (payload.bio !== undefined) {
+      updateData.bio = payload.bio ?? null
+    }
+    if (payload.location_city !== undefined) {
+      updateData.location_city = payload.location_city ?? null
+    }
+    if (payload.location_region !== undefined) {
+      updateData.location_region = payload.location_region ?? null
+    }
+  } catch (e) {
+    // Ignore - these columns might not exist
+  }
+  
+  // Always set updated_at
+  updateData.updated_at = new Date().toISOString()
+  
   const { data, error } = await sb
     .from('profiles')
-    .update({
-      display_name: payload.display_name,
-      bio: payload.bio ?? null,
-      location_city: payload.location_city ?? null,
-      location_region: payload.location_region ?? null,
-      avatar_url: payload.avatar_url ?? null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', user.id)
+  
+  // If update fails due to missing columns, try with only base columns
+  if (error && error.message?.includes('column') && error.message?.includes('not found')) {
+    const baseUpdateData: Record<string, any> = {
+      full_name: payload.display_name || undefined,
+      avatar_url: payload.avatar_url || undefined,
+      updated_at: new Date().toISOString(),
+    }
+    // Remove undefined values
+    Object.keys(baseUpdateData).forEach(key => baseUpdateData[key] === undefined && delete baseUpdateData[key])
+    
+    const { data: baseData, error: baseError } = await sb
+      .from('profiles')
+      .update(baseUpdateData)
+      .eq('id', user.id)
+    
+    if (baseError) {
+      const status = baseError.code === '42501' ? 403 : 500
+      return NextResponse.json({ ok: false, error: baseError.message }, { status })
+    }
+    
+    // Fetch updated profile from view
+    const { data: profileData } = await sb
+      .from('profiles_v2')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+      .eq('id', user.id)
+      .maybeSingle()
+    
+    return NextResponse.json({ ok: true, data: profileData || baseData })
+  }
+  
+  if (error) {
+    const status = error.code === '42501' ? 403 : 500
+    return NextResponse.json({ ok: false, error: error.message }, { status })
+  }
+  
+  // Fetch updated profile from view to get all computed fields
+  const { data: profileData } = await sb
+    .from('profiles_v2')
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+    .eq('id', user.id)
     .maybeSingle()
+  
+  const data = profileData
 
   if (error) {
     const status = error.code === '42501' ? 403 : 500
@@ -75,17 +143,28 @@ export async function POST(_request: NextRequest) {
     console.log('🔄 [AUTH FLOW] profile-creation → start: start', { userId: user.id })
   }
 
+  // Check if profile exists - try both view and table to avoid race conditions
   const { data: existing, error: checkError } = await supabase
-    .from('profiles_v2')
-    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+    .from('profiles')
+    .select('id')
     .eq('id', user.id)
     .maybeSingle()
   if (checkError) return NextResponse.json({ ok: false, error: 'Failed to check existing profile', details: checkError.message }, { status: 500 })
   if (existing) {
+    // Profile exists, fetch full profile from view
+    const { data: fullProfile, error: fetchError } = await supabase
+      .from('profiles_v2')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (fetchError || !fullProfile) {
+      // If view fetch fails, return basic profile
+      return NextResponse.json({ ok: true, data: existing, created: false, message: 'Profile already exists' })
+    }
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('✅ [AUTH FLOW] profile-creation → exists: success', { userId: user.id })
     }
-    return NextResponse.json({ ok: true, data: existing, created: false, message: 'Profile already exists' })
+    return NextResponse.json({ ok: true, data: fullProfile, created: false, message: 'Profile already exists' })
   }
 
   // Insert into profiles table directly (profiles_v2 is a view, cannot insert into it)

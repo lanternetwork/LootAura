@@ -221,7 +221,13 @@ export default function ProfileClient() {
     if (!profile) return
     
     // Use username if available, otherwise fallback to user_id
+    // Only navigate if we have a valid identifier
     const slug = profile.username || profile.id
+    
+    if (!slug) {
+      console.error('[PROFILE] Cannot navigate to public profile: no username or id')
+      return
+    }
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[PROFILE] navigate to public profile:', `/u/${slug}`)

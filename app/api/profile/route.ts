@@ -105,109 +105,54 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: 'No fields to update' }, { status: 400 })
   }
 
+  // Always use RPC function to update base table (lootaura_v2.profiles)
+  // The RPC function handles missing columns gracefully and ensures we write to the canonical base table
+  console.log('[PROFILE] PUT using RPC function to update base table with:', updateData)
+  
+  const rpcParams: Record<string, any> = { p_user_id: user.id }
+  if ('avatar_url' in updateData) rpcParams.p_avatar_url = updateData.avatar_url
+  if ('display_name' in updateData) {
+    rpcParams.p_display_name = updateData.display_name
+    rpcParams.p_full_name = updateData.display_name
+  }
+  if ('bio' in updateData) rpcParams.p_bio = updateData.bio
+  if ('location_city' in updateData) rpcParams.p_location_city = updateData.location_city
+  if ('location_region' in updateData) rpcParams.p_location_region = updateData.location_region
+  
+  const { data: rpcResult, error: rpcError } = await sb.rpc('update_profile', rpcParams)
+  
   let updated: any = null
   let updateErr: any = null
-  {
-    console.log('[PROFILE] PUT attempting direct update to profiles table with:', updateData)
-    const res = await sb
-      .from('profiles')
-      .update(updateData)
-      .eq('id', user.id)
-      .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
-      .single()
-    updated = res.data
-    updateErr = res.error
-    
-    console.log('[PROFILE] PUT direct update result:', { 
-      hasData: !!res.data, 
-      error: res.error?.message,
-      bioInResponse: res.data?.bio 
+  
+  if (rpcError) {
+    console.error('[PROFILE] PUT RPC error:', rpcError.message)
+    updateErr = rpcError
+  } else if (rpcResult) {
+    // RPC returns JSONB - parse it if it's a string, otherwise use as-is
+    let profileData = rpcResult
+    if (typeof rpcResult === 'string') {
+      try {
+        profileData = JSON.parse(rpcResult)
+      } catch {
+        // If parsing fails, fetch from view
+        console.log('[PROFILE] PUT RPC returned string, parsing failed, fetching from view')
+        const { data: viewData } = await sb
+          .from('profiles_v2')
+          .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+          .eq('id', user.id)
+          .maybeSingle()
+        profileData = viewData
+      }
+    }
+    updated = profileData
+    console.log('[PROFILE] PUT RPC result:', { 
+      hasData: !!updated, 
+      bioInResult: updated?.bio,
+      keysInResult: updated ? Object.keys(updated) : []
     })
-  }
-
-  // If any column doesn't exist in this env, try using RPC function to update
-  // The RPC function handles missing columns gracefully
-  if (updateErr && updateErr.message?.includes('column')) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[PROFILE] PUT column error, falling back to RPC:', updateErr.message)
-    }
-    
-    // Use RPC function which handles missing columns gracefully
-    const rpcParams: Record<string, any> = { p_user_id: user.id }
-    if ('avatar_url' in updateData) rpcParams.p_avatar_url = updateData.avatar_url
-    if ('display_name' in updateData) {
-      rpcParams.p_display_name = updateData.display_name
-      rpcParams.p_full_name = updateData.display_name
-    }
-    if ('bio' in updateData) rpcParams.p_bio = updateData.bio
-    if ('location_city' in updateData) rpcParams.p_location_city = updateData.location_city
-    if ('location_region' in updateData) rpcParams.p_location_region = updateData.location_region
-    
-    const { data: rpcResult, error: rpcError } = await sb.rpc('update_profile', rpcParams)
-    
-    if (!rpcError && rpcResult) {
-      // RPC returns JSONB - parse it if it's a string, otherwise use as-is
-      let profileData = rpcResult
-      if (typeof rpcResult === 'string') {
-        try {
-          profileData = JSON.parse(rpcResult)
-        } catch {
-          // If parsing fails, fetch from view
-          const { data: viewData } = await sb
-            .from('profiles_v2')
-            .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
-            .eq('id', user.id)
-            .maybeSingle()
-          profileData = viewData
-        }
-      }
-      updated = profileData
-      updateErr = null
-    } else {
-      // RPC also failed - fallback to core columns only
-      const retryData: Record<string, any> = {}
-      if ('avatar_url' in updateData) retryData.avatar_url = updateData.avatar_url
-      
-      if (Object.keys(retryData).length > 0) {
-        const res2 = await sb
-          .from('profiles')
-          .update(retryData)
-          .eq('id', user.id)
-          .select('id, avatar_url, created_at')
-          .single()
-        if (res2.data) {
-          updated = {
-            ...res2.data,
-            display_name: updateData.display_name ?? null,
-            bio: updateData.bio ?? null,
-            location_city: updateData.location_city ?? null,
-            location_region: updateData.location_region ?? null,
-            verified: false,
-          }
-        }
-        updateErr = res2.error
-      } else {
-        // Nothing we can safely update; fetch current core row and return ok with synthesized fields
-        const res3 = await sb
-          .from('profiles')
-          .select('id, avatar_url, created_at')
-          .eq('id', user.id)
-          .single()
-        if (res3.data) {
-          updated = {
-            ...res3.data,
-            display_name: updateData.display_name ?? null,
-            bio: updateData.bio ?? null,
-            location_city: updateData.location_city ?? null,
-            location_region: updateData.location_region ?? null,
-            verified: false,
-          }
-          updateErr = null
-        } else {
-          updateErr = res3.error
-        }
-      }
-    }
+  } else {
+    console.error('[PROFILE] PUT RPC returned no data and no error')
+    updateErr = new Error('RPC returned no data')
   }
 
   if (updateErr || !updated) {

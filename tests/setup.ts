@@ -267,6 +267,10 @@ console.error = (...args: any[]) => {
 
 console.warn = (...args: any[]) => {
   const message = args.join(' ')
+  // Allow GoTrueClient warning about multiple instances (common in tests)
+  if (message.includes('Multiple GoTrueClient instances')) {
+    return // Suppress this warning
+  }
   if (!isAllowedMessage(message)) {
     throw new Error(`Unexpected console.warn: ${message}`)
   }

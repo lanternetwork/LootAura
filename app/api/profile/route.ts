@@ -10,15 +10,15 @@ export async function GET(_req: NextRequest) {
 
   console.log('[PROFILE] GET /api/profile start', { userId: user.id })
 
-  // Read directly from canonical base table
-  // Try selecting with all columns; if any column doesn't exist, fallback to core columns only
+  // Read from profiles_v2 view which reads from lootaura_v2.profiles base table
+  // This ensures we read from the same source that PUT writes to
   let data: any = null
   let error: any = null
   {
-    console.log('[PROFILE] GET attempting to read from profiles table')
+    console.log('[PROFILE] GET attempting to read from profiles_v2 view')
     const res = await sb
-      .from('profiles')
-      .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .from('profiles_v2')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
       .eq('id', user.id)
       .maybeSingle()
     data = res.data
@@ -36,7 +36,7 @@ export async function GET(_req: NextRequest) {
     console.log('[PROFILE] GET column error, falling back to core columns:', error.message)
     // Fallback to core columns that definitely exist
     const res2 = await sb
-      .from('profiles')
+      .from('profiles_v2')
       .select('id, avatar_url, created_at')
       .eq('id', user.id)
       .maybeSingle()

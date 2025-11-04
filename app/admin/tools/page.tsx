@@ -10,6 +10,7 @@ import MapInteractionTester from '@/components/MapInteractionTester'
 import MapPinsDiagnostics from '@/components/admin/MapPinsDiagnostics'
 import DiagnosticToolsValidator from '@/components/admin/DiagnosticToolsValidator'
 import SalesDataTester from '@/components/admin/SalesDataTester'
+import TestSalesGenerator from '@/components/admin/TestSalesGenerator'
 import SimpleMap from '@/components/location/SimpleMap'
 import RateLimitStatus from '@/components/admin/RateLimitStatus'
 import LoadTestControls from '@/components/admin/LoadTestControls'
@@ -123,6 +124,9 @@ export default function AdminToolsPage() {
 
           {/* Sales Data Tester */}
           <SalesDataTester />
+
+          {/* Test Sales Generator */}
+          <TestSalesGenerator />
 
           {/* ZIP Lookup Testing */}
           <ZipLookupTester />

@@ -61,8 +61,9 @@ describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Public Profile Routing', () =
         .eq('username', 'nonexistent-username-12345')
         .maybeSingle()
 
-      // Should not find profile - data should be null or empty
-      expect(data).toBeFalsy()
+      // Should not find profile - maybeSingle() returns null when no record found
+      // Check for null specifically (not just falsy) to catch any unexpected returns
+      expect(data).toBeNull()
       expect(error).toBeNull()
     })
   })

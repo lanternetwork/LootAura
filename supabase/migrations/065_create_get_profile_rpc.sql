@@ -18,6 +18,8 @@ BEGIN
   FROM lootaura_v2.profiles p
   WHERE p.id = p_user_id;
   
+  -- If profile doesn't exist, return null (don't raise exception)
+  -- Caller can handle this case
   RETURN v_result;
 END;
 $$;

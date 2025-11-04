@@ -18,6 +18,14 @@ AS $$
 DECLARE
   v_result jsonb;
 BEGIN
+  -- Ensure profile exists before updating
+  -- If profile doesn't exist, create it with minimal data
+  IF NOT EXISTS (SELECT 1 FROM lootaura_v2.profiles WHERE id = p_user_id) THEN
+    INSERT INTO lootaura_v2.profiles (id, created_at, updated_at)
+    VALUES (p_user_id, now(), now())
+    ON CONFLICT (id) DO NOTHING;
+  END IF;
+  
   -- Update the profile table directly using dynamic SQL to only update columns that exist
   -- Use conditional updates to avoid errors if columns don't exist
   

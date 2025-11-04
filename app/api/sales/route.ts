@@ -721,15 +721,31 @@ async function postHandler(request: NextRequest) {
     // Check authentication (allow test environment bypass to keep integration tests hermetic)
     const authResponse = await supabase.auth.getUser()
     let user = authResponse?.data?.user as { id: string } | null
+    
+    // Debug: Log auth response to diagnose Google OAuth session issues
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' || !user) {
+      console.log('[SALES] POST auth check:', {
+        hasUser: !!user,
+        userId: user?.id,
+        error: authResponse?.error?.message,
+        errorCode: authResponse?.error?.code,
+        errorStatus: authResponse?.error?.status
+      })
+    }
+    
     if (!user || authResponse?.error) {
       if (process.env.NODE_ENV === 'test') {
         // In test runs, permit creating a deterministic test user so other validation paths are exercised
         user = { id: 'test-user' }
       } else {
         const authError = authResponse?.error
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES] Auth failed:', { event: 'sales-create', status: 'fail', code: authError?.message })
-        }
+        console.log('[SALES] Auth failed:', { 
+          event: 'sales-create', 
+          status: 'fail', 
+          code: authError?.message,
+          errorCode: authError?.code,
+          errorStatus: authError?.status
+        })
         return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
       }
     }

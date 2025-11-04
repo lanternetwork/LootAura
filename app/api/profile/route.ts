@@ -121,11 +121,19 @@ export async function PUT(req: Request) {
   
   const { data: rpcResult, error: rpcError } = await sb.rpc('update_profile', rpcParams)
   
+  console.log('[PROFILE] PUT RPC call result:', { 
+    hasResult: !!rpcResult, 
+    hasError: !!rpcError,
+    error: rpcError?.message,
+    resultType: typeof rpcResult,
+    resultValue: rpcResult
+  })
+  
   let updated: any = null
   let updateErr: any = null
   
   if (rpcError) {
-    console.error('[PROFILE] PUT RPC error:', rpcError.message)
+    console.error('[PROFILE] PUT RPC error:', rpcError.message, rpcError)
     updateErr = rpcError
   } else if (rpcResult) {
     // RPC returns JSONB - parse it if it's a string, otherwise use as-is
@@ -151,8 +159,28 @@ export async function PUT(req: Request) {
       keysInResult: updated ? Object.keys(updated) : []
     })
   } else {
-    console.error('[PROFILE] PUT RPC returned no data and no error')
-    updateErr = new Error('RPC returned no data')
+    // RPC returned null/undefined - try fetching from view as fallback
+    console.log('[PROFILE] PUT RPC returned null, fetching from view as fallback')
+    const { data: viewData, error: viewError } = await sb
+      .from('profiles_v2')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .eq('id', user.id)
+      .maybeSingle()
+    
+    if (viewError) {
+      console.error('[PROFILE] PUT view fetch error:', viewError.message)
+      updateErr = viewError
+    } else if (viewData) {
+      updated = viewData
+      console.log('[PROFILE] PUT view fallback result:', { 
+        hasData: !!updated, 
+        bioInResult: updated?.bio,
+        keysInResult: updated ? Object.keys(updated) : []
+      })
+    } else {
+      console.error('[PROFILE] PUT both RPC and view returned no data')
+      updateErr = new Error('RPC returned no data and view fetch returned no data')
+    }
   }
 
   if (updateErr || !updated) {

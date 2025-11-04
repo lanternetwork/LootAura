@@ -199,7 +199,7 @@ export default async function PublicProfilePage({ params, searchParams }: Public
           profile={{
             displayName: profile.display_name,
             username: profile.username,
-            avatarUrl: profile.avatar_url,
+            avatarUrl: profile.avatar_url ? `${profile.avatar_url}?v=${Date.now()}` : null,
             locationCity: profile.location_city,
             locationRegion: profile.location_region,
             createdAt: profile.created_at,

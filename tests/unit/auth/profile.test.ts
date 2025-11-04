@@ -416,6 +416,30 @@ describe('Profile Management', () => {
       }))
       
       mockSupabaseClient.from = mockFrom
+      
+      // Mock rpc to return null (profile creation failed)
+      mockSupabaseClient.rpc.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'RPC failed' },
+      })
+      
+      // Mock direct query to base table as last resort (also returns null)
+      const mockBaseTableFrom = vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn().mockResolvedValueOnce({
+            data: null,
+            error: null,
+          }),
+        })),
+      }))
+      
+      // Override from to return different mock for base table query
+      mockSupabaseClient.from = vi.fn((table) => {
+        if (table === 'profiles') {
+          return mockBaseTableFrom()
+        }
+        return mockFrom()
+      })
 
       const request = new NextRequest('https://example.com/api/profile', {
         method: 'GET',

@@ -119,26 +119,8 @@ export async function middleware(req: NextRequest) {
   
   const cookieStore = cookies()
   
-  // Fast session check for middleware
-  if (!hasValidSession(cookieStore)) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[MIDDLEWARE] No valid session found', { event: 'auth-mw', path: pathname, authenticated: false })
-    }
-    
-    // For API routes, return 401
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
-    // For pages, redirect to signin
-    const loginUrl = new URL('/auth/signin', req.url)
-    // Only allow same-origin relative paths for redirectTo
-    const redirectTo = req.nextUrl.pathname.startsWith('/') ? req.nextUrl.pathname : '/'
-    loginUrl.searchParams.set('redirectTo', redirectTo)
-    return NextResponse.redirect(loginUrl)
-  }
-
-  // Validate session with Supabase
+  // Validate session with Supabase (skip the fast check for Google OAuth compatibility)
+  // Google OAuth sessions may use different cookie names than the fast check expects
   const session = await validateSession(cookieStore)
   if (!session) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

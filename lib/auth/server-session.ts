@@ -149,25 +149,73 @@ export function clearSessionCookies(response: NextResponse): void {
  */
 export async function validateSession(cookieStore: ReturnType<typeof cookies>) {
   try {
-    const supabase = createServerSupabaseClient(cookieStore)
-    const { data: { session }, error } = await supabase.auth.getSession()
+    // Use the same Supabase client creation method as the route handlers
+    // This ensures we read cookies the same way (handles Google OAuth correctly)
+    const { createServerClient } = await import('@supabase/ssr')
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     
-    if (error || !session) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AUTH] Session validation failed:', error?.message || 'No session')
-      }
+    if (!url || !anon) {
       return null
     }
-
-    // Check if session is expired
-    if (session.expires_at && session.expires_at < Date.now() / 1000) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AUTH] Session expired')
+    
+    const supabase = createServerClient(url, anon, {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          try {
+            cookieStore.set({ name, value, ...options })
+          } catch (error) {
+            // Cookie setting can fail in middleware, that's ok
+          }
+        },
+        remove(name: string, options: any) {
+          try {
+            cookieStore.set({ name, value: '', ...options, maxAge: 0 })
+          } catch (error) {
+            // Cookie removal can fail in middleware, that's ok
+          }
+        },
+      },
+    })
+    
+    // Try getUser() first (more reliable for SSR sessions)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (user && !userError) {
+      // User found, try to get full session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (session && !sessionError) {
+        // Check if session is expired
+        if (session.expires_at && session.expires_at < Date.now() / 1000) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[AUTH] Session expired')
+          }
+          return null
+        }
+        return session
       }
-      return null
+      
+      // If getUser() succeeded but getSession() failed, user is still authenticated
+      // Return a minimal session object
+      return {
+        access_token: '',
+        refresh_token: '',
+        expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+        user: {
+          id: user.id,
+          email: user.email
+        }
+      } as any
     }
-
-    return session
+    
+    if (userError && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[AUTH] Session validation failed:', userError?.message || 'No session')
+    }
+    return null
   } catch (error) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[AUTH] Session validation error:', error)

@@ -3,8 +3,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export async function GET(req: Request) {
   const supabase = createSupabaseServerClient()
-  const { data: user } = await supabase.auth.getUser()
-  if (!user?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') || 'active'
@@ -24,12 +24,15 @@ export async function GET(req: Request) {
   const { data, error, count } = await supabase
     .from('sales_v2')
     .select('id, title, cover_url, address, status, owner_id', { count: 'exact' })
-    .eq('owner_id', user.user.id)
+    .eq('owner_id', user.id)
     .eq('status', dbStatus)
     .order('created_at', { ascending: false })
     .range(from, to)
   
   if (error) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[PROFILE LISTINGS] GET error:', error)
+    }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
   

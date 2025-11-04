@@ -9,16 +9,53 @@ export async function GET(_req: NextRequest) {
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] schema check profiles.bio')
+    console.log('[PROFILE] GET profile start', { userId: user.id })
   }
 
+  // First check if profile exists in table
+  const { data: tableData, error: tableError } = await sb
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle()
+  
+  if (tableError) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[PROFILE] GET profile table check error:', tableError)
+    }
+    return NextResponse.json({ ok: false, error: tableError.message }, { status: 500 })
+  }
+  
+  // If profile doesn't exist in table, return 404 so client can create it
+  if (!tableData) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[PROFILE] GET profile not found', { userId: user.id })
+    }
+    return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+  }
+
+  // Profile exists in table, fetch from view to get all computed fields
   const { data, error } = await sb
     .from('profiles_v2')
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .eq('id', user.id)
     .maybeSingle()
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-  if (!data) return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+  
+  if (error) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[PROFILE] GET profile view fetch error:', error)
+    }
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  }
+  
+  if (!data) {
+    // View fetch failed but table check passed - return basic profile
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[PROFILE] GET profile view fetch returned null, using table data')
+    }
+    return NextResponse.json({ ok: true, data: { id: tableData.id, username: null, display_name: null, avatar_url: null, bio: null, location_city: null, location_region: null, created_at: null, verified: false, home_zip: null, preferences: {} } })
+  }
+  
   return NextResponse.json({ ok: true, data })
 }
 
@@ -49,23 +86,18 @@ export async function PUT(req: Request) {
     updateData.avatar_url = payload.avatar_url
   }
   
-  // Try to update optional columns (may not exist in all schemas)
-  // Use a try-catch approach or update in a separate query if needed
-  try {
-    if (payload.display_name !== undefined) {
-      updateData.display_name = payload.display_name
-    }
-    if (payload.bio !== undefined) {
-      updateData.bio = payload.bio ?? null
-    }
-    if (payload.location_city !== undefined) {
-      updateData.location_city = payload.location_city ?? null
-    }
-    if (payload.location_region !== undefined) {
-      updateData.location_region = payload.location_region ?? null
-    }
-  } catch (e) {
-    // Ignore - these columns might not exist
+  // Add optional columns (may not exist in all schemas)
+  if (payload.display_name !== undefined) {
+    updateData.display_name = payload.display_name
+  }
+  if (payload.bio !== undefined) {
+    updateData.bio = payload.bio ?? null
+  }
+  if (payload.location_city !== undefined) {
+    updateData.location_city = payload.location_city ?? null
+  }
+  if (payload.location_region !== undefined) {
+    updateData.location_region = payload.location_region ?? null
   }
   
   // Always set updated_at
@@ -183,6 +215,17 @@ export async function POST(_request: NextRequest) {
   if (createError) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.error('❌ [AUTH FLOW] profile-creation → insert error:', createError)
+    }
+    // If duplicate key error, profile already exists - fetch it
+    if (createError.message?.includes('duplicate key') || createError.code === '23505') {
+      const { data: fullProfile, error: fetchError } = await supabase
+        .from('profiles_v2')
+        .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (!fetchError && fullProfile) {
+        return NextResponse.json({ ok: true, data: fullProfile, created: false, message: 'Profile already exists' })
+      }
     }
     return NextResponse.json({ ok: false, error: 'Failed to create profile', details: createError.message }, { status: 500 })
   }

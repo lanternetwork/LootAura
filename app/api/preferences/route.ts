@@ -9,13 +9,30 @@ export async function GET() {
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
+  // Try to get preferences from user_preferences table
+  // If table doesn't exist or query fails, return defaults
   const { data, error } = await sb
     .from('user_preferences')
     .select('theme,email_opt_in,units,discovery_radius_km,updated_at')
     .eq('user_id', user.id)
     .maybeSingle()
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  if (error) {
+    // If error is about table not existing or schema issues, return defaults
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.warn('[PREFERENCES] GET error, returning defaults:', error.message)
+    }
+    // Check if profile has preferences stored there
+    const { data: profileData } = await sb
+      .from('profiles_v2')
+      .select('preferences')
+      .eq('id', user.id)
+      .maybeSingle()
+    
+    const prefs = profileData?.preferences || {}
+    return NextResponse.json({ ok: true, data: { user_id: user.id, ...DEFAULTS, ...prefs } })
+  }
+  
   return NextResponse.json({ ok: true, data: data ?? { user_id: user.id, ...DEFAULTS } })
 }
 

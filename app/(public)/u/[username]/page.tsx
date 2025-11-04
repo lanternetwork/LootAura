@@ -26,7 +26,21 @@ export async function generateMetadata({ params }: { params: { username: string 
     ? await supabase.from('profiles_v2').select('display_name, bio, avatar_url, username').eq('id', slug).maybeSingle()
     : await supabase.from('profiles_v2').select('display_name, bio, avatar_url, username').eq('username', slug).maybeSingle()
   
-  const profile = prof.data
+  let profile = prof.data as any
+  if (!profile) {
+    // Fallback to base table if view has not materialized yet
+    const byTable = isUUID
+      ? await supabase.from('profiles').select('id, created_at').eq('id', slug).maybeSingle()
+      : await supabase.from('profiles_v2').select('id, username, created_at').eq('username', slug).maybeSingle()
+    if (byTable.data) {
+      profile = {
+        username: byTable.data.username ?? null,
+        display_name: null,
+        bio: null,
+        avatar_url: null,
+      }
+    }
+  }
   if (!profile) {
     return createPageMetadata({ title: 'User Not Found', path: `/u/${slug}` })
   }
@@ -71,7 +85,28 @@ async function fetchProfileData(slug: string) {
       .maybeSingle()
   }
   
-  const profile = prof.data
+  let profile = prof.data as any
+  if (!profile) {
+    // Fallback to base table if view has not materialized yet
+    const byTable = await supabase
+      .from('profiles')
+      .select('id, created_at')
+      .eq(isUUID ? 'id' : 'username', slug)
+      .maybeSingle()
+    if (byTable.data) {
+      profile = {
+        id: byTable.data.id,
+        username: isUUID ? null : slug,
+        display_name: null,
+        avatar_url: null,
+        bio: null,
+        location_city: null,
+        location_region: null,
+        created_at: byTable.data.created_at ?? null,
+        verified: false,
+      }
+    }
+  }
   if (!profile) return null
   
   const [preferred, ownerStatsResult] = await Promise.all([

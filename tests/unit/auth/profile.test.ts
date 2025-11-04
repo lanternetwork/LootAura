@@ -418,7 +418,8 @@ describe('Profile Management', () => {
       mockSupabaseClient.from = mockFrom
       
       // Mock rpc to return null (profile creation failed)
-      mockSupabaseClient.rpc.mockResolvedValueOnce({
+      // The rpc call expects { data, error } structure
+      mockSupabaseClient.rpc = vi.fn().mockResolvedValueOnce({
         data: null,
         error: { message: 'RPC failed' },
       })
@@ -434,7 +435,7 @@ describe('Profile Management', () => {
       }))
       
       // Override from to return different mock for base table query
-      mockSupabaseClient.from = vi.fn((table) => {
+      mockSupabaseClient.from = vi.fn((table: string) => {
         if (table === 'profiles') {
           return mockBaseTableFrom()
         }

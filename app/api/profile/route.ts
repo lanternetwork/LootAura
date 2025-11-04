@@ -101,19 +101,6 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: 'No fields to update' }, { status: 400 })
   }
 
-  if (Object.keys(updateData).length === 0) {
-    // Nothing to update; return current row
-    const { data: current, error: currentErr } = await sb
-      .from('lootaura_v2.profiles')
-      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
-      .eq('id', user.id)
-      .single()
-    if (currentErr || !current) {
-      return NextResponse.json({ ok: false, error: currentErr?.message || 'Profile not found' }, { status: currentErr ? 500 : 404 })
-    }
-    return NextResponse.json({ ok: true, data: current })
-  }
-
   let updated: any = null
   let updateErr: any = null
   {

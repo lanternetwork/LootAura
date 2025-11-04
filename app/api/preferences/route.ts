@@ -48,6 +48,8 @@ export async function PUT(req: Request) {
   }
 
   const payload = { user_id: user.id, ...parsed.data }
+  
+  // Try to upsert to user_preferences table first
   const { data, error } = await sb
     .from('user_preferences')
     .upsert(payload, { onConflict: 'user_id' })
@@ -55,12 +57,49 @@ export async function PUT(req: Request) {
     .maybeSingle()
 
   if (error) {
-    const status = error.code === '42501' ? 403 : 500
-    return NextResponse.json({ ok: false, error: error.message }, { status })
+    // If user_preferences table doesn't exist or has schema issues, fallback to profile.preferences
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.warn('[PREFERENCES] PUT user_preferences failed, falling back to profile.preferences:', error.message)
+    }
+    
+    // Fallback: Store preferences in profile.preferences JSONB column
+    const { data: profileData, error: profileError } = await sb
+      .from('profiles')
+      .update({ 
+        preferences: {
+          ...parsed.data,
+          updated_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id)
+      .select('preferences')
+      .maybeSingle()
+    
+    if (profileError) {
+      const status = profileError.code === '42501' ? 403 : 500
+      return NextResponse.json({ ok: false, error: profileError.message }, { status })
+    }
+    
+    // Return preferences in the same format as user_preferences table
+    const prefs = profileData?.preferences || parsed.data
+    const response = {
+      theme: prefs.theme || parsed.data.theme || DEFAULTS.theme,
+      email_opt_in: prefs.email_opt_in ?? parsed.data.email_opt_in ?? DEFAULTS.email_opt_in,
+      units: prefs.units || parsed.data.units || DEFAULTS.units,
+      discovery_radius_km: prefs.discovery_radius_km ?? parsed.data.discovery_radius_km ?? DEFAULTS.discovery_radius_km,
+      updated_at: new Date().toISOString(),
+    }
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[PREFERENCES] PUT fallback to profile.preferences success')
+    }
+    
+    return NextResponse.json({ ok: true, data: response })
   }
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PREFERENCES] upsert success')
+    console.log('[PREFERENCES] PUT upsert success')
   }
 
   return NextResponse.json({ ok: true, data })

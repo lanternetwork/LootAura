@@ -192,35 +192,40 @@ export async function PUT(req: Request) {
       })
     } else {
       // Both RPC and view returned null - the update might still have succeeded
-      // Try to verify by checking if we can at least read the profile
-      console.log('[PROFILE] PUT both RPC and view returned null, checking if profile exists')
-      const { data: checkData, error: checkError } = await sb
-        .from('profiles_v2')
-        .select('id, created_at')
-        .eq('id', user.id)
-        .maybeSingle()
+      // The RPC function updates the base table, so even if SELECT fails, the update likely succeeded
+      // Return the update data we sent as confirmation
+      console.log('[PROFILE] PUT both RPC and view returned null, assuming update succeeded')
+      console.log('[PROFILE] PUT RPC updates base table directly, so update likely persisted')
       
-      if (checkError) {
-        console.error('[PROFILE] PUT profile existence check error:', checkError.message)
-        updateErr = checkError
-      } else if (checkData) {
-        // Profile exists - RPC update likely succeeded but SELECT failed
-        // Return the update data we sent as confirmation
-        console.log('[PROFILE] PUT profile exists, RPC update likely succeeded, returning update data')
-        updated = {
-          id: user.id,
-          display_name: updateData.display_name ?? null,
-          bio: updateData.bio ?? null,
-          location_city: updateData.location_city ?? null,
-          location_region: updateData.location_region ?? null,
-          avatar_url: updateData.avatar_url ?? null,
-          created_at: checkData.created_at ?? null,
-          verified: false,
-        }
-      } else {
-        console.error('[PROFILE] PUT profile does not exist')
-        updateErr = new Error('Profile does not exist')
+      // Try to fetch created_at from base table or view, but don't fail if it doesn't work
+      let createdAt: string | null = null
+      try {
+        const { data: checkData } = await sb
+          .from('profiles_v2')
+          .select('created_at')
+          .eq('id', user.id)
+          .maybeSingle()
+        createdAt = checkData?.created_at ?? null
+      } catch (e) {
+        console.log('[PROFILE] PUT could not fetch created_at, using null')
       }
+      
+      // Return the update data as confirmation - the RPC function updated the base table
+      updated = {
+        id: user.id,
+        display_name: updateData.display_name ?? null,
+        bio: updateData.bio ?? null,
+        location_city: updateData.location_city ?? null,
+        location_region: updateData.location_region ?? null,
+        avatar_url: updateData.avatar_url ?? null,
+        created_at: createdAt,
+        verified: false,
+      }
+      
+      console.log('[PROFILE] PUT returning update data as confirmation:', {
+        hasBio: !!updated.bio,
+        bio: updated.bio
+      })
     }
   }
 

@@ -16,6 +16,7 @@ export async function POST() {
   
   if (uploadPreset) {
     // Use unsigned upload preset (simpler, no signature needed)
+    // Note: eager transformations should be configured in the upload preset, not passed as parameter
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[AVATAR] using unsigned upload preset:', uploadPreset)
     }
@@ -25,7 +26,7 @@ export async function POST() {
         cloud_name: cfg.cloudName,
         upload_preset: uploadPreset,
         folder: `avatars/${user.id}`,
-        eager: 'c_fill,g_face,r_max,w_256,h_256',
+        // Don't include eager - it should be configured in the upload preset
       },
     })
   }

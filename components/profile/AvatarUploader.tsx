@@ -52,9 +52,10 @@ export function AvatarUploader({ initialUrl, onUpdated, onClose }: AvatarUploade
       // Check if using unsigned preset (preferred) or signed upload
       if (sig.data.upload_preset) {
         // Unsigned upload preset (simpler, no signature needed)
+        // eager transformations should be configured in the upload preset, not passed as parameter
         form.append('upload_preset', sig.data.upload_preset)
         if (sig.data.folder) form.append('folder', sig.data.folder)
-        if (sig.data.eager) form.append('eager', sig.data.eager)
+        // Don't include eager for unsigned uploads - it's not allowed
         
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[AVATAR] uploading with unsigned preset:', {

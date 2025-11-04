@@ -139,6 +139,7 @@ export async function PUT(req: Request) {
     
     // Try to update optional columns (bio, location) separately
     // These might not exist in all schema configurations
+    // Use the view which should have all columns, or skip if view doesn't support UPDATE
     const optionalUpdateData: Record<string, any> = {}
     if (payload.display_name !== undefined) {
       optionalUpdateData.display_name = payload.display_name
@@ -153,16 +154,34 @@ export async function PUT(req: Request) {
       optionalUpdateData.location_region = payload.location_region ?? null
     }
     
-    // Try to update optional columns - ignore errors if columns don't exist
+    // Try to update optional columns via view if it supports UPDATE
+    // Otherwise, these will be updated when the view is refreshed
     if (Object.keys(optionalUpdateData).length > 0) {
-      const { error: optionalError } = await sb
-        .from('profiles')
-        .update(optionalUpdateData)
-        .eq('id', user.id)
-      
-      if (optionalError && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        // Log but don't fail - these columns might not exist
-        console.warn('[PROFILE] PUT optional columns update failed (non-critical):', optionalError.message)
+      try {
+        // First try updating via view (which might have triggers/rules)
+        const { error: viewError } = await sb
+          .from('profiles_v2')
+          .update(optionalUpdateData)
+          .eq('id', user.id)
+        
+        if (viewError) {
+          // If view doesn't support UPDATE, try direct table update
+          // But catch errors if columns don't exist
+          const { error: optionalError } = await sb
+            .from('profiles')
+            .update(optionalUpdateData)
+            .eq('id', user.id)
+          
+          if (optionalError && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            // Log but don't fail - these columns might not exist
+            console.warn('[PROFILE] PUT optional columns update failed (non-critical):', optionalError.message)
+          }
+        }
+      } catch (e: any) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[PROFILE] PUT optional columns update error (non-critical):', e?.message)
+        }
+        // Don't fail - these columns might not exist
       }
     }
     

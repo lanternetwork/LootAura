@@ -14,7 +14,6 @@ export async function GET(_req: NextRequest) {
 
   // Read directly from canonical base table
   const { data, error } = await sb
-    .schema('lootaura_v2')
     .from('profiles')
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
     .eq('id', user.id)
@@ -82,7 +81,6 @@ export async function PUT(req: Request) {
   }
 
   const { data: updated, error: updateErr } = await sb
-    .schema('lootaura_v2')
     .from('profiles')
     .update(updateData)
     .eq('id', user.id)
@@ -147,7 +145,6 @@ export async function POST(_request: NextRequest) {
   // Only add fields that we know exist - let the database handle defaults
   // Insert with just id first, then update with values
   const { error: createError, data: insertedData } = await supabase
-    .schema('lootaura_v2')
     .from('profiles')
     .insert(defaultProfile)
     .select()
@@ -159,7 +156,6 @@ export async function POST(_request: NextRequest) {
     // If duplicate key error, profile already exists - fetch it
     if (createError.message?.includes('duplicate key') || createError.code === '23505') {
     const { data: fullProfile, error: fetchError } = await supabase
-      .schema('lootaura_v2')
       .from('profiles')
         .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
         .eq('id', user.id)
@@ -189,7 +185,6 @@ export async function POST(_request: NextRequest) {
   // Update the profile if we have fields to set
   if (Object.keys(updateData).length > 0) {
     const { error: updateError } = await supabase
-      .schema('lootaura_v2')
       .from('profiles')
       .update(updateData)
       .eq('id', user.id)
@@ -201,7 +196,6 @@ export async function POST(_request: NextRequest) {
   
   // Fetch the created profile from the view to get all computed fields (username, etc.)
   const { data: profileData, error: fetchError } = await supabase
-    .schema('lootaura_v2')
     .from('profiles')
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .eq('id', user.id)

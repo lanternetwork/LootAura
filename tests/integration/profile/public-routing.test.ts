@@ -32,9 +32,11 @@ describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Public Profile Routing', () =
           .eq('username', profile.username)
           .maybeSingle()
 
-        expect(error).toBeFalsy()
-        expect(data).toBeTruthy()
-        expect(data?.username).toBe(profile.username)
+        expect(error).toBeNull()
+        expect(data).not.toBeNull()
+        if (data) {
+          expect(data.username).toBe(profile.username)
+        }
       }
     })
 
@@ -45,8 +47,8 @@ describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Public Profile Routing', () =
         .eq('username', 'nonexistent-username-12345')
         .maybeSingle()
 
-      // Should not find profile
-      expect(data).toBeFalsy()
+      // Should not find profile - data should be null
+      expect(data).toBeNull()
     })
   })
 
@@ -72,9 +74,11 @@ describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Public Profile Routing', () =
           .eq('id', profile.id)
           .maybeSingle()
 
-        expect(error).toBeFalsy()
-        expect(data).toBeTruthy()
-        expect(data?.id).toBe(profile.id)
+        expect(error).toBeNull()
+        expect(data).not.toBeNull()
+        if (data) {
+          expect(data.id).toBe(profile.id)
+        }
       }
     })
   })

@@ -27,6 +27,11 @@ export function AboutCard({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Debug: check if component is rendering
+  useEffect(() => {
+    console.log('[ABOUT] AboutCard rendered', { isEditable, hasOnSave: !!onSave })
+  }, [isEditable, onSave])
+
   useEffect(() => {
     if (!isEditing) {
       setEditBio(bio || '')
@@ -37,14 +42,10 @@ export function AboutCard({
   }, [bio, displayName, locationCity, locationRegion, isEditing])
 
   const handleSave = async () => {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[ABOUT] save clicked')
-    }
+    console.log('[ABOUT] save clicked - handler firing')
     
     if (!onSave) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.error('[ABOUT] onSave handler not provided')
-      }
+      console.error('[ABOUT] onSave handler not provided')
       return
     }
     setError(null)
@@ -66,21 +67,16 @@ export function AboutCard({
       locationRegion: editRegion.trim() || undefined,
     }
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[ABOUT] sending PUT /api/profile with keys:', Object.keys(patch).filter(k => patch[k as keyof typeof patch] !== undefined))
-    }
+    console.log('[ABOUT] sending PUT /api/profile with keys:', Object.keys(patch).filter(k => patch[k as keyof typeof patch] !== undefined))
     
     setSaving(true)
     try {
+      console.log('[ABOUT] calling onSave handler...')
       await onSave(patch)
+      console.log('[ABOUT] save successful')
       setIsEditing(false)
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[ABOUT] save successful')
-      }
     } catch (e: any) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.error('[ABOUT] save failed:', e?.message)
-      }
+      console.error('[ABOUT] save failed:', e?.message)
       setError(e?.message || 'Failed to save')
     } finally {
       setSaving(false)

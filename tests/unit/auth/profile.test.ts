@@ -77,6 +77,7 @@ describe('Profile Management', () => {
               })),
             })),
             insert: vi.fn(),
+            update: vi.fn(),
           }
         } else if (callCount === 2) {
           // Second call: insert into profiles table
@@ -87,9 +88,19 @@ describe('Profile Management', () => {
                 single: vi.fn().mockResolvedValueOnce({ data: mockNewProfile, error: null }),
               })),
             })),
+            update: vi.fn(),
+          }
+        } else if (callCount === 3) {
+          // Third call: update profile after insert
+          return {
+            select: vi.fn(),
+            insert: vi.fn(),
+            update: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValueOnce({ error: null }),
+            })),
           }
         } else {
-          // Third call: fetch from profiles_v2
+          // Fourth call: fetch from profiles_v2
           return {
             select: vi.fn(() => ({
               eq: vi.fn(() => ({
@@ -98,6 +109,7 @@ describe('Profile Management', () => {
               })),
             })),
             insert: vi.fn(),
+            update: vi.fn(),
           }
         }
       })
@@ -212,6 +224,7 @@ describe('Profile Management', () => {
               })),
             })),
             insert: vi.fn(),
+            update: vi.fn(),
           }
         } else {
           // Second call: insert fails
@@ -273,6 +286,7 @@ describe('Profile Management', () => {
               })),
             })),
             insert: vi.fn(),
+            update: vi.fn(),
           }
         } else if (callCount === 2) {
           // Second call: insert into profiles table
@@ -283,9 +297,19 @@ describe('Profile Management', () => {
                 single: vi.fn().mockResolvedValueOnce({ data: { id: 'user123' }, error: null }),
               })),
             })),
+            update: vi.fn(),
+          }
+        } else if (callCount === 3) {
+          // Third call: update profile after insert
+          return {
+            select: vi.fn(),
+            insert: vi.fn(),
+            update: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValueOnce({ error: null }),
+            })),
           }
         } else {
-          // Third call: fetch from profiles_v2
+          // Fourth call: fetch from profiles_v2
           return {
             select: vi.fn(() => ({
               eq: vi.fn(() => ({
@@ -297,6 +321,7 @@ describe('Profile Management', () => {
               })),
             })),
             insert: vi.fn(),
+            update: vi.fn(),
           }
         }
       })

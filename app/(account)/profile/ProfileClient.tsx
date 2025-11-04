@@ -181,12 +181,15 @@ export default function ProfileClient() {
         location_region: data.locationRegion,
       }),
     })
-    if (!res.ok) {
-      const j = await res.json().catch(() => ({}))
+    
+    // Read response once - don't read it twice!
+    const j = await res.json().catch(() => ({ ok: false, error: 'Failed to parse response' }))
+    
+    if (!res.ok || !j?.ok) {
       throw new Error(j?.error || 'Failed to save')
     }
-    const j = await res.json()
-    if (j?.ok && j?.data) {
+    
+    if (j?.data) {
       setProfile((prev) => (prev ? {
         ...prev,
         display_name: j.data.display_name ?? data.displayName ?? prev.display_name,
@@ -196,7 +199,7 @@ export default function ProfileClient() {
       } : null))
       
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[PROFILE] owner update success')
+        console.log('[PROFILE] owner update success', { profileData: j.data })
       }
     }
   }

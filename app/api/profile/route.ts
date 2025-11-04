@@ -76,15 +76,26 @@ export async function PUT(req: Request) {
 
   // Use RPC function to update profile - bypasses schema cache issues
   // The RPC function updates the table directly in lootaura_v2 schema
-  const { data: rpcResult, error: rpcError } = await sb.rpc('update_profile', {
-    p_user_id: user.id,
-    p_avatar_url: payload.avatar_url ?? null,
-    p_display_name: payload.display_name ?? null,
-    p_full_name: payload.display_name ?? null,
-    p_bio: payload.bio ?? null,
-    p_location_city: payload.location_city ?? null,
-    p_location_region: payload.location_region ?? null,
-  })
+  // Only pass parameters that are explicitly provided (not undefined)
+  const rpcParams: Record<string, any> = { p_user_id: user.id }
+  if (payload.avatar_url !== undefined) {
+    rpcParams.p_avatar_url = payload.avatar_url
+  }
+  if (payload.display_name !== undefined) {
+    rpcParams.p_display_name = payload.display_name
+    rpcParams.p_full_name = payload.display_name
+  }
+  if (payload.bio !== undefined) {
+    rpcParams.p_bio = payload.bio
+  }
+  if (payload.location_city !== undefined) {
+    rpcParams.p_location_city = payload.location_city
+  }
+  if (payload.location_region !== undefined) {
+    rpcParams.p_location_region = payload.location_region
+  }
+  
+  const { data: rpcResult, error: rpcError } = await sb.rpc('update_profile', rpcParams)
   
   if (rpcError) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -105,12 +116,30 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: true, data: profileData })
   }
   
+  // RPC returns JSONB - parse it if it's a string, otherwise use as-is
+  let profileData = rpcResult
+  if (typeof rpcResult === 'string') {
+    try {
+      profileData = JSON.parse(rpcResult)
+    } catch (e) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('[PROFILE] RPC result is not valid JSON, fetching from view:', e)
+      }
+      // If RPC result is invalid, fetch from view
+      const { data: viewData } = await sb
+        .from('profiles_v2')
+        .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+        .eq('id', user.id)
+        .maybeSingle()
+      profileData = viewData
+    }
+  }
+  
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] update profile success via RPC')
+    console.log('[PROFILE] update profile success via RPC', { hasProfileData: !!profileData })
   }
 
-  // RPC returns the updated profile as JSONB
-  return NextResponse.json({ ok: true, data: rpcResult })
+  return NextResponse.json({ ok: true, data: profileData })
 }
 
 // Legacy handlers removed to avoid duplicate exports and name collisions

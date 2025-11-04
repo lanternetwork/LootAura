@@ -63,6 +63,7 @@ export default function TestSalesGenerator() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies for Google OAuth session
         body: JSON.stringify(saleData)
       })
 

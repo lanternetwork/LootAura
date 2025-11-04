@@ -83,17 +83,54 @@ export async function GET(_req: NextRequest) {
     console.log('[PROFILE] GET attempting to create profile via update_profile RPC')
     try {
       const { data: createRpcData, error: createRpcError } = await sb.rpc('update_profile', { p_user_id: user.id })
+      console.log('[PROFILE] GET update_profile RPC result:', {
+        hasData: !!createRpcData,
+        hasError: !!createRpcError,
+        error: createRpcError?.message,
+        errorCode: createRpcError?.code,
+        errorDetails: createRpcError?.details,
+        dataType: typeof createRpcData,
+        dataPreview: createRpcData ? JSON.stringify(createRpcData).substring(0, 200) : null
+      })
       if (!createRpcError && createRpcData) {
         const profileData = typeof createRpcData === 'string' ? JSON.parse(createRpcData) : createRpcData
-        console.log('[PROFILE] GET update_profile RPC created profile successfully')
+        console.log('[PROFILE] GET update_profile RPC created profile successfully, bio:', profileData.bio)
         data = profileData
       } else {
-        console.log('[PROFILE] GET update_profile RPC failed:', createRpcError?.message)
-        // Profile doesn't exist and couldn't create it - return 404
-        return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+        console.error('[PROFILE] GET update_profile RPC failed:', createRpcError?.message, createRpcError?.code)
+        // Even if RPC fails, try to query base table directly as last resort
+        console.log('[PROFILE] GET trying direct query to base table as last resort')
+        try {
+          // Try to query the base table directly using a simple select
+          // This bypasses RPC and view issues
+          const { data: directData, error: directError } = await sb
+            .from('profiles')
+            .select('id, avatar_url, created_at')
+            .eq('id', user.id)
+            .maybeSingle()
+          if (directData) {
+            console.log('[PROFILE] GET direct query found profile, synthesizing with nulls')
+            data = {
+              ...directData,
+              display_name: null,
+              bio: null,
+              location_city: null,
+              location_region: null,
+              verified: false,
+            }
+          } else {
+            console.error('[PROFILE] GET direct query also failed:', directError?.message)
+            // Profile doesn't exist and couldn't create it - return 404
+            return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+          }
+        } catch (directE: any) {
+          console.error('[PROFILE] GET direct query exception:', directE?.message || directE)
+          // Profile doesn't exist and couldn't create it - return 404
+          return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
+        }
       }
     } catch (e: any) {
-      console.log('[PROFILE] GET update_profile RPC exception:', e?.message || e)
+      console.error('[PROFILE] GET update_profile RPC exception:', e?.message || e, e?.stack)
       // Profile doesn't exist and couldn't create it - return 404
       return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
     }

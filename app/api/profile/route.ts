@@ -104,6 +104,7 @@ export async function PUT(req: Request) {
   let updated: any = null
   let updateErr: any = null
   {
+    console.log('[PROFILE] PUT attempting direct update to profiles table with:', updateData)
     const res = await sb
       .from('profiles')
       .update(updateData)
@@ -112,6 +113,12 @@ export async function PUT(req: Request) {
       .single()
     updated = res.data
     updateErr = res.error
+    
+    console.log('[PROFILE] PUT direct update result:', { 
+      hasData: !!res.data, 
+      error: res.error?.message,
+      bioInResponse: res.data?.bio 
+    })
   }
 
   // If any column doesn't exist in this env, try using RPC function to update
@@ -200,15 +207,13 @@ export async function PUT(req: Request) {
   }
 
   if (updateErr || !updated) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.error('[PROFILE] PUT update failed:', updateErr?.message || 'No data returned')
-    }
+    console.error('[PROFILE] PUT update failed:', updateErr?.message || 'No data returned')
     return NextResponse.json({ ok: false, error: updateErr?.message || 'Update failed' }, { status: updateErr ? 500 : 400 })
   }
 
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] PUT updated successfully, returning keys:', Object.keys(updated))
-  }
+  console.log('[PROFILE] PUT updated successfully, returning keys:', Object.keys(updated))
+  console.log('[PROFILE] PUT returning bio:', updated.bio)
+  console.log('[PROFILE] PUT returning full data:', JSON.stringify(updated, null, 2))
 
   return NextResponse.json({ ok: true, data: updated })
 }

@@ -195,23 +195,28 @@ export default function ProfileClient() {
     const j = await res.json().catch(() => ({ ok: false, error: 'Failed to parse response' }))
     
     console.log('[ABOUT] response j.ok=', j?.ok, 'error=', j?.error)
+    console.log('[ABOUT] response data:', j?.data)
+    console.log('[ABOUT] response bio in data:', j?.data?.bio)
     
     if (!res.ok || !j?.ok) {
       throw new Error(j?.error || 'Failed to save')
     }
     
     if (j?.data) {
-      setProfile((prev) => (prev ? {
-        ...prev,
-        display_name: j.data.display_name ?? data.displayName ?? prev.display_name,
-        bio: j.data.bio ?? data.bio ?? prev.bio,
-        location_city: j.data.location_city ?? data.locationCity ?? prev.location_city,
-        location_region: j.data.location_region ?? data.locationRegion ?? prev.location_region,
-      } : null))
+      console.log('[ABOUT] updating local state with bio:', j.data.bio)
+      setProfile((prev) => {
+        const updated = prev ? {
+          ...prev,
+          display_name: j.data.display_name ?? data.displayName ?? prev.display_name,
+          bio: j.data.bio ?? data.bio ?? prev.bio,
+          location_city: j.data.location_city ?? data.locationCity ?? prev.location_city,
+          location_region: j.data.location_region ?? data.locationRegion ?? prev.location_region,
+        } : null
+        console.log('[ABOUT] updated local state:', updated)
+        return updated
+      })
       
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[PROFILE] owner update success', { profileData: j.data })
-      }
+      console.log('[PROFILE] owner update success', { profileData: j.data })
     }
   }
 

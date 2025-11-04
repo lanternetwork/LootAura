@@ -251,6 +251,10 @@ const ALLOWED_PATTERNS = [
   // FeaturedSalesSection logging (components/landing/FeaturedSalesSection.tsx)
   /^\[FeaturedSales\]/, // FeaturedSales debug logging - tests/integration/landing.featured-demo.test.tsx
   /^Failed to fetch featured sales:/, // FeaturedSales error logging - tests/integration/landing.featured-demo.test.tsx
+  
+  // Profile API error logging (app/api/profile/route.ts)
+  /^\[PROFILE\] GET update_profile RPC failed:/, // Expected RPC error in profile not found test - tests/unit/auth/profile.test.ts
+  /^\[PROFILE\] GET update_profile RPC exception:/, // Expected RPC exception in profile not found test - tests/unit/auth/profile.test.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {

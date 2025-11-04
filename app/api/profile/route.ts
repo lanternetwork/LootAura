@@ -196,7 +196,7 @@ export async function PUT(req: Request) {
       console.log('[PROFILE] PUT both RPC and view returned null, checking if profile exists')
       const { data: checkData, error: checkError } = await sb
         .from('profiles_v2')
-        .select('id')
+        .select('id, created_at')
         .eq('id', user.id)
         .maybeSingle()
       

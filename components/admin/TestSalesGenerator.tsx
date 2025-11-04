@@ -73,7 +73,12 @@ export default function TestSalesGenerator() {
     }
     
     if (!response.ok || !data.ok) {
-      throw new Error(data.error || 'Failed to create sale')
+      // Include detailed error information if available
+      const errorMessage = data.details 
+        ? `${data.error}: ${data.details}` 
+        : data.error || 'Failed to create sale'
+      const errorCode = data.code ? ` (${data.code})` : ''
+      throw new Error(`${errorMessage}${errorCode}`)
     }
 
     return data.sale as CreatedSale

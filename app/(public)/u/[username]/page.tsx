@@ -33,8 +33,9 @@ export async function generateMetadata({ params }: { params: { username: string 
       ? await supabase.from('profiles').select('id, created_at').eq('id', slug).maybeSingle()
       : await supabase.from('profiles_v2').select('id, username, created_at').eq('username', slug).maybeSingle()
     if (byTable.data) {
+      const username = isUUID ? null : (byTable.data as any).username ?? null
       profile = {
-        username: byTable.data.username ?? null,
+        username,
         display_name: null,
         bio: null,
         avatar_url: null,

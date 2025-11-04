@@ -16,57 +16,82 @@ SECURITY DEFINER
 SET search_path = lootaura_v2, public
 AS $$
 DECLARE
-  v_update_data jsonb := '{}'::jsonb;
   v_result jsonb;
 BEGIN
-  -- Build update data dynamically, only including fields that are provided
+  -- Update the profile table directly using dynamic SQL to only update columns that exist
+  -- Use conditional updates to avoid errors if columns don't exist
+  
+  -- Update avatar_url if provided
   IF p_avatar_url IS NOT NULL THEN
-    v_update_data := v_update_data || jsonb_build_object('avatar_url', p_avatar_url);
+    UPDATE lootaura_v2.profiles
+    SET avatar_url = p_avatar_url
+    WHERE id = p_user_id;
   END IF;
   
+  -- Update full_name if provided
   IF p_full_name IS NOT NULL THEN
-    v_update_data := v_update_data || jsonb_build_object('full_name', p_full_name);
+    UPDATE lootaura_v2.profiles
+    SET full_name = p_full_name
+    WHERE id = p_user_id;
   END IF;
   
+  -- Update display_name if provided (try to update, ignore if column doesn't exist)
   IF p_display_name IS NOT NULL THEN
-    v_update_data := v_update_data || jsonb_build_object('display_name', p_display_name);
+    BEGIN
+      UPDATE lootaura_v2.profiles
+      SET display_name = p_display_name
+      WHERE id = p_user_id;
+    EXCEPTION WHEN undefined_column THEN
+      -- Column doesn't exist, skip it
+      NULL;
+    END;
   END IF;
   
-  IF p_bio IS NOT NULL OR p_bio IS NULL AND p_bio IS DISTINCT FROM NULL THEN
-    v_update_data := v_update_data || jsonb_build_object('bio', p_bio);
+  -- Update bio if provided (try to update, ignore if column doesn't exist)
+  IF p_bio IS NOT NULL OR (p_bio IS NULL AND p_bio IS DISTINCT FROM NULL) THEN
+    BEGIN
+      UPDATE lootaura_v2.profiles
+      SET bio = p_bio
+      WHERE id = p_user_id;
+    EXCEPTION WHEN undefined_column THEN
+      -- Column doesn't exist, skip it
+      NULL;
+    END;
   END IF;
   
-  IF p_location_city IS NOT NULL OR p_location_city IS NULL AND p_location_city IS DISTINCT FROM NULL THEN
-    v_update_data := v_update_data || jsonb_build_object('location_city', p_location_city);
+  -- Update location_city if provided (try to update, ignore if column doesn't exist)
+  IF p_location_city IS NOT NULL OR (p_location_city IS NULL AND p_location_city IS DISTINCT FROM NULL) THEN
+    BEGIN
+      UPDATE lootaura_v2.profiles
+      SET location_city = p_location_city
+      WHERE id = p_user_id;
+    EXCEPTION WHEN undefined_column THEN
+      -- Column doesn't exist, skip it
+      NULL;
+    END;
   END IF;
   
-  IF p_location_region IS NOT NULL OR p_location_region IS NULL AND p_location_region IS DISTINCT FROM NULL THEN
-    v_update_data := v_update_data || jsonb_build_object('location_region', p_location_region);
+  -- Update location_region if provided (try to update, ignore if column doesn't exist)
+  IF p_location_region IS NOT NULL OR (p_location_region IS NULL AND p_location_region IS DISTINCT FROM NULL) THEN
+    BEGIN
+      UPDATE lootaura_v2.profiles
+      SET location_region = p_location_region
+      WHERE id = p_user_id;
+    EXCEPTION WHEN undefined_column THEN
+      -- Column doesn't exist, skip it
+      NULL;
+    END;
   END IF;
   
-  -- Always update updated_at
-  v_update_data := v_update_data || jsonb_build_object('updated_at', now());
-  
-  -- Update the profile table directly
-  UPDATE lootaura_v2.profiles
-  SET
-    avatar_url = COALESCE((v_update_data->>'avatar_url')::text, avatar_url),
-    full_name = COALESCE((v_update_data->>'full_name')::text, full_name),
-    display_name = COALESCE((v_update_data->>'display_name')::text, display_name),
-    bio = CASE 
-      WHEN v_update_data ? 'bio' THEN (v_update_data->>'bio')::text
-      ELSE bio
-    END,
-    location_city = CASE 
-      WHEN v_update_data ? 'location_city' THEN (v_update_data->>'location_city')::text
-      ELSE location_city
-    END,
-    location_region = CASE 
-      WHEN v_update_data ? 'location_region' THEN (v_update_data->>'location_region')::text
-      ELSE location_region
-    END,
-    updated_at = now()
-  WHERE id = p_user_id;
+  -- Always update updated_at (this should exist, but wrap in try-catch just in case)
+  BEGIN
+    UPDATE lootaura_v2.profiles
+    SET updated_at = now()
+    WHERE id = p_user_id;
+  EXCEPTION WHEN undefined_column THEN
+    -- updated_at doesn't exist, skip it
+    NULL;
+  END;
   
   -- Return updated profile from view
   SELECT row_to_json(p.*) INTO v_result

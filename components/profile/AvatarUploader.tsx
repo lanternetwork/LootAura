@@ -46,20 +46,48 @@ export function AvatarUploader({ initialUrl, onUpdated, onClose }: AvatarUploade
       }
       
       // Upload to Cloudinary
+      // IMPORTANT: Parameters must be sent in the same order as signed
+      // For signed uploads, Cloudinary expects: eager, folder, timestamp (lexicographically sorted)
       const form = new FormData()
       form.append('file', file)
+      // Add parameters in lexicographic order to match signature
+      form.append('eager', sig.data.eager)
+      form.append('folder', sig.data.folder)
       form.append('timestamp', String(sig.data.timestamp))
       form.append('api_key', sig.data.api_key)
       form.append('signature', sig.data.signature)
-      form.append('folder', sig.data.folder)
-      if (sig.data.eager) form.append('eager', sig.data.eager)
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[AVATAR] uploading with params:', {
+          eager: sig.data.eager,
+          folder: sig.data.folder,
+          timestamp: sig.data.timestamp,
+          api_key: sig.data.api_key,
+          signature: sig.data.signature,
+        })
+      }
       
       const cloudUrl = `https://api.cloudinary.com/v1_1/${sig.data.cloud_name}/image/upload`
       const uploadRes = await fetch(cloudUrl, { method: 'POST', body: form })
+      
+      if (!uploadRes.ok) {
+        const errorText = await uploadRes.text()
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: errorText }
+        }
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[AVATAR] upload error:', errorData)
+        }
+        throw new Error(errorData?.error?.message || errorData?.message || `Upload failed: ${uploadRes.status}`)
+      }
+      
       const uploadResult = await uploadRes.json()
       
-      if (!uploadRes.ok || !uploadResult.secure_url) {
-        throw new Error(uploadResult?.error?.message || 'Upload failed')
+      if (!uploadResult.secure_url) {
+        throw new Error(uploadResult?.error?.message || 'Upload succeeded but no URL returned')
       }
       
       // Validate URL is from allowed host

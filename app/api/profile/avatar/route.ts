@@ -11,27 +11,33 @@ export async function POST() {
   const cfg = getCloudinaryConfig()
   if (!cfg) return NextResponse.json({ ok: false, error: 'Cloudinary not configured' }, { status: 501 })
 
-  // Basic signature for unsigned upload preset or direct folder
-  // Cloudinary requires params to be sorted lexicographically before signing
+  // Cloudinary signed upload signature generation
+  // All parameters EXCEPT file, api_key, and signature must be included in signature
+  // Parameters must be sorted lexicographically
   const timestamp = Math.floor(Date.now() / 1000)
   const folder = `avatars/${user.id}`
-  // Example: limit transformations server-allowed (e.g., max 512x512)
   const eager = 'c_fill,g_face,r_max,w_256,h_256'
   
-  // Sort params lexicographically (Cloudinary requirement)
+  // Build params object with all parameters that will be sent (except file, api_key, signature)
   const params: Record<string, string> = {
     eager,
     folder,
     timestamp: String(timestamp),
   }
+  
+  // Sort keys lexicographically and build signature string
   const sortedKeys = Object.keys(params).sort()
   const paramsToSign = sortedKeys.map(key => `${key}=${params[key]}`).join('&')
   
-  // Use HMAC-SHA1 per Cloudinary signing guidance to avoid weak-hash lint
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[AVATAR] signing params:', paramsToSign)
+  }
+  
+  // Generate HMAC-SHA1 signature
   const signature = createHmac('sha1', cfg.apiSecret).update(paramsToSign).digest('hex')
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[AVATAR] sign params', { folder, timestamp, eager })
+    console.log('[AVATAR] generated signature:', signature, 'for params:', { eager, folder, timestamp })
   }
 
   return NextResponse.json({

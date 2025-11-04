@@ -206,7 +206,14 @@ export async function PUT(req: Request) {
   }
 
   if (updateErr || !updated) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[PROFILE] PUT update failed:', updateErr?.message || 'No data returned')
+    }
     return NextResponse.json({ ok: false, error: updateErr?.message || 'Update failed' }, { status: updateErr ? 500 : 400 })
+  }
+
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[PROFILE] PUT updated successfully, returning keys:', Object.keys(updated))
   }
 
   return NextResponse.json({ ok: true, data: updated })

@@ -37,7 +37,16 @@ export function AboutCard({
   }, [bio, displayName, locationCity, locationRegion, isEditing])
 
   const handleSave = async () => {
-    if (!onSave) return
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ABOUT] save clicked')
+    }
+    
+    if (!onSave) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[ABOUT] onSave handler not provided')
+      }
+      return
+    }
     setError(null)
     
     // Validation
@@ -50,16 +59,28 @@ export function AboutCard({
       return
     }
     
+    const patch = {
+      displayName: editDisplayName.trim() || undefined,
+      bio: editBio.trim() || undefined,
+      locationCity: editCity.trim() || undefined,
+      locationRegion: editRegion.trim() || undefined,
+    }
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ABOUT] sending PUT /api/profile with keys:', Object.keys(patch).filter(k => patch[k as keyof typeof patch] !== undefined))
+    }
+    
     setSaving(true)
     try {
-      await onSave({
-        displayName: editDisplayName.trim() || undefined,
-        bio: editBio.trim() || undefined,
-        locationCity: editCity.trim() || undefined,
-        locationRegion: editRegion.trim() || undefined,
-      })
+      await onSave(patch)
       setIsEditing(false)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[ABOUT] save successful')
+      }
     } catch (e: any) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[ABOUT] save failed:', e?.message)
+      }
       setError(e?.message || 'Failed to save')
     } finally {
       setSaving(false)

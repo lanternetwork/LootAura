@@ -171,19 +171,37 @@ export default function ProfileClient() {
   }, [])
 
   const handleAboutSave = async (data: { displayName?: string; bio?: string; locationCity?: string; locationRegion?: string }) => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ABOUT] handleAboutSave called with keys:', Object.keys(data).filter(k => data[k as keyof typeof data] !== undefined))
+    }
+    
+    // Build patch with only provided fields (no undefined -> null coercion)
+    const patch: Record<string, any> = {}
+    if (data.displayName !== undefined) patch.display_name = data.displayName
+    if (data.bio !== undefined) patch.bio = data.bio
+    if (data.locationCity !== undefined) patch.location_city = data.locationCity
+    if (data.locationRegion !== undefined) patch.location_region = data.locationRegion
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ABOUT] sending PUT /api/profile with keys:', Object.keys(patch))
+    }
+    
     const res = await fetch('/api/profile', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        display_name: data.displayName,
-        bio: data.bio,
-        location_city: data.locationCity,
-        location_region: data.locationRegion,
-      }),
+      body: JSON.stringify(patch),
     })
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ABOUT] response ok=', res.ok)
+    }
     
     // Read response once - don't read it twice!
     const j = await res.json().catch(() => ({ ok: false, error: 'Failed to parse response' }))
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ABOUT] response j.ok=', j?.ok, 'error=', j?.error)
+    }
     
     if (!res.ok || !j?.ok) {
       throw new Error(j?.error || 'Failed to save')

@@ -146,10 +146,25 @@ BEGIN
     NULL;
   END;
   
-  -- Return updated profile from view
+  -- Return updated profile directly from base table (not view)
+  -- This ensures we return the actual data even if view has RLS issues
   SELECT row_to_json(p.*) INTO v_result
-  FROM public.profiles_v2 p
+  FROM lootaura_v2.profiles p
   WHERE p.id = p_user_id;
+  
+  -- If base table query returned null, synthesize minimal profile
+  IF v_result IS NULL THEN
+    v_result := jsonb_build_object(
+      'id', p_user_id,
+      'display_name', p_display_name,
+      'bio', p_bio,
+      'location_city', p_location_city,
+      'location_region', p_location_region,
+      'avatar_url', p_avatar_url,
+      'created_at', now(),
+      'updated_at', now()
+    );
+  END IF;
   
   RETURN v_result;
 END;

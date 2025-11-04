@@ -32,6 +32,24 @@ export async function GET(_req: NextRequest) {
     })
   }
 
+  // If view doesn't return data, try using RPC to read from base table
+  // The RPC function can read even if view has RLS issues
+  if (!data && !error) {
+    console.log('[PROFILE] GET view returned null, trying RPC to read base table')
+    try {
+      // Use RPC to read profile - RPC is SECURITY DEFINER and can read base table
+      const { data: rpcData, error: rpcError } = await sb.rpc('get_profile', { p_user_id: user.id })
+      if (rpcData && !rpcError) {
+        console.log('[PROFILE] GET RPC read successful, bio:', rpcData.bio)
+        data = typeof rpcData === 'string' ? JSON.parse(rpcData) : rpcData
+      } else {
+        console.log('[PROFILE] GET RPC read failed:', rpcError?.message)
+      }
+    } catch (e) {
+      console.log('[PROFILE] GET RPC read exception:', e)
+    }
+  }
+
   if (error && error.message?.includes('column')) {
     console.log('[PROFILE] GET column error, falling back to core columns:', error.message)
     // Fallback to core columns that definitely exist
@@ -60,7 +78,8 @@ export async function GET(_req: NextRequest) {
   }
 
   if (!data) {
-    console.log('[PROFILE] GET profile not found', { userId: user.id })
+    console.log('[PROFILE] GET profile not found in view or via RPC', { userId: user.id })
+    // Profile doesn't exist - client should create it
     return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
   }
 

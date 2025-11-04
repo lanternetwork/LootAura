@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest) {
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] GET profile start', { userId: user.id })
+    console.log('[PROFILE] GET /api/profile start', { userId: user.id })
   }
 
   // First check if profile exists in table
@@ -56,6 +56,10 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ ok: true, data: { id: tableData.id, username: null, display_name: null, avatar_url: null, bio: null, location_city: null, location_region: null, created_at: null, verified: false, home_zip: null, preferences: {} } })
   }
   
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[PROFILE] GET /api/profile returned keys:', data ? Object.keys(data) : [])
+  }
+  
   return NextResponse.json({ ok: true, data })
 }
 
@@ -74,6 +78,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: 'Avatar host not allowed' }, { status: 400 })
   }
 
+  // Write directly to lootaura_v2.profiles table (canonical data source)
   // Use RPC function to update profile - bypasses schema cache issues
   // The RPC function updates the table directly in lootaura_v2 schema
   // Only pass parameters that are explicitly provided (not undefined)
@@ -86,13 +91,17 @@ export async function PUT(req: Request) {
     rpcParams.p_full_name = payload.display_name
   }
   if (payload.bio !== undefined) {
-    rpcParams.p_bio = payload.bio
+    rpcParams.p_bio = payload.bio ?? null // Allow NULL to clear bio
   }
   if (payload.location_city !== undefined) {
-    rpcParams.p_location_city = payload.location_city
+    rpcParams.p_location_city = payload.location_city ?? null
   }
   if (payload.location_region !== undefined) {
-    rpcParams.p_location_region = payload.location_region
+    rpcParams.p_location_region = payload.location_region ?? null
+  }
+  
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[PROFILE] PUT /api/profile fields:', Object.keys(rpcParams).filter(k => k !== 'p_user_id'))
   }
   
   const { data: rpcResult, error: rpcError } = await sb.rpc('update_profile', rpcParams)
@@ -136,7 +145,7 @@ export async function PUT(req: Request) {
   }
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] update profile success via RPC', { hasProfileData: !!profileData })
+    console.log('[PROFILE] GET /api/profile returned keys:', profileData ? Object.keys(profileData) : [])
   }
 
   return NextResponse.json({ ok: true, data: profileData })

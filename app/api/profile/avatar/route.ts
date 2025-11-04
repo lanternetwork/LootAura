@@ -39,6 +39,12 @@ export async function POST() {
   const folder = `avatars/${user.id}`
   const eager = 'c_fill,g_face,r_max,w_256,h_256'
   
+  // Validate timestamp (must be within 120 seconds)
+  const now = Math.floor(Date.now() / 1000)
+  if (timestamp > now + 120) {
+    return NextResponse.json({ ok: false, error: 'Invalid timestamp' }, { status: 400 })
+  }
+  
   // Build params object with all parameters that will be sent (except file, api_key, signature)
   const params: Record<string, string> = {
     eager,
@@ -51,14 +57,14 @@ export async function POST() {
   const paramsToSign = sortedKeys.map(key => `${key}=${params[key]}`).join('&')
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[AVATAR] signing params:', paramsToSign)
+    console.log('[AVATAR] sign params', { folder, timestamp, eager })
   }
   
   // Generate HMAC-SHA1 signature
   const signature = createHmac('sha1', cfg.apiSecret).update(paramsToSign).digest('hex')
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[AVATAR] generated signature:', signature, 'for params:', { eager, folder, timestamp })
+    console.log('[AVATAR] generated signature for params:', paramsToSign)
   }
 
   return NextResponse.json({

@@ -115,31 +115,31 @@ export function AvatarUploader({ initialUrl, onUpdated, onClose }: AvatarUploade
         throw new Error('Invalid image host')
       }
       
-      setPreview(uploadResult.secure_url)
+      // Add cache busting parameter to ensure fresh image
+      const cacheBustedUrl = `${uploadResult.secure_url}?v=${Date.now()}`
+      setPreview(cacheBustedUrl)
       
-      // Persist to profile
+      // Persist to profile - write to base table via RPC
       const profileRes = await fetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatar_url: uploadResult.secure_url }),
+        body: JSON.stringify({ avatar_url: uploadResult.secure_url }), // Store original URL without cache bust
       })
       
-      if (!profileRes.ok) {
-        const errorData = await profileRes.json().catch(() => ({ error: 'Failed to save avatar' }))
-        const errorMsg = errorData?.error || 'Failed to save avatar'
+      // Read response once - don't read it twice!
+      const profileData = await profileRes.json().catch(() => ({ ok: false, error: 'Failed to parse response' }))
+      
+      if (!profileRes.ok || !profileData?.ok) {
+        const errorMsg = profileData?.error || 'Failed to save avatar'
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.error('[AVATAR] save to profile failed:', errorMsg, errorData)
+          console.error('[AVATAR] save to profile failed:', errorMsg, profileData)
         }
         throw new Error(errorMsg)
       }
       
-      const profileData = await profileRes.json()
-      if (!profileData?.ok) {
-        throw new Error(profileData?.error || 'Failed to save avatar')
-      }
-      
       if (onUpdated) {
-        onUpdated(uploadResult.secure_url)
+        // Pass cache-busted URL to parent so it updates immediately
+        onUpdated(cacheBustedUrl)
       }
     } catch (e: any) {
       setError(e?.message || 'Upload failed')

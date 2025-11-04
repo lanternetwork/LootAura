@@ -16,44 +16,60 @@ type PublicProfilePageProps = {
 }
 
 export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
-  const username = decodeURIComponent(params.username)
+  const slug = decodeURIComponent(params.username)
   const supabase = createSupabaseServerClient()
-  const prof = await supabase
-    .from('profiles_v2')
-    .select('display_name, bio, avatar_url, username')
-    .or(`username.eq.${username},id.eq.${username}`)
-    .maybeSingle()
+  
+  // Detect if slug is UUID
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+  
+  const prof = isUUID
+    ? await supabase.from('profiles_v2').select('display_name, bio, avatar_url, username').eq('id', slug).maybeSingle()
+    : await supabase.from('profiles_v2').select('display_name, bio, avatar_url, username').eq('username', slug).maybeSingle()
   
   const profile = prof.data
   if (!profile) {
-    return createPageMetadata({ title: 'User Not Found', path: `/u/${username}` })
+    return createPageMetadata({ title: 'User Not Found', path: `/u/${slug}` })
   }
   
-  const title = profile.display_name || profile.username || username
+  const title = profile.display_name || profile.username || slug
   const description = profile.bio || `View ${title}'s profile on Loot Aura`
   const image = profile.avatar_url || undefined
   
   return createPageMetadata({
     title,
     description,
-    path: `/u/${username}`,
+    path: `/u/${slug}`,
     image,
     type: 'website',
   })
 }
 
-async function fetchProfileData(username: string) {
+async function fetchProfileData(slug: string) {
   const supabase = createSupabaseServerClient()
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] public page fetch start', { username })
+    console.log('[PROFILE] public page fetch start', { slug })
   }
   
-  const prof = await supabase
-    .from('profiles_v2')
-    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
-    .or(`username.eq.${username},id.eq.${username}`)
-    .maybeSingle()
+  // Detect if slug is UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+  
+  let prof
+  if (isUUID) {
+    // Treat as user_id
+    prof = await supabase
+      .from('profiles_v2')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .eq('id', slug)
+      .maybeSingle()
+  } else {
+    // Treat as username
+    prof = await supabase
+      .from('profiles_v2')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .eq('username', slug)
+      .maybeSingle()
+  }
   
   const profile = prof.data
   if (!profile) return null
@@ -72,7 +88,7 @@ async function fetchProfileData(username: string) {
     : ownerStatsResult.data
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] public page fetch end', { username, hasProfile: !!profile, categoriesCount: preferred.length })
+    console.log('[PROFILE] public page fetch end', { slug, hasProfile: !!profile, categoriesCount: preferred.length })
   }
   
   return {
@@ -132,10 +148,10 @@ function ProfileSkeleton() {
 }
 
 export default async function PublicProfilePage({ params, searchParams }: PublicProfilePageProps) {
-  const username = decodeURIComponent(params.username)
+  const slug = decodeURIComponent(params.username)
   const page = Number(searchParams.page || '1')
   
-  const data = await fetchProfileData(username)
+  const data = await fetchProfileData(slug)
   if (!data) return notFound()
   
   const { profile, preferred, ownerStats } = data
@@ -221,7 +237,7 @@ export default async function PublicProfilePage({ params, searchParams }: Public
                   <div className="flex gap-2">
                     {page > 1 && (
                       <Link
-                        href={`/u/${encodeURIComponent(username)}?page=${page - 1}`}
+                        href={`/u/${encodeURIComponent(slug)}?page=${page - 1}`}
                         className="btn-accent text-sm"
                       >
                         Previous
@@ -229,7 +245,7 @@ export default async function PublicProfilePage({ params, searchParams }: Public
                     )}
                     {listings.hasMore && (
                       <Link
-                        href={`/u/${encodeURIComponent(username)}?page=${page + 1}`}
+                        href={`/u/${encodeURIComponent(slug)}?page=${page + 1}`}
                         className="btn-accent text-sm"
                       >
                         Next

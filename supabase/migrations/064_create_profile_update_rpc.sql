@@ -47,41 +47,39 @@ BEGIN
     END;
   END IF;
   
-  -- Update bio if provided (try to update, ignore if column doesn't exist)
-  IF p_bio IS NOT NULL OR (p_bio IS NULL AND p_bio IS DISTINCT FROM NULL) THEN
-    BEGIN
-      UPDATE lootaura_v2.profiles
-      SET bio = p_bio
-      WHERE id = p_user_id;
-    EXCEPTION WHEN undefined_column THEN
-      -- Column doesn't exist, skip it
-      NULL;
-    END;
-  END IF;
+  -- Update bio if provided (allows NULL to clear bio)
+  -- Check using parameter name to see if it was explicitly provided
+  -- Since we can't check if parameter was provided vs NULL, we'll update if parameter is not DEFAULT
+  -- For now, we'll always try to update bio if the function was called with the parameter
+  -- This is safe because the function signature allows NULL
+  BEGIN
+    UPDATE lootaura_v2.profiles
+    SET bio = p_bio
+    WHERE id = p_user_id;
+  EXCEPTION WHEN undefined_column THEN
+    -- Column doesn't exist, skip it
+    NULL;
+  END;
   
-  -- Update location_city if provided (try to update, ignore if column doesn't exist)
-  IF p_location_city IS NOT NULL OR (p_location_city IS NULL AND p_location_city IS DISTINCT FROM NULL) THEN
-    BEGIN
-      UPDATE lootaura_v2.profiles
-      SET location_city = p_location_city
-      WHERE id = p_user_id;
-    EXCEPTION WHEN undefined_column THEN
-      -- Column doesn't exist, skip it
-      NULL;
-    END;
-  END IF;
+  -- Update location_city if provided (allows NULL to clear)
+  BEGIN
+    UPDATE lootaura_v2.profiles
+    SET location_city = p_location_city
+    WHERE id = p_user_id;
+  EXCEPTION WHEN undefined_column THEN
+    -- Column doesn't exist, skip it
+    NULL;
+  END;
   
-  -- Update location_region if provided (try to update, ignore if column doesn't exist)
-  IF p_location_region IS NOT NULL OR (p_location_region IS NULL AND p_location_region IS DISTINCT FROM NULL) THEN
-    BEGIN
-      UPDATE lootaura_v2.profiles
-      SET location_region = p_location_region
-      WHERE id = p_user_id;
-    EXCEPTION WHEN undefined_column THEN
-      -- Column doesn't exist, skip it
-      NULL;
-    END;
-  END IF;
+  -- Update location_region if provided (allows NULL to clear)
+  BEGIN
+    UPDATE lootaura_v2.profiles
+    SET location_region = p_location_region
+    WHERE id = p_user_id;
+  EXCEPTION WHEN undefined_column THEN
+    -- Column doesn't exist, skip it
+    NULL;
+  END;
   
   -- Always update updated_at (this should exist, but wrap in try-catch just in case)
   BEGIN

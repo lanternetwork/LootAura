@@ -220,6 +220,12 @@ export default function ProfileClient() {
     setShowAvatarUploader(true)
   }
 
+  const handleAvatarUpdated = (url: string | null) => {
+    // Update profile state with new avatar URL (may include cache bust param)
+    setProfile((prev) => (prev ? { ...prev, avatar_url: url } : null))
+    setShowAvatarUploader(false)
+  }
+
   const handleViewPublic = () => {
     if (!profile) return
     
@@ -233,10 +239,10 @@ export default function ProfileClient() {
     }
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[PROFILE] navigate to public profile:', `/u/${slug}`)
+      console.log('[PROFILE] navigate to public profile: /u/' + slug)
     }
     
-    router.push(`/u/${slug}`)
+    router.push(`/u/${encodeURIComponent(slug)}`)
   }
 
   if (loading) {
@@ -270,7 +276,7 @@ export default function ProfileClient() {
           id: profile.id,
           displayName: profile.display_name,
           username: profile.username,
-          avatarUrl: profile.avatar_url,
+          avatarUrl: profile.avatar_url ? `${profile.avatar_url}?v=${Date.now()}` : null,
           locationCity: profile.location_city,
           locationRegion: profile.location_region,
           createdAt: profile.created_at,
@@ -296,10 +302,7 @@ export default function ProfileClient() {
             </div>
             <AvatarUploaderComponent
               initialUrl={profile.avatar_url || undefined}
-              onUpdated={(url) => {
-                setProfile((prev) => (prev ? { ...prev, avatar_url: url } : null))
-                setShowAvatarUploader(false)
-              }}
+              onUpdated={handleAvatarUpdated}
               onClose={() => setShowAvatarUploader(false)}
             />
           </div>

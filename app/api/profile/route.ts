@@ -210,7 +210,13 @@ export async function PUT(req: Request) {
           console.log('[PROFILE] PUT RPC returned null, trying get_profile RPC to read back')
           const { data: getProfileData, error: getProfileError } = await sb.rpc('get_profile', { p_user_id: user.id })
           
-          if (getProfileData && !getProfileError) {
+          if (getProfileError) {
+            console.error('[PROFILE] PUT get_profile RPC error:', getProfileError.message, getProfileError.code)
+            // If RPC function doesn't exist, try view fallback
+            if (getProfileError.message?.includes('function') || getProfileError.code === '42883') {
+              console.log('[PROFILE] PUT get_profile RPC function not found - migration may not be applied, trying view')
+            }
+          } else if (getProfileData) {
             updated = typeof getProfileData === 'string' ? JSON.parse(getProfileData) : getProfileData
             console.log('[PROFILE] PUT get_profile RPC read successful:', { 
               hasData: !!updated, 
@@ -219,8 +225,12 @@ export async function PUT(req: Request) {
               keysInResult: updated ? Object.keys(updated) : []
             })
           } else {
-            // Both RPCs failed - try view as last resort
-            console.log('[PROFILE] PUT both RPCs returned null, trying view as fallback')
+            // get_profile returned null - try view as fallback
+            console.log('[PROFILE] PUT get_profile returned null, trying view as fallback')
+          }
+          
+          // If we still don't have data, try view as last resort
+          if (!updated) {
             const { data: viewData, error: viewError } = await sb
               .from('profiles_v2')
               .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
@@ -234,13 +244,14 @@ export async function PUT(req: Request) {
                 bioInResult: updated?.bio,
                 avatarUrlInResult: updated?.avatar_url
               })
+            } else if (viewError) {
+              console.error('[PROFILE] PUT view error:', viewError.message)
             } else {
               console.error('[PROFILE] PUT all read methods failed - RPC update likely succeeded but cannot verify')
-              console.error('[PROFILE] PUT get_profile error:', getProfileError?.message)
-              console.error('[PROFILE] PUT view error:', viewError?.message)
+              console.error('[PROFILE] PUT get_profile returned null, view returned null')
               
               // Even if we can't read back, the update likely succeeded
-              // Return the updateData as confirmation
+              // Return the updateData as confirmation (but preserve existing fields if we have them)
               updated = {
                 id: user.id,
                 display_name: updateData.display_name ?? undefined,
@@ -251,7 +262,7 @@ export async function PUT(req: Request) {
                 created_at: undefined,
                 verified: false,
               }
-              console.log('[PROFILE] PUT returning updateData as confirmation (readback failed)')
+              console.log('[PROFILE] PUT returning updateData as confirmation (readback failed):', updated)
             }
           }
         }

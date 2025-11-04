@@ -91,7 +91,14 @@ export async function PUT(req: Request) {
   if (payload.location_region !== undefined) updateData.location_region = payload.location_region
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] PUT /api/profile fields:', Object.keys(updateData))
+    console.log('[PROFILE] PUT received fields:', Object.keys(updateData))
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.warn('[PROFILE] PUT received empty update data')
+    }
+    return NextResponse.json({ ok: false, error: 'No fields to update' }, { status: 400 })
   }
 
   if (Object.keys(updateData).length === 0) {

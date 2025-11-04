@@ -37,8 +37,7 @@ export async function GET(_req: NextRequest) {
     console.log('[PROFILE] GET /api/profile returned keys:', Object.keys(data))
   }
 
-  // Ensure stable shape including optional username (may not exist on base table)
-  return NextResponse.json({ ok: true, data: { ...data, username: (data as any)?.username ?? null } })
+  return NextResponse.json({ ok: true, data })
 }
 
 export async function PUT(req: Request) {
@@ -92,7 +91,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: updateErr?.message || 'Update failed' }, { status: updateErr ? 500 : 400 })
   }
 
-  return NextResponse.json({ ok: true, data: { ...updated, username: (updated as any)?.username ?? null } })
+  return NextResponse.json({ ok: true, data: updated })
 }
 
 // Legacy handlers removed to avoid duplicate exports and name collisions
@@ -232,5 +231,5 @@ export async function POST(_request: NextRequest) {
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('✅ [AUTH FLOW] profile-creation → created: success', { userId: user.id, profileId: profileData.id })
   }
-  return NextResponse.json({ ok: true, data: { ...profileData, username: (profileData as any)?.username ?? null }, created: true, message: 'Profile created successfully' })
+  return NextResponse.json({ ok: true, data: profileData, created: true, message: 'Profile created successfully' })
 }

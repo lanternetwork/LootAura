@@ -125,7 +125,17 @@ export function AvatarUploader({ initialUrl, onUpdated, onClose }: AvatarUploade
       })
       
       if (!profileRes.ok) {
-        throw new Error('Failed to save avatar')
+        const errorData = await profileRes.json().catch(() => ({ error: 'Failed to save avatar' }))
+        const errorMsg = errorData?.error || 'Failed to save avatar'
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[AVATAR] save to profile failed:', errorMsg, errorData)
+        }
+        throw new Error(errorMsg)
+      }
+      
+      const profileData = await profileRes.json()
+      if (!profileData?.ok) {
+        throw new Error(profileData?.error || 'Failed to save avatar')
       }
       
       if (onUpdated) {

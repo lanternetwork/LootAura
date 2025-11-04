@@ -74,59 +74,43 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: 'Avatar host not allowed' }, { status: 400 })
   }
 
-  // Update via profiles_v2 view only - don't touch the table directly
-  // The view handles schema differences between public and lootaura_v2 schemas
-  // Build update data with all provided fields
-  const updateData: Record<string, any> = {}
+  // Use RPC function to update profile - bypasses schema cache issues
+  // The RPC function updates the table directly in lootaura_v2 schema
+  const { data: rpcResult, error: rpcError } = await sb.rpc('update_profile', {
+    p_user_id: user.id,
+    p_avatar_url: payload.avatar_url ?? null,
+    p_display_name: payload.display_name ?? null,
+    p_full_name: payload.display_name ?? null,
+    p_bio: payload.bio ?? null,
+    p_location_city: payload.location_city ?? null,
+    p_location_region: payload.location_region ?? null,
+  })
   
-  if (payload.avatar_url !== undefined) {
-    updateData.avatar_url = payload.avatar_url
-  }
-  if (payload.display_name !== undefined) {
-    updateData.display_name = payload.display_name
-    updateData.full_name = payload.display_name
-  }
-  if (payload.bio !== undefined) {
-    updateData.bio = payload.bio ?? null
-  }
-  if (payload.location_city !== undefined) {
-    updateData.location_city = payload.location_city ?? null
-  }
-  if (payload.location_region !== undefined) {
-    updateData.location_region = payload.location_region ?? null
-  }
-  
-  // Try to update via view - views may or may not support UPDATE
-  // If it fails, we'll just return the current profile data
-  if (Object.keys(updateData).length > 0) {
-    const { error: updateError } = await sb
-      .from('profiles_v2')
-      .update(updateData)
-      .eq('id', user.id)
-    
-    if (updateError) {
-      // View doesn't support UPDATE or schema issue - try using raw SQL via RPC
-      // Or just log and continue - we'll fetch current profile anyway
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.warn('[PROFILE] PUT view update failed, will fetch current profile:', updateError.message)
-      }
-      // Don't fail - we'll return current profile data
+  if (rpcError) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[PROFILE] PUT RPC update failed:', rpcError)
     }
+    // RPC failed - try fallback to view select
+    const { data: profileData, error: viewError } = await sb
+      .from('profiles_v2')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+      .eq('id', user.id)
+      .maybeSingle()
+    
+    if (viewError || !profileData) {
+      const status = rpcError.code === '42501' ? 403 : 500
+      return NextResponse.json({ ok: false, error: rpcError.message }, { status })
+    }
+    
+    return NextResponse.json({ ok: true, data: profileData })
   }
-  
-  // Always fetch updated profile from view (which should have all columns)
-  const { data: profileData } = await sb
-    .from('profiles_v2')
-    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
-    .eq('id', user.id)
-    .maybeSingle()
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] update profile success', { hasProfileData: !!profileData })
+    console.log('[PROFILE] update profile success via RPC')
   }
 
-  // Return success with current profile data from view
-  return NextResponse.json({ ok: true, data: profileData })
+  // RPC returns the updated profile as JSONB
+  return NextResponse.json({ ok: true, data: rpcResult })
 }
 
 // Legacy handlers removed to avoid duplicate exports and name collisions

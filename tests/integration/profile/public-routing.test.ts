@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-describe('Public Profile Routing', () => {
+describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Public Profile Routing', () => {
   let supabase: ReturnType<typeof createClient>
 
   beforeAll(async () => {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase env vars not set')
+    }
     supabase = createClient(supabaseUrl, supabaseAnonKey)
   })
 

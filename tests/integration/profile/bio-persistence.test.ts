@@ -1,16 +1,19 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-describe('Profile Bio Persistence', () => {
+describe.skipIf(!supabaseUrl || !supabaseAnonKey)('Profile Bio Persistence', () => {
   let testUserId: string
   let supabase: ReturnType<typeof createClient>
 
   beforeAll(async () => {
     // Create a test user session (this would need to be done via auth API in real tests)
     // For now, we'll use the anon key and test with a mock user ID
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase env vars not set')
+    }
     supabase = createClient(supabaseUrl, supabaseAnonKey)
     
     // In a real test, you'd create a test user via auth API

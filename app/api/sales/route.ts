@@ -802,6 +802,9 @@ async function postHandler(request: NextRequest) {
       return NextResponse.json({ ok: true, sale: synthetic })
     }
 
+    // Allow status from body if provided (for test sales), otherwise default to 'published'
+    const saleStatus = body.status === 'draft' || body.status === 'archived' ? body.status : 'published'
+    
     const { data, error } = await fromSales
       .insert({
         title,
@@ -819,18 +822,26 @@ async function postHandler(request: NextRequest) {
         cover_image_url: cover_image_url || null,
         images: images || [],
         pricing_mode: pricing_mode || 'negotiable',
-        status: 'published',
+        status: saleStatus,
         owner_id: user!.id // Server-side binding - never trust client
       })
       .select()
       .single()
     
     if (error) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES] Insert failed:', { event: 'sales-create', status: 'fail', code: error.message })
-      }
-      console.error('Sales insert error:', error)
-      return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
+      console.error('[SALES] Insert failed:', { 
+        event: 'sales-create', 
+        status: 'fail', 
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
+      return NextResponse.json({ 
+        error: 'Failed to create sale',
+        details: error.message,
+        code: error.code
+      }, { status: 500 })
     }
     
     if (!data) {
@@ -844,11 +855,17 @@ async function postHandler(request: NextRequest) {
     
     return NextResponse.json({ ok: true, sale: data })
   } catch (error: any) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SALES] Unexpected error:', { event: 'sales-create', status: 'fail' })
-    }
-    console.error('Sales POST error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('[SALES] Unexpected error:', { 
+      event: 'sales-create', 
+      status: 'fail',
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name
+    })
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      message: error?.message || 'Unknown error'
+    }, { status: 500 })
   }
 }
 

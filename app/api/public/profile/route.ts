@@ -16,8 +16,11 @@ export async function GET(req: Request) {
     profile = byId.data
   }
   if (!profile) {
-    // Fallback: check base table so we don't 404 before view is ready
-    const byTable = await supabase.from('profiles').select('id, created_at').or(`id.eq.${username},username.eq.${username}`).maybeSingle()
+    // Fallback: check base table by id only if the slug is a UUID
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username)
+    const byTable = isUUID
+      ? await supabase.from('profiles').select('id, created_at').eq('id', username).maybeSingle()
+      : { data: null }
     if (byTable.data) {
       profile = {
         id: byTable.data.id,

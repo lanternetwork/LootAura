@@ -13,11 +13,28 @@ export async function GET(_req: NextRequest) {
   }
 
   // Read directly from canonical base table
-  const { data, error } = await sb
-    .from('profiles')
-    .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
-    .eq('id', user.id)
-    .maybeSingle()
+  // Try selecting with bio; if the column doesn't exist in this env, retry without it
+  let data: any = null
+  let error: any = null
+  {
+    const res = await sb
+      .from('profiles')
+      .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .eq('id', user.id)
+      .maybeSingle()
+    data = res.data
+    error = res.error
+  }
+
+  if (error && (error.message?.includes('column') || error.message?.includes('bio'))) {
+    const res2 = await sb
+      .from('profiles')
+      .select('id, display_name, avatar_url, location_city, location_region, created_at, verified')
+      .eq('id', user.id)
+      .maybeSingle()
+    data = res2.data ? { ...res2.data, bio: null } : null
+    error = res2.error
+  }
 
   if (error) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -80,12 +97,32 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: true, data: current })
   }
 
-  const { data: updated, error: updateErr } = await sb
-    .from('profiles')
-    .update(updateData)
-    .eq('id', user.id)
-    .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
-    .single()
+  let updated: any = null
+  let updateErr: any = null
+  {
+    const res = await sb
+      .from('profiles')
+      .update(updateData)
+      .eq('id', user.id)
+      .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .single()
+    updated = res.data
+    updateErr = res.error
+  }
+
+  // If bio column doesn't exist in this env, retry without updating/reading it
+  if (updateErr && (updateErr.message?.includes('column') || updateErr.message?.includes('bio'))) {
+    const retryData = { ...updateData }
+    delete retryData.bio
+    const res2 = await sb
+      .from('profiles')
+      .update(retryData)
+      .eq('id', user.id)
+      .select('id, display_name, avatar_url, location_city, location_region, created_at, verified')
+      .single()
+    updated = res2.data ? { ...res2.data, bio: null } : null
+    updateErr = res2.error
+  }
 
   if (updateErr || !updated) {
     return NextResponse.json({ ok: false, error: updateErr?.message || 'Update failed' }, { status: updateErr ? 500 : 400 })
@@ -195,11 +232,27 @@ export async function POST(_request: NextRequest) {
   }
   
   // Fetch the created profile from the view to get all computed fields (username, etc.)
-  const { data: profileData, error: fetchError } = await supabase
-    .from('profiles')
-    .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
-    .eq('id', user.id)
-    .maybeSingle()
+  // Fetch created profile; handle missing bio column gracefully
+  let profileData: any = null
+  let fetchError: any = null
+  {
+    const res = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .eq('id', user.id)
+      .maybeSingle()
+    profileData = res.data
+    fetchError = res.error
+  }
+  if (fetchError && (fetchError.message?.includes('column') || fetchError.message?.includes('bio'))) {
+    const res2 = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url, location_city, location_region, created_at, verified')
+      .eq('id', user.id)
+      .maybeSingle()
+    profileData = res2.data ? { ...res2.data, bio: null } : null
+    fetchError = res2.error
+  }
   
   if (fetchError || !profileData) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

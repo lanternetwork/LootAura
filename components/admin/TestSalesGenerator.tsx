@@ -68,6 +68,10 @@ export default function TestSalesGenerator() {
 
       const data = await response.json()
       
+      if (response.status === 401) {
+        throw new Error('You must be signed in to create sales. Please sign in and try again.')
+      }
+      
       if (!response.ok || !data.ok) {
         throw new Error(data.error || 'Failed to create sale')
       }
@@ -129,6 +133,11 @@ export default function TestSalesGenerator() {
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
           <p className="text-red-600 font-medium">Error:</p>
           <p className="text-red-600 text-sm">{error}</p>
+          {error.includes('signed in') && (
+            <p className="text-red-600 text-sm mt-2">
+              <a href="/auth/signin" className="underline">Click here to sign in</a>
+            </p>
+          )}
         </div>
       )}
 

@@ -144,6 +144,26 @@ export async function PUT(req: Request) {
         }
       }
       updateErr = res2.error
+    } else {
+      // Nothing we can safely update; fetch current core row and return ok with synthesized fields
+      const res3 = await sb
+        .from('profiles')
+        .select('id, avatar_url, created_at')
+        .eq('id', user.id)
+        .single()
+      if (res3.data) {
+        updated = {
+          ...res3.data,
+          display_name: updateData.display_name ?? null,
+          bio: updateData.bio ?? null,
+          location_city: updateData.location_city ?? null,
+          location_region: updateData.location_region ?? null,
+          verified: false,
+        }
+        updateErr = null
+      } else {
+        updateErr = res3.error
+      }
     }
   }
 

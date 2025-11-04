@@ -8,15 +8,14 @@ export async function GET(_req: NextRequest) {
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] GET /api/profile start', { userId: user.id })
-  }
+  console.log('[PROFILE] GET /api/profile start', { userId: user.id })
 
   // Read directly from canonical base table
   // Try selecting with all columns; if any column doesn't exist, fallback to core columns only
   let data: any = null
   let error: any = null
   {
+    console.log('[PROFILE] GET attempting to read from profiles table')
     const res = await sb
       .from('profiles')
       .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
@@ -24,9 +23,17 @@ export async function GET(_req: NextRequest) {
       .maybeSingle()
     data = res.data
     error = res.error
+    
+    console.log('[PROFILE] GET result:', { 
+      hasData: !!res.data, 
+      error: res.error?.message,
+      bioInData: res.data?.bio,
+      keysInData: res.data ? Object.keys(res.data) : []
+    })
   }
 
   if (error && error.message?.includes('column')) {
+    console.log('[PROFILE] GET column error, falling back to core columns:', error.message)
     // Fallback to core columns that definitely exist
     const res2 = await sb
       .from('profiles')
@@ -42,27 +49,24 @@ export async function GET(_req: NextRequest) {
         location_region: null,
         verified: false,
       }
+      console.log('[PROFILE] GET fallback data synthesized with bio=null')
     }
     error = res2.error
   }
 
   if (error) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.error('[PROFILE] GET table fetch error:', error)
-    }
+    console.error('[PROFILE] GET table fetch error:', error)
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 
   if (!data) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[PROFILE] GET profile not found', { userId: user.id })
-    }
+    console.log('[PROFILE] GET profile not found', { userId: user.id })
     return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
   }
 
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] GET /api/profile returned keys:', Object.keys(data))
-  }
+  console.log('[PROFILE] GET /api/profile returned keys:', Object.keys(data))
+  console.log('[PROFILE] GET returning bio:', data.bio)
+  console.log('[PROFILE] GET returning full data:', JSON.stringify(data, null, 2))
 
   return NextResponse.json({ ok: true, data })
 }

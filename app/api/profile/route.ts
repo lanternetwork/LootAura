@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest) {
   // Read directly from canonical base table
   const { data, error } = await sb
     .from('profiles')
-    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+    .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -37,7 +37,8 @@ export async function GET(_req: NextRequest) {
     console.log('[PROFILE] GET /api/profile returned keys:', Object.keys(data))
   }
 
-  return NextResponse.json({ ok: true, data })
+  // Ensure stable shape including optional username (may not exist on base table)
+  return NextResponse.json({ ok: true, data: { ...data, username: (data as any)?.username ?? null } })
 }
 
 export async function PUT(req: Request) {
@@ -84,14 +85,14 @@ export async function PUT(req: Request) {
     .from('profiles')
     .update(updateData)
     .eq('id', user.id)
-    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+    .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
     .single()
 
   if (updateErr || !updated) {
     return NextResponse.json({ ok: false, error: updateErr?.message || 'Update failed' }, { status: updateErr ? 500 : 400 })
   }
 
-  return NextResponse.json({ ok: true, data: updated })
+  return NextResponse.json({ ok: true, data: { ...updated, username: (updated as any)?.username ?? null } })
 }
 
 // Legacy handlers removed to avoid duplicate exports and name collisions
@@ -157,7 +158,7 @@ export async function POST(_request: NextRequest) {
     if (createError.message?.includes('duplicate key') || createError.code === '23505') {
     const { data: fullProfile, error: fetchError } = await supabase
       .from('profiles')
-        .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+      .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
         .eq('id', user.id)
         .maybeSingle()
       if (!fetchError && fullProfile) {
@@ -197,7 +198,7 @@ export async function POST(_request: NextRequest) {
   // Fetch the created profile from the view to get all computed fields (username, etc.)
   const { data: profileData, error: fetchError } = await supabase
     .from('profiles')
-    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+    .select('id, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
     .eq('id', user.id)
     .maybeSingle()
   
@@ -231,5 +232,5 @@ export async function POST(_request: NextRequest) {
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('✅ [AUTH FLOW] profile-creation → created: success', { userId: user.id, profileId: profileData.id })
   }
-  return NextResponse.json({ ok: true, data: profileData, created: true, message: 'Profile created successfully' })
+  return NextResponse.json({ ok: true, data: { ...profileData, username: (profileData as any)?.username ?? null }, created: true, message: 'Profile created successfully' })
 }

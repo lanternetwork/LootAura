@@ -12,54 +12,31 @@ export async function GET(_req: NextRequest) {
     console.log('[PROFILE] GET /api/profile start', { userId: user.id })
   }
 
-  // First check if profile exists in table
-  const { data: tableData, error: tableError } = await sb
-    .from('profiles')
-    .select('id')
+  // Read directly from canonical base table
+  const { data, error } = await sb
+    .from('lootaura_v2.profiles')
+    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
     .eq('id', user.id)
     .maybeSingle()
-  
-  if (tableError) {
+
+  if (error) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.error('[PROFILE] GET profile table check error:', tableError)
+      console.error('[PROFILE] GET table fetch error:', error)
     }
-    return NextResponse.json({ ok: false, error: tableError.message }, { status: 500 })
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
-  
-  // If profile doesn't exist in table, return 404 so client can create it
-  if (!tableData) {
+
+  if (!data) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[PROFILE] GET profile not found', { userId: user.id })
     }
     return NextResponse.json({ ok: false, error: 'Profile not found' }, { status: 404 })
   }
 
-  // Profile exists in table, fetch from view to get all computed fields
-  const { data, error } = await sb
-    .from('profiles_v2')
-    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
-    .eq('id', user.id)
-    .maybeSingle()
-  
-  if (error) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.error('[PROFILE] GET profile view fetch error:', error)
-    }
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-  }
-  
-  if (!data) {
-    // View fetch failed but table check passed - return basic profile
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[PROFILE] GET profile view fetch returned null, using table data')
-    }
-    return NextResponse.json({ ok: true, data: { id: tableData.id, username: null, display_name: null, avatar_url: null, bio: null, location_city: null, location_region: null, created_at: null, verified: false, home_zip: null, preferences: {} } })
-  }
-  
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] GET /api/profile returned keys:', data ? Object.keys(data) : [])
+    console.log('[PROFILE] GET /api/profile returned keys:', Object.keys(data))
   }
-  
+
   return NextResponse.json({ ok: true, data })
 }
 
@@ -78,77 +55,43 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: 'Avatar host not allowed' }, { status: 400 })
   }
 
-  // Write directly to lootaura_v2.profiles table (canonical data source)
-  // Use RPC function to update profile - bypasses schema cache issues
-  // The RPC function updates the table directly in lootaura_v2 schema
-  // Only pass parameters that are explicitly provided (not undefined)
-  const rpcParams: Record<string, any> = { p_user_id: user.id }
-  if (payload.avatar_url !== undefined) {
-    rpcParams.p_avatar_url = payload.avatar_url
-  }
-  if (payload.display_name !== undefined) {
-    rpcParams.p_display_name = payload.display_name
-    rpcParams.p_full_name = payload.display_name
-  }
-  if (payload.bio !== undefined) {
-    rpcParams.p_bio = payload.bio ?? null // Allow NULL to clear bio
-  }
-  if (payload.location_city !== undefined) {
-    rpcParams.p_location_city = payload.location_city ?? null
-  }
-  if (payload.location_region !== undefined) {
-    rpcParams.p_location_region = payload.location_region ?? null
-  }
-  
+  // Build update object with only provided fields (no undefined -> null coercion)
+  const updateData: Record<string, any> = {}
+  if ('avatar_url' in payload) updateData.avatar_url = payload.avatar_url
+  if ('display_name' in payload) updateData.display_name = payload.display_name
+  if ('bio' in payload) updateData.bio = payload.bio
+  if ('location_city' in payload) updateData.location_city = payload.location_city
+  if ('location_region' in payload) updateData.location_region = payload.location_region
+
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] PUT /api/profile fields:', Object.keys(rpcParams).filter(k => k !== 'p_user_id'))
-  }
-  
-  const { data: rpcResult, error: rpcError } = await sb.rpc('update_profile', rpcParams)
-  
-  if (rpcError) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.error('[PROFILE] PUT RPC update failed:', rpcError)
-    }
-    // RPC failed - try fallback to view select
-    const { data: profileData, error: viewError } = await sb
-      .from('profiles_v2')
-      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
-      .eq('id', user.id)
-      .maybeSingle()
-    
-    if (viewError || !profileData) {
-      const status = rpcError.code === '42501' ? 403 : 500
-      return NextResponse.json({ ok: false, error: rpcError.message }, { status })
-    }
-    
-    return NextResponse.json({ ok: true, data: profileData })
-  }
-  
-  // RPC returns JSONB - parse it if it's a string, otherwise use as-is
-  let profileData = rpcResult
-  if (typeof rpcResult === 'string') {
-    try {
-      profileData = JSON.parse(rpcResult)
-    } catch (e) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.warn('[PROFILE] RPC result is not valid JSON, fetching from view:', e)
-      }
-      // If RPC result is invalid, fetch from view
-      const { data: viewData } = await sb
-        .from('profiles_v2')
-        .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
-        .eq('id', user.id)
-        .maybeSingle()
-      profileData = viewData
-    }
-  }
-  
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[PROFILE] GET /api/profile returned keys:', profileData ? Object.keys(profileData) : [])
+    console.log('[PROFILE] PUT /api/profile fields:', Object.keys(updateData))
   }
 
-  return NextResponse.json({ ok: true, data: profileData })
+  if (Object.keys(updateData).length === 0) {
+    // Nothing to update; return current row
+    const { data: current, error: currentErr } = await sb
+      .from('lootaura_v2.profiles')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .eq('id', user.id)
+      .single()
+    if (currentErr || !current) {
+      return NextResponse.json({ ok: false, error: currentErr?.message || 'Profile not found' }, { status: currentErr ? 500 : 404 })
+    }
+    return NextResponse.json({ ok: true, data: current })
+  }
+
+  const { data: updated, error: updateErr } = await sb
+    .from('lootaura_v2.profiles')
+    .update(updateData)
+    .eq('id', user.id)
+    .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+    .single()
+
+  if (updateErr || !updated) {
+    return NextResponse.json({ ok: false, error: updateErr?.message || 'Update failed' }, { status: updateErr ? 500 : 400 })
+  }
+
+  return NextResponse.json({ ok: true, data: updated })
 }
 
 // Legacy handlers removed to avoid duplicate exports and name collisions
@@ -202,7 +145,7 @@ export async function POST(_request: NextRequest) {
   // Only add fields that we know exist - let the database handle defaults
   // Insert with just id first, then update with values
   const { error: createError, data: insertedData } = await supabase
-    .from('profiles')
+    .from('lootaura_v2.profiles')
     .insert(defaultProfile)
     .select()
     .single()
@@ -212,8 +155,8 @@ export async function POST(_request: NextRequest) {
     }
     // If duplicate key error, profile already exists - fetch it
     if (createError.message?.includes('duplicate key') || createError.code === '23505') {
-      const { data: fullProfile, error: fetchError } = await supabase
-        .from('profiles_v2')
+    const { data: fullProfile, error: fetchError } = await supabase
+      .from('lootaura_v2.profiles')
         .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
         .eq('id', user.id)
         .maybeSingle()
@@ -242,7 +185,7 @@ export async function POST(_request: NextRequest) {
   // Update the profile if we have fields to set
   if (Object.keys(updateData).length > 0) {
     const { error: updateError } = await supabase
-      .from('profiles')
+      .from('lootaura_v2.profiles')
       .update(updateData)
       .eq('id', user.id)
     if (updateError && process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -253,7 +196,7 @@ export async function POST(_request: NextRequest) {
   
   // Fetch the created profile from the view to get all computed fields (username, etc.)
   const { data: profileData, error: fetchError } = await supabase
-    .from('profiles_v2')
+    .from('lootaura_v2.profiles')
     .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
     .eq('id', user.id)
     .maybeSingle()

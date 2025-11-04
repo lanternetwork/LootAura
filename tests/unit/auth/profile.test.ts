@@ -38,6 +38,8 @@ describe('Profile Management', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     delete process.env.NEXT_PUBLIC_DEBUG
+    // Reset rpc mock to ensure it's a proper function
+    mockSupabaseClient.rpc = vi.fn()
   })
 
   describe('POST /api/profile', () => {
@@ -433,13 +435,18 @@ describe('Profile Management', () => {
         return mockFrom()
       })
       
-      // Mock rpc to return null (profile creation failed)
-      // The rpc call expects { data, error } structure
-      // Use mockResolvedValueOnce on the existing mock function
-      mockSupabaseClient.rpc.mockResolvedValueOnce({
-        data: null,
-        error: { message: 'RPC failed' },
-      })
+      // Mock rpc calls - GET handler calls get_profile first, then update_profile
+      // First call: get_profile RPC returns null (profile not found)
+      // Second call: update_profile RPC returns null (profile creation failed)
+      mockSupabaseClient.rpc
+        .mockResolvedValueOnce({
+          data: null,
+          error: { message: 'Profile not found' },
+        })
+        .mockResolvedValueOnce({
+          data: null,
+          error: { message: 'RPC failed' },
+        })
 
       const request = new NextRequest('https://example.com/api/profile', {
         method: 'GET',

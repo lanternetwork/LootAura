@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -7,7 +7,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 describe('Public Profile Routing', () => {
   let supabase: ReturnType<typeof createClient>
 
-  beforeAll(() => {
+  beforeAll(async () => {
     supabase = createClient(supabaseUrl, supabaseAnonKey)
   })
 

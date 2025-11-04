@@ -110,6 +110,20 @@ export async function PUT(req: Request) {
   console.log('[PROFILE] PUT attempting to update base table with:', updateData)
   console.log('[PROFILE] PUT user.id:', user.id)
   
+  // Verify profile exists first
+  const { data: existingProfile } = await sb
+    .from('profiles_v2')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle()
+  
+  if (!existingProfile) {
+    console.error('[PROFILE] PUT profile does not exist, cannot update')
+    return NextResponse.json({ ok: false, error: 'Profile does not exist. Please create your profile first.' }, { status: 404 })
+  }
+  
+  console.log('[PROFILE] PUT profile exists, proceeding with RPC update')
+  
   // First, try to update directly using SQL via RPC
   // Build RPC params
   const rpcParams: Record<string, any> = { p_user_id: user.id }

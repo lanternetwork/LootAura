@@ -774,9 +774,10 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // In test environments where the Supabase insert chain may be partially mocked,
-    // fall back to a synthetic success to exercise validation paths without DB.
-    const fromSales = supabase.from('sales_v2') as any
+    // Insert into base table (lootaura_v2.sales) instead of view (sales_v2)
+    // to avoid schema cache issues with missing columns like cover_image_url
+    // The view may not include all columns, but the base table has them
+    const fromSales = supabase.from('sales') as any
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {

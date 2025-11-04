@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   
   // Try to query sales_v2 view
   // If it fails, try with minimal columns or return empty results
-  let query = supabase
+  const query = supabase
     .from('sales_v2')
     .select('id, title, cover_url, address, status, owner_id', { count: 'exact' })
     .eq('owner_id', user.id)

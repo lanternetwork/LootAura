@@ -191,41 +191,49 @@ export async function PUT(req: Request) {
         keysInResult: updated ? Object.keys(updated) : []
       })
     } else {
-      // Both RPC and view returned null - the update might still have succeeded
-      // The RPC function updates the base table, so even if SELECT fails, the update likely succeeded
-      // Return the update data we sent as confirmation
-      console.log('[PROFILE] PUT both RPC and view returned null, assuming update succeeded')
-      console.log('[PROFILE] PUT RPC updates base table directly, so update likely persisted')
+      // Both RPC and view returned null - verify if update actually persisted
+      console.log('[PROFILE] PUT both RPC and view returned null, verifying update persistence')
       
-      // Try to fetch created_at from base table or view, but don't fail if it doesn't work
-      let createdAt: string | null = null
-      try {
-        const { data: checkData } = await sb
-          .from('profiles_v2')
-          .select('created_at')
-          .eq('id', user.id)
-          .maybeSingle()
-        createdAt = checkData?.created_at ?? null
-      } catch (e) {
-        console.log('[PROFILE] PUT could not fetch created_at, using null')
-      }
+      // Wait a moment for any potential replication delay, then verify
+      await new Promise(resolve => setTimeout(resolve, 100))
       
-      // Return the update data as confirmation - the RPC function updated the base table
-      updated = {
-        id: user.id,
-        display_name: updateData.display_name ?? null,
-        bio: updateData.bio ?? null,
-        location_city: updateData.location_city ?? null,
-        location_region: updateData.location_region ?? null,
-        avatar_url: updateData.avatar_url ?? null,
-        created_at: createdAt,
-        verified: false,
-      }
+      // Try to fetch the updated profile from the view to verify persistence
+      const { data: verifyData, error: verifyError } = await sb
+        .from('profiles_v2')
+        .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+        .eq('id', user.id)
+        .maybeSingle()
       
-      console.log('[PROFILE] PUT returning update data as confirmation:', {
-        hasBio: !!updated.bio,
-        bio: updated.bio
+      console.log('[PROFILE] PUT verification fetch:', {
+        hasData: !!verifyData,
+        hasError: !!verifyError,
+        error: verifyError?.message,
+        bioInVerify: verifyData?.bio,
+        expectedBio: updateData.bio
       })
+      
+      if (verifyData) {
+        // Verification succeeded - return the actual data from the view
+        updated = verifyData
+        console.log('[PROFILE] PUT verification successful, returning view data')
+      } else if (verifyError) {
+        // Verification failed with error - return update data as confirmation
+        console.log('[PROFILE] PUT verification failed with error, returning update data as confirmation')
+        updated = {
+          id: user.id,
+          display_name: updateData.display_name ?? null,
+          bio: updateData.bio ?? null,
+          location_city: updateData.location_city ?? null,
+          location_region: updateData.location_region ?? null,
+          avatar_url: updateData.avatar_url ?? null,
+          created_at: null,
+          verified: false,
+        }
+      } else {
+        // Verification returned null - profile might not exist in view
+        console.error('[PROFILE] PUT verification returned null - profile not found in view')
+        updateErr = new Error('Profile not found in view after update')
+      }
     }
   }
 

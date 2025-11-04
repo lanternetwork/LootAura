@@ -35,31 +35,54 @@ BEGIN
     WHERE id = p_user_id;
   END IF;
   
-  -- Update display_name if provided (try to update, ignore if column doesn't exist)
+  -- Update display_name if provided
   IF p_display_name IS NOT NULL THEN
     BEGIN
+      -- Ensure column exists
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' 
+        AND table_name = 'profiles' 
+        AND column_name = 'display_name'
+      ) THEN
+        ALTER TABLE lootaura_v2.profiles ADD COLUMN display_name text;
+      END IF;
+      
       UPDATE lootaura_v2.profiles
       SET display_name = p_display_name
       WHERE id = p_user_id;
-    EXCEPTION WHEN undefined_column THEN
-      -- Column doesn't exist, skip it
-      NULL;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'Failed to update display_name: %', SQLERRM;
     END;
   END IF;
   
   -- Update bio if provided (allows NULL to clear bio)
-  -- Check using parameter name to see if it was explicitly provided
-  -- Since we can't check if parameter was provided vs NULL, we'll update if parameter is not DEFAULT
-  -- For now, we'll always try to update bio if the function was called with the parameter
-  -- This is safe because the function signature allows NULL
-  BEGIN
-    UPDATE lootaura_v2.profiles
-    SET bio = p_bio
-    WHERE id = p_user_id;
-  EXCEPTION WHEN undefined_column THEN
-    -- Column doesn't exist, skip it
-    NULL;
-  END;
+  -- Ensure bio column exists before updating
+  IF p_bio IS NOT NULL OR (p_bio IS NULL AND EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'lootaura_v2' 
+    AND table_name = 'profiles' 
+    AND column_name = 'bio'
+  )) THEN
+    BEGIN
+      -- Ensure column exists
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' 
+        AND table_name = 'profiles' 
+        AND column_name = 'bio'
+      ) THEN
+        ALTER TABLE lootaura_v2.profiles ADD COLUMN bio text;
+      END IF;
+      
+      UPDATE lootaura_v2.profiles
+      SET bio = p_bio
+      WHERE id = p_user_id;
+    EXCEPTION WHEN OTHERS THEN
+      -- Log error but don't fail entire update
+      RAISE WARNING 'Failed to update bio: %', SQLERRM;
+    END;
+  END IF;
   
   -- Update location_city if provided (allows NULL to clear)
   BEGIN

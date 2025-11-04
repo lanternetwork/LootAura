@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
-import { hasValidSession, validateSession } from '@/lib/auth/server-session'
+import { validateSession } from '@/lib/auth/server-session'
 
 export async function middleware(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;

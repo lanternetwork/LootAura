@@ -57,30 +57,26 @@ export default function TestSalesGenerator() {
       pricing_mode: 'negotiable'
     }
 
-    try {
-      const response = await fetch('/api/sales', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies for Google OAuth session
-        body: JSON.stringify(saleData)
-      })
+    const response = await fetch('/api/sales', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // Include cookies for Google OAuth session
+      body: JSON.stringify(saleData)
+    })
 
-      const data = await response.json()
-      
-      if (response.status === 401) {
-        throw new Error('You must be signed in to create sales. Please sign in and try again.')
-      }
-      
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || 'Failed to create sale')
-      }
-
-      return data.sale as CreatedSale
-    } catch (err) {
-      throw err
+    const data = await response.json()
+    
+    if (response.status === 401) {
+      throw new Error('You must be signed in to create sales. Please sign in and try again.')
     }
+    
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || 'Failed to create sale')
+    }
+
+    return data.sale as CreatedSale
   }
 
   const createTestSales = async () => {

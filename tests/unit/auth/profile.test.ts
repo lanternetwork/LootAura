@@ -20,6 +20,7 @@ const mockSupabaseClient = {
       })),
     })),
   })),
+  rpc: vi.fn(),
 }
 
 vi.mock('@/lib/supabase/server', () => ({

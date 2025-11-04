@@ -21,7 +21,9 @@ export async function GET(req: Request) {
   }
   const dbStatus = statusMap[status] || status
   
-  const { data, error, count } = await supabase
+  // Try to query sales_v2 view
+  // If it fails, try with minimal columns or return empty results
+  let query = supabase
     .from('sales_v2')
     .select('id, title, cover_url, address, status, owner_id', { count: 'exact' })
     .eq('owner_id', user.id)
@@ -29,10 +31,33 @@ export async function GET(req: Request) {
     .order('created_at', { ascending: false })
     .range(from, to)
   
+  const { data, error, count } = await query
+  
   if (error) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.error('[PROFILE LISTINGS] GET error:', error)
+      console.error('[PROFILE LISTINGS] GET error:', error, { status: dbStatus, userId: user.id })
     }
+    
+    // If error is about missing columns, try with minimal columns
+    if (error.message?.includes('column') || error.message?.includes('not found')) {
+      const { data: minimalData, error: minimalError, count: minimalCount } = await supabase
+        .from('sales_v2')
+        .select('id, title, status, owner_id', { count: 'exact' })
+        .eq('owner_id', user.id)
+        .eq('status', dbStatus)
+        .order('created_at', { ascending: false })
+        .range(from, to)
+      
+      if (!minimalError) {
+        return NextResponse.json({
+          items: minimalData || [],
+          total: minimalCount || 0,
+          page,
+          hasMore: to + 1 < (minimalCount || 0),
+        })
+      }
+    }
+    
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
   

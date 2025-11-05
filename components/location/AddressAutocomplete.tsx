@@ -51,23 +51,74 @@ export default function AddressAutocomplete({
 
   // Try to capture user location once (for proximity bias)
   useEffect(() => {
+    let geoCompleted = false
+    const setCoords = (lat: number, lng: number) => {
+      if (!geoCompleted) {
+        geoCompleted = true
+        setUserLat(lat)
+        setUserLng(lng)
+        geoWaitRef.current = false
+      }
+    }
+    
+    // Try browser geolocation first
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
       geoWaitRef.current = true
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setUserLat(pos.coords.latitude)
-          setUserLng(pos.coords.longitude)
-          geoWaitRef.current = false
+          setCoords(pos.coords.latitude, pos.coords.longitude)
         },
-        () => {
+        async () => {
+          // Browser geolocation failed/denied - fallback to IP geolocation
+          try {
+            const ipRes = await fetch('/api/geolocation/ip')
+            if (ipRes.ok) {
+              const ipData = await ipRes.json()
+              if (ipData.lat && ipData.lng) {
+                setCoords(ipData.lat, ipData.lng)
+                return
+              }
+            }
+          } catch (err) {
+            console.warn('[AddressAutocomplete] IP geolocation fallback failed:', err)
+          }
           geoWaitRef.current = false
         },
         { enableHighAccuracy: false, maximumAge: 600000, timeout: 2000 }
       )
       // Fallback timeout if geolocation takes too long
-      setTimeout(() => {
-        geoWaitRef.current = false
+      setTimeout(async () => {
+        if (!geoCompleted && geoWaitRef.current) {
+          try {
+            const ipRes = await fetch('/api/geolocation/ip')
+            if (ipRes.ok) {
+              const ipData = await ipRes.json()
+              if (ipData.lat && ipData.lng) {
+                setCoords(ipData.lat, ipData.lng)
+                return
+              }
+            }
+          } catch (err) {
+            console.warn('[AddressAutocomplete] IP geolocation fallback failed:', err)
+          }
+          geoWaitRef.current = false
+        }
       }, 400)
+    } else {
+      // No browser geolocation support - use IP geolocation
+      geoWaitRef.current = true
+      fetch('/api/geolocation/ip')
+        .then(res => res.ok ? res.json() : null)
+        .then(ipData => {
+          if (ipData?.lat && ipData?.lng) {
+            setCoords(ipData.lat, ipData.lng)
+          } else {
+            geoWaitRef.current = false
+          }
+        })
+        .catch(() => {
+          geoWaitRef.current = false
+        })
     }
   }, [])
 

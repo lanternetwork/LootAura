@@ -362,7 +362,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const renderStep = () => {
     switch (currentStep) {
       case 0:
-        return <DetailsStep formData={formData} onChange={handleInputChange} errors={_errors} />
+        return <DetailsStep formData={formData} onChange={handleInputChange} errors={_errors} userLat={userLat} userLng={userLng} />
       case 1:
         return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
       case 2:
@@ -473,7 +473,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 }
 
 // Step Components
-function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void, errors?: Record<string, string> }) {
+function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void, errors?: Record<string, string>, userLat?: number, userLng?: number }) {
   return (
     <div className="space-y-6">
       <div>

@@ -216,7 +216,7 @@ async function overpassHandler(request: NextRequest) {
     })
     
     // Convert to AddressSuggestion format and trim to limit
-    const suggestions: AddressSuggestion[] = withDistance.slice(0, limit).map(({ upstreamIndex: _i, distanceM: _d, ...addr }) => ({
+    const suggestions: AddressSuggestion[] = withDistance.slice(0, limit).map((addr) => ({
       id: addr.id,
       label: formatLabel(addr),
       lat: addr.lat,

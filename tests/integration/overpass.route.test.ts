@@ -238,7 +238,10 @@ describe('Overpass Address Route Integration', () => {
   })
 
   it('should include debug info in development mode', async () => {
-    process.env.NODE_ENV = 'development'
+    // Store original NODE_ENV
+    const originalEnv = process.env.NODE_ENV
+    // Use vi.stubEnv to temporarily set NODE_ENV
+    vi.stubEnv('NODE_ENV', 'development')
     
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -269,6 +272,13 @@ describe('Overpass Address Route Integration', () => {
     expect(data._debug).toHaveProperty('countRaw')
     expect(data._debug).toHaveProperty('countNormalized')
     expect(data._debug).toHaveProperty('coords')
+    
+    // Restore original NODE_ENV
+    if (originalEnv) {
+      vi.stubEnv('NODE_ENV', originalEnv)
+    } else {
+      delete process.env.NODE_ENV
+    }
   })
 
   it('should drop elements missing required fields', async () => {

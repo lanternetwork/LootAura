@@ -223,14 +223,14 @@ async function suggestHandler(request: NextRequest) {
       setCachedSuggestions(cacheKey, finalSuggestions, hasCoords ? TTL_WITH_COORDS_MS : TTL_NO_COORDS_MS)
     }
     
-    const response: any = {
+    const respBody: any = {
       ok: true,
       data: finalSuggestions
     }
     
     // Dev-only debug info
     if (process.env.NODE_ENV === 'development') {
-      response._debug = {
+      respBody._debug = {
         viewboxApplied,
         upstreamLimit,
         cacheHit,
@@ -240,7 +240,7 @@ async function suggestHandler(request: NextRequest) {
       }
     }
     
-    return NextResponse.json(response, {
+    return NextResponse.json(respBody, {
       headers: {
         'Cache-Control': hasCoords ? 'public, max-age=60' : 'public, max-age=5'
       }

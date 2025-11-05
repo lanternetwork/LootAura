@@ -173,7 +173,7 @@ g.fetch = vi.fn(async (input: any) => {
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
 })
 
-// Mock window.matchMedia for JSDOM test environment
+// Mock window.matchMedia for JSDOM test environment (guard Node environment)
 const mockMatchMedia = vi.fn().mockImplementation((query: string) => ({
   matches: false,
   media: query,
@@ -185,19 +185,23 @@ const mockMatchMedia = vi.fn().mockImplementation((query: string) => ({
   dispatchEvent: vi.fn(),
 }))
 
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: mockMatchMedia,
-})
+if (typeof window !== 'undefined' && (window as any)) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: mockMatchMedia,
+  })
+}
 
-// Also mock it on globalThis for broader compatibility
-Object.defineProperty(globalThis, 'matchMedia', {
-  writable: true,
-  value: mockMatchMedia,
-})
+if (typeof globalThis !== 'undefined') {
+  Object.defineProperty(globalThis as any, 'matchMedia', {
+    writable: true,
+    value: mockMatchMedia,
+  })
+}
 
-// Ensure it's available on the global object as well
-;(global as any).matchMedia = mockMatchMedia
+try {
+  ;(global as any).matchMedia = mockMatchMedia
+} catch {}
 
 // Console noise guardrail - fail tests on unexpected console output
 const originalConsoleError = console.error

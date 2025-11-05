@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { geocodeAddress, fetchSuggestions, AddressSuggestion } from '@/lib/geocode'
+import { geocodeAddress, fetchSuggestions, fetchOverpassAddresses, AddressSuggestion } from '@/lib/geocode'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import OSMAttribution from './OSMAttribution'
 
@@ -42,6 +42,7 @@ export default function AddressAutocomplete({
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [isGeocoding, setIsGeocoding] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [showFallbackMessage, setShowFallbackMessage] = useState(false)
   const [userLat, setUserLat] = useState<number | undefined>(undefined)
   const [userLng, setUserLng] = useState<number | undefined>(undefined)
   const abortRef = useRef<AbortController | null>(null)
@@ -79,27 +80,130 @@ export default function AddressAutocomplete({
 
   // Fetch suggestions when query changes
   useEffect(() => {
-    // Enforce min 2 chars (match API requirement) - don't block on location
-    if (!debouncedQuery || debouncedQuery.length < 2) {
+    const trimmedQuery = debouncedQuery?.trim() || ''
+    
+    // Check if query is numeric-only (1-6 digits)
+    const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
+    const hasCoords = Boolean(userLat && userLng)
+    
+    // Minimum length: 1 for numeric-only, 2 for general text
+    const minLength = isNumericOnly ? 1 : 2
+    if (!trimmedQuery || trimmedQuery.length < minLength) {
       setSuggestions([])
       setIsOpen(false)
+      setShowFallbackMessage(false)
       return
     }
+    
     const currentId = ++requestIdRef.current
     setIsLoading(true)
+    setShowFallbackMessage(false)
 
     // Don't block on location - send request immediately (with or without coords)
     // Will refresh automatically when coords arrive (see useEffect below)
     if (abortRef.current) abortRef.current.abort()
     const controller = new AbortController()
     abortRef.current = controller
-    const hadCoords = Boolean(userLat && userLng)
-    lastHadCoordsRef.current = hadCoords
-    // Always pass coords once available
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[AddressAutocomplete] Fetching suggestions', { query: debouncedQuery.substring(0, 20), userLat, userLng })
-    }
-    fetchSuggestions(debouncedQuery, userLat, userLng, controller.signal)
+    lastHadCoordsRef.current = hasCoords
+    
+    // For numeric-only queries with coords, try Overpass first
+    if (isNumericOnly && hasCoords) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AddressAutocomplete] Fetching Overpass addresses', { prefix: trimmedQuery, userLat, userLng })
+      }
+      
+      fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 8, controller.signal)
+        .then((response) => {
+          if (requestIdRef.current !== currentId) return
+          
+          if (response.ok && response.data && response.data.length > 0) {
+            // Overpass succeeded
+            const unique: AddressSuggestion[] = []
+            const seen = new Set<string>()
+            for (const s of response.data) {
+              const key = s.id
+              if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(s)
+              }
+            }
+            if (process.env.NODE_ENV === 'development' && unique.length > 0) {
+              console.log('[AddressAutocomplete] Received Overpass addresses', { count: unique.length, first: unique[0]?.label })
+            }
+            setSuggestions(unique)
+            setIsOpen(unique.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+            if (requestIdRef.current === currentId) setIsLoading(false)
+          } else {
+            // Overpass failed or returned empty - fallback to Nominatim
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[AddressAutocomplete] Overpass failed/empty, falling back to Nominatim', { code: response.code })
+            }
+            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+              .then((results) => {
+                if (requestIdRef.current !== currentId) return
+                const unique: AddressSuggestion[] = []
+                const seen = new Set<string>()
+                for (const s of results) {
+                  const key = s.id
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    unique.push(s)
+                  }
+                }
+                setSuggestions(unique)
+                setIsOpen(unique.length > 0)
+                setSelectedIndex(-1)
+                setShowFallbackMessage(unique.length > 0) // Show message if we got results from fallback
+                if (requestIdRef.current === currentId) setIsLoading(false)
+              })
+          }
+        })
+        .catch((err) => {
+          if (requestIdRef.current !== currentId) return
+          if (err?.name === 'AbortError') {
+            if (requestIdRef.current === currentId) setIsLoading(false)
+            return
+          }
+          
+          // Fallback to Nominatim on error
+          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results) => {
+              if (requestIdRef.current !== currentId) return
+              const unique: AddressSuggestion[] = []
+              const seen = new Set<string>()
+              for (const s of results) {
+                const key = s.id
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(s)
+                }
+              }
+              setSuggestions(unique)
+              setIsOpen(unique.length > 0)
+              setSelectedIndex(-1)
+              setShowFallbackMessage(unique.length > 0)
+              if (requestIdRef.current === currentId) setIsLoading(false)
+            })
+            .catch((fallbackErr) => {
+              if (requestIdRef.current !== currentId) return
+              if (fallbackErr?.name === 'AbortError') {
+                if (requestIdRef.current === currentId) setIsLoading(false)
+                return
+              }
+              console.error('Suggest error:', fallbackErr)
+              setSuggestions([])
+              setIsOpen(false)
+              if (requestIdRef.current === currentId) setIsLoading(false)
+            })
+        })
+    } else {
+      // Use Nominatim for non-numeric or when coords not available
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AddressAutocomplete] Fetching suggestions', { query: trimmedQuery.substring(0, 20), userLat, userLng })
+      }
+      fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
       .then((results) => {
         if (requestIdRef.current !== currentId) return
         const unique: AddressSuggestion[] = []
@@ -132,32 +236,104 @@ export default function AddressAutocomplete({
 
   // If last fetch lacked coords and coords arrive, abort stale request and refetch with coords
   useEffect(() => {
-    if (!debouncedQuery || debouncedQuery.length < 2) return
+    const trimmedQuery = debouncedQuery?.trim() || ''
+    const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
+    const minLength = isNumericOnly ? 1 : 2
+    
+    if (!trimmedQuery || trimmedQuery.length < minLength) return
     if (!userLat || !userLng) return
     if (lastHadCoordsRef.current) return
+    
     const currentId = ++requestIdRef.current
     if (abortRef.current) abortRef.current.abort()
     const controller = new AbortController()
     abortRef.current = controller
     setIsLoading(true)
-    fetchSuggestions(debouncedQuery, userLat, userLng, controller.signal)
-      .then((results) => {
-        if (requestIdRef.current !== currentId) return
-        const unique: AddressSuggestion[] = []
-        const seen = new Set<string>()
-        for (const s of results) {
-          const key = s.id
-          if (!seen.has(key)) {
-            seen.add(key)
-            unique.push(s)
+    setShowFallbackMessage(false)
+    
+    // For numeric-only queries, use Overpass; otherwise use Nominatim
+    if (isNumericOnly) {
+      fetchOverpassAddresses(trimmedQuery, userLat, userLng, 8, controller.signal)
+        .then((response) => {
+          if (requestIdRef.current !== currentId) return
+          if (response.ok && response.data && response.data.length > 0) {
+            const unique: AddressSuggestion[] = []
+            const seen = new Set<string>()
+            for (const s of response.data) {
+              const key = s.id
+              if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(s)
+              }
+            }
+            setSuggestions(unique)
+            setIsOpen(unique.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+          } else {
+            // Fallback to Nominatim
+            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+              .then((results) => {
+                if (requestIdRef.current !== currentId) return
+                const unique: AddressSuggestion[] = []
+                const seen = new Set<string>()
+                for (const s of results) {
+                  const key = s.id
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    unique.push(s)
+                  }
+                }
+                setSuggestions(unique)
+                setIsOpen(unique.length > 0)
+                setSelectedIndex(-1)
+                setShowFallbackMessage(unique.length > 0)
+              })
           }
-        }
-        setSuggestions(unique)
-        setIsOpen(unique.length > 0)
-        setSelectedIndex(-1)
-      })
-      .catch(() => {})
-      .finally(() => setIsLoading(false))
+        })
+        .catch(() => {
+          // Fallback to Nominatim on error
+          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results) => {
+              if (requestIdRef.current !== currentId) return
+              const unique: AddressSuggestion[] = []
+              const seen = new Set<string>()
+              for (const s of results) {
+                const key = s.id
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(s)
+                }
+              }
+              setSuggestions(unique)
+              setIsOpen(unique.length > 0)
+              setSelectedIndex(-1)
+              setShowFallbackMessage(unique.length > 0)
+            })
+            .catch(() => {})
+        })
+        .finally(() => setIsLoading(false))
+    } else {
+      fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+        .then((results) => {
+          if (requestIdRef.current !== currentId) return
+          const unique: AddressSuggestion[] = []
+          const seen = new Set<string>()
+          for (const s of results) {
+            const key = s.id
+            if (!seen.has(key)) {
+              seen.add(key)
+              unique.push(s)
+            }
+          }
+          setSuggestions(unique)
+          setIsOpen(unique.length > 0)
+          setSelectedIndex(-1)
+          setShowFallbackMessage(false)
+        })
+        .catch(() => {})
+        .finally(() => setIsLoading(false))
+    }
   }, [userLat, userLng, debouncedQuery])
 
   // Handle suggestion selection
@@ -186,7 +362,10 @@ export default function AddressAutocomplete({
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen || suggestions.length === 0) {
-      if (e.key === 'Enter' && value.length >= 2) {
+      const trimmedValue = value?.trim() || ''
+      const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
+      const minLength = isNumericOnly ? 1 : 2
+      if (e.key === 'Enter' && value.length >= minLength) {
         handleBlur()
       }
       return
@@ -244,7 +423,10 @@ export default function AddressAutocomplete({
 
   // Handle input focus
   const handleFocus = () => {
-    if (debouncedQuery && debouncedQuery.length >= 2 && suggestions.length > 0) {
+    const trimmedQuery = debouncedQuery?.trim() || ''
+    const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
+    const minLength = isNumericOnly ? 1 : 2
+    if (trimmedQuery && trimmedQuery.length >= minLength && suggestions.length > 0) {
       setIsOpen(true)
     }
   }
@@ -297,20 +479,41 @@ export default function AddressAutocomplete({
           <p className="mt-1 text-sm text-red-600">{error}</p>
         )}
         
-        {value && value.length < 2 && !error && (
-          <p className="mt-1 text-xs text-gray-500">Type at least 2 characters</p>
-        )}
+        {(() => {
+          const trimmedValue = value?.trim() || ''
+          const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
+          const minLength = isNumericOnly ? 1 : 2
+          if (value && value.length < minLength && !error) {
+            return <p className="mt-1 text-xs text-gray-500">Type at least {minLength} {minLength === 1 ? 'character' : 'characters'}</p>
+          }
+          return null
+        })()}
         
         {isGeocoding && (
           <p className="mt-1 text-xs text-gray-500">Looking up address...</p>
         )}
 
-        {isLoading && value.length >= 2 && (
+        {isLoading && ((() => {
+          const trimmedValue = value?.trim() || ''
+          const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
+          const minLength = isNumericOnly ? 1 : 2
+          return value.length >= minLength
+        })()) && (
           <p className="mt-1 text-xs text-gray-500">Searching...</p>
         )}
 
+        {/* Fallback message */}
+        {showFallbackMessage && !isLoading && suggestions.length > 0 && (
+          <p className="mt-1 text-xs text-gray-500 italic">Showing broader matches—add a street name for more precise results.</p>
+        )}
+
         {/* No results state */}
-        {!isLoading && value.length >= 2 && debouncedQuery.length >= 2 && !isOpen && suggestions.length === 0 && !error && (
+        {!isLoading && (() => {
+          const trimmedValue = value?.trim() || ''
+          const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
+          const minLength = isNumericOnly ? 1 : 2
+          return value.length >= minLength && debouncedQuery.length >= minLength && !isOpen && suggestions.length === 0 && !error
+        })() && (
           <p className="mt-1 text-xs text-gray-500">No results found</p>
         )}
 

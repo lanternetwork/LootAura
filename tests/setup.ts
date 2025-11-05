@@ -261,5 +261,9 @@ vitestAfterEach(async () => {
     const clear = (globalThis as any).__clearSuggestCache
     if (typeof clear === 'function') clear()
   } catch {}
+  try {
+    const clear = (globalThis as any).__clearOverpassCache
+    if (typeof clear === 'function') clear()
+  } catch {}
 })
 

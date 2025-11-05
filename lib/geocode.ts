@@ -159,6 +159,88 @@ export async function fetchSuggestions(query: string, userLat?: number, userLng?
   }
 }
 
+// API response type
+export interface ApiResponse<T> {
+  ok: boolean
+  data?: T
+  error?: string
+  code?: string
+  _debug?: any
+}
+
+// Fetch addresses from Overpass API for numeric prefix searches
+export async function fetchOverpassAddresses(
+  prefix: string,
+  lat: number,
+  lng: number,
+  limit: number = 8,
+  signal?: AbortSignal
+): Promise<ApiResponse<AddressSuggestion[]>> {
+  // Validate prefix is numeric
+  if (!/^\d{1,6}$/.test(prefix)) {
+    return {
+      ok: false,
+      error: 'Prefix must be 1-6 digits',
+      code: 'INVALID_PREFIX'
+    }
+  }
+  
+  // Validate coordinates
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return {
+      ok: false,
+      error: 'Latitude and longitude are required',
+      code: 'NO_COORDS'
+    }
+  }
+
+  try {
+    const params = new URLSearchParams({
+      prefix,
+      lat: String(lat),
+      lng: String(lng),
+      limit: String(Math.min(Math.max(limit, 3), 10))
+    })
+    
+    const response = await fetch(`/api/geocoding/overpass-address?${params.toString()}`, { signal })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      return {
+        ok: false,
+        error: errorData.error || 'Overpass request failed',
+        code: errorData.code || 'OVERPASS_UNAVAILABLE'
+      }
+    }
+    
+    const data = await response.json()
+    if (data.ok && Array.isArray(data.data)) {
+      return data
+    }
+    
+    return {
+      ok: false,
+      error: 'Invalid response from Overpass',
+      code: 'OVERPASS_UNAVAILABLE'
+    }
+  } catch (error: any) {
+    // AbortError is expected when requests are cancelled - don't log it
+    if (error?.name === 'AbortError') {
+      return {
+        ok: false,
+        error: 'Request cancelled',
+        code: 'ABORTED'
+      }
+    }
+    console.error('Overpass error:', error)
+    return {
+      ok: false,
+      error: 'Overpass request failed',
+      code: 'OVERPASS_UNAVAILABLE'
+    }
+  }
+}
+
 // Reverse geocoding (coordinates → address)
 export async function reverseGeocode(lat: number, lng: number): Promise<AddressSuggestion | null> {
   try {

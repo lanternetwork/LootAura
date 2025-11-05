@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { geocodeAddress, fetchSuggestions, AddressSuggestion } from '@/lib/geocode'
-import useDebounce from '@/lib/hooks/useDebounce'
+import { useDebounce } from '@/lib/hooks/useDebounce'
 import OSMAttribution from './OSMAttribution'
 
 interface AddressAutocompleteProps {

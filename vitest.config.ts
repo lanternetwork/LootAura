@@ -5,11 +5,8 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: 'node', // Use node for unit/integration tests (MSW works in node)
-    setupFiles: [
-      path.resolve(__dirname, 'tests/setup/index.ts'),
-      path.resolve(__dirname, 'tests/setup.ts'),
-    ],
+    environment: 'jsdom',
+    setupFiles: [path.resolve(__dirname, 'tests/setup.ts')],
     globals: true,
     exclude: [
       '**/node_modules/**',
@@ -22,14 +19,8 @@ export default defineConfig({
     // Ensure no network calls in tests
     testTimeout: 10000,
     hookTimeout: 10000,
-    // Memory optimization settings
-    pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-        isolate: true, // Enable isolation for proper module reset
-      },
-    },
+    // Ensure jsdom environment is available to tests
+    pool: 'threads',
     // Reduce memory usage
     maxConcurrency: 1,
     // Constrain worker count to prevent OOMs

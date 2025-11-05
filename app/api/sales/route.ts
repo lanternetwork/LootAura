@@ -774,11 +774,9 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // Insert into base table (lootaura_v2.sales) instead of view (sales_v2)
-    // to avoid schema cache issues with missing columns like cover_image_url
-    // The view is missing cover_image_url and images columns (migration 055)
-    // Access base table directly via schema
-    const fromSales = (supabase as any).schema('lootaura_v2').from('sales') as any
+    // Insert into view (sales_v2) - the view is missing cover_image_url and images
+    // So we'll omit those columns for now (they can be added via migration later)
+    const fromSales = supabase.from('sales_v2') as any
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {
@@ -807,26 +805,32 @@ async function postHandler(request: NextRequest) {
     // Allow status from body if provided (for test sales), otherwise default to 'published'
     const saleStatus = body.status === 'draft' || body.status === 'archived' ? body.status : 'published'
     
+    // Build insert payload - only include columns that exist in sales_v2 view
+    // The view is missing cover_image_url and images (migration 055 didn't include them)
+    // We'll omit those for now to avoid schema cache errors
+    const insertPayload: any = {
+      title,
+      description,
+      address,
+      city,
+      state,
+      zip_code,
+      lat,
+      lng,
+      date_start,
+      time_start,
+      date_end,
+      time_end,
+      pricing_mode: pricing_mode || 'negotiable',
+      status: saleStatus,
+      owner_id: user!.id // Server-side binding - never trust client
+    }
+    
+    // Note: cover_image_url and images are omitted because sales_v2 view doesn't include them
+    // TODO: Create migration to add these columns to the view
+    
     const { data, error } = await fromSales
-      .insert({
-        title,
-        description,
-        address,
-        city,
-        state,
-        zip_code,
-        lat,
-        lng,
-        date_start,
-        time_start,
-        date_end,
-        time_end,
-        cover_image_url: cover_image_url || null,
-        images: images || [],
-        pricing_mode: pricing_mode || 'negotiable',
-        status: saleStatus,
-        owner_id: user!.id // Server-side binding - never trust client
-      })
+      .insert(insertPayload)
       .select()
       .single()
     

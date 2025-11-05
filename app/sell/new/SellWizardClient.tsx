@@ -65,6 +65,22 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const [_errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
+    if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
+    const parts = value.split(':')
+    const hRaw = parts[0]
+    const mRaw = parts[1]
+    const h0 = Math.max(0, Math.min(23, parseInt(hRaw, 10) || 0))
+    const m0 = Math.max(0, Math.min(59, parseInt(mRaw, 10) || 0))
+    let snapped = Math.round(m0 / 30) * 30 // round to nearest 0 or 30
+    let h = h0
+    if (snapped === 60) { // carry over
+      snapped = 0
+      h = (h + 1) % 24
+    }
+    return `${String(h).padStart(2, '0')}:${String(snapped).padStart(2, '0')}`
+  }, [])
+
   // Check authentication status
   useEffect(() => {
     const checkUser = async () => {
@@ -105,7 +121,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       if (savedDraft) {
         try {
           const draft = JSON.parse(savedDraft)
-          setFormData(draft.formData || {})
+          const nextForm = { ...(draft.formData || {}) }
+          if (nextForm.time_start) {
+            nextForm.time_start = normalizeTimeToNearest30(nextForm.time_start)
+          }
+          setFormData(nextForm)
           setPhotos(draft.photos || [])
           // Ensure items have IDs when loading from draft
           const loadedItems = (draft.items || []).map((item: any) => ({
@@ -125,14 +145,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
 
-      // Snap start time to 30-minute increments (floor to nearest 00/30)
+      // Snap start time to 30-minute increments (nearest 00/30 with carry)
       if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
-        const [hRaw, mRaw] = value.split(':')
-        const h = Math.max(0, Math.min(23, parseInt(hRaw, 10) || 0))
-        const m = Math.max(0, Math.min(59, parseInt(mRaw, 10) || 0))
-        const snappedMinutes = Math.floor(m / 30) * 30 // 0-29 -> 0, 30-59 -> 30
-        const snapped = `${String(h).padStart(2, '0')}:${String(snappedMinutes).padStart(2, '0')}`
-        updated.time_start = snapped
+        updated.time_start = normalizeTimeToNearest30(value)
       }
       
       // Calculate end date/time when duration, start date, or start time changes
@@ -254,6 +269,13 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
 
     setLoading(true)
+    // Ensure time_start is normalized just before submit (covers pasted/loaded values)
+    if (formData.time_start) {
+      const snapped = normalizeTimeToNearest30(formData.time_start)
+      if (snapped !== formData.time_start) {
+        setFormData(prev => ({ ...prev, time_start: snapped }))
+      }
+    }
     try {
       // Prepare sale data with cover image
       // Remove duration_hours from payload (it's only used for client-side calculation)

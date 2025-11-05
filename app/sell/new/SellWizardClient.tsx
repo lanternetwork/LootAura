@@ -759,14 +759,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
                   <input
                     type="text"
                     value={item.name || ''}
-                    onChange={(e) => {
-                      e.preventDefault()
-                      onUpdate(index, 'name', e.target.value)
-                    }}
-                    onBlur={(e) => {
-                      // Ensure value is saved on blur
-                      onUpdate(index, 'name', e.target.value)
-                    }}
+                    onChange={(e) => onUpdate(index, 'name', e.target.value)}
                     placeholder="e.g., Vintage Coffee Table"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
                     required
@@ -780,14 +773,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
                   <input
                     type="number"
                     value={item.price || ''}
-                    onChange={(e) => {
-                      e.preventDefault()
-                      onUpdate(index, 'price', e.target.value ? parseFloat(e.target.value) : undefined)
-                    }}
-                    onBlur={(e) => {
-                      // Ensure value is saved on blur
-                      onUpdate(index, 'price', e.target.value ? parseFloat(e.target.value) : undefined)
-                    }}
+                    onChange={(e) => onUpdate(index, 'price', e.target.value ? parseFloat(e.target.value) : undefined)}
                     placeholder="0.00"
                     min="0"
                     step="0.01"
@@ -802,14 +788,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
                 </label>
                 <textarea
                   value={item.description || ''}
-                  onChange={(e) => {
-                    e.preventDefault()
-                    onUpdate(index, 'description', e.target.value)
-                  }}
-                  onBlur={(e) => {
-                    // Ensure value is saved on blur
-                    onUpdate(index, 'description', e.target.value)
-                  }}
+                  onChange={(e) => onUpdate(index, 'description', e.target.value)}
                   placeholder="Describe the item's condition, age, etc."
                   rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"

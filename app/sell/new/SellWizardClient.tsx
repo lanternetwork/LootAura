@@ -714,7 +714,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   onRemove: (index: number) => void
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium text-gray-900">Items for Sale</h3>
         <button

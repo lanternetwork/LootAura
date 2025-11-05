@@ -17,7 +17,7 @@ export interface NormalizedAddress {
 }
 
 /**
- * Build Overpass QL query for address prefix search
+ * Build Overpass QL query for address prefix search (numeric-only)
  * @param prefix - 1-6 digits (already validated)
  * @param lat - User latitude
  * @param lng - User longitude
@@ -45,6 +45,45 @@ export function buildOverpassAddressQuery(
   node["addr:housenumber"~"^${prefix}"]["addr:street"](around:${radius},${lat},${lng});
   way["addr:housenumber"~"^${prefix}"]["addr:street"](around:${radius},${lat},${lng});
   relation["addr:housenumber"~"^${prefix}"]["addr:street"](around:${radius},${lat},${lng});
+);
+out center 100;`
+
+  return query
+}
+
+/**
+ * Build Overpass QL query for digits+street search
+ * @param num - 1-8 digits (already validated)
+ * @param streetRegex - Normalized street regex pattern (case-insensitive)
+ * @param lat - User latitude
+ * @param lng - User longitude
+ * @param radiusM - Search radius in meters
+ * @param timeoutSec - Query timeout in seconds
+ */
+export function buildOverpassDigitsStreetQuery(
+  num: string,
+  streetRegex: string,
+  lat: number,
+  lng: number,
+  radiusM: number,
+  timeoutSec: number
+): string {
+  // Validate num is 1-8 digits
+  if (!/^\d{1,8}$/.test(num)) {
+    throw new Error(`Invalid num: must be 1-8 digits, got "${num}"`)
+  }
+
+  const timeout = Math.floor(timeoutSec)
+  const radius = Math.floor(radiusM)
+
+  // streetRegex is already a safe pattern from buildStreetRegex (tokens escaped, joined with \\s+)
+  // Overpass QL supports (?i) for case-insensitive matching
+  // Overpass QL query for nodes, ways, and relations with both housenumber prefix and street match
+  const query = `[out:json][timeout:${timeout}];
+(
+  node["addr:housenumber"~"^${num}"]["addr:street"~"(?i)${streetRegex}"](around:${radius},${lat},${lng});
+  way["addr:housenumber"~"^${num}"]["addr:street"~"(?i)${streetRegex}"](around:${radius},${lat},${lng});
+  relation["addr:housenumber"~"^${num}"]["addr:street"~"(?i)${streetRegex}"](around:${radius},${lat},${lng});
 );
 out center 100;`
 

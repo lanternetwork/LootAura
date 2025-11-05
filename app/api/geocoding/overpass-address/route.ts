@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
-import { buildOverpassAddressQuery, parseOverpassElements, formatLabel, NormalizedAddress } from '@/lib/geo/overpass'
+import { buildOverpassAddressQuery, buildOverpassDigitsStreetQuery, parseOverpassElements, formatLabel, NormalizedAddress } from '@/lib/geo/overpass'
+import { normalizeStreetName, buildStreetRegex } from '@/lib/geo/streetNormalize'
 import { haversineMeters } from '@/lib/geo/distance'
 import { AddressSuggestion } from '@/lib/geocode'
 
@@ -53,6 +54,7 @@ async function overpassHandler(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const prefix = searchParams.get('prefix')
+    const streetParam = searchParams.get('street') // Optional, for digits+street mode
     const latParam = searchParams.get('lat')
     const lngParam = searchParams.get('lng')
     const limitParam = searchParams.get('limit')
@@ -60,12 +62,25 @@ async function overpassHandler(request: NextRequest) {
     
     const enableDebug = debugParam === '1' || process.env.NODE_ENV === 'development'
     
-    // Validate prefix
-    if (!prefix || !/^\d{1,6}$/.test(prefix)) {
+    // Determine mode: numeric-only (prefix only) or digits+street (prefix + street)
+    const mode = streetParam ? 'digits+street' : 'numeric-only'
+    
+    // Validate prefix (1-6 digits for numeric-only, 1-8 for digits+street)
+    const maxPrefixLength = mode === 'digits+street' ? 8 : 6
+    if (!prefix || !new RegExp(`^\\d{1,${maxPrefixLength}}$`).test(prefix)) {
       return NextResponse.json({
         ok: false,
         code: 'INVALID_PREFIX',
-        error: 'Prefix must be 1-6 digits'
+        error: `Prefix must be 1-${maxPrefixLength} digits`
+      }, { status: 400 })
+    }
+    
+    // Validate street parameter for digits+street mode
+    if (mode === 'digits+street' && (!streetParam || streetParam.trim().length === 0)) {
+      return NextResponse.json({
+        ok: false,
+        code: 'INVALID_STREET',
+        error: 'Street parameter is required for digits+street mode'
       }, { status: 400 })
     }
     
@@ -90,8 +105,9 @@ async function overpassHandler(request: NextRequest) {
     const roundedLat = Math.round((lat as number) * 10000) / 10000
     const roundedLng = Math.round((lng as number) * 10000) / 10000
     
-    // Check cache
-    const cacheKey = `overpass:v1:prefix=${prefix}|lat=${roundedLat}|lng=${roundedLng}|r=${OVERPASS_RADIUS_M}|L=${limit}`
+    // Build cache key (include street if present)
+    const streetKey = streetParam ? `|street=${normalizeStreetName(streetParam)}` : ''
+    const cacheKey = `overpass:v1:prefix=${prefix}${streetKey}|lat=${roundedLat}|lng=${roundedLng}|r=${OVERPASS_RADIUS_M}|L=${limit}`
     const cached = getCachedResults(cacheKey)
     
     if (cached) {
@@ -123,7 +139,9 @@ async function overpassHandler(request: NextRequest) {
       
       if (enableDebug) {
         respBody._debug = {
+          mode,
           cacheHit: true,
+          radiusUsedM: OVERPASS_RADIUS_M,
           radiusM: OVERPASS_RADIUS_M,
           countRaw: sortedCached.length,
           countNormalized: sortedCached.length,
@@ -136,7 +154,9 @@ async function overpassHandler(request: NextRequest) {
           }))
         }
         console.log('[OVERPASS] Cached results re-sorted:', {
+          mode,
           prefix,
+          street: streetParam || undefined,
           userCoords: [lat, lng],
           count: sortedCached.length,
           distances: cachedWithDistance.slice(0, 5).map(addr => ({
@@ -154,105 +174,143 @@ async function overpassHandler(request: NextRequest) {
       })
     }
     
-    // Build Overpass query
+    // Build and execute Overpass query with radius expansion for digits+street mode
     const userLat = lat as number
     const userLng = lng as number
     
-    if (enableDebug) {
-      console.log('[OVERPASS] Query parameters:', {
-        prefix,
-        userLat,
-        userLng,
-        radiusM: OVERPASS_RADIUS_M,
-        radiusKm: (OVERPASS_RADIUS_M / 1000).toFixed(2)
-      })
-    }
-    
-    const query = buildOverpassAddressQuery(
-      prefix,
-      userLat,
-      userLng,
-      OVERPASS_RADIUS_M,
-      OVERPASS_TIMEOUT_SEC
-    )
-    
-    // Fetch from Overpass with timeout
-    const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS)
-    
-    let response: Response
+    let json: any = null
     let rawCount = 0
+    let radiusUsed = OVERPASS_RADIUS_M
+    const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
     
-    try {
-      response = await fetch(OVERPASS_BASE_URL, {
-        method: 'POST',
-        headers: {
-          'User-Agent': `LootAura/1.0 (${email})`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: `data=${encodeURIComponent(query)}`,
-        signal: controller.signal
-      })
+    // For digits+street mode, implement radius expansion: 3000m -> 5000m -> 8000m
+    const radiusSequence = mode === 'digits+street' ? [3000, 5000, 8000] : [OVERPASS_RADIUS_M]
+    const minResults = mode === 'digits+street' ? 3 : 0
+    
+    for (const currentRadius of radiusSequence) {
+      radiusUsed = currentRadius
       
-      clearTimeout(timeoutId)
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId)
+      // Build query based on mode
+      let query: string
+      if (mode === 'digits+street' && streetParam) {
+        const normalizedStreet = normalizeStreetName(streetParam)
+        const streetRegex = buildStreetRegex(normalizedStreet)
+        query = buildOverpassDigitsStreetQuery(
+          prefix,
+          streetRegex,
+          userLat,
+          userLng,
+          currentRadius,
+          OVERPASS_TIMEOUT_SEC
+        )
+      } else {
+        query = buildOverpassAddressQuery(
+          prefix,
+          userLat,
+          userLng,
+          currentRadius,
+          OVERPASS_TIMEOUT_SEC
+        )
+      }
       
-      // Handle timeout or abort
-      if (fetchError?.name === 'AbortError' || controller.signal.aborted) {
+      if (enableDebug) {
+        console.log('[OVERPASS] Query parameters:', {
+          mode,
+          prefix,
+          street: streetParam || undefined,
+          userLat,
+          userLng,
+          radiusM: currentRadius,
+          radiusKm: (currentRadius / 1000).toFixed(2)
+        })
+      }
+      
+      // Fetch from Overpass with timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS)
+      
+      let response: Response
+      
+      try {
+        response = await fetch(OVERPASS_BASE_URL, {
+          method: 'POST',
+          headers: {
+            'User-Agent': `LootAura/1.0 (${email})`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: `data=${encodeURIComponent(query)}`,
+          signal: controller.signal
+        })
+        
+        clearTimeout(timeoutId)
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        
+        // Handle timeout or abort
+        if (fetchError?.name === 'AbortError' || controller.signal.aborted) {
+          return NextResponse.json({
+            ok: false,
+            code: 'OVERPASS_UNAVAILABLE',
+            error: 'Overpass request timed out'
+          }, { status: 504 })
+        }
+        
+        // Other fetch errors
         return NextResponse.json({
           ok: false,
           code: 'OVERPASS_UNAVAILABLE',
-          error: 'Overpass request timed out'
-        }, { status: 504 })
+          error: 'Overpass request failed'
+        }, { status: 503 })
       }
       
-      // Other fetch errors
-      return NextResponse.json({
-        ok: false,
-        code: 'OVERPASS_UNAVAILABLE',
-        error: 'Overpass request failed'
-      }, { status: 503 })
-    }
-    
-    if (!response.ok) {
-      // Handle 429 rate limit
-      if (response.status === 429) {
+      if (!response.ok) {
+        // Handle 429 rate limit
+        if (response.status === 429) {
+          return NextResponse.json({
+            ok: false,
+            code: 'OVERPASS_UNAVAILABLE',
+            error: 'Overpass rate limit exceeded'
+          }, { status: 429 })
+        }
+        
+        // Other errors
         return NextResponse.json({
           ok: false,
           code: 'OVERPASS_UNAVAILABLE',
-          error: 'Overpass rate limit exceeded'
-        }, { status: 429 })
+          error: `Overpass request failed: ${response.status}`
+        }, { status: response.status })
       }
       
-      // Other errors
-      return NextResponse.json({
-        ok: false,
-        code: 'OVERPASS_UNAVAILABLE',
-        error: `Overpass request failed: ${response.status}`
-      }, { status: response.status })
+      // Parse response
+      try {
+        json = await response.json()
+      } catch (parseError) {
+        return NextResponse.json({
+          ok: false,
+          code: 'OVERPASS_UNAVAILABLE',
+          error: 'Invalid response from Overpass'
+        }, { status: 502 })
+      }
+      
+      rawCount = json.elements?.length || 0
+      
+      // For digits+street mode, continue expanding radius if we have < 3 results
+      if (mode === 'digits+street' && rawCount < minResults && currentRadius < radiusSequence[radiusSequence.length - 1]) {
+        if (enableDebug) {
+          console.log(`[OVERPASS] Only ${rawCount} results at ${currentRadius}m, expanding radius...`)
+        }
+        continue // Try next radius
+      }
+      
+      break // We have enough results or reached max radius
     }
-    
-    // Parse response
-    let json: any
-    try {
-      json = await response.json()
-    } catch (parseError) {
-      return NextResponse.json({
-        ok: false,
-        code: 'OVERPASS_UNAVAILABLE',
-        error: 'Invalid response from Overpass'
-      }, { status: 502 })
-    }
-    
-    rawCount = json.elements?.length || 0
     
     // Parse and normalize
     const normalized = parseOverpassElements(json)
     
-    // Calculate distances and filter by radius (userLat/userLng already defined above)
+    // Calculate distances and filter by radiusUsed + 500m buffer
+    const filterRadius = radiusUsed + 500 // Allow 500m buffer beyond search radius
     const withDistance: (NormalizedAddress & { distanceM: number })[] = normalized
       .map(addr => {
         const distanceM = haversineMeters(userLat, userLng, addr.lat, addr.lng)
@@ -262,17 +320,18 @@ async function overpassHandler(request: NextRequest) {
         }
       })
       .filter(addr => {
-        const withinRadius = addr.distanceM <= OVERPASS_RADIUS_M
+        const withinRadius = addr.distanceM <= filterRadius
         if (enableDebug && !withinRadius) {
           console.log('[OVERPASS] Filtered out (outside radius):', {
             label: formatLabel(addr),
             distanceM: Math.round(addr.distanceM),
             distanceKm: (addr.distanceM / 1000).toFixed(2),
-            radiusM: OVERPASS_RADIUS_M
+            radiusUsedM: radiusUsed,
+            filterRadiusM: filterRadius
           })
         }
         return withinRadius
-      }) // Only include results within radius
+      }) // Only include results within radiusUsed + 500m buffer
     
     // Sort by distance (ascending) - closest first
     withDistance.sort((a, b) => {
@@ -319,7 +378,9 @@ async function overpassHandler(request: NextRequest) {
     
     if (enableDebug) {
       respBody._debug = {
+        mode,
         cacheHit: false,
+        radiusUsedM: radiusUsed,
         radiusM: OVERPASS_RADIUS_M,
         countRaw: rawCount,
         countNormalized: normalized.length,
@@ -332,8 +393,11 @@ async function overpassHandler(request: NextRequest) {
         }))
       }
       console.log('[OVERPASS] Sorted results (final):', {
+        mode,
         prefix,
+        street: streetParam || undefined,
         userCoords: [userLat, userLng],
+        radiusUsedM: radiusUsed,
         count: suggestions.length,
         limit,
         distances: withDistance.slice(0, limit).map((addr, idx) => ({

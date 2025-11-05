@@ -82,8 +82,10 @@ export default function AddressAutocomplete({
   useEffect(() => {
     const trimmedQuery = debouncedQuery?.trim() || ''
     
-    // Check if query is numeric-only (1-6 digits)
+    // Check query patterns
     const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
+    const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].+)$/)
+    const isDigitsStreet = digitsStreetMatch !== null
     const hasCoords = Boolean(userLat && userLng)
     
     // Minimum length: 1 for numeric-only, 2 for general text
@@ -106,8 +108,108 @@ export default function AddressAutocomplete({
     abortRef.current = controller
     lastHadCoordsRef.current = hasCoords
     
-    // For numeric-only queries with coords, try Overpass first
-    if (isNumericOnly && hasCoords) {
+    // For digits+street queries with coords, try Overpass first
+    if (isDigitsStreet && hasCoords && digitsStreetMatch?.groups) {
+      const num = digitsStreetMatch.groups.num
+      const street = digitsStreetMatch.groups.street.trim()
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AddressAutocomplete] Fetching Overpass addresses (digits+street)', { num, street, userLat, userLng })
+      }
+      
+      fetchOverpassAddresses(num, userLat as number, userLng as number, 2, controller.signal, street)
+        .then((response) => {
+          if (requestIdRef.current !== currentId) return
+          
+          if (response.ok && response.data && response.data.length > 0) {
+            // Overpass succeeded
+            const unique: AddressSuggestion[] = []
+            const seen = new Set<string>()
+            for (const s of response.data) {
+              const key = s.id
+              if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(s)
+              }
+            }
+            if (process.env.NODE_ENV === 'development' && unique.length > 0) {
+              console.log('[AddressAutocomplete] Received Overpass addresses (digits+street)', { 
+                count: unique.length, 
+                first: unique[0]?.label,
+                all: unique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
+                debug: response._debug
+              })
+            }
+            setSuggestions(unique)
+            setIsOpen(unique.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+            if (requestIdRef.current === currentId) setIsLoading(false)
+          } else {
+            // Overpass failed or returned empty - fallback to Nominatim
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim', { code: response.code })
+            }
+            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+              .then((results) => {
+                if (requestIdRef.current !== currentId) return
+                const unique: AddressSuggestion[] = []
+                const seen = new Set<string>()
+                for (const s of results) {
+                  const key = s.id
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    unique.push(s)
+                  }
+                }
+                setSuggestions(unique)
+                setIsOpen(unique.length > 0)
+                setSelectedIndex(-1)
+                setShowFallbackMessage(unique.length > 0)
+                if (requestIdRef.current === currentId) setIsLoading(false)
+              })
+          }
+        })
+        .catch((err) => {
+          if (requestIdRef.current !== currentId) return
+          if (err?.name === 'AbortError') {
+            if (requestIdRef.current === currentId) setIsLoading(false)
+            return
+          }
+          
+          // Fallback to Nominatim on error
+          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results) => {
+              if (requestIdRef.current !== currentId) return
+              const unique: AddressSuggestion[] = []
+              const seen = new Set<string>()
+              for (const s of results) {
+                const key = s.id
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(s)
+                }
+              }
+              setSuggestions(unique)
+              setIsOpen(unique.length > 0)
+              setSelectedIndex(-1)
+              setShowFallbackMessage(unique.length > 0)
+              if (requestIdRef.current === currentId) setIsLoading(false)
+            })
+            .catch((fallbackErr) => {
+              if (requestIdRef.current !== currentId) return
+              if (fallbackErr?.name === 'AbortError') {
+                if (requestIdRef.current === currentId) setIsLoading(false)
+                return
+              }
+              console.error('Suggest error:', fallbackErr)
+              setSuggestions([])
+              setIsOpen(false)
+              if (requestIdRef.current === currentId) setIsLoading(false)
+            })
+        })
+    } else if (isNumericOnly && hasCoords) {
+      // For numeric-only queries with coords, try Overpass first
       if (process.env.NODE_ENV === 'development') {
         console.log('[AddressAutocomplete] Fetching Overpass addresses', { prefix: trimmedQuery, userLat, userLng })
       }
@@ -244,6 +346,8 @@ export default function AddressAutocomplete({
   useEffect(() => {
     const trimmedQuery = debouncedQuery?.trim() || ''
     const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
+    const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].+)$/)
+    const isDigitsStreet = digitsStreetMatch !== null
     const minLength = isNumericOnly ? 1 : 2
     
     if (!trimmedQuery || trimmedQuery.length < minLength) return
@@ -257,9 +361,74 @@ export default function AddressAutocomplete({
     setIsLoading(true)
     setShowFallbackMessage(false)
     
-    // For numeric-only queries, use Overpass; otherwise use Nominatim
-    if (isNumericOnly) {
-      fetchOverpassAddresses(trimmedQuery, userLat, userLng, 8, controller.signal)
+    // For digits+street queries, use Overpass with street parameter
+    if (isDigitsStreet && digitsStreetMatch?.groups) {
+      const num = digitsStreetMatch.groups.num
+      const street = digitsStreetMatch.groups.street.trim()
+      
+      fetchOverpassAddresses(num, userLat, userLng, 2, controller.signal, street)
+        .then((response) => {
+          if (requestIdRef.current !== currentId) return
+          if (response.ok && response.data && response.data.length > 0) {
+            const unique: AddressSuggestion[] = []
+            const seen = new Set<string>()
+            for (const s of response.data) {
+              const key = s.id
+              if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(s)
+              }
+            }
+            setSuggestions(unique)
+            setIsOpen(unique.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+          } else {
+            // Fallback to Nominatim
+            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+              .then((results) => {
+                if (requestIdRef.current !== currentId) return
+                const unique: AddressSuggestion[] = []
+                const seen = new Set<string>()
+                for (const s of results) {
+                  const key = s.id
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    unique.push(s)
+                  }
+                }
+                setSuggestions(unique)
+                setIsOpen(unique.length > 0)
+                setSelectedIndex(-1)
+                setShowFallbackMessage(unique.length > 0)
+              })
+          }
+        })
+        .catch(() => {
+          // Fallback to Nominatim on error
+          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results) => {
+              if (requestIdRef.current !== currentId) return
+              const unique: AddressSuggestion[] = []
+              const seen = new Set<string>()
+              for (const s of results) {
+                const key = s.id
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(s)
+                }
+              }
+              setSuggestions(unique)
+              setIsOpen(unique.length > 0)
+              setSelectedIndex(-1)
+              setShowFallbackMessage(unique.length > 0)
+            })
+            .catch(() => {})
+        })
+        .finally(() => setIsLoading(false))
+    } else if (isNumericOnly) {
+      // For numeric-only queries, use Overpass; otherwise use Nominatim
+      fetchOverpassAddresses(trimmedQuery, userLat, userLng, 2, controller.signal)
         .then((response) => {
           if (requestIdRef.current !== currentId) return
           if (response.ok && response.data && response.data.length > 0) {

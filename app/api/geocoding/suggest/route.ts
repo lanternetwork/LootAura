@@ -35,9 +35,9 @@ function setCachedSuggestions(key: string, data: AddressSuggestion[]): void {
   })
 }
 
-// Test-only helper to ensure deterministic behavior across tests
-export function __clearSuggestCache(): void {
-  suggestCache.clear()
+// Test-only hook: attach a clearing helper to global to avoid Next.js Route export validation errors
+if (process.env.NODE_ENV === 'test') {
+  ;(globalThis as any).__clearSuggestCache = () => suggestCache.clear()
 }
 
 export interface AddressSuggestion {

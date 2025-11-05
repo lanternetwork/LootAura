@@ -2,20 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import ResendConfirmation from '@/components/auth/ResendConfirmation'
 
-// Mock fetch
-global.fetch = vi.fn()
-
 describe('Resend Confirmation Integration', () => {
   beforeEach(() => {
     // Clear mocks before each test
     vi.clearAllMocks()
-    ;(fetch as any)?.mockClear?.()
+    vi.stubGlobal('fetch', vi.fn())
   })
 
   afterEach(() => {
     // Clean up mocks and reset state
     cleanup()
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('should show resend link and handle successful resend', async () => {

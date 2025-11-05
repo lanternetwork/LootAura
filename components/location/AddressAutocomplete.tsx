@@ -50,8 +50,8 @@ export default function AddressAutocomplete({
   const requestIdRef = useRef(0)
   const geoWaitRef = useRef<boolean>(false)
 
-  // Debounce search query (250-300ms range)
-  const debouncedQuery = useDebounce(value, 250)
+  // Debounce search query (50ms for real-time feel)
+  const debouncedQuery = useDebounce(value, 50)
 
   // Use location from props if provided, otherwise fetch IP geolocation (no browser prompt) for proximity bias
   useEffect(() => {

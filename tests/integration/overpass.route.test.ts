@@ -243,41 +243,44 @@ describe('Overpass Address Route Integration', () => {
     // Use vi.stubEnv to temporarily set NODE_ENV
     vi.stubEnv('NODE_ENV', 'development')
     
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        elements: [
-          {
-            type: 'node',
-            id: 123,
-            lat: 38.2512,
-            lon: -85.7494,
-            tags: {
-              'addr:housenumber': '123',
-              'addr:street': 'Main St'
+    try {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          elements: [
+            {
+              type: 'node',
+              id: 123,
+              lat: 38.2512,
+              lon: -85.7494,
+              tags: {
+                'addr:housenumber': '123',
+                'addr:street': 'Main St'
+              }
             }
-          }
-        ]
+          ]
+        })
       })
-    })
 
-    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=123&lat=38.25&lng=-85.75&_debug=1')
-    const response = await GET(request)
-    const data = await response.json()
+      const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=123&lat=38.25&lng=-85.75&_debug=1')
+      const response = await GET(request)
+      const data = await response.json()
 
-    expect(response.status).toBe(200)
-    expect(data._debug).toBeDefined()
-    expect(data._debug).toHaveProperty('cacheHit')
-    expect(data._debug).toHaveProperty('radiusM')
-    expect(data._debug).toHaveProperty('countRaw')
-    expect(data._debug).toHaveProperty('countNormalized')
-    expect(data._debug).toHaveProperty('coords')
-    
-    // Restore original NODE_ENV
-    if (originalEnv) {
-      vi.stubEnv('NODE_ENV', originalEnv)
-    } else {
-      vi.unstubEnv('NODE_ENV')
+      expect(response.status).toBe(200)
+      expect(data._debug).toBeDefined()
+      expect(data._debug).toHaveProperty('cacheHit')
+      expect(data._debug).toHaveProperty('radiusM')
+      expect(data._debug).toHaveProperty('countRaw')
+      expect(data._debug).toHaveProperty('countNormalized')
+      expect(data._debug).toHaveProperty('coords')
+    } finally {
+      // Restore original NODE_ENV
+      if (originalEnv !== undefined) {
+        vi.stubEnv('NODE_ENV', originalEnv)
+      } else {
+        // If it was undefined, just set it back to 'test' (default test env)
+        vi.stubEnv('NODE_ENV', 'test')
+      }
     }
   })
 

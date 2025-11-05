@@ -165,7 +165,7 @@ async function suggestHandler(request: NextRequest) {
     }
     // De-dupe by id, keep first occurrence (upstream order)
     const seen = new Set<string>()
-    let upstreamIndexed: Array<{ upstreamIndex: number; item: any }> = []
+    const upstreamIndexed: Array<{ upstreamIndex: number; item: any }> = []
     ;(usOnly || []).forEach((it: any, idx: number) => {
       const id = toId(it, idx)
       if (!seen.has(id)) {
@@ -206,7 +206,7 @@ async function suggestHandler(request: NextRequest) {
       })
     }
     // Trim to client limit and strip private fields
-    const finalSuggestions: AddressSuggestion[] = suggestions.slice(0, limit).map(({ __distanceKm, upstreamIndex, ...rest }) => rest)
+    const finalSuggestions: AddressSuggestion[] = suggestions.slice(0, limit).map(({ __distanceKm: _d, upstreamIndex: _i, ...rest }) => rest)
     
     // Cache results with TTL dependent on coords
     setCachedSuggestions(cacheKey, finalSuggestions, (Number.isFinite(userLat as number) && Number.isFinite(userLng as number)) ? TTL_WITH_COORDS_MS : TTL_NO_COORDS_MS)

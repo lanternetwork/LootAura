@@ -243,7 +243,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     try {
       // Prepare sale data with cover image
       // Remove duration_hours from payload (it's only used for client-side calculation)
-      const { duration_hours, ...restFormData } = formData
+      const { duration_hours: _duration_hours, ...restFormData } = formData
       const saleData = {
         ...restFormData,
         cover_image_url: photos.length > 0 ? photos[0] : undefined,
@@ -833,7 +833,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
-function ReviewStep({ formData, photos, items, onPublish, loading, submitError }: {
+function ReviewStep({ formData, photos, items, onPublish, loading, submitError: _submitError }: {
   formData: Partial<SaleInput>,
   photos: string[],
   items: Array<{ id?: string; name: string; price?: number; description?: string }>,

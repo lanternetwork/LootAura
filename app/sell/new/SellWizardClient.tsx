@@ -53,7 +53,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     time_start: initialData?.time_start || '',
     date_end: initialData?.date_end || '',
     time_end: initialData?.time_end || '',
-    price: initialData?.price,
+    duration_hours: initialData?.duration_hours || 4, // Default 4 hours
     tags: initialData?.tags || [],
     pricing_mode: initialData?.pricing_mode || 'negotiable',
     status: initialData?.status || 'draft'
@@ -115,17 +115,65 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }, [initialData])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      
+      // Calculate end date/time when duration, start date, or start time changes
+      if (field === 'duration_hours' || field === 'date_start' || field === 'time_start') {
+        const dateStart = updated.date_start || prev.date_start
+        const timeStart = updated.time_start || prev.time_start
+        const durationHours = updated.duration_hours || prev.duration_hours || 4
+        
+        if (dateStart && timeStart && durationHours) {
+          // Validate duration doesn't exceed 24 hours
+          const maxDuration = 24
+          const actualDuration = Math.min(durationHours, maxDuration)
+          
+          // Calculate end time
+          const startDateTime = new Date(`${dateStart}T${timeStart}`)
+          const endDateTime = new Date(startDateTime.getTime() + actualDuration * 60 * 60 * 1000)
+          
+          // Format end date (YYYY-MM-DD)
+          const endDate = endDateTime.toISOString().split('T')[0]
+          // Format end time (HH:MM)
+          const endTime = endDateTime.toTimeString().split(' ')[0].substring(0, 5)
+          
+          updated.date_end = endDate
+          updated.time_end = endTime
+        }
+      }
+      
+      return updated
+    })
   }
 
   const validateDetails = (): Record<string, string> => {
     const nextErrors: Record<string, string> = {}
     if (!formData.title) nextErrors.title = 'Title is required'
-    if (!formData.address) nextErrors.address = 'Address is required'
-    if (!formData.city) nextErrors.city = 'City is required'
-    if (!formData.state) nextErrors.state = 'State is required'
+    if (!formData.address || formData.address.trim().length < 5) {
+      nextErrors.address = 'Address is required (minimum 5 characters)'
+    }
+    if (!formData.city || formData.city.trim().length < 2) {
+      nextErrors.city = 'City is required (minimum 2 characters)'
+    }
+    if (!formData.state || formData.state.trim().length < 2) {
+      nextErrors.state = 'State is required (minimum 2 characters)'
+    }
+    if (formData.zip_code && !/^\d{5}(-\d{4})?$/.test(formData.zip_code)) {
+      nextErrors.zip_code = 'ZIP code must be 5 digits or 5+4 format'
+    }
     if (!formData.date_start) nextErrors.date_start = 'Start date is required'
     if (!formData.time_start) nextErrors.time_start = 'Start time is required'
+    
+    // Validate duration
+    const durationHours = formData.duration_hours || 4
+    if (durationHours > 24) {
+      nextErrors.duration_hours = 'Sale cannot last more than 24 hours'
+    }
+    if (durationHours <= 0) {
+      nextErrors.duration_hours = 'Duration must be greater than 0'
+    }
+    
     // Unsavory language checks (client-side guard; server also validates)
     const unsavoryFields: Array<[keyof SaleInput, string | undefined]> = [
       ['title', formData.title],
@@ -266,7 +314,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       case 2:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
       case 3:
-        return <ReviewStep formData={formData} photos={photos} items={items} />
+        return <ReviewStep formData={formData} photos={photos} items={items} onPublish={handleSubmit} loading={loading} />
       default:
         return null
     }
@@ -435,29 +483,35 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            End Date (Optional)
-          </label>
-          <input
-            type="date"
-            value={formData.date_end || ''}
-            onChange={(e) => onChange('date_end', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            End Time (Optional)
-          </label>
-          <input
-            type="time"
-            value={formData.time_end || ''}
-            onChange={(e) => onChange('time_end', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-          />
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Duration (Hours) *
+        </label>
+        <input
+          type="number"
+          min="1"
+          max="24"
+          step="0.5"
+          value={formData.duration_hours || 4}
+          onChange={(e) => {
+            const hours = parseFloat(e.target.value) || 4
+            const maxHours = 24
+            onChange('duration_hours', Math.min(hours, maxHours))
+          }}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+          required
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Sale duration (1-24 hours). End time is calculated automatically.
+        </p>
+        {errors?.duration_hours && (
+          <p className="mt-1 text-sm text-red-600">{errors.duration_hours}</p>
+        )}
+        {formData.date_end && formData.time_end && (
+          <p className="mt-1 text-sm text-gray-600">
+            Ends: {new Date(`${formData.date_end}T${formData.time_end}`).toLocaleString()}
+          </p>
+        )}
       </div>
 
       <div>
@@ -468,12 +522,16 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           type="text"
           value={formData.address || ''}
           onChange={(e) => onChange('address', e.target.value)}
-          placeholder="Street address"
+          placeholder="Street address (e.g., 123 Main St)"
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           required
+          minLength={5}
         />
         {errors?.address && (
           <p className="mt-1 text-sm text-red-600">{errors.address}</p>
+        )}
+        {formData.address && formData.address.length < 5 && (
+          <p className="mt-1 text-xs text-gray-500">Address must be at least 5 characters</p>
         )}
       </div>
 
@@ -489,6 +547,9 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
             placeholder="City"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
             required
+            minLength={2}
+            pattern="[A-Za-z\s]+"
+            title="City name (letters only)"
           />
         {errors?.city && (
           <p className="mt-1 text-sm text-red-600">{errors.city}</p>
@@ -501,10 +562,14 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           <input
             type="text"
             value={formData.state || ''}
-            onChange={(e) => onChange('state', e.target.value)}
-            placeholder="State"
+            onChange={(e) => onChange('state', e.target.value.toUpperCase().slice(0, 2))}
+            placeholder="State (e.g., KY)"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
+            minLength={2}
+            maxLength={2}
+            pattern="[A-Z]{2}"
+            title="Two-letter state code (e.g., KY, CA)"
           />
         {errors?.state && (
           <p className="mt-1 text-sm text-red-600">{errors.state}</p>
@@ -517,10 +582,18 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           <input
             type="text"
             value={formData.zip_code || ''}
-            onChange={(e) => onChange('zip_code', e.target.value)}
-            placeholder="ZIP Code"
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, '').slice(0, 5)
+              onChange('zip_code', value)
+            }}
+            placeholder="ZIP Code (5 digits)"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            pattern="\d{5}"
+            title="5-digit ZIP code"
           />
+        {errors?.zip_code && (
+          <p className="mt-1 text-sm text-red-600">{errors.zip_code}</p>
+        )}
         </div>
       </div>
 
@@ -543,21 +616,6 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
         </p>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Starting Price (Optional)
-        </label>
-        <input
-          type="number"
-          value={formData.price || ''}
-          onChange={(e) => onChange('price', e.target.value ? parseFloat(e.target.value) : undefined)}
-          placeholder="0.00"
-          min="0"
-          step="0.01"
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-        <p className="text-sm text-gray-500 mt-1">Leave blank if items are free</p>
-      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -760,10 +818,12 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
-function ReviewStep({ formData, photos, items }: {
+function ReviewStep({ formData, photos, items, onPublish, loading }: {
   formData: Partial<SaleInput>,
   photos: string[],
-  items: Array<{ name: string; price?: number; description?: string }>
+  items: Array<{ name: string; price?: number; description?: string }>,
+  onPublish: () => void,
+  loading: boolean
 }) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -847,6 +907,28 @@ function ReviewStep({ formData, photos, items }: {
             </p>
           </div>
         </div>
+      </div>
+      
+      <div className="mt-6">
+        <button
+          onClick={onPublish}
+          disabled={loading}
+          className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
+        >
+          {loading ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Publishing...
+            </>
+          ) : (
+            <>
+              Publish Sale
+              <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </>
+          )}
+        </button>
       </div>
     </div>
   )

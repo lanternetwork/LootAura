@@ -149,7 +149,11 @@ export async function fetchSuggestions(query: string, userLat?: number, userLng?
     }
     
     return []
-  } catch (error) {
+  } catch (error: any) {
+    // AbortError is expected when requests are cancelled - don't log it
+    if (error?.name === 'AbortError') {
+      return []
+    }
     console.error('Suggest error:', error)
     return []
   }

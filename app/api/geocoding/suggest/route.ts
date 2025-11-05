@@ -90,7 +90,27 @@ async function suggestHandler(request: NextRequest) {
     // Fetch from Nominatim
     const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
     // Restrict to United States only using countrycodes=us
-    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=us&limit=${limit}&q=${encodeURIComponent(query)}&email=${email}`
+    const base = new URL('https://nominatim.openstreetmap.org/search')
+    base.searchParams.set('format', 'json')
+    base.searchParams.set('addressdetails', '1')
+    base.searchParams.set('countrycodes', 'us')
+    base.searchParams.set('limit', String(limit))
+    base.searchParams.set('q', query)
+    base.searchParams.set('email', email)
+    // Proximity bias: include a viewbox around the user to influence ranking (not bounded)
+    if (Number.isFinite(userLat as number) && Number.isFinite(userLng as number)) {
+      const radiusKm = 50
+      const dLat = radiusKm / 111
+      const dLng = radiusKm / (111 * Math.cos((userLat as number) * Math.PI / 180))
+      const top = (userLat as number) + dLat
+      const bottom = (userLat as number) - dLat
+      const left = (userLng as number) - dLng
+      const right = (userLng as number) + dLng
+      // Nominatim expects viewbox as: left,top,right,bottom (lon,lat)
+      base.searchParams.set('viewbox', `${left},${top},${right},${bottom}`)
+      base.searchParams.set('bounded', '0')
+    }
+    const url = base.toString()
     
     const response = await fetch(url, {
       headers: {

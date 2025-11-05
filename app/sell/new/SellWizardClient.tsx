@@ -548,9 +548,10 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           step="0.5"
           value={formData.duration_hours || 4}
           onChange={(e) => {
-            const hours = parseFloat(e.target.value) || 4
-            const maxHours = 24
-            onChange('duration_hours', Math.min(hours, maxHours))
+            const raw = (e.currentTarget as HTMLInputElement).valueAsNumber
+            const hours = Number.isFinite(raw) ? raw : 4
+            const clamped = Math.max(1, Math.min(24, hours))
+            onChange('duration_hours', clamped)
           }}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
           required

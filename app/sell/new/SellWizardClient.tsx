@@ -63,6 +63,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const [items, setItems] = useState<Array<{ id: string; name: string; price?: number; description?: string; image_url?: string }>>([])
   const [loading, setLoading] = useState(false)
   const [_errors, setErrors] = useState<Record<string, string>>({})
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   // Check authentication status
   useEffect(() => {
@@ -833,7 +834,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
-function ReviewStep({ formData, photos, items, onPublish, loading, submitError: _submitError }: {
+function ReviewStep({ formData, photos, items, onPublish, loading, submitError }: {
   formData: Partial<SaleInput>,
   photos: string[],
   items: Array<{ id?: string; name: string; price?: number; description?: string }>,
@@ -926,6 +927,11 @@ function ReviewStep({ formData, photos, items, onPublish, loading, submitError: 
       </div>
       
       <div className="mt-6 mb-6">
+        {submitError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {submitError}
+          </div>
+        )}
         <button
           onClick={onPublish}
           disabled={loading}

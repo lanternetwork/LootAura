@@ -40,6 +40,8 @@ export default function AddressAutocomplete({
   const [isLoading, setIsLoading] = useState(false)
   const [userLat, setUserLat] = useState<number | undefined>(undefined)
   const [userLng, setUserLng] = useState<number | undefined>(undefined)
+  const abortRef = useRef<AbortController | null>(null)
+  const lastHadCoordsRef = useRef<boolean>(false)
   const requestIdRef = useRef(0)
 
   // Debounce search query
@@ -61,18 +63,68 @@ export default function AddressAutocomplete({
 
   // Fetch suggestions when query changes
   useEffect(() => {
-    if (!debouncedQuery || debouncedQuery.length < 3) {
+    if (!debouncedQuery || debouncedQuery.length < 2) {
       setSuggestions([])
       setIsOpen(false)
       return
     }
-
     const currentId = ++requestIdRef.current
     setIsLoading(true)
-    fetchSuggestions(debouncedQuery, userLat, userLng)
+
+    // Wait briefly (≤400ms) for geolocation on first call without coords
+    const shouldWait = !userLat || !userLng
+    const delay = shouldWait ? 400 : 0
+
+    const timer = setTimeout(() => {
+      if (abortRef.current) abortRef.current.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+      const hadCoords = Boolean(userLat && userLng)
+      lastHadCoordsRef.current = hadCoords
+      fetchSuggestions(debouncedQuery, userLat, userLng, controller.signal)
+        .then((results) => {
+          if (requestIdRef.current !== currentId) return
+          const unique: AddressSuggestion[] = []
+          const seen = new Set<string>()
+          for (const s of results) {
+            const key = s.id
+            if (!seen.has(key)) {
+              seen.add(key)
+              unique.push(s)
+            }
+          }
+          setSuggestions(unique)
+          setIsOpen(unique.length > 0)
+          setSelectedIndex(-1)
+        })
+        .catch((err) => {
+          if (requestIdRef.current !== currentId) return
+          if (err?.name === 'AbortError') return
+          console.error('Suggest error:', err)
+          setSuggestions([])
+          setIsOpen(false)
+        })
+        .finally(() => {
+          if (requestIdRef.current === currentId) setIsLoading(false)
+        })
+    }, delay)
+
+    return () => clearTimeout(timer)
+  }, [debouncedQuery, userLat, userLng])
+
+  // If last fetch lacked coords and coords arrive, refetch with coords
+  useEffect(() => {
+    if (!debouncedQuery || debouncedQuery.length < 2) return
+    if (!userLat || !userLng) return
+    if (lastHadCoordsRef.current) return
+    const currentId = ++requestIdRef.current
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setIsLoading(true)
+    fetchSuggestions(debouncedQuery, userLat, userLng, controller.signal)
       .then((results) => {
         if (requestIdRef.current !== currentId) return
-        // Dedupe by id/osm_id
         const unique: AddressSuggestion[] = []
         const seen = new Set<string>()
         for (const s of results) {
@@ -86,16 +138,9 @@ export default function AddressAutocomplete({
         setIsOpen(unique.length > 0)
         setSelectedIndex(-1)
       })
-      .catch((err) => {
-        if (requestIdRef.current !== currentId) return
-        console.error('Suggest error:', err)
-        setSuggestions([])
-        setIsOpen(false)
-      })
-      .finally(() => {
-        if (requestIdRef.current === currentId) setIsLoading(false)
-      })
-  }, [debouncedQuery])
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [userLat, userLng, debouncedQuery])
 
   // Handle suggestion selection
   const handleSelect = useCallback((suggestion: AddressSuggestion) => {

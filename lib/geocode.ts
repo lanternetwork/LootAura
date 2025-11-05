@@ -127,7 +127,7 @@ export interface AddressSuggestion {
   }
 }
 
-export async function fetchSuggestions(query: string, userLat?: number, userLng?: number): Promise<AddressSuggestion[]> {
+export async function fetchSuggestions(query: string, userLat?: number, userLng?: number, signal?: AbortSignal): Promise<AddressSuggestion[]> {
   if (!query || query.length < 3) {
     return []
   }
@@ -138,7 +138,7 @@ export async function fetchSuggestions(query: string, userLat?: number, userLng?
       params.set('lat', String(userLat))
       params.set('lng', String(userLng))
     }
-    const response = await fetch(`/api/geocoding/suggest?${params.toString()}`)
+    const response = await fetch(`/api/geocoding/suggest?${params.toString()}`, { signal })
     if (!response.ok) {
       return []
     }

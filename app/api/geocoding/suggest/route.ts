@@ -12,7 +12,8 @@ interface CacheEntry {
 }
 
 const suggestCache = new Map<string, CacheEntry>()
-const CACHE_TTL_MS = 60 * 1000 // 60 seconds
+const TTL_WITH_COORDS_MS = 60 * 1000
+const TTL_NO_COORDS_MS = 5 * 1000
 
 function getCachedSuggestions(key: string): AddressSuggestion[] | null {
   const entry = suggestCache.get(key)
@@ -28,10 +29,10 @@ function getCachedSuggestions(key: string): AddressSuggestion[] | null {
   return entry.data
 }
 
-function setCachedSuggestions(key: string, data: AddressSuggestion[]): void {
+function setCachedSuggestions(key: string, data: AddressSuggestion[], ttlMs: number): void {
   suggestCache.set(key, {
     data,
-    expires: Date.now() + CACHE_TTL_MS
+    expires: Date.now() + ttlMs
   })
 }
 
@@ -60,7 +61,7 @@ async function suggestHandler(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q')
     const limitParam = searchParams.get('limit')
-    const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10), 1), 10) : 5
+    const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10), 1), 10) : 8
     const latParam = searchParams.get('lat')
     const lngParam = searchParams.get('lng')
     const userLat = latParam ? parseFloat(latParam) : undefined
@@ -73,8 +74,9 @@ async function suggestHandler(request: NextRequest) {
       }, { status: 400 })
     }
     
-    // Check cache
-    const cacheKey = `${query.toLowerCase()}:${limit}`
+    // Check cache (vary by coords)
+    const normQ = query.trim().toLowerCase()
+    const cacheKey = `suggest:v1:q=${normQ}|L=${limit}|lat=${Number.isFinite(userLat as number) ? userLat : '-'}|lng=${Number.isFinite(userLng as number) ? userLng : '-'}`
     const cached = getCachedSuggestions(cacheKey)
     if (cached) {
       return NextResponse.json({
@@ -94,7 +96,8 @@ async function suggestHandler(request: NextRequest) {
     base.searchParams.set('format', 'json')
     base.searchParams.set('addressdetails', '1')
     base.searchParams.set('countrycodes', 'us')
-    base.searchParams.set('limit', String(limit))
+    const upstreamLimit = Number.isFinite(userLat as number) && Number.isFinite(userLng as number) ? 20 : 7
+    base.searchParams.set('limit', String(upstreamLimit))
     base.searchParams.set('q', query)
     base.searchParams.set('email', email)
     // Proximity bias: include a viewbox around the user to influence ranking (not bounded)
@@ -153,9 +156,27 @@ async function suggestHandler(request: NextRequest) {
       return cc === 'us' || country === 'united states' || country === 'us' || country === 'u.s.' || (!cc && !country)
     })
 
-    let suggestions: (AddressSuggestion & { __distanceKm?: number })[] = (usOnly || []).map((item: any, index: number) => ({
-      id: `${item.place_id || index}`,
-      label: item.display_name || '',
+    // Normalize; prefer stable id osm_type:osm_id and concise label
+    const toId = (it: any, index: number) => `${(it.osm_type || 'N')}:${(it.osm_id || it.place_id || index)}`
+    const conciseLabel = (it: any) => {
+      const a = it.address || {}
+      const parts = [a.house_number, a.road, a.city || a.town || a.village, a.state, a.postcode].filter(Boolean)
+      return parts.length > 0 ? parts.join(', ') : (it.display_name || '')
+    }
+    // De-dupe by id, keep first occurrence (upstream order)
+    const seen = new Set<string>()
+    let upstreamIndexed: Array<{ upstreamIndex: number; item: any }> = []
+    ;(usOnly || []).forEach((it: any, idx: number) => {
+      const id = toId(it, idx)
+      if (!seen.has(id)) {
+        seen.add(id)
+        upstreamIndexed.push({ upstreamIndex: idx, item: it })
+      }
+    })
+
+    let suggestions: (AddressSuggestion & { __distanceKm?: number; upstreamIndex: number })[] = upstreamIndexed.map(({ upstreamIndex, item }, index) => ({
+      id: toId(item, index),
+      label: conciseLabel(item),
       lat: parseFloat(item.lat) || 0,
       lng: parseFloat(item.lon) || 0,
       address: item.address ? {
@@ -165,7 +186,8 @@ async function suggestHandler(request: NextRequest) {
         state: item.address.state,
         postcode: item.address.postcode,
         country: item.address.country
-      } : undefined
+      } : undefined,
+      upstreamIndex
     }))
 
     // If user location provided, compute distance and sort nearest-first (preference, not exclusion)
@@ -177,18 +199,24 @@ async function suggestHandler(request: NextRequest) {
         const a = Math.sin(dLat/2) ** 2 + Math.cos((userLat as number) * Math.PI/180) * Math.cos((s.lat || 0) * Math.PI/180) * Math.sin(dLng/2) ** 2
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         return { ...s, __distanceKm: R * c }
-      }).sort((a, b) => (a.__distanceKm || 0) - (b.__distanceKm || 0))
+      }).sort((a, b) => {
+        const d = (a.__distanceKm || 0) - (b.__distanceKm || 0)
+        if (d !== 0) return d
+        return a.upstreamIndex - b.upstreamIndex
+      })
     }
+    // Trim to client limit and strip private fields
+    const finalSuggestions: AddressSuggestion[] = suggestions.slice(0, limit).map(({ __distanceKm, upstreamIndex, ...rest }) => rest)
     
-    // Cache results
-    setCachedSuggestions(cacheKey, suggestions)
+    // Cache results with TTL dependent on coords
+    setCachedSuggestions(cacheKey, finalSuggestions, (Number.isFinite(userLat as number) && Number.isFinite(userLng as number)) ? TTL_WITH_COORDS_MS : TTL_NO_COORDS_MS)
     
     return NextResponse.json({
       ok: true,
-      data: suggestions
+      data: finalSuggestions
     }, {
       headers: {
-        'Cache-Control': 'public, max-age=60'
+        'Cache-Control': Number.isFinite(userLat as number) && Number.isFinite(userLng as number) ? 'public, max-age=60' : 'public, max-age=5'
       }
     })
     

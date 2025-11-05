@@ -69,7 +69,8 @@ export default function AddressAutocomplete({
   error
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const autocompleteRef = useRef<InstanceType<typeof window.google.maps.places.Autocomplete> | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const autocompleteRef = useRef<any>(null)
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {

@@ -277,7 +277,7 @@ describe('Overpass Address Route Integration', () => {
     if (originalEnv) {
       vi.stubEnv('NODE_ENV', originalEnv)
     } else {
-      delete process.env.NODE_ENV
+      vi.unstubEnv('NODE_ENV')
     }
   })
 

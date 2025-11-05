@@ -173,7 +173,7 @@ export async function fetchOverpassAddresses(
   prefix: string,
   lat: number,
   lng: number,
-  limit: number = 8,
+  limit: number = 2,
   signal?: AbortSignal
 ): Promise<ApiResponse<AddressSuggestion[]>> {
   // Validate prefix is numeric
@@ -199,7 +199,7 @@ export async function fetchOverpassAddresses(
       prefix,
       lat: String(lat),
       lng: String(lng),
-      limit: String(Math.min(Math.max(limit, 3), 10))
+      limit: String(Math.min(Math.max(limit, 1), 10))
     })
     
     const response = await fetch(`/api/geocoding/overpass-address?${params.toString()}`, { signal })

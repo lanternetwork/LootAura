@@ -83,8 +83,8 @@ async function overpassHandler(request: NextRequest) {
     
     // Validate and clamp limit
     const limit = limitParam 
-      ? Math.min(Math.max(parseInt(limitParam, 10), 3), 10)
-      : 8
+      ? Math.min(Math.max(parseInt(limitParam, 10), 1), 10)
+      : 2
     
     // Round coordinates for cache key (4 decimal places ≈ 11m precision)
     const roundedLat = Math.round((lat as number) * 10000) / 10000

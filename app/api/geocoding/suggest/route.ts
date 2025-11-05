@@ -62,7 +62,7 @@ async function suggestHandler(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q')
     const limitParam = searchParams.get('limit')
-    const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10), 1), 10) : 8
+    const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10), 1), 10) : 2
     const latParam = searchParams.get('lat')
     const lngParam = searchParams.get('lng')
     const userLat = latParam ? parseFloat(latParam) : undefined

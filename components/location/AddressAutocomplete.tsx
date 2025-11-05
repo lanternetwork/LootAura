@@ -112,7 +112,7 @@ export default function AddressAutocomplete({
         console.log('[AddressAutocomplete] Fetching Overpass addresses', { prefix: trimmedQuery, userLat, userLng })
       }
       
-      fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 8, controller.signal)
+      fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
         .then((response) => {
           if (requestIdRef.current !== currentId) return
           

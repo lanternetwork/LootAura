@@ -200,7 +200,7 @@ if (typeof globalThis !== 'undefined') {
 }
 
 try {
-  ;(global as any).matchMedia = mockMatchMedia
+  (global as any).matchMedia = mockMatchMedia
 } catch {}
 
 // Console noise guardrail - fail tests on unexpected console output

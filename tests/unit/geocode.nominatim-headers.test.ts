@@ -1,22 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { geocodeAddress } from '@/lib/geocode'
-
-// Mock fetch globally
-const mockFetch = vi.fn()
-global.fetch = mockFetch as any
 
 // Mock process.env
 const originalEnv = process.env
 
 describe('Nominatim Headers', () => {
+  let mockFetch: ReturnType<typeof vi.fn>
+
   beforeEach(() => {
     vi.resetModules()
-    mockFetch.mockClear()
     process.env = { ...originalEnv }
+    // Use vi.stubGlobal to properly mock fetch for module imports
+    mockFetch = vi.fn()
+    vi.stubGlobal('fetch', mockFetch)
   })
 
   afterEach(() => {
     process.env = originalEnv
+    vi.restoreAllMocks()
   })
 
   it('should include User-Agent header in Nominatim requests', async () => {
@@ -36,10 +36,13 @@ describe('Nominatim Headers', () => {
       }]
     })
 
-    // Re-import to get fresh module with env
-    const { geocodeAddress } = await import('@/lib/geocode')
+    // Re-import to get fresh module with env and mocked fetch
+    const { geocodeAddress, clearGeocodeCache } = await import('@/lib/geocode')
+    // Clear cache to ensure fresh fetch
+    clearGeocodeCache()
     await geocodeAddress('123 Test St, Louisville, KY')
 
+    expect(mockFetch).toHaveBeenCalledTimes(1)
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('nominatim.openstreetmap.org'),
       expect.objectContaining({
@@ -67,9 +70,11 @@ describe('Nominatim Headers', () => {
       }]
     })
 
-    const { geocodeAddress } = await import('@/lib/geocode')
+    const { geocodeAddress, clearGeocodeCache } = await import('@/lib/geocode')
+    clearGeocodeCache()
     await geocodeAddress('123 Test St, Louisville, KY')
 
+    expect(mockFetch).toHaveBeenCalledTimes(1)
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('email=test%40example.com'),
       expect.any(Object)
@@ -93,9 +98,11 @@ describe('Nominatim Headers', () => {
       }]
     })
 
-    const { geocodeAddress } = await import('@/lib/geocode')
+    const { geocodeAddress, clearGeocodeCache } = await import('@/lib/geocode')
+    clearGeocodeCache()
     await geocodeAddress('123 Test St, Louisville, KY')
 
+    expect(mockFetch).toHaveBeenCalledTimes(1)
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('email=admin%40lootaura.com'),
       expect.objectContaining({

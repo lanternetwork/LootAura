@@ -72,13 +72,17 @@ describe('Suggest Route Integration', () => {
   })
 
   it('should handle 429 rate limit with retry-after', async () => {
-    mockFetch.mockResolvedValueOnce({
+    // Create a mock response that has status 429
+    const mockResponse = {
       ok: false,
       status: 429,
       headers: new Headers({
         'Retry-After': '60'
-      })
-    })
+      }),
+      json: async () => ({ error: 'Rate limit exceeded' })
+    }
+    
+    mockFetch.mockResolvedValueOnce(mockResponse)
 
     const request = new NextRequest('http://localhost:3000/api/geocoding/suggest?q=123%20Main%20St')
     const response = await GET(request)
@@ -113,7 +117,10 @@ describe('Suggest Route Integration', () => {
     const response = await GET(request)
     const data = await response.json()
 
+    expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
+    expect(Array.isArray(data.data)).toBe(true)
+    expect(data.data.length).toBe(1)
     expect(data.data[0]).toHaveProperty('id')
     expect(data.data[0]).toHaveProperty('label')
     expect(data.data[0]).toHaveProperty('lat')

@@ -1,26 +1,27 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { geocodeAddress, clearGeocodeCache } from '@/lib/geocode'
-
-// Mock fetch globally
-const mockFetch = vi.fn()
-global.fetch = mockFetch as any
 
 // Mock Date.now for TTL testing
 const mockNow = vi.fn()
 const originalNow = Date.now
 
 describe('Geocode Cache TTL', () => {
+  let mockFetch: ReturnType<typeof vi.fn>
+
   beforeEach(() => {
     vi.resetModules()
-    mockFetch.mockClear()
     mockNow.mockReturnValue(1000000) // Start at 1M ms
     Date.now = mockNow
-    clearGeocodeCache()
+    // Use vi.stubGlobal to properly mock fetch for module imports
+    mockFetch = vi.fn()
+    vi.stubGlobal('fetch', mockFetch)
+    mockFetch.mockClear()
   })
 
   afterEach(() => {
     Date.now = originalNow
-    clearGeocodeCache()
+    vi.restoreAllMocks()
+    // Import to clear cache
+    import('@/lib/geocode').then(m => m.clearGeocodeCache()).catch(() => {})
   })
 
   it('should cache results for 10 minutes', async () => {
@@ -40,7 +41,8 @@ describe('Geocode Cache TTL', () => {
       }]
     })
 
-    const { geocodeAddress } = await import('@/lib/geocode')
+    const { geocodeAddress, clearGeocodeCache } = await import('@/lib/geocode')
+    clearGeocodeCache()
     
     // First call - should fetch
     const result1 = await geocodeAddress('123 Test St, Louisville, KY')
@@ -71,7 +73,8 @@ describe('Geocode Cache TTL', () => {
       }]
     })
 
-    const { geocodeAddress } = await import('@/lib/geocode')
+    const { geocodeAddress, clearGeocodeCache } = await import('@/lib/geocode')
+    clearGeocodeCache()
     
     // First call - should fetch
     await geocodeAddress('123 Test St, Louisville, KY')
@@ -96,7 +99,8 @@ describe('Geocode Cache TTL', () => {
       }]
     })
 
-    const { geocodeAddress } = await import('@/lib/geocode')
+    const { geocodeAddress, clearGeocodeCache } = await import('@/lib/geocode')
+    clearGeocodeCache()
     
     // Fill cache with 101 entries
     for (let i = 0; i < 101; i++) {
@@ -132,6 +136,7 @@ describe('Geocode Cache TTL', () => {
     })
 
     const { geocodeAddress, clearGeocodeCache } = await import('@/lib/geocode')
+    clearGeocodeCache()
     
     // First call - should fetch
     await geocodeAddress('123 Test St, Louisville, KY')

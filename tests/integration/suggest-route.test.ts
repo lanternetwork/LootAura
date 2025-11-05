@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/geocoding/suggest/route'
 
@@ -27,6 +27,8 @@ describe('Suggest Route Integration', () => {
       json: async () => [
         {
           place_id: 123,
+          osm_type: 'N',
+          osm_id: 123,
           display_name: '123 Main St, Louisville, KY',
           lat: '38.2512',
           lon: '-85.7494',
@@ -51,8 +53,8 @@ describe('Suggest Route Integration', () => {
     expect(Array.isArray(data.data)).toBe(true)
     expect(data.data.length).toBe(1)
     expect(data.data[0]).toMatchObject({
-      id: '123',
-      label: '123 Main St, Louisville, KY',
+      id: 'N:123',
+      label: '123, Main St, Louisville, KY, 40201',
       lat: 38.2512,
       lng: -85.7494,
       address: expect.objectContaining({

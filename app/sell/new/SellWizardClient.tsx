@@ -8,6 +8,7 @@ import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { containsUnsavory } from '@/lib/filters/profanity'
 import AddressAutocomplete from '@/components/location/AddressAutocomplete'
+import TimePicker30 from '@/components/TimePicker30'
 
 interface WizardStep {
   id: string
@@ -525,17 +526,14 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Start Time *
           </label>
-          <input
-            type="time"
+          <TimePicker30
             value={formData.time_start || ''}
-            step={1800}
-            onChange={(e) => onChange('time_start', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+            onChange={(t) => onChange('time_start', t)}
             required
           />
-        {errors?.time_start && (
-          <p className="mt-1 text-sm text-red-600">{errors.time_start}</p>
-        )}
+          {errors?.time_start && (
+            <p className="mt-1 text-sm text-red-600">{errors.time_start}</p>
+          )}
         </div>
       </div>
 

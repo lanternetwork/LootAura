@@ -228,16 +228,27 @@ async function suggestHandler(request: NextRequest) {
       data: finalSuggestions
     }
     
-    // Dev-only debug info
+    // Dev-only debug info (also log to console for troubleshooting)
     if (process.env.NODE_ENV === 'development') {
       respBody._debug = {
         viewboxApplied,
         upstreamLimit,
         cacheHit,
         usedCoords: hasCoords,
+        userLat: hasCoords ? userLat : undefined,
+        userLng: hasCoords ? userLng : undefined,
         suggestionsBeforeTrim: suggestions.length,
-        finalCount: finalSuggestions.length
+        finalCount: finalSuggestions.length,
+        distances: hasCoords && suggestions.length > 0 ? suggestions.slice(0, 3).map(s => ({ id: s.id, distanceKm: (s as any).__distanceKm })) : undefined
       }
+      console.log('[SUGGEST]', {
+        query: query.substring(0, 20),
+        hasCoords,
+        viewboxApplied,
+        upstreamLimit,
+        suggestionsCount: finalSuggestions.length,
+        firstThreeDistances: hasCoords && suggestions.length > 0 ? suggestions.slice(0, 3).map(s => ({ id: s.id, distanceKm: (s as any).__distanceKm?.toFixed(2) })) : undefined
+      })
     }
     
     return NextResponse.json(respBody, {

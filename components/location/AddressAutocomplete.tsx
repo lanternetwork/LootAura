@@ -94,6 +94,9 @@ export default function AddressAutocomplete({
       const hadCoords = Boolean(userLat && userLng)
       lastHadCoordsRef.current = hadCoords
       // Always pass coords once available
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AddressAutocomplete] Fetching suggestions', { query: debouncedQuery.substring(0, 20), userLat, userLng })
+      }
       fetchSuggestions(debouncedQuery, userLat, userLng, controller.signal)
         .then((results) => {
           if (requestIdRef.current !== currentId) return
@@ -105,6 +108,9 @@ export default function AddressAutocomplete({
               seen.add(key)
               unique.push(s)
             }
+          }
+          if (process.env.NODE_ENV === 'development' && unique.length > 0) {
+            console.log('[AddressAutocomplete] Received suggestions', { count: unique.length, first: unique[0]?.label })
           }
           setSuggestions(unique)
           setIsOpen(unique.length > 0)

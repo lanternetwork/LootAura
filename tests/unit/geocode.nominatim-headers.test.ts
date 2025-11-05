@@ -9,6 +9,8 @@ const originalEnv = process.env
 describe('Nominatim Headers', () => {
   beforeEach(() => {
     vi.resetModules()
+    // Ensure the real module is used for these tests (override global setup mock)
+    vi.doUnmock('@/lib/geocode')
     mockFetch = vi.fn()
     vi.stubGlobal('fetch', mockFetch)
     process.env = { ...originalEnv }

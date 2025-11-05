@@ -805,10 +805,9 @@ async function postHandler(request: NextRequest) {
     // Allow status from body if provided (for test sales), otherwise default to 'published'
     const saleStatus = body.status === 'draft' || body.status === 'archived' ? body.status : 'published'
     
-    // Build insert payload - only include columns that exist in sales_v2 view
-    // The view is missing cover_image_url and images (migration 055 didn't include them)
-    // We'll omit those for now to avoid schema cache errors
-    const insertPayload: any = {
+    // Build insert payload for sales_v2 view
+    // Attempt to include cover_image_url/images; if schema rejects, we'll gracefully retry without
+    const basePayload: any = {
       title,
       description,
       address,
@@ -825,14 +824,33 @@ async function postHandler(request: NextRequest) {
       status: saleStatus,
       owner_id: user!.id // Server-side binding - never trust client
     }
-    
-    // Note: cover_image_url and images are omitted because sales_v2 view doesn't include them
-    // TODO: Create migration to add these columns to the view
-    
-    const { data, error } = await fromSales
-      .insert(insertPayload)
-      .select()
-      .single()
+    const firstTryPayload = {
+      ...basePayload,
+      cover_image_url: cover_image_url ?? null,
+      images: images ?? null,
+    }
+
+    let data: any | null = null
+    let error: any | null = null
+
+    // First try: include image fields
+    {
+      const res = await fromSales.insert(firstTryPayload).select().single()
+      data = res?.data
+      error = res?.error
+    }
+
+    // If insert failed due to schema (e.g., PGRST204 unknown column), retry without image fields
+    if (error && /schema|column|PGRST204|not exist/i.test(String(error?.message || error?.details || ''))) {
+      const retryRes = await fromSales.insert(basePayload).select().single()
+      if (retryRes?.data) {
+        data = { ...retryRes.data, cover_image_url: cover_image_url ?? null, images: images ?? null }
+        error = null
+      } else {
+        data = retryRes?.data
+        error = retryRes?.error
+      }
+    }
     
     if (error) {
       console.error('[SALES] Insert failed:', { 

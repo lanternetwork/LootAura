@@ -9,6 +9,8 @@ const originalNow = Date.now
 describe('Geocode Cache TTL', () => {
   beforeEach(async () => {
     vi.resetModules()
+    // Ensure the real module is used for these tests (override global setup mock)
+    vi.doUnmock('@/lib/geocode')
     mockFetch = vi.fn()
     vi.stubGlobal('fetch', mockFetch)
     mockNow.mockReturnValue(1000000) // Start at 1M ms

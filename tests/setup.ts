@@ -258,5 +258,11 @@ vitestAfterEach(async () => {
       ;(mod as any).clearGeocodeCache()
     }
   } catch {}
+  try {
+    const route = await import('@/app/api/geocoding/suggest/route')
+    if (typeof (route as any).__clearSuggestCache === 'function') {
+      ;(route as any).__clearSuggestCache()
+    }
+  } catch {}
 })
 

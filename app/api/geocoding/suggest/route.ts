@@ -35,6 +35,11 @@ function setCachedSuggestions(key: string, data: AddressSuggestion[]): void {
   })
 }
 
+// Test-only helper to ensure deterministic behavior across tests
+export function __clearSuggestCache(): void {
+  suggestCache.clear()
+}
+
 export interface AddressSuggestion {
   id: string
   label: string

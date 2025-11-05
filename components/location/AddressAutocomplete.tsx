@@ -38,10 +38,26 @@ export default function AddressAutocomplete({
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [isGeocoding, setIsGeocoding] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [userLat, setUserLat] = useState<number | undefined>(undefined)
+  const [userLng, setUserLng] = useState<number | undefined>(undefined)
   const requestIdRef = useRef(0)
 
   // Debounce search query
   const debouncedQuery = useDebounce(value, 300)
+
+  // Try to capture user location once (for proximity bias)
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLat(pos.coords.latitude)
+          setUserLng(pos.coords.longitude)
+        },
+        () => {},
+        { enableHighAccuracy: false, maximumAge: 600000, timeout: 2000 }
+      )
+    }
+  }, [])
 
   // Fetch suggestions when query changes
   useEffect(() => {
@@ -53,7 +69,7 @@ export default function AddressAutocomplete({
 
     const currentId = ++requestIdRef.current
     setIsLoading(true)
-    fetchSuggestions(debouncedQuery)
+    fetchSuggestions(debouncedQuery, userLat, userLng)
       .then((results) => {
         if (requestIdRef.current !== currentId) return
         // Dedupe by id/osm_id

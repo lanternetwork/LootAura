@@ -61,6 +61,10 @@ async function suggestHandler(request: NextRequest) {
     const query = searchParams.get('q')
     const limitParam = searchParams.get('limit')
     const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10), 1), 10) : 5
+    const latParam = searchParams.get('lat')
+    const lngParam = searchParams.get('lng')
+    const userLat = latParam ? parseFloat(latParam) : undefined
+    const userLng = lngParam ? parseFloat(lngParam) : undefined
     
     if (!query || query.length < 3) {
       return NextResponse.json({
@@ -129,7 +133,7 @@ async function suggestHandler(request: NextRequest) {
       return cc === 'us' || country === 'united states' || country === 'us' || country === 'u.s.' || (!cc && !country)
     })
 
-    const suggestions: AddressSuggestion[] = (usOnly || []).map((item: any, index: number) => ({
+    let suggestions: (AddressSuggestion & { __distanceKm?: number })[] = (usOnly || []).map((item: any, index: number) => ({
       id: `${item.place_id || index}`,
       label: item.display_name || '',
       lat: parseFloat(item.lat) || 0,
@@ -143,6 +147,18 @@ async function suggestHandler(request: NextRequest) {
         country: item.address.country
       } : undefined
     }))
+
+    // If user location provided, compute distance and sort nearest-first (preference, not exclusion)
+    if (Number.isFinite(userLat as number) && Number.isFinite(userLng as number)) {
+      const R = 6371 // km
+      suggestions = suggestions.map(s => {
+        const dLat = ((s.lat || 0) - (userLat as number)) * Math.PI / 180
+        const dLng = ((s.lng || 0) - (userLng as number)) * Math.PI / 180
+        const a = Math.sin(dLat/2) ** 2 + Math.cos((userLat as number) * Math.PI/180) * Math.cos((s.lat || 0) * Math.PI/180) * Math.sin(dLng/2) ** 2
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return { ...s, __distanceKm: R * c }
+      }).sort((a, b) => (a.__distanceKm || 0) - (b.__distanceKm || 0))
+    }
     
     // Cache results
     setCachedSuggestions(cacheKey, suggestions)

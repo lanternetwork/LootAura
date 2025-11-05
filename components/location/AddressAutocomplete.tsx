@@ -232,6 +232,7 @@ export default function AddressAutocomplete({
       .finally(() => {
         if (requestIdRef.current === currentId) setIsLoading(false)
       })
+    }
   }, [debouncedQuery, userLat, userLng])
 
   // If last fetch lacked coords and coords arrive, abort stale request and refetch with coords

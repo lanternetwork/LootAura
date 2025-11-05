@@ -169,6 +169,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     if (formData.zip_code && !/^\d{5}(-\d{4})?$/.test(formData.zip_code)) {
       nextErrors.zip_code = 'ZIP code must be 5 digits or 5+4 format'
     }
+    if (!formData.lat || !formData.lng) {
+      nextErrors.address = 'Please select an address from the suggestions to get location coordinates'
+    }
     if (!formData.date_start) nextErrors.date_start = 'Start date is required'
     if (!formData.time_start) nextErrors.time_start = 'Start time is required'
     
@@ -543,6 +546,8 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
             onChange('city', place.city)
             onChange('state', place.state)
             onChange('zip_code', place.zip)
+            onChange('lat', place.lat)
+            onChange('lng', place.lng)
           }}
           placeholder="Start typing your address..."
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"

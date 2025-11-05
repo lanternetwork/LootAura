@@ -17,7 +17,7 @@ export default function TimePicker30({
   const { hour12, minute, ampm } = useMemo(() => {
     if (!value || !value.includes(':')) return { hour12: 9, minute: '00', ampm: 'AM' as 'AM' | 'PM' }
     const [hStr, mStr] = value.split(':')
-    let h = Math.max(0, Math.min(23, parseInt(hStr, 10) || 0))
+    const h = Math.max(0, Math.min(23, parseInt(hStr, 10) || 0))
     const m = (parseInt(mStr, 10) || 0) >= 30 ? '30' : '00'
     const am = h < 12
     const hr12 = h % 12 === 0 ? 12 : h % 12

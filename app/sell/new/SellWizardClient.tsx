@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
 import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
@@ -242,9 +242,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setLoading(true)
     try {
       // Prepare sale data with cover image
+      // Remove duration_hours from payload (it's only used for client-side calculation)
+      const { duration_hours, ...restFormData } = formData
       const saleData = {
-        ...formData,
-        cover_image_url: photos.length > 0 ? photos[0] : undefined
+        ...restFormData,
+        cover_image_url: photos.length > 0 ? photos[0] : undefined,
+        images: photos.length > 1 ? photos.slice(1) : undefined
       }
 
       const response = await fetch('/api/sales', {
@@ -256,15 +259,19 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       })
 
       if (response.ok) {
-        const { sale } = await response.json()
+        const result = await response.json()
+        const sale = result.sale || result
         // Clear draft after successful submission
         localStorage.removeItem('sale_draft')
         router.push(`/sales/${sale.id}`)
       } else {
-        console.error('Failed to create sale')
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create sale' }))
+        console.error('Failed to create sale:', errorData)
+        setSubmitError(errorData.error || errorData.details || 'Failed to create sale')
       }
     } catch (error) {
       console.error('Error creating sale:', error)
+      setSubmitError(error instanceof Error ? error.message : 'Failed to create sale')
     } finally {
       setLoading(false)
     }
@@ -301,14 +308,14 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setItems(prev => [...prev, { id: `item-${Date.now()}-${Math.random()}`, name: '', price: undefined, description: '' }])
   }
 
-  const handleUpdateItem = (index: number, field: string, value: any) => {
+  const handleUpdateItem = useCallback((index: number, field: string, value: any) => {
     setItems(prev => {
       const updated = prev.map((item, i) => 
         i === index ? { ...item, [field]: value } : item
       )
       return updated
     })
-  }
+  }, [])
 
   const handleRemoveItem = (index: number) => {
     setItems(prev => prev.filter((_, i) => i !== index))
@@ -323,7 +330,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       case 2:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
       case 3:
-        return <ReviewStep formData={formData} photos={photos} items={items} onPublish={handleSubmit} loading={loading} />
+        return <ReviewStep formData={formData} photos={photos} items={items} onPublish={handleSubmit} loading={loading} submitError={submitError} />
       default:
         return null
     }
@@ -826,12 +833,13 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
-function ReviewStep({ formData, photos, items, onPublish, loading }: {
+function ReviewStep({ formData, photos, items, onPublish, loading, submitError }: {
   formData: Partial<SaleInput>,
   photos: string[],
   items: Array<{ id?: string; name: string; price?: number; description?: string }>,
   onPublish: () => void,
-  loading: boolean
+  loading: boolean,
+  submitError?: string | null
 }) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)

@@ -2,6 +2,46 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+// Type definitions for Google Maps (if available)
+declare global {
+  interface Window {
+    google?: {
+      maps?: {
+        places?: {
+          Autocomplete: new (
+            inputField: HTMLInputElement,
+            options?: {
+              types?: string[]
+              componentRestrictions?: { country: string }
+              fields?: string[]
+            }
+          ) => {
+            getPlace: () => {
+              address_components?: Array<{
+                long_name: string
+                short_name: string
+                types: string[]
+              }>
+              formatted_address?: string
+              geometry?: {
+                location?: {
+                  lat: () => number
+                  lng: () => number
+                }
+              }
+            }
+            addListener: (event: string, callback: () => void) => void
+          }
+          AutocompleteService?: unknown
+        }
+        event?: {
+          clearInstanceListeners: (instance: unknown) => void
+        }
+      }
+    }
+  }
+}
+
 interface AddressAutocompleteProps {
   value: string
   onChange: (address: string) => void
@@ -29,7 +69,7 @@ export default function AddressAutocomplete({
   error
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
+  const autocompleteRef = useRef<InstanceType<typeof window.google.maps.places.Autocomplete> | null>(null)
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
@@ -43,7 +83,9 @@ export default function AddressAutocomplete({
       document.head.appendChild(script)
       
       return () => {
-        document.head.removeChild(script)
+        if (document.head.contains(script)) {
+          document.head.removeChild(script)
+        }
       }
     } else if (window.google?.maps?.places) {
       setIsLoaded(true)
@@ -51,10 +93,11 @@ export default function AddressAutocomplete({
   }, [])
 
   useEffect(() => {
-    if (!isLoaded || !inputRef.current || autocompleteRef.current) return
+    if (!isLoaded || !inputRef.current || autocompleteRef.current || !window.google?.maps?.places?.Autocomplete) return
 
     // Initialize autocomplete
-    const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
+    const Autocomplete = window.google.maps.places.Autocomplete
+    const autocomplete = new Autocomplete(inputRef.current, {
       types: ['address'],
       componentRestrictions: { country: 'us' },
       fields: ['address_components', 'formatted_address', 'geometry']
@@ -74,7 +117,7 @@ export default function AddressAutocomplete({
       let state = ''
       let zip = ''
 
-      place.address_components?.forEach((component) => {
+      place.address_components?.forEach((component: { long_name: string; short_name: string; types: string[] }) => {
         const types = component.types
         if (types.includes('street_number')) {
           streetNumber = component.long_name
@@ -114,8 +157,8 @@ export default function AddressAutocomplete({
     autocompleteRef.current = autocomplete
 
     return () => {
-      if (autocompleteRef.current) {
-        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current)
+      if (autocompleteRef.current && window.google?.maps?.event) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current)
       }
     }
   }, [isLoaded, onChange, onPlaceSelected])

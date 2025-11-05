@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { geocodeAddress } from '@/lib/geocode'
 
 // Type definitions for Google Maps (if available)
 declare global {
@@ -72,6 +73,7 @@ export default function AddressAutocomplete({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const autocompleteRef = useRef<any>(null)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isGeocoding, setIsGeocoding] = useState(false)
 
   useEffect(() => {
     // Only load if API key is configured
@@ -173,25 +175,73 @@ export default function AddressAutocomplete({
     }
   }, [isLoaded, onChange, onPlaceSelected])
 
+  // Handle geocoding when Google Places API is not available
+  const handleGeocode = async () => {
+    if (!value || value.length < 5 || !onPlaceSelected) return
+    
+    setIsGeocoding(true)
+    try {
+      const result = await geocodeAddress(value)
+      if (result) {
+        // Extract city, state, zip from formatted address or use separate fields
+        const city = result.city || ''
+        const state = result.state || ''
+        const zip = result.zip || ''
+        
+        onPlaceSelected({
+          address: result.formatted_address,
+          city,
+          state,
+          zip,
+          lat: result.lat,
+          lng: result.lng
+        })
+      } else {
+        console.warn('Geocoding failed for address:', value)
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error)
+    } finally {
+      setIsGeocoding(false)
+    }
+  }
+
   // Fallback if Google Places API is not available
   if (!process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY) {
     return (
       <div>
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={className}
-          required={required}
-          minLength={5}
-        />
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={handleGeocode}
+            placeholder={placeholder}
+            className={className}
+            required={required}
+            minLength={5}
+            disabled={isGeocoding}
+          />
+          {value && value.length >= 5 && onPlaceSelected && (
+            <button
+              type="button"
+              onClick={handleGeocode}
+              disabled={isGeocoding}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              {isGeocoding ? 'Looking up...' : 'Get Location'}
+            </button>
+          )}
+        </div>
         {error && (
           <p className="mt-1 text-sm text-red-600">{error}</p>
         )}
-        {value && value.length < 5 && (
+        {value && value.length < 5 && !error && (
           <p className="mt-1 text-xs text-gray-500">Address must be at least 5 characters</p>
+        )}
+        {!process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY && value.length >= 5 && !error && (
+          <p className="mt-1 text-xs text-gray-500">Enter your address and click "Get Location" to find coordinates</p>
         )}
       </div>
     )

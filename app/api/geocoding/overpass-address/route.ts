@@ -97,10 +97,14 @@ async function overpassHandler(request: NextRequest) {
     if (cached) {
       // Re-sort cached results by distance from actual (non-rounded) coordinates
       // This ensures accuracy even when cache key used rounded coordinates
+      const userLat = lat as number
+      const userLng = lng as number
+      
       const cachedWithDistance = cached.map(addr => ({
         ...addr,
-        distanceM: haversineMeters(lat as number, lng as number, addr.lat, addr.lng)
+        distanceM: haversineMeters(userLat, userLng, addr.lat, addr.lng)
       }))
+      .filter(addr => addr.distanceM <= OVERPASS_RADIUS_M) // Only include results within radius
       
       cachedWithDistance.sort((a, b) => {
         const distDiff = a.distanceM - b.distanceM
@@ -151,10 +155,23 @@ async function overpassHandler(request: NextRequest) {
     }
     
     // Build Overpass query
+    const userLat = lat as number
+    const userLng = lng as number
+    
+    if (enableDebug) {
+      console.log('[OVERPASS] Query parameters:', {
+        prefix,
+        userLat,
+        userLng,
+        radiusM: OVERPASS_RADIUS_M,
+        radiusKm: (OVERPASS_RADIUS_M / 1000).toFixed(2)
+      })
+    }
+    
     const query = buildOverpassAddressQuery(
       prefix,
-      lat as number,
-      lng as number,
+      userLat,
+      userLng,
       OVERPASS_RADIUS_M,
       OVERPASS_TIMEOUT_SEC
     )
@@ -235,18 +252,46 @@ async function overpassHandler(request: NextRequest) {
     // Parse and normalize
     const normalized = parseOverpassElements(json)
     
-    // Calculate distances and sort
-    const withDistance: (NormalizedAddress & { distanceM: number })[] = normalized.map(addr => ({
-      ...addr,
-      distanceM: haversineMeters(lat as number, lng as number, addr.lat, addr.lng)
-    }))
+    // Calculate distances and filter by radius (userLat/userLng already defined above)
+    const withDistance: (NormalizedAddress & { distanceM: number })[] = normalized
+      .map(addr => {
+        const distanceM = haversineMeters(userLat, userLng, addr.lat, addr.lng)
+        return {
+          ...addr,
+          distanceM
+        }
+      })
+      .filter(addr => {
+        const withinRadius = addr.distanceM <= OVERPASS_RADIUS_M
+        if (enableDebug && !withinRadius) {
+          console.log('[OVERPASS] Filtered out (outside radius):', {
+            label: formatLabel(addr),
+            distanceM: Math.round(addr.distanceM),
+            distanceKm: (addr.distanceM / 1000).toFixed(2),
+            radiusM: OVERPASS_RADIUS_M
+          })
+        }
+        return withinRadius
+      }) // Only include results within radius
     
-    // Sort by distance (ascending)
+    // Sort by distance (ascending) - closest first
     withDistance.sort((a, b) => {
       const distDiff = a.distanceM - b.distanceM
       if (distDiff !== 0) return distDiff
       return a.upstreamIndex - b.upstreamIndex
     })
+    
+    if (enableDebug) {
+      console.log('[OVERPASS] Before sorting:', {
+        normalizedCount: normalized.length,
+        withinRadius: withDistance.length,
+        distances: withDistance.map(addr => ({
+          label: formatLabel(addr),
+          distanceM: Math.round(addr.distanceM),
+          distanceKm: (addr.distanceM / 1000).toFixed(2)
+        }))
+      })
+    }
     
     // Convert to AddressSuggestion format and trim to limit
     const suggestions: AddressSuggestion[] = withDistance.slice(0, limit).map((addr) => ({
@@ -286,15 +331,23 @@ async function overpassHandler(request: NextRequest) {
           distanceKm: (addr.distanceM / 1000).toFixed(2)
         }))
       }
-      console.log('[OVERPASS] Sorted results:', {
+      console.log('[OVERPASS] Sorted results (final):', {
         prefix,
-        userCoords: [lat, lng],
+        userCoords: [userLat, userLng],
         count: suggestions.length,
-        distances: withDistance.slice(0, 5).map(addr => ({
+        limit,
+        distances: withDistance.slice(0, limit).map((addr, idx) => ({
+          index: idx,
           label: formatLabel(addr),
           distanceM: Math.round(addr.distanceM),
-          distanceKm: (addr.distanceM / 1000).toFixed(2)
-        }))
+          distanceKm: (addr.distanceM / 1000).toFixed(2),
+          coords: [addr.lat, addr.lng]
+        })),
+        firstResult: suggestions[0] ? {
+          label: suggestions[0].label,
+          distanceM: Math.round(withDistance[0]?.distanceM || 0),
+          distanceKm: ((withDistance[0]?.distanceM || 0) / 1000).toFixed(2)
+        } : null
       })
     }
     

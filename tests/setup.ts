@@ -133,45 +133,9 @@ vi.mock('@/lib/supabase/server', () => {
   }
 })
 
-// Geocode mock ensuring non-null for valid addresses
-// @ts-ignore vitest mock hoisting in test env
-vi.mock('@/lib/geocode', () => ({
-  geocodeAddress: vi.fn(async (addr: string) => {
-    if (!addr || /invalid|fail/i.test(addr)) return null
-    return {
-      lat: 38.1405,
-      lng: -85.6936,
-      formatted_address: '123 Test St, Louisville, KY',
-      city: 'Louisville',
-      state: 'KY',
-      zip: '40201',
-    }
-  }),
-  clearGeocodeCache: vi.fn(),
-}))
+// Prefer real geocode module in combination with MSW; keep minimal mocks local to specific tests
 
-// Fetch mock for Nominatim fallback used by geocode module (always override)
-const g: any = globalThis as any
-g.fetch = vi.fn(async (input: any) => {
-  const url = typeof input === 'string' ? input : input?.url ?? ''
-  if (/nominatim\.openstreetmap\.org/.test(url)) {
-    if (/invalid|fail/i.test(url)) {
-      return new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    }
-    return new Response(
-      JSON.stringify([
-        {
-          lat: '38.1405',
-          lon: '-85.6936',
-          display_name: '123 Test St, Louisville, KY',
-          address: { city: 'Louisville', state: 'KY', postcode: '40201' },
-        },
-      ]),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
-  return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-})
+// Do not globally stub fetch; MSW server (tests/setup/msw.server.ts) will intercept network calls
 
 // Mock window.matchMedia for JSDOM test environment (guard Node environment)
 const mockMatchMedia = vi.fn().mockImplementation((query: string) => ({

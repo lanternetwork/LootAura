@@ -6,7 +6,10 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
-    setupFiles: [path.resolve(__dirname, 'tests/setup.ts')],
+    setupFiles: [
+      path.resolve(__dirname, 'tests/setup/msw.server.ts'),
+      path.resolve(__dirname, 'tests/setup.ts'),
+    ],
     globals: true,
     exclude: [
       '**/node_modules/**',

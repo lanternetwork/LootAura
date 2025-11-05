@@ -170,7 +170,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       nextErrors.zip_code = 'ZIP code must be 5 digits or 5+4 format'
     }
     if (!formData.lat || !formData.lng) {
-      nextErrors.address = 'Please select an address from the suggestions to get location coordinates'
+      nextErrors.address = 'Please enter a complete address (street, city, state) and leave the field to get location coordinates'
     }
     if (!formData.date_start) nextErrors.date_start = 'Start date is required'
     if (!formData.time_start) nextErrors.time_start = 'Start time is required'

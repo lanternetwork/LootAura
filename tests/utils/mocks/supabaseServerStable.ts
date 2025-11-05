@@ -53,3 +53,5 @@ export function makeStableSupabaseClient() {
   return client
 }
 
+export default makeStableSupabaseClient
+

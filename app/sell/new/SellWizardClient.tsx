@@ -314,9 +314,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
   const handleUpdateItem = useCallback((index: number, field: string, value: any) => {
     setItems(prev => {
-      const updated = prev.map((item, i) => 
-        i === index ? { ...item, [field]: value } : item
-      )
+      const updated = [...prev]
+      if (updated[index]) {
+        updated[index] = { ...updated[index], [field]: value }
+      }
       return updated
     })
   }, [])

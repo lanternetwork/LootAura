@@ -43,6 +43,8 @@ export default function AddressAutocomplete({
   const abortRef = useRef<AbortController | null>(null)
   const lastHadCoordsRef = useRef<boolean>(false)
   const requestIdRef = useRef(0)
+  const geoWaitRef = useRef<boolean>(false)
+  const firstRequestRef = useRef<boolean>(true)
 
   // Debounce search query
   const debouncedQuery = useDebounce(value, 300)
@@ -50,20 +52,29 @@ export default function AddressAutocomplete({
   // Try to capture user location once (for proximity bias)
   useEffect(() => {
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      geoWaitRef.current = true
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           setUserLat(pos.coords.latitude)
           setUserLng(pos.coords.longitude)
+          geoWaitRef.current = false
         },
-        () => {},
+        () => {
+          geoWaitRef.current = false
+        },
         { enableHighAccuracy: false, maximumAge: 600000, timeout: 2000 }
       )
+      // Fallback timeout if geolocation takes too long
+      setTimeout(() => {
+        geoWaitRef.current = false
+      }, 400)
     }
   }, [])
 
   // Fetch suggestions when query changes
   useEffect(() => {
-    if (!debouncedQuery || debouncedQuery.length < 2) {
+    // Enforce min 3 chars (match API requirement)
+    if (!debouncedQuery || debouncedQuery.length < 3) {
       setSuggestions([])
       setIsOpen(false)
       return
@@ -71,9 +82,10 @@ export default function AddressAutocomplete({
     const currentId = ++requestIdRef.current
     setIsLoading(true)
 
-    // Wait briefly (≤400ms) for geolocation on first call without coords
-    const shouldWait = !userLat || !userLng
+    // Wait up to 400ms for geolocation on first request
+    const shouldWait = firstRequestRef.current && geoWaitRef.current && (!userLat || !userLng)
     const delay = shouldWait ? 400 : 0
+    firstRequestRef.current = false
 
     const timer = setTimeout(() => {
       if (abortRef.current) abortRef.current.abort()
@@ -81,6 +93,7 @@ export default function AddressAutocomplete({
       abortRef.current = controller
       const hadCoords = Boolean(userLat && userLng)
       lastHadCoordsRef.current = hadCoords
+      // Always pass coords once available
       fetchSuggestions(debouncedQuery, userLat, userLng, controller.signal)
         .then((results) => {
           if (requestIdRef.current !== currentId) return
@@ -112,9 +125,9 @@ export default function AddressAutocomplete({
     return () => clearTimeout(timer)
   }, [debouncedQuery, userLat, userLng])
 
-  // If last fetch lacked coords and coords arrive, refetch with coords
+  // If last fetch lacked coords and coords arrive, abort stale request and refetch with coords
   useEffect(() => {
-    if (!debouncedQuery || debouncedQuery.length < 2) return
+    if (!debouncedQuery || debouncedQuery.length < 3) return
     if (!userLat || !userLng) return
     if (lastHadCoordsRef.current) return
     const currentId = ++requestIdRef.current

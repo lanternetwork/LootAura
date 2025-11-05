@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
+import { haversineMeters } from '@/lib/geo/distance'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -91,27 +92,39 @@ async function suggestHandler(request: NextRequest) {
     
     // Fetch from Nominatim
     const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
-    // Restrict to United States only using countrycodes=us
+    const hasCoords = Number.isFinite(userLat as number) && Number.isFinite(userLng as number)
     const base = new URL('https://nominatim.openstreetmap.org/search')
-    base.searchParams.set('format', 'json')
+    base.searchParams.set('format', 'jsonv2')
     base.searchParams.set('addressdetails', '1')
     base.searchParams.set('countrycodes', 'us')
-    const upstreamLimit = Number.isFinite(userLat as number) && Number.isFinite(userLng as number) ? 20 : 7
+    const upstreamLimit = hasCoords ? 30 : 7
     base.searchParams.set('limit', String(upstreamLimit))
-    base.searchParams.set('q', query)
     base.searchParams.set('email', email)
-    // Proximity bias: include a viewbox around the user to influence ranking (not bounded)
-    if (Number.isFinite(userLat as number) && Number.isFinite(userLng as number)) {
-      const radiusKm = 50
-      const dLat = radiusKm / 111
-      const dLng = radiusKm / (111 * Math.cos((userLat as number) * Math.PI / 180))
-      const top = (userLat as number) + dLat
-      const bottom = (userLat as number) - dLat
-      const left = (userLng as number) - dLng
-      const right = (userLng as number) + dLng
+    
+    // Handle numeric queries (like "5001") with structured search
+    const isNumericQuery = /^\d{1,6}$/.test(query.trim())
+    let viewboxApplied = false
+    if (hasCoords) {
+      // ~25km viewbox for proximity bias
+      const d = 25 / 111.32 // ≈ 0.225
+      const minLon = (userLng as number) - d
+      const minLat = (userLat as number) - d
+      const maxLon = (userLng as number) + d
+      const maxLat = (userLat as number) + d
       // Nominatim expects viewbox as: left,top,right,bottom (lon,lat)
-      base.searchParams.set('viewbox', `${left},${top},${right},${bottom}`)
+      base.searchParams.set('viewbox', `${minLon},${maxLat},${maxLon},${minLat}`)
       base.searchParams.set('bounded', '0')
+      viewboxApplied = true
+      
+      if (isNumericQuery) {
+        // For numeric queries, use structured search with street number
+        base.searchParams.set('street', query)
+        // Optionally add city/state from reverse geocode (future enhancement)
+      } else {
+        base.searchParams.set('q', query)
+      }
+    } else {
+      base.searchParams.set('q', query)
     }
     const url = base.toString()
     
@@ -191,14 +204,10 @@ async function suggestHandler(request: NextRequest) {
     }))
 
     // If user location provided, compute distance and sort nearest-first (preference, not exclusion)
-    if (Number.isFinite(userLat as number) && Number.isFinite(userLng as number)) {
-      const R = 6371 // km
+    if (hasCoords) {
       suggestions = suggestions.map(s => {
-        const dLat = ((s.lat || 0) - (userLat as number)) * Math.PI / 180
-        const dLng = ((s.lng || 0) - (userLng as number)) * Math.PI / 180
-        const a = Math.sin(dLat/2) ** 2 + Math.cos((userLat as number) * Math.PI/180) * Math.cos((s.lat || 0) * Math.PI/180) * Math.sin(dLng/2) ** 2
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        return { ...s, __distanceKm: R * c }
+        const distM = haversineMeters(userLat as number, userLng as number, s.lat || 0, s.lng || 0)
+        return { ...s, __distanceKm: distM / 1000 }
       }).sort((a, b) => {
         const d = (a.__distanceKm || 0) - (b.__distanceKm || 0)
         if (d !== 0) return d
@@ -208,15 +217,32 @@ async function suggestHandler(request: NextRequest) {
     // Trim to client limit and strip private fields
     const finalSuggestions: AddressSuggestion[] = suggestions.slice(0, limit).map(({ __distanceKm: _d, upstreamIndex: _i, ...rest }) => rest)
     
-    // Cache results with TTL dependent on coords
-    setCachedSuggestions(cacheKey, finalSuggestions, (Number.isFinite(userLat as number) && Number.isFinite(userLng as number)) ? TTL_WITH_COORDS_MS : TTL_NO_COORDS_MS)
+    // Cache results with TTL dependent on coords (cacheHit was already determined above)
+    const cacheHit = cached !== null
+    if (!cacheHit) {
+      setCachedSuggestions(cacheKey, finalSuggestions, hasCoords ? TTL_WITH_COORDS_MS : TTL_NO_COORDS_MS)
+    }
     
-    return NextResponse.json({
+    const response: any = {
       ok: true,
       data: finalSuggestions
-    }, {
+    }
+    
+    // Dev-only debug info
+    if (process.env.NODE_ENV === 'development') {
+      response._debug = {
+        viewboxApplied,
+        upstreamLimit,
+        cacheHit,
+        usedCoords: hasCoords,
+        suggestionsBeforeTrim: suggestions.length,
+        finalCount: finalSuggestions.length
+      }
+    }
+    
+    return NextResponse.json(response, {
       headers: {
-        'Cache-Control': Number.isFinite(userLat as number) && Number.isFinite(userLng as number) ? 'public, max-age=60' : 'public, max-age=5'
+        'Cache-Control': hasCoords ? 'public, max-age=60' : 'public, max-age=5'
       }
     })
     

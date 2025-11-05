@@ -87,8 +87,8 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
         value: "default-src 'self'; " +
-                   // Allow runtime scripts from self; keep eval for Next dev/runtime; allow Vercel Live script in previews
-                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live; " +
+                   // Allow runtime scripts from self; keep eval for Next dev/runtime; allow Vercel Live script in previews; allow Google Maps Places API
+                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://maps.googleapis.com; " +
                    // Allow Mapbox CSS
                    "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Some browsers use style-src-elem separately

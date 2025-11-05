@@ -302,9 +302,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }
 
   const handleUpdateItem = (index: number, field: string, value: any) => {
-    setItems(prev => prev.map((item, i) => 
-      i === index ? { ...item, [field]: value } : item
-    ))
+    setItems(prev => {
+      const updated = prev.map((item, i) => 
+        i === index ? { ...item, [field]: value } : item
+      )
+      return updated
+    })
   }
 
   const handleRemoveItem = (index: number) => {

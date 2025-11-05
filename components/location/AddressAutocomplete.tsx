@@ -74,6 +74,11 @@ export default function AddressAutocomplete({
   const [isLoaded, setIsLoaded] = useState(false)
 
   useEffect(() => {
+    // Only load if API key is configured
+    if (!process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY) {
+      return
+    }
+
     // Load Google Maps Places API script
     if (typeof window !== 'undefined' && !window.google?.maps?.places) {
       const script = document.createElement('script')
@@ -81,6 +86,10 @@ export default function AddressAutocomplete({
       script.async = true
       script.defer = true
       script.onload = () => setIsLoaded(true)
+      script.onerror = () => {
+        console.warn('Failed to load Google Maps Places API')
+        setIsLoaded(false)
+      }
       document.head.appendChild(script)
       
       return () => {

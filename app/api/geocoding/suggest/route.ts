@@ -137,7 +137,7 @@ async function suggestHandler(request: NextRequest) {
     
     // Fetch from Nominatim (with structured search if applicable)
     let url = base.toString()
-    let response = await fetch(url, {
+    const response = await fetch(url, {
       headers: {
         'User-Agent': `LootAura/1.0 (${email})`
       }

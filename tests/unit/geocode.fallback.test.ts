@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { geocodeAddress } from '@/lib/geocode'
 import { getAddressFixtures } from '@/tests/utils/mocks'
 
 // Use the global MSW handlers from tests/setup.ts
@@ -8,13 +7,13 @@ import { getAddressFixtures } from '@/tests/utils/mocks'
 const originalEnv = process.env
 
 describe('Geocoding Fallback', () => {
-  beforeEach(() => {
-    vi.unmock('@/lib/geocode')
-  })
-  beforeEach(() => {
+  let geocodeAddress: (addr: string) => Promise<any>
+  beforeEach(async () => {
     vi.resetModules()
+    vi.doUnmock('@/lib/geocode')
     process.env = { ...originalEnv }
     vi.clearAllMocks()
+    ;({ geocodeAddress } = await import('@/lib/geocode'))
   })
 
   afterEach(() => {

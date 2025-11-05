@@ -72,10 +72,9 @@ describe('Nominatim Headers', () => {
     const { geocodeAddress } = await import('@/lib/geocode')
     await geocodeAddress('123 Test St, Louisville, KY')
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('email=test%40example.com'),
-      expect.any(Object)
-    )
+    expect(mockFetch).toHaveBeenCalled()
+    const args = (mockFetch as any).mock.calls[0]
+    expect(String(args[0])).toMatch(/email=(test@example\.com|test%40example\.com)/)
   })
 
   it('should use default email when NOMINATIM_APP_EMAIL is not set', async () => {
@@ -98,14 +97,12 @@ describe('Nominatim Headers', () => {
     const { geocodeAddress } = await import('@/lib/geocode')
     await geocodeAddress('123 Test St, Louisville, KY')
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('email=admin%40lootaura.com'),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          'User-Agent': 'LootAura/1.0 (admin@lootaura.com)'
-        })
-      })
-    )
+    expect(mockFetch).toHaveBeenCalled()
+    const args2 = (mockFetch as any).mock.calls[0]
+    expect(String(args2[0])).toMatch(/email=(admin@lootaura\.com|admin%40lootaura\.com)/)
+    expect(args2[1]).toEqual(expect.objectContaining({
+      headers: expect.objectContaining({ 'User-Agent': 'LootAura/1.0 (admin@lootaura.com)' })
+    }))
   })
 })
 

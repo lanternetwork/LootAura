@@ -17,7 +17,7 @@ describe('Resend Confirmation Integration', () => {
   })
 
   it('should show resend link and handle successful resend', async () => {
-    ;(fetch as any).mockResolvedValueOnce({
+    (fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ message: 'Confirmation email sent' }),
     } as Response)
@@ -52,7 +52,7 @@ describe('Resend Confirmation Integration', () => {
   })
 
   it('should handle resend failure', async () => {
-    ;(fetch as any).mockResolvedValueOnce({
+    (fetch as any).mockResolvedValueOnce({
       ok: false,
       json: async () => ({ message: 'Rate limit exceeded' }),
     } as Response)
@@ -68,7 +68,7 @@ describe('Resend Confirmation Integration', () => {
   })
 
   it('should handle network error', async () => {
-    ;(fetch as any).mockRejectedValueOnce(new Error('Network error'))
+    (fetch as any).mockRejectedValueOnce(new Error('Network error'))
 
     render(<ResendConfirmation email="test@example.com" />)
 

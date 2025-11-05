@@ -37,7 +37,7 @@ function setCachedSuggestions(key: string, data: AddressSuggestion[]): void {
 
 // Test-only hook: attach a clearing helper to global to avoid Next.js Route export validation errors
 if (process.env.NODE_ENV === 'test') {
-  ;(globalThis as any).__clearSuggestCache = () => suggestCache.clear()
+  (globalThis as any).__clearSuggestCache = () => suggestCache.clear()
 }
 
 export interface AddressSuggestion {

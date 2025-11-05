@@ -1,14 +1,14 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 
-import { vi } from 'vitest'
+import { vi, afterEach as vitestAfterEach } from 'vitest'
 import { makeStableSupabaseClient } from './utils/mocks/supabaseServerStable'
 
 // never re-create this per test, keep it stable
 const stableSupabase = makeStableSupabaseClient()
 
 // Ensure rate limiting is bypassed in tests
-;(process.env as any).RATE_LIMITING_ENABLED = 'false'
+(process.env as any).RATE_LIMITING_ENABLED = 'false'
 
 // Mock next/image to avoid optimization/config errors in JSDOM
 // @ts-ignore vitest mock hoisting in test env
@@ -250,12 +250,11 @@ console.warn = (...args: any[]) => {
 }
 
 // Clear geocode caches after each test to ensure determinism for TTL-based tests
-import { afterEach as vitestAfterEach } from 'vitest'
 vitestAfterEach(async () => {
   try {
     const mod = await import('@/lib/geocode')
     if (typeof (mod as any).clearGeocodeCache === 'function') {
-      ;(mod as any).clearGeocodeCache()
+      (mod as any).clearGeocodeCache()
     }
   } catch {}
   try {

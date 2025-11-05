@@ -20,6 +20,8 @@ interface AddressAutocompleteProps {
   className?: string
   required?: boolean
   error?: string
+  userLat?: number
+  userLng?: number
 }
 
 export default function AddressAutocomplete({
@@ -29,7 +31,9 @@ export default function AddressAutocomplete({
   placeholder = 'Start typing your address...',
   className = '',
   required = false,
-  error
+  error,
+  userLat: propUserLat,
+  userLng: propUserLng
 }: AddressAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const listboxRef = useRef<HTMLUListElement>(null)
@@ -49,22 +53,30 @@ export default function AddressAutocomplete({
   // Debounce search query
   const debouncedQuery = useDebounce(value, 300)
 
-  // Use IP geolocation (no browser prompt) for proximity bias
+  // Use location from props if provided, otherwise fetch IP geolocation (no browser prompt) for proximity bias
   useEffect(() => {
-    geoWaitRef.current = true
-    fetch('/api/geolocation/ip')
-      .then(res => res.ok ? res.json() : null)
-      .then(ipData => {
-        if (ipData?.lat && ipData?.lng) {
-          setUserLat(ipData.lat)
-          setUserLng(ipData.lng)
-        }
-        geoWaitRef.current = false
-      })
-      .catch(() => {
-        geoWaitRef.current = false
-      })
-  }, [])
+    if (propUserLat && propUserLng) {
+      // Location provided via props (from server-side) - use it directly
+      setUserLat(propUserLat)
+      setUserLng(propUserLng)
+      geoWaitRef.current = false
+    } else {
+      // No props provided - fetch IP geolocation client-side
+      geoWaitRef.current = true
+      fetch('/api/geolocation/ip')
+        .then(res => res.ok ? res.json() : null)
+        .then(ipData => {
+          if (ipData?.lat && ipData?.lng) {
+            setUserLat(ipData.lat)
+            setUserLng(ipData.lng)
+          }
+          geoWaitRef.current = false
+        })
+        .catch(() => {
+          geoWaitRef.current = false
+        })
+    }
+  }, [propUserLat, propUserLng])
 
   // Fetch suggestions when query changes
   useEffect(() => {

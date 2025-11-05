@@ -39,7 +39,7 @@ const WIZARD_STEPS: WizardStep[] = [
   }
 ]
 
-export default function SellWizardClient({ initialData, isEdit: _isEdit = false, saleId: _saleId }: { initialData?: Partial<SaleInput>; isEdit?: boolean; saleId?: string }) {
+export default function SellWizardClient({ initialData, isEdit: _isEdit = false, saleId: _saleId, userLat, userLng }: { initialData?: Partial<SaleInput>; isEdit?: boolean; saleId?: string; userLat?: number; userLng?: number }) {
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
   const [currentStep, setCurrentStep] = useState(0)
@@ -585,6 +585,8 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
             onChange('lng', place.lng)
           }}
           placeholder="Start typing your address..."
+          userLat={userLat}
+          userLng={userLng}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           required
           error={errors?.address}

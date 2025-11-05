@@ -130,6 +130,17 @@ async function overpassHandler(request: NextRequest) {
         return a.lng - b.lng
       })
       
+      // Verify cached results are sorted correctly
+      if (enableDebug && cachedWithDistance.length > 1) {
+        const sorted = cachedWithDistance.every((addr, idx) => {
+          if (idx === 0) return true
+          return addr.distanceM >= cachedWithDistance[idx - 1].distanceM
+        })
+        if (!sorted) {
+          console.error('[OVERPASS] WARNING: Cached results are NOT sorted by distance!')
+        }
+      }
+      
       const sortedCached = cachedWithDistance.map(({ distanceM: _d, ...addr }) => addr)
       
       const respBody: any = {
@@ -159,10 +170,14 @@ async function overpassHandler(request: NextRequest) {
           street: streetParam || undefined,
           userCoords: [lat, lng],
           count: sortedCached.length,
-          distances: cachedWithDistance.slice(0, 5).map(addr => ({
+          firstDistance: cachedWithDistance[0] ? Math.round(cachedWithDistance[0].distanceM) : null,
+          firstDistanceKm: cachedWithDistance[0] ? (cachedWithDistance[0].distanceM / 1000).toFixed(2) : null,
+          distances: cachedWithDistance.slice(0, 5).map((addr, idx) => ({
+            index: idx,
             label: addr.label,
             distanceM: Math.round(addr.distanceM),
-            distanceKm: (addr.distanceM / 1000).toFixed(2)
+            distanceKm: (addr.distanceM / 1000).toFixed(2),
+            coords: [addr.lat, addr.lng]
           }))
         })
       }
@@ -311,6 +326,21 @@ async function overpassHandler(request: NextRequest) {
     
     // Calculate distances and filter by radiusUsed + 500m buffer
     const filterRadius = radiusUsed + 500 // Allow 500m buffer beyond search radius
+    
+    if (enableDebug) {
+      console.log('[OVERPASS] Distance calculation:', {
+        userCoords: [userLat, userLng],
+        normalizedCount: normalized.length,
+        radiusUsedM: radiusUsed,
+        filterRadiusM: filterRadius,
+        sampleAddress: normalized[0] ? {
+          label: formatLabel(normalized[0]),
+          coords: [normalized[0].lat, normalized[0].lng],
+          calculatedDistance: Math.round(haversineMeters(userLat, userLng, normalized[0].lat, normalized[0].lng))
+        } : null
+      })
+    }
+    
     const withDistance: (NormalizedAddress & { distanceM: number })[] = normalized
       .map(addr => {
         const distanceM = haversineMeters(userLat, userLng, addr.lat, addr.lng)
@@ -327,7 +357,9 @@ async function overpassHandler(request: NextRequest) {
             distanceM: Math.round(addr.distanceM),
             distanceKm: (addr.distanceM / 1000).toFixed(2),
             radiusUsedM: radiusUsed,
-            filterRadiusM: filterRadius
+            filterRadiusM: filterRadius,
+            userCoords: [userLat, userLng],
+            addrCoords: [addr.lat, addr.lng]
           })
         }
         return withinRadius
@@ -340,14 +372,37 @@ async function overpassHandler(request: NextRequest) {
       return a.upstreamIndex - b.upstreamIndex
     })
     
+    // Verify sorting is correct (for debugging)
+    if (enableDebug && withDistance.length > 1) {
+      const sorted = withDistance.every((addr, idx) => {
+        if (idx === 0) return true
+        return addr.distanceM >= withDistance[idx - 1].distanceM
+      })
+      if (!sorted) {
+        console.error('[OVERPASS] WARNING: Results are NOT sorted by distance!', {
+          distances: withDistance.map((addr, idx) => ({
+            index: idx,
+            label: formatLabel(addr),
+            distanceM: Math.round(addr.distanceM),
+            distanceKm: (addr.distanceM / 1000).toFixed(2)
+          }))
+        })
+      }
+    }
+    
     if (enableDebug) {
-      console.log('[OVERPASS] Before sorting:', {
+      console.log('[OVERPASS] After sorting:', {
         normalizedCount: normalized.length,
         withinRadius: withDistance.length,
-        distances: withDistance.map(addr => ({
+        firstDistance: withDistance[0] ? Math.round(withDistance[0].distanceM) : null,
+        firstDistanceKm: withDistance[0] ? (withDistance[0].distanceM / 1000).toFixed(2) : null,
+        distances: withDistance.slice(0, 10).map((addr, idx) => ({
+          index: idx,
           label: formatLabel(addr),
           distanceM: Math.round(addr.distanceM),
-          distanceKm: (addr.distanceM / 1000).toFixed(2)
+          distanceKm: (addr.distanceM / 1000).toFixed(2),
+          coords: [addr.lat, addr.lng],
+          userCoords: [userLat, userLng]
         }))
       })
     }

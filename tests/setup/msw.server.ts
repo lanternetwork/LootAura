@@ -19,7 +19,7 @@ const handlers = [
         lat: '38.1405',
         lon: '-85.6936',
         display_name: '123 Test St, Louisville, KY',
-        address: { city: 'Louisville', state: 'KY', postcode: '40201' },
+        address: { city: 'Louisville', state: 'KY', postcode: '40201', country_code: 'us', country: 'United States' },
       },
     ])
   }),

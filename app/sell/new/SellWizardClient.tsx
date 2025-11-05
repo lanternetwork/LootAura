@@ -7,6 +7,7 @@ import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
 import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { containsUnsavory } from '@/lib/filters/profanity'
+import AddressAutocomplete from '@/components/location/AddressAutocomplete'
 
 interface WizardStep {
   id: string
@@ -59,7 +60,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     status: initialData?.status || 'draft'
   })
   const [photos, setPhotos] = useState<string[]>([])
-  const [items, setItems] = useState<Array<{ name: string; price?: number; description?: string; image_url?: string }>>([])
+  const [items, setItems] = useState<Array<{ id: string; name: string; price?: number; description?: string; image_url?: string }>>([])
   const [loading, setLoading] = useState(false)
   const [_errors, setErrors] = useState<Record<string, string>>({})
 
@@ -105,7 +106,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
           const draft = JSON.parse(savedDraft)
           setFormData(draft.formData || {})
           setPhotos(draft.photos || [])
-          setItems(draft.items || [])
+          // Ensure items have IDs when loading from draft
+          const loadedItems = (draft.items || []).map((item: any) => ({
+            ...item,
+            id: item.id || `item-${Date.now()}-${Math.random()}`
+          }))
+          setItems(loadedItems)
           setCurrentStep(draft.currentStep || 0)
         } catch (error) {
           console.error('Error loading draft:', error)
@@ -292,7 +298,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }
 
   const handleAddItem = () => {
-    setItems(prev => [...prev, { name: '', price: undefined, description: '' }])
+    setItems(prev => [...prev, { id: `item-${Date.now()}-${Math.random()}`, name: '', price: undefined, description: '' }])
   }
 
   const handleUpdateItem = (index: number, field: string, value: any) => {
@@ -321,7 +327,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32">
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">List Your Sale</h1>
@@ -363,7 +369,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       </div>
 
       {/* Step Content */}
-      <div className="bg-white rounded-lg shadow-sm p-8">
+      <div className="bg-white rounded-lg shadow-sm p-8 mb-24">
         {renderStep()}
       </div>
 
@@ -518,21 +524,20 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Address *
         </label>
-        <input
-          type="text"
+        <AddressAutocomplete
           value={formData.address || ''}
-          onChange={(e) => onChange('address', e.target.value)}
-          placeholder="Street address (e.g., 123 Main St)"
+          onChange={(address) => onChange('address', address)}
+          onPlaceSelected={(place) => {
+            onChange('address', place.address)
+            onChange('city', place.city)
+            onChange('state', place.state)
+            onChange('zip_code', place.zip)
+          }}
+          placeholder="Start typing your address..."
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           required
-          minLength={5}
+          error={errors?.address}
         />
-        {errors?.address && (
-          <p className="mt-1 text-sm text-red-600">{errors.address}</p>
-        )}
-        {formData.address && formData.address.length < 5 && (
-          <p className="mt-1 text-xs text-gray-500">Address must be at least 5 characters</p>
-        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -693,7 +698,7 @@ function PhotosStep({ photos, onUpload, onRemove, onReorder, onSetCover }: {
 }
 
 function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
-  items: Array<{ name: string; price?: number; description?: string; image_url?: string }>,
+  items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string }>,
   onAdd: () => void,
   onUpdate: (index: number, field: string, value: any) => void,
   onRemove: (index: number) => void
@@ -723,7 +728,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
       ) : (
         <div className="space-y-4">
           {items.map((item, index) => (
-            <div key={index} className="border border-gray-200 rounded-lg p-4">
+            <div key={item.id} className="border border-gray-200 rounded-lg p-4">
               <div className="flex justify-between items-start mb-4">
                 <h4 className="font-medium text-gray-900">Item {index + 1}</h4>
                 <button
@@ -821,7 +826,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
 function ReviewStep({ formData, photos, items, onPublish, loading }: {
   formData: Partial<SaleInput>,
   photos: string[],
-  items: Array<{ name: string; price?: number; description?: string }>,
+  items: Array<{ id?: string; name: string; price?: number; description?: string }>,
   onPublish: () => void,
   loading: boolean
 }) {
@@ -909,7 +914,7 @@ function ReviewStep({ formData, photos, items, onPublish, loading }: {
         </div>
       </div>
       
-      <div className="mt-6">
+      <div className="mt-6 mb-6">
         <button
           onClick={onPublish}
           disabled={loading}

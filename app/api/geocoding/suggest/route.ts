@@ -121,9 +121,12 @@ async function suggestHandler(request: NextRequest) {
     // Normalize to AddressSuggestion format
     // Filter to US-only as a defense-in-depth in case upstream ignores countrycodes
     const usOnly = (data || []).filter((item: any) => {
-      const cc = (item?.address?.country_code || '').toLowerCase()
-      const country = String(item?.address?.country || '').toLowerCase()
-      return cc === 'us' || country === 'united states' || country === 'us' || country === 'u.s.'
+      // If address is missing, upstream was already restricted with countrycodes=us → accept
+      if (!item?.address) return true
+      const cc = String(item.address.country_code || '').toLowerCase()
+      const country = String(item.address.country || '').toLowerCase()
+      // Accept common US indicators; fallback to accept when both are empty (still constrained by upstream param)
+      return cc === 'us' || country === 'united states' || country === 'us' || country === 'u.s.' || (!cc && !country)
     })
 
     const suggestions: AddressSuggestion[] = (usOnly || []).map((item: any, index: number) => ({

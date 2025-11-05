@@ -128,7 +128,7 @@ export interface AddressSuggestion {
 }
 
 export async function fetchSuggestions(query: string, userLat?: number, userLng?: number, signal?: AbortSignal): Promise<AddressSuggestion[]> {
-  if (!query || query.length < 3) {
+  if (!query || query.length < 2) {
     return []
   }
 

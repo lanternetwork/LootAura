@@ -68,16 +68,21 @@ async function suggestHandler(request: NextRequest) {
     const userLat = latParam ? parseFloat(latParam) : undefined
     const userLng = lngParam ? parseFloat(lngParam) : undefined
     
-    if (!query || query.length < 3) {
+    if (!query || query.length < 2) {
       return NextResponse.json({
         ok: false,
-        error: 'Query must be at least 3 characters'
+        code: 'SHORT_QUERY',
+        error: 'Query must be at least 2 characters'
       }, { status: 400 })
     }
     
-    // Check cache (vary by coords)
-    const normQ = query.trim().toLowerCase()
-    const cacheKey = `suggest:v1:q=${normQ}|L=${limit}|lat=${Number.isFinite(userLat as number) ? userLat : '-'}|lng=${Number.isFinite(userLng as number) ? userLng : '-'}`
+    // Normalize: trim, collapse whitespace to single space, preserve full string
+    const trimmedQuery = query.trim().replace(/\s+/g, ' ')
+    const normQ = trimmedQuery.toLowerCase()
+    const hasCoords = Number.isFinite(userLat as number) && Number.isFinite(userLng as number)
+    
+    // Check cache (vary by coords) - don't cache short queries (already rejected above)
+    const cacheKey = `suggest:v1:q=${normQ}|L=${limit}|lat=${hasCoords ? userLat : '-'}|lng=${hasCoords ? userLng : '-'}`
     const cached = getCachedSuggestions(cacheKey)
     if (cached) {
       return NextResponse.json({
@@ -85,25 +90,27 @@ async function suggestHandler(request: NextRequest) {
         data: cached
       }, {
         headers: {
-          'Cache-Control': 'public, max-age=60'
+          'Cache-Control': hasCoords ? 'public, max-age=60' : 'public, max-age=5'
         }
       })
     }
     
     // Fetch from Nominatim
     const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
-    const hasCoords = Number.isFinite(userLat as number) && Number.isFinite(userLng as number)
     const base = new URL('https://nominatim.openstreetmap.org/search')
     base.searchParams.set('format', 'jsonv2')
     base.searchParams.set('addressdetails', '1')
     base.searchParams.set('countrycodes', 'us')
-    const upstreamLimit = hasCoords ? 30 : 7
+    const upstreamLimit = hasCoords ? 30 : 10
     base.searchParams.set('limit', String(upstreamLimit))
     base.searchParams.set('email', email)
     
-    // Handle numeric queries (like "5001") with structured search
-    const isNumericQuery = /^\d{1,6}$/.test(query.trim())
+    // Detect numeric-leading queries (e.g., "5001", "5001 pre")
+    // Use /^\d{1,8}(\s|$)/ to match 1-8 digits followed by space or end of string
+    const isNumericLeading = /^\d{1,8}(\s|$)/.test(trimmedQuery)
     let viewboxApplied = false
+    let useStructuredSearch = false
+    
     if (hasCoords) {
       // ~25km viewbox for proximity bias
       const d = 25 / 111.32 // ≈ 0.225
@@ -111,24 +118,26 @@ async function suggestHandler(request: NextRequest) {
       const minLat = (userLat as number) - d
       const maxLon = (userLng as number) + d
       const maxLat = (userLat as number) + d
-      // Nominatim expects viewbox as: left,top,right,bottom (lon,lat)
+      // Nominatim expects viewbox as: left,top,right,bottom (lon,lat) = minLon,maxLat,maxLon,minLat
       base.searchParams.set('viewbox', `${minLon},${maxLat},${maxLon},${minLat}`)
       base.searchParams.set('bounded', '0')
       viewboxApplied = true
-      
-      if (isNumericQuery) {
-        // For numeric queries, use structured search with street number
-        base.searchParams.set('street', query)
-        // Optionally add city/state from reverse geocode (future enhancement)
-      } else {
-        base.searchParams.set('q', query)
-      }
-    } else {
-      base.searchParams.set('q', query)
     }
-    const url = base.toString()
     
-    const response = await fetch(url, {
+    // For numeric-leading queries, try structured search first
+    if (isNumericLeading) {
+      // Use structured search: street=<FULL_INPUT> (preserve full input including trailing text)
+      base.searchParams.set('street', trimmedQuery)
+      // Include city/state if available (future enhancement: from reverse-geo or chosen location)
+      useStructuredSearch = true
+    } else {
+      // Free-text search
+      base.searchParams.set('q', trimmedQuery)
+    }
+    
+    // Fetch from Nominatim (with structured search if applicable)
+    let url = base.toString()
+    let response = await fetch(url, {
       headers: {
         'User-Agent': `LootAura/1.0 (${email})`
       }
@@ -156,7 +165,41 @@ async function suggestHandler(request: NextRequest) {
       }, { status: response.status })
     }
     
-    const data = await response.json()
+    let data = await response.json()
+    
+    // If structured search returned empty, fallback to free-text search
+    if (useStructuredSearch && (!data || data.length === 0)) {
+      // Retry with free-text search
+      const fallbackBase = new URL('https://nominatim.openstreetmap.org/search')
+      fallbackBase.searchParams.set('format', 'jsonv2')
+      fallbackBase.searchParams.set('addressdetails', '1')
+      fallbackBase.searchParams.set('countrycodes', 'us')
+      fallbackBase.searchParams.set('limit', String(upstreamLimit))
+      fallbackBase.searchParams.set('email', email)
+      fallbackBase.searchParams.set('q', trimmedQuery)
+      
+      if (hasCoords) {
+        const d = 25 / 111.32
+        const minLon = (userLng as number) - d
+        const minLat = (userLat as number) - d
+        const maxLon = (userLng as number) + d
+        const maxLat = (userLat as number) + d
+        fallbackBase.searchParams.set('viewbox', `${minLon},${maxLat},${maxLon},${minLat}`)
+        fallbackBase.searchParams.set('bounded', '0')
+      }
+      
+      url = fallbackBase.toString()
+      response = await fetch(url, {
+        headers: {
+          'User-Agent': `LootAura/1.0 (${email})`
+        }
+      })
+      
+      if (response.ok) {
+        data = await response.json()
+        useStructuredSearch = false // Mark as fallback
+      }
+    }
     
     // Normalize to AddressSuggestion format
     // Filter to US-only as a defense-in-depth in case upstream ignores countrycodes

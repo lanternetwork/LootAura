@@ -48,10 +48,9 @@ export default function AddressAutocomplete({
   const lastHadCoordsRef = useRef<boolean>(false)
   const requestIdRef = useRef(0)
   const geoWaitRef = useRef<boolean>(false)
-  const firstRequestRef = useRef<boolean>(true)
 
-  // Debounce search query
-  const debouncedQuery = useDebounce(value, 300)
+  // Debounce search query (250-300ms range)
+  const debouncedQuery = useDebounce(value, 250)
 
   // Use location from props if provided, otherwise fetch IP geolocation (no browser prompt) for proximity bias
   useEffect(() => {
@@ -80,8 +79,8 @@ export default function AddressAutocomplete({
 
   // Fetch suggestions when query changes
   useEffect(() => {
-    // Enforce min 3 chars (match API requirement)
-    if (!debouncedQuery || debouncedQuery.length < 3) {
+    // Enforce min 2 chars (match API requirement) - don't block on location
+    if (!debouncedQuery || debouncedQuery.length < 2) {
       setSuggestions([])
       setIsOpen(false)
       return
@@ -89,58 +88,51 @@ export default function AddressAutocomplete({
     const currentId = ++requestIdRef.current
     setIsLoading(true)
 
-    // Wait up to 400ms for geolocation on first request
-    const shouldWait = firstRequestRef.current && geoWaitRef.current && (!userLat || !userLng)
-    const delay = shouldWait ? 400 : 0
-    firstRequestRef.current = false
-
-    const timer = setTimeout(() => {
-      if (abortRef.current) abortRef.current.abort()
-      const controller = new AbortController()
-      abortRef.current = controller
-      const hadCoords = Boolean(userLat && userLng)
-      lastHadCoordsRef.current = hadCoords
-      // Always pass coords once available
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[AddressAutocomplete] Fetching suggestions', { query: debouncedQuery.substring(0, 20), userLat, userLng })
-      }
-      fetchSuggestions(debouncedQuery, userLat, userLng, controller.signal)
-        .then((results) => {
-          if (requestIdRef.current !== currentId) return
-          const unique: AddressSuggestion[] = []
-          const seen = new Set<string>()
-          for (const s of results) {
-            const key = s.id
-            if (!seen.has(key)) {
-              seen.add(key)
-              unique.push(s)
-            }
+    // Don't block on location - send request immediately (with or without coords)
+    // Will refresh automatically when coords arrive (see useEffect below)
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    const hadCoords = Boolean(userLat && userLng)
+    lastHadCoordsRef.current = hadCoords
+    // Always pass coords once available
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[AddressAutocomplete] Fetching suggestions', { query: debouncedQuery.substring(0, 20), userLat, userLng })
+    }
+    fetchSuggestions(debouncedQuery, userLat, userLng, controller.signal)
+      .then((results) => {
+        if (requestIdRef.current !== currentId) return
+        const unique: AddressSuggestion[] = []
+        const seen = new Set<string>()
+        for (const s of results) {
+          const key = s.id
+          if (!seen.has(key)) {
+            seen.add(key)
+            unique.push(s)
           }
-          if (process.env.NODE_ENV === 'development' && unique.length > 0) {
-            console.log('[AddressAutocomplete] Received suggestions', { count: unique.length, first: unique[0]?.label })
-          }
-          setSuggestions(unique)
-          setIsOpen(unique.length > 0)
-          setSelectedIndex(-1)
-        })
-        .catch((err) => {
-          if (requestIdRef.current !== currentId) return
-          if (err?.name === 'AbortError') return
-          console.error('Suggest error:', err)
-          setSuggestions([])
-          setIsOpen(false)
-        })
-        .finally(() => {
-          if (requestIdRef.current === currentId) setIsLoading(false)
-        })
-    }, delay)
-
-    return () => clearTimeout(timer)
+        }
+        if (process.env.NODE_ENV === 'development' && unique.length > 0) {
+          console.log('[AddressAutocomplete] Received suggestions', { count: unique.length, first: unique[0]?.label })
+        }
+        setSuggestions(unique)
+        setIsOpen(unique.length > 0)
+        setSelectedIndex(-1)
+      })
+      .catch((err) => {
+        if (requestIdRef.current !== currentId) return
+        if (err?.name === 'AbortError') return
+        console.error('Suggest error:', err)
+        setSuggestions([])
+        setIsOpen(false)
+      })
+      .finally(() => {
+        if (requestIdRef.current === currentId) setIsLoading(false)
+      })
   }, [debouncedQuery, userLat, userLng])
 
   // If last fetch lacked coords and coords arrive, abort stale request and refetch with coords
   useEffect(() => {
-    if (!debouncedQuery || debouncedQuery.length < 3) return
+    if (!debouncedQuery || debouncedQuery.length < 2) return
     if (!userLat || !userLng) return
     if (lastHadCoordsRef.current) return
     const currentId = ++requestIdRef.current
@@ -194,7 +186,7 @@ export default function AddressAutocomplete({
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen || suggestions.length === 0) {
-      if (e.key === 'Enter' && value.length >= 5) {
+      if (e.key === 'Enter' && value.length >= 2) {
         handleBlur()
       }
       return
@@ -252,7 +244,7 @@ export default function AddressAutocomplete({
 
   // Handle input focus
   const handleFocus = () => {
-    if (debouncedQuery && debouncedQuery.length >= 3 && suggestions.length > 0) {
+    if (debouncedQuery && debouncedQuery.length >= 2 && suggestions.length > 0) {
       setIsOpen(true)
     }
   }
@@ -305,16 +297,21 @@ export default function AddressAutocomplete({
           <p className="mt-1 text-sm text-red-600">{error}</p>
         )}
         
-        {value && value.length < 5 && !error && (
-          <p className="mt-1 text-xs text-gray-500">Address must be at least 5 characters</p>
+        {value && value.length < 2 && !error && (
+          <p className="mt-1 text-xs text-gray-500">Type at least 2 characters</p>
         )}
         
         {isGeocoding && (
           <p className="mt-1 text-xs text-gray-500">Looking up address...</p>
         )}
 
-        {isLoading && value.length >= 3 && (
+        {isLoading && value.length >= 2 && (
           <p className="mt-1 text-xs text-gray-500">Searching...</p>
+        )}
+
+        {/* No results state */}
+        {!isLoading && value.length >= 2 && debouncedQuery.length >= 2 && !isOpen && suggestions.length === 0 && !error && (
+          <p className="mt-1 text-xs text-gray-500">No results found</p>
         )}
 
         {/* Suggestions listbox */}

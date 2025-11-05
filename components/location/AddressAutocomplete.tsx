@@ -121,6 +121,20 @@ export default function AddressAutocomplete({
         .then((response) => {
           if (requestIdRef.current !== currentId) return
           
+          // Always log for debugging distance issues
+          console.log('[AddressAutocomplete] Overpass response (digits+street):', {
+            ok: response.ok,
+            code: response.code,
+            dataCount: response.data?.length || 0,
+            userCoords: [userLat, userLng],
+            debug: response._debug,
+            firstResult: response.data?.[0] ? {
+              label: response.data[0].label,
+              coords: [response.data[0].lat, response.data[0].lng],
+              distanceKm: response._debug?.distances?.[0]?.distanceKm
+            } : null
+          })
+          
           if (response.ok && response.data && response.data.length > 0) {
             // Overpass succeeded
             const unique: AddressSuggestion[] = []
@@ -132,6 +146,26 @@ export default function AddressAutocomplete({
                 unique.push(s)
               }
             }
+            
+            // Calculate and log distances for each result
+            const withDistances = unique.map(s => {
+              const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
+              const dy = (s.lat - (userLat as number)) * 111320
+              const distanceM = Math.sqrt(dx * dx + dy * dy)
+              return {
+                label: s.label,
+                coords: [s.lat, s.lng],
+                distanceM: Math.round(distanceM),
+                distanceKm: (distanceM / 1000).toFixed(2)
+              }
+            })
+            
+            console.log('[AddressAutocomplete] Overpass results with distances (digits+street):', {
+              count: unique.length,
+              results: withDistances,
+              debug: response._debug
+            })
+            
             if (process.env.NODE_ENV === 'development' && unique.length > 0) {
               console.log('[AddressAutocomplete] Received Overpass addresses (digits+street)', { 
                 count: unique.length, 
@@ -218,6 +252,20 @@ export default function AddressAutocomplete({
         .then((response) => {
           if (requestIdRef.current !== currentId) return
           
+          // Always log for debugging distance issues
+          console.log('[AddressAutocomplete] Overpass response (numeric-only):', {
+            ok: response.ok,
+            code: response.code,
+            dataCount: response.data?.length || 0,
+            userCoords: [userLat, userLng],
+            debug: response._debug,
+            firstResult: response.data?.[0] ? {
+              label: response.data[0].label,
+              coords: [response.data[0].lat, response.data[0].lng],
+              distanceKm: response._debug?.distances?.[0]?.distanceKm
+            } : null
+          })
+          
           if (response.ok && response.data && response.data.length > 0) {
             // Overpass succeeded
             const unique: AddressSuggestion[] = []
@@ -229,6 +277,26 @@ export default function AddressAutocomplete({
                 unique.push(s)
               }
             }
+            
+            // Calculate and log distances for each result
+            const withDistances = unique.map(s => {
+              const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
+              const dy = (s.lat - (userLat as number)) * 111320
+              const distanceM = Math.sqrt(dx * dx + dy * dy)
+              return {
+                label: s.label,
+                coords: [s.lat, s.lng],
+                distanceM: Math.round(distanceM),
+                distanceKm: (distanceM / 1000).toFixed(2)
+              }
+            })
+            
+            console.log('[AddressAutocomplete] Overpass results with distances (numeric-only):', {
+              count: unique.length,
+              results: withDistances,
+              debug: response._debug
+            })
+            
             if (process.env.NODE_ENV === 'development' && unique.length > 0) {
               console.log('[AddressAutocomplete] Received Overpass addresses', { 
                 count: unique.length, 

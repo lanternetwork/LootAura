@@ -36,6 +36,33 @@ const handlers = [
       address: { city: 'Louisville', state: 'KY', postcode: '40201' },
     })
   }),
+  // Relative Next.js routes (match by pathname regardless of host)
+  http.get((req) => new URL(req.url).pathname === '/api/geocoding/suggest', ({ request }) => {
+    const url = new URL(request.url)
+    const q = url.searchParams.get('q') || ''
+    if (q.length < 3) {
+      return HttpResponse.json({ ok: false, error: 'Query must be at least 3 characters' }, { status: 400 })
+    }
+    return HttpResponse.json({
+      ok: true,
+      data: [
+        {
+          id: '1',
+          label: `${q} Test St, Louisville, KY 40201`,
+          lat: 38.2512,
+          lng: -85.7494,
+          address: { houseNumber: '123', road: 'Test St', city: 'Louisville', state: 'KY', postcode: '40201', country: 'US' },
+        },
+      ],
+    })
+  }),
+  http.get((req) => new URL(req.url).pathname === '/api/geocoding/reverse', () => {
+    return HttpResponse.json({ ok: true, data: { id: 'reverse', label: 'Reverse Result', lat: 38.2512, lng: -85.7494 } })
+  }),
+  // PostgREST profiles_v2 (silence unhandled warnings in tests that probe unknown usernames)
+  http.get(/\/rest\/v1\/profiles_v2.*/i, () => {
+    return HttpResponse.json([], { status: 200 })
+  }),
 ]
 
 // Server

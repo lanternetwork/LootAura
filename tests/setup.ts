@@ -249,3 +249,14 @@ console.warn = (...args: any[]) => {
   originalConsoleWarn(...args)
 }
 
+// Clear geocode caches after each test to ensure determinism for TTL-based tests
+import { afterEach as vitestAfterEach } from 'vitest'
+vitestAfterEach(async () => {
+  try {
+    const mod = await import('@/lib/geocode')
+    if (typeof (mod as any).clearGeocodeCache === 'function') {
+      ;(mod as any).clearGeocodeCache()
+    }
+  } catch {}
+})
+

@@ -5,8 +5,11 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: 'jsdom',
-    setupFiles: [path.resolve(__dirname, 'tests/setup.ts')],
+    environment: 'node', // Use node for unit/integration tests (MSW works in node)
+    setupFiles: [
+      path.resolve(__dirname, 'tests/setup/index.ts'),
+      path.resolve(__dirname, 'tests/setup.ts'),
+    ],
     globals: true,
     exclude: [
       '**/node_modules/**',
@@ -24,7 +27,7 @@ export default defineConfig({
     poolOptions: {
       forks: {
         singleFork: true,
-        isolate: false,
+        isolate: true, // Enable isolation for proper module reset
       },
     },
     // Reduce memory usage

@@ -19,6 +19,13 @@ const geocodeCache = new Map<string, CacheEntry>()
 const CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes
 const MAX_CACHE_SIZE = 100
 
+// DI seam for fetch - allows tests to inject a mock
+let _http: typeof fetch = globalThis.fetch
+
+export function setHttpClient(fn: typeof fetch): void {
+  _http = fn
+}
+
 function evictCacheIfNeeded(): void {
   if (geocodeCache.size >= MAX_CACHE_SIZE) {
     // Remove oldest entry (first in map)
@@ -81,7 +88,7 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
 async function geocodeWithNominatim(address: string): Promise<GeocodeResult | null> {
   const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
   
-  const response = await fetch(
+  const response = await _http(
     `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&email=${email}&limit=1`,
     {
       headers: {
@@ -133,7 +140,7 @@ export async function fetchSuggestions(query: string): Promise<AddressSuggestion
   }
 
   try {
-    const response = await fetch(`/api/geocoding/suggest?q=${encodeURIComponent(query)}`)
+    const response = await _http(`/api/geocoding/suggest?q=${encodeURIComponent(query)}`)
     if (!response.ok) {
       return []
     }
@@ -153,7 +160,7 @@ export async function fetchSuggestions(query: string): Promise<AddressSuggestion
 // Reverse geocoding (coordinates → address)
 export async function reverseGeocode(lat: number, lng: number): Promise<AddressSuggestion | null> {
   try {
-    const response = await fetch(`/api/geocoding/reverse?lat=${lat}&lng=${lng}`)
+    const response = await _http(`/api/geocoding/reverse?lat=${lat}&lng=${lng}`)
     if (!response.ok) {
       return null
     }

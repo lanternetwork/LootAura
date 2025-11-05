@@ -67,14 +67,44 @@ describe('Suggest Route Integration', () => {
     })
   })
 
-  it('should return 400 for query less than 3 characters', async () => {
-    const request = new NextRequest('http://localhost:3000/api/geocoding/suggest?q=ab')
+  it('should return 400 for query less than 2 characters', async () => {
+    const request = new NextRequest('http://localhost:3000/api/geocoding/suggest?q=a')
     const response = await GET(request)
     const data = await response.json()
 
     expect(response.status).toBe(400)
     expect(data.ok).toBe(false)
-    expect(data.error).toContain('at least 3 characters')
+    expect(data.code).toBe('SHORT_QUERY')
+    expect(data.error).toContain('at least 2 characters')
+  })
+
+  it('should accept queries with 2 characters', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [
+        {
+          place_id: 123,
+          osm_type: 'N',
+          osm_id: 123,
+          display_name: 'Test Address',
+          lat: '38.0',
+          lon: '-85.0',
+          address: {
+            city: 'Test City',
+            state: 'KY',
+            country_code: 'us'
+          }
+        }
+      ]
+    })
+
+    const request = new NextRequest('http://localhost:3000/api/geocoding/suggest?q=ab')
+    const response = await GET(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(Array.isArray(data.data)).toBe(true)
   })
 
   it('should handle 429 rate limit with retry-after when Nominatim returns 429', async () => {

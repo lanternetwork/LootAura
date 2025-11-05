@@ -169,35 +169,43 @@ async function suggestHandler(request: NextRequest) {
     
     // If structured search returned empty, fallback to free-text search
     if (useStructuredSearch && (!data || data.length === 0)) {
-      // Retry with free-text search
-      const fallbackBase = new URL('https://nominatim.openstreetmap.org/search')
-      fallbackBase.searchParams.set('format', 'jsonv2')
-      fallbackBase.searchParams.set('addressdetails', '1')
-      fallbackBase.searchParams.set('countrycodes', 'us')
-      fallbackBase.searchParams.set('limit', String(upstreamLimit))
-      fallbackBase.searchParams.set('email', email)
-      fallbackBase.searchParams.set('q', trimmedQuery)
-      
-      if (hasCoords) {
-        const d = 25 / 111.32
-        const minLon = (userLng as number) - d
-        const minLat = (userLat as number) - d
-        const maxLon = (userLng as number) + d
-        const maxLat = (userLat as number) + d
-        fallbackBase.searchParams.set('viewbox', `${minLon},${maxLat},${maxLon},${minLat}`)
-        fallbackBase.searchParams.set('bounded', '0')
-      }
-      
-      url = fallbackBase.toString()
-      response = await fetch(url, {
-        headers: {
-          'User-Agent': `LootAura/1.0 (${email})`
+      try {
+        // Retry with free-text search
+        const fallbackBase = new URL('https://nominatim.openstreetmap.org/search')
+        fallbackBase.searchParams.set('format', 'jsonv2')
+        fallbackBase.searchParams.set('addressdetails', '1')
+        fallbackBase.searchParams.set('countrycodes', 'us')
+        fallbackBase.searchParams.set('limit', String(upstreamLimit))
+        fallbackBase.searchParams.set('email', email)
+        fallbackBase.searchParams.set('q', trimmedQuery)
+        
+        if (hasCoords) {
+          const d = 25 / 111.32
+          const minLon = (userLng as number) - d
+          const minLat = (userLat as number) - d
+          const maxLon = (userLng as number) + d
+          const maxLat = (userLat as number) + d
+          fallbackBase.searchParams.set('viewbox', `${minLon},${maxLat},${maxLon},${minLat}`)
+          fallbackBase.searchParams.set('bounded', '0')
         }
-      })
-      
-      if (response.ok) {
-        data = await response.json()
-        useStructuredSearch = false // Mark as fallback
+        
+        url = fallbackBase.toString()
+        const fallbackResponse = await fetch(url, {
+          headers: {
+            'User-Agent': `LootAura/1.0 (${email})`
+          }
+        })
+        
+        if (fallbackResponse.ok) {
+          data = await fallbackResponse.json()
+          useStructuredSearch = false // Mark as fallback
+        } else {
+          // Fallback also failed - return empty results
+          data = []
+        }
+      } catch (fallbackError) {
+        // Fallback fetch failed - return empty results
+        data = []
       }
     }
     

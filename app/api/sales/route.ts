@@ -754,6 +754,14 @@ async function postHandler(request: NextRequest) {
     
     const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images, pricing_mode } = body
 
+    // Enforce 30-minute granularity for start time
+    if (typeof time_start === 'string' && time_start.includes(':')) {
+      const mins = parseInt(time_start.split(':')[1] || '0', 10)
+      if (!Number.isFinite(mins) || mins % 30 !== 0) {
+        return NextResponse.json({ ok: false, error: 'Start time must be in 30-minute increments' }, { status: 400 })
+      }
+    }
+
     // Validate optional cover image URL
     if (cover_image_url && !isAllowedImageUrl(cover_image_url)) {
       // Log image validation failures for monitoring (production logging)

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { geocodeAddress, fetchSuggestions, AddressSuggestion } from '@/lib/geocode'
-import { useDebounce } from '@/lib/hooks/useDebounce'
+import useDebounce from '@/lib/hooks/useDebounce'
 import OSMAttribution from './OSMAttribution'
 
 interface AddressAutocompleteProps {
@@ -38,6 +38,7 @@ export default function AddressAutocomplete({
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const [isGeocoding, setIsGeocoding] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const requestIdRef = useRef(0)
 
   // Debounce search query
   const debouncedQuery = useDebounce(value, 300)
@@ -50,20 +51,33 @@ export default function AddressAutocomplete({
       return
     }
 
+    const currentId = ++requestIdRef.current
     setIsLoading(true)
     fetchSuggestions(debouncedQuery)
       .then((results) => {
-        setSuggestions(results)
-        setIsOpen(results.length > 0)
+        if (requestIdRef.current !== currentId) return
+        // Dedupe by id/osm_id
+        const unique: AddressSuggestion[] = []
+        const seen = new Set<string>()
+        for (const s of results) {
+          const key = s.id
+          if (!seen.has(key)) {
+            seen.add(key)
+            unique.push(s)
+          }
+        }
+        setSuggestions(unique)
+        setIsOpen(unique.length > 0)
         setSelectedIndex(-1)
       })
       .catch((err) => {
+        if (requestIdRef.current !== currentId) return
         console.error('Suggest error:', err)
         setSuggestions([])
         setIsOpen(false)
       })
       .finally(() => {
-        setIsLoading(false)
+        if (requestIdRef.current === currentId) setIsLoading(false)
       })
   }, [debouncedQuery])
 
@@ -191,6 +205,8 @@ export default function AddressAutocomplete({
           required={required}
           minLength={5}
           disabled={isGeocoding}
+          autoComplete="section-sell address-line1"
+          name="sale_address_line1"
           aria-autocomplete="list"
           aria-expanded={isOpen}
           aria-controls="address-suggestions"

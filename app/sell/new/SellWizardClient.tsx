@@ -124,6 +124,14 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const handleInputChange = (field: keyof SaleInput, value: any) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
+
+      // Snap start time to 30-minute increments
+      if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
+        const [h, m] = value.split(':').map(v => parseInt(v, 10) || 0)
+        const minutes = Math.round(m / 30) * 30
+        const snapped = `${String(h).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+        updated.time_start = snapped
+      }
       
       // Calculate end date/time when duration, start date, or start time changes
       if (field === 'duration_hours' || field === 'date_start' || field === 'time_start') {
@@ -389,7 +397,8 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between mt-8">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between">
         <button
           onClick={handlePrevious}
           disabled={currentStep === 0}
@@ -432,6 +441,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
             )}
           </button>
         )}
+        </div>
       </div>
     </div>
   )
@@ -494,6 +504,7 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           <input
             type="time"
             value={formData.time_start || ''}
+            step={1800}
             onChange={(e) => onChange('time_start', e.target.value)}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
             required

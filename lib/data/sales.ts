@@ -16,6 +16,7 @@ const SaleInputSchema = z.object({
   time_start: z.string().min(1, 'Start time is required'),
   date_end: z.string().optional(),
   time_end: z.string().optional(),
+  duration_hours: z.number().min(1).max(24).optional(),
   price: z.number().optional(),
   tags: z.array(z.string()).optional(),
   status: z.enum(['draft', 'published', 'completed', 'cancelled']).default('draft'),

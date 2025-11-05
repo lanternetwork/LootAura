@@ -95,19 +95,52 @@ async function overpassHandler(request: NextRequest) {
     const cached = getCachedResults(cacheKey)
     
     if (cached) {
+      // Re-sort cached results by distance from actual (non-rounded) coordinates
+      // This ensures accuracy even when cache key used rounded coordinates
+      const cachedWithDistance = cached.map(addr => ({
+        ...addr,
+        distanceM: haversineMeters(lat as number, lng as number, addr.lat, addr.lng)
+      }))
+      
+      cachedWithDistance.sort((a, b) => {
+        const distDiff = a.distanceM - b.distanceM
+        if (distDiff !== 0) return distDiff
+        // Use lat/lng as tie-breaker if distances are equal
+        if (a.lat !== b.lat) return a.lat - b.lat
+        return a.lng - b.lng
+      })
+      
+      const sortedCached = cachedWithDistance.map(({ distanceM: _d, ...addr }) => addr)
+      
       const respBody: any = {
         ok: true,
-        data: cached
+        data: sortedCached
       }
       
       if (enableDebug) {
         respBody._debug = {
           cacheHit: true,
           radiusM: OVERPASS_RADIUS_M,
-          countRaw: cached.length,
-          countNormalized: cached.length,
-          coords: [lat, lng]
+          countRaw: sortedCached.length,
+          countNormalized: sortedCached.length,
+          coords: [lat, lng],
+          distances: cachedWithDistance.slice(0, 5).map(addr => ({
+            id: addr.id,
+            label: addr.label,
+            distanceM: Math.round(addr.distanceM),
+            distanceKm: (addr.distanceM / 1000).toFixed(2)
+          }))
         }
+        console.log('[OVERPASS] Cached results re-sorted:', {
+          prefix,
+          userCoords: [lat, lng],
+          count: sortedCached.length,
+          distances: cachedWithDistance.slice(0, 5).map(addr => ({
+            label: addr.label,
+            distanceM: Math.round(addr.distanceM),
+            distanceKm: (addr.distanceM / 1000).toFixed(2)
+          }))
+        })
       }
       
       return NextResponse.json(respBody, {
@@ -245,8 +278,24 @@ async function overpassHandler(request: NextRequest) {
         radiusM: OVERPASS_RADIUS_M,
         countRaw: rawCount,
         countNormalized: normalized.length,
-        coords: [lat, lng]
+        coords: [lat, lng],
+        distances: withDistance.slice(0, 5).map(addr => ({
+          id: addr.id,
+          label: formatLabel(addr),
+          distanceM: Math.round(addr.distanceM),
+          distanceKm: (addr.distanceM / 1000).toFixed(2)
+        }))
       }
+      console.log('[OVERPASS] Sorted results:', {
+        prefix,
+        userCoords: [lat, lng],
+        count: suggestions.length,
+        distances: withDistance.slice(0, 5).map(addr => ({
+          label: formatLabel(addr),
+          distanceM: Math.round(addr.distanceM),
+          distanceKm: (addr.distanceM / 1000).toFixed(2)
+        }))
+      })
     }
     
     return NextResponse.json(respBody, {

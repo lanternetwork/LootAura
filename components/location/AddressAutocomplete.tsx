@@ -128,7 +128,12 @@ export default function AddressAutocomplete({
               }
             }
             if (process.env.NODE_ENV === 'development' && unique.length > 0) {
-              console.log('[AddressAutocomplete] Received Overpass addresses', { count: unique.length, first: unique[0]?.label })
+              console.log('[AddressAutocomplete] Received Overpass addresses', { 
+                count: unique.length, 
+                first: unique[0]?.label,
+                all: unique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
+                debug: response._debug
+              })
             }
             setSuggestions(unique)
             setIsOpen(unique.length > 0)

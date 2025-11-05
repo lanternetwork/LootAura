@@ -125,11 +125,13 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
 
-      // Snap start time to 30-minute increments
+      // Snap start time to 30-minute increments (floor to nearest 00/30)
       if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
-        const [h, m] = value.split(':').map(v => parseInt(v, 10) || 0)
-        const minutes = Math.round(m / 30) * 30
-        const snapped = `${String(h).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+        const [hRaw, mRaw] = value.split(':')
+        const h = Math.max(0, Math.min(23, parseInt(hRaw, 10) || 0))
+        const m = Math.max(0, Math.min(59, parseInt(mRaw, 10) || 0))
+        const snappedMinutes = Math.floor(m / 30) * 30 // 0-29 -> 0, 30-59 -> 30
+        const snapped = `${String(h).padStart(2, '0')}:${String(snappedMinutes).padStart(2, '0')}`
         updated.time_start = snapped
       }
       

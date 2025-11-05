@@ -36,8 +36,8 @@ const handlers = [
       address: { city: 'Louisville', state: 'KY', postcode: '40201' },
     })
   }),
-  // Relative Next.js routes (match by pathname regardless of host)
-  http.get((req) => new URL(req.url).pathname === '/api/geocoding/suggest', ({ request }) => {
+  // Relative Next.js routes
+  http.get('/api/geocoding/suggest', ({ request }) => {
     const url = new URL(request.url)
     const q = url.searchParams.get('q') || ''
     if (q.length < 3) {
@@ -56,7 +56,7 @@ const handlers = [
       ],
     })
   }),
-  http.get((req) => new URL(req.url).pathname === '/api/geocoding/reverse', () => {
+  http.get('/api/geocoding/reverse', () => {
     return HttpResponse.json({ ok: true, data: { id: 'reverse', label: 'Reverse Result', lat: 38.2512, lng: -85.7494 } })
   }),
   // PostgREST profiles_v2 (silence unhandled warnings in tests that probe unknown usernames)

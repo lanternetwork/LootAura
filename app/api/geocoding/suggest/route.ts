@@ -85,7 +85,8 @@ async function suggestHandler(request: NextRequest) {
     
     // Fetch from Nominatim
     const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
-    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=${limit}&q=${encodeURIComponent(query)}&email=${email}`
+    // Restrict to United States only using countrycodes=us
+    const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=us&limit=${limit}&q=${encodeURIComponent(query)}&email=${email}`
     
     const response = await fetch(url, {
       headers: {
@@ -118,7 +119,10 @@ async function suggestHandler(request: NextRequest) {
     const data = await response.json()
     
     // Normalize to AddressSuggestion format
-    const suggestions: AddressSuggestion[] = (data || []).map((item: any, index: number) => ({
+    // Filter to US-only as a defense-in-depth in case upstream ignores countrycodes
+    const usOnly = (data || []).filter((item: any) => (item?.address?.country_code || '').toLowerCase() === 'us')
+
+    const suggestions: AddressSuggestion[] = (usOnly || []).map((item: any, index: number) => ({
       id: `${item.place_id || index}`,
       label: item.display_name || '',
       lat: parseFloat(item.lat) || 0,

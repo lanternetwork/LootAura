@@ -55,15 +55,8 @@ export function normalizeStreetName(street: string): string {
   // Split into tokens
   const rawTokens = normalized.split(/\s+/)
 
-  // Keep tokens >= 2 chars OR known directionals (n/e/s/w, ne/nw/se/sw)
-  // Ignore tokens that contain digits (route numbers like "us-31w", "ky-xxx", "31w")
-  const filteredTokens = rawTokens.filter(token => {
-    if (!token) return false
-    if (/\d/.test(token)) return false // drop tokens with any digits (route numbers)
-    if (token.length >= 2) return true
-    // keep 1-char directionals
-    return token === 'n' || token === 'e' || token === 's' || token === 'w'
-  })
+  // Keep tokens that are non-empty; allow digits, we will ignore digit-tokens during regex building only
+  const filteredTokens = rawTokens.filter(token => !!token)
 
   // Expand abbreviations and directionals
   const expanded = filteredTokens.map(token => {
@@ -95,6 +88,10 @@ export function buildStreetRegex(normalizedStreet: string): string {
   const lookaheads: string[] = []
 
   for (const token of tokens) {
+    // Ignore tokens that contain digits in regex (route numbers)
+    if (/\d/.test(token)) {
+      continue
+    }
     const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
     // Optional synonym group for street types or directionals

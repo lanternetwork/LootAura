@@ -145,7 +145,7 @@ export default function GeolocationDiagnostics() {
       // 3. Test Browser Geolocation (High Accuracy)
       if (includeBrowserGeo && 'geolocation' in navigator) {
         try {
-          await new Promise<void>((resolve, reject) => {
+          await new Promise<void>((resolve, _reject) => {
             navigator.geolocation.getCurrentPosition(
               (position) => {
                 newResults.push({

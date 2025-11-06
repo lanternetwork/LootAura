@@ -236,7 +236,10 @@ export default function AddressAutocomplete({
                 
                 // Calculate and log distances for Nominatim fallback results
                 // Filter to only actual street addresses (with house number or matching street pattern)
-                const filteredUnique = unique.filter(s => {
+                // For very short street inputs (e.g., 'pr'), skip aggressive filtering to avoid losing valid results
+                const streetInput = (trimmedQuery.match(/^\d+\s+(.+)$/)?.[1] || '').trim()
+                const isShortStreet = streetInput.length > 0 && streetInput.length < 3
+                const filteredUnique = (isShortStreet ? unique : unique.filter(s => {
                   // Include if it has a house number
                   if (s.address?.houseNumber) return true
                   // Include if label matches pattern like "5001 Main St" or starts with number
@@ -244,7 +247,7 @@ export default function AddressAutocomplete({
                   // Include if it has a road and label starts with number
                   if (s.address?.road && s.label.match(/^\d+/)) return true
                   return false
-                })
+                }))
                 
                 // Recalculate distances for filtered results
                 const filteredWithDistances = filteredUnique.map(s => {

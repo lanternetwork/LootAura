@@ -255,13 +255,11 @@ async function overpassHandler(request: NextRequest) {
         if (enableDebug) {
           console.error('[OVERPASS] Query build error:', queryError)
         }
-        // If query building fails, try next radius or return error
+        // If query building fails, try next radius or break out of loop
+        // (we'll return empty results to allow client to fall back to Nominatim)
         if (currentRadius >= radiusSequence[radiusSequence.length - 1]) {
-          return NextResponse.json({
-            ok: false,
-            code: 'INVALID_QUERY',
-            error: `Failed to build query: ${queryError?.message || 'Unknown error'}`
-          }, { status: 400 })
+          // Last radius failed - break out of loop, we'll return empty results
+          break
         }
         continue // Try next radius
       }
@@ -425,6 +423,19 @@ async function overpassHandler(request: NextRequest) {
     // Use best results from expansion loop
     const withDistance = bestResults
     json = bestJson
+    
+    // If we have no results after trying all radii, return empty results (not an error)
+    // This allows the client to fall back to Nominatim
+    if (withDistance.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        data: []
+      }, {
+        headers: {
+          'Cache-Control': 'public, max-age=120'
+        }
+      })
+    }
     
     // Verify sorting is correct (for debugging)
     if (enableDebug && withDistance.length > 1) {

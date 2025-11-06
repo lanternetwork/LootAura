@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { geocodeAddress, fetchSuggestions, fetchOverpassAddresses, AddressSuggestion } from '@/lib/geocode'
 import { useDebounce } from '@/lib/hooks/useDebounce'
+import { haversineMeters } from '@/lib/geo/distance'
 import OSMAttribution from './OSMAttribution'
 
 interface AddressAutocompleteProps {
@@ -35,6 +36,15 @@ export default function AddressAutocomplete({
   userLat: propUserLat,
   userLng: propUserLng
 }: AddressAutocompleteProps) {
+  // Helper function to sort suggestions by distance
+  const sortByDistance = useCallback((suggestions: AddressSuggestion[], lat?: number, lng?: number): AddressSuggestion[] => {
+    if (!lat || !lng) return suggestions
+    return [...suggestions].sort((a, b) => {
+      const distA = haversineMeters(lat, lng, a.lat, a.lng)
+      const distB = haversineMeters(lat, lng, b.lat, b.lng)
+      return distA - distB
+    })
+  }, [])
   const inputRef = useRef<HTMLInputElement>(null)
   const listboxRef = useRef<HTMLUListElement>(null)
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([])
@@ -521,10 +531,12 @@ export default function AddressAutocomplete({
                     unique.push(s)
                   }
                 }
-                setSuggestions(unique)
-                setIsOpen(unique.length > 0)
+                // Sort by distance for digits+street mode
+                const sorted = sortByDistance(unique, userLat, userLng)
+                setSuggestions(sorted)
+                setIsOpen(sorted.length > 0)
                 setSelectedIndex(-1)
-                setShowFallbackMessage(unique.length > 0)
+                setShowFallbackMessage(sorted.length > 0)
               })
           }
         })
@@ -542,10 +554,12 @@ export default function AddressAutocomplete({
                   unique.push(s)
                 }
               }
-              setSuggestions(unique)
-              setIsOpen(unique.length > 0)
+              // Sort by distance for digits+street mode
+              const sorted = sortByDistance(unique, userLat, userLng)
+              setSuggestions(sorted)
+              setIsOpen(sorted.length > 0)
               setSelectedIndex(-1)
-              setShowFallbackMessage(unique.length > 0)
+              setShowFallbackMessage(sorted.length > 0)
             })
             .catch(() => {})
         })
@@ -583,10 +597,12 @@ export default function AddressAutocomplete({
                     unique.push(s)
                   }
                 }
-                setSuggestions(unique)
-                setIsOpen(unique.length > 0)
+                // Sort by distance for numeric-only mode
+                const sorted = sortByDistance(unique, userLat, userLng)
+                setSuggestions(sorted)
+                setIsOpen(sorted.length > 0)
                 setSelectedIndex(-1)
-                setShowFallbackMessage(unique.length > 0)
+                setShowFallbackMessage(sorted.length > 0)
               })
           }
         })
@@ -604,10 +620,12 @@ export default function AddressAutocomplete({
                   unique.push(s)
                 }
               }
-              setSuggestions(unique)
-              setIsOpen(unique.length > 0)
+              // Sort by distance for numeric-only mode
+              const sorted = sortByDistance(unique, userLat, userLng)
+              setSuggestions(sorted)
+              setIsOpen(sorted.length > 0)
               setSelectedIndex(-1)
-              setShowFallbackMessage(unique.length > 0)
+              setShowFallbackMessage(sorted.length > 0)
             })
             .catch(() => {})
         })
@@ -837,19 +855,28 @@ export default function AddressAutocomplete({
                 onMouseEnter={() => setSelectedIndex(index)}
               >
                 <div className="font-medium">{suggestion.label}</div>
-                {suggestion.address && (
-                  <div className="text-xs text-gray-500">
-                    {[
-                      suggestion.address.houseNumber,
-                      suggestion.address.road,
-                      suggestion.address.city,
-                      suggestion.address.state,
-                      suggestion.address.postcode
-                    ]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </div>
-                )}
+                {suggestion.address && (() => {
+                  // Build address string from components
+                  const addressString = [
+                    suggestion.address.houseNumber,
+                    suggestion.address.road,
+                    suggestion.address.city,
+                    suggestion.address.state,
+                    suggestion.address.postcode
+                  ]
+                    .filter(Boolean)
+                    .join(', ')
+                  
+                  // Only show secondary line if it's different from the label
+                  if (addressString && addressString !== suggestion.label) {
+                    return (
+                      <div className="text-xs text-gray-500">
+                        {addressString}
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
               </li>
             ))}
           </ul>

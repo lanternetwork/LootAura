@@ -227,7 +227,7 @@ describe('OAuth Callback Route', () => {
         expect.objectContaining({
           hasCode: true,
           hasError: false,
-          next: '/sales',
+          redirectTo: '/sales',
         })
       )
 

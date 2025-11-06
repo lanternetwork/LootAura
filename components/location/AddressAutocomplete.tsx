@@ -242,20 +242,42 @@ export default function AddressAutocomplete({
                 // Sort by distance (Nominatim may not return sorted results)
                 withDistances.sort((a, b) => a.distanceM - b.distanceM)
                 
-                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} results`)
-                if (withDistances.length > 0) {
-                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${withDistances[0].label}" - Distance: ${withDistances[0].distanceKm} km (${withDistances[0].distanceM} m)`)
-                  if (withDistances.length > 1) {
-                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${withDistances[1].label}" - Distance: ${withDistances[1].distanceKm} km (${withDistances[1].distanceM} m)`)
+                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} total, ${filteredUnique.length} after filtering`)
+                if (filteredWithDistances.length > 0) {
+                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${filteredWithDistances[0].suggestion.label}" - Distance: ${filteredWithDistances[0].distanceKm} km (${Math.round(filteredWithDistances[0].distanceM)} m)`)
+                  if (filteredWithDistances.length > 1) {
+                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${filteredWithDistances[1].suggestion.label}" - Distance: ${filteredWithDistances[1].distanceKm} km (${Math.round(filteredWithDistances[1].distanceM)} m)`)
                   }
                 }
                 
-                // Re-sort unique array by distance to match sorted distances
-                unique.sort((a, b) => {
-                  const distA = withDistances.find(d => d.label === a.label)?.distanceM || Infinity
-                  const distB = withDistances.find(d => d.label === b.label)?.distanceM || Infinity
-                  return distA - distB
+                // Filter to only actual street addresses (with house number or matching street pattern)
+                const filteredUnique = unique.filter(s => {
+                  // Include if it has a house number
+                  if (s.address?.houseNumber) return true
+                  // Include if label matches pattern like "5001 Main St" or starts with number
+                  if (s.label.match(/^\d+\s+[A-Za-z]/)) return true
+                  // Include if it has a road and label starts with number
+                  if (s.address?.road && s.label.match(/^\d+/)) return true
+                  return false
                 })
+                
+                // Recalculate distances for filtered results
+                const filteredWithDistances = filteredUnique.map(s => {
+                  const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
+                  const dy = (s.lat - (userLat as number)) * 111320
+                  const distanceM = Math.sqrt(dx * dx + dy * dy)
+                  return {
+                    suggestion: s,
+                    distanceM: distanceM,
+                    distanceKm: (distanceM / 1000).toFixed(2)
+                  }
+                })
+                
+                // Sort by distance (closest first)
+                filteredWithDistances.sort((a, b) => a.distanceM - b.distanceM)
+                
+                // Extract sorted suggestions
+                const sortedUnique = filteredWithDistances.map(item => item.suggestion)
                 
                 setSuggestions(unique)
                 setIsOpen(unique.length > 0)

@@ -213,25 +213,49 @@ async function overpassHandler(request: NextRequest) {
       
       // Build query based on mode
       let query: string
-      if (mode === 'digits+street' && streetParam) {
-        const normalizedStreet = normalizeStreetName(streetParam)
-        const streetRegex = buildStreetRegex(normalizedStreet)
-        query = buildOverpassDigitsStreetQuery(
-          prefix,
-          streetRegex,
-          userLat,
-          userLng,
-          currentRadius,
-          OVERPASS_TIMEOUT_SEC
-        )
-      } else {
-        query = buildOverpassAddressQuery(
-          prefix,
-          userLat,
-          userLng,
-          currentRadius,
-          OVERPASS_TIMEOUT_SEC
-        )
+      try {
+        if (mode === 'digits+street' && streetParam) {
+          const normalizedStreet = normalizeStreetName(streetParam)
+          const streetRegex = buildStreetRegex(normalizedStreet)
+          
+          // Validate normalized street is not empty after normalization
+          if (!normalizedStreet || normalizedStreet.trim().length === 0) {
+            if (enableDebug) {
+              console.log('[OVERPASS] Street normalized to empty, skipping this radius')
+            }
+            continue // Skip this radius, try next
+          }
+          
+          query = buildOverpassDigitsStreetQuery(
+            prefix,
+            streetRegex,
+            userLat,
+            userLng,
+            currentRadius,
+            OVERPASS_TIMEOUT_SEC
+          )
+        } else {
+          query = buildOverpassAddressQuery(
+            prefix,
+            userLat,
+            userLng,
+            currentRadius,
+            OVERPASS_TIMEOUT_SEC
+          )
+        }
+      } catch (queryError: any) {
+        if (enableDebug) {
+          console.error('[OVERPASS] Query build error:', queryError)
+        }
+        // If query building fails, try next radius or return error
+        if (currentRadius >= radiusSequence[radiusSequence.length - 1]) {
+          return NextResponse.json({
+            ok: false,
+            code: 'INVALID_QUERY',
+            error: `Failed to build query: ${queryError?.message || 'Unknown error'}`
+          }, { status: 400 })
+        }
+        continue // Try next radius
       }
       
       if (enableDebug) {

@@ -97,7 +97,7 @@ export function MapPreviewSection() {
             const fallback = { zip: '40204' }
             setLocation(fallback)
           },
-          { enableHighAccuracy: false, timeout: 3500 }
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 } // High accuracy for better location precision
         )
       } else {
         // No geolocation API - try localStorage

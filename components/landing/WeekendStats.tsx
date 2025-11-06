@@ -85,7 +85,7 @@ export function WeekendStats() {
           console.warn('[WeekendStats] Geolocation error:', error)
           setStatus('error')
         },
-        { timeout: 5000, maximumAge: 60000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 } // High accuracy for better location precision
       )
     })
   }, [searchParams])

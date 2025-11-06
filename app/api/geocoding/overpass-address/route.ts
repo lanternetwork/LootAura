@@ -109,22 +109,16 @@ async function overpassHandler(request: NextRequest) {
     const roundedLat = Math.round((lat as number) * 100000) / 100000
     const roundedLng = Math.round((lng as number) * 100000) / 100000
     
-    // Build cache key per spec: overpass:v2:mode=<numeric|digits+street>|q=<normalized input>|lat=<round5>|lng=<round5>|r=<radiusUsed>|L=<limit>
-    // Note: We'll build the cache key with actual radiusUsed after we determine it
-    // For now, we'll check cache with a placeholder, then rebuild with actual radius after query
+    // Build cache key per spec: overpass:v2:mode=<numeric|digits+street>|q=<normalized input>|lat=<round5>|lng=<round5>|L=<limit>
+    // Note: We don't include radius in cache key since we're not filtering by radius - just sorting by distance
     // The normalized query string for cache key
     const normalizedQ = mode === 'digits+street' && streetParam
       ? `${prefix} ${normalizeStreetName(streetParam)}`
       : prefix
     
-    // Build cache key function - we'll call this after we know the radius used
-    const buildCacheKey = (radiusUsed: number) => 
-      `overpass:v2:mode=${mode}|q=${normalizedQ}|lat=${roundedLat}|lng=${roundedLng}|r=${radiusUsed}|L=${limit}`
-    
-    // Check cache with max radius (we'll re-sort by distance anyway)
-    // For checking, use a consistent large radius since we don't filter by radius
-    const cacheCheckKey = buildCacheKey(3000000) // Max radius for cache check
-    const cached = getCachedResults(cacheCheckKey)
+    // Build cache key (no radius since we don't filter by it)
+    const cacheKey = `overpass:v2:mode=${mode}|q=${normalizedQ}|lat=${roundedLat}|lng=${roundedLng}|L=${limit}`
+    const cached = getCachedResults(cacheKey)
     
     if (cached) {
       // Re-sort cached results by distance from actual (non-rounded) coordinates
@@ -466,9 +460,8 @@ async function overpassHandler(request: NextRequest) {
       }
     }))
     
-    // Cache results with actual radius used
-    const finalCacheKey = buildCacheKey(radiusUsed)
-    setCachedResults(finalCacheKey, suggestions, TTL_MS)
+    // Cache results (cache key doesn't include radius since we don't filter by it)
+    setCachedResults(cacheKey, suggestions, TTL_MS)
     
     const respBody: any = {
       ok: true,

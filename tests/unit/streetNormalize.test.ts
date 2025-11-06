@@ -39,7 +39,7 @@ describe('streetNormalize', () => {
     it('should build token-AND regex pattern from normalized street', () => {
       const pattern = buildStreetRegex('main street')
       // Pattern should match all tokens: (?i).*\btoken1\b.*\btoken2\b.*
-      expect(pattern).toMatch(/\(i\)/)
+      expect(pattern).toMatch(/\(\?i\)/)
       expect(pattern).toContain('main')
       expect(pattern).toContain('street')
     })
@@ -52,7 +52,7 @@ describe('streetNormalize', () => {
 
     it('should handle single token', () => {
       const pattern = buildStreetRegex('highway')
-      expect(pattern).toMatch(/\(i\)/)
+      expect(pattern).toMatch(/\(\?i\)/)
       expect(pattern).toContain('highway')
     })
 

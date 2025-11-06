@@ -18,7 +18,7 @@ async function callbackHandler(request: NextRequest) {
     authDebug.logAuthFlow('oauth-callback', 'start', 'start', {
       hasCode: !!code,
       hasError: !!error,
-      next
+      redirectTo
     })
 
     if (error) {

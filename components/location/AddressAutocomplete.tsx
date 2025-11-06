@@ -227,29 +227,6 @@ export default function AddressAutocomplete({
                 }
                 
                 // Calculate and log distances for Nominatim fallback results
-                const withDistances = unique.map(s => {
-                  const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
-                  const dy = (s.lat - (userLat as number)) * 111320
-                  const distanceM = Math.sqrt(dx * dx + dy * dy)
-                  return {
-                    label: s.label,
-                    coords: [s.lat, s.lng],
-                    distanceM: Math.round(distanceM),
-                    distanceKm: (distanceM / 1000).toFixed(2)
-                  }
-                })
-                
-                // Sort by distance (Nominatim may not return sorted results)
-                withDistances.sort((a, b) => a.distanceM - b.distanceM)
-                
-                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} total, ${filteredUnique.length} after filtering`)
-                if (filteredWithDistances.length > 0) {
-                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${filteredWithDistances[0].suggestion.label}" - Distance: ${filteredWithDistances[0].distanceKm} km (${Math.round(filteredWithDistances[0].distanceM)} m)`)
-                  if (filteredWithDistances.length > 1) {
-                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${filteredWithDistances[1].suggestion.label}" - Distance: ${filteredWithDistances[1].distanceKm} km (${Math.round(filteredWithDistances[1].distanceM)} m)`)
-                  }
-                }
-                
                 // Filter to only actual street addresses (with house number or matching street pattern)
                 const filteredUnique = unique.filter(s => {
                   // Include if it has a house number
@@ -275,6 +252,14 @@ export default function AddressAutocomplete({
                 
                 // Sort by distance (closest first)
                 filteredWithDistances.sort((a, b) => a.distanceM - b.distanceM)
+                
+                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} total, ${filteredUnique.length} after filtering`)
+                if (filteredWithDistances.length > 0) {
+                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${filteredWithDistances[0].suggestion.label}" - Distance: ${filteredWithDistances[0].distanceKm} km (${Math.round(filteredWithDistances[0].distanceM)} m)`)
+                  if (filteredWithDistances.length > 1) {
+                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${filteredWithDistances[1].suggestion.label}" - Distance: ${filteredWithDistances[1].distanceKm} km (${Math.round(filteredWithDistances[1].distanceM)} m)`)
+                  }
+                }
                 
                 // Extract sorted suggestions
                 const sortedUnique = filteredWithDistances.map(item => item.suggestion)

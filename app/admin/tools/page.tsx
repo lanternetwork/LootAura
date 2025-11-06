@@ -17,6 +17,7 @@ import LoadTestControls from '@/components/admin/LoadTestControls'
 import CloudinaryDiagnostics from '@/components/admin/CloudinaryDiagnostics'
 import ImageStatsView from '@/components/admin/ImageStatsView'
 import ZipCodeImport from '@/components/admin/ZipCodeImport'
+import GeolocationDiagnostics from '@/components/admin/GeolocationDiagnostics'
 import { useState, useRef } from 'react'
 // MapRef is a namespace in react-map-gl v7, not a type
 
@@ -55,6 +56,9 @@ export default function AdminToolsPage() {
               </div>
             </div>
           </div>
+
+          {/* Geolocation Diagnostics */}
+          <GeolocationDiagnostics />
 
           {/* Cloudinary Diagnostics */}
           <CloudinaryDiagnostics />

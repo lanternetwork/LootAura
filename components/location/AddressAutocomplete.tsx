@@ -122,7 +122,8 @@ export default function AddressAutocomplete({
           if (requestIdRef.current !== currentId) return
           
           // Always log for debugging distance issues
-          console.log('[AddressAutocomplete] Overpass response (digits+street):', {
+          console.log(`[AddressAutocomplete] Overpass response (digits+street): ok=${response.ok}, dataCount=${response.data?.length || 0}, userCoords=[${userLat}, ${userLng}]`)
+          console.log('[AddressAutocomplete] Overpass response (digits+street) details:', {
             ok: response.ok,
             code: response.code,
             dataCount: response.data?.length || 0,
@@ -160,6 +161,14 @@ export default function AddressAutocomplete({
                 distanceKm: (distanceM / 1000).toFixed(2)
               }
             })
+            
+            // Log first result distance directly for visibility
+            if (withDistances.length > 0) {
+              console.log(`[AddressAutocomplete] FIRST RESULT (digits+street): "${withDistances[0].label}" - Distance: ${withDistances[0].distanceKm} km (${withDistances[0].distanceM} m)`)
+              if (withDistances.length > 1) {
+                console.log(`[AddressAutocomplete] SECOND RESULT (digits+street): "${withDistances[1].label}" - Distance: ${withDistances[1].distanceKm} km (${withDistances[1].distanceM} m)`)
+              }
+            }
             
             console.log('[AddressAutocomplete] Overpass results with distances (digits+street):', {
               count: unique.length,
@@ -261,7 +270,8 @@ export default function AddressAutocomplete({
           if (requestIdRef.current !== currentId) return
           
           // Always log for debugging distance issues
-          console.log('[AddressAutocomplete] Overpass response (numeric-only):', {
+          console.log(`[AddressAutocomplete] Overpass response (numeric-only): ok=${response.ok}, dataCount=${response.data?.length || 0}, userCoords=[${userLat}, ${userLng}]`)
+          console.log('[AddressAutocomplete] Overpass response (numeric-only) details:', {
             ok: response.ok,
             code: response.code,
             dataCount: response.data?.length || 0,
@@ -299,6 +309,14 @@ export default function AddressAutocomplete({
                 distanceKm: (distanceM / 1000).toFixed(2)
               }
             })
+            
+            // Log first result distance directly for visibility
+            if (withDistances.length > 0) {
+              console.log(`[AddressAutocomplete] FIRST RESULT (numeric-only): "${withDistances[0].label}" - Distance: ${withDistances[0].distanceKm} km (${withDistances[0].distanceM} m)`)
+              if (withDistances.length > 1) {
+                console.log(`[AddressAutocomplete] SECOND RESULT (numeric-only): "${withDistances[1].label}" - Distance: ${withDistances[1].distanceKm} km (${withDistances[1].distanceM} m)`)
+              }
+            }
             
             console.log('[AddressAutocomplete] Overpass results with distances (numeric-only):', {
               count: unique.length,

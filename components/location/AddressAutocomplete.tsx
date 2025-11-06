@@ -958,6 +958,9 @@ export default function AddressAutocomplete({
         {/* No results state */}
         {!isLoading && !hasJustSelected && (() => {
           const trimmedValue = value?.trim() || ''
+          // Don't show "No results found" if the value looks like a complete address (has commas, city/state/zip pattern)
+          const looksLikeCompleteAddress = /,/.test(trimmedValue) && trimmedValue.length > 10
+          if (looksLikeCompleteAddress) return false
           const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
           const minLength = isNumericOnly ? 1 : 2
           return value.length >= minLength && debouncedQuery.length >= minLength && !isOpen && suggestions.length === 0 && !error

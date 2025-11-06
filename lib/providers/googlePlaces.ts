@@ -36,13 +36,20 @@ export async function googleAutocomplete(
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': key,
+      // Field mask for predictions (Places API New requires explicit field mask)
+      'X-Goog-FieldMask': 'predictions.placeId,predictions.structuredFormat.mainText,predictions.structuredFormat.secondaryText',
     },
     body: JSON.stringify(body),
     signal,
   })
 
   if (!resp.ok) {
-    throw new Error(`Google autocomplete failed: ${resp.status}`)
+    let msg = `Google autocomplete failed: ${resp.status}`
+    try {
+      const err = await resp.json()
+      if (err?.error?.message) msg += ` - ${err.error.message}`
+    } catch {}
+    throw new Error(msg)
   }
   const data = await resp.json().catch(() => ({}))
   const predictions = Array.isArray(data.predictions) ? data.predictions : []
@@ -61,12 +68,12 @@ export async function googlePlaceDetails(
 ): Promise<AddressSuggestion | null> {
   if (!placeId) return null
   const key = getApiKey()
-  const fields = 'id,formattedAddress,addressComponents,location'
-  const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=en&sessionToken=${encodeURIComponent(sessionToken)}&fields=${fields}`
+  const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=en&sessionToken=${encodeURIComponent(sessionToken)}`
 
   const resp = await fetch(url, {
     headers: {
       'X-Goog-Api-Key': key,
+      'X-Goog-FieldMask': 'id,formattedAddress,addressComponents,location',
     },
     signal,
   })

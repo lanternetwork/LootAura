@@ -392,7 +392,7 @@ export default function GeolocationDiagnostics() {
         }
       }
     } catch (e: any) {
-      setError(e?.message || 'Google request failed')
+      setError(e?.message || 'Google request failed (check NEXT_PUBLIC_GOOGLE_PLACES_API_KEY referrer restriction to include this domain)')
     }
   }
 

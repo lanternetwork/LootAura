@@ -90,7 +90,11 @@ export default function AddressAutocomplete({
     
     // Minimum length: 1 for numeric-only, 2 for general text
     const minLength = isNumericOnly ? 1 : 2
+    
+    console.log(`[AddressAutocomplete] Query processing: "${trimmedQuery}" (length: ${trimmedQuery.length}, minLength: ${minLength}, isNumericOnly: ${isNumericOnly}, isDigitsStreet: ${isDigitsStreet}, hasCoords: ${hasCoords})`)
+    
     if (!trimmedQuery || trimmedQuery.length < minLength) {
+      console.log(`[AddressAutocomplete] Query too short: "${trimmedQuery}" (length: ${trimmedQuery.length} < ${minLength})`)
       setSuggestions([])
       setIsOpen(false)
       setShowFallbackMessage(false)

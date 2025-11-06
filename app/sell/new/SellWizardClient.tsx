@@ -97,12 +97,14 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
+      console.log('[SELL_WIZARD] Auth check:', { hasUser: !!user, userId: user?.id })
       setUser(user)
     }
     checkUser()
 
     // Listen for auth state changes (e.g., after login)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[SELL_WIZARD] Auth state change:', { event, hasUser: !!session?.user, userId: session?.user?.id })
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user)
       } else if (event === 'SIGNED_OUT') {

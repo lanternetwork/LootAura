@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
 import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
@@ -9,6 +9,9 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { containsUnsavory } from '@/lib/filters/profanity'
 import AddressAutocomplete from '@/components/location/AddressAutocomplete'
 import TimePicker30 from '@/components/TimePicker30'
+import ItemFormModal from '@/components/sales/ItemFormModal'
+import ItemCard from '@/components/sales/ItemCard'
+import Toast from '@/components/sales/Toast'
 
 interface WizardStep {
   id: string
@@ -61,7 +64,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     status: initialData?.status || 'draft'
   })
   const [photos, setPhotos] = useState<string[]>([])
-  const [items, setItems] = useState<Array<{ id: string; name: string; price?: number; description?: string; image_url?: string }>>([])
+  const [items, setItems] = useState<Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }>>([])
   const [loading, setLoading] = useState(false)
   const [_errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -341,8 +344,8 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setPhotos(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleAddItem = () => {
-    setItems(prev => [...prev, { id: `item-${Date.now()}-${Math.random()}`, name: '', price: undefined, description: '' }])
+  const handleAddItem = (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => {
+    setItems(prev => [...prev, item])
   }
 
   const handleUpdateItem = useCallback((index: number, field: string, value: any) => {
@@ -375,7 +378,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">List Your Sale</h1>
@@ -751,128 +754,103 @@ function PhotosStep({ photos, onUpload, onRemove, onReorder, onSetCover }: {
 }
 
 function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
-  items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string }>,
-  onAdd: () => void,
+  items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }>,
+  onAdd: (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => void,
   onUpdate: (index: number, field: string, value: any) => void,
   onRemove: (index: number) => void
 }) {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [showToast, setShowToast] = useState(false)
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  const MAX_ITEMS = 50
+
+  const handleOpenModal = () => {
+    if (items.length >= MAX_ITEMS) {
+      setToastMessage('Item limit reached (50)')
+      setShowToast(true)
+      return
+    }
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    // Return focus to +Add Item button
+    setTimeout(() => {
+      addButtonRef.current?.focus()
+    }, 100)
+  }
+
+  const handleSubmit = (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => {
+    onAdd(item)
+    setIsModalOpen(false)
+    // Return focus to +Add Item button
+    setTimeout(() => {
+      addButtonRef.current?.focus()
+    }, 100)
+  }
+
   return (
-    <div className="space-y-6 pb-32">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900">Items for Sale</h3>
-        <button
-          onClick={onAdd}
-          className="inline-flex items-center px-4 py-2 btn-accent min-h-[44px]"
-        >
-          <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Add Item
-        </button>
+    <>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">Items for Sale</h3>
+            {items.length > 0 && (
+              <p className="text-sm text-gray-500 mt-1">
+                {items.length} {items.length === 1 ? 'item' : 'items'} added
+              </p>
+            )}
+          </div>
+          <button
+            ref={addButtonRef}
+            onClick={handleOpenModal}
+            disabled={items.length >= MAX_ITEMS}
+            className="inline-flex items-center px-4 py-2 btn-accent min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Add item"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Item
+          </button>
+        </div>
+
+        {items.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            <p>No items added yet. Click "Add Item" to get started.</p>
+          </div>
+        ) : (
+          <div className="overflow-y-auto max-h-[calc(100vh-300px)] pr-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {items.map((item, index) => (
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  onDelete={() => onRemove(index)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {items.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
-          <p>No items added yet. Click "Add Item" to get started.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {items.map((item, index) => (
-            <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex justify-between items-start mb-4">
-                <h4 className="font-medium text-gray-900">Item {index + 1}</h4>
-                <button
-                  onClick={() => onRemove(index)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Item Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={item.name || ''}
-                    onChange={(e) => onUpdate(index, 'name', e.target.value)}
-                    placeholder="e.g., Vintage Coffee Table"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Price (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    value={item.price || ''}
-                    onChange={(e) => onUpdate(index, 'price', e.target.value ? parseFloat(e.target.value) : undefined)}
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-                  />
-                </div>
-              </div>
-              
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description (Optional)
-                </label>
-                <textarea
-                  value={item.description || ''}
-                  onChange={(e) => onUpdate(index, 'description', e.target.value)}
-                  placeholder="Describe the item's condition, age, etc."
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-                />
-              </div>
+      <ItemFormModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onSubmit={handleSubmit}
+      />
 
-              {/* Item Image Upload */}
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Item Photo (Optional)
-                </label>
-                <CloudinaryUploadWidget 
-                  onUpload={(urls) => onUpdate(index, 'image_url', urls[0])}
-                  maxFiles={1}
-                  className="mb-3"
-                />
-                {item.image_url && (
-                  <div className="mt-2">
-                    <div className="relative inline-block">
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-                      />
-                      <button
-                        onClick={() => onUpdate(index, 'image_url', undefined)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+      <Toast
+        message={toastMessage || ''}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
+    </>
   )
 }
 

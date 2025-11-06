@@ -405,12 +405,11 @@ export default function AddressAutocomplete({
         })
       } else {
         // For non-numeric queries, use Nominatim directly (existing behavior)
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[AddressAutocomplete] Fetching suggestions', { query: trimmedQuery.substring(0, 20), userLat, userLng })
-        }
+        console.log(`[AddressAutocomplete] Fetching Nominatim suggestions for non-numeric query: "${trimmedQuery.substring(0, 30)}"`, { userLat, userLng, hasCoords: !!userLat && !!userLng })
         fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
           .then((results) => {
             if (requestIdRef.current !== currentId) return
+            console.log(`[AddressAutocomplete] Nominatim returned ${results.length} results for "${trimmedQuery.substring(0, 30)}"`)
             const unique: AddressSuggestion[] = []
             const seen = new Set<string>()
             for (const s of results) {
@@ -420,8 +419,9 @@ export default function AddressAutocomplete({
                 unique.push(s)
               }
             }
-            if (process.env.NODE_ENV === 'development' && unique.length > 0) {
-              console.log('[AddressAutocomplete] Received suggestions', { count: unique.length, first: unique[0]?.label })
+            console.log(`[AddressAutocomplete] Nominatim unique results: ${unique.length} (after deduplication)`)
+            if (unique.length > 0) {
+              console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim): "${unique[0]?.label}"`)
             }
             setSuggestions(unique)
             setIsOpen(unique.length > 0)
@@ -431,7 +431,7 @@ export default function AddressAutocomplete({
           .catch((err) => {
             if (requestIdRef.current !== currentId) return
             if (err?.name === 'AbortError') return
-            console.error('Suggest error:', err)
+            console.error(`[AddressAutocomplete] Nominatim error for "${trimmedQuery.substring(0, 30)}":`, err)
             setSuggestions([])
             setIsOpen(false)
           })

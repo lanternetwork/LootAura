@@ -22,11 +22,12 @@ export async function googleAutocomplete(
   if (!input || input.trim().length < 2) return []
   const key = getApiKey()
 
-  const body = {
+  const body: any = {
     input: input.trim(),
     languageCode: 'en',
     regionCode: 'US',
-    includedPrimaryTypes: ['street_address', 'premise', 'subpremise', 'plus_code'],
+    // Use includedTypes (more widely supported) to bias toward address-like results
+    includedTypes: ['street_address', 'premise', 'subpremise'],
     locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 50000 } },
     sessionToken,
   }

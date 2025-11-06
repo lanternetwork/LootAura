@@ -18,13 +18,18 @@ export default function SignIn() {
 
   useEffect(() => {
     if (!authLoading && currentUser) {
-      // Check for redirect query param or sessionStorage
-      const redirectTo = params.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect') || '/sales'
-      // Clear sessionStorage redirect if used
-      if (sessionStorage.getItem('auth:postLoginRedirect')) {
-        sessionStorage.removeItem('auth:postLoginRedirect')
-      }
-      router.replace(redirectTo)
+      // Small delay to ensure auth state is fully propagated
+      const timeoutId = setTimeout(() => {
+        // Check for redirect query param or sessionStorage
+        const redirectTo = params.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect') || '/sales'
+        console.log('[SIGNIN] Redirecting after login:', { redirectTo, hasParam: !!params.get('redirectTo'), hasStorage: !!sessionStorage.getItem('auth:postLoginRedirect') })
+        // Clear sessionStorage redirect if used
+        if (sessionStorage.getItem('auth:postLoginRedirect')) {
+          sessionStorage.removeItem('auth:postLoginRedirect')
+        }
+        router.replace(redirectTo)
+      }, 100)
+      return () => clearTimeout(timeoutId)
     }
   }, [authLoading, currentUser, router, params])
 

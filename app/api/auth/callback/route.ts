@@ -13,6 +13,8 @@ async function callbackHandler(request: NextRequest) {
     const code = url.searchParams.get('code')
     const error = url.searchParams.get('error')
     // Check for redirectTo (preferred) or next (fallback)
+    // Note: We can't access sessionStorage from server-side, so we rely on the query param
+    // The client-side signin page will handle sessionStorage fallback
     const redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next') || '/sales'
 
     authDebug.logAuthFlow('oauth-callback', 'start', 'start', {

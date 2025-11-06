@@ -406,27 +406,33 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   // Auto-resume after login
   useEffect(() => {
     const resume = searchParams.get('resume')
+    console.log('[SELL_WIZARD] Auto-resume check:', { resume, hasUser: !!user, hasResumed: hasResumedRef.current })
     if (resume === '1' && user && !hasResumedRef.current) {
       const draftJson = sessionStorage.getItem('draft:sale:new')
+      console.log('[SELL_WIZARD] Draft found for resume:', { hasDraft: !!draftJson, size: draftJson?.length || 0 })
       if (draftJson) {
         hasResumedRef.current = true
         try {
           const payload = JSON.parse(draftJson)
+          console.log('[SELL_WIZARD] Submitting draft:', { payloadKeys: Object.keys(payload), itemsCount: payload.items?.length || 0 })
           // Submit the draft immediately
           submitSalePayload(payload).catch((error) => {
-            console.error('Error submitting draft:', error)
+            console.error('[SELL_WIZARD] Error submitting draft:', error)
             setToastMessage('Failed to submit sale. Please try again.')
             setShowToast(true)
             // Keep draft for retry
+            hasResumedRef.current = false // Allow retry
           })
         } catch (error) {
-          console.error('Error parsing draft:', error)
+          console.error('[SELL_WIZARD] Error parsing draft:', error)
           // Clear invalid draft
           sessionStorage.removeItem('draft:sale:new')
           sessionStorage.removeItem('auth:postLoginRedirect')
           setToastMessage('Draft data is invalid. Please start over.')
           setShowToast(true)
         }
+      } else {
+        console.warn('[SELL_WIZARD] No draft found in sessionStorage for resume')
       }
     }
   }, [searchParams, user, submitSalePayload])
@@ -443,8 +449,13 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     if (!user) {
       // Build payload and save to sessionStorage
       const payload = buildSalePayload()
+      console.log('[SELL_WIZARD] Saving draft before redirect:', { payloadKeys: Object.keys(payload), itemsCount: payload.items?.length || 0 })
       sessionStorage.setItem('draft:sale:new', JSON.stringify(payload))
       sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=1')
+      
+      // Verify draft was saved
+      const savedDraft = sessionStorage.getItem('draft:sale:new')
+      console.log('[SELL_WIZARD] Draft saved verification:', { saved: !!savedDraft, size: savedDraft?.length || 0 })
       
       // Redirect to login
       router.push('/auth/signin?redirectTo=/sell/new?resume=1')

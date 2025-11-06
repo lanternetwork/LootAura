@@ -507,8 +507,35 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         // Continue anyway - don't block navigation
       }
 
+      // Auth gate: Items (2) → Review (3)
+      // Check auth state synchronously to ensure we have the latest value
+      if (currentStep === STEPS.ITEMS) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        console.log('[SELL_WIZARD] Auth gate check:', { currentStep, hasUser: !!currentUser, userId: currentUser?.id })
+        
+        if (!currentUser) {
+          // Set redirect keys
+          sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
+          sessionStorage.setItem('draft:returnStep', 'review')
+          
+          // Update user state
+          setUser(null)
+          
+          // Redirect to login
+          router.push('/auth/signin?redirectTo=/sell/new?resume=review')
+          isNavigatingRef.current = false
+          return // Don't advance step
+        } else {
+          // Update user state if it was null
+          if (!user) {
+            setUser(currentUser)
+          }
+        }
+      }
+
       // Fire-and-forget server save (throttled, non-blocking)
-      if (user && draftKeyRef.current) {
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (currentUser && draftKeyRef.current) {
         const now = Date.now()
         if (now - lastServerSaveRef.current > 10000) {
           lastServerSaveRef.current = now
@@ -516,18 +543,6 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
             // Silent fail - already saved locally
           })
         }
-      }
-
-      // Auth gate: Items (2) → Review (3)
-      if (currentStep === STEPS.ITEMS && !user) {
-        // Set redirect keys
-        sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
-        sessionStorage.setItem('draft:returnStep', 'review')
-        
-        // Redirect to login
-        router.push('/auth/signin?redirectTo=/sell/new?resume=review')
-        isNavigatingRef.current = false
-        return // Don't advance step
       }
 
       // Normal navigation

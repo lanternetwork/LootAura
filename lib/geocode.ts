@@ -220,16 +220,21 @@ export async function fetchOverpassAddresses(
       }
     }
     
-    const data = await response.json()
-    if (data.ok && Array.isArray(data.data)) {
-      return data
-    }
-    
-    return {
-      ok: false,
-      error: 'Invalid response from Overpass',
-      code: 'OVERPASS_UNAVAILABLE'
-    }
+            const data = await response.json()
+            if (data.ok && Array.isArray(data.data)) {
+              // Include debug info if present
+              return {
+                ok: true,
+                data: data.data,
+                _debug: data._debug // Preserve debug info from server
+              }
+            }
+            
+            return {
+              ok: false,
+              error: 'Invalid response from Overpass',
+              code: 'OVERPASS_UNAVAILABLE'
+            }
   } catch (error: any) {
     // AbortError is expected when requests are cancelled - don't log it
     if (error?.name === 'AbortError') {

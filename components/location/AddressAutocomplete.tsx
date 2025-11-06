@@ -128,10 +128,11 @@ export default function AddressAutocomplete({
             dataCount: response.data?.length || 0,
             userCoords: [userLat, userLng],
             debug: response._debug,
+            fullResponse: response, // Full response for debugging
             firstResult: response.data?.[0] ? {
               label: response.data[0].label,
               coords: [response.data[0].lat, response.data[0].lng],
-              distanceKm: response._debug?.distances?.[0]?.distanceKm
+              address: response.data[0].address
             } : null
           })
           
@@ -163,6 +164,13 @@ export default function AddressAutocomplete({
             console.log('[AddressAutocomplete] Overpass results with distances (digits+street):', {
               count: unique.length,
               results: withDistances,
+              rawResults: unique.map(s => ({
+                id: s.id,
+                label: s.label,
+                lat: s.lat,
+                lng: s.lng,
+                address: s.address
+              })),
               debug: response._debug
             })
             
@@ -259,10 +267,11 @@ export default function AddressAutocomplete({
             dataCount: response.data?.length || 0,
             userCoords: [userLat, userLng],
             debug: response._debug,
+            fullResponse: response, // Full response for debugging
             firstResult: response.data?.[0] ? {
               label: response.data[0].label,
               coords: [response.data[0].lat, response.data[0].lng],
-              distanceKm: response._debug?.distances?.[0]?.distanceKm
+              address: response.data[0].address
             } : null
           })
           
@@ -294,6 +303,13 @@ export default function AddressAutocomplete({
             console.log('[AddressAutocomplete] Overpass results with distances (numeric-only):', {
               count: unique.length,
               results: withDistances,
+              rawResults: unique.map(s => ({
+                id: s.id,
+                label: s.label,
+                lat: s.lat,
+                lng: s.lng,
+                address: s.address
+              })),
               debug: response._debug
             })
             

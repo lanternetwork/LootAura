@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect, useRef } from 'react'
 
 export default function TimePicker30({
   value,
@@ -13,9 +13,13 @@ export default function TimePicker30({
   required?: boolean
   className?: string
 }) {
+  const hasInitializedRef = useRef(false)
+
   // Parse current value (expects HH:MM 24h)
   const { hour12, minute, ampm } = useMemo(() => {
-    if (!value || !value.includes(':')) return { hour12: 9, minute: '00', ampm: 'AM' as 'AM' | 'PM' }
+    if (!value || !value.includes(':')) {
+      return { hour12: 9, minute: '00' as '00' | '30', ampm: 'AM' as 'AM' | 'PM' }
+    }
     const [hStr, mStr] = value.split(':')
     const h = Math.max(0, Math.min(23, parseInt(hStr, 10) || 0))
     const m = (parseInt(mStr, 10) || 0) >= 30 ? '30' : '00'
@@ -23,6 +27,17 @@ export default function TimePicker30({
     const hr12 = h % 12 === 0 ? 12 : h % 12
     return { hour12: hr12, minute: m as '00' | '30', ampm: (am ? 'AM' : 'PM') as 'AM' | 'PM' }
   }, [value])
+
+  // Initialize with default value if empty and required (only once)
+  useEffect(() => {
+    if (required && (!value || !value.includes(':')) && !hasInitializedRef.current) {
+      onChange('09:00')
+      hasInitializedRef.current = true
+    } else if (value && value.includes(':')) {
+      // Reset flag if value is set externally
+      hasInitializedRef.current = true
+    }
+  }, [required, value, onChange])
 
   const hours = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), [])
   const minutes: Array<'00' | '30'> = ['00', '30']

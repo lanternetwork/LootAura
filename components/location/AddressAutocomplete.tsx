@@ -198,9 +198,7 @@ export default function AddressAutocomplete({
             if (requestIdRef.current === currentId) setIsLoading(false)
           } else {
             // Overpass failed or returned empty - fallback to Nominatim
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim', { code: response.code })
-            }
+            console.warn(`[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim for "${trimmedQuery}"`)
             return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
               .then((results) => {
                 if (requestIdRef.current !== currentId) return
@@ -213,6 +211,38 @@ export default function AddressAutocomplete({
                     unique.push(s)
                   }
                 }
+                
+                // Calculate and log distances for Nominatim fallback results
+                const withDistances = unique.map(s => {
+                  const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
+                  const dy = (s.lat - (userLat as number)) * 111320
+                  const distanceM = Math.sqrt(dx * dx + dy * dy)
+                  return {
+                    label: s.label,
+                    coords: [s.lat, s.lng],
+                    distanceM: Math.round(distanceM),
+                    distanceKm: (distanceM / 1000).toFixed(2)
+                  }
+                })
+                
+                // Sort by distance (Nominatim may not return sorted results)
+                withDistances.sort((a, b) => a.distanceM - b.distanceM)
+                
+                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} results`)
+                if (withDistances.length > 0) {
+                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${withDistances[0].label}" - Distance: ${withDistances[0].distanceKm} km (${withDistances[0].distanceM} m)`)
+                  if (withDistances.length > 1) {
+                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${withDistances[1].label}" - Distance: ${withDistances[1].distanceKm} km (${withDistances[1].distanceM} m)`)
+                  }
+                }
+                
+                // Re-sort unique array by distance to match sorted distances
+                unique.sort((a, b) => {
+                  const distA = withDistances.find(d => d.label === a.label)?.distanceM || Infinity
+                  const distB = withDistances.find(d => d.label === b.label)?.distanceM || Infinity
+                  return distA - distB
+                })
+                
                 setSuggestions(unique)
                 setIsOpen(unique.length > 0)
                 setSelectedIndex(-1)
@@ -270,12 +300,16 @@ export default function AddressAutocomplete({
           if (requestIdRef.current !== currentId) return
           
           // Always log for debugging distance issues
-          console.log(`[AddressAutocomplete] Overpass response (numeric-only): ok=${response.ok}, dataCount=${response.data?.length || 0}, userCoords=[${userLat}, ${userLng}]`)
+          console.log(`[AddressAutocomplete] Overpass response (numeric-only): ok=${response.ok}, dataCount=${response.data?.length || 0}, userCoords=[${userLat}, ${userLng}], prefix="${trimmedQuery}"`)
+          if (response.data?.length === 0) {
+            console.warn(`[AddressAutocomplete] Overpass returned 0 results for prefix "${trimmedQuery}" at [${userLat}, ${userLng}] - will fallback to Nominatim`)
+          }
           console.log('[AddressAutocomplete] Overpass response (numeric-only) details:', {
             ok: response.ok,
             code: response.code,
             dataCount: response.data?.length || 0,
             userCoords: [userLat, userLng],
+            prefix: trimmedQuery,
             debug: response._debug,
             fullResponse: response, // Full response for debugging
             firstResult: response.data?.[0] ? {
@@ -346,9 +380,7 @@ export default function AddressAutocomplete({
             if (requestIdRef.current === currentId) setIsLoading(false)
           } else {
             // Overpass failed or returned empty - fallback to Nominatim
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[AddressAutocomplete] Overpass failed/empty, falling back to Nominatim', { code: response.code })
-            }
+            console.warn(`[AddressAutocomplete] Overpass failed/empty (numeric-only), falling back to Nominatim for "${trimmedQuery}"`)
             return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
               .then((results) => {
                 if (requestIdRef.current !== currentId) return
@@ -361,6 +393,38 @@ export default function AddressAutocomplete({
                     unique.push(s)
                   }
                 }
+                
+                // Calculate and log distances for Nominatim fallback results
+                const withDistances = unique.map(s => {
+                  const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
+                  const dy = (s.lat - (userLat as number)) * 111320
+                  const distanceM = Math.sqrt(dx * dx + dy * dy)
+                  return {
+                    label: s.label,
+                    coords: [s.lat, s.lng],
+                    distanceM: Math.round(distanceM),
+                    distanceKm: (distanceM / 1000).toFixed(2)
+                  }
+                })
+                
+                // Sort by distance (Nominatim may not return sorted results)
+                withDistances.sort((a, b) => a.distanceM - b.distanceM)
+                
+                console.log(`[AddressAutocomplete] Nominatim fallback results (numeric-only): ${unique.length} results`)
+                if (withDistances.length > 0) {
+                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${withDistances[0].label}" - Distance: ${withDistances[0].distanceKm} km (${withDistances[0].distanceM} m)`)
+                  if (withDistances.length > 1) {
+                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${withDistances[1].label}" - Distance: ${withDistances[1].distanceKm} km (${withDistances[1].distanceM} m)`)
+                  }
+                }
+                
+                // Re-sort unique array by distance to match sorted distances
+                unique.sort((a, b) => {
+                  const distA = withDistances.find(d => d.label === a.label)?.distanceM || Infinity
+                  const distB = withDistances.find(d => d.label === b.label)?.distanceM || Infinity
+                  return distA - distB
+                })
+                
                 setSuggestions(unique)
                 setIsOpen(unique.length > 0)
                 setSelectedIndex(-1)

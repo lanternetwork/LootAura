@@ -37,11 +37,15 @@ export default function ImageUploadCard({
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map())
   const hasUploadingItemsRef = useRef(false)
 
-  // Initialize with existing URLs (only on mount or when value changes from empty to non-empty)
+  // Initialize with existing URLs (only when value prop changes externally, not from our own onChange)
+  const prevValueRef = useRef<string[]>([])
   const isInitializedRef = useRef(false)
   useEffect(() => {
-    // Only initialize once, or when value changes from empty to non-empty
-    if (!isInitializedRef.current && value.length > 0) {
+    // Only sync if value prop changed externally (not from our own onChange)
+    const valueChanged = JSON.stringify([...value].sort()) !== JSON.stringify([...prevValueRef.current].sort())
+    
+    if (valueChanged && value.length > 0 && !isInitializedRef.current) {
+      // Only initialize if we haven't initialized yet (to avoid overwriting in-progress uploads)
       const initialItems: ImageItem[] = value.map((url, index) => ({
         id: `existing-${index}-${Date.now()}`,
         status: 'done' as const,
@@ -49,19 +53,30 @@ export default function ImageUploadCard({
         url
       }))
       setItems(initialItems)
+      prevValueRef.current = [...value]
       isInitializedRef.current = true
     } else if (value.length === 0 && items.length === 0) {
-      // Reset when value becomes empty
+      // Reset when value becomes empty and we have no items
+      prevValueRef.current = []
       isInitializedRef.current = false
+    } else if (valueChanged) {
+      // Update ref even if we don't sync (to track external changes)
+      prevValueRef.current = [...value]
     }
   }, [value, items.length])
 
-  // Emit final URLs whenever done items change
+  // Emit final URLs whenever done items change (but only if URLs actually changed)
+  const prevUrlsRef = useRef<string[]>([])
   useEffect(() => {
     const doneUrls = items
       .filter(item => item.status === 'done' && item.url)
       .map(item => item.url!)
-    if (doneUrls.length > 0 || items.length === 0) {
+      .sort() // Sort for stable comparison
+    
+    // Only call onChange if URLs actually changed (prevents infinite loops)
+    const urlsChanged = JSON.stringify(doneUrls) !== JSON.stringify(prevUrlsRef.current)
+    if (urlsChanged) {
+      prevUrlsRef.current = doneUrls
       onChange(doneUrls)
     }
     

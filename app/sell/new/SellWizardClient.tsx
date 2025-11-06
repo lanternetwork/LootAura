@@ -456,9 +456,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     await submitSalePayload(payload)
   }
 
-  const handlePhotoUpload = (urls: string[]) => {
-    setPhotos(prev => [...prev, ...urls])
-  }
+  const handlePhotoUpload = useCallback((urls: string[]) => {
+    // Replace photos array with new URLs (ImageUploadCard emits all done URLs)
+    setPhotos(urls)
+  }, [])
 
   const handleReorderPhotos = (fromIndex: number, toIndex: number) => {
     setPhotos(prev => {

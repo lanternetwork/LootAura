@@ -100,6 +100,39 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     return `${String(h).padStart(2, '0')}:${String(snapped).padStart(2, '0')}`
   }, [])
 
+  // Helper to build draft payload (defined early so it can be used in useEffects)
+  const buildDraftPayload = useCallback((): SaleDraftPayload => {
+    return {
+      formData: {
+        title: formData.title,
+        description: formData.description,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zip_code,
+        lat: formData.lat,
+        lng: formData.lng,
+        date_start: formData.date_start,
+        time_start: formData.time_start,
+        date_end: formData.date_end,
+        time_end: formData.time_end,
+        duration_hours: formData.duration_hours,
+        tags: formData.tags,
+        pricing_mode: formData.pricing_mode,
+      },
+      photos,
+      items: items.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        description: item.description,
+        image_url: item.image_url,
+        category: item.category,
+      })),
+      currentStep,
+    }
+  }, [formData, photos, items, currentStep])
+
   // Check authentication status
   useEffect(() => {
     const checkUser = async () => {
@@ -153,39 +186,6 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       draftKeyRef.current = getDraftKey()
     }
   }, [])
-
-  // Helper to build draft payload (defined early so it can be used in useEffects)
-  const buildDraftPayload = useCallback((): SaleDraftPayload => {
-    return {
-      formData: {
-        title: formData.title,
-        description: formData.description,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        zip_code: formData.zip_code,
-        lat: formData.lat,
-        lng: formData.lng,
-        date_start: formData.date_start,
-        time_start: formData.time_start,
-        date_end: formData.date_end,
-        time_end: formData.time_end,
-        duration_hours: formData.duration_hours,
-        tags: formData.tags,
-        pricing_mode: formData.pricing_mode,
-      },
-      photos,
-      items: items.map(item => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        description: item.description,
-        image_url: item.image_url,
-        category: item.category,
-      })),
-      currentStep,
-    }
-  }, [formData, photos, items, currentStep])
 
   // Debounced autosave (local + server)
   useEffect(() => {

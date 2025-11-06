@@ -6,8 +6,9 @@ export const DraftStatusSchema = z.enum(['active', 'published', 'archived'])
 export type DraftStatus = z.infer<typeof DraftStatusSchema>
 
 // Sale draft item schema (matches wizard item structure)
+// Note: id can be UUID or fallback format (item-timestamp-random)
 export const SaleDraftItemSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().min(1), // Allow any string ID (UUID or fallback format)
   name: z.string().min(1),
   price: z.number().nonnegative().optional(),
   description: z.string().optional(),

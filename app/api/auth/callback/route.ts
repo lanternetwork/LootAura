@@ -15,7 +15,19 @@ async function callbackHandler(request: NextRequest) {
     // Check for redirectTo (preferred) or next (fallback)
     // Note: We can't access sessionStorage from server-side, so we rely on the query param
     // The client-side signin page will handle sessionStorage fallback
-    const redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next') || '/sales'
+    let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
+    
+    // If no redirectTo in query, default to /sales
+    if (!redirectTo) {
+      redirectTo = '/sales'
+    }
+    
+    // Decode the redirectTo if it was encoded
+    try {
+      redirectTo = decodeURIComponent(redirectTo)
+    } catch (e) {
+      // If decoding fails, use as-is
+    }
 
     authDebug.logAuthFlow('oauth-callback', 'start', 'start', {
       hasCode: !!code,

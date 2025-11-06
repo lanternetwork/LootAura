@@ -521,8 +521,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
           // Update user state
           setUser(null)
           
-          // Redirect to login
-          router.push('/auth/signin?redirectTo=/sell/new?resume=review')
+          // Redirect to login (encode redirectTo to preserve query params)
+          const redirectUrl = encodeURIComponent('/sell/new?resume=review')
+          router.push(`/auth/signin?redirectTo=${redirectUrl}`)
           isNavigatingRef.current = false
           return // Don't advance step
         } else {

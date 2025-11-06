@@ -279,10 +279,10 @@ export default function AddressAutocomplete({
                 // Extract sorted suggestions
                 const sortedUnique = filteredWithDistances.map(item => item.suggestion)
                 
-                setSuggestions(unique)
-                setIsOpen(unique.length > 0)
+                setSuggestions(sortedUnique)
+                setIsOpen(sortedUnique.length > 0)
                 setSelectedIndex(-1)
-                setShowFallbackMessage(unique.length > 0)
+                setShowFallbackMessage(sortedUnique.length > 0)
                 if (requestIdRef.current === currentId) setIsLoading(false)
               })
           }

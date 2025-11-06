@@ -24,6 +24,7 @@ export default function GeolocationDiagnostics() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const mapRef = useRef<any>(null)
+  const [includeBrowserGeo, setIncludeBrowserGeo] = useState(false)
 
   // Color scheme for different methods
   const methodColors: Record<string, string> = {
@@ -142,7 +143,7 @@ export default function GeolocationDiagnostics() {
       }
 
       // 3. Test Browser Geolocation (High Accuracy)
-      if ('geolocation' in navigator) {
+      if (includeBrowserGeo && 'geolocation' in navigator) {
         try {
           await new Promise<void>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(
@@ -231,6 +232,8 @@ export default function GeolocationDiagnostics() {
             error: err.message || 'Failed',
           })
         }
+      } else if (includeBrowserGeo === false) {
+        // Skipped browser geolocation by design; do nothing
       } else {
         newResults.push({
           method: 'Browser (High Accuracy)',
@@ -356,6 +359,15 @@ export default function GeolocationDiagnostics() {
         >
           {isLoading ? 'Testing...' : 'Run Tests'}
         </button>
+        <label className="ml-3 inline-flex items-center text-sm">
+          <input
+            type="checkbox"
+            checked={includeBrowserGeo}
+            onChange={(e) => setIncludeBrowserGeo(e.target.checked)}
+            className="mr-2"
+          />
+          Include browser geolocation (will prompt)
+        </label>
       </div>
 
       {error && (

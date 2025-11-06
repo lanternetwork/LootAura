@@ -71,56 +71,21 @@ export default function AddressAutocomplete({
       setUserLng(propUserLng)
       geoWaitRef.current = false
     } else {
-      // No props provided - try browser geolocation first (high accuracy), then fall back to IP geolocation
+      // No props provided - use IP geolocation only (never prompt the user)
       geoWaitRef.current = true
-      
-      // Try browser geolocation first (high accuracy for better address matching)
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const lat = pos.coords.latitude
-            const lng = pos.coords.longitude
-            const accuracy = pos.coords.accuracy
-            console.log('[AddressAutocomplete] Using browser geolocation (high accuracy):', { lat, lng, accuracy: `${Math.round(accuracy)}m` })
-            setUserLat(lat)
-            setUserLng(lng)
-            geoWaitRef.current = false
-          },
-          () => {
-            // Browser geolocation failed or denied - fall back to IP geolocation
-            console.log('[AddressAutocomplete] Browser geolocation failed, falling back to IP geolocation')
-            fetch('/api/geolocation/ip')
-              .then(res => res.ok ? res.json() : null)
-              .then(ipData => {
-                if (ipData?.lat && ipData?.lng) {
-                  console.log('[AddressAutocomplete] Using IP geolocation (less accurate):', { lat: ipData.lat, lng: ipData.lng, source: ipData.source })
-                  setUserLat(ipData.lat)
-                  setUserLng(ipData.lng)
-                }
-                geoWaitRef.current = false
-              })
-              .catch(() => {
-                geoWaitRef.current = false
-              })
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 } // 5 min cache
-        )
-      } else {
-        // No geolocation API - fall back to IP geolocation
-        fetch('/api/geolocation/ip')
-          .then(res => res.ok ? res.json() : null)
-          .then(ipData => {
-            if (ipData?.lat && ipData?.lng) {
-              console.log('[AddressAutocomplete] Using IP geolocation (no browser geolocation):', { lat: ipData.lat, lng: ipData.lng, source: ipData.source })
-              setUserLat(ipData.lat)
-              setUserLng(ipData.lng)
-            }
-            geoWaitRef.current = false
-          })
-          .catch(() => {
-            geoWaitRef.current = false
-          })
-      }
+      fetch('/api/geolocation/ip')
+        .then(res => res.ok ? res.json() : null)
+        .then(ipData => {
+          if (ipData?.lat && ipData?.lng) {
+            console.log('[AddressAutocomplete] Using IP geolocation:', { lat: ipData.lat, lng: ipData.lng, source: ipData.source })
+            setUserLat(ipData.lat)
+            setUserLng(ipData.lng)
+          }
+          geoWaitRef.current = false
+        })
+        .catch(() => {
+          geoWaitRef.current = false
+        })
     }
   }, [propUserLat, propUserLng])
 

@@ -67,72 +67,32 @@ export function FeaturedSalesSection() {
         return // IP geolocation succeeded - use it
       }
       
-      // IP geolocation failed - try browser geolocation (but it won't change with VPN)
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            // Use geolocation coordinates in memory only (do not persist to localStorage)
-            // This avoids storing sensitive location data while still providing UX benefit
-            const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-            console.log('[FeaturedSales] Using browser geolocation:', loc)
-            setLocation(loc)
-            setStatus('ready')
-          },
-          () => {
-            // Browser geolocation failed - try localStorage as fallback
-            try {
-              const saved = window.localStorage.getItem('loot-aura:lastLocation')
-              if (saved) {
-                try {
-                  const parsed = JSON.parse(saved)
-                  // Only use saved data if it's a ZIP code (not exact coordinates)
-                  if (parsed && parsed.zip) {
-                    console.log('[FeaturedSales] Using localStorage ZIP:', parsed.zip)
-                    setLocation({ zip: parsed.zip })
-                    setStatus('ready')
-                    return
-                  }
-                } catch {
-                  // Invalid JSON, continue
-                }
-              }
-            } catch {
-              // localStorage might be unavailable
+      // IP geolocation failed - do NOT prompt for browser geolocation; fall back to localStorage or city fallback
+      try {
+        const saved = window.localStorage.getItem('loot-aura:lastLocation')
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved)
+            // Only use saved data if it's a ZIP code (not exact coordinates)
+            if (parsed && parsed.zip) {
+              console.log('[FeaturedSales] Using localStorage ZIP:', parsed.zip)
+              setLocation({ zip: parsed.zip })
+              setStatus('ready')
+              return
             }
-            
-            // Final fallback city (Louisville)
-            console.log('[FeaturedSales] Using fallback Louisville')
-            const fallback = { zip: '40204' }
-            setLocation(fallback)
-            setStatus('ready')
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 } // High accuracy for better location precision
-        )
-      } else {
-        // No geolocation API - try localStorage
-        try {
-          const saved = window.localStorage.getItem('loot-aura:lastLocation')
-          if (saved) {
-            try {
-              const parsed = JSON.parse(saved)
-              // Only use saved data if it's a ZIP code (not exact coordinates)
-              if (parsed && parsed.zip) {
-                setLocation({ zip: parsed.zip })
-                setStatus('ready')
-                return
-              }
-            } catch {
-              // Invalid JSON, continue
-            }
+          } catch {
+            // Invalid JSON, continue
           }
-        } catch {
-          // localStorage might be unavailable
         }
-        
-        // Final fallback
-        setLocation({ zip: '40204' })
-        setStatus('ready')
+      } catch {
+        // localStorage might be unavailable
       }
+      
+      // Final fallback city (Louisville)
+      console.log('[FeaturedSales] Using fallback Louisville')
+      const fallback = { zip: '40204' }
+      setLocation(fallback)
+      setStatus('ready')
     })
   }, [searchParams])
 

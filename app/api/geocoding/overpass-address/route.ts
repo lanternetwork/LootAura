@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { buildOverpassAddressQuery, buildOverpassDigitsStreetQuery, parseOverpassElements, formatLabel, NormalizedAddress } from '@/lib/geo/overpass'
-import { normalizeStreetName, buildStreetRegex, parseDigitsStreetQuery } from '@/lib/geo/streetNormalize'
+import { normalizeStreetName, buildStreetRegex } from '@/lib/geo/streetNormalize'
 import { haversineMeters } from '@/lib/geo/distance'
 import { AddressSuggestion } from '@/lib/geocode'
 
@@ -12,7 +12,6 @@ export const runtime = 'nodejs'
 // Environment configuration
 const OVERPASS_BASE_URL = process.env.OVERPASS_BASE_URL || 'https://overpass-api.de/api/interpreter'
 const OVERPASS_TIMEOUT_MS = parseInt(process.env.OVERPASS_TIMEOUT_MS || '8000', 10)
-const OVERPASS_RADIUS_M = parseInt(process.env.OVERPASS_RADIUS_M || '5000', 10)
 const OVERPASS_TIMEOUT_SEC = Math.floor(OVERPASS_TIMEOUT_MS / 1000)
 
 // In-memory cache with 120s TTL
@@ -216,7 +215,6 @@ async function overpassHandler(request: NextRequest) {
     
     // Progressive radius expansion per spec
     const radiusSequence = [1000, 3000, 10000, 30000, 100000, 300000, 1000000, 2000000, 3000000] // meters
-    const minResults = mode === 'digits+street' ? 3 : 1 // Try to get at least 1-3 results
     const radiiTriedM: number[] = [] // Track radii tried for debug output
     
     // Store best results found during expansion

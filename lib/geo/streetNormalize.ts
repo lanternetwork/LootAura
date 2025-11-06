@@ -103,7 +103,7 @@ export function buildStreetRegex(normalizedStreet: string): string {
     
     // Find abbreviation for this token (reverse lookup)
     const abbreviation = Object.entries(STREET_TYPE_EXPANSIONS).find(
-      ([abbr, full]) => full === token
+      ([_abbr, full]) => full === token
     )?.[0]
     
     if (abbreviation) {
@@ -113,7 +113,7 @@ export function buildStreetRegex(normalizedStreet: string): string {
     } else {
       // Check for directional abbreviations
       const dirAbbreviation = Object.entries(DIRECTIONAL_EXPANSIONS).find(
-        ([abbr, full]) => full === token
+        ([_abbr, full]) => full === token
       )?.[0]
       
       if (dirAbbreviation) {
@@ -155,7 +155,7 @@ export function buildStreetTokenAndRegex(normalizedStreet: string): string {
     
     // Find abbreviation for this token (reverse lookup)
     const abbreviation = Object.entries(STREET_TYPE_EXPANSIONS).find(
-      ([abbr, full]) => full === token
+      ([_abbr, full]) => full === token
     )?.[0]
     
     if (abbreviation) {
@@ -165,7 +165,7 @@ export function buildStreetTokenAndRegex(normalizedStreet: string): string {
     } else {
       // Check for directional abbreviations
       const dirAbbreviation = Object.entries(DIRECTIONAL_EXPANSIONS).find(
-        ([abbr, full]) => full === token
+        ([_abbr, full]) => full === token
       )?.[0]
       
       if (dirAbbreviation) {

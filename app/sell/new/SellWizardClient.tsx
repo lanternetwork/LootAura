@@ -14,6 +14,9 @@ import ItemCard from '@/components/sales/ItemCard'
 import Toast from '@/components/sales/Toast'
 import ConfirmationModal from '@/components/sales/ConfirmationModal'
 import type { CategoryValue } from '@/lib/types'
+import { getDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalDraft } from '@/lib/draft/localDraft'
+import { saveDraftServer, getLatestDraftServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
+import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 
 interface WizardStep {
   id: string
@@ -74,7 +77,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const hasResumedRef = useRef(false)
+  const draftKeyRef = useRef<string | null>(null)
+  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastServerSaveRef = useRef<number>(0)
   const searchParams = useSearchParams()
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
@@ -117,6 +124,16 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
   }, [supabase.auth])
 
+  // Save local draft to server when user signs in mid-wizard
+  useEffect(() => {
+    if (user && draftKeyRef.current && hasLocalDraft()) {
+      const payload = buildDraftPayload()
+      saveDraftServer(payload, draftKeyRef.current).catch(() => {
+        // Silent fail - already saved locally
+      })
+    }
+  }, [user, buildDraftPayload])
+
   // Save draft to localStorage whenever form data changes
   useEffect(() => {
     // Ensure body scroll is unlocked on mount (in case a previous modal left it locked)
@@ -130,55 +147,188 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
   }, [])
 
-  // Save draft to localStorage whenever form data changes
+  // Initialize draft key on mount
   useEffect(() => {
-    const draftData = {
-      formData,
-      photos,
-      items,
-      currentStep
+    if (!draftKeyRef.current) {
+      draftKeyRef.current = getDraftKey()
     }
-    localStorage.setItem('sale_draft', JSON.stringify(draftData))
-  }, [formData, photos, items, currentStep])
+  }, [])
+
+  // Debounced autosave (local + server)
+  useEffect(() => {
+    // Clear existing timeout
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current)
+    }
+
+    // Set new timeout for debounced save (1.5s)
+    autosaveTimeoutRef.current = setTimeout(() => {
+      const payload = buildDraftPayload()
+      
+      // Always save locally
+      saveLocalDraft(payload)
+      setSaveStatus('saved')
+
+      // Save to server if authenticated (throttle to max 1x per 10s)
+      if (user && draftKeyRef.current) {
+        const now = Date.now()
+        const timeSinceLastSave = now - lastServerSaveRef.current
+        
+        if (timeSinceLastSave >= 10000) {
+          setSaveStatus('saving')
+          saveDraftServer(payload, draftKeyRef.current)
+            .then((result) => {
+              if (result.ok) {
+                lastServerSaveRef.current = Date.now()
+                setSaveStatus('saved')
+              } else {
+                setSaveStatus('error')
+                // Don't show error toast for autosave failures - just log
+                console.warn('[SELL_WIZARD] Autosave to server failed:', result.error)
+              }
+            })
+            .catch((error) => {
+              setSaveStatus('error')
+              console.error('[SELL_WIZARD] Autosave error:', error)
+            })
+        }
+      }
+    }, 1500)
+
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current)
+      }
+    }
+  }, [formData, photos, items, currentStep, user, buildDraftPayload])
+
+  // Save on beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const payload = buildDraftPayload()
+      saveLocalDraft(payload)
+      if (user && draftKeyRef.current) {
+        // Fire and forget - don't wait for response
+        saveDraftServer(payload, draftKeyRef.current).catch(() => {})
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [buildDraftPayload, user])
 
 
-  // Load draft from localStorage on mount (for backward compatibility)
-  // Also check sessionStorage if user just logged in but wasn't redirected with resume=1
+  // Resume draft on mount (priority: server > local)
   useEffect(() => {
-    const resume = searchParams.get('resume')
-    const hasSessionDraft = sessionStorage.getItem('draft:sale:new')
-    
-    // If we have a sessionStorage draft but no resume param, user might have been redirected incorrectly
-    // In this case, we should still try to restore the draft
-    if (hasSessionDraft && !resume && user) {
-      console.log('[SELL_WIZARD] Found sessionStorage draft without resume param, user is logged in - will auto-submit on next render')
-      // The auto-resume effect will handle this when user is set
-    }
-    
-    if (!initialData && !resume && !hasSessionDraft) {
-      const savedDraft = localStorage.getItem('sale_draft')
-      if (savedDraft) {
-        try {
-          const draft = JSON.parse(savedDraft)
-          const nextForm = { ...(draft.formData || {}) }
-          if (nextForm.time_start) {
-            nextForm.time_start = normalizeTimeToNearest30(nextForm.time_start)
+    if (initialData || hasResumedRef.current) return
+
+    const resumeDraft = async () => {
+      let draftToRestore: SaleDraftPayload | null = null
+      let source: 'server' | 'local' | null = null
+
+      // Priority 1: If authenticated, try server draft
+      if (user) {
+        const serverResult = await getLatestDraftServer()
+        if (serverResult.ok && serverResult.data?.payload) {
+          draftToRestore = serverResult.data.payload
+          source = 'server'
+          console.log('[SELL_WIZARD] Found server draft')
+        }
+      }
+
+      // Priority 2: If no server draft, try local draft
+      if (!draftToRestore) {
+        const localDraft = loadLocalDraft()
+        if (localDraft) {
+          draftToRestore = localDraft
+          source = 'local'
+          console.log('[SELL_WIZARD] Found local draft')
+        }
+      }
+
+      // Priority 3: Backward compatibility - check old localStorage format
+      if (!draftToRestore) {
+        const oldDraft = localStorage.getItem('sale_draft')
+        if (oldDraft) {
+          try {
+            const parsed = JSON.parse(oldDraft)
+            if (parsed && typeof parsed === 'object') {
+              // Convert old format to new format
+              draftToRestore = {
+                formData: parsed.formData || {},
+                photos: parsed.photos || [],
+                items: (parsed.items || []).map((item: any) => ({
+                  id: item.id || `item-${Date.now()}-${Math.random()}`,
+                  name: item.name || '',
+                  price: item.price,
+                  description: item.description,
+                  image_url: item.image_url,
+                  category: item.category,
+                })),
+                currentStep: parsed.currentStep || 0,
+              }
+              source = 'local'
+              console.log('[SELL_WIZARD] Found old format draft')
+            }
+          } catch (error) {
+            console.error('[SELL_WIZARD] Error parsing old draft:', error)
           }
-          setFormData(nextForm)
-          setPhotos(draft.photos || [])
-          // Ensure items have IDs when loading from draft
-          const loadedItems = (draft.items || []).map((item: any) => ({
-            ...item,
-            id: item.id || `item-${Date.now()}-${Math.random()}`
+        }
+      }
+
+      // Restore draft if found
+      if (draftToRestore) {
+        hasResumedRef.current = true
+        
+        // Restore form data
+        if (draftToRestore.formData) {
+          const nextForm = { ...draftToRestore.formData }
+          if (nextForm.time_start) {
+            nextForm.time_start = normalizeTimeToNearest30(nextForm.time_start) || nextForm.time_start
+          }
+          setFormData(nextForm as Partial<SaleInput>)
+        }
+
+        // Restore photos
+        if (draftToRestore.photos) {
+          setPhotos(draftToRestore.photos)
+        }
+
+        // Restore items (ensure IDs)
+        if (draftToRestore.items) {
+          const loadedItems = draftToRestore.items.map(item => ({
+            id: item.id || `item-${Date.now()}-${Math.random()}`,
+            name: item.name,
+            price: item.price,
+            description: item.description,
+            image_url: item.image_url,
+            category: item.category,
           }))
           setItems(loadedItems)
-          setCurrentStep(draft.currentStep || 0)
-        } catch (error) {
-          console.error('Error loading draft:', error)
+        }
+
+        // Restore step
+        if (draftToRestore.currentStep !== undefined) {
+          setCurrentStep(draftToRestore.currentStep)
+        }
+
+        // Show toast
+        setToastMessage(`Draft restored${source === 'server' ? ' from cloud' : ''}`)
+        setShowToast(true)
+
+        // If user just signed in and we restored local draft, save to server
+        if (user && source === 'local' && draftKeyRef.current) {
+          saveDraftServer(draftToRestore, draftKeyRef.current).catch(() => {
+            // Silent fail - already saved locally
+          })
         }
       }
     }
-  }, [initialData, searchParams, user])
+
+    resumeDraft()
+  }, [initialData, user, normalizeTimeToNearest30])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
     setFormData(prev => {
@@ -292,7 +442,40 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
   }
 
-  // Helper to build sale payload
+  // Helper to build draft payload
+  const buildDraftPayload = useCallback((): SaleDraftPayload => {
+    return {
+      formData: {
+        title: formData.title,
+        description: formData.description,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zip_code,
+        lat: formData.lat,
+        lng: formData.lng,
+        date_start: formData.date_start,
+        time_start: formData.time_start,
+        date_end: formData.date_end,
+        time_end: formData.time_end,
+        duration_hours: formData.duration_hours,
+        tags: formData.tags,
+        pricing_mode: formData.pricing_mode,
+      },
+      photos,
+      items: items.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        description: item.description,
+        image_url: item.image_url,
+        category: item.category,
+      })),
+      currentStep,
+    }
+  }, [formData, photos, items, currentStep])
+
+  // Helper to build sale payload (for direct publish without draft)
   const buildSalePayload = useCallback(() => {
     // Ensure time_start is normalized
     let normalizedTimeStart = formData.time_start
@@ -401,9 +584,8 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       }
 
       // Clear draft keys
-      sessionStorage.removeItem('draft:sale:new')
+      clearLocalDraft()
       sessionStorage.removeItem('auth:postLoginRedirect')
-      localStorage.removeItem('sale_draft')
 
       // Show confirmation modal
       setCreatedSaleId(saleId)
@@ -416,49 +598,48 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
   }, [router, createItemsForSale])
 
-  // Auto-resume after login
+  // Auto-resume after login (resume=1 param)
+  // If user returns after login and has a draft, auto-publish it
   useEffect(() => {
     const resume = searchParams.get('resume')
-    const hasSessionDraft = !!sessionStorage.getItem('draft:sale:new')
-    console.log('[SELL_WIZARD] Auto-resume check:', { 
-      resume, 
-      hasUser: !!user, 
-      hasResumed: hasResumedRef.current,
-      hasSessionDraft,
-      shouldResume: (resume === '1' || hasSessionDraft) && user && !hasResumedRef.current
-    })
-    
-    // Resume if: (1) resume=1 param is present, OR (2) we have a sessionStorage draft and user is logged in
-    // This handles cases where user was redirected incorrectly but draft still exists
-    if (user && !hasResumedRef.current && (resume === '1' || hasSessionDraft)) {
-      const draftJson = sessionStorage.getItem('draft:sale:new')
-      console.log('[SELL_WIZARD] Draft found for resume:', { hasDraft: !!draftJson, size: draftJson?.length || 0 })
-      if (draftJson) {
-        hasResumedRef.current = true
-        try {
-          const payload = JSON.parse(draftJson)
-          console.log('[SELL_WIZARD] Submitting draft:', { payloadKeys: Object.keys(payload), itemsCount: payload.items?.length || 0 })
-          // Submit the draft immediately
-          submitSalePayload(payload).catch((error) => {
-            console.error('[SELL_WIZARD] Error submitting draft:', error)
-            setToastMessage('Failed to submit sale. Please try again.')
-            setShowToast(true)
-            // Keep draft for retry
-            hasResumedRef.current = false // Allow retry
-          })
-        } catch (error) {
-          console.error('[SELL_WIZARD] Error parsing draft:', error)
-          // Clear invalid draft
-          sessionStorage.removeItem('draft:sale:new')
-          sessionStorage.removeItem('auth:postLoginRedirect')
-          setToastMessage('Draft data is invalid. Please start over.')
-          setShowToast(true)
-        }
-      } else {
-        console.warn('[SELL_WIZARD] No draft found in sessionStorage for resume')
+    if (resume === '1' && user && !hasResumedRef.current && draftKeyRef.current && hasLocalDraft()) {
+      hasResumedRef.current = true
+      
+      // Validate before auto-publishing
+      const nextErrors = validateDetails()
+      if (Object.keys(nextErrors).length > 0) {
+        // Don't auto-publish if validation fails - let user fix it
+        setToastMessage('Please complete all required fields before publishing')
+        setShowToast(true)
+        hasResumedRef.current = false
+        return
       }
+
+      // Auto-publish the draft
+      setLoading(true)
+      publishDraftServer(draftKeyRef.current)
+        .then((result) => {
+          if (result.ok && result.data?.saleId) {
+            clearLocalDraft()
+            setCreatedSaleId(result.data.saleId)
+            setConfirmationModalOpen(true)
+          } else {
+            setToastMessage(result.error || 'Failed to publish sale. Please try again.')
+            setShowToast(true)
+            hasResumedRef.current = false // Allow retry
+          }
+        })
+        .catch((error) => {
+          console.error('[SELL_WIZARD] Error auto-publishing draft:', error)
+          setToastMessage('Failed to publish sale. Please try again.')
+          setShowToast(true)
+          hasResumedRef.current = false // Allow retry
+        })
+        .finally(() => {
+          setLoading(false)
+        })
     }
-  }, [searchParams, user, submitSalePayload])
+  }, [searchParams, user, validateDetails])
 
   const handleSubmit = async () => {
     // Client-side required validation
@@ -470,24 +651,65 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
     // Check if user is authenticated
     if (!user) {
-      // Build payload and save to sessionStorage
-      const payload = buildSalePayload()
-      console.log('[SELL_WIZARD] Saving draft before redirect:', { payloadKeys: Object.keys(payload), itemsCount: payload.items?.length || 0 })
-      sessionStorage.setItem('draft:sale:new', JSON.stringify(payload))
+      // Build draft payload and save locally
+      const draftPayload = buildDraftPayload()
+      saveLocalDraft(draftPayload)
       sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=1')
-      
-      // Verify draft was saved
-      const savedDraft = sessionStorage.getItem('draft:sale:new')
-      console.log('[SELL_WIZARD] Draft saved verification:', { saved: !!savedDraft, size: savedDraft?.length || 0 })
       
       // Redirect to login
       router.push('/auth/signin?redirectTo=/sell/new?resume=1')
       return
     }
 
-    // User is authenticated, submit the sale
-    const payload = buildSalePayload()
-    await submitSalePayload(payload)
+    // User is authenticated - try to publish draft if exists, else create directly
+    if (draftKeyRef.current && hasLocalDraft()) {
+      // Publish draft (transactional)
+      setLoading(true)
+      setSubmitError(null)
+
+      try {
+        const result = await publishDraftServer(draftKeyRef.current)
+        
+        if (!result.ok) {
+          if (result.code === 'AUTH_REQUIRED') {
+            // Should not happen since we checked user, but handle gracefully
+            router.push('/auth/signin?redirectTo=/sell/new?resume=1')
+            setLoading(false)
+            return
+          }
+          
+          setSubmitError(result.error || 'Failed to publish sale')
+          setLoading(false)
+          return
+        }
+
+        const saleId = result.data?.saleId
+        if (!saleId) {
+          setSubmitError('Invalid response from server')
+          setLoading(false)
+          return
+        }
+
+        // Clear drafts
+        clearLocalDraft()
+        if (draftKeyRef.current) {
+          // Draft is already marked as published on server
+        }
+
+        // Show confirmation modal
+        setCreatedSaleId(saleId)
+        setConfirmationModalOpen(true)
+      } catch (error) {
+        console.error('[SELL_WIZARD] Error publishing draft:', error)
+        setSubmitError(error instanceof Error ? error.message : 'Failed to publish sale')
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      // No draft exists, create sale directly (existing flow)
+      const payload = buildSalePayload()
+      await submitSalePayload(payload)
+    }
   }
 
   const handlePhotoUpload = useCallback((urls: string[]) => {
@@ -557,12 +779,68 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">List Your Sale</h1>
-        <p className="text-gray-600">Create a listing to reach more buyers in your area</p>
-        <p className="text-sm text-gray-500 mt-2">You can fill this out without an account. We'll ask you to sign in when you submit.</p>
-      </div>
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold text-gray-900">List Your Sale</h1>
+              {saveStatus === 'saving' && (
+                <span className="text-sm text-gray-500 flex items-center gap-1">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400"></div>
+                  Saving...
+                </span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="text-sm text-green-600 flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Saved
+                </span>
+              )}
+              {saveStatus === 'error' && (
+                <span className="text-sm text-red-600">Save failed</span>
+              )}
+            </div>
+            <p className="text-gray-600">Create a listing to reach more buyers in your area</p>
+            <p className="text-sm text-gray-500 mt-2">You can fill this out without an account. We'll ask you to sign in when you submit.</p>
+            {hasLocalDraft() && (
+              <button
+                onClick={() => {
+                  if (confirm('Are you sure you want to discard this draft? This cannot be undone.')) {
+                    clearLocalDraft()
+                    if (user && draftKeyRef.current) {
+                      deleteDraftServer(draftKeyRef.current).catch(() => {})
+                    }
+                    // Reset form
+                    setFormData({
+                      title: '',
+                      description: '',
+                      address: '',
+                      city: '',
+                      state: '',
+                      zip_code: '',
+                      date_start: '',
+                      time_start: '09:00',
+                      date_end: '',
+                      time_end: '',
+                      duration_hours: 4,
+                      tags: [],
+                      pricing_mode: 'negotiable',
+                      status: 'draft'
+                    })
+                    setPhotos([])
+                    setItems([])
+                    setCurrentStep(0)
+                    setToastMessage('Draft discarded')
+                    setShowToast(true)
+                  }
+                }}
+                className="text-sm text-red-600 hover:text-red-700 mt-2 underline"
+              >
+                Discard draft
+              </button>
+            )}
+          </div>
 
       {/* Progress Steps */}
       <div className="mb-8">
@@ -1182,3 +1460,4 @@ function ReviewStep({ formData, photos, items, onPublish, loading, submitError }
     </div>
   )
 }
+

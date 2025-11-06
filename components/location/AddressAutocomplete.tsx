@@ -117,7 +117,6 @@ export default function AddressAutocomplete({
     if (suppressNextFetchRef.current) {
       suppressNextFetchRef.current = false
       justSelectedRef.current = false
-      setHasJustSelected(false)
       setIsLoading(false)
       setIsOpen(false)
       setShowGoogleAttribution(false)

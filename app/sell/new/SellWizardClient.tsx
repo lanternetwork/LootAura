@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
-import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
+import ImageUploadCard from '@/components/sales/ImageUploadCard'
 import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { containsUnsavory } from '@/lib/filters/profanity'
@@ -742,10 +742,11 @@ function PhotosStep({ photos, onUpload, onRemove, onReorder, onSetCover }: {
           Add photos to showcase your items. You can upload up to 10 photos.
         </p>
         
-        <CloudinaryUploadWidget 
-          onUpload={onUpload}
-          maxFiles={10 - photos.length}
-          className="mb-6"
+        <ImageUploadCard
+          value={photos}
+          onChange={onUpload}
+          maxFiles={10}
+          maxSizeMB={5}
         />
       </div>
 

@@ -379,102 +379,15 @@ export default function AddressAutocomplete({
             setShowFallbackMessage(false)
             if (requestIdRef.current === currentId) setIsLoading(false)
           } else {
-            // Overpass failed or returned empty - fallback to Nominatim
-            console.warn(`[AddressAutocomplete] Overpass failed/empty (numeric-only), falling back to Nominatim for "${trimmedQuery}"`)
-            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
-              .then((results) => {
-                if (requestIdRef.current !== currentId) return
-                
-                // Log raw results to understand structure
-                console.log(`[AddressAutocomplete] Nominatim raw results (numeric-only): ${results.length} results`, results.map(s => ({
-                  label: s.label,
-                  hasHouseNumber: !!s.address?.houseNumber,
-                  hasRoad: !!s.address?.road,
-                  address: s.address
-                })))
-                
-                const unique: AddressSuggestion[] = []
-                const seen = new Set<string>()
-                
-                // For numeric-only queries, filter to only include actual street addresses
-                // This prevents irrelevant results like "Devils Campground Interpretive Trail" with "5001" in the name
-                const filtered = results.filter(s => {
-                  // Check each condition and log why it's included/excluded
-                  const hasHouseNumber = !!s.address?.houseNumber
-                  const hasRoad = !!s.address?.road
-                  const labelStartsWithNumber = /^\d+/.test(s.label)
-                  const labelMatchesStreetPattern = /^\d+\s+[A-Za-z]/.test(s.label)
-                  
-                  // Include if it has a house_number in the address
-                  if (hasHouseNumber) {
-                    console.log(`[AddressAutocomplete] Including result (has houseNumber): "${s.label}"`)
-                    return true
-                  }
-                  // Or if the label matches street address pattern (number followed by street name)
-                  if (labelMatchesStreetPattern) {
-                    console.log(`[AddressAutocomplete] Including result (matches street pattern): "${s.label}"`)
-                    return true
-                  }
-                  // Or if it has a road/street in the address AND the label starts with the number
-                  // This catches cases where house_number might be missing but road is present
-                  if (hasRoad && labelStartsWithNumber) {
-                    console.log(`[AddressAutocomplete] Including result (has road and starts with number): "${s.label}"`)
-                    return true
-                  }
-                  // Otherwise exclude (likely a place with the number in the name, not a street address)
-                  console.log(`[AddressAutocomplete] Excluding result: "${s.label}" (hasHouseNumber: ${hasHouseNumber}, hasRoad: ${hasRoad}, startsWithNumber: ${labelStartsWithNumber})`)
-                  return false
-                })
-                
-                console.log(`[AddressAutocomplete] After filtering: ${filtered.length} results (from ${results.length} total)`)
-                
-                for (const s of filtered) {
-                  const key = s.id
-                  if (!seen.has(key)) {
-                    seen.add(key)
-                    unique.push(s)
-                  }
-                }
-                
-                // Calculate and log distances for Nominatim fallback results
-                const withDistances = unique.map(s => {
-                  const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
-                  const dy = (s.lat - (userLat as number)) * 111320
-                  const distanceM = Math.sqrt(dx * dx + dy * dy)
-                  return {
-                    label: s.label,
-                    coords: [s.lat, s.lng],
-                    distanceM: Math.round(distanceM),
-                    distanceKm: (distanceM / 1000).toFixed(2)
-                  }
-                })
-                
-                // Sort by distance (Nominatim may not return sorted results)
-                withDistances.sort((a, b) => a.distanceM - b.distanceM)
-                
-                console.log(`[AddressAutocomplete] Nominatim fallback results (numeric-only): ${unique.length} results (filtered from ${results.length} total)`)
-                if (withDistances.length > 0) {
-                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${withDistances[0].label}" - Distance: ${withDistances[0].distanceKm} km (${withDistances[0].distanceM} m)`)
-                  if (withDistances.length > 1) {
-                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${withDistances[1].label}" - Distance: ${withDistances[1].distanceKm} km (${withDistances[1].distanceM} m)`)
-                  }
-                } else {
-                  console.warn(`[AddressAutocomplete] No valid street addresses found in Nominatim results for "${trimmedQuery}"`)
-                }
-                
-                // Re-sort unique array by distance to match sorted distances
-                unique.sort((a, b) => {
-                  const distA = withDistances.find(d => d.label === a.label)?.distanceM || Infinity
-                  const distB = withDistances.find(d => d.label === b.label)?.distanceM || Infinity
-                  return distA - distB
-                })
-                
-                setSuggestions(unique)
-                setIsOpen(unique.length > 0)
-                setSelectedIndex(-1)
-                setShowFallbackMessage(unique.length > 0) // Show message if we got results from fallback
-                if (requestIdRef.current === currentId) setIsLoading(false)
-              })
+            // Overpass failed or returned empty
+            // For numeric-only queries, don't fallback to Nominatim because free-text search
+            // for just a number returns irrelevant results (places with the number in the name, not addresses)
+            console.warn(`[AddressAutocomplete] Overpass returned 0 results for numeric-only query "${trimmedQuery}" - showing no results (Nominatim fallback disabled for numeric-only queries)`)
+            setSuggestions([])
+            setIsOpen(false)
+            setShowFallbackMessage(false)
+            if (requestIdRef.current === currentId) setIsLoading(false)
+            return
           }
         })
         .catch((err) => {
@@ -484,73 +397,49 @@ export default function AddressAutocomplete({
             return
           }
           
-          // Fallback to Nominatim on error
-          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
-            .then((results) => {
-              if (requestIdRef.current !== currentId) return
-              const unique: AddressSuggestion[] = []
-              const seen = new Set<string>()
-              for (const s of results) {
-                const key = s.id
-                if (!seen.has(key)) {
-                  seen.add(key)
-                  unique.push(s)
-                }
-              }
-              setSuggestions(unique)
-              setIsOpen(unique.length > 0)
-              setSelectedIndex(-1)
-              setShowFallbackMessage(unique.length > 0)
-              if (requestIdRef.current === currentId) setIsLoading(false)
-            })
-            .catch((fallbackErr) => {
-              if (requestIdRef.current !== currentId) return
-              if (fallbackErr?.name === 'AbortError') {
-                if (requestIdRef.current === currentId) setIsLoading(false)
-                return
-              }
-              console.error('Suggest error:', fallbackErr)
-              setSuggestions([])
-              setIsOpen(false)
-              if (requestIdRef.current === currentId) setIsLoading(false)
-            })
+          // On error, also don't fallback for numeric-only queries
+          console.warn(`[AddressAutocomplete] Overpass error for numeric-only query "${trimmedQuery}" - showing no results`)
+          setSuggestions([])
+          setIsOpen(false)
+          if (requestIdRef.current === currentId) setIsLoading(false)
         })
-    } else {
-      // Use Nominatim for non-numeric or when coords not available
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[AddressAutocomplete] Fetching suggestions', { query: trimmedQuery.substring(0, 20), userLat, userLng })
+      } else {
+        // For non-numeric queries, use Nominatim directly (existing behavior)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AddressAutocomplete] Fetching suggestions', { query: trimmedQuery.substring(0, 20), userLat, userLng })
+        }
+        fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+          .then((results) => {
+            if (requestIdRef.current !== currentId) return
+            const unique: AddressSuggestion[] = []
+            const seen = new Set<string>()
+            for (const s of results) {
+              const key = s.id
+              if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(s)
+              }
+            }
+            if (process.env.NODE_ENV === 'development' && unique.length > 0) {
+              console.log('[AddressAutocomplete] Received suggestions', { count: unique.length, first: unique[0]?.label })
+            }
+            setSuggestions(unique)
+            setIsOpen(unique.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+          })
+          .catch((err) => {
+            if (requestIdRef.current !== currentId) return
+            if (err?.name === 'AbortError') return
+            console.error('Suggest error:', err)
+            setSuggestions([])
+            setIsOpen(false)
+          })
+          .finally(() => {
+            if (requestIdRef.current === currentId) setIsLoading(false)
+          })
       }
-      fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
-      .then((results) => {
-        if (requestIdRef.current !== currentId) return
-        const unique: AddressSuggestion[] = []
-        const seen = new Set<string>()
-        for (const s of results) {
-          const key = s.id
-          if (!seen.has(key)) {
-            seen.add(key)
-            unique.push(s)
-          }
-        }
-        if (process.env.NODE_ENV === 'development' && unique.length > 0) {
-          console.log('[AddressAutocomplete] Received suggestions', { count: unique.length, first: unique[0]?.label })
-        }
-        setSuggestions(unique)
-        setIsOpen(unique.length > 0)
-        setSelectedIndex(-1)
-      })
-      .catch((err) => {
-        if (requestIdRef.current !== currentId) return
-        if (err?.name === 'AbortError') return
-        console.error('Suggest error:', err)
-        setSuggestions([])
-        setIsOpen(false)
-      })
-      .finally(() => {
-        if (requestIdRef.current === currentId) setIsLoading(false)
-      })
-    }
-  }, [debouncedQuery, userLat, userLng])
+    }, [debouncedQuery, userLat, userLng])
 
   // If last fetch lacked coords and coords arrive, abort stale request and refetch with coords
   useEffect(() => {

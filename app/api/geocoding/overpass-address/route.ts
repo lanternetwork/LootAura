@@ -199,8 +199,11 @@ async function overpassHandler(request: NextRequest) {
     const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
     
     // For digits+street mode, implement radius expansion: 3000m -> 5000m -> 8000m
-    const radiusSequence = mode === 'digits+street' ? [3000, 5000, 8000] : [OVERPASS_RADIUS_M]
-    const minResults = mode === 'digits+street' ? 3 : 0
+    // For numeric-only, also expand radius if 0 results: 5000m -> 8000m -> 12000m
+    const radiusSequence = mode === 'digits+street' 
+      ? [3000, 5000, 8000] 
+      : [OVERPASS_RADIUS_M, 8000, 12000] // Expand for numeric-only too
+    const minResults = mode === 'digits+street' ? 3 : (mode === 'numeric-only' ? 1 : 0) // Try to get at least 1 result for numeric-only
     
     for (const currentRadius of radiusSequence) {
       radiusUsed = currentRadius
@@ -311,7 +314,12 @@ async function overpassHandler(request: NextRequest) {
       rawCount = json.elements?.length || 0
       
       // For digits+street mode, continue expanding radius if we have < 3 results
-      if (mode === 'digits+street' && rawCount < minResults && currentRadius < radiusSequence[radiusSequence.length - 1]) {
+      // For numeric-only mode, continue expanding radius if we have 0 results
+      const shouldExpand = mode === 'digits+street' 
+        ? (rawCount < minResults && currentRadius < radiusSequence[radiusSequence.length - 1])
+        : (mode === 'numeric-only' && rawCount === 0 && currentRadius < radiusSequence[radiusSequence.length - 1])
+      
+      if (shouldExpand) {
         if (enableDebug) {
           console.log(`[OVERPASS] Only ${rawCount} results at ${currentRadius}m, expanding radius...`)
         }

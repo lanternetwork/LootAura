@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
+import ImageUploadCard from './ImageUploadCard'
 import { CATEGORIES, type CategoryDef, getCategoryByValue } from '@/lib/data/categories'
 import type { CategoryValue } from '@/lib/types'
 
@@ -44,7 +44,8 @@ export default function ItemFormModal({
   const [name, setName] = useState('')
   const [price, setPrice] = useState<string>('')
   const [description, setDescription] = useState('')
-  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined)
+  const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [isUploading, setIsUploading] = useState(false)
   const [category, setCategory] = useState<CategoryValue | ''>('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const modalRef = useRef<HTMLDivElement>(null)
@@ -59,7 +60,7 @@ export default function ItemFormModal({
         setName(initialItem.name || '')
         setPrice(initialItem.price?.toString() || '')
         setDescription(initialItem.description || '')
-        setImageUrl(initialItem.image_url)
+        setImageUrls(initialItem.image_url ? [initialItem.image_url] : [])
         // Validate category - if invalid, set to empty and show helper
         const categoryValue = initialItem.category
         if (categoryValue && getCategoryByValue(categoryValue)) {
@@ -75,9 +76,10 @@ export default function ItemFormModal({
         setName('')
         setPrice('')
         setDescription('')
-        setImageUrl(undefined)
+        setImageUrls([])
         setCategory('')
       }
+      setIsUploading(false)
       setErrors({})
       // Focus name input after a brief delay to ensure modal is rendered
       setTimeout(() => {
@@ -116,11 +118,22 @@ export default function ItemFormModal({
 
   // Stable image upload handler - buffers locally
   const handleImageUpload = useCallback((urls: string[]) => {
-    setImageUrl(urls[0])
+    setImageUrls(urls)
+  }, [])
+
+  // Track upload state from ImageUploadCard
+  const handleUploadStateChange = useCallback((uploading: boolean) => {
+    setIsUploading(uploading)
   }, [])
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Block save if uploads are in progress
+    if (isUploading) {
+      setErrors({ _upload: 'Please wait for uploads to finish before saving' })
+      return
+    }
     
     // Validation
     const newErrors: Record<string, string> = {}
@@ -144,18 +157,19 @@ export default function ItemFormModal({
     }
 
     // Submit - use stable ID from initialItem or generate new one
+    // Use first image URL for backward compatibility (API expects single image_url)
     const item = {
       id: initialItem?.id || generateItemId(),
       name: trimmedName,
       price: price ? parseFloat(price) : undefined,
       description: description.trim() || undefined,
-      image_url: imageUrl,
+      image_url: imageUrls[0],
       category: category as CategoryValue,
     }
 
     onSubmit(item)
     onClose()
-  }, [name, price, description, imageUrl, category, initialItem, onSubmit, onClose])
+  }, [name, price, description, imageUrls, category, isUploading, initialItem, onSubmit, onClose])
 
   if (!isOpen) return null
 
@@ -305,37 +319,17 @@ export default function ItemFormModal({
           {/* Image Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Item Photo (Optional)
+              Item Photos (Optional)
             </label>
-            {imageUrl ? (
-              <div className="space-y-2">
-                <div className="relative inline-block">
-                  <img
-                    src={imageUrl}
-                    alt={name || 'Item'}
-                    className="w-32 h-32 object-cover rounded-lg border border-gray-200"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setImageUrl(undefined)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                    aria-label="Remove image"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <CloudinaryUploadWidget
-                  onUpload={handleImageUpload}
-                  maxFiles={1}
-                />
-              </div>
-            ) : (
-              <CloudinaryUploadWidget
-                onUpload={handleImageUpload}
-                maxFiles={1}
-              />
+            <ImageUploadCard
+              value={imageUrls}
+              onChange={handleImageUpload}
+              onUploadStateChange={handleUploadStateChange}
+              maxFiles={6}
+              maxSizeMB={5}
+            />
+            {errors._upload && (
+              <p className="mt-1 text-sm text-red-600">{errors._upload}</p>
             )}
           </div>
 
@@ -350,9 +344,10 @@ export default function ItemFormModal({
             </button>
             <button
               type="submit"
-              className="px-4 py-2 btn-accent min-h-[44px]"
+              disabled={isUploading}
+              className="px-4 py-2 btn-accent min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {initialItem ? 'Update Item' : 'Add Item'}
+              {isUploading ? 'Uploading...' : (initialItem ? 'Update Item' : 'Add Item')}
             </button>
           </div>
         </form>

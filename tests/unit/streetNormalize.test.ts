@@ -38,10 +38,11 @@ describe('streetNormalize', () => {
   describe('buildStreetRegex', () => {
     it('should build token-AND regex pattern from normalized street', () => {
       const pattern = buildStreetRegex('main street')
-      // Pattern should match all tokens: (?i).*\btoken1\b.*\btoken2\b.*
-      expect(pattern).toMatch(/\(\?i\)/)
+      // Pattern should match all tokens: .*token1.*token2.*
+      // The (?i) flag is added in the Overpass query itself
       expect(pattern).toContain('main')
       expect(pattern).toContain('street')
+      expect(pattern).toMatch(/.*main.*street.*/)
     })
 
     it('should escape special regex characters', () => {
@@ -52,8 +53,9 @@ describe('streetNormalize', () => {
 
     it('should handle single token', () => {
       const pattern = buildStreetRegex('highway')
-      expect(pattern).toMatch(/\(\?i\)/)
+      // Pattern should match the token: .*token.*
       expect(pattern).toContain('highway')
+      expect(pattern).toMatch(/.*highway.*/)
     })
 
     it('should handle empty string', () => {

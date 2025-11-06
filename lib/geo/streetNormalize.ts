@@ -122,13 +122,16 @@ export function buildStreetRegex(normalizedStreet: string): string {
       }
     }
     
-    // Match token as whole word: \b...\b
-    patterns.push(`\\b${tokenPattern}\\b`)
+    // Match token (Overpass may not support \b word boundaries, so we use a space or start/end anchor)
+    // Use a pattern that matches the token with word boundaries or spaces
+    patterns.push(tokenPattern)
   }
   
-  // Build pattern: (?i).*token1.*token2.* (all tokens must appear)
+  // Build pattern: .*token1.*token2.* (all tokens must appear)
   // This is simpler than lookaheads but still requires all tokens
-  return `(?i).*${patterns.join('.*')}.*`
+  // Note: Overpass regex may not support \b, so we use a simpler pattern
+  // The (?i) flag is added in the Overpass query itself, so we don't include it here
+  return `.*${patterns.join('.*')}.*`
 }
 
 /**

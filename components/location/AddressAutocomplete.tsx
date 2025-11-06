@@ -76,6 +76,7 @@ export default function AddressAutocomplete({
   const geoWaitRef = useRef<boolean>(false)
   const suppressNextFetchRef = useRef<boolean>(false)
   const justSelectedRef = useRef<boolean>(false)
+  const [hasJustSelected, setHasJustSelected] = useState(false)
 
   // Debounce search query (250ms per spec to avoid "empty flashes")
   const debouncedQuery = useDebounce(value, 250)
@@ -116,6 +117,7 @@ export default function AddressAutocomplete({
     if (suppressNextFetchRef.current) {
       suppressNextFetchRef.current = false
       justSelectedRef.current = false
+      setHasJustSelected(false)
       setIsLoading(false)
       setIsOpen(false)
       setShowGoogleAttribution(false)
@@ -784,9 +786,11 @@ export default function AddressAutocomplete({
       // Prevent an immediate re-query from the newly populated address value
       suppressNextFetchRef.current = true
       justSelectedRef.current = true
+      setHasJustSelected(true)
       onChange(address)
       setIsOpen(false)
       setSuggestions([])
+      setShowFallbackMessage(false)
 
       if (onPlaceSelected) {
         onPlaceSelected({
@@ -902,7 +906,7 @@ export default function AddressAutocomplete({
           ref={inputRef}
           type="text"
           value={value}
-          onChange={(e) => { justSelectedRef.current = false; onChange(e.target.value) }}
+          onChange={(e) => { justSelectedRef.current = false; setHasJustSelected(false); onChange(e.target.value) }}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           onFocus={handleFocus}
@@ -953,7 +957,7 @@ export default function AddressAutocomplete({
         )}
 
         {/* No results state */}
-        {!isLoading && !justSelectedRef.current && (() => {
+        {!isLoading && !hasJustSelected && (() => {
           const trimmedValue = value?.trim() || ''
           const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
           const minLength = isNumericOnly ? 1 : 2

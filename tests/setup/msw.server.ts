@@ -108,6 +108,41 @@ const handlers = [
       ]
     })
   }),
+  // Google Places Autocomplete
+  http.post('https://places.googleapis.com/v1/places:autocomplete', async ({ request }) => {
+    const body = await request.json().catch(() => ({} as any))
+    const input = body?.input || ''
+    if (!input || input.length < 2) return HttpResponse.json({ predictions: [] })
+    return HttpResponse.json({
+      predictions: [
+        {
+          placeId: 'gp1',
+          structuredFormat: { mainText: { text: `${input} Main` }, secondaryText: { text: 'Louisville, KY' } },
+        },
+        {
+          placeId: 'gp2',
+          structuredFormat: { mainText: { text: `${input} Second` }, secondaryText: { text: 'Louisville, KY' } },
+        },
+      ],
+    })
+  }),
+  // Google Place Details
+  http.get('https://places.googleapis.com/v1/places/:id', ({ params }) => {
+    const id = params.id as string
+    return HttpResponse.json({
+      id,
+      formattedAddress: '123 Test St, Louisville, KY 40201',
+      addressComponents: [
+        { shortText: '123', longText: '123', types: ['street_number'] },
+        { shortText: 'Test St', longText: 'Test St', types: ['route'] },
+        { shortText: 'Louisville', longText: 'Louisville', types: ['locality'] },
+        { shortText: 'KY', longText: 'Kentucky', types: ['administrative_area_level_1'] },
+        { shortText: '40201', longText: '40201', types: ['postal_code'] },
+        { shortText: 'US', longText: 'United States', types: ['country'] },
+      ],
+      location: { latitude: 38.2512, longitude: -85.7494 },
+    })
+  }),
   // Overpass address route
   http.get('/api/geocoding/overpass-address', ({ request }) => {
     const url = new URL(request.url)

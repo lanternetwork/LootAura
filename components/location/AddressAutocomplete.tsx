@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { geocodeAddress, fetchSuggestions, fetchOverpassAddresses, AddressSuggestion } from '@/lib/geocode'
+import { googleAutocomplete, googlePlaceDetails } from '@/lib/providers/googlePlaces'
+import PoweredBy from './PoweredBy'
+import { v4 as uuidv4 } from 'uuid'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { haversineMeters } from '@/lib/geo/distance'
 import OSMAttribution from './OSMAttribution'
@@ -55,6 +58,8 @@ export default function AddressAutocomplete({
   const [showFallbackMessage, setShowFallbackMessage] = useState(false)
   const [userLat, setUserLat] = useState<number | undefined>(undefined)
   const [userLng, setUserLng] = useState<number | undefined>(undefined)
+  const [googleSessionToken, setGoogleSessionToken] = useState<string | null>(null)
+  const [showGoogleAttribution, setShowGoogleAttribution] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const lastHadCoordsRef = useRef<boolean>(false)
   const requestIdRef = useRef(0)
@@ -88,6 +93,16 @@ export default function AddressAutocomplete({
         })
     }
   }, [propUserLat, propUserLng])
+
+  // Start Google session token on focus
+  const onFocus = () => {
+    if (!googleSessionToken) setGoogleSessionToken(uuidv4())
+  }
+
+  // Reset session token on blur
+  const onBlurResetSession = () => {
+    setGoogleSessionToken(null)
+  }
 
   // Fetch suggestions when query changes
   useEffect(() => {
@@ -123,6 +138,83 @@ export default function AddressAutocomplete({
     abortRef.current = controller
     lastHadCoordsRef.current = hasCoords
     
+    // Try Google first when we have coords and minimum length
+    const hasCoords = Boolean(userLat && userLng)
+    const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
+    const minLen = isNumericOnly ? 1 : 2
+
+    if (hasCoords && trimmedQuery.length >= minLen && googleSessionToken) {
+      if (abortRef.current) abortRef.current.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      googleAutocomplete(trimmedQuery, userLat as number, userLng as number, googleSessionToken, controller.signal)
+        .then(async (predictions) => {
+          if (requestIdRef.current !== currentId) return
+          if (predictions && predictions.length > 0) {
+            setShowGoogleAttribution(true)
+            // Render predictions as suggestions (without coords) using their primary/secondary text
+            const limited = predictions.slice(0, 2)
+            const suggestions: AddressSuggestion[] = limited.map((p, idx) => ({
+              id: `google:${p.placeId}`,
+              label: p.primaryText + (p.secondaryText ? `, ${p.secondaryText}` : ''),
+              lat: userLat as number,
+              lng: userLng as number,
+            }))
+            setSuggestions(suggestions)
+            setIsOpen(suggestions.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+            setIsLoading(false)
+          } else {
+            // Google returned empty → fallback to OSM
+            setShowGoogleAttribution(false)
+            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+              .then((results) => {
+                if (requestIdRef.current !== currentId) return
+                const unique: AddressSuggestion[] = []
+                const seen = new Set<string>()
+                for (const s of results) {
+                  const key = s.id
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    unique.push(s)
+                  }
+                }
+                setSuggestions(unique)
+                setIsOpen(unique.length > 0)
+                setSelectedIndex(-1)
+                setShowFallbackMessage(unique.length > 0)
+              })
+              .finally(() => setIsLoading(false))
+          }
+        })
+        .catch(() => {
+          // Google error → fallback
+          if (requestIdRef.current !== currentId) return
+          setShowGoogleAttribution(false)
+          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results) => {
+              if (requestIdRef.current !== currentId) return
+              const unique: AddressSuggestion[] = []
+              const seen = new Set<string>()
+              for (const s of results) {
+                const key = s.id
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(s)
+                }
+              }
+              setSuggestions(unique)
+              setIsOpen(unique.length > 0)
+              setSelectedIndex(-1)
+              setShowFallbackMessage(unique.length > 0)
+            })
+            .finally(() => setIsLoading(false))
+        })
+      return
+    }
+
     // For digits+street queries with coords, try Overpass first
     if (isDigitsStreet && hasCoords && digitsStreetMatch?.groups) {
       if (process.env.NODE_ENV === 'development') {
@@ -659,25 +751,40 @@ export default function AddressAutocomplete({
 
   // Handle suggestion selection
   const handleSelect = useCallback((suggestion: AddressSuggestion) => {
-    const address = suggestion.label
-    const city = suggestion.address?.city || ''
-    const state = suggestion.address?.state || ''
-    const zip = suggestion.address?.postcode || ''
+    const run = async () => {
+      let final = suggestion
+      // If Google suggestion, fetch details using current session token
+      if (suggestion.id?.startsWith('google:') && googleSessionToken) {
+        const placeId = suggestion.id.split(':')[1]
+        const details = await googlePlaceDetails(placeId, googleSessionToken).catch(() => null)
+        if (details) {
+          final = details
+        }
+        // end session
+        setGoogleSessionToken(null)
+      }
 
-    onChange(address)
-    setIsOpen(false)
-    setSuggestions([])
+      const address = final.label
+      const city = final.address?.city || ''
+      const state = final.address?.state || ''
+      const zip = final.address?.postcode || ''
 
-    if (onPlaceSelected) {
-      onPlaceSelected({
-        address,
-        city,
-        state,
-        zip,
-        lat: suggestion.lat,
-        lng: suggestion.lng
-      })
+      onChange(address)
+      setIsOpen(false)
+      setSuggestions([])
+
+      if (onPlaceSelected) {
+        onPlaceSelected({
+          address,
+          city,
+          state,
+          zip,
+          lat: final.lat,
+          lng: final.lng
+        })
+      }
     }
+    run()
   }, [onChange, onPlaceSelected])
 
   // Handle keyboard navigation
@@ -717,6 +824,7 @@ export default function AddressAutocomplete({
 
   // Handle blur (geocode if no selection)
   const handleBlur = async () => {
+    setGoogleSessionToken(null)
     // Delay to allow click on suggestion to register
     setTimeout(async () => {
       if (value && value.length >= 5 && onPlaceSelected && !isGeocoding && !isOpen) {
@@ -744,6 +852,7 @@ export default function AddressAutocomplete({
 
   // Handle input focus
   const handleFocus = () => {
+    if (!googleSessionToken) setGoogleSessionToken(uuidv4())
     const trimmedQuery = debouncedQuery?.trim() || ''
     const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
     const minLength = isNumericOnly ? 1 : 2
@@ -885,6 +994,7 @@ export default function AddressAutocomplete({
             ))}
           </ul>
         )}
+        {isOpen && showGoogleAttribution && <PoweredBy provider="google" />}
       </div>
       
       {/* OSM Attribution - outside relative container to avoid z-index issues */}

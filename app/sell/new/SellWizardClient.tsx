@@ -24,6 +24,14 @@ interface WizardStep {
   description: string
 }
 
+// Single source of truth for step indexes
+const STEPS = {
+  DETAILS: 0,
+  PHOTOS: 1,
+  ITEMS: 2,
+  REVIEW: 3
+} as const
+
 const WIZARD_STEPS: WizardStep[] = [
   {
     id: 'details',
@@ -82,6 +90,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const draftKeyRef = useRef<string | null>(null)
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastServerSaveRef = useRef<number>(0)
+  const isNavigatingRef = useRef(false)
   const searchParams = useSearchParams()
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
@@ -258,6 +267,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     if (initialData || hasResumedRef.current) return
 
     const resumeDraft = async () => {
+      const resume = searchParams.get('resume')
+      const isReviewResume = resume === 'review'
+      
       let draftToRestore: SaleDraftPayload | null = null
       let source: 'server' | 'local' | null = null
 
@@ -342,26 +354,39 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
           setItems(loadedItems)
         }
 
-        // Restore step
-        if (draftToRestore.currentStep !== undefined) {
+        // Restore step: if resume=review, force Review step; otherwise use saved step
+        if (isReviewResume) {
+          setCurrentStep(STEPS.REVIEW)
+          setToastMessage('Draft restored. Ready to review your sale.')
+        } else if (draftToRestore.currentStep !== undefined) {
           setCurrentStep(draftToRestore.currentStep)
+          setToastMessage(`Draft restored${source === 'server' ? ' from cloud' : ''}`)
         }
 
-        // Show toast
-        setToastMessage(`Draft restored${source === 'server' ? ' from cloud' : ''}`)
         setShowToast(true)
 
-        // If user just signed in and we restored local draft, save to server
+        // If user is authenticated and we restored local draft, save to server
         if (user && source === 'local' && draftKeyRef.current) {
           saveDraftServer(draftToRestore, draftKeyRef.current).catch(() => {
             // Silent fail - already saved locally
           })
         }
+      } else if (isReviewResume) {
+        // Draft not found but resume=review - still go to Review step
+        setCurrentStep(STEPS.REVIEW)
+        setToastMessage('Draft not found; please review details.')
+        setShowToast(true)
+      }
+
+      // Clear sessionStorage keys after resume
+      if (isReviewResume) {
+        sessionStorage.removeItem('auth:postLoginRedirect')
+        sessionStorage.removeItem('draft:returnStep')
       }
     }
 
     resumeDraft()
-  }, [initialData, user, normalizeTimeToNearest30])
+  }, [initialData, user, normalizeTimeToNearest30, searchParams])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
     setFormData(prev => {
@@ -455,22 +480,70 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     return nextErrors
   }
 
-  const handleNext = () => {
-    // Require core fields on the Details step before advancing
-    if (currentStep === 0) {
-      const nextErrors = validateDetails()
-      setErrors(nextErrors)
-      if (Object.keys(nextErrors).length > 0) {
-        return
+  const handleNext = async () => {
+    // Guard against duplicate clicks
+    if (isNavigatingRef.current) return
+    isNavigatingRef.current = true
+
+    try {
+      // Require core fields on the Details step before advancing
+      if (currentStep === STEPS.DETAILS) {
+        const nextErrors = validateDetails()
+        setErrors(nextErrors)
+        if (Object.keys(nextErrors).length > 0) {
+          isNavigatingRef.current = false
+          return
+        }
       }
-    }
-    if (currentStep < WIZARD_STEPS.length - 1) {
-      setCurrentStep(currentStep + 1)
+
+      // Build and save draft before advancing
+      const payload = buildDraftPayload()
+      
+      // Save to localStorage first (await to ensure it's written)
+      try {
+        saveLocalDraft(payload)
+      } catch (error) {
+        console.error('[SELL_WIZARD] Error saving local draft:', error)
+        // Continue anyway - don't block navigation
+      }
+
+      // Fire-and-forget server save (throttled, non-blocking)
+      if (user && draftKeyRef.current) {
+        const now = Date.now()
+        if (now - lastServerSaveRef.current > 10000) {
+          lastServerSaveRef.current = now
+          saveDraftServer(payload, draftKeyRef.current).catch(() => {
+            // Silent fail - already saved locally
+          })
+        }
+      }
+
+      // Auth gate: Items (2) → Review (3)
+      if (currentStep === STEPS.ITEMS && !user) {
+        // Set redirect keys
+        sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
+        sessionStorage.setItem('draft:returnStep', 'review')
+        
+        // Redirect to login
+        router.push('/auth/signin?redirectTo=/sell/new?resume=review')
+        isNavigatingRef.current = false
+        return // Don't advance step
+      }
+
+      // Normal navigation
+      if (currentStep < WIZARD_STEPS.length - 1) {
+        setCurrentStep(currentStep + 1)
+      }
+    } finally {
+      // Reset navigation guard after a short delay
+      setTimeout(() => {
+        isNavigatingRef.current = false
+      }, 500)
     }
   }
 
   const handlePrevious = () => {
-    if (currentStep > 0) {
+    if (currentStep > STEPS.DETAILS) {
       setCurrentStep(currentStep - 1)
     }
   }
@@ -552,10 +625,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       if (response.status === 401) {
         // Save draft to sessionStorage
         sessionStorage.setItem('draft:sale:new', JSON.stringify(payload))
-        sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=1')
+        sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
+        sessionStorage.setItem('draft:returnStep', 'review')
         
         // Redirect to login
-        router.push('/auth/signin?redirectTo=/sell/new?resume=1')
+        router.push('/auth/signin?redirectTo=/sell/new?resume=review')
         setLoading(false)
         return
       }
@@ -583,9 +657,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         await createItemsForSale(saleId, payload.items)
       }
 
-      // Clear draft keys
+      // Clear draft keys and sessionStorage
       clearLocalDraft()
       sessionStorage.removeItem('auth:postLoginRedirect')
+      sessionStorage.removeItem('draft:returnStep')
 
       // Show confirmation modal
       setCreatedSaleId(saleId)
@@ -654,10 +729,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       // Build draft payload and save locally
       const draftPayload = buildDraftPayload()
       saveLocalDraft(draftPayload)
-      sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=1')
+      sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
+      sessionStorage.setItem('draft:returnStep', 'review')
       
       // Redirect to login
-      router.push('/auth/signin?redirectTo=/sell/new?resume=1')
+      router.push('/auth/signin?redirectTo=/sell/new?resume=review')
       return
     }
 
@@ -690,8 +766,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
           return
         }
 
-        // Clear drafts
+        // Clear drafts and sessionStorage keys
         clearLocalDraft()
+        sessionStorage.removeItem('auth:postLoginRedirect')
+        sessionStorage.removeItem('draft:returnStep')
         if (draftKeyRef.current) {
           // Draft is already marked as published on server
         }
@@ -764,13 +842,13 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
   const renderStep = () => {
     switch (currentStep) {
-      case 0:
+      case STEPS.DETAILS:
         return <DetailsStep formData={formData} onChange={handleInputChange} errors={_errors} userLat={userLat} userLng={userLng} />
-      case 1:
+      case STEPS.PHOTOS:
         return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
-      case 2:
+      case STEPS.ITEMS:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
-      case 3:
+      case STEPS.REVIEW:
         return <ReviewStep formData={formData} photos={photos} items={items} onPublish={handleSubmit} loading={loading} submitError={submitError} />
       default:
         return null
@@ -885,7 +963,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between">
         <button
           onClick={handlePrevious}
-          disabled={currentStep === 0}
+          disabled={currentStep === STEPS.DETAILS}
           className="inline-flex items-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
         >
           <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

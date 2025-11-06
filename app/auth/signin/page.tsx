@@ -20,8 +20,8 @@ export default function SignIn() {
     if (!authLoading && currentUser) {
       // Small delay to ensure auth state is fully propagated
       const timeoutId = setTimeout(() => {
-        // Check for redirect query param or sessionStorage
-        const redirectParam = params.get('redirectTo')
+        // Check for redirect query param (accept both 'redirect' and 'redirectTo' for consistency)
+        const redirectParam = params.get('redirectTo') || params.get('redirect')
         const storageRedirect = sessionStorage.getItem('auth:postLoginRedirect')
         const redirectTo = redirectParam || storageRedirect || '/sales'
         console.log('[SIGNIN] Redirecting after login:', { 
@@ -34,6 +34,7 @@ export default function SignIn() {
         // Clear sessionStorage redirect if used
         if (storageRedirect) {
           sessionStorage.removeItem('auth:postLoginRedirect')
+          sessionStorage.removeItem('draft:returnStep')
         }
         router.replace(redirectTo)
       }, 200) // Increased delay to ensure auth state propagation

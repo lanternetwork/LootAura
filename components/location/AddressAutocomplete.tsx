@@ -206,7 +206,7 @@ export default function AddressAutocomplete({
               })
             }
             setSuggestions(sortedUnique)
-            setIsOpen(unique.length > 0)
+            setIsOpen(sortedUnique.length > 0)
             setSelectedIndex(-1)
             setShowFallbackMessage(false)
             if (requestIdRef.current === currentId) setIsLoading(false)
@@ -398,7 +398,7 @@ export default function AddressAutocomplete({
               })
             }
             setSuggestions(sortedUnique)
-            setIsOpen(unique.length > 0)
+            setIsOpen(sortedUnique.length > 0)
             setSelectedIndex(-1)
             setShowFallbackMessage(false)
             if (requestIdRef.current === currentId) setIsLoading(false)

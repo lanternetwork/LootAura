@@ -399,14 +399,30 @@ export default function AddressAutocomplete({
                 // For numeric-only queries, filter to only include actual street addresses
                 // This prevents irrelevant results like "Devils Campground Interpretive Trail" with "5001" in the name
                 const filtered = results.filter(s => {
+                  // Check each condition and log why it's included/excluded
+                  const hasHouseNumber = !!s.address?.houseNumber
+                  const hasRoad = !!s.address?.road
+                  const labelStartsWithNumber = /^\d+/.test(s.label)
+                  const labelMatchesStreetPattern = /^\d+\s+[A-Za-z]/.test(s.label)
+                  
                   // Include if it has a house_number in the address
-                  if (s.address?.houseNumber) return true
+                  if (hasHouseNumber) {
+                    console.log(`[AddressAutocomplete] Including result (has houseNumber): "${s.label}"`)
+                    return true
+                  }
                   // Or if the label matches street address pattern (number followed by street name)
-                  if (s.label.match(/^\d+\s+[A-Za-z]/)) return true
+                  if (labelMatchesStreetPattern) {
+                    console.log(`[AddressAutocomplete] Including result (matches street pattern): "${s.label}"`)
+                    return true
+                  }
                   // Or if it has a road/street in the address AND the label starts with the number
                   // This catches cases where house_number might be missing but road is present
-                  if (s.address?.road && s.label.match(/^\d+/)) return true
+                  if (hasRoad && labelStartsWithNumber) {
+                    console.log(`[AddressAutocomplete] Including result (has road and starts with number): "${s.label}"`)
+                    return true
+                  }
                   // Otherwise exclude (likely a place with the number in the name, not a street address)
+                  console.log(`[AddressAutocomplete] Excluding result: "${s.label}" (hasHouseNumber: ${hasHouseNumber}, hasRoad: ${hasRoad}, startsWithNumber: ${labelStartsWithNumber})`)
                   return false
                 })
                 

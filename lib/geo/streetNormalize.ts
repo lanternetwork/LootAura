@@ -47,27 +47,31 @@ const DIRECTIONAL_EXPANSIONS: Record<string, string> = {
  */
 export function normalizeStreetName(street: string): string {
   // Lowercase and strip punctuation
-  let normalized = street.toLowerCase().replace(/[^\w\s]/g, ' ')
-  
+  let normalized = street.toLowerCase().replace(/[^\w\s-]/g, ' ')
+
   // Collapse whitespace
   normalized = normalized.replace(/\s+/g, ' ').trim()
-  
+
   // Split into tokens
-  const tokens = normalized.split(/\s+/)
-  
-  // Expand abbreviations
-  const expanded = tokens.map(token => {
-    // Check street type abbreviations
-    if (STREET_TYPE_EXPANSIONS[token]) {
-      return STREET_TYPE_EXPANSIONS[token]
-    }
-    // Check directional abbreviations
-    if (DIRECTIONAL_EXPANSIONS[token]) {
-      return DIRECTIONAL_EXPANSIONS[token]
-    }
+  const rawTokens = normalized.split(/\s+/)
+
+  // Keep tokens >= 2 chars OR known directionals (n/e/s/w, ne/nw/se/sw)
+  // Ignore tokens that contain digits (route numbers like "us-31w", "ky-xxx", "31w")
+  const filteredTokens = rawTokens.filter(token => {
+    if (!token) return false
+    if (/\d/.test(token)) return false // drop tokens with any digits (route numbers)
+    if (token.length >= 2) return true
+    // keep 1-char directionals
+    return token === 'n' || token === 'e' || token === 's' || token === 'w'
+  })
+
+  // Expand abbreviations and directionals
+  const expanded = filteredTokens.map(token => {
+    if (STREET_TYPE_EXPANSIONS[token]) return STREET_TYPE_EXPANSIONS[token]
+    if (DIRECTIONAL_EXPANSIONS[token]) return DIRECTIONAL_EXPANSIONS[token]
     return token
   })
-  
+
   return expanded.join(' ')
 }
 
@@ -83,55 +87,37 @@ export function normalizeStreetName(street: string): string {
  * For full token-AND semantics, use buildStreetTokenAndRegex instead
  */
 export function buildStreetRegex(normalizedStreet: string): string {
+  // Build a token-AND prefix regex with lookaheads: (?i)(?=.*\bpre)
+  // We keep tokens >= 2, with synonym group for known types/directionals.
   const tokens = normalizedStreet.split(/\s+/).filter(Boolean)
-  
-  if (tokens.length === 0) {
-    return '.*'
-  }
-  
-  // Build pattern that matches all tokens (order doesn't matter for basic matching)
-  // We'll use a simple pattern that matches tokens with .* between them
-  // Overpass may not support lookaheads, so we use a simpler approach
-  const patterns: string[] = []
-  
+  if (tokens.length === 0) return '.*'
+
+  const lookaheads: string[] = []
+
   for (const token of tokens) {
-    // Escape special regex characters
     const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    
-    // Check if this token has an abbreviation variant
-    let tokenPattern = escapedToken
-    
-    // Find abbreviation for this token (reverse lookup)
-    const abbreviation = Object.entries(STREET_TYPE_EXPANSIONS).find(
-      ([_abbr, full]) => full === token
-    )?.[0]
-    
-    if (abbreviation) {
-      // Support both full form and abbreviation
-      const escapedAbbr = abbreviation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      tokenPattern = `(${escapedToken}|${escapedAbbr})`
+
+    // Optional synonym group for street types or directionals
+    let group = escapedToken
+    const typeAbbr = Object.entries(STREET_TYPE_EXPANSIONS).find(([_abbr, full]) => full === token)?.[0]
+    if (typeAbbr) {
+      const escapedAbbr = typeAbbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      group = `(${escapedToken}|${escapedAbbr})`
     } else {
-      // Check for directional abbreviations
-      const dirAbbreviation = Object.entries(DIRECTIONAL_EXPANSIONS).find(
-        ([_abbr, full]) => full === token
-      )?.[0]
-      
-      if (dirAbbreviation) {
-        const escapedDirAbbr = dirAbbreviation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        tokenPattern = `(${escapedToken}|${escapedDirAbbr})`
+      const dirAbbr = Object.entries(DIRECTIONAL_EXPANSIONS).find(([_abbr, full]) => full === token)?.[0]
+      if (dirAbbr) {
+        const escapedDir = dirAbbr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        group = `(${escapedToken}|${escapedDir})`
       }
     }
-    
-    // Match token (Overpass may not support \b word boundaries, so we use a space or start/end anchor)
-    // Use a pattern that matches the token with word boundaries or spaces
-    patterns.push(tokenPattern)
+
+    // Prefix match per token using word boundary + prefix
+    // We'll not add (?i) here; the query will add it.
+    lookaheads.push(`(?=.*\\b${group})`)
   }
-  
-  // Build pattern: .*token1.*token2.* (all tokens must appear)
-  // This is simpler than lookaheads but still requires all tokens
-  // Note: Overpass regex may not support \b, so we use a simpler pattern
-  // The (?i) flag is added in the Overpass query itself, so we don't include it here
-  return `.*${patterns.join('.*')}.*`
+
+  // Combine lookaheads and permit any trailing content
+  return `${lookaheads.join('')}.*`
 }
 
 /**

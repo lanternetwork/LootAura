@@ -104,6 +104,8 @@ async function overpassHandler(request: NextRequest) {
     const limit = limitParam 
       ? Math.min(Math.max(parseInt(limitParam, 10), 1), 10)
       : 8
+    // Internal search cap: always try to gather up to 8 to avoid stopping too early when client displays 2
+    const searchCap = Math.max(8, limit)
     
     // Round coordinates for cache key (5 decimal places ≈ 1.1m precision per spec)
     const roundedLat = Math.round((lat as number) * 100000) / 100000
@@ -395,13 +397,13 @@ async function overpassHandler(request: NextRequest) {
         bestJson = json
       }
       
-      // Check if we have enough results (≥ client limit per spec)
-      if (withDistance.length >= limit && currentRadius < radiusSequence[radiusSequence.length - 1]) {
+      // Check if we have enough results (≥ display limit OR up to reasonable cap)
+      if (withDistance.length >= searchCap && currentRadius < radiusSequence[radiusSequence.length - 1]) {
         // We have enough results, use this radius
         bestResults = withDistance
         bestJson = json
         if (enableDebug) {
-          console.log(`[OVERPASS] Found ${withDistance.length} valid results at ${currentRadius}m (≥ limit ${limit}), stopping expansion`)
+          console.log(`[OVERPASS] Found ${withDistance.length} valid results at ${currentRadius}m (≥ searchCap ${searchCap}), stopping expansion`)
         }
         break
       }
@@ -421,20 +423,59 @@ async function overpassHandler(request: NextRequest) {
     }
     
     // Use best results from expansion loop
-    const withDistance = bestResults
+    let withDistance = bestResults
     json = bestJson
-    
-    // If we have no results after trying all radii, return empty results (not an error)
-    // This allows the client to fall back to Nominatim
-    if (withDistance.length === 0) {
-      return NextResponse.json({
-        ok: true,
-        data: []
-      }, {
-        headers: {
-          'Cache-Control': 'public, max-age=120'
+
+    // If we have no results after trying all radii, perform a final US-area sweep
+    if (withDistance.length === 0 && mode === 'digits+street' && streetParam) {
+      try {
+        const normalizedStreet = normalizeStreetName(streetParam)
+        const streetRegex = buildStreetRegex(normalizedStreet) // token-AND prefix regex
+        // Overpass US area sweep (ISO3166-1=US)
+        const timeoutSec = OVERPASS_TIMEOUT_SEC
+        const usAreaQuery = `
+          [out:json][timeout:${timeoutSec}];
+          area["ISO3166-1"="US"][admin_level=2]->.searchArea;
+          (
+            node["addr:housenumber"~"^${prefix}"]["addr:street"~"(?i)${streetRegex}"](area.searchArea);
+            way["addr:housenumber"~"^${prefix}"]["addr:street"~"(?i)${streetRegex}"](area.searchArea);
+            relation["addr:housenumber"~"^${prefix}"]["addr:street"~"(?i)${streetRegex}"](area.searchArea);
+          );
+          out center 100;
+        `
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), OVERPASS_TIMEOUT_MS)
+        const response = await fetch(OVERPASS_BASE_URL, {
+          method: 'POST',
+          headers: {
+            'User-Agent': `LootAura/1.0 (${email})`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: `data=${encodeURIComponent(usAreaQuery)}`,
+          signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+        if (response.ok) {
+          const usJson = await response.json()
+          const normalized = parseOverpassElements(usJson)
+          const withDist = normalized.map(addr => ({
+            ...addr,
+            distanceM: haversineMeters(userLat, userLng, addr.lat, addr.lng)
+          }))
+          withDist.sort((a, b) => a.distanceM - b.distanceM)
+          withDistance = withDist
         }
-      })
+      } catch {
+        // ignore and fall back
+      }
+    }
+
+    // If still no results after US-area sweep, return empty (client will fall back to Nominatim)
+    if (withDistance.length === 0) {
+      // Cache empty very briefly to avoid hammering
+      setCachedResults(cacheKey, [], 10_000) // 10s TTL for empties
+      return NextResponse.json({ ok: true, data: [] }, { headers: { 'Cache-Control': 'public, max-age=10' } })
     }
     
     // Verify sorting is correct (for debugging)

@@ -408,8 +408,18 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   // Auto-resume after login
   useEffect(() => {
     const resume = searchParams.get('resume')
-    console.log('[SELL_WIZARD] Auto-resume check:', { resume, hasUser: !!user, hasResumed: hasResumedRef.current })
-    if (resume === '1' && user && !hasResumedRef.current) {
+    const hasSessionDraft = !!sessionStorage.getItem('draft:sale:new')
+    console.log('[SELL_WIZARD] Auto-resume check:', { 
+      resume, 
+      hasUser: !!user, 
+      hasResumed: hasResumedRef.current,
+      hasSessionDraft,
+      shouldResume: (resume === '1' || hasSessionDraft) && user && !hasResumedRef.current
+    })
+    
+    // Resume if: (1) resume=1 param is present, OR (2) we have a sessionStorage draft and user is logged in
+    // This handles cases where user was redirected incorrectly but draft still exists
+    if (user && !hasResumedRef.current && (resume === '1' || hasSessionDraft)) {
       const draftJson = sessionStorage.getItem('draft:sale:new')
       console.log('[SELL_WIZARD] Draft found for resume:', { hasDraft: !!draftJson, size: draftJson?.length || 0 })
       if (draftJson) {

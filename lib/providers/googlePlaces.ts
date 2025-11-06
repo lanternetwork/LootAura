@@ -26,8 +26,6 @@ export async function googleAutocomplete(
     input: input.trim(),
     languageCode: 'en',
     regionCode: 'US',
-    // Use includedTypes (more widely supported) to bias toward address-like results
-    includedTypes: ['street_address', 'premise', 'subpremise'],
     locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 50000 } },
     sessionToken,
   }

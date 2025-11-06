@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import ImageUploadCard from './ImageUploadCard'
-import { CATEGORIES, type CategoryDef, getCategoryByValue } from '@/lib/data/categories'
+import { CATEGORIES, getCategoryByValue } from '@/lib/data/categories'
 import type { CategoryValue } from '@/lib/types'
 
 // Generate stable UUID for new items

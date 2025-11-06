@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { haversineMeters } from '@/lib/geo/distance'
+import { googleAutocomplete, googlePlaceDetails, type GooglePrediction } from '@/lib/providers/googlePlaces'
 
 // Dynamically import map to avoid SSR issues
 const SimpleMap = dynamic(() => import('@/components/location/SimpleMap'), { ssr: false })
@@ -25,6 +26,9 @@ export default function GeolocationDiagnostics() {
   const [error, setError] = useState<string | null>(null)
   const mapRef = useRef<any>(null)
   const [includeBrowserGeo, setIncludeBrowserGeo] = useState(false)
+  const [googleQuery, setGoogleQuery] = useState('5001 pres')
+  const [googlePredictions, setGooglePredictions] = useState<GooglePrediction[]>([])
+  const [googleSession, setGoogleSession] = useState<string>('')
 
   // Color scheme for different methods
   const methodColors: Record<string, string> = {
@@ -342,7 +346,51 @@ export default function GeolocationDiagnostics() {
   // Auto-run on mount
   useEffect(() => {
     testAllMethods()
+    // initialize Google session token lazily
+    try {
+      // @ts-ignore
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        // @ts-ignore
+        setGoogleSession(crypto.randomUUID())
+      } else {
+        setGoogleSession(Math.random().toString(36).slice(2) + Date.now().toString(36))
+      }
+    } catch {
+      setGoogleSession(Math.random().toString(36).slice(2) + Date.now().toString(36))
+    }
   }, [])
+
+  async function runGoogleTest() {
+    setError(null)
+    setGooglePredictions([])
+    // Use the first valid location as center or fallback to Louisville
+    const center = (() => {
+      const valid = results.find(r => !r.error && r.lat && r.lng)
+      return valid ? { lat: valid.lat, lng: valid.lng } : { lat: 38.2527, lng: -85.7585 }
+    })()
+    try {
+      const preds = await googleAutocomplete(googleQuery, center.lat, center.lng, googleSession)
+      setGooglePredictions(preds)
+      // Attempt details of first prediction and add to results/pins
+      if (preds.length > 0) {
+        const details = await googlePlaceDetails(preds[0].placeId, googleSession)
+        if (details) {
+          const entry: GeolocationResult = {
+            method: 'Google Place Details',
+            lat: details.lat,
+            lng: details.lng,
+            accuracy: undefined,
+            source: 'google',
+            timestamp: Date.now(),
+            details: { label: details.label }
+          }
+          setResults(prev => [...prev, entry])
+        }
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Google request failed')
+    }
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -368,6 +416,22 @@ export default function GeolocationDiagnostics() {
           />
           Include browser geolocation (will prompt)
         </label>
+        {/* Google test controls */}
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="text"
+            value={googleQuery}
+            onChange={(e) => setGoogleQuery(e.target.value)}
+            placeholder="Google test query (e.g. 5001 pres)"
+            className="border rounded px-2 py-1 text-sm flex-1"
+          />
+          <button
+            onClick={runGoogleTest}
+            className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
+          >
+            Test Google
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -500,6 +564,22 @@ export default function GeolocationDiagnostics() {
           </table>
         </div>
       </div>
+
+      {/* Google Predictions */}
+      {googlePredictions.length > 0 && (
+        <div className="mb-6">
+          <h4 className="text-md font-medium mb-2">Google Predictions</h4>
+          <ul className="list-disc pl-5 text-sm text-gray-700">
+            {googlePredictions.slice(0, 5).map((p) => (
+              <li key={p.placeId}>
+                <span className="font-mono text-xs">{p.placeId}</span> — {p.primaryText}
+                {p.secondaryText ? <span className="text-gray-500">, {p.secondaryText}</span> : null}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[10px] text-right text-gray-500">Powered by Google</p>
+        </div>
+      )}
 
       {/* Detailed Information */}
       {results.length > 0 && (

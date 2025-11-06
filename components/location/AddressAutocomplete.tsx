@@ -384,16 +384,33 @@ export default function AddressAutocomplete({
             return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
               .then((results) => {
                 if (requestIdRef.current !== currentId) return
+                
+                // Log raw results to understand structure
+                console.log(`[AddressAutocomplete] Nominatim raw results (numeric-only): ${results.length} results`, results.map(s => ({
+                  label: s.label,
+                  hasHouseNumber: !!s.address?.houseNumber,
+                  hasRoad: !!s.address?.road,
+                  address: s.address
+                })))
+                
                 const unique: AddressSuggestion[] = []
                 const seen = new Set<string>()
                 
-                // For numeric-only queries, filter to only include actual street addresses (with house_number)
+                // For numeric-only queries, filter to only include actual street addresses
                 // This prevents irrelevant results like "Devils Campground Interpretive Trail" with "5001" in the name
                 const filtered = results.filter(s => {
-                  // Only include results that have a house_number in the address
-                  // This ensures we're showing actual street addresses, not just places with the number in the name
-                  return s.address?.houseNumber || s.label.match(/^\d+\s+[A-Za-z]/) // Match pattern like "5001 Main St"
+                  // Include if it has a house_number in the address
+                  if (s.address?.houseNumber) return true
+                  // Or if the label matches street address pattern (number followed by street name)
+                  if (s.label.match(/^\d+\s+[A-Za-z]/)) return true
+                  // Or if it has a road/street in the address AND the label starts with the number
+                  // This catches cases where house_number might be missing but road is present
+                  if (s.address?.road && s.label.match(/^\d+/)) return true
+                  // Otherwise exclude (likely a place with the number in the name, not a street address)
+                  return false
                 })
+                
+                console.log(`[AddressAutocomplete] After filtering: ${filtered.length} results (from ${results.length} total)`)
                 
                 for (const s of filtered) {
                   const key = s.id

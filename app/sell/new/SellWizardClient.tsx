@@ -143,8 +143,19 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
 
   // Load draft from localStorage on mount (for backward compatibility)
+  // Also check sessionStorage if user just logged in but wasn't redirected with resume=1
   useEffect(() => {
-    if (!initialData && !searchParams.get('resume')) {
+    const resume = searchParams.get('resume')
+    const hasSessionDraft = sessionStorage.getItem('draft:sale:new')
+    
+    // If we have a sessionStorage draft but no resume param, user might have been redirected incorrectly
+    // In this case, we should still try to restore the draft
+    if (hasSessionDraft && !resume && user) {
+      console.log('[SELL_WIZARD] Found sessionStorage draft without resume param, user is logged in - will auto-submit on next render')
+      // The auto-resume effect will handle this when user is set
+    }
+    
+    if (!initialData && !resume && !hasSessionDraft) {
       const savedDraft = localStorage.getItem('sale_draft')
       if (savedDraft) {
         try {
@@ -167,7 +178,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         }
       }
     }
-  }, [initialData, searchParams])
+  }, [initialData, searchParams, user])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
     setFormData(prev => {

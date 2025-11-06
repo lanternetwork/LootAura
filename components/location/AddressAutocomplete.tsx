@@ -4,7 +4,17 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { geocodeAddress, fetchSuggestions, fetchOverpassAddresses, AddressSuggestion } from '@/lib/geocode'
 import { googleAutocomplete, googlePlaceDetails } from '@/lib/providers/googlePlaces'
 import PoweredBy from './PoweredBy'
-import { v4 as uuidv4 } from 'uuid'
+// Generate session tokens using Web Crypto if available
+function newSessionToken(): string {
+  try {
+    // @ts-ignore
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      // @ts-ignore
+      return crypto.randomUUID()
+    }
+  } catch {}
+  return Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { haversineMeters } from '@/lib/geo/distance'
 import OSMAttribution from './OSMAttribution'
@@ -94,15 +104,7 @@ export default function AddressAutocomplete({
     }
   }, [propUserLat, propUserLng])
 
-  // Start Google session token on focus
-  const onFocus = () => {
-    if (!googleSessionToken) setGoogleSessionToken(uuidv4())
-  }
-
-  // Reset session token on blur
-  const onBlurResetSession = () => {
-    setGoogleSessionToken(null)
-  }
+  // (session token creation handled inside handleFocus; reset in handleBlur)
 
   // Fetch suggestions when query changes
   useEffect(() => {
@@ -139,8 +141,6 @@ export default function AddressAutocomplete({
     lastHadCoordsRef.current = hasCoords
     
     // Try Google first when we have coords and minimum length
-    const hasCoords = Boolean(userLat && userLng)
-    const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
     const minLen = isNumericOnly ? 1 : 2
 
     if (hasCoords && trimmedQuery.length >= minLen && googleSessionToken) {
@@ -155,7 +155,7 @@ export default function AddressAutocomplete({
             setShowGoogleAttribution(true)
             // Render predictions as suggestions (without coords) using their primary/secondary text
             const limited = predictions.slice(0, 2)
-            const suggestions: AddressSuggestion[] = limited.map((p, idx) => ({
+            const suggestions: AddressSuggestion[] = limited.map((p, _idx) => ({
               id: `google:${p.placeId}`,
               label: p.primaryText + (p.secondaryText ? `, ${p.secondaryText}` : ''),
               lat: userLat as number,
@@ -852,7 +852,7 @@ export default function AddressAutocomplete({
 
   // Handle input focus
   const handleFocus = () => {
-    if (!googleSessionToken) setGoogleSessionToken(uuidv4())
+    if (!googleSessionToken) setGoogleSessionToken(newSessionToken())
     const trimmedQuery = debouncedQuery?.trim() || ''
     const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
     const minLength = isNumericOnly ? 1 : 2

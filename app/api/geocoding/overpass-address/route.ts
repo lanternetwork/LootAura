@@ -106,8 +106,9 @@ async function overpassHandler(request: NextRequest) {
     const roundedLng = Math.round((lng as number) * 10000) / 10000
     
     // Build cache key (include street if present)
+    // Note: We use a large consistent radius (200km) for cache key since we don't filter by radius
     const streetKey = streetParam ? `|street=${normalizeStreetName(streetParam)}` : ''
-    const cacheKey = `overpass:v1:prefix=${prefix}${streetKey}|lat=${roundedLat}|lng=${roundedLng}|r=${OVERPASS_RADIUS_M}|L=${limit}`
+    const cacheKey = `overpass:v1:prefix=${prefix}${streetKey}|lat=${roundedLat}|lng=${roundedLng}|r=200000|L=${limit}`
     const cached = getCachedResults(cacheKey)
     
     if (cached) {
@@ -120,7 +121,7 @@ async function overpassHandler(request: NextRequest) {
         ...addr,
         distanceM: haversineMeters(userLat, userLng, addr.lat, addr.lng)
       }))
-      .filter(addr => addr.distanceM <= OVERPASS_RADIUS_M) // Only include results within radius
+      // No radius filtering - show all results sorted by distance
       
       cachedWithDistance.sort((a, b) => {
         const distDiff = a.distanceM - b.distanceM
@@ -198,12 +199,14 @@ async function overpassHandler(request: NextRequest) {
     let radiusUsed = OVERPASS_RADIUS_M
     const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
     
-    // For digits+street mode, implement radius expansion: 3000m -> 5000m -> 8000m
-    // For numeric-only, also expand radius if 0 results: 5000m -> 8000m -> 12000m
+    // Use large radius to search broadly - we want to find the closest match regardless of distance
+    // For digits+street mode: start with 10km, expand to 50km, 100km
+    // For numeric-only: start with 50km, expand to 100km, 200km
+    // Note: We don't filter by radius when displaying - we show all results sorted by distance
     const radiusSequence = mode === 'digits+street' 
-      ? [3000, 5000, 8000] 
-      : [OVERPASS_RADIUS_M, 8000, 12000] // Expand for numeric-only too
-    const minResults = mode === 'digits+street' ? 3 : (mode === 'numeric-only' ? 1 : 0) // Try to get at least 1 result for numeric-only
+      ? [10000, 50000, 100000] // 10km -> 50km -> 100km
+      : [50000, 100000, 200000] // 50km -> 100km -> 200km for numeric-only
+    const minResults = mode === 'digits+street' ? 3 : 1 // Try to get at least 1 result
     
     for (const currentRadius of radiusSequence) {
       radiusUsed = currentRadius
@@ -332,15 +335,15 @@ async function overpassHandler(request: NextRequest) {
     // Parse and normalize
     const normalized = parseOverpassElements(json)
     
-    // Calculate distances and filter by radiusUsed + 500m buffer
-    const filterRadius = radiusUsed + 500 // Allow 500m buffer beyond search radius
+    // Calculate distances for all results - NO radius filtering
+    // We want to show the closest match regardless of distance
     
     if (enableDebug) {
       console.log('[OVERPASS] Distance calculation:', {
         userCoords: [userLat, userLng],
         normalizedCount: normalized.length,
         radiusUsedM: radiusUsed,
-        filterRadiusM: filterRadius,
+        radiusUsedKm: (radiusUsed / 1000).toFixed(2),
         sampleAddress: normalized[0] ? {
           label: formatLabel(normalized[0]),
           coords: [normalized[0].lat, normalized[0].lng],
@@ -349,6 +352,7 @@ async function overpassHandler(request: NextRequest) {
       })
     }
     
+    // Calculate distances for ALL results - no filtering by radius
     const withDistance: (NormalizedAddress & { distanceM: number })[] = normalized
       .map(addr => {
         const distanceM = haversineMeters(userLat, userLng, addr.lat, addr.lng)
@@ -357,21 +361,7 @@ async function overpassHandler(request: NextRequest) {
           distanceM
         }
       })
-      .filter(addr => {
-        const withinRadius = addr.distanceM <= filterRadius
-        if (enableDebug && !withinRadius) {
-          console.log('[OVERPASS] Filtered out (outside radius):', {
-            label: formatLabel(addr),
-            distanceM: Math.round(addr.distanceM),
-            distanceKm: (addr.distanceM / 1000).toFixed(2),
-            radiusUsedM: radiusUsed,
-            filterRadiusM: filterRadius,
-            userCoords: [userLat, userLng],
-            addrCoords: [addr.lat, addr.lng]
-          })
-        }
-        return withinRadius
-      }) // Only include results within radiusUsed + 500m buffer
+    // No radius filtering - show all results sorted by distance
     
     // Sort by distance (ascending) - closest first
     withDistance.sort((a, b) => {
@@ -399,9 +389,9 @@ async function overpassHandler(request: NextRequest) {
     }
     
     if (enableDebug) {
-      console.log('[OVERPASS] After sorting:', {
+      console.log('[OVERPASS] After sorting (all results, no radius filter):', {
         normalizedCount: normalized.length,
-        withinRadius: withDistance.length,
+        totalResults: withDistance.length,
         firstDistance: withDistance[0] ? Math.round(withDistance[0].distanceM) : null,
         firstDistanceKm: withDistance[0] ? (withDistance[0].distanceM / 1000).toFixed(2) : null,
         distances: withDistance.slice(0, 10).map((addr, idx) => ({

@@ -755,6 +755,15 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
     // User is authenticated - try to publish draft if exists, else create directly
     if (draftKeyRef.current && hasLocalDraft()) {
+      // First, ensure draft is saved to server (in case it's only local)
+      const localPayload = buildDraftPayload()
+      try {
+        await saveDraftServer(localPayload, draftKeyRef.current)
+      } catch (error) {
+        console.warn('[SELL_WIZARD] Failed to save draft to server before publish:', error)
+        // Continue anyway - might already exist on server
+      }
+
       // Publish draft (transactional)
       setLoading(true)
       setSubmitError(null)
@@ -765,7 +774,17 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         if (!result.ok) {
           if (result.code === 'AUTH_REQUIRED') {
             // Should not happen since we checked user, but handle gracefully
-            router.push('/auth/signin?redirectTo=/sell/new?resume=1')
+            const redirectUrl = encodeURIComponent('/sell/new?resume=review')
+            router.push(`/auth/signin?redirectTo=${redirectUrl}`)
+            setLoading(false)
+            return
+          }
+          
+          // If draft not found, fall back to direct creation
+          if (result.code === 'DRAFT_NOT_FOUND') {
+            console.log('[SELL_WIZARD] Draft not found on server, creating sale directly')
+            const payload = buildSalePayload()
+            await submitSalePayload(payload)
             setLoading(false)
             return
           }

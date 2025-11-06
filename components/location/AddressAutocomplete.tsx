@@ -153,31 +153,41 @@ export default function AddressAutocomplete({
               }
             }
             
-            // Calculate and log distances for each result
+            // Calculate distances and sort by distance (closest first)
             const withDistances = unique.map(s => {
               const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
               const dy = (s.lat - (userLat as number)) * 111320
               const distanceM = Math.sqrt(dx * dx + dy * dy)
               return {
-                label: s.label,
-                coords: [s.lat, s.lng],
-                distanceM: Math.round(distanceM),
+                suggestion: s,
+                distanceM: distanceM,
                 distanceKm: (distanceM / 1000).toFixed(2)
               }
             })
             
+            // Sort by distance (closest first)
+            withDistances.sort((a, b) => a.distanceM - b.distanceM)
+            
+            // Extract sorted suggestions
+            const sortedUnique = withDistances.map(item => item.suggestion)
+            
             // Log first result distance directly for visibility
             if (withDistances.length > 0) {
-              console.log(`[AddressAutocomplete] FIRST RESULT (digits+street): "${withDistances[0].label}" - Distance: ${withDistances[0].distanceKm} km (${withDistances[0].distanceM} m)`)
+              console.log(`[AddressAutocomplete] FIRST RESULT (digits+street): "${withDistances[0].suggestion.label}" - Distance: ${withDistances[0].distanceKm} km (${Math.round(withDistances[0].distanceM)} m)`)
               if (withDistances.length > 1) {
-                console.log(`[AddressAutocomplete] SECOND RESULT (digits+street): "${withDistances[1].label}" - Distance: ${withDistances[1].distanceKm} km (${withDistances[1].distanceM} m)`)
+                console.log(`[AddressAutocomplete] SECOND RESULT (digits+street): "${withDistances[1].suggestion.label}" - Distance: ${withDistances[1].distanceKm} km (${Math.round(withDistances[1].distanceM)} m)`)
               }
             }
             
-            console.log('[AddressAutocomplete] Overpass results with distances (digits+street):', {
-              count: unique.length,
-              results: withDistances,
-              rawResults: unique.map(s => ({
+            console.log('[AddressAutocomplete] Overpass results with distances (digits+street, sorted):', {
+              count: sortedUnique.length,
+              results: withDistances.map(item => ({
+                label: item.suggestion.label,
+                coords: [item.suggestion.lat, item.suggestion.lng],
+                distanceM: Math.round(item.distanceM),
+                distanceKm: item.distanceKm
+              })),
+              rawResults: sortedUnique.map(s => ({
                 id: s.id,
                 label: s.label,
                 lat: s.lat,
@@ -187,15 +197,15 @@ export default function AddressAutocomplete({
               debug: response._debug
             })
             
-            if (process.env.NODE_ENV === 'development' && unique.length > 0) {
-              console.log('[AddressAutocomplete] Received Overpass addresses (digits+street)', { 
-                count: unique.length, 
-                first: unique[0]?.label,
-                all: unique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
+            if (process.env.NODE_ENV === 'development' && sortedUnique.length > 0) {
+              console.log('[AddressAutocomplete] Received Overpass addresses (digits+street, sorted by distance)', {
+                count: sortedUnique.length,
+                first: sortedUnique[0]?.label,
+                all: sortedUnique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
                 debug: response._debug
               })
             }
-            setSuggestions(unique)
+            setSuggestions(sortedUnique)
             setIsOpen(unique.length > 0)
             setSelectedIndex(-1)
             setShowFallbackMessage(false)
@@ -335,31 +345,41 @@ export default function AddressAutocomplete({
               }
             }
             
-            // Calculate and log distances for each result
+            // Calculate distances and sort by distance (closest first)
             const withDistances = unique.map(s => {
               const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
               const dy = (s.lat - (userLat as number)) * 111320
               const distanceM = Math.sqrt(dx * dx + dy * dy)
               return {
-                label: s.label,
-                coords: [s.lat, s.lng],
-                distanceM: Math.round(distanceM),
+                suggestion: s,
+                distanceM: distanceM,
                 distanceKm: (distanceM / 1000).toFixed(2)
               }
             })
             
+            // Sort by distance (closest first)
+            withDistances.sort((a, b) => a.distanceM - b.distanceM)
+            
+            // Extract sorted suggestions
+            const sortedUnique = withDistances.map(item => item.suggestion)
+            
             // Log first result distance directly for visibility
             if (withDistances.length > 0) {
-              console.log(`[AddressAutocomplete] FIRST RESULT (numeric-only): "${withDistances[0].label}" - Distance: ${withDistances[0].distanceKm} km (${withDistances[0].distanceM} m)`)
+              console.log(`[AddressAutocomplete] FIRST RESULT (numeric-only): "${withDistances[0].suggestion.label}" - Distance: ${withDistances[0].distanceKm} km (${Math.round(withDistances[0].distanceM)} m)`)
               if (withDistances.length > 1) {
-                console.log(`[AddressAutocomplete] SECOND RESULT (numeric-only): "${withDistances[1].label}" - Distance: ${withDistances[1].distanceKm} km (${withDistances[1].distanceM} m)`)
+                console.log(`[AddressAutocomplete] SECOND RESULT (numeric-only): "${withDistances[1].suggestion.label}" - Distance: ${withDistances[1].distanceKm} km (${Math.round(withDistances[1].distanceM)} m)`)
               }
             }
             
-            console.log('[AddressAutocomplete] Overpass results with distances (numeric-only):', {
-              count: unique.length,
-              results: withDistances,
-              rawResults: unique.map(s => ({
+            console.log('[AddressAutocomplete] Overpass results with distances (numeric-only, sorted):', {
+              count: sortedUnique.length,
+              results: withDistances.map(item => ({
+                label: item.suggestion.label,
+                coords: [item.suggestion.lat, item.suggestion.lng],
+                distanceM: Math.round(item.distanceM),
+                distanceKm: item.distanceKm
+              })),
+              rawResults: sortedUnique.map(s => ({
                 id: s.id,
                 label: s.label,
                 lat: s.lat,
@@ -369,15 +389,15 @@ export default function AddressAutocomplete({
               debug: response._debug
             })
             
-            if (process.env.NODE_ENV === 'development' && unique.length > 0) {
-              console.log('[AddressAutocomplete] Received Overpass addresses', { 
-                count: unique.length, 
-                first: unique[0]?.label,
-                all: unique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
+            if (process.env.NODE_ENV === 'development' && sortedUnique.length > 0) {
+              console.log('[AddressAutocomplete] Received Overpass addresses (sorted by distance)', { 
+                count: sortedUnique.length, 
+                first: sortedUnique[0]?.label,
+                all: sortedUnique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
                 debug: response._debug
               })
             }
-            setSuggestions(unique)
+            setSuggestions(sortedUnique)
             setIsOpen(unique.length > 0)
             setSelectedIndex(-1)
             setShowFallbackMessage(false)

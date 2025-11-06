@@ -386,7 +386,16 @@ export default function AddressAutocomplete({
                 if (requestIdRef.current !== currentId) return
                 const unique: AddressSuggestion[] = []
                 const seen = new Set<string>()
-                for (const s of results) {
+                
+                // For numeric-only queries, filter to only include actual street addresses (with house_number)
+                // This prevents irrelevant results like "Devils Campground Interpretive Trail" with "5001" in the name
+                const filtered = results.filter(s => {
+                  // Only include results that have a house_number in the address
+                  // This ensures we're showing actual street addresses, not just places with the number in the name
+                  return s.address?.houseNumber || s.label.match(/^\d+\s+[A-Za-z]/) // Match pattern like "5001 Main St"
+                })
+                
+                for (const s of filtered) {
                   const key = s.id
                   if (!seen.has(key)) {
                     seen.add(key)
@@ -410,12 +419,14 @@ export default function AddressAutocomplete({
                 // Sort by distance (Nominatim may not return sorted results)
                 withDistances.sort((a, b) => a.distanceM - b.distanceM)
                 
-                console.log(`[AddressAutocomplete] Nominatim fallback results (numeric-only): ${unique.length} results`)
+                console.log(`[AddressAutocomplete] Nominatim fallback results (numeric-only): ${unique.length} results (filtered from ${results.length} total)`)
                 if (withDistances.length > 0) {
                   console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${withDistances[0].label}" - Distance: ${withDistances[0].distanceKm} km (${withDistances[0].distanceM} m)`)
                   if (withDistances.length > 1) {
                     console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${withDistances[1].label}" - Distance: ${withDistances[1].distanceKm} km (${withDistances[1].distanceM} m)`)
                   }
+                } else {
+                  console.warn(`[AddressAutocomplete] No valid street addresses found in Nominatim results for "${trimmedQuery}"`)
                 }
                 
                 // Re-sort unique array by distance to match sorted distances

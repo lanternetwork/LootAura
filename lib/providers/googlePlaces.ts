@@ -41,7 +41,9 @@ export async function googleAutocomplete(
     signal,
   })
 
-  if (!resp.ok) return []
+  if (!resp.ok) {
+    throw new Error(`Google autocomplete failed: ${resp.status}`)
+  }
   const data = await resp.json().catch(() => ({}))
   const predictions = Array.isArray(data.predictions) ? data.predictions : []
 

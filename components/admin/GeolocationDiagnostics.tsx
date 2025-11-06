@@ -371,6 +371,10 @@ export default function GeolocationDiagnostics() {
     try {
       const preds = await googleAutocomplete(googleQuery, center.lat, center.lng, googleSession)
       setGooglePredictions(preds)
+      if (!preds || preds.length === 0) {
+        setError('Google returned no predictions for this query (check API key/referrer settings).')
+        return
+      }
       // Attempt details of first prediction and add to results/pins
       if (preds.length > 0) {
         const details = await googlePlaceDetails(preds[0].placeId, googleSession)

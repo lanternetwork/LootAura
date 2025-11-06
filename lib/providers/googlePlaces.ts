@@ -26,7 +26,7 @@ export async function googleAutocomplete(
     input: input.trim(),
     languageCode: 'en',
     regionCode: 'US',
-    locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 50000 } },
+    locationBias: { circle: { center: { latitude: lat, longitude: lng }, radius: 20000 } },
     sessionToken,
   }
 

@@ -36,7 +36,7 @@ describe('SaleDraftPayloadSchema', () => {
       photos: ['https://example.com/image1.jpg', 'https://example.com/image2.jpg'],
       items: [
         {
-          id: 'item-1',
+          id: '550e8400-e29b-41d4-a716-446655440000',
           name: 'Test Item',
           price: 10.50,
           description: 'A test item',
@@ -79,7 +79,7 @@ describe('SaleDraftPayloadSchema', () => {
 describe('SaleDraftItemSchema', () => {
   it('should validate a minimal item', () => {
     const minimal = {
-      id: 'item-1',
+      id: '550e8400-e29b-41d4-a716-446655440000',
       name: 'Test Item'
     }
     
@@ -89,7 +89,7 @@ describe('SaleDraftItemSchema', () => {
 
   it('should validate a complete item', () => {
     const complete = {
-      id: 'item-1',
+      id: '550e8400-e29b-41d4-a716-446655440000',
       name: 'Test Item',
       price: 10.50,
       description: 'A test item',
@@ -103,7 +103,7 @@ describe('SaleDraftItemSchema', () => {
 
   it('should reject negative prices', () => {
     const invalid = {
-      id: 'item-1',
+      id: '550e8400-e29b-41d4-a716-446655440000',
       name: 'Test Item',
       price: -10
     }

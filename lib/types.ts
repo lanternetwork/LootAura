@@ -71,6 +71,9 @@ export type Marker = {
 // Draft types
 export type DraftStatus = 'active' | 'published' | 'archived'
 
+// Re-export from validation schema first
+export type { SaleDraftPayload, SaleDraftItem } from '@/lib/validation/saleDraft'
+
 export type SaleDraft = {
   id: string
   user_id: string
@@ -82,6 +85,3 @@ export type SaleDraft = {
   updated_at: string
   expires_at: string
 }
-
-// Re-export from validation schema
-export type { SaleDraftPayload, SaleDraftItem } from '@/lib/validation/saleDraft'

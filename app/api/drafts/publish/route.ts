@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
       }))
 
       const { error: itemsError } = await supabase
-        .from('lootaura_v2.items_v2')
+        .from('items_v2')
         .insert(itemsToInsert)
 
       if (itemsError) {

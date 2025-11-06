@@ -1012,10 +1012,12 @@ export default function AddressAutocomplete({
         {isOpen && showGoogleAttribution && <PoweredBy provider="google" />}
       </div>
       
-      {/* OSM Attribution - outside relative container to avoid z-index issues */}
-      <div className="mt-2">
-        <OSMAttribution showGeocoding={true} />
-      </div>
+      {/* OSM Attribution - only show when OSM-based suggestions are visible (i.e., not Google) */}
+      {isOpen && !showGoogleAttribution && (
+        <div className="mt-2">
+          <OSMAttribution showGeocoding={true} />
+        </div>
+      )}
     </div>
   )
 }

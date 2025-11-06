@@ -56,7 +56,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     state: initialData?.state || '',
     zip_code: initialData?.zip_code || '',
     date_start: initialData?.date_start || '',
-    time_start: initialData?.time_start || '',
+    time_start: initialData?.time_start || '09:00', // Default to 9:00 AM
     date_end: initialData?.date_end || '',
     time_end: initialData?.time_end || '',
     duration_hours: initialData?.duration_hours || 4, // Default 4 hours
@@ -203,7 +203,16 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       nextErrors.address = 'Please enter a complete address (street, city, state) and leave the field to get location coordinates'
     }
     if (!formData.date_start) nextErrors.date_start = 'Start date is required'
-    if (!formData.time_start) nextErrors.time_start = 'Start time is required'
+    
+    // Ensure time_start has a value (default to 09:00 if empty)
+    let timeStart = formData.time_start
+    if (!timeStart || !timeStart.includes(':')) {
+      timeStart = '09:00'
+      // Update formData with default time if it's missing
+      setFormData(prev => ({ ...prev, time_start: timeStart }))
+    }
+    
+    if (!timeStart) nextErrors.time_start = 'Start time is required'
     
     // Validate duration
     const durationHours = formData.duration_hours || 4

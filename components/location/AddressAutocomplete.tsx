@@ -74,6 +74,7 @@ export default function AddressAutocomplete({
   const lastHadCoordsRef = useRef<boolean>(false)
   const requestIdRef = useRef(0)
   const geoWaitRef = useRef<boolean>(false)
+  const suppressNextFetchRef = useRef<boolean>(false)
 
   // Debounce search query (250ms per spec to avoid "empty flashes")
   const debouncedQuery = useDebounce(value, 250)
@@ -109,6 +110,15 @@ export default function AddressAutocomplete({
   // Fetch suggestions when query changes
   useEffect(() => {
     const trimmedQuery = debouncedQuery?.trim() || ''
+
+    // If we just selected a suggestion, suppress the next search triggered by programmatic value change
+    if (suppressNextFetchRef.current) {
+      suppressNextFetchRef.current = false
+      setIsLoading(false)
+      setIsOpen(false)
+      setShowGoogleAttribution(false)
+      return
+    }
     
     // Check query patterns
     const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
@@ -769,6 +779,8 @@ export default function AddressAutocomplete({
       const state = final.address?.state || ''
       const zip = final.address?.postcode || ''
 
+      // Prevent an immediate re-query from the newly populated address value
+      suppressNextFetchRef.current = true
       onChange(address)
       setIsOpen(false)
       setSuggestions([])

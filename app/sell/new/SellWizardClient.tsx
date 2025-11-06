@@ -344,23 +344,27 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setPhotos(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleAddItem = (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => {
-    setItems(prev => [...prev, item])
-  }
-
-  const handleUpdateItem = useCallback((index: number, field: string, value: any) => {
+  const handleAddItem = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => {
     setItems(prev => {
-      const updated = [...prev]
-      if (updated[index]) {
-        updated[index] = { ...updated[index], [field]: value }
-      }
-      return updated
+      if (prev.length >= 50) return prev
+      return [...prev, item]
     })
   }, [])
 
-  const handleRemoveItem = (index: number) => {
-    setItems(prev => prev.filter((_, i) => i !== index))
-  }
+  const handleUpdateItem = useCallback((updated: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => {
+    setItems(prev => {
+      const next = prev.slice()
+      const i = next.findIndex(it => it.id === updated.id)
+      if (i !== -1) {
+        next[i] = { ...next[i], ...updated }
+      }
+      return next
+    })
+  }, [])
+
+  const handleRemoveItem = useCallback((id: string) => {
+    setItems(prev => prev.filter(it => it.id !== id))
+  }, [])
 
   const renderStep = () => {
     switch (currentStep) {
@@ -756,40 +760,48 @@ function PhotosStep({ photos, onUpload, onRemove, onReorder, onSetCover }: {
 function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }>,
   onAdd: (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => void,
-  onUpdate: (index: number, field: string, value: any) => void,
-  onRemove: (index: number) => void
+  onUpdate: (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => void,
+  onRemove: (id: string) => void
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
   const addButtonRef = useRef<HTMLButtonElement>(null)
   const MAX_ITEMS = 50
 
-  const handleOpenModal = () => {
+  const handleOpenModal = useCallback(() => {
     if (items.length >= MAX_ITEMS) {
       setToastMessage('Item limit reached (50)')
       setShowToast(true)
       return
     }
+    setEditingItemId(null)
     setIsModalOpen(true)
-  }
+  }, [items.length])
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setIsModalOpen(false)
+    setEditingItemId(null)
     // Return focus to +Add Item button
     setTimeout(() => {
       addButtonRef.current?.focus()
     }, 100)
-  }
+  }, [])
 
-  const handleSubmit = (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => {
-    onAdd(item)
+  const handleSubmit = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => {
+    if (editingItemId && item.id === editingItemId) {
+      onUpdate(item)
+    } else {
+      onAdd(item)
+    }
     setIsModalOpen(false)
+    setEditingItemId(null)
     // Return focus to +Add Item button
     setTimeout(() => {
       addButtonRef.current?.focus()
     }, 100)
-  }
+  }, [editingItemId, onAdd, onUpdate])
 
   return (
     <>
@@ -827,11 +839,11 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
         ) : (
           <div className="overflow-y-auto max-h-[calc(100vh-300px)] pr-2">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {items.map((item, index) => (
+              {items.map((item) => (
                 <ItemCard
                   key={item.id}
                   item={item}
-                  onDelete={() => onRemove(index)}
+                  onDelete={() => onRemove(item.id)}
                 />
               ))}
             </div>
@@ -843,6 +855,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
+        initialItem={editingItemId ? items.find(it => it.id === editingItemId) : undefined}
       />
 
       <Toast
@@ -920,8 +933,8 @@ function ReviewStep({ formData, photos, items, onPublish, loading, submitError }
           <div>
             <h4 className="font-medium text-gray-900">Items ({items.length})</h4>
             <div className="mt-2 space-y-2">
-              {items.map((item, index) => (
-                <div key={index} className="text-sm text-gray-600">
+              {items.map((item) => (
+                <div key={item.id || `review-item-${item.name}`} className="text-sm text-gray-600">
                   <strong>{item.name}</strong>
                   {item.price && ` - $${item.price}`}
                   {item.description && <div className="text-xs text-gray-500">{item.description}</div>}

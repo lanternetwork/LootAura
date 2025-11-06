@@ -3,6 +3,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
 
+// Generate stable UUID for new items
+function generateItemId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  // Fallback for environments without crypto.randomUUID
+  return `item-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+}
+
 interface ItemFormModalProps {
   isOpen: boolean
   onClose: () => void
@@ -39,9 +48,11 @@ export default function ItemFormModal({
   const modalRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
-  // Reset form when modal opens/closes or initialItem changes
+  // Reset form when modal opens - only reset when opening, not on every initialItem change
+  const previousIsOpenRef = useRef(false)
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !previousIsOpenRef.current) {
+      // Modal just opened - reset form
       if (initialItem) {
         setName(initialItem.name || '')
         setPrice(initialItem.price?.toString() || '')
@@ -61,6 +72,7 @@ export default function ItemFormModal({
         nameInputRef.current?.focus()
       }, 100)
     }
+    previousIsOpenRef.current = isOpen
   }, [isOpen, initialItem])
 
   // Handle ESC key
@@ -83,14 +95,19 @@ export default function ItemFormModal({
     }
   }, [isOpen, onClose])
 
-  // Handle outside click
+  // Handle outside click - stable callback
   const handleBackdropClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
       onClose()
     }
   }, [onClose])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Stable image upload handler - buffers locally
+  const handleImageUpload = useCallback((urls: string[]) => {
+    setImageUrl(urls[0])
+  }, [])
+
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
     
     // Validation
@@ -110,9 +127,9 @@ export default function ItemFormModal({
       return
     }
 
-    // Submit
+    // Submit - use stable ID from initialItem or generate new one
     const item = {
-      id: initialItem?.id || `item-${Date.now()}-${Math.random()}`,
+      id: initialItem?.id || generateItemId(),
       name: trimmedName,
       price: price ? parseFloat(price) : undefined,
       description: description.trim() || undefined,
@@ -122,11 +139,7 @@ export default function ItemFormModal({
 
     onSubmit(item)
     onClose()
-  }
-
-  const handleImageUpload = (urls: string[]) => {
-    setImageUrl(urls[0])
-  }
+  }, [name, price, description, imageUrl, category, initialItem, onSubmit, onClose])
 
   if (!isOpen) return null
 
@@ -171,7 +184,13 @@ export default function ItemFormModal({
               value={name}
               onChange={(e) => {
                 setName(e.target.value)
-                if (errors.name) setErrors({ ...errors, name: '' })
+                if (errors.name) {
+                  setErrors(prev => {
+                    const next = { ...prev }
+                    delete next.name
+                    return next
+                  })
+                }
               }}
               placeholder="e.g., Vintage Coffee Table"
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] ${
@@ -196,7 +215,13 @@ export default function ItemFormModal({
                 value={price}
                 onChange={(e) => {
                   setPrice(e.target.value)
-                  if (errors.price) setErrors({ ...errors, price: '' })
+                  if (errors.price) {
+                    setErrors(prev => {
+                      const next = { ...prev }
+                      delete next.price
+                      return next
+                    })
+                  }
                 }}
                 placeholder="0.00"
                 min="0"

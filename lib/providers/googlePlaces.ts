@@ -35,8 +35,8 @@ export async function googleAutocomplete(
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': key,
-      // Field mask for predictions (Places API New requires explicit field mask)
-      'X-Goog-FieldMask': 'predictions.placeId,predictions.structuredFormat.mainText,predictions.structuredFormat.secondaryText',
+      // Field mask for Places API (New): use suggestions.placePrediction.*
+      'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.structuredFormat.mainText,suggestions.placePrediction.structuredFormat.secondaryText',
     },
     body: JSON.stringify(body),
     signal,
@@ -51,8 +51,21 @@ export async function googleAutocomplete(
     throw new Error(msg)
   }
   const data = await resp.json().catch(() => ({}))
-  const predictions = Array.isArray(data.predictions) ? data.predictions : []
+  const suggestions = Array.isArray(data.suggestions) ? data.suggestions : []
+  // Map Places (New) suggestions
+  const mappedFromSuggestions: GooglePrediction[] = suggestions.map((s: any) => {
+    const pp = s.placePrediction || s.place_prediction || s
+    return {
+      placeId: pp?.placeId || pp?.place_id || '',
+      primaryText: pp?.structuredFormat?.mainText?.text || pp?.primaryText || pp?.description || '',
+      secondaryText: pp?.structuredFormat?.secondaryText?.text || pp?.secondaryText || '',
+    }
+  }).filter((p: GooglePrediction) => !!p.placeId && !!p.primaryText)
 
+  if (mappedFromSuggestions.length > 0) return mappedFromSuggestions
+
+  // Fallback for any legacy/mock shapes
+  const predictions = Array.isArray(data.predictions) ? data.predictions : []
   return predictions.map((p: any) => ({
     placeId: p.placeId || p.place_id || '',
     primaryText: p.structuredFormat?.mainText?.text || p.primary_text || p.description || '',

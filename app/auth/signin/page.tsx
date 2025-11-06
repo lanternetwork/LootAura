@@ -18,9 +18,15 @@ export default function SignIn() {
 
   useEffect(() => {
     if (!authLoading && currentUser) {
-      router.replace('/sales')
+      // Check for redirect query param or sessionStorage
+      const redirectTo = params.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect') || '/sales'
+      // Clear sessionStorage redirect if used
+      if (sessionStorage.getItem('auth:postLoginRedirect')) {
+        sessionStorage.removeItem('auth:postLoginRedirect')
+      }
+      router.replace(redirectTo)
     }
-  }, [authLoading, currentUser, router])
+  }, [authLoading, currentUser, router, params])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -28,8 +34,7 @@ export default function SignIn() {
 
     try {
       await signIn.mutateAsync({ email, password })
-      const redirectTo = params.get('redirectTo') || '/sales'
-      window.location.href = redirectTo
+      // Redirect will be handled by the useEffect above
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
     }

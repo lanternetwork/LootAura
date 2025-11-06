@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
 import ImageUploadCard from '@/components/sales/ImageUploadCard'
 import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
@@ -12,6 +12,7 @@ import TimePicker30 from '@/components/TimePicker30'
 import ItemFormModal from '@/components/sales/ItemFormModal'
 import ItemCard from '@/components/sales/ItemCard'
 import Toast from '@/components/sales/Toast'
+import ConfirmationModal from '@/components/sales/ConfirmationModal'
 import type { CategoryValue } from '@/lib/types'
 
 interface WizardStep {
@@ -69,6 +70,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const [loading, setLoading] = useState(false)
   const [_errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
+  const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [showToast, setShowToast] = useState(false)
+  const hasResumedRef = useRef(false)
+  const searchParams = useSearchParams()
 
   const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
     if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
@@ -93,6 +100,19 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       setUser(user)
     }
     checkUser()
+
+    // Listen for auth state changes (e.g., after login)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user)
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [supabase.auth])
 
   // Save draft to localStorage whenever form data changes
@@ -119,9 +139,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     localStorage.setItem('sale_draft', JSON.stringify(draftData))
   }, [formData, photos, items, currentStep])
 
-  // Load draft from localStorage on mount
+
+  // Load draft from localStorage on mount (for backward compatibility)
   useEffect(() => {
-    if (!initialData) {
+    if (!initialData && !searchParams.get('resume')) {
       const savedDraft = localStorage.getItem('sale_draft')
       if (savedDraft) {
         try {
@@ -144,7 +165,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         }
       }
     }
-  }, [initialData])
+  }, [initialData, searchParams])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
     setFormData(prev => {
@@ -258,6 +279,158 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
   }
 
+  // Helper to build sale payload
+  const buildSalePayload = useCallback(() => {
+    // Ensure time_start is normalized
+    let normalizedTimeStart = formData.time_start
+    if (normalizedTimeStart) {
+      normalizedTimeStart = normalizeTimeToNearest30(normalizedTimeStart) || normalizedTimeStart
+    }
+
+    // Prepare sale data with cover image
+    const { duration_hours: _duration_hours, ...restFormData } = formData
+    const saleData = {
+      ...restFormData,
+      time_start: normalizedTimeStart,
+      cover_image_url: photos.length > 0 ? photos[0] : undefined,
+      images: photos.length > 1 ? photos.slice(1) : undefined,
+      status: 'published' as const
+    }
+
+    return {
+      saleData,
+      items: items.map(item => ({
+        name: item.name,
+        price: item.price,
+        description: item.description,
+        category: item.category,
+        image_url: item.image_url
+      }))
+    }
+  }, [formData, photos, items, normalizeTimeToNearest30])
+
+  // Helper to create items for a sale
+  const createItemsForSale = useCallback(async (saleId: string, itemsToCreate: Array<{ name: string; price?: number; description?: string; category?: CategoryValue; image_url?: string }>) => {
+    if (itemsToCreate.length === 0) return
+
+    const itemPromises = itemsToCreate.map(item =>
+      fetch('/api/items_v2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sale_id: saleId,
+          title: item.name,
+          description: item.description,
+          price: item.price,
+          category: item.category,
+          image_url: item.image_url
+        }),
+      })
+    )
+
+    const results = await Promise.allSettled(itemPromises)
+    const failures = results.filter(r => r.status === 'rejected')
+    if (failures.length > 0) {
+      console.warn('Some items failed to create:', failures)
+    }
+  }, [])
+
+  // Helper to submit sale payload (used by both handleSubmit and auto-resume)
+  const submitSalePayload = useCallback(async (payload: { saleData: any; items: any[] }) => {
+    setLoading(true)
+    setSubmitError(null)
+
+    try {
+      const response = await fetch('/api/sales', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload.saleData),
+      })
+
+      const result = await response.json()
+
+      if (response.status === 401) {
+        // Save draft to sessionStorage
+        sessionStorage.setItem('draft:sale:new', JSON.stringify(payload))
+        sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=1')
+        
+        // Redirect to login
+        router.push('/auth/signin?redirectTo=/sell/new?resume=1')
+        setLoading(false)
+        return
+      }
+
+      if (!response.ok) {
+        const errorData = result || { error: 'Failed to create sale' }
+        console.error('Failed to create sale:', errorData)
+        setSubmitError(errorData.error || errorData.details || 'Failed to create sale')
+        setLoading(false)
+        return
+      }
+
+      // API returns { ok: true, sale: {...} } or { sale: {...} }
+      const sale = result.sale || result
+      if (!sale || !sale.id) {
+        console.error('Invalid sale response:', result)
+        setSubmitError('Invalid response from server')
+        setLoading(false)
+        return
+      }
+      const saleId = sale.id
+
+      // Create items for the sale
+      if (payload.items && payload.items.length > 0) {
+        await createItemsForSale(saleId, payload.items)
+      }
+
+      // Clear draft keys
+      sessionStorage.removeItem('draft:sale:new')
+      sessionStorage.removeItem('auth:postLoginRedirect')
+      localStorage.removeItem('sale_draft')
+
+      // Show confirmation modal
+      setCreatedSaleId(saleId)
+      setConfirmationModalOpen(true)
+    } catch (error) {
+      console.error('Error creating sale:', error)
+      setSubmitError(error instanceof Error ? error.message : 'Failed to create sale')
+    } finally {
+      setLoading(false)
+    }
+  }, [router, createItemsForSale])
+
+  // Auto-resume after login
+  useEffect(() => {
+    const resume = searchParams.get('resume')
+    if (resume === '1' && user && !hasResumedRef.current) {
+      const draftJson = sessionStorage.getItem('draft:sale:new')
+      if (draftJson) {
+        hasResumedRef.current = true
+        try {
+          const payload = JSON.parse(draftJson)
+          // Submit the draft immediately
+          submitSalePayload(payload).catch((error) => {
+            console.error('Error submitting draft:', error)
+            setToastMessage('Failed to submit sale. Please try again.')
+            setShowToast(true)
+            // Keep draft for retry
+          })
+        } catch (error) {
+          console.error('Error parsing draft:', error)
+          // Clear invalid draft
+          sessionStorage.removeItem('draft:sale:new')
+          sessionStorage.removeItem('auth:postLoginRedirect')
+          setToastMessage('Draft data is invalid. Please start over.')
+          setShowToast(true)
+        }
+      }
+    }
+  }, [searchParams, user, submitSalePayload])
+
   const handleSubmit = async () => {
     // Client-side required validation
     const nextErrors = validateDetails()
@@ -265,66 +438,22 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     if (Object.keys(nextErrors).length > 0) {
       return
     }
+
     // Check if user is authenticated
     if (!user) {
-      // Save current draft and redirect to auth
-      const draftData = {
-        formData,
-        photos,
-        items,
-        currentStep
-      }
-      localStorage.setItem('sale_draft', JSON.stringify(draftData))
+      // Build payload and save to sessionStorage
+      const payload = buildSalePayload()
+      sessionStorage.setItem('draft:sale:new', JSON.stringify(payload))
+      sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=1')
       
-      // Redirect to auth with return URL
-      const returnUrl = encodeURIComponent(window.location.pathname)
-      router.push(`/auth/signin?redirectTo=${returnUrl}`)
+      // Redirect to login
+      router.push('/auth/signin?redirectTo=/sell/new?resume=1')
       return
     }
 
-    setLoading(true)
-    // Ensure time_start is normalized just before submit (covers pasted/loaded values)
-    if (formData.time_start) {
-      const snapped = normalizeTimeToNearest30(formData.time_start)
-      if (snapped !== formData.time_start) {
-        setFormData(prev => ({ ...prev, time_start: snapped }))
-      }
-    }
-    try {
-      // Prepare sale data with cover image
-      // Remove duration_hours from payload (it's only used for client-side calculation)
-      const { duration_hours: _duration_hours, ...restFormData } = formData
-      const saleData = {
-        ...restFormData,
-        cover_image_url: photos.length > 0 ? photos[0] : undefined,
-        images: photos.length > 1 ? photos.slice(1) : undefined
-      }
-
-      const response = await fetch('/api/sales', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(saleData),
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        const sale = result.sale || result
-        // Clear draft after successful submission
-        localStorage.removeItem('sale_draft')
-        router.push(`/sales/${sale.id}`)
-      } else {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to create sale' }))
-        console.error('Failed to create sale:', errorData)
-        setSubmitError(errorData.error || errorData.details || 'Failed to create sale')
-      }
-    } catch (error) {
-      console.error('Error creating sale:', error)
-      setSubmitError(error instanceof Error ? error.message : 'Failed to create sale')
-    } finally {
-      setLoading(false)
-    }
+    // User is authenticated, submit the sale
+    const payload = buildSalePayload()
+    await submitSalePayload(payload)
   }
 
   const handlePhotoUpload = (urls: string[]) => {
@@ -485,6 +614,25 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         )}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {createdSaleId && (
+        <ConfirmationModal
+          open={confirmationModalOpen}
+          onClose={() => {
+            setConfirmationModalOpen(false)
+            router.push('/dashboard')
+          }}
+          saleId={createdSaleId}
+        />
+      )}
+
+      {/* Toast for errors */}
+      <Toast
+        message={toastMessage || ''}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   )
 }

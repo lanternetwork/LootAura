@@ -12,7 +12,8 @@ async function callbackHandler(request: NextRequest) {
     const url = new URL(request.url)
     const code = url.searchParams.get('code')
     const error = url.searchParams.get('error')
-    const next = url.searchParams.get('next') || '/sales'
+    // Check for redirectTo (preferred) or next (fallback)
+    const redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next') || '/sales'
 
     authDebug.logAuthFlow('oauth-callback', 'start', 'start', {
       hasCode: !!code,
@@ -77,8 +78,8 @@ async function callbackHandler(request: NextRequest) {
       }
 
       // Success: user session cookies are automatically set by auth-helpers
-      authDebug.logAuthFlow('oauth-callback', 'redirect', 'success', { next })
-      return NextResponse.redirect(new URL(next, url.origin))
+      authDebug.logAuthFlow('oauth-callback', 'redirect', 'success', { redirectTo })
+      return NextResponse.redirect(new URL(redirectTo, url.origin))
     }
 
     authDebug.logAuthFlow('oauth-callback', 'no-session', 'error')

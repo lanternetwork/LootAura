@@ -16,7 +16,13 @@ export default function GoogleSignInButton() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
-      const redirectTo = `${window.location.origin}/auth/callback`
+      
+      // Preserve redirect query param or sessionStorage redirect
+      const urlParams = new URLSearchParams(window.location.search)
+      const redirectParam = urlParams.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect')
+      const redirectTo = redirectParam 
+        ? `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectParam)}`
+        : `${window.location.origin}/auth/callback`
       
       console.log('[GOOGLE_AUTH] Redirect URL:', redirectTo)
       

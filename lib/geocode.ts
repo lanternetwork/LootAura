@@ -170,23 +170,12 @@ export interface ApiResponse<T> {
 
 // Fetch addresses from Overpass API for numeric prefix searches
 export async function fetchOverpassAddresses(
-  prefix: string,
+  q: string, // Full query string (numeric-only or digits+street)
   lat: number,
   lng: number,
-  limit: number = 2,
-  signal?: AbortSignal,
-  street?: string // Optional street name for digits+street mode
+  limit: number = 8,
+  signal?: AbortSignal
 ): Promise<ApiResponse<AddressSuggestion[]>> {
-  // Validate prefix (1-6 digits for numeric-only, 1-8 for digits+street)
-  const maxPrefixLength = street ? 8 : 6
-  if (!new RegExp(`^\\d{1,${maxPrefixLength}}$`).test(prefix)) {
-    return {
-      ok: false,
-      error: `Prefix must be 1-${maxPrefixLength} digits`,
-      code: 'INVALID_PREFIX'
-    }
-  }
-  
   // Validate coordinates
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return {
@@ -198,16 +187,11 @@ export async function fetchOverpassAddresses(
 
   try {
     const params = new URLSearchParams({
-      prefix,
+      q: q.trim(),
       lat: String(lat),
       lng: String(lng),
       limit: String(Math.min(Math.max(limit, 1), 10))
     })
-    
-    // Add street parameter if provided (for digits+street mode)
-    if (street) {
-      params.set('street', street)
-    }
     
     const response = await fetch(`/api/geocoding/overpass-address?${params.toString()}`, { signal })
     

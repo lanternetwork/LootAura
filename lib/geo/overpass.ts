@@ -12,6 +12,7 @@ export interface NormalizedAddress {
   state?: string
   postcode?: string
   country?: string
+  countryCode?: string
   type: 'node' | 'way' | 'relation'
   upstreamIndex: number
 }
@@ -147,6 +148,7 @@ export function parseOverpassElements(json: any): NormalizedAddress[] {
       state: element.tags?.['addr:state'],
       postcode: element.tags?.['addr:postcode'],
       country: element.tags?.['addr:country'],
+      countryCode: element.tags?.['addr:country_code'],
       type: element.type,
       upstreamIndex: index
     })

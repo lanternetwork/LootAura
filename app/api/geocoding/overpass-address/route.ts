@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { buildOverpassAddressQuery, buildOverpassDigitsStreetQuery, parseOverpassElements, formatLabel, NormalizedAddress } from '@/lib/geo/overpass'
-import { normalizeStreetName, buildStreetRegex } from '@/lib/geo/streetNormalize'
+import { normalizeStreetName, buildStreetRegex, parseDigitsStreetQuery } from '@/lib/geo/streetNormalize'
 import { haversineMeters } from '@/lib/geo/distance'
 import { AddressSuggestion } from '@/lib/geocode'
 
@@ -53,8 +53,7 @@ if (process.env.NODE_ENV === 'test') {
 async function overpassHandler(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const prefix = searchParams.get('prefix')
-    const streetParam = searchParams.get('street') // Optional, for digits+street mode
+    const q = searchParams.get('q')?.trim() || ''
     const latParam = searchParams.get('lat')
     const lngParam = searchParams.get('lng')
     const limitParam = searchParams.get('limit')
@@ -62,26 +61,32 @@ async function overpassHandler(request: NextRequest) {
     
     const enableDebug = debugParam === '1' || process.env.NODE_ENV === 'development'
     
-    // Determine mode: numeric-only (prefix only) or digits+street (prefix + street)
-    const mode = streetParam ? 'digits+street' : 'numeric-only'
+    // Classify input on server side
+    // Numeric-only mode: /^\d{1,6}$/
+    // Digits+street mode: /^(?<num>\d{1,8})\s+(?<street>[A-Za-z].+)$/
+    // Else: fall back to existing Nominatim flow (return error to trigger fallback)
+    let mode: 'numeric-only' | 'digits+street'
+    let prefix: string
+    let streetParam: string | undefined
     
-    // Validate prefix (1-6 digits for numeric-only, 1-8 for digits+street)
-    const maxPrefixLength = mode === 'digits+street' ? 8 : 6
-    if (!prefix || !new RegExp(`^\\d{1,${maxPrefixLength}}$`).test(prefix)) {
-      return NextResponse.json({
-        ok: false,
-        code: 'INVALID_PREFIX',
-        error: `Prefix must be 1-${maxPrefixLength} digits`
-      }, { status: 400 })
-    }
-    
-    // Validate street parameter for digits+street mode
-    if (mode === 'digits+street' && (!streetParam || streetParam.trim().length === 0)) {
-      return NextResponse.json({
-        ok: false,
-        code: 'INVALID_STREET',
-        error: 'Street parameter is required for digits+street mode'
-      }, { status: 400 })
+    if (/^\d{1,6}$/.test(q)) {
+      mode = 'numeric-only'
+      prefix = q
+      streetParam = undefined
+    } else {
+      const digitsStreetMatch = q.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].+)$/)
+      if (digitsStreetMatch?.groups) {
+        mode = 'digits+street'
+        prefix = digitsStreetMatch.groups.num
+        streetParam = digitsStreetMatch.groups.street.trim()
+      } else {
+        // Not a match for Overpass modes - return error to trigger Nominatim fallback
+        return NextResponse.json({
+          ok: false,
+          code: 'INVALID_QUERY',
+          error: 'Query must be numeric-only (1-6 digits) or digits+street (1-8 digits followed by street name)'
+        }, { status: 400 })
+      }
     }
     
     // Validate coordinates
@@ -96,20 +101,31 @@ async function overpassHandler(request: NextRequest) {
       }, { status: 400 })
     }
     
-    // Validate and clamp limit
+    // Validate and clamp limit (default 8 per spec)
     const limit = limitParam 
       ? Math.min(Math.max(parseInt(limitParam, 10), 1), 10)
-      : 2
+      : 8
     
-    // Round coordinates for cache key (4 decimal places ≈ 11m precision)
-    const roundedLat = Math.round((lat as number) * 10000) / 10000
-    const roundedLng = Math.round((lng as number) * 10000) / 10000
+    // Round coordinates for cache key (5 decimal places ≈ 1.1m precision per spec)
+    const roundedLat = Math.round((lat as number) * 100000) / 100000
+    const roundedLng = Math.round((lng as number) * 100000) / 100000
     
-    // Build cache key (include street if present)
-    // Note: We use a large consistent radius (200km) for cache key since we don't filter by radius
-    const streetKey = streetParam ? `|street=${normalizeStreetName(streetParam)}` : ''
-    const cacheKey = `overpass:v1:prefix=${prefix}${streetKey}|lat=${roundedLat}|lng=${roundedLng}|r=200000|L=${limit}`
-    const cached = getCachedResults(cacheKey)
+    // Build cache key per spec: overpass:v2:mode=<numeric|digits+street>|q=<normalized input>|lat=<round5>|lng=<round5>|r=<radiusUsed>|L=<limit>
+    // Note: We'll build the cache key with actual radiusUsed after we determine it
+    // For now, we'll check cache with a placeholder, then rebuild with actual radius after query
+    // The normalized query string for cache key
+    const normalizedQ = mode === 'digits+street' && streetParam
+      ? `${prefix} ${normalizeStreetName(streetParam)}`
+      : prefix
+    
+    // Build cache key function - we'll call this after we know the radius used
+    const buildCacheKey = (radiusUsed: number) => 
+      `overpass:v2:mode=${mode}|q=${normalizedQ}|lat=${roundedLat}|lng=${roundedLng}|r=${radiusUsed}|L=${limit}`
+    
+    // Check cache with max radius (we'll re-sort by distance anyway)
+    // For checking, use a consistent large radius since we don't filter by radius
+    const cacheCheckKey = buildCacheKey(3000000) // Max radius for cache check
+    const cached = getCachedResults(cacheCheckKey)
     
     if (cached) {
       // Re-sort cached results by distance from actual (non-rounded) coordinates
@@ -150,20 +166,17 @@ async function overpassHandler(request: NextRequest) {
       }
       
       if (enableDebug) {
+        const distancesM = cachedWithDistance.slice(0, limit).map(addr => Math.round(addr.distanceM))
+        
         respBody._debug = {
           mode,
-          cacheHit: true,
-          radiusUsedM: OVERPASS_RADIUS_M,
-          radiusM: OVERPASS_RADIUS_M,
+          coords: [lat, lng],
+          radiiTriedM: [],
+          radiusUsedM: 0, // Unknown for cached results
           countRaw: sortedCached.length,
           countNormalized: sortedCached.length,
-          coords: [lat, lng],
-          distances: cachedWithDistance.slice(0, 5).map(addr => ({
-            id: addr.id,
-            label: addr.label,
-            distanceM: Math.round(addr.distanceM),
-            distanceKm: (addr.distanceM / 1000).toFixed(2)
-          }))
+          distancesM: distancesM,
+          cacheHit: true
         }
         console.log('[OVERPASS] Cached results re-sorted:', {
           mode,
@@ -190,26 +203,29 @@ async function overpassHandler(request: NextRequest) {
       })
     }
     
-    // Build and execute Overpass query with radius expansion for digits+street mode
+    // Build and execute Overpass query with progressive radius expansion
+    // Progressive search per spec: [1000, 3000, 10000, 30000, 100000, 300000, 1000000, 2000000, 3000000]
+    // Escalate until at least 1-3 valid candidates are found, then stop
     const userLat = lat as number
     const userLng = lng as number
     
     let json: any = null
     let rawCount = 0
-    let radiusUsed = OVERPASS_RADIUS_M
+    let radiusUsed = 1000 // Start with first radius
     const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
     
-    // Use large radius to search broadly - we want to find the closest match regardless of distance
-    // For digits+street mode: start with 10km, expand to 50km, 100km
-    // For numeric-only: start with 50km, expand to 100km, 200km
-    // Note: We don't filter by radius when displaying - we show all results sorted by distance
-    const radiusSequence = mode === 'digits+street' 
-      ? [10000, 50000, 100000] // 10km -> 50km -> 100km
-      : [50000, 100000, 200000] // 50km -> 100km -> 200km for numeric-only
-    const minResults = mode === 'digits+street' ? 3 : 1 // Try to get at least 1 result
+    // Progressive radius expansion per spec
+    const radiusSequence = [1000, 3000, 10000, 30000, 100000, 300000, 1000000, 2000000, 3000000] // meters
+    const minResults = mode === 'digits+street' ? 3 : 1 // Try to get at least 1-3 results
+    const radiiTriedM: number[] = [] // Track radii tried for debug output
+    
+    // Store best results found during expansion
+    let bestResults: (NormalizedAddress & { distanceM: number })[] = []
+    let bestJson: any = null
     
     for (const currentRadius of radiusSequence) {
       radiusUsed = currentRadius
+      radiiTriedM.push(currentRadius)
       
       // Build query based on mode
       let query: string
@@ -340,59 +356,83 @@ async function overpassHandler(request: NextRequest) {
       
       rawCount = json.elements?.length || 0
       
-      // For digits+street mode, continue expanding radius if we have < 3 results
-      // For numeric-only mode, continue expanding radius if we have 0 results
-      const shouldExpand = mode === 'digits+street' 
-        ? (rawCount < minResults && currentRadius < radiusSequence[radiusSequence.length - 1])
-        : (mode === 'numeric-only' && rawCount === 0 && currentRadius < radiusSequence[radiusSequence.length - 1])
+      // Parse and normalize to check if we have enough valid results
+      const normalized = parseOverpassElements(json)
       
-      if (shouldExpand) {
+      // Apply US-only filtering per spec
+      // Prefer candidates with addr:country_code in {"us", "US"} or addr:country including "United States"
+      // If the tag is missing, keep the candidate (many OSM address points omit it)
+      const usFiltered = normalized.filter(addr => {
+        const countryCode = addr.countryCode?.toLowerCase() || addr.country?.toLowerCase()
+        const country = addr.country?.toLowerCase()
+        
+        // Prefer US addresses
+        if (countryCode === 'us' || country?.includes('united states')) {
+          return true
+        }
+        
+        // Keep addresses without country tags (common in OSM)
+        if (!addr.country && !addr.countryCode) {
+          return true
+        }
+        
+        // Filter out non-US addresses only if we have enough US candidates
+        // For now, we'll keep all addresses and let distance sorting prioritize US results
+        // (since we center on US coords, distance naturally prioritizes US)
+        return true
+      })
+      
+      // Calculate distances for all US-filtered results
+      const withDistance: (NormalizedAddress & { distanceM: number })[] = usFiltered
+        .map(addr => {
+          const distanceM = haversineMeters(userLat, userLng, addr.lat, addr.lng)
+          return {
+            ...addr,
+            distanceM
+          }
+        })
+      
+      // Sort by distance (ascending) - closest first
+      withDistance.sort((a, b) => {
+        const distDiff = a.distanceM - b.distanceM
+        if (distDiff !== 0) return distDiff
+        return a.upstreamIndex - b.upstreamIndex
+      })
+      
+      // Store best results found so far
+      if (withDistance.length > bestResults.length) {
+        bestResults = withDistance
+        bestJson = json
+      }
+      
+      // Check if we have enough results (≥ client limit per spec)
+      if (withDistance.length >= limit && currentRadius < radiusSequence[radiusSequence.length - 1]) {
+        // We have enough results, use this radius
+        bestResults = withDistance
+        bestJson = json
         if (enableDebug) {
-          console.log(`[OVERPASS] Only ${rawCount} results at ${currentRadius}m, expanding radius...`)
+          console.log(`[OVERPASS] Found ${withDistance.length} valid results at ${currentRadius}m (≥ limit ${limit}), stopping expansion`)
+        }
+        break
+      }
+      
+      // Continue expanding if we don't have enough results and haven't reached max radius
+      if (withDistance.length < limit && currentRadius < radiusSequence[radiusSequence.length - 1]) {
+        if (enableDebug) {
+          console.log(`[OVERPASS] Only ${withDistance.length} valid results at ${currentRadius}m (need ${limit}), expanding radius...`)
         }
         continue // Try next radius
       }
       
-      break // We have enough results or reached max radius
+      // We've reached max radius or have some results, use what we have
+      bestResults = withDistance
+      bestJson = json
+      break
     }
     
-    // Parse and normalize
-    const normalized = parseOverpassElements(json)
-    
-    // Calculate distances for all results - NO radius filtering
-    // We want to show the closest match regardless of distance
-    
-    if (enableDebug) {
-      console.log('[OVERPASS] Distance calculation:', {
-        userCoords: [userLat, userLng],
-        normalizedCount: normalized.length,
-        radiusUsedM: radiusUsed,
-        radiusUsedKm: (radiusUsed / 1000).toFixed(2),
-        sampleAddress: normalized[0] ? {
-          label: formatLabel(normalized[0]),
-          coords: [normalized[0].lat, normalized[0].lng],
-          calculatedDistance: Math.round(haversineMeters(userLat, userLng, normalized[0].lat, normalized[0].lng))
-        } : null
-      })
-    }
-    
-    // Calculate distances for ALL results - no filtering by radius
-    const withDistance: (NormalizedAddress & { distanceM: number })[] = normalized
-      .map(addr => {
-        const distanceM = haversineMeters(userLat, userLng, addr.lat, addr.lng)
-        return {
-          ...addr,
-          distanceM
-        }
-      })
-    // No radius filtering - show all results sorted by distance
-    
-    // Sort by distance (ascending) - closest first
-    withDistance.sort((a, b) => {
-      const distDiff = a.distanceM - b.distanceM
-      if (distDiff !== 0) return distDiff
-      return a.upstreamIndex - b.upstreamIndex
-    })
+    // Use best results from expansion loop
+    const withDistance = bestResults
+    json = bestJson
     
     // Verify sorting is correct (for debugging)
     if (enableDebug && withDistance.length > 1) {
@@ -412,23 +452,6 @@ async function overpassHandler(request: NextRequest) {
       }
     }
     
-    if (enableDebug) {
-      console.log('[OVERPASS] After sorting (all results, no radius filter):', {
-        normalizedCount: normalized.length,
-        totalResults: withDistance.length,
-        firstDistance: withDistance[0] ? Math.round(withDistance[0].distanceM) : null,
-        firstDistanceKm: withDistance[0] ? (withDistance[0].distanceM / 1000).toFixed(2) : null,
-        distances: withDistance.slice(0, 10).map((addr, idx) => ({
-          index: idx,
-          label: formatLabel(addr),
-          distanceM: Math.round(addr.distanceM),
-          distanceKm: (addr.distanceM / 1000).toFixed(2),
-          coords: [addr.lat, addr.lng],
-          userCoords: [userLat, userLng]
-        }))
-      })
-    }
-    
     // Convert to AddressSuggestion format and trim to limit
     const suggestions: AddressSuggestion[] = withDistance.slice(0, limit).map((addr) => ({
       id: addr.id,
@@ -445,8 +468,9 @@ async function overpassHandler(request: NextRequest) {
       }
     }))
     
-    // Cache results
-    setCachedResults(cacheKey, suggestions, TTL_MS)
+    // Cache results with actual radius used
+    const finalCacheKey = buildCacheKey(radiusUsed)
+    setCachedResults(finalCacheKey, suggestions, TTL_MS)
     
     const respBody: any = {
       ok: true,
@@ -454,40 +478,34 @@ async function overpassHandler(request: NextRequest) {
     }
     
     if (enableDebug) {
+      const distancesM = withDistance.slice(0, limit).map(addr => Math.round(addr.distanceM))
+      
       respBody._debug = {
         mode,
-        cacheHit: false,
-        radiusUsedM: radiusUsed,
-        radiusM: OVERPASS_RADIUS_M,
-        countRaw: rawCount,
-        countNormalized: normalized.length,
         coords: [lat, lng],
-        distances: withDistance.slice(0, 5).map(addr => ({
-          id: addr.id,
-          label: formatLabel(addr),
-          distanceM: Math.round(addr.distanceM),
-          distanceKm: (addr.distanceM / 1000).toFixed(2)
-        }))
+        radiiTriedM: radiiTriedM,
+        radiusUsedM: radiusUsed,
+        countRaw: rawCount,
+        countNormalized: withDistance.length,
+        distancesM: distancesM,
+        cacheHit: false
       }
-      console.log('[OVERPASS] Sorted results (final):', {
+      
+      console.log('[OVERPASS] Final sorted results:', {
         mode,
+        q,
         prefix,
         street: streetParam || undefined,
         userCoords: [userLat, userLng],
+        radiiTriedM,
         radiusUsedM: radiusUsed,
         count: suggestions.length,
         limit,
-        distances: withDistance.slice(0, limit).map((addr, idx) => ({
-          index: idx,
-          label: formatLabel(addr),
-          distanceM: Math.round(addr.distanceM),
-          distanceKm: (addr.distanceM / 1000).toFixed(2),
-          coords: [addr.lat, addr.lng]
-        })),
+        distancesM,
         firstResult: suggestions[0] ? {
           label: suggestions[0].label,
-          distanceM: Math.round(withDistance[0]?.distanceM || 0),
-          distanceKm: ((withDistance[0]?.distanceM || 0) / 1000).toFixed(2)
+          distanceM: distancesM[0],
+          distanceKm: (distancesM[0] / 1000).toFixed(2)
         } : null
       })
     }

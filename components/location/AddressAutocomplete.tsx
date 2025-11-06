@@ -114,14 +114,11 @@ export default function AddressAutocomplete({
     
     // For digits+street queries with coords, try Overpass first
     if (isDigitsStreet && hasCoords && digitsStreetMatch?.groups) {
-      const num = digitsStreetMatch.groups.num
-      const street = digitsStreetMatch.groups.street.trim()
-      
       if (process.env.NODE_ENV === 'development') {
-        console.log('[AddressAutocomplete] Fetching Overpass addresses (digits+street)', { num, street, userLat, userLng })
+        console.log('[AddressAutocomplete] Fetching Overpass addresses (digits+street)', { q: trimmedQuery, userLat, userLng })
       }
       
-      fetchOverpassAddresses(num, userLat as number, userLng as number, 2, controller.signal, street)
+      fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
         .then((response) => {
           if (requestIdRef.current !== currentId) return
           
@@ -491,12 +488,9 @@ export default function AddressAutocomplete({
     setIsLoading(true)
     setShowFallbackMessage(false)
     
-    // For digits+street queries, use Overpass with street parameter
+    // For digits+street queries, use Overpass with full query string
     if (isDigitsStreet && digitsStreetMatch?.groups) {
-      const num = digitsStreetMatch.groups.num
-      const street = digitsStreetMatch.groups.street.trim()
-      
-      fetchOverpassAddresses(num, userLat, userLng, 2, controller.signal, street)
+      fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
         .then((response) => {
           if (requestIdRef.current !== currentId) return
           if (response.ok && response.data && response.data.length > 0) {

@@ -66,7 +66,7 @@ describe('Overpass Address Route Integration', () => {
       })
     })
 
-    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=12&lat=38.25&lng=-85.75&limit=8')
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=12&lat=38.25&lng=-85.75&limit=8')
     const response = await GET(request)
     const data = await response.json()
 
@@ -87,18 +87,18 @@ describe('Overpass Address Route Integration', () => {
     expect(call[1]?.method).toBe('POST')
   })
 
-  it('should return 400 for invalid prefix', async () => {
-    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=abc&lat=38.25&lng=-85.75')
+  it('should return 400 for invalid query (non-numeric, non-digits+street)', async () => {
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=abc&lat=38.25&lng=-85.75')
     const response = await GET(request)
     const data = await response.json()
 
     expect(response.status).toBe(400)
     expect(data.ok).toBe(false)
-    expect(data.code).toBe('INVALID_PREFIX')
+    expect(data.code).toBe('INVALID_QUERY')
   })
 
   it('should return 400 for missing coordinates', async () => {
-    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=123')
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=123')
     const response = await GET(request)
     const data = await response.json()
 
@@ -107,14 +107,14 @@ describe('Overpass Address Route Integration', () => {
     expect(data.code).toBe('NO_COORDS')
   })
 
-  it('should return 400 for prefix longer than 6 digits', async () => {
-    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=1234567&lat=38.25&lng=-85.75')
+  it('should return 400 for numeric-only query longer than 6 digits', async () => {
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=1234567&lat=38.25&lng=-85.75')
     const response = await GET(request)
     const data = await response.json()
 
     expect(response.status).toBe(400)
     expect(data.ok).toBe(false)
-    expect(data.code).toBe('INVALID_PREFIX')
+    expect(data.code).toBe('INVALID_QUERY')
   })
 
   it('should handle Overpass 429 rate limit', async () => {
@@ -124,7 +124,7 @@ describe('Overpass Address Route Integration', () => {
       json: async () => ({ error: 'rate limit' })
     })
 
-    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=123&lat=38.25&lng=-85.75')
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=123&lat=38.25&lng=-85.75')
     const response = await GET(request)
     const data = await response.json()
 
@@ -163,7 +163,7 @@ describe('Overpass Address Route Integration', () => {
       })
     })
 
-    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=500&lat=38.25&lng=-85.75&limit=8')
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=500&lat=38.25&lng=-85.75&limit=8')
     const response = await GET(request)
     const data = await response.json()
 
@@ -194,7 +194,7 @@ describe('Overpass Address Route Integration', () => {
       json: async () => ({ elements })
     })
 
-    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=12&lat=38.25&lng=-85.75&limit=5')
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=12&lat=38.25&lng=-85.75&limit=5')
     const response = await GET(request)
     const data = await response.json()
 
@@ -222,7 +222,7 @@ describe('Overpass Address Route Integration', () => {
       })
     })
 
-    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=123&lat=38.25&lng=-85.75')
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=123&lat=38.25&lng=-85.75')
 
     // First call
     const response1 = await GET(request)
@@ -262,17 +262,20 @@ describe('Overpass Address Route Integration', () => {
         })
       })
 
-      const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=123&lat=38.25&lng=-85.75&_debug=1')
+      const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=123&lat=38.25&lng=-85.75&_debug=1')
       const response = await GET(request)
       const data = await response.json()
 
       expect(response.status).toBe(200)
       expect(data._debug).toBeDefined()
+      expect(data._debug).toHaveProperty('mode')
       expect(data._debug).toHaveProperty('cacheHit')
-      expect(data._debug).toHaveProperty('radiusM')
+      expect(data._debug).toHaveProperty('radiusUsedM')
       expect(data._debug).toHaveProperty('countRaw')
       expect(data._debug).toHaveProperty('countNormalized')
       expect(data._debug).toHaveProperty('coords')
+      expect(data._debug).toHaveProperty('radiiTriedM')
+      expect(data._debug).toHaveProperty('distancesM')
     } finally {
       // Restore original NODE_ENV
       if (originalEnv !== undefined) {
@@ -313,7 +316,7 @@ describe('Overpass Address Route Integration', () => {
       })
     })
 
-    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?prefix=12&lat=38.25&lng=-85.75')
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=12&lat=38.25&lng=-85.75')
     const response = await GET(request)
     const data = await response.json()
 
@@ -321,6 +324,39 @@ describe('Overpass Address Route Integration', () => {
     expect(data.ok).toBe(true)
     expect(data.data.length).toBe(1) // Only the valid one
     expect(data.data[0].address?.road).toBe('Main St')
+  })
+
+  it('should accept digits+street query format', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        elements: [
+          {
+            type: 'node',
+            id: 123,
+            lat: 38.2512,
+            lon: -85.7494,
+            tags: {
+              'addr:housenumber': '5001',
+              'addr:street': 'Preston Highway',
+              'addr:city': 'Louisville',
+              'addr:state': 'KY',
+              'addr:postcode': '40219',
+              'addr:country': 'US'
+            }
+          }
+        ]
+      })
+    })
+
+    const request = new NextRequest('http://localhost:3000/api/geocoding/overpass-address?q=5001%20preston&lat=38.25&lng=-85.75&limit=8')
+    const response = await GET(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(Array.isArray(data.data)).toBe(true)
+    expect(data.data.length).toBeGreaterThan(0)
   })
 })
 

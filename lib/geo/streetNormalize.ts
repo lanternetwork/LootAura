@@ -72,8 +72,15 @@ export function normalizeStreetName(street: string): string {
 }
 
 /**
- * Build a case-insensitive regex pattern for matching street names
- * Handles token order variations and partial matches
+ * Build a case-insensitive token-AND regex pattern for matching street names
+ * All tokens must match (in any order), with support for abbreviations
+ * 
+ * Note: Overpass regex may not support lookaheads, so we use a simpler pattern
+ * that matches all tokens with wildcards between them. Results are filtered
+ * afterward to ensure all tokens are present.
+ * 
+ * Pattern: (?i).*token1.*token2.* (simplified for Overpass compatibility)
+ * For full token-AND semantics, use buildStreetTokenAndRegex instead
  */
 export function buildStreetRegex(normalizedStreet: string): string {
   const tokens = normalizedStreet.split(/\s+/).filter(Boolean)
@@ -82,14 +89,97 @@ export function buildStreetRegex(normalizedStreet: string): string {
     return '.*'
   }
   
-  // Escape special regex characters in tokens
-  const escapedTokens = tokens.map(token => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  // Build pattern that matches all tokens (order doesn't matter for basic matching)
+  // We'll use a simple pattern that matches tokens with .* between them
+  // Overpass may not support lookaheads, so we use a simpler approach
+  const patterns: string[] = []
   
-  // Build pattern that matches tokens in order (with optional whitespace)
-  // This allows for variations like "main street" matching "main st" after normalization
-  const pattern = escapedTokens.join('\\s+')
+  for (const token of tokens) {
+    // Escape special regex characters
+    const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    
+    // Check if this token has an abbreviation variant
+    let tokenPattern = escapedToken
+    
+    // Find abbreviation for this token (reverse lookup)
+    const abbreviation = Object.entries(STREET_TYPE_EXPANSIONS).find(
+      ([abbr, full]) => full === token
+    )?.[0]
+    
+    if (abbreviation) {
+      // Support both full form and abbreviation
+      const escapedAbbr = abbreviation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      tokenPattern = `(${escapedToken}|${escapedAbbr})`
+    } else {
+      // Check for directional abbreviations
+      const dirAbbreviation = Object.entries(DIRECTIONAL_EXPANSIONS).find(
+        ([abbr, full]) => full === token
+      )?.[0]
+      
+      if (dirAbbreviation) {
+        const escapedDirAbbr = dirAbbreviation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        tokenPattern = `(${escapedToken}|${escapedDirAbbr})`
+      }
+    }
+    
+    // Match token as whole word: \b...\b
+    patterns.push(`\\b${tokenPattern}\\b`)
+  }
   
-  return pattern
+  // Build pattern: (?i).*token1.*token2.* (all tokens must appear)
+  // This is simpler than lookaheads but still requires all tokens
+  return `(?i).*${patterns.join('.*')}.*`
+}
+
+/**
+ * Build a full token-AND regex pattern with lookaheads (for use in post-filtering)
+ * Pattern: (?i)(?=.*\btoken1\b)(?=.*\b(token2|alt2)\b)....*
+ * This ensures all tokens match in any order
+ */
+export function buildStreetTokenAndRegex(normalizedStreet: string): string {
+  const tokens = normalizedStreet.split(/\s+/).filter(Boolean)
+  
+  if (tokens.length === 0) {
+    return '.*'
+  }
+  
+  // Build token-AND pattern: each token must appear (order doesn't matter)
+  const patterns: string[] = []
+  
+  for (const token of tokens) {
+    // Escape special regex characters
+    const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    
+    // Check if this token has an abbreviation variant
+    let tokenPattern = escapedToken
+    
+    // Find abbreviation for this token (reverse lookup)
+    const abbreviation = Object.entries(STREET_TYPE_EXPANSIONS).find(
+      ([abbr, full]) => full === token
+    )?.[0]
+    
+    if (abbreviation) {
+      // Support both full form and abbreviation
+      const escapedAbbr = abbreviation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      tokenPattern = `(${escapedToken}|${escapedAbbr})`
+    } else {
+      // Check for directional abbreviations
+      const dirAbbreviation = Object.entries(DIRECTIONAL_EXPANSIONS).find(
+        ([abbr, full]) => full === token
+      )?.[0]
+      
+      if (dirAbbreviation) {
+        const escapedDirAbbr = dirAbbreviation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        tokenPattern = `(${escapedToken}|${escapedDirAbbr})`
+      }
+    }
+    
+    // Add positive lookahead: (?=.*\btoken\b) - token must appear as whole word
+    patterns.push(`(?=.*\\b${tokenPattern}\\b)`)
+  }
+  
+  // Combine: (?i) for case-insensitive, all lookaheads, then .* to match the full string
+  return `(?i)${patterns.join('')}.*`
 }
 
 /**

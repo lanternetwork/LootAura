@@ -36,7 +36,11 @@ test.describe('Sell Wizard - Overpass Prefix Search', () => {
     // Mock Overpass API
     await page.route('**/api/geocoding/overpass-address**', async (route) => {
       const url = new URL(route.request().url())
-      const prefix = url.searchParams.get('prefix') || ''
+      const q = url.searchParams.get('q') || ''
+      
+      // Extract prefix from query (numeric-only or digits+street)
+      const numericMatch = q.match(/^(\d{1,6})(?:\s|$)/)
+      const prefix = numericMatch ? numericMatch[1] : ''
       
       await route.fulfill({
         status: 200,

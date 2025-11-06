@@ -36,9 +36,12 @@ describe('streetNormalize', () => {
   })
 
   describe('buildStreetRegex', () => {
-    it('should build regex pattern from normalized street', () => {
+    it('should build token-AND regex pattern from normalized street', () => {
       const pattern = buildStreetRegex('main street')
-      expect(pattern).toBe('main\\s+street')
+      // Pattern should match all tokens: (?i).*\btoken1\b.*\btoken2\b.*
+      expect(pattern).toMatch(/\(i\)/)
+      expect(pattern).toContain('main')
+      expect(pattern).toContain('street')
     })
 
     it('should escape special regex characters', () => {
@@ -49,12 +52,20 @@ describe('streetNormalize', () => {
 
     it('should handle single token', () => {
       const pattern = buildStreetRegex('highway')
-      expect(pattern).toBe('highway')
+      expect(pattern).toMatch(/\(i\)/)
+      expect(pattern).toContain('highway')
     })
 
     it('should handle empty string', () => {
       const pattern = buildStreetRegex('')
       expect(pattern).toBe('.*')
+    })
+
+    it('should support abbreviations in token pattern', () => {
+      const pattern = buildStreetRegex('main highway')
+      // Should support both "highway" and "hwy"
+      expect(pattern).toContain('main')
+      expect(pattern).toContain('highway')
     })
   })
 

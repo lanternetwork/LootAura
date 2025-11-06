@@ -1,5 +1,8 @@
 'use client'
 
+import { getCategoryLabel, getCategoryIcon } from '@/lib/data/categories'
+import type { CategoryValue } from '@/lib/types'
+
 interface ItemCardProps {
   item: {
     id: string
@@ -7,7 +10,7 @@ interface ItemCardProps {
     price?: number
     description?: string
     image_url?: string
-    category?: string
+    category?: CategoryValue | string // Allow string for backward compatibility
   }
   onDelete?: () => void
   onEdit?: () => void
@@ -56,11 +59,16 @@ export default function ItemCard({
             <div className="flex-1 min-w-0">
               <h4 className="font-medium text-gray-900 truncate">{item.name}</h4>
               <p className="text-sm text-gray-600 mt-1">{formatPrice(item.price)}</p>
-              {item.category && (
-                <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                  {item.category}
-                </span>
-              )}
+              {item.category && (() => {
+                const categoryIcon = getCategoryIcon(item.category)
+                const categoryLabel = getCategoryLabel(item.category)
+                return (
+                  <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+                    {categoryIcon && <span>{categoryIcon}</span>}
+                    <span>{categoryLabel}</span>
+                  </span>
+                )
+              })()}
             </div>
             
             {/* Actions */}

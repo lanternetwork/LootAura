@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
+import { CATEGORIES, type CategoryDef, getCategoryByValue } from '@/lib/data/categories'
+import type { CategoryValue } from '@/lib/types'
 
 // Generate stable UUID for new items
 function generateItemId(): string {
@@ -21,7 +23,7 @@ interface ItemFormModalProps {
     price?: number
     description?: string
     image_url?: string
-    category?: string
+    category: CategoryValue
   }) => void
   initialItem?: {
     id: string
@@ -29,7 +31,7 @@ interface ItemFormModalProps {
     price?: number
     description?: string
     image_url?: string
-    category?: string
+    category?: CategoryValue
   }
 }
 
@@ -43,7 +45,7 @@ export default function ItemFormModal({
   const [price, setPrice] = useState<string>('')
   const [description, setDescription] = useState('')
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined)
-  const [category, setCategory] = useState<string>('')
+  const [category, setCategory] = useState<CategoryValue | ''>('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const modalRef = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -58,7 +60,17 @@ export default function ItemFormModal({
         setPrice(initialItem.price?.toString() || '')
         setDescription(initialItem.description || '')
         setImageUrl(initialItem.image_url)
-        setCategory(initialItem.category || '')
+        // Validate category - if invalid, set to empty and show helper
+        const categoryValue = initialItem.category
+        if (categoryValue && getCategoryByValue(categoryValue)) {
+          setCategory(categoryValue)
+        } else {
+          setCategory('')
+          // Show helper for invalid categories
+          if (categoryValue) {
+            setErrors({ category: 'Please choose a valid category to continue' })
+          }
+        }
       } else {
         setName('')
         setPrice('')
@@ -118,6 +130,10 @@ export default function ItemFormModal({
       newErrors.name = 'Item name is required'
     }
 
+    if (!category) {
+      newErrors.category = 'Category is required'
+    }
+
     if (price && (isNaN(parseFloat(price)) || parseFloat(price) < 0)) {
       newErrors.price = 'Price must be a number greater than or equal to 0'
     }
@@ -134,7 +150,7 @@ export default function ItemFormModal({
       price: price ? parseFloat(price) : undefined,
       description: description.trim() || undefined,
       image_url: imageUrl,
-      category: category.trim() || undefined,
+      category: category as CategoryValue,
     }
 
     onSubmit(item)
@@ -237,16 +253,37 @@ export default function ItemFormModal({
 
             <div>
               <label htmlFor="item-category" className="block text-sm font-medium text-gray-700 mb-1">
-                Category (Optional)
+                Category *
               </label>
-              <input
+              <select
                 id="item-category"
-                type="text"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="e.g., Furniture"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-              />
+                onChange={(e) => {
+                  setCategory(e.target.value as CategoryValue | '')
+                  if (errors.category) {
+                    setErrors(prev => {
+                      const next = { ...prev }
+                      delete next.category
+                      return next
+                    })
+                  }
+                }}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] ${
+                  errors.category ? 'border-red-300' : 'border-gray-300'
+                }`}
+                required
+                aria-label="Select category"
+              >
+                <option value="">Select category</option>
+                {CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.icon ? `${cat.icon} ${cat.label}` : cat.label}
+                  </option>
+                ))}
+              </select>
+              {errors.category && (
+                <p className="mt-1 text-sm text-red-600">{errors.category}</p>
+              )}
             </div>
           </div>
 

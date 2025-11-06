@@ -43,6 +43,10 @@ export type SaleItem = {
   created_at?: string
 }
 
+// Category type - must match values from lib/data/categories.ts
+import { CATEGORY_VALUES } from './data/categories'
+export type CategoryValue = (typeof CATEGORY_VALUES)[number]
+
 export type Profile = {
   id: string
   display_name?: string

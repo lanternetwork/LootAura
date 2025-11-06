@@ -12,6 +12,7 @@ import TimePicker30 from '@/components/TimePicker30'
 import ItemFormModal from '@/components/sales/ItemFormModal'
 import ItemCard from '@/components/sales/ItemCard'
 import Toast from '@/components/sales/Toast'
+import type { CategoryValue } from '@/lib/types'
 
 interface WizardStep {
   id: string
@@ -64,7 +65,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     status: initialData?.status || 'draft'
   })
   const [photos, setPhotos] = useState<string[]>([])
-  const [items, setItems] = useState<Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }>>([])
+  const [items, setItems] = useState<Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>>([])
   const [loading, setLoading] = useState(false)
   const [_errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -344,14 +345,14 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setPhotos(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleAddItem = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => {
+  const handleAddItem = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category: CategoryValue }) => {
     setItems(prev => {
       if (prev.length >= 50) return prev
       return [...prev, item]
     })
   }, [])
 
-  const handleUpdateItem = useCallback((updated: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => {
+  const handleUpdateItem = useCallback((updated: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }) => {
     setItems(prev => {
       const next = prev.slice()
       const i = next.findIndex(it => it.id === updated.id)
@@ -758,9 +759,9 @@ function PhotosStep({ photos, onUpload, onRemove, onReorder, onSetCover }: {
 }
 
 function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
-  items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }>,
-  onAdd: (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => void,
-  onUpdate: (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => void,
+  items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>,
+  onAdd: (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category: CategoryValue }) => void,
+  onUpdate: (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }) => void,
   onRemove: (id: string) => void
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -789,7 +790,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
     }, 100)
   }, [])
 
-  const handleSubmit = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: string }) => {
+  const handleSubmit = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category: CategoryValue }) => {
     if (editingItemId && item.id === editingItemId) {
       onUpdate(item)
     } else {
@@ -870,7 +871,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
 function ReviewStep({ formData, photos, items, onPublish, loading, submitError }: {
   formData: Partial<SaleInput>,
   photos: string[],
-  items: Array<{ id?: string; name: string; price?: number; description?: string }>,
+  items: Array<{ id?: string; name: string; price?: number; description?: string; category?: CategoryValue }>,
   onPublish: () => void,
   loading: boolean,
   submitError?: string | null

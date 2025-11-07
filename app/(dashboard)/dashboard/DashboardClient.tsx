@@ -134,26 +134,27 @@ export default function DashboardClient({
           <h2 className="text-lg font-semibold">Your Sales</h2>
           <a href="/sell/new" className="btn-accent">Create</a>
         </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {listings.map((l) => (
-          <div key={l.id} className="card card-hover">
-            <div className="card-body">
-              {(l.cover_url || l.cover_image_url) ? (
-                <div className="w-full h-32 rounded mb-3" style={{ backgroundImage: `url(${l.cover_url || l.cover_image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-              ) : null}
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">{l.title}</div>
-                  <div className="text-xs text-gray-500">{l.updated_at ? new Date(l.updated_at).toLocaleString() : ''}</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {listings.map((l) => (
+            <div key={l.id} className="card card-hover">
+              <div className="card-body">
+                {(l.cover_url || l.cover_image_url) ? (
+                  <div className="w-full h-32 rounded mb-3" style={{ backgroundImage: `url(${l.cover_url || l.cover_image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                ) : null}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">{l.title}</div>
+                    <div className="text-xs text-gray-500">{l.updated_at ? new Date(l.updated_at).toLocaleString() : ''}</div>
+                  </div>
+                  <a href={`/sales/${l.id}`} className="link-accent text-sm">Edit</a>
                 </div>
-                <a href={`/sales/${l.id}`} className="link-accent text-sm">Edit</a>
               </div>
             </div>
-          </div>
-        ))}
-        {listings.length === 0 && (
-          <div className="text-gray-600">No listings yet.</div>
-        )}
+          ))}
+          {listings.length === 0 && (
+            <div className="text-gray-600">No listings yet.</div>
+          )}
+        </div>
       </div>
     </div>
   )

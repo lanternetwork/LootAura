@@ -778,6 +778,10 @@ export default function AddressAutocomplete({
       }
 
       const address = final.label
+      
+      // Extract address components - only use if address object exists
+      // If address is undefined, we'll only update the address field and coordinates
+      const hasAddressData = !!final.address
       const city = final.address?.city || ''
       const state = final.address?.state || ''
       const zip = final.address?.postcode || ''
@@ -789,6 +793,7 @@ export default function AddressAutocomplete({
         zip,
         lat: final.lat,
         lng: final.lng,
+        hasAddressData,
         hasOnPlaceSelected: !!onPlaceSelected
       })
 
@@ -803,13 +808,17 @@ export default function AddressAutocomplete({
       setShowFallbackMessage(false)
       setShowGoogleAttribution(false)
 
-      // Call onPlaceSelected FIRST to update all form fields
+      // Update the input value first (this will trigger onChange)
+      onChange(address)
+
+      // Call onPlaceSelected to update all form fields
+      // Only update fields that have data - don't clear existing fields with empty strings
       if (onPlaceSelected) {
         const placeData = {
           address,
-          city,
-          state,
-          zip,
+          city: hasAddressData ? city : undefined,
+          state: hasAddressData ? state : undefined,
+          zip: hasAddressData ? zip : undefined,
           lat: final.lat,
           lng: final.lng
         }
@@ -825,9 +834,6 @@ export default function AddressAutocomplete({
       } else {
         console.warn('[AddressAutocomplete] onPlaceSelected is not defined!')
       }
-
-      // Then update the input value (this will trigger onChange)
-      onChange(address)
     }
     run()
   }, [onChange, onPlaceSelected, googleSessionToken])

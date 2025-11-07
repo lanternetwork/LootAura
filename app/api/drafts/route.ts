@@ -35,7 +35,7 @@ export async function GET(_request: NextRequest) {
     if (allDrafts) {
       // Return all active drafts for user
       const { data: drafts, error } = await supabase
-        .from('sale_drafts')
+        .from('lootaura_v2.sale_drafts')
         .select('id, draft_key, title, payload, updated_at')
         .eq('user_id', user.id)
         .eq('status', 'active')
@@ -60,7 +60,7 @@ export async function GET(_request: NextRequest) {
 
     // Fetch latest active draft for user (original behavior)
     const { data: draft, error } = await supabase
-      .from('sale_drafts')
+      .from('lootaura_v2.sale_drafts')
       .select('id, payload, updated_at')
       .eq('user_id', user.id)
       .eq('status', 'active')
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
     })
     
     const { data: draft, error } = await supabase
-      .from('sale_drafts')
+      .from('lootaura_v2.sale_drafts')
       .upsert({
         user_id: user.id,
         draft_key: draftKey,
@@ -279,7 +279,7 @@ export async function DELETE(request: NextRequest) {
 
     // Mark draft as archived (soft delete)
     const { error } = await supabase
-      .from('sale_drafts')
+      .from('lootaura_v2.sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)

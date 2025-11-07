@@ -47,6 +47,6 @@ export function createSupabaseServerClient() {
         cookieStore.set({ name, value: '', ...options, maxAge: 0 })
       },
     },
-    db: { schema: 'lootaura_v2' }, // Use lootaura_v2 schema for tables
+    db: { schema: 'public' }, // Default schema; use lootaura_v2.table_name in .from() calls
   });
 }

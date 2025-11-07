@@ -6,25 +6,34 @@ type Listing = { id: string; title: string; updated_at?: string | null; status?:
 
 export default function DashboardClient({ initialListings }: { initialListings: Listing[] }) {
   const [tab, setTab] = useState<'listings' | 'settings' | 'analytics'>('listings')
-  const [listings, _setListings] = useState<Listing[]>(initialListings)
+  const [listings, setListings] = useState<Listing[]>(initialListings)
   const [saving, setSaving] = useState(false)
   const [emailOptIn, setEmailOptIn] = useState(false)
   const [defaultRadiusKm, setDefaultRadiusKm] = useState<number>(10)
 
-  // Debug logging
+  // If no listings from server, fetch from API (which works)
   useEffect(() => {
     console.log('[DASHBOARD_CLIENT] Initial listings received:', initialListings?.length || 0)
     if (initialListings && initialListings.length > 0) {
       console.log('[DASHBOARD_CLIENT] Sample listing:', initialListings[0])
     } else {
-      console.warn('[DASHBOARD_CLIENT] No listings received - checking if sale exists...')
-      // Try to fetch sales directly from API
+      console.warn('[DASHBOARD_CLIENT] No listings from server - fetching from API...')
+      // Fetch sales directly from API (which successfully finds them)
       fetch('/api/sales_v2?my_sales=true')
         .then(res => res.json())
         .then(data => {
           console.log('[DASHBOARD_CLIENT] API response:', data)
-          if (data.sales && data.sales.length > 0) {
-            console.log('[DASHBOARD_CLIENT] Found', data.sales.length, 'sales via API')
+          if (data.sales && Array.isArray(data.sales) && data.sales.length > 0) {
+            // Map API response to Listing format
+            const apiListings: Listing[] = data.sales.map((sale: any) => ({
+              id: sale.id,
+              title: sale.title,
+              updated_at: sale.updated_at,
+              status: sale.status,
+              cover_image_url: sale.cover_image_url,
+            }))
+            console.log('[DASHBOARD_CLIENT] Found', apiListings.length, 'sales via API, updating state')
+            setListings(apiListings)
           } else {
             console.warn('[DASHBOARD_CLIENT] API returned no sales')
           }

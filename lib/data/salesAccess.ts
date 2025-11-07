@@ -56,15 +56,18 @@ export async function getUserSales(
       .limit(limit)
 
     if (!error && sales) {
-      // Debug: log image data for first sale
-      if (sales.length > 0 && process.env.NODE_ENV === 'development') {
+      // Debug: log image data for first sale (always log for debugging)
+      if (sales.length > 0) {
+        const firstSale = sales[0] as any
         console.log('[SALES_ACCESS] Sample sale image data:', {
-          id: sales[0].id,
-          title: sales[0].title,
-          cover_image_url: (sales[0] as any).cover_image_url,
-          images: (sales[0] as any).images,
-          imagesType: typeof (sales[0] as any).images,
-          imagesIsArray: Array.isArray((sales[0] as any).images),
+          id: firstSale.id,
+          title: firstSale.title,
+          cover_image_url: firstSale.cover_image_url,
+          images: firstSale.images,
+          imagesType: typeof firstSale.images,
+          imagesIsArray: Array.isArray(firstSale.images),
+          imagesLength: Array.isArray(firstSale.images) ? firstSale.images.length : 'N/A',
+          allKeys: Object.keys(firstSale),
         })
       }
       return {

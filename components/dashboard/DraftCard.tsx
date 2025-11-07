@@ -2,6 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'react-toastify'
+import { Edit2, Trash2, Send, Calendar } from 'lucide-react'
+import { publishDraftServer, deleteDraftServer } from '@/lib/draft/draftClient'
+import { getCategoryLabel } from '@/lib/data/categories'
+import type { DraftListing } from '@/lib/data/salesAccess'
+
 // Format relative time helper (no external dependency)
 function formatRelativeTime(date: Date): string {
   const now = new Date()
@@ -17,10 +23,6 @@ function formatRelativeTime(date: Date): string {
   if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`
   return date.toLocaleDateString()
 }
-import { Edit2, Trash2, Send, Calendar } from 'lucide-react'
-import { publishDraftServer, deleteDraftServer } from '@/lib/draft/draftClient'
-import { getCategoryLabel } from '@/lib/data/categories'
-import type { DraftListing } from '@/lib/data/salesAccess'
 
 interface DraftCardProps {
   draft: DraftListing
@@ -67,13 +69,14 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
       const result = await publishDraftServer(draft.draft_key)
       if (result.ok && result.data?.saleId) {
         onPublish(draft.draft_key, result.data.saleId)
+        toast.success('Draft published successfully!')
         router.push(`/sales/${result.data.saleId}`)
       } else {
-        alert(result.error || 'Failed to publish draft')
+        toast.error(result.error || 'Failed to publish draft')
       }
     } catch (error) {
       console.error('[DRAFT_CARD] Error publishing:', error)
-      alert('Failed to publish draft')
+      toast.error('Failed to publish draft. Please try again.')
     } finally {
       setIsPublishing(false)
     }
@@ -85,12 +88,13 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
       const result = await deleteDraftServer(draft.draft_key)
       if (result.ok) {
         onDelete(draft.draft_key)
+        toast.success('Draft deleted')
       } else {
-        alert(result.error || 'Failed to delete draft')
+        toast.error(result.error || 'Failed to delete draft')
       }
     } catch (error) {
       console.error('[DRAFT_CARD] Error deleting:', error)
-      alert('Failed to delete draft')
+      toast.error('Failed to delete draft. Please try again.')
     } finally {
       setIsDeleting(false)
       setShowDeleteConfirm(false)

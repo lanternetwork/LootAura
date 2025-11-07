@@ -1,6 +1,7 @@
 'use client'
 
-import { Plus } from 'lucide-react'
+import { useState } from 'react'
+import { Plus, RefreshCw, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import DraftCard from './DraftCard'
 import type { DraftListing } from '@/lib/data/salesAccess'
@@ -8,11 +9,13 @@ import type { DraftListing } from '@/lib/data/salesAccess'
 interface DraftsPanelProps {
   drafts: DraftListing[]
   isLoading?: boolean
+  error?: any
   onDelete: (draftKey: string) => void
   onPublish: (draftKey: string, saleId: string) => void
+  onRetry?: () => void
 }
 
-export default function DraftsPanel({ drafts, isLoading, onDelete, onPublish }: DraftsPanelProps) {
+export default function DraftsPanel({ drafts, isLoading, error, onDelete, onPublish, onRetry }: DraftsPanelProps) {
   return (
     <div className="card">
       <div className="card-body-lg">
@@ -35,6 +38,29 @@ export default function DraftsPanel({ drafts, isLoading, onDelete, onPublish }: 
             Create New Sale
           </Link>
         </div>
+
+        {/* Error State */}
+        {error && !isLoading && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-800 font-medium">Failed to load drafts</p>
+                <p className="text-xs text-red-600 mt-1">{error.message || 'An error occurred'}</p>
+                {onRetry && (
+                  <button
+                    onClick={onRetry}
+                    className="mt-2 px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700 flex items-center gap-1"
+                    aria-label="Retry loading drafts"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Retry
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Body */}
         {isLoading ? (

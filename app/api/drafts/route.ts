@@ -27,7 +27,37 @@ export async function GET(_request: NextRequest) {
       }, { status: 401 })
     }
 
-    // Fetch latest active draft for user
+    // Check if we should return all drafts or just the latest
+    const { searchParams } = new URL(_request.url)
+    const allDrafts = searchParams.get('all') === 'true'
+
+    if (allDrafts) {
+      // Return all active drafts for user
+      const { data: drafts, error } = await supabase
+        .from('lootaura_v2.sale_drafts')
+        .select('id, draft_key, title, payload, updated_at')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('updated_at', { ascending: false })
+        .limit(50)
+
+      if (error) {
+        console.error('[DRAFTS] Error fetching drafts:', error)
+        Sentry.captureException(error, { tags: { operation: 'getAllDrafts' } })
+        return NextResponse.json<ApiResponse>({
+          ok: false,
+          error: 'Failed to fetch drafts',
+          code: 'FETCH_ERROR'
+        }, { status: 500 })
+      }
+
+      return NextResponse.json<ApiResponse>({
+        ok: true,
+        data: drafts || []
+      })
+    }
+
+    // Fetch latest active draft for user (original behavior)
     const { data: draft, error } = await supabase
       .from('lootaura_v2.sale_drafts')
       .select('id, payload, updated_at')

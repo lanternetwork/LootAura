@@ -17,6 +17,8 @@ export default function DashboardClient({
   const [tab, setTab] = useState<'listings' | 'settings' | 'analytics'>('listings')
   const [listings, setListings] = useState<Listing[]>(initialListings)
   const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
+  const [draftsLoading, setDraftsLoading] = useState(false)
+  const [draftsError, setDraftsError] = useState<any>(null)
   const [saving, setSaving] = useState(false)
   const [emailOptIn, setEmailOptIn] = useState(false)
   const [defaultRadiusKm, setDefaultRadiusKm] = useState<number>(10)
@@ -28,8 +30,47 @@ export default function DashboardClient({
   const handleDraftPublish = (draftKey: string, saleId: string) => {
     // Remove draft from list on successful publish
     setDrafts((prev) => prev.filter((d) => d.draft_key !== draftKey))
-    // Optionally refresh listings to show the new sale
-    // For now, we'll let the user navigate to the sale page
+    // Refresh listings to show the new sale
+    fetch('/api/sales_v2?my_sales=true')
+      .then(res => res.json())
+      .then(data => {
+        if (data.sales && Array.isArray(data.sales)) {
+          const apiListings: Listing[] = data.sales.map((sale: any) => ({
+            id: sale.id,
+            title: sale.title,
+            updated_at: sale.updated_at,
+            status: sale.status,
+            cover_image_url: sale.cover_image_url,
+          }))
+          setListings(apiListings)
+        }
+      })
+      .catch(err => console.error('[DASHBOARD_CLIENT] Error refreshing listings:', err))
+  }
+
+  const handleRetryDrafts = async () => {
+    setDraftsLoading(true)
+    setDraftsError(null)
+    try {
+      const response = await fetch('/api/drafts?all=true')
+      const result = await response.json()
+      if (result.ok && Array.isArray(result.data)) {
+        const mappedDrafts: DraftListing[] = result.data.map((draft: any) => ({
+          id: draft.id,
+          draft_key: draft.draft_key,
+          title: draft.title || draft.payload?.formData?.title || null,
+          updated_at: draft.updated_at,
+          payload: draft.payload || {},
+        }))
+        setDrafts(mappedDrafts)
+      } else {
+        setDraftsError({ message: result.error || 'Failed to load drafts' })
+      }
+    } catch (error) {
+      setDraftsError({ message: 'Network error. Please try again.' })
+    } finally {
+      setDraftsLoading(false)
+    }
   }
 
   // If no listings from server, fetch from API (which works)
@@ -79,9 +120,12 @@ export default function DashboardClient({
     <div className="space-y-6">
       {/* Drafts Panel */}
       <DraftsPanel 
-        drafts={drafts} 
+        drafts={drafts}
+        isLoading={draftsLoading}
+        error={draftsError}
         onDelete={handleDraftDelete}
         onPublish={handleDraftPublish}
+        onRetry={handleRetryDrafts}
       />
 
       {/* Sales Listings */}

@@ -15,7 +15,6 @@ export default function DashboardClient({
   initialListings: Listing[]
   initialDrafts?: DraftListing[]
 }) {
-  const [tab, setTab] = useState<'listings' | 'settings' | 'analytics'>('listings')
   const [listings, setListings] = useState<Listing[]>(initialListings)
   const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
   const [draftsLoading, setDraftsLoading] = useState(false)
@@ -117,95 +116,81 @@ export default function DashboardClient({
     loadSettings()
   }, [])
 
-  const listingsView = (
-    <div className="space-y-6">
-      {/* Drafts Panel */}
-      <DraftsPanel 
-        drafts={drafts}
-        isLoading={draftsLoading}
-        error={draftsError}
-        onDelete={handleDraftDelete}
-        onPublish={handleDraftPublish}
-        onRetry={handleRetryDrafts}
-      />
-
-      {/* Sales Panel */}
-      <SalesPanel listings={listings} />
-
-      {/* Analytics Panel */}
-      <AnalyticsPanel />
-    </div>
-  )
-
-  const settingsView = (
-    <form
-      className="space-y-6"
-      onSubmit={async (e) => {
-        e.preventDefault()
-        if (!Number.isFinite(defaultRadiusKm) || defaultRadiusKm < 1 || defaultRadiusKm > 50) {
-          alert('Default radius must be between 1 and 50 km')
-          return
-        }
-        setSaving(true)
-        const res = await fetch('/api/seller-settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email_opt_in: emailOptIn, default_radius_km: defaultRadiusKm }),
-        })
-        const j = await res.json()
-        setSaving(false)
-        if (!res.ok) {
-          alert(j?.error || 'Failed to save settings')
-          return
-        }
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          // eslint-disable-next-line no-console
-          console.log('[DASHBOARD] settings: upsert success')
-        }
-      }}
-    >
-      <div className="card">
-        <div className="card-body-lg">
-          <h3 className="card-title mb-4">Preferences</h3>
-          <label className="flex items-center gap-3">
-            <input type="checkbox" className="rounded border-gray-300" checked={emailOptIn} onChange={(e) => setEmailOptIn(e.target.checked)} />
-            <span>Email me occasional tips and updates</span>
-          </label>
-          <div className="mt-4">
-            <label className="block text-sm font-medium mb-1">Default search radius (km)</label>
-            <input
-              type="number"
-              min={1}
-              max={50}
-              value={defaultRadiusKm}
-              onChange={(e) => setDefaultRadiusKm(Number(e.target.value))}
-              className="w-40 px-3 py-2 border rounded"
-            />
-          </div>
-          <div className="mt-6 flex gap-2">
-            <button type="submit" className="btn-accent" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-            <button type="button" className="rounded px-4 py-2 border" onClick={() => { setEmailOptIn(false); setDefaultRadiusKm(10) }}>Reset</button>
-          </div>
-        </div>
-      </div>
-    </form>
-  )
-
-  const analyticsView = (
-    <AnalyticsPanel />
-  )
-
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-semibold mb-6">Seller Dashboard</h1>
-      <div className="flex gap-2 mb-6">
-        <button className={`px-3 py-1.5 rounded border ${tab==='listings' ? 'btn-accent' : ''}`} onClick={() => setTab('listings')}>Listings</button>
-        <button className={`px-3 py-1.5 rounded border ${tab==='settings' ? 'btn-accent' : ''}`} onClick={() => setTab('settings')}>Settings</button>
-        <button className={`px-3 py-1.5 rounded border ${tab==='analytics' ? 'btn-accent' : ''}`} onClick={() => setTab('analytics')}>Analytics</button>
+      
+      <div className="space-y-6">
+        {/* Drafts Panel */}
+        <DraftsPanel 
+          drafts={drafts}
+          isLoading={draftsLoading}
+          error={draftsError}
+          onDelete={handleDraftDelete}
+          onPublish={handleDraftPublish}
+          onRetry={handleRetryDrafts}
+        />
+
+        {/* Sales Panel */}
+        <SalesPanel listings={listings} />
+
+        {/* Analytics Panel */}
+        <AnalyticsPanel />
+
+        {/* Settings Panel */}
+        <div className="card">
+          <div className="card-body-lg">
+            <h2 className="card-title mb-4">Settings</h2>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!Number.isFinite(defaultRadiusKm) || defaultRadiusKm < 1 || defaultRadiusKm > 50) {
+                  alert('Default radius must be between 1 and 50 km')
+                  return
+                }
+                setSaving(true)
+                const res = await fetch('/api/seller-settings', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email_opt_in: emailOptIn, default_radius_km: defaultRadiusKm }),
+                })
+                const j = await res.json()
+                setSaving(false)
+                if (!res.ok) {
+                  alert(j?.error || 'Failed to save settings')
+                  return
+                }
+                if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                  // eslint-disable-next-line no-console
+                  console.log('[DASHBOARD] settings: upsert success')
+                }
+              }}
+            >
+              <div className="space-y-4">
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" className="rounded border-gray-300" checked={emailOptIn} onChange={(e) => setEmailOptIn(e.target.checked)} />
+                  <span>Email me occasional tips and updates</span>
+                </label>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Default search radius (km)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={defaultRadiusKm}
+                    onChange={(e) => setDefaultRadiusKm(Number(e.target.value))}
+                    className="w-40 px-3 py-2 border rounded"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button type="submit" className="btn-accent" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+                  <button type="button" className="rounded px-4 py-2 border" onClick={() => { setEmailOptIn(false); setDefaultRadiusKm(10) }}>Reset</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
-      {tab === 'listings' && listingsView}
-      {tab === 'settings' && settingsView}
-      {tab === 'analytics' && analyticsView}
     </div>
   )
 }

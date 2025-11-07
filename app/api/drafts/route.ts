@@ -153,6 +153,14 @@ export async function POST(request: NextRequest) {
     const title = validatedPayload.formData?.title || null
 
     // Upsert draft (insert or update by user_id + draft_key)
+    console.log('[DRAFTS] Saving draft:', {
+      userId: user.id,
+      draftKey,
+      title,
+      hasPayload: !!validatedPayload,
+      payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
+    })
+    
     const { data: draft, error } = await supabase
       .from('lootaura_v2.sale_drafts')
       .upsert({
@@ -166,7 +174,7 @@ export async function POST(request: NextRequest) {
         onConflict: 'user_id,draft_key',
         ignoreDuplicates: false
       })
-      .select('id')
+      .select('id, draft_key, title, status, updated_at')
       .single()
 
     if (error) {
@@ -186,6 +194,14 @@ export async function POST(request: NextRequest) {
         details: error.message
       }, { status: 500 })
     }
+
+    console.log('[DRAFTS] Draft saved successfully:', {
+      id: draft?.id,
+      draftKey: draft?.draft_key,
+      title: draft?.title,
+      status: draft?.status,
+      updatedAt: draft?.updated_at,
+    })
 
     return NextResponse.json<ApiResponse>({
       ok: true,

@@ -167,6 +167,8 @@ export async function getUserDrafts(
   offset: number = 0
 ): Promise<{ data: DraftListing[]; error?: any }> {
   try {
+    console.log('[SALES_ACCESS] Fetching drafts for user:', userId, 'limit:', limit, 'offset:', offset)
+    
     const { data: drafts, error } = await supabase
       .from('lootaura_v2.sale_drafts')
       .select('id, draft_key, title, updated_at, payload')
@@ -176,11 +178,20 @@ export async function getUserDrafts(
       .range(offset, offset + limit - 1)
 
     if (error) {
+      console.error('[SALES_ACCESS] Error fetching drafts:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        userId,
+      })
       return {
         data: [],
         error,
       }
     }
+
+    console.log('[SALES_ACCESS] Found', drafts?.length || 0, 'drafts for user:', userId)
 
     // Map to DraftListing format, extracting title from payload if not set
     const mappedDrafts: DraftListing[] = (drafts || []).map((draft: any) => ({
@@ -195,6 +206,7 @@ export async function getUserDrafts(
       data: mappedDrafts,
     }
   } catch (error) {
+    console.error('[SALES_ACCESS] Unexpected error fetching drafts:', error)
     return {
       data: [],
       error,

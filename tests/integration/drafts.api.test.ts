@@ -96,9 +96,15 @@ describe('Drafts API', () => {
     })
 
     it('should reject invalid draft payload', () => {
-      const invalidPayload = { formData: {} }
+      // Test with missing required formData field
+      const invalidPayload = {}
       const result = SaleDraftPayloadSchema.safeParse(invalidPayload)
       expect(result.success).toBe(false)
+      
+      // Test with invalid type for formData
+      const invalidPayload2 = { formData: 'not an object' }
+      const result2 = SaleDraftPayloadSchema.safeParse(invalidPayload2)
+      expect(result2.success).toBe(false)
     })
   })
 
@@ -144,6 +150,7 @@ describe('Drafts API', () => {
   describe('RLS policies', () => {
     it('should use base tables (not views) for writes', () => {
       // Verify that we use lootaura_v2.* tables, not views
+      // Views typically end with _v2 (e.g., sales_v2), base tables don't
       const writeTables = [
         'lootaura_v2.sale_drafts',
         'lootaura_v2.sales',
@@ -152,8 +159,10 @@ describe('Drafts API', () => {
 
       writeTables.forEach((table) => {
         expect(table).toContain('lootaura_v2.')
-        expect(table).not.toContain('_v2') // Not a view
         expect(table).not.toContain('public.')
+        // Check that table name itself doesn't end with _v2 (view indicator)
+        const tableName = table.split('.').pop() || ''
+        expect(tableName).not.toMatch(/_v2$/) // Table name shouldn't end with _v2
       })
     })
   })

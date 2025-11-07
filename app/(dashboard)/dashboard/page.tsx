@@ -20,54 +20,44 @@ export default async function DashboardPage() {
   }
 
   // Fetch all sales for the user (including published, draft, etc.)
-  // Try base table first (bypasses view RLS issues)
+  // Use the same approach as the API endpoint that works: sales_v2 view
   console.log('[DASHBOARD] Fetching sales for user:', user.id)
   
-  // First, let's verify the user can query their own sales
-  // Try a simple count query to see if RLS is blocking
-  const { count: salesCount, error: countError } = await supabase
-    .from('lootaura_v2.sales')
-    .select('*', { count: 'exact', head: true })
-    .eq('owner_id', user.id)
-  
-  console.log('[DASHBOARD] Sales count query result:', { count: salesCount, error: countError })
-  
+  // Use sales_v2 view (same as API endpoint /api/sales_v2?my_sales=true)
+  // The view includes owner_id and works correctly
   const { data: listings, error: listingsError } = await supabase
-    .from('lootaura_v2.sales')
+    .from('sales_v2')
     .select('id, title, updated_at, status, cover_image_url')
     .eq('owner_id', user.id)
     .order('updated_at', { ascending: false })
     .limit(20)
 
   if (listingsError) {
-    console.error('[DASHBOARD] Error fetching listings from base table:', listingsError)
+    console.error('[DASHBOARD] Error fetching listings from view:', listingsError)
     console.error('[DASHBOARD] Error details:', JSON.stringify(listingsError, null, 2))
     
-    // Fallback: try sales_v2 view
-    const { data: viewListings, error: viewError } = await supabase
-      .from('sales_v2')
+    // Fallback: try base table
+    const { data: baseListings, error: baseError } = await supabase
+      .from('lootaura_v2.sales')
       .select('id, title, updated_at, status, cover_image_url')
       .eq('owner_id', user.id)
       .order('updated_at', { ascending: false })
       .limit(20)
     
-    if (viewError) {
-      console.error('[DASHBOARD] Error fetching listings from view:', viewError)
-      console.error('[DASHBOARD] View error details:', JSON.stringify(viewError, null, 2))
+    if (baseError) {
+      console.error('[DASHBOARD] Error fetching listings from base table:', baseError)
     } else {
-      console.log('[DASHBOARD] Found', viewListings?.length || 0, 'listings from view')
+      console.log('[DASHBOARD] Found', baseListings?.length || 0, 'listings from base table')
     }
     
     return (
-      <DashboardClient initialListings={viewListings ?? []} />
+      <DashboardClient initialListings={baseListings ?? []} />
     )
   }
 
-  console.log('[DASHBOARD] Found', listings?.length || 0, 'listings from base table')
+  console.log('[DASHBOARD] Found', listings?.length || 0, 'listings from view')
   if (listings && listings.length > 0) {
     console.log('[DASHBOARD] Sample listing:', listings[0])
-  } else {
-    console.warn('[DASHBOARD] No listings found, but no error occurred. Sales count was:', salesCount)
   }
 
   return (

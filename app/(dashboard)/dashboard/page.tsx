@@ -20,28 +20,40 @@ export default async function DashboardPage() {
   }
 
   // Fetch all sales for the user (including published, draft, etc.)
-  // Use sales_v2 view which should have proper RLS policies
-  // If that fails, we'll add error logging
+  // Try base table first (bypasses view RLS issues)
+  console.log('[DASHBOARD] Fetching sales for user:', user.id)
+  
   const { data: listings, error: listingsError } = await supabase
-    .from('sales_v2')
+    .from('lootaura_v2.sales')
     .select('id, title, updated_at, status, cover_image_url')
     .eq('owner_id', user.id)
     .order('updated_at', { ascending: false })
     .limit(20)
 
   if (listingsError) {
-    console.error('[DASHBOARD] Error fetching listings:', listingsError)
-    // Fallback: try querying base table directly
-    const { data: fallbackListings } = await supabase
-      .from('lootaura_v2.sales')
+    console.error('[DASHBOARD] Error fetching listings from base table:', listingsError)
+    // Fallback: try sales_v2 view
+    const { data: viewListings, error: viewError } = await supabase
+      .from('sales_v2')
       .select('id, title, updated_at, status, cover_image_url')
       .eq('owner_id', user.id)
       .order('updated_at', { ascending: false })
       .limit(20)
     
+    if (viewError) {
+      console.error('[DASHBOARD] Error fetching listings from view:', viewError)
+    } else {
+      console.log('[DASHBOARD] Found', viewListings?.length || 0, 'listings from view')
+    }
+    
     return (
-      <DashboardClient initialListings={fallbackListings ?? []} />
+      <DashboardClient initialListings={viewListings ?? []} />
     )
+  }
+
+  console.log('[DASHBOARD] Found', listings?.length || 0, 'listings from base table')
+  if (listings && listings.length > 0) {
+    console.log('[DASHBOARD] Sample listing:', listings[0])
   }
 
   return (

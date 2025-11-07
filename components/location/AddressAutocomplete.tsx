@@ -790,8 +790,8 @@ export default function AddressAutocomplete({
       const zip = final.address?.zip || final.address?.postcode || ''
       const country = final.address?.country || 'US'
       
-      // Use label as the full address string for the input field
-      const address = final.label
+      // Use line1 (street address) for the address field, not the full formatted label
+      const streetAddress = addressLine1 || final.label.split(',')[0].trim() || final.label
 
       // Prevent an immediate re-query from the newly populated address value
       suppressNextFetchRef.current = true
@@ -805,10 +805,10 @@ export default function AddressAutocomplete({
       setShowGoogleAttribution(false)
 
       // Call onPlaceSelected to update all form fields atomically
-      // Use full label for address field to match what will be displayed in input
+      // Use street address (line1) for address field, not full formatted label
       if (onPlaceSelected) {
         const placeData = {
-          address: address, // Use full label for consistency with input display
+          address: streetAddress, // Use street address (number + street name)
           city: city || '',
           state: state || '',
           zip: zip || '',
@@ -822,10 +822,10 @@ export default function AddressAutocomplete({
         }
       }
       
-      // Update the input value to match (use full label for display)
+      // Update the input value to match (use street address for display)
       // Use setTimeout to ensure parent's onChange completes first and prevent re-query
       setTimeout(() => {
-        onChange(address)
+        onChange(streetAddress)
         // Keep focus on input after selection
         inputRef.current?.focus()
         // Keep suppress flag active for a bit longer to prevent debounced query

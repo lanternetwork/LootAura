@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import DraftsPanel from '@/components/dashboard/DraftsPanel'
+import SalesPanel from '@/components/dashboard/SalesPanel'
+import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
 import type { DraftListing } from '@/lib/data/salesAccess'
 
 type Listing = { id: string; title: string; updated_at?: string | null; status?: string | null; cover_image_url?: string | null; cover_url?: string | null }
@@ -127,34 +129,11 @@ export default function DashboardClient({
         onRetry={handleRetryDrafts}
       />
 
-      {/* Sales Listings */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Your Sales</h2>
-          <a href="/sell/new" className="btn-accent">Create</a>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {listings.map((l) => (
-            <div key={l.id} className="card card-hover">
-              <div className="card-body">
-                {(l.cover_url || l.cover_image_url) ? (
-                  <div className="w-full h-32 rounded mb-3" style={{ backgroundImage: `url(${l.cover_url || l.cover_image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-                ) : null}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{l.title}</div>
-                    <div className="text-xs text-gray-500">{l.updated_at ? new Date(l.updated_at).toLocaleString() : ''}</div>
-                  </div>
-                  <a href={`/sales/${l.id}`} className="link-accent text-sm">Edit</a>
-                </div>
-              </div>
-            </div>
-          ))}
-          {listings.length === 0 && (
-            <div className="text-gray-600">No listings yet.</div>
-          )}
-        </div>
-      </div>
+      {/* Sales Panel */}
+      <SalesPanel listings={listings} />
+
+      {/* Analytics Panel */}
+      <AnalyticsPanel />
     </div>
   )
 
@@ -213,17 +192,7 @@ export default function DashboardClient({
   )
 
   const analyticsView = (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      {['Views', 'Saves', 'CTR'].map((label) => (
-        <div key={label} className="card">
-          <div className="card-body">
-            <div className="card-subtitle">{label}</div>
-            <div className="text-2xl font-semibold mt-2">—</div>
-            <div className="text-xs text-gray-500 mt-1">Coming soon</div>
-          </div>
-        </div>
-      ))}
-    </div>
+    <AnalyticsPanel />
   )
 
   return (

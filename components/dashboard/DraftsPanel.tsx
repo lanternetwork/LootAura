@@ -28,14 +28,6 @@ export default function DraftsPanel({ drafts, isLoading, error, onDelete, onPubl
               </span>
             )}
           </div>
-          <Link
-            href="/sell/new"
-            className="btn-accent flex items-center gap-1 text-sm"
-            aria-label="Create new sale"
-          >
-            <FaPlus className="w-4 h-4" />
-            Create New Sale
-          </Link>
         </div>
 
         {/* Error State */}
@@ -80,11 +72,7 @@ export default function DraftsPanel({ drafts, isLoading, error, onDelete, onPubl
           </div>
         ) : drafts.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-600 mb-4">No drafts yet. Start a new sale.</p>
-            <Link href="/sell/new" className="btn-accent inline-flex items-center gap-1">
-              <FaPlus className="w-4 h-4" />
-              Start a new sale
-            </Link>
+            <p className="text-gray-600">No drafts yet.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

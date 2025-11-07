@@ -115,11 +115,15 @@ export default function AddressAutocomplete({
     const trimmedQuery = debouncedQuery?.trim() || ''
 
     // If we just selected a suggestion, suppress the next search triggered by programmatic value change
-    if (suppressNextFetchRef.current || justSelectedRef.current) {
+    // Also check if the query looks like a complete formatted address (has multiple commas) - this indicates a selection was made
+    // This prevents searching when the value is accidentally set to the full formatted address
+    const looksLikeFormattedAddress = trimmedQuery.includes(',') && trimmedQuery.split(',').length >= 3
+    if (suppressNextFetchRef.current || justSelectedRef.current || hasJustSelected || isSuppressing || looksLikeFormattedAddress) {
       // Don't reset flags here - they're managed in handleSelect
       setIsLoading(false)
       setIsOpen(false)
       setShowGoogleAttribution(false)
+      setShowFallbackMessage(false)
       return
     }
     

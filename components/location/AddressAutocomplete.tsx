@@ -943,7 +943,14 @@ export default function AddressAutocomplete({
           ref={inputRef}
           type="text"
           value={value}
-          onChange={(e) => { justSelectedRef.current = false; setHasJustSelected(false); onChange(e.target.value) }}
+          onChange={(e) => {
+            // Only reset selection flags if user is manually typing (not programmatic update)
+            if (!suppressNextFetchRef.current) {
+              justSelectedRef.current = false
+              setHasJustSelected(false)
+            }
+            onChange(e.target.value)
+          }}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           onFocus={handleFocus}

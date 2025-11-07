@@ -22,20 +22,20 @@ export default async function DashboardPage() {
   // Fetch all sales for the user (including published, draft, etc.)
   // Replicate the EXACT query from the working API endpoint
   // The API endpoint uses sales_v2 view with select('*') and owner_id filter
-  // Key difference: API uses select('*'), not specific columns
   let query = supabase
     .from('sales_v2')
     .select('*')
   
+  // Filter by owner_id (same as API endpoint)
   query = query.eq('owner_id', user.id)
   
-  // Note: API endpoint doesn't use order/limit when my_sales=true, but we need it for dashboard
+  // Add ordering and limit for dashboard
   query = query.order('updated_at', { ascending: false })
   query = query.limit(20)
   
   const { data: sales, error: listingsError } = await query
   
-  // Map to Listing format (same as API response)
+  // Map to Listing format
   const listings = sales?.map((sale: any) => ({
     id: sale.id,
     title: sale.title,
@@ -50,13 +50,19 @@ export default async function DashboardPage() {
     console.error('[DASHBOARD] Error message:', listingsError.message)
     console.error('[DASHBOARD] Error details:', listingsError.details)
     console.error('[DASHBOARD] Error hint:', listingsError.hint)
-  } else {
-    console.log('[DASHBOARD] Query successful, found', listings.length, 'listings')
-    if (listings.length > 0) {
-      console.log('[DASHBOARD] Sample listing:', listings[0])
-    } else {
-      console.warn('[DASHBOARD] Query returned 0 results but no error. Sales data:', sales)
-    }
+    
+    // If query fails, return empty array (client will fetch from API)
+    return (
+      <DashboardClient initialListings={[]} />
+    )
+  }
+  
+  console.log('[DASHBOARD] Query successful, found', listings.length, 'listings')
+  if (listings.length > 0) {
+    console.log('[DASHBOARD] Sample listing:', listings[0])
+  } else if (sales && sales.length === 0) {
+    console.warn('[DASHBOARD] Query returned 0 results. User ID:', user.id)
+    console.warn('[DASHBOARD] This suggests RLS is blocking the query or sales don\'t exist for this user')
   }
 
   return (

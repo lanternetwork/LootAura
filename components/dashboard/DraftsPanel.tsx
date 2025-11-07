@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, RefreshCw, AlertCircle } from 'lucide-react'
+import { FaPlus, FaSync, FaExclamationCircle } from 'react-icons/fa'
 import Link from 'next/link'
 import DraftCard from './DraftCard'
 import type { DraftListing } from '@/lib/data/salesAccess'
@@ -34,7 +34,7 @@ export default function DraftsPanel({ drafts, isLoading, error, onDelete, onPubl
             className="btn-accent flex items-center gap-1 text-sm"
             aria-label="Create new sale"
           >
-            <Plus className="w-4 h-4" />
+            <FaPlus className="w-4 h-4" />
             Create New Sale
           </Link>
         </div>
@@ -43,7 +43,7 @@ export default function DraftsPanel({ drafts, isLoading, error, onDelete, onPubl
         {error && !isLoading && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <FaExclamationCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-red-800 font-medium">Failed to load drafts</p>
                 <p className="text-xs text-red-600 mt-1">{error.message || 'An error occurred'}</p>
@@ -53,7 +53,7 @@ export default function DraftsPanel({ drafts, isLoading, error, onDelete, onPubl
                     className="mt-2 px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700 flex items-center gap-1"
                     aria-label="Retry loading drafts"
                   >
-                    <RefreshCw className="w-3 h-3" />
+                    <FaSync className="w-3 h-3" />
                     Retry
                   </button>
                 )}
@@ -83,7 +83,7 @@ export default function DraftsPanel({ drafts, isLoading, error, onDelete, onPubl
           <div className="text-center py-12">
             <p className="text-gray-600 mb-4">No drafts yet. Start a new sale.</p>
             <Link href="/sell/new" className="btn-accent inline-flex items-center gap-1">
-              <Plus className="w-4 h-4" />
+              <FaPlus className="w-4 h-4" />
               Start a new sale
             </Link>
           </div>

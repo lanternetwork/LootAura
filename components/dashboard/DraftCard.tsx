@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
-import { Edit2, Trash2, Send, Calendar } from 'lucide-react'
+import { FaEdit, FaTrash, FaPaperPlane, FaCalendar } from 'react-icons/fa'
 import { publishDraftServer, deleteDraftServer } from '@/lib/draft/draftClient'
 import { getCategoryLabel } from '@/lib/data/categories'
 import type { DraftListing } from '@/lib/data/salesAccess'
@@ -143,7 +143,7 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
           />
         ) : (
           <div className="w-full h-32 rounded mb-3 bg-gray-100 flex items-center justify-center">
-            <Calendar className="w-8 h-8 text-gray-400" />
+            <FaCalendar className="w-8 h-8 text-gray-400" />
           </div>
         )}
 
@@ -158,7 +158,7 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
         {/* Date range */}
         {dateRange && (
           <div className="text-xs text-gray-600 mb-2 flex items-center gap-1">
-            <Calendar className="w-3 h-3" />
+            <FaCalendar className="w-3 h-3" />
             {dateRange}
           </div>
         )}
@@ -187,7 +187,7 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
             className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 flex items-center justify-center gap-1"
             aria-label={`Continue editing ${title}`}
           >
-            <Edit2 className="w-3 h-3" />
+            <FaEdit className="w-3 h-3" />
             Continue
           </button>
           <button
@@ -196,7 +196,7 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
             className="px-3 py-1.5 border border-green-600 text-green-600 rounded text-sm hover:bg-green-50 disabled:opacity-50 flex items-center gap-1"
             aria-label={`Publish ${title}`}
           >
-            <Send className="w-3 h-3" />
+            <FaPaperPlane className="w-3 h-3" />
             {isPublishing ? '...' : 'Publish'}
           </button>
           <button
@@ -205,7 +205,7 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
             className="px-3 py-1.5 border border-red-600 text-red-600 rounded text-sm hover:bg-red-50 disabled:opacity-50"
             aria-label={`Delete ${title}`}
           >
-            <Trash2 className="w-3 h-3" />
+            <FaTrash className="w-3 h-3" />
           </button>
         </div>
       </div>

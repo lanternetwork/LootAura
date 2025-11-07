@@ -654,8 +654,16 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
       if (!response.ok) {
         const errorData = result || { error: 'Failed to create sale' }
-        console.error('Failed to create sale:', errorData)
-        setSubmitError(errorData.error || errorData.details || 'Failed to create sale')
+        console.error('[SELL_WIZARD] Failed to create sale:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData.error,
+          details: errorData.details,
+          code: errorData.code,
+          fullResponse: errorData
+        })
+        const errorMessage = errorData.error || errorData.details || `Failed to create sale (${response.status})`
+        setSubmitError(errorMessage)
         setLoading(false)
         return
       }

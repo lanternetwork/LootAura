@@ -754,6 +754,29 @@ async function postHandler(request: NextRequest) {
     
     const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images, pricing_mode } = body
     
+    // Validate required fields
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    }
+    if (!city || typeof city !== 'string' || city.trim().length < 2) {
+      return NextResponse.json({ error: 'City is required (minimum 2 characters)' }, { status: 400 })
+    }
+    if (!state || typeof state !== 'string' || state.trim().length < 2) {
+      return NextResponse.json({ error: 'State is required (minimum 2 characters)' }, { status: 400 })
+    }
+    if (!date_start || typeof date_start !== 'string') {
+      return NextResponse.json({ error: 'Start date is required' }, { status: 400 })
+    }
+    if (!time_start || typeof time_start !== 'string') {
+      return NextResponse.json({ error: 'Start time is required' }, { status: 400 })
+    }
+    if (lat === undefined || lat === null || !Number.isFinite(Number(lat))) {
+      return NextResponse.json({ error: 'Latitude is required and must be a valid number' }, { status: 400 })
+    }
+    if (lng === undefined || lng === null || !Number.isFinite(Number(lng))) {
+      return NextResponse.json({ error: 'Longitude is required and must be a valid number' }, { status: 400 })
+    }
+    
     // Debug: log image data being received
     console.log('[SALES] POST received image data:', {
       cover_image_url,

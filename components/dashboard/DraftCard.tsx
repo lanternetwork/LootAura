@@ -67,7 +67,7 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
       const result = await publishDraftServer(draft.draft_key)
       if (result.ok && result.data?.saleId) {
         onPublish(draft.draft_key, result.data.saleId)
-        router.push(`/s/${result.data.saleId}`)
+        router.push(`/sales/${result.data.saleId}`)
       } else {
         alert(result.error || 'Failed to publish draft')
       }

@@ -77,6 +77,7 @@ export default function AddressAutocomplete({
   const suppressNextFetchRef = useRef<boolean>(false)
   const justSelectedRef = useRef<boolean>(false)
   const [hasJustSelected, setHasJustSelected] = useState(false)
+  const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
 
   // Debounce search query (250ms per spec to avoid "empty flashes")
   const debouncedQuery = useDebounce(value, 250)
@@ -797,6 +798,7 @@ export default function AddressAutocomplete({
       suppressNextFetchRef.current = true
       justSelectedRef.current = true
       setHasJustSelected(true)
+      setIsSuppressing(true) // Update state for JSX render
       
       // Close dropdown first
       setIsOpen(false)
@@ -833,6 +835,7 @@ export default function AddressAutocomplete({
           suppressNextFetchRef.current = false
           justSelectedRef.current = false
           setHasJustSelected(false)
+          setIsSuppressing(false) // Update state for JSX render
         }, 2000) // Increased to 2 seconds to prevent blur handler from geocoding
       }, 0)
     }
@@ -1015,7 +1018,7 @@ export default function AddressAutocomplete({
         )}
 
         {/* No results state */}
-        {!isLoading && !hasJustSelected && !justSelectedRef.current && !suppressNextFetchRef.current && (() => {
+        {!isLoading && !hasJustSelected && !isSuppressing && (() => {
           const trimmedValue = value?.trim() || ''
           // Don't show "No results found" if the value looks like a complete address (has commas, city/state/zip pattern)
           const looksLikeCompleteAddress = /,/.test(trimmedValue) && trimmedValue.length > 10

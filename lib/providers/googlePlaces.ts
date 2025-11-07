@@ -89,13 +89,30 @@ export async function googlePlaceDetails(
     },
     signal,
   })
-  if (!resp.ok) return null
-  const data = await resp.json().catch(() => null)
-  if (!data) return null
+  if (!resp.ok) {
+    console.error('[GOOGLE_PLACES] Place Details API error:', resp.status, resp.statusText)
+    try {
+      const errorData = await resp.json()
+      console.error('[GOOGLE_PLACES] Error details:', errorData)
+    } catch {}
+    return null
+  }
+  const data = await resp.json().catch((error) => {
+    console.error('[GOOGLE_PLACES] Error parsing Place Details response:', error)
+    return null
+  })
+  if (!data) {
+    console.warn('[GOOGLE_PLACES] Place Details response is null')
+    return null
+  }
+
+  console.log('[GOOGLE_PLACES] Place Details raw response:', data)
 
   const formatted = data.formattedAddress || data.formatted_address
   const location = data.location || data.geometry?.location
   const comps = data.addressComponents || data.address_components || []
+
+  console.log('[GOOGLE_PLACES] Extracted components:', { formatted, location, compsCount: comps.length })
 
   const byType = (type: string) => comps.find((c: any) => (c.types || c.types?.length ? c.types : c?.type)?.includes?.(type)) || comps.find((c: any) => c?.type === type)
   const getShort = (t: string) => byType(t)?.shortText || byType(t)?.short_name || ''
@@ -108,9 +125,18 @@ export async function googlePlaceDetails(
   const postcode = getLong('postal_code') || getShort('postal_code')
   const country = getLong('country') || getShort('country')
 
-  if (!location?.latitude || !location?.longitude || country?.toLowerCase() !== 'united states') {
+  console.log('[GOOGLE_PLACES] Extracted address components:', { houseNumber, road, city, state, postcode, country })
+
+  if (!location?.latitude || !location?.longitude) {
+    console.warn('[GOOGLE_PLACES] Missing location data')
     return null
   }
+  
+  // Don't filter by country - allow all countries for now
+  // if (country?.toLowerCase() !== 'united states') {
+  //   console.warn('[GOOGLE_PLACES] Not US address:', country)
+  //   return null
+  // }
 
   const suggestion: AddressSuggestion = {
     id: `google:${data.id || placeId}`,

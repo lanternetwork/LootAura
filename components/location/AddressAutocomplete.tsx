@@ -769,9 +769,17 @@ export default function AddressAutocomplete({
       // If Google suggestion, fetch details using current session token
       if (suggestion.id?.startsWith('google:') && googleSessionToken) {
         const placeId = suggestion.id.split(':')[1]
-        const details = await googlePlaceDetails(placeId, googleSessionToken).catch(() => null)
+        console.log('[AddressAutocomplete] Fetching Google Place Details for:', placeId)
+        const details = await googlePlaceDetails(placeId, googleSessionToken).catch((error) => {
+          console.error('[AddressAutocomplete] Error fetching Google Place Details:', error)
+          return null
+        })
         if (details) {
+          console.log('[AddressAutocomplete] Google Place Details received:', details)
+          console.log('[AddressAutocomplete] Google Place Details address:', details.address)
           final = details
+        } else {
+          console.warn('[AddressAutocomplete] Google Place Details returned null, using original suggestion')
         }
         // end session
         setGoogleSessionToken(null)

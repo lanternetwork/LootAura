@@ -170,12 +170,20 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('[DRAFTS] Error saving draft:', error)
+      console.error('[DRAFTS] Error saving draft:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        draftKey,
+        userId: user.id,
+      })
       Sentry.captureException(error, { tags: { operation: 'saveDraft' } })
       return NextResponse.json<ApiResponse>({
         ok: false,
         error: 'Failed to save draft',
-        code: 'SAVE_ERROR'
+        code: 'SAVE_ERROR',
+        details: error.message
       }, { status: 500 })
     }
 

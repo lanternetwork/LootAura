@@ -56,6 +56,17 @@ export async function getUserSales(
       .limit(limit)
 
     if (!error && sales) {
+      // Debug: log image data for first sale
+      if (sales.length > 0 && process.env.NODE_ENV === 'development') {
+        console.log('[SALES_ACCESS] Sample sale image data:', {
+          id: sales[0].id,
+          title: sales[0].title,
+          cover_image_url: (sales[0] as any).cover_image_url,
+          images: (sales[0] as any).images,
+          imagesType: typeof (sales[0] as any).images,
+          imagesIsArray: Array.isArray((sales[0] as any).images),
+        })
+      }
       return {
         data: sales as Sale[],
         source: 'view',

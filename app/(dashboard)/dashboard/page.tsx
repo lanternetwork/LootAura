@@ -19,9 +19,11 @@ export default async function DashboardPage() {
     )
   }
 
+  // Fetch all sales for the user (including published, draft, etc.)
+  // Note: sales_v2 view may have RLS, so we query the base table directly for owner's sales
   const { data: listings } = await supabase
-    .from('sales_v2')
-    .select('id, title, updated_at, status, cover_url')
+    .from('lootaura_v2.sales')
+    .select('id, title, updated_at, status, cover_image_url')
     .eq('owner_id', user.id)
     .order('updated_at', { ascending: false })
     .limit(20)

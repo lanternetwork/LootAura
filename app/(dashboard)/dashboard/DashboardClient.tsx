@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-type Listing = { id: string; title: string; updated_at?: string | null; status?: string | null; cover_url?: string | null }
+type Listing = { id: string; title: string; updated_at?: string | null; status?: string | null; cover_image_url?: string | null; cover_url?: string | null }
 
 export default function DashboardClient({ initialListings }: { initialListings: Listing[] }) {
   const [tab, setTab] = useState<'listings' | 'settings' | 'analytics'>('listings')
@@ -33,8 +33,8 @@ export default function DashboardClient({ initialListings }: { initialListings: 
         {listings.map((l) => (
           <div key={l.id} className="card card-hover">
             <div className="card-body">
-              {l.cover_url ? (
-                <div className="w-full h-32 rounded mb-3" style={{ backgroundImage: `url(${l.cover_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+              {(l.cover_url || l.cover_image_url) ? (
+                <div className="w-full h-32 rounded mb-3" style={{ backgroundImage: `url(${l.cover_url || l.cover_image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
               ) : null}
               <div className="flex items-center justify-between">
                 <div>

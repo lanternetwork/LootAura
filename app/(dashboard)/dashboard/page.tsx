@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getUserSales } from '@/lib/data/salesAccess'
 import DashboardClient from './DashboardClient'
 
 export const dynamic = 'force-dynamic'
@@ -19,71 +20,29 @@ export default async function DashboardPage() {
     )
   }
 
-  // Fetch all sales for the user (including published, draft, etc.)
-  // Query the base table directly (bypasses potential view RLS issues)
-  // The sales_owner_read policy allows owners to read their own sales
-  const { data: sales, error: listingsError } = await supabase
-    .from('lootaura_v2.sales')
-    .select('id, title, updated_at, status, cover_image_url')
-    .eq('owner_id', user.id)
-    .order('updated_at', { ascending: false })
-    .limit(20)
-  
-  // Map to Listing format
-  const listings = sales?.map((sale: any) => ({
-    id: sale.id,
-    title: sale.title,
-    updated_at: sale.updated_at,
-    status: sale.status,
-    cover_image_url: sale.cover_image_url,
-  })) ?? []
+  // Fetch all sales for the user using data access helper
+  // Prefers view, falls back to base table automatically
+  const { data: listings, source, error } = await getUserSales(supabase, user.id, 20)
 
-  if (listingsError) {
-    console.error('[DASHBOARD] Error fetching listings from base table:', listingsError)
-    console.error('[DASHBOARD] Error code:', listingsError.code)
-    console.error('[DASHBOARD] Error message:', listingsError.message)
-    console.error('[DASHBOARD] Error details:', listingsError.details)
-    console.error('[DASHBOARD] Error hint:', listingsError.hint)
-    
-    // Fallback: try the view (same as API endpoint)
-    const { data: viewSales, error: viewError } = await supabase
-      .from('sales_v2')
-      .select('*')
-      .eq('owner_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(20)
-    
-    if (viewError) {
-      console.error('[DASHBOARD] Error fetching from view:', viewError)
-      return (
-        <DashboardClient initialListings={[]} />
-      )
-    }
-    
-    const viewListings = viewSales?.map((sale: any) => ({
-      id: sale.id,
-      title: sale.title,
-      updated_at: sale.updated_at,
-      status: sale.status,
-      cover_image_url: sale.cover_image_url,
-    })) ?? []
-    
-    console.log('[DASHBOARD] Fallback: Found', viewListings.length, 'listings from view')
+  if (error) {
+    console.error('[DASHBOARD] Error fetching listings:', error)
     return (
-      <DashboardClient initialListings={viewListings} />
+      <DashboardClient initialListings={[]} />
     )
   }
-  
-  console.log('[DASHBOARD] Query successful, found', listings.length, 'listings from base table')
+
+  if (source === 'base_table') {
+    // Log fallback usage for observability
+    console.warn('[DASHBOARD] Using base-table fallback. View may need attention.')
+  }
+
+  console.log('[DASHBOARD] Query successful, found', listings.length, 'listings (source:', source, ')')
   if (listings.length > 0) {
     console.log('[DASHBOARD] Sample listing:', listings[0])
-  } else {
-    console.warn('[DASHBOARD] Query returned 0 results. User ID:', user.id)
-    console.warn('[DASHBOARD] This suggests RLS is blocking the query or sales don\'t exist for this user')
   }
 
   return (
-    <DashboardClient initialListings={listings ?? []} />
+    <DashboardClient initialListings={listings} />
   )
 }
 

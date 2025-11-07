@@ -782,16 +782,37 @@ export default function AddressAutocomplete({
       const state = final.address?.state || ''
       const zip = final.address?.postcode || ''
 
+      console.log('[AddressAutocomplete] handleSelect called:', {
+        address,
+        city,
+        state,
+        zip,
+        lat: final.lat,
+        lng: final.lng,
+        hasOnPlaceSelected: !!onPlaceSelected
+      })
+
       // Prevent an immediate re-query from the newly populated address value
       suppressNextFetchRef.current = true
       justSelectedRef.current = true
       setHasJustSelected(true)
-      onChange(address)
+      
+      // Close dropdown first
       setIsOpen(false)
       setSuggestions([])
       setShowFallbackMessage(false)
+      setShowGoogleAttribution(false)
 
+      // Call onPlaceSelected FIRST to update all form fields
       if (onPlaceSelected) {
+        console.log('[AddressAutocomplete] Calling onPlaceSelected with:', {
+          address,
+          city,
+          state,
+          zip,
+          lat: final.lat,
+          lng: final.lng
+        })
         onPlaceSelected({
           address,
           city,
@@ -801,9 +822,12 @@ export default function AddressAutocomplete({
           lng: final.lng
         })
       }
+
+      // Then update the input value (this will trigger onChange)
+      onChange(address)
     }
     run()
-  }, [onChange, onPlaceSelected])
+  }, [onChange, onPlaceSelected, googleSessionToken])
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

@@ -26,6 +26,8 @@ export interface DraftListing {
     }
     photos?: string[]
     items?: Array<{
+      id?: string
+      name?: string
       category?: string
     }>
   }

@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { FaPlus, FaSync, FaExclamationCircle } from 'react-icons/fa'
 import Link from 'next/link'
 import DraftCard from './DraftCard'

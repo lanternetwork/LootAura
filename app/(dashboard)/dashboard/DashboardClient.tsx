@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import DraftsPanel from '@/components/dashboard/DraftsPanel'
-import { publishDraftServer, deleteDraftServer } from '@/lib/draft/draftClient'
 import type { DraftListing } from '@/lib/data/salesAccess'
 
 type Listing = { id: string; title: string; updated_at?: string | null; status?: string | null; cover_image_url?: string | null; cover_url?: string | null }
@@ -27,9 +26,9 @@ export default function DashboardClient({
     setDrafts((prev) => prev.filter((d) => d.draft_key !== draftKey))
   }
 
-  const handleDraftPublish = (draftKey: string, saleId: string) => {
+  const handleDraftPublish = (_draftKey: string, _saleId: string) => {
     // Remove draft from list on successful publish
-    setDrafts((prev) => prev.filter((d) => d.draft_key !== draftKey))
+    setDrafts((prev) => prev.filter((d) => d.draft_key !== _draftKey))
     // Refresh listings to show the new sale
     fetch('/api/sales_v2?my_sales=true')
       .then(res => res.json())

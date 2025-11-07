@@ -867,10 +867,14 @@ export default function AddressAutocomplete({
 
   // Handle blur (geocode if no selection)
   const handleBlur = async () => {
-    setGoogleSessionToken(null)
+    // Don't reset session token on blur if we just selected (allow Details call to complete)
+    if (!justSelectedRef.current) {
+      setGoogleSessionToken(null)
+    }
     // Delay to allow click on suggestion to register
     setTimeout(async () => {
-      if (value && value.length >= 5 && onPlaceSelected && !isGeocoding && !isOpen) {
+      // Only geocode if dropdown is closed and we didn't just select
+      if (value && value.length >= 5 && onPlaceSelected && !isGeocoding && !isOpen && !justSelectedRef.current) {
         setIsGeocoding(true)
         try {
           const result = await geocodeAddress(value)

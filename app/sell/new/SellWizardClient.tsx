@@ -389,8 +389,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }, [initialData, user, normalizeTimeToNearest30, searchParams])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
+    console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
+      console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
 
       // Snap start time to 30-minute increments (nearest 00/30 with carry)
       if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
@@ -1168,12 +1170,15 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
           value={formData.address || ''}
           onChange={(address) => onChange('address', address)}
           onPlaceSelected={(place) => {
+            console.log('[SELL_WIZARD] onPlaceSelected called with:', place)
+            console.log('[SELL_WIZARD] Current formData before update:', formData)
             onChange('address', place.address)
             onChange('city', place.city)
             onChange('state', place.state)
             onChange('zip_code', place.zip)
             onChange('lat', place.lat)
             onChange('lng', place.lng)
+            console.log('[SELL_WIZARD] Form fields updated via onChange')
           }}
           placeholder="Start typing your address..."
           userLat={userLat}

@@ -805,22 +805,25 @@ export default function AddressAutocomplete({
 
       // Call onPlaceSelected FIRST to update all form fields
       if (onPlaceSelected) {
-        console.log('[AddressAutocomplete] Calling onPlaceSelected with:', {
+        const placeData = {
           address,
           city,
           state,
           zip,
           lat: final.lat,
           lng: final.lng
-        })
-        onPlaceSelected({
-          address,
-          city,
-          state,
-          zip,
-          lat: final.lat,
-          lng: final.lng
-        })
+        }
+        console.log('[AddressAutocomplete] Calling onPlaceSelected with:', placeData)
+        console.log('[AddressAutocomplete] Final suggestion object:', final)
+        console.log('[AddressAutocomplete] Final.address:', final.address)
+        try {
+          onPlaceSelected(placeData)
+          console.log('[AddressAutocomplete] onPlaceSelected called successfully')
+        } catch (error) {
+          console.error('[AddressAutocomplete] Error calling onPlaceSelected:', error)
+        }
+      } else {
+        console.warn('[AddressAutocomplete] onPlaceSelected is not defined!')
       }
 
       // Then update the input value (this will trigger onChange)

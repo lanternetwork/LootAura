@@ -24,9 +24,9 @@ interface AddressAutocompleteProps {
   onChange: (address: string) => void
   onPlaceSelected?: (place: {
     address: string
-    city: string
-    state: string
-    zip: string
+    city?: string
+    state?: string
+    zip?: string
     lat: number
     lng: number
   }) => void

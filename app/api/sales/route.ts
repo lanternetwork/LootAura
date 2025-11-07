@@ -753,6 +753,15 @@ async function postHandler(request: NextRequest) {
     const body = await request.json()
     
     const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images, pricing_mode } = body
+    
+    // Debug: log image data being received
+    console.log('[SALES] POST received image data:', {
+      cover_image_url,
+      images,
+      imagesType: typeof images,
+      imagesIsArray: Array.isArray(images),
+      imagesLength: Array.isArray(images) ? images.length : 'N/A',
+    })
 
     // Enforce 30-minute granularity for start time (accept HH:MM or HH:MM:SS)
     if (typeof time_start === 'string') {

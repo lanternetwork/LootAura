@@ -828,12 +828,12 @@ export default function AddressAutocomplete({
         onChange(streetAddress)
         // Keep focus on input after selection
         inputRef.current?.focus()
-        // Keep suppress flag active for a bit longer to prevent debounced query
+        // Keep suppress flag active for longer to prevent debounced query and blur geocoding
         setTimeout(() => {
           suppressNextFetchRef.current = false
           justSelectedRef.current = false
           setHasJustSelected(false)
-        }, 500)
+        }, 2000) // Increased to 2 seconds to prevent blur handler from geocoding
       }, 0)
     }
     run()
@@ -882,8 +882,22 @@ export default function AddressAutocomplete({
     }
     // Delay to allow click on suggestion to register
     setTimeout(async () => {
-      // Only geocode if dropdown is closed and we didn't just select
-      if (value && value.length >= 5 && onPlaceSelected && !isGeocoding && !isOpen && !justSelectedRef.current) {
+      // Only geocode if:
+      // 1. Dropdown is closed
+      // 2. We didn't just select (check both ref and state)
+      // 3. Not already geocoding
+      // 4. Value is long enough
+      // 5. Suppress flag is not active (additional safety check)
+      if (
+        value && 
+        value.length >= 5 && 
+        onPlaceSelected && 
+        !isGeocoding && 
+        !isOpen && 
+        !justSelectedRef.current && 
+        !hasJustSelected &&
+        !suppressNextFetchRef.current
+      ) {
         setIsGeocoding(true)
         try {
           const result = await geocodeAddress(value)

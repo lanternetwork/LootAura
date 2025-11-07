@@ -787,23 +787,30 @@ export default function AddressAutocomplete({
 
       const address = final.label
       
-      // Extract address components - only use if address object exists
-      // If address is undefined, we'll only update the address field and coordinates
-      const hasAddressData = !!final.address
-      const city = final.address?.city || ''
-      const state = final.address?.state || ''
-      const zip = final.address?.postcode || ''
+      // Extract address components - try structured data first, then parse label as fallback
+      let city = final.address?.city || ''
+      let state = final.address?.state || ''
+      let zip = final.address?.postcode || ''
 
-      console.log('[AddressAutocomplete] handleSelect called:', {
-        address,
-        city,
-        state,
-        zip,
-        lat: final.lat,
-        lng: final.lng,
-        hasAddressData,
-        hasOnPlaceSelected: !!onPlaceSelected
-      })
+      // FALLBACK: If no structured data, try to parse from label (e.g., "5001 Preston Highway, Louisville, KY 40213")
+      if (!city && !state && !zip && address.includes(',')) {
+        const parts = address.split(',').map(p => p.trim())
+        if (parts.length >= 2) {
+          // Last part might be "State ZIP" or just "State"
+          const lastPart = parts[parts.length - 1]
+          const stateZipMatch = lastPart.match(/^([A-Z]{2})\s*(\d{5})?$/)
+          if (stateZipMatch) {
+            state = stateZipMatch[1]
+            zip = stateZipMatch[2] || ''
+          } else if (lastPart.match(/^[A-Z]{2}$/)) {
+            state = lastPart
+          }
+          // Second-to-last is usually city
+          if (parts.length >= 2) {
+            city = parts[parts.length - 2]
+          }
+        }
+      }
 
       // Prevent an immediate re-query from the newly populated address value
       suppressNextFetchRef.current = true
@@ -820,27 +827,21 @@ export default function AddressAutocomplete({
       onChange(address)
 
       // Call onPlaceSelected to update all form fields
-      // Only update fields that have data - don't clear existing fields with empty strings
+      // Always pass values (even if empty) - let the parent decide
       if (onPlaceSelected) {
         const placeData = {
           address,
-          city: hasAddressData ? city : undefined,
-          state: hasAddressData ? state : undefined,
-          zip: hasAddressData ? zip : undefined,
+          city: city || undefined,
+          state: state || undefined,
+          zip: zip || undefined,
           lat: final.lat,
           lng: final.lng
         }
-        console.log('[AddressAutocomplete] Calling onPlaceSelected with:', placeData)
-        console.log('[AddressAutocomplete] Final suggestion object:', final)
-        console.log('[AddressAutocomplete] Final.address:', final.address)
         try {
           onPlaceSelected(placeData)
-          console.log('[AddressAutocomplete] onPlaceSelected called successfully')
         } catch (error) {
           console.error('[AddressAutocomplete] Error calling onPlaceSelected:', error)
         }
-      } else {
-        console.warn('[AddressAutocomplete] onPlaceSelected is not defined!')
       }
     }
     run()

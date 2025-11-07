@@ -1170,16 +1170,13 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
           value={formData.address || ''}
           onChange={(address) => onChange('address', address)}
           onPlaceSelected={(place) => {
-            console.log('[SELL_WIZARD] onPlaceSelected called with:', place)
-            console.log('[SELL_WIZARD] Current formData before update:', formData)
             onChange('address', place.address)
-            // Only update fields if they have values (don't clear with undefined/empty)
-            if (place.city) onChange('city', place.city)
-            if (place.state) onChange('state', place.state)
-            if (place.zip) onChange('zip_code', place.zip)
-            if (place.lat) onChange('lat', place.lat)
-            if (place.lng) onChange('lng', place.lng)
-            console.log('[SELL_WIZARD] Form fields updated via onChange')
+            // Always update all fields - use empty string if undefined
+            onChange('city', place.city || '')
+            onChange('state', place.state || '')
+            onChange('zip_code', place.zip || '')
+            onChange('lat', place.lat)
+            onChange('lng', place.lng)
           }}
           placeholder="Start typing your address..."
           userLat={userLat}

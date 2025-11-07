@@ -10,13 +10,26 @@ const DRAFT_KEY_STORAGE_KEY = 'draft:sale:key'
 
 /**
  * Generate a stable UUID for draft key (idempotency)
+ * Always returns a valid UUID format (required by database schema)
  */
 export function generateDraftKey(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID()
   }
-  // Fallback for environments without crypto.randomUUID
-  return `draft-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+  
+  // Fallback: Generate a valid UUID v4 format manually
+  // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  const hex = '0123456789abcdef'
+  const randomHex = (length: number) => {
+    let result = ''
+    for (let i = 0; i < length; i++) {
+      result += hex[Math.floor(Math.random() * 16)]
+    }
+    return result
+  }
+  
+  // Generate UUID v4 format
+  return `${randomHex(8)}-${randomHex(4)}-4${randomHex(3)}-${(8 + Math.floor(Math.random() * 4)).toString(16)}${randomHex(3)}-${randomHex(12)}`
 }
 
 /**

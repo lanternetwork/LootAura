@@ -28,6 +28,32 @@ export async function saveDraftServer(
       body: JSON.stringify({ payload, draftKey }),
     })
 
+    if (!response.ok) {
+      // Try to parse error response
+      let errorData: any = {}
+      try {
+        errorData = await response.json()
+      } catch {
+        // If JSON parsing fails, use status text
+        errorData = { error: response.statusText || 'Failed to save draft' }
+      }
+      
+      console.error('[DRAFT_CLIENT] Save failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData.error,
+        code: errorData.code,
+        details: errorData.details
+      })
+      
+      return {
+        ok: false,
+        error: errorData.error || `Failed to save draft (${response.status})`,
+        code: errorData.code || 'SAVE_ERROR',
+        details: errorData.details
+      }
+    }
+
     const result = await response.json()
     return result
   } catch (error) {
@@ -100,6 +126,30 @@ export async function publishDraftServer(draftKey: string): Promise<ApiResponse<
       },
       body: JSON.stringify({ draftKey }),
     })
+
+    if (!response.ok) {
+      // Try to parse error response
+      let errorData: any = {}
+      try {
+        errorData = await response.json()
+      } catch {
+        // If JSON parsing fails, use status text
+        errorData = { error: response.statusText || 'Failed to publish draft' }
+      }
+      
+      console.error('[DRAFT_CLIENT] Publish failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData.error,
+        code: errorData.code
+      })
+      
+      return {
+        ok: false,
+        error: errorData.error || `Failed to publish draft (${response.status})`,
+        code: errorData.code || 'PUBLISH_ERROR'
+      }
+    }
 
     const result = await response.json()
     return result

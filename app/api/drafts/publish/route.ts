@@ -27,7 +27,20 @@ export async function POST(request: NextRequest) {
       }, { status: 401 })
     }
 
-    const body = await request.json()
+    let body: any
+    try {
+      body = await request.json()
+    } catch (error) {
+      console.error('[DRAFTS_PUBLISH] JSON parse error:', {
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return NextResponse.json<ApiResponse>({
+        ok: false,
+        error: 'Invalid JSON in request body',
+        code: 'INVALID_JSON'
+      }, { status: 400 })
+    }
+    
     const { draftKey } = body
 
     if (!draftKey || typeof draftKey !== 'string') {

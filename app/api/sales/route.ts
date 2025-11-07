@@ -750,7 +750,18 @@ async function postHandler(request: NextRequest) {
       }
     }
     
-    const body = await request.json()
+    let body: any
+    try {
+      body = await request.json()
+    } catch (error) {
+      console.error('[SALES] JSON parse error:', {
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return NextResponse.json({ 
+        error: 'Invalid JSON in request body',
+        code: 'INVALID_JSON'
+      }, { status: 400 })
+    }
     
     const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images, pricing_mode } = body
     
@@ -956,11 +967,14 @@ async function postHandler(request: NextRequest) {
       status: 'fail',
       message: error?.message,
       stack: error?.stack,
-      name: error?.name
+      name: error?.name,
+      error: error instanceof Error ? error.message : String(error),
+      fullError: error
     })
     return NextResponse.json({ 
       error: 'Internal server error',
-      message: error?.message || 'Unknown error'
+      message: error?.message || 'Unknown error',
+      details: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
 }

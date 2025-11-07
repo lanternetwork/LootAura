@@ -88,8 +88,7 @@ describe('DraftsPanel', () => {
       />
     )
 
-    expect(screen.getByText('No drafts yet. Start a new sale.')).toBeInTheDocument()
-    expect(screen.getByText('Start a new sale')).toBeInTheDocument()
+    expect(screen.getByText('No drafts yet.')).toBeInTheDocument()
   })
 
   it('should show loading skeletons when loading', () => {

@@ -6,6 +6,8 @@ import { ConditionalHeader } from '@/components/landing/ConditionalHeader'
 import { PWAComponents } from './PWAComponents'
 import DebugToggle from '@/components/debug/DebugToggle'
 import { createHomepageStructuredData, createOrganizationStructuredData } from '@/lib/metadata'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 // Disable Mapbox telemetry at app startup
 import '@/lib/maps/telemetry'
 
@@ -47,6 +49,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <PWAComponents />
           <DebugToggle />
+          <ToastContainer
+            position="bottom-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="light"
+          />
         </Providers>
       </body>
     </html>

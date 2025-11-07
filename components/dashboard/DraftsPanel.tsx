@@ -1,7 +1,6 @@
 'use client'
 
-import { FaPlus, FaSync, FaExclamationCircle } from 'react-icons/fa'
-import Link from 'next/link'
+import { FaSync, FaExclamationCircle } from 'react-icons/fa'
 import DraftCard from './DraftCard'
 import type { DraftListing } from '@/lib/data/salesAccess'
 

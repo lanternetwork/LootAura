@@ -789,7 +789,7 @@ export default function AddressAutocomplete({
       const city = final.address?.city || ''
       const state = final.address?.state || ''
       const zip = final.address?.zip || final.address?.postcode || ''
-      const country = final.address?.country || 'US'
+      const _country = final.address?.country || 'US' // Extracted but not currently used in callback
       
       // Use line1 (street address) for the address field, not the full formatted label
       const streetAddress = addressLine1 || final.label.split(',')[0].trim() || final.label

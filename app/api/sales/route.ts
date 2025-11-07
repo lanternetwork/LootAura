@@ -827,10 +827,11 @@ async function postHandler(request: NextRequest) {
     // Allow status from body if provided (for test sales), otherwise default to 'published'
     const saleStatus = body.status === 'draft' || body.status === 'archived' ? body.status : 'published'
     
-    // Build insert payload for sales_v2 view
-    // Attempt to include cover_image_url/images; if schema rejects, we'll gracefully retry without
+    // Build insert payload for base table (lootaura_v2.sales)
+    // Include all required fields and image fields
     const basePayload: any = {
-      title,
+      owner_id: user!.id, // Server-side binding - never trust client (required)
+      title, // Required
       description,
       address,
       city,
@@ -838,13 +839,14 @@ async function postHandler(request: NextRequest) {
       zip_code,
       lat,
       lng,
-      date_start,
-      time_start,
+      date_start, // Required
+      time_start, // Required
       date_end,
       time_end,
       pricing_mode: pricing_mode || 'negotiable',
       status: saleStatus,
-      owner_id: user!.id // Server-side binding - never trust client
+      privacy_mode: 'exact', // Required (has default but explicit is better)
+      is_featured: false, // Has default but explicit is better
     }
     const firstTryPayload = {
       ...basePayload,

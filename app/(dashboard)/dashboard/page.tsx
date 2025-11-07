@@ -44,7 +44,7 @@ export default async function DashboardPage() {
   console.log('[DASHBOARD] Found', drafts.length, 'drafts')
 
   return (
-    <DashboardClient initialListings={listings} initialDrafts={drafts || []} />
+    <DashboardClient initialSales={listings} initialDrafts={drafts || []} />
   )
 }
 

@@ -5,17 +5,16 @@ import DraftsPanel from '@/components/dashboard/DraftsPanel'
 import SalesPanel from '@/components/dashboard/SalesPanel'
 import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
 import type { DraftListing } from '@/lib/data/salesAccess'
-
-type Listing = { id: string; title: string; updated_at?: string | null; status?: string | null; cover_image_url?: string | null; cover_url?: string | null }
+import { Sale } from '@/lib/types'
 
 export default function DashboardClient({ 
-  initialListings,
+  initialSales,
   initialDrafts = []
 }: { 
-  initialListings: Listing[]
+  initialSales: Sale[]
   initialDrafts?: DraftListing[]
 }) {
-  const [listings, setListings] = useState<Listing[]>(initialListings)
+  const [sales, setSales] = useState<Sale[]>(initialSales)
   const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [draftsError, setDraftsError] = useState<any>(null)
@@ -30,22 +29,15 @@ export default function DashboardClient({
   const handleDraftPublish = (_draftKey: string, _saleId: string) => {
     // Remove draft from list on successful publish
     setDrafts((prev) => prev.filter((d) => d.draft_key !== _draftKey))
-    // Refresh listings to show the new sale
+    // Refresh sales to show the new sale
     fetch('/api/sales_v2?my_sales=true')
       .then(res => res.json())
       .then(data => {
         if (data.sales && Array.isArray(data.sales)) {
-          const apiListings: Listing[] = data.sales.map((sale: any) => ({
-            id: sale.id,
-            title: sale.title,
-            updated_at: sale.updated_at,
-            status: sale.status,
-            cover_image_url: sale.cover_image_url,
-          }))
-          setListings(apiListings)
+          setSales(data.sales as Sale[])
         }
       })
-      .catch(err => console.error('[DASHBOARD_CLIENT] Error refreshing listings:', err))
+      .catch(err => console.error('[DASHBOARD_CLIENT] Error refreshing sales:', err))
   }
 
   const handleRetryDrafts = async () => {
@@ -73,36 +65,28 @@ export default function DashboardClient({
     }
   }
 
-  // If no listings from server, fetch from API (which works)
+  // If no sales from server, fetch from API (which works)
   useEffect(() => {
-    console.log('[DASHBOARD_CLIENT] Initial listings received:', initialListings?.length || 0)
-    if (initialListings && initialListings.length > 0) {
-      console.log('[DASHBOARD_CLIENT] Sample listing:', initialListings[0])
+    console.log('[DASHBOARD_CLIENT] Initial sales received:', initialSales?.length || 0)
+    if (initialSales && initialSales.length > 0) {
+      console.log('[DASHBOARD_CLIENT] Sample sale:', initialSales[0])
     } else {
-      console.warn('[DASHBOARD_CLIENT] No listings from server - fetching from API...')
+      console.warn('[DASHBOARD_CLIENT] No sales from server - fetching from API...')
       // Fetch sales directly from API (which successfully finds them)
       fetch('/api/sales_v2?my_sales=true')
         .then(res => res.json())
         .then(data => {
           console.log('[DASHBOARD_CLIENT] API response:', data)
           if (data.sales && Array.isArray(data.sales) && data.sales.length > 0) {
-            // Map API response to Listing format
-            const apiListings: Listing[] = data.sales.map((sale: any) => ({
-              id: sale.id,
-              title: sale.title,
-              updated_at: sale.updated_at,
-              status: sale.status,
-              cover_image_url: sale.cover_image_url,
-            }))
-            console.log('[DASHBOARD_CLIENT] Found', apiListings.length, 'sales via API, updating state')
-            setListings(apiListings)
+            console.log('[DASHBOARD_CLIENT] Found', data.sales.length, 'sales via API, updating state')
+            setSales(data.sales as Sale[])
           } else {
             console.warn('[DASHBOARD_CLIENT] API returned no sales')
           }
         })
         .catch(err => console.error('[DASHBOARD_CLIENT] API fetch error:', err))
     }
-  }, [initialListings])
+  }, [initialSales])
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -132,7 +116,7 @@ export default function DashboardClient({
         />
 
         {/* Sales Panel */}
-        <SalesPanel listings={listings} />
+        <SalesPanel sales={sales} />
 
         {/* Analytics Panel */}
         <AnalyticsPanel />

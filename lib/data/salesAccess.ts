@@ -4,6 +4,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { Sale } from '@/lib/types'
 
 export interface SaleListing {
   id: string
@@ -44,25 +45,19 @@ export async function getUserSales(
   supabase: SupabaseClient,
   userId: string,
   limit: number = 20
-): Promise<{ data: SaleListing[]; source: 'view' | 'base_table'; error?: any }> {
+): Promise<{ data: Sale[]; source: 'view' | 'base_table'; error?: any }> {
   // Try view first (preferred)
   try {
     const { data: sales, error } = await supabase
       .from('sales_v2')
-      .select('id, title, updated_at, status, cover_image_url')
+      .select('*')
       .eq('owner_id', userId)
       .order('updated_at', { ascending: false })
       .limit(limit)
 
     if (!error && sales) {
       return {
-        data: sales.map((sale: any) => ({
-          id: sale.id,
-          title: sale.title,
-          updated_at: sale.updated_at,
-          status: sale.status,
-          cover_image_url: sale.cover_image_url,
-        })),
+        data: sales as Sale[],
         source: 'view',
       }
     }
@@ -111,7 +106,7 @@ export async function getUserSales(
   try {
     const { data: sales, error } = await supabase
       .from('lootaura_v2.sales')
-      .select('id, title, updated_at, status, cover_image_url')
+      .select('*')
       .eq('owner_id', userId)
       .order('updated_at', { ascending: false })
       .limit(limit)
@@ -124,18 +119,6 @@ export async function getUserSales(
       }
     }
 
-    // Runtime assertion: verify required columns exist
-    if (sales && sales.length > 0) {
-      const firstSale = sales[0]
-      const requiredColumns = ['id', 'title', 'updated_at', 'status', 'cover_image_url']
-      const missingColumns = requiredColumns.filter(col => !(col in firstSale))
-      
-      if (missingColumns.length > 0) {
-        console.error('[SALES_ACCESS] Missing required columns in base table response:', missingColumns)
-        throw new Error(`Missing required columns: ${missingColumns.join(', ')}`)
-      }
-    }
-
     // Log fallback usage for observability
     console.warn('[SALES_ACCESS] Using base-table fallback. View may need attention.', {
       userId,
@@ -143,13 +126,7 @@ export async function getUserSales(
     })
 
     return {
-      data: (sales || []).map((sale: any) => ({
-        id: sale.id,
-        title: sale.title,
-        updated_at: sale.updated_at,
-        status: sale.status,
-        cover_image_url: sale.cover_image_url,
-      })),
+      data: (sales || []) as Sale[],
       source: 'base_table',
     }
   } catch (error) {

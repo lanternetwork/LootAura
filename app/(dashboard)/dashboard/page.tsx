@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getUserSales } from '@/lib/data/salesAccess'
+import { getUserSales, getUserDrafts } from '@/lib/data/salesAccess'
 import DashboardClient from './DashboardClient'
 
 export const dynamic = 'force-dynamic'
@@ -24,11 +24,15 @@ export default async function DashboardPage() {
   // Prefers view, falls back to base table automatically
   const { data: listings, source, error } = await getUserSales(supabase, user.id, 20)
 
+  // Fetch active drafts
+  const { data: drafts, error: draftsError } = await getUserDrafts(supabase, user.id, 12, 0)
+
   if (error) {
     console.error('[DASHBOARD] Error fetching listings:', error)
-    return (
-      <DashboardClient initialListings={[]} />
-    )
+  }
+
+  if (draftsError) {
+    console.error('[DASHBOARD] Error fetching drafts:', draftsError)
   }
 
   if (source === 'base_table') {
@@ -37,12 +41,10 @@ export default async function DashboardPage() {
   }
 
   console.log('[DASHBOARD] Query successful, found', listings.length, 'listings (source:', source, ')')
-  if (listings.length > 0) {
-    console.log('[DASHBOARD] Sample listing:', listings[0])
-  }
+  console.log('[DASHBOARD] Found', drafts.length, 'drafts')
 
   return (
-    <DashboardClient initialListings={listings} />
+    <DashboardClient initialListings={listings} initialDrafts={drafts || []} />
   )
 }
 

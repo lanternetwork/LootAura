@@ -13,6 +13,24 @@ export interface SaleListing {
   cover_image_url?: string | null
 }
 
+export interface DraftListing {
+  id: string
+  draft_key: string
+  title?: string | null
+  updated_at?: string | null
+  payload: {
+    formData?: {
+      title?: string
+      date_start?: string
+      date_end?: string
+    }
+    photos?: string[]
+    items?: Array<{
+      category?: string
+    }>
+  }
+}
+
 /**
  * Fetch user's sales (prefers view, falls back to base table)
  * @param supabase - Authenticated Supabase client
@@ -136,6 +154,56 @@ export async function getUserSales(
     return {
       data: [],
       source: 'base_table',
+      error,
+    }
+  }
+}
+
+/**
+ * Fetch user's active drafts
+ * @param supabase - Authenticated Supabase client
+ * @param userId - User ID to filter by
+ * @param limit - Maximum number of results (default: 12)
+ * @param offset - Offset for pagination (default: 0)
+ * @returns Array of draft listings
+ */
+export async function getUserDrafts(
+  supabase: SupabaseClient,
+  userId: string,
+  limit: number = 12,
+  offset: number = 0
+): Promise<{ data: DraftListing[]; error?: any }> {
+  try {
+    const { data: drafts, error } = await supabase
+      .from('lootaura_v2.sale_drafts')
+      .select('id, draft_key, title, updated_at, payload')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (error) {
+      return {
+        data: [],
+        error,
+      }
+    }
+
+    // Map to DraftListing format, extracting title from payload if not set
+    const mappedDrafts: DraftListing[] = (drafts || []).map((draft: any) => ({
+      id: draft.id,
+      draft_key: draft.draft_key,
+      title: draft.title || draft.payload?.formData?.title || null,
+      updated_at: draft.updated_at,
+      payload: draft.payload || {},
+    }))
+
+    return {
+      data: mappedDrafts,
+    }
+  } catch (error) {
+    return {
+      data: [],
       error,
     }
   }

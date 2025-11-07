@@ -1,15 +1,36 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import DraftsPanel from '@/components/dashboard/DraftsPanel'
+import { publishDraftServer, deleteDraftServer } from '@/lib/draft/draftClient'
+import type { DraftListing } from '@/lib/data/salesAccess'
 
 type Listing = { id: string; title: string; updated_at?: string | null; status?: string | null; cover_image_url?: string | null; cover_url?: string | null }
 
-export default function DashboardClient({ initialListings }: { initialListings: Listing[] }) {
+export default function DashboardClient({ 
+  initialListings,
+  initialDrafts = []
+}: { 
+  initialListings: Listing[]
+  initialDrafts?: DraftListing[]
+}) {
   const [tab, setTab] = useState<'listings' | 'settings' | 'analytics'>('listings')
   const [listings, setListings] = useState<Listing[]>(initialListings)
+  const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
   const [saving, setSaving] = useState(false)
   const [emailOptIn, setEmailOptIn] = useState(false)
   const [defaultRadiusKm, setDefaultRadiusKm] = useState<number>(10)
+
+  const handleDraftDelete = (draftKey: string) => {
+    setDrafts((prev) => prev.filter((d) => d.draft_key !== draftKey))
+  }
+
+  const handleDraftPublish = (draftKey: string, saleId: string) => {
+    // Remove draft from list on successful publish
+    setDrafts((prev) => prev.filter((d) => d.draft_key !== draftKey))
+    // Optionally refresh listings to show the new sale
+    // For now, we'll let the user navigate to the sale page
+  }
 
   // If no listings from server, fetch from API (which works)
   useEffect(() => {
@@ -55,11 +76,20 @@ export default function DashboardClient({ initialListings }: { initialListings: 
   }, [])
 
   const listingsView = (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Your listings</h2>
-        <a href="/sell/new" className="btn-accent">Create</a>
-      </div>
+    <div className="space-y-6">
+      {/* Drafts Panel */}
+      <DraftsPanel 
+        drafts={drafts} 
+        onDelete={handleDraftDelete}
+        onPublish={handleDraftPublish}
+      />
+
+      {/* Sales Listings */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Your Sales</h2>
+          <a href="/sell/new" className="btn-accent">Create</a>
+        </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {listings.map((l) => (
           <div key={l.id} className="card card-hover">

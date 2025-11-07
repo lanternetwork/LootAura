@@ -11,6 +11,28 @@ export default function DashboardClient({ initialListings }: { initialListings: 
   const [emailOptIn, setEmailOptIn] = useState(false)
   const [defaultRadiusKm, setDefaultRadiusKm] = useState<number>(10)
 
+  // Debug logging
+  useEffect(() => {
+    console.log('[DASHBOARD_CLIENT] Initial listings received:', initialListings?.length || 0)
+    if (initialListings && initialListings.length > 0) {
+      console.log('[DASHBOARD_CLIENT] Sample listing:', initialListings[0])
+    } else {
+      console.warn('[DASHBOARD_CLIENT] No listings received - checking if sale exists...')
+      // Try to fetch sales directly from API
+      fetch('/api/sales_v2?my_sales=true')
+        .then(res => res.json())
+        .then(data => {
+          console.log('[DASHBOARD_CLIENT] API response:', data)
+          if (data.sales && data.sales.length > 0) {
+            console.log('[DASHBOARD_CLIENT] Found', data.sales.length, 'sales via API')
+          } else {
+            console.warn('[DASHBOARD_CLIENT] API returned no sales')
+          }
+        })
+        .catch(err => console.error('[DASHBOARD_CLIENT] API fetch error:', err))
+    }
+  }, [initialListings])
+
   useEffect(() => {
     const loadSettings = async () => {
       const res = await fetch('/api/seller-settings')

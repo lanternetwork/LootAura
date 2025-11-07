@@ -90,29 +90,19 @@ export async function googlePlaceDetails(
     signal,
   })
   if (!resp.ok) {
-    console.error('[GOOGLE_PLACES] Place Details API error:', resp.status, resp.statusText)
-    try {
-      const errorData = await resp.json()
-      console.error('[GOOGLE_PLACES] Error details:', errorData)
-    } catch {}
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[GOOGLE_PLACES] Place Details API error:', resp.status, resp.statusText)
+    }
     return null
   }
-  const data = await resp.json().catch((error) => {
-    console.error('[GOOGLE_PLACES] Error parsing Place Details response:', error)
-    return null
-  })
+  const data = await resp.json().catch(() => null)
   if (!data) {
-    console.warn('[GOOGLE_PLACES] Place Details response is null')
     return null
   }
-
-  console.log('[GOOGLE_PLACES] Place Details raw response:', data)
 
   const formatted = data.formattedAddress || data.formatted_address
   const location = data.location || data.geometry?.location
   const comps = data.addressComponents || data.address_components || []
-
-  console.log('[GOOGLE_PLACES] Extracted components:', { formatted, location, compsCount: comps.length })
 
   const byType = (type: string) => comps.find((c: any) => (c.types || c.types?.length ? c.types : c?.type)?.includes?.(type)) || comps.find((c: any) => c?.type === type)
   const getShort = (t: string) => byType(t)?.shortText || byType(t)?.short_name || ''
@@ -125,29 +115,26 @@ export async function googlePlaceDetails(
   const postcode = getLong('postal_code') || getShort('postal_code')
   const country = getLong('country') || getShort('country')
 
-  console.log('[GOOGLE_PLACES] Extracted address components:', { houseNumber, road, city, state, postcode, country })
+  // Combine houseNumber + road into line1
+  const line1 = [houseNumber, road].filter(Boolean).join(' ').trim() || undefined
 
   if (!location?.latitude || !location?.longitude) {
     console.warn('[GOOGLE_PLACES] Missing location data')
     return null
   }
-  
-  // Don't filter by country - allow all countries for now
-  // if (country?.toLowerCase() !== 'united states') {
-  //   console.warn('[GOOGLE_PLACES] Not US address:', country)
-  //   return null
-  // }
 
   const suggestion: AddressSuggestion = {
     id: `google:${data.id || placeId}`,
-    label: formatted || `${houseNumber ? houseNumber + ' ' : ''}${road || ''}${city ? `, ${city}` : ''}${state ? `, ${state}` : ''}${postcode ? ` ${postcode}` : ''}`,
+    label: formatted || `${line1 || ''}${city ? `, ${city}` : ''}${state ? `, ${state}` : ''}${postcode ? ` ${postcode}` : ''}`.trim(),
     lat: Number(location.latitude),
     lng: Number(location.longitude),
     address: {
+      line1,
       houseNumber: houseNumber || undefined,
       road: road || undefined,
       city: city || undefined,
       state: state || undefined,
+      zip: postcode || undefined, // Alias for postcode
       postcode: postcode || undefined,
       country: country || undefined,
     },

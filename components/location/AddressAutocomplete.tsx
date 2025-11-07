@@ -766,51 +766,33 @@ export default function AddressAutocomplete({
   const handleSelect = useCallback((suggestion: AddressSuggestion) => {
     const run = async () => {
       let final = suggestion
-      // If Google suggestion, fetch details using current session token
+      
+      // ALWAYS fetch Place Details for Google suggestions (never short-circuit)
       if (suggestion.id?.startsWith('google:') && googleSessionToken) {
         const placeId = suggestion.id.split(':')[1]
-        console.log('[AddressAutocomplete] Fetching Google Place Details for:', placeId)
         const details = await googlePlaceDetails(placeId, googleSessionToken).catch((error) => {
           console.error('[AddressAutocomplete] Error fetching Google Place Details:', error)
           return null
         })
         if (details) {
-          console.log('[AddressAutocomplete] Google Place Details received:', details)
-          console.log('[AddressAutocomplete] Google Place Details address:', details.address)
           final = details
         } else {
+          // If Details fails, fall back to original suggestion but log warning
           console.warn('[AddressAutocomplete] Google Place Details returned null, using original suggestion')
         }
-        // end session
+        // End session after selection
         setGoogleSessionToken(null)
       }
 
-      const address = final.label
+      // Extract address components from normalized suggestion
+      const addressLine1 = final.address?.line1 || final.address?.road || ''
+      const city = final.address?.city || ''
+      const state = final.address?.state || ''
+      const zip = final.address?.zip || final.address?.postcode || ''
+      const country = final.address?.country || 'US'
       
-      // Extract address components - try structured data first, then parse label as fallback
-      let city = final.address?.city || ''
-      let state = final.address?.state || ''
-      let zip = final.address?.postcode || ''
-
-      // FALLBACK: If no structured data, try to parse from label (e.g., "5001 Preston Highway, Louisville, KY 40213")
-      if (!city && !state && !zip && address.includes(',')) {
-        const parts = address.split(',').map(p => p.trim())
-        if (parts.length >= 2) {
-          // Last part might be "State ZIP" or just "State"
-          const lastPart = parts[parts.length - 1]
-          const stateZipMatch = lastPart.match(/^([A-Z]{2})\s*(\d{5})?$/)
-          if (stateZipMatch) {
-            state = stateZipMatch[1]
-            zip = stateZipMatch[2] || ''
-          } else if (lastPart.match(/^[A-Z]{2}$/)) {
-            state = lastPart
-          }
-          // Second-to-last is usually city
-          if (parts.length >= 2) {
-            city = parts[parts.length - 2]
-          }
-        }
-      }
+      // Use label as the full address string for the input field
+      const address = final.label
 
       // Prevent an immediate re-query from the newly populated address value
       suppressNextFetchRef.current = true
@@ -823,22 +805,23 @@ export default function AddressAutocomplete({
       setShowFallbackMessage(false)
       setShowGoogleAttribution(false)
 
-      // Update the input value first (this will trigger onChange)
+      // Update the input value (this will trigger onChange)
       onChange(address)
 
-      // Call onPlaceSelected to update all form fields
-      // Always pass values (even if empty) - let the parent decide
+      // Call onPlaceSelected to update all form fields atomically
       if (onPlaceSelected) {
         const placeData = {
-          address,
-          city: city || undefined,
-          state: state || undefined,
-          zip: zip || undefined,
+          address: addressLine1 || address, // Use line1 if available, otherwise full label
+          city: city || '',
+          state: state || '',
+          zip: zip || '',
           lat: final.lat,
           lng: final.lng
         }
         try {
           onPlaceSelected(placeData)
+          // Keep focus on input after selection
+          inputRef.current?.focus()
         } catch (error) {
           console.error('[AddressAutocomplete] Error calling onPlaceSelected:', error)
         }
@@ -1027,7 +1010,10 @@ export default function AddressAutocomplete({
                 className={`px-4 py-2 cursor-pointer hover:bg-gray-100 ${
                   selectedIndex === index ? 'bg-gray-100' : ''
                 }`}
-                onClick={() => handleSelect(suggestion)}
+                onMouseDown={(e) => {
+                  e.preventDefault() // Prevent input blur
+                  handleSelect(suggestion)
+                }}
                 onMouseEnter={() => setSelectedIndex(index)}
               >
                 <div className="font-medium">{suggestion.label}</div>

@@ -118,10 +118,12 @@ export interface AddressSuggestion {
   lat: number
   lng: number
   address?: {
+    line1?: string // Combined houseNumber + road
     houseNumber?: string
     road?: string
     city?: string
     state?: string
+    zip?: string // Alias for postcode
     postcode?: string
     country?: string
   }

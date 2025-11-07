@@ -1015,7 +1015,7 @@ export default function AddressAutocomplete({
         )}
 
         {/* No results state */}
-        {!isLoading && !hasJustSelected && (() => {
+        {!isLoading && !hasJustSelected && !justSelectedRef.current && !suppressNextFetchRef.current && (() => {
           const trimmedValue = value?.trim() || ''
           // Don't show "No results found" if the value looks like a complete address (has commas, city/state/zip pattern)
           const looksLikeCompleteAddress = /,/.test(trimmedValue) && trimmedValue.length > 10

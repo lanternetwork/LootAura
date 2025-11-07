@@ -19,6 +19,6 @@ export function createSupabaseBrowserClient() {
     throw new Error(error);
   }
 
-  // Force public schema for REST access; PostgREST only exposes public/graphql_public
-  return createBrowserClient(url, anon, { db: { schema: 'public' } });
+  // Use lootaura_v2 schema for tables
+  return createBrowserClient(url, anon, { db: { schema: 'lootaura_v2' } });
 }

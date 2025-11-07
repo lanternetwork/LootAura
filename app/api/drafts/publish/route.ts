@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch draft by user_id + draft_key with status active
     const { data: draft, error: fetchError } = await supabase
-      .from('lootaura_v2.sale_drafts')
+      .from('sale_drafts')
       .select('id, payload, status')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     if (fetchError || !draft) {
       // Check if already published (idempotency)
       const { data: publishedDraft } = await supabase
-        .from('lootaura_v2.sale_drafts')
+        .from('sale_drafts')
         .select('id')
         .eq('user_id', user.id)
         .eq('draft_key', draftKey)
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Create sale
     const { data: sale, error: saleError } = await supabase
-      .from('lootaura_v2.sales')
+      .from('sales')
       .insert({
         owner_id: user.id,
         title: formData.title,
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
       if (itemsError) {
         console.error('[DRAFTS] Error creating items:', itemsError)
         // Try to clean up the sale (best effort)
-        await supabase.from('lootaura_v2.sales').delete().eq('id', sale.id)
+        await supabase.from('sales').delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
         return NextResponse.json<ApiResponse>({
           ok: false,
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Mark draft as published
     const { error: updateError } = await supabase
-      .from('lootaura_v2.sale_drafts')
+      .from('sale_drafts')
       .update({ status: 'published' })
       .eq('id', draft.id)
 

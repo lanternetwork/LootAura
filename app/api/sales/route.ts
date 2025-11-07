@@ -860,10 +860,27 @@ async function postHandler(request: NextRequest) {
       const res = await fromSales.insert(firstTryPayload).select().single()
       data = res?.data
       error = res?.error
+      
+      // Log the error immediately for debugging
+      if (error) {
+        console.error('[SALES] Insert failed (first attempt):', { 
+          event: 'sales-create', 
+          status: 'fail', 
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          payload: {
+            ...firstTryPayload,
+            owner_id: '[REDACTED]', // Don't log user ID
+          }
+        })
+      }
     }
 
     // If insert failed due to schema (e.g., PGRST204 unknown column), retry without image fields
     if (error && /schema|column|PGRST204|not exist/i.test(String(error?.message || error?.details || ''))) {
+      console.warn('[SALES] Retrying insert without image fields due to schema error')
       const retryRes = await fromSales.insert(basePayload).select().single()
       if (retryRes?.data) {
         data = { ...retryRes.data, cover_image_url: cover_image_url ?? null, images: images ?? null }
@@ -871,11 +888,19 @@ async function postHandler(request: NextRequest) {
       } else {
         data = retryRes?.data
         error = retryRes?.error
+        console.error('[SALES] Insert failed (retry without images):', { 
+          event: 'sales-create', 
+          status: 'fail', 
+          code: error?.code,
+          message: error?.message,
+          details: error?.details,
+          hint: error?.hint
+        })
       }
     }
     
     if (error) {
-      console.error('[SALES] Insert failed:', { 
+      console.error('[SALES] Insert failed (final):', { 
         event: 'sales-create', 
         status: 'fail', 
         code: error.code,

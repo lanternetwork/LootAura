@@ -104,12 +104,18 @@ export async function GET(_request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('[DRAFTS] Unexpected error in GET:', error)
+    console.error('[DRAFTS] Unexpected error in GET:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : typeof error,
+      fullError: error
+    })
     Sentry.captureException(error, { tags: { operation: 'getLatestDraft' } })
     return NextResponse.json<ApiResponse>({
       ok: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
+      error: error instanceof Error ? error.message : 'Internal server error',
+      code: 'INTERNAL_ERROR',
+      details: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
 }
@@ -142,11 +148,19 @@ export async function POST(request: NextRequest) {
     // Validate payload
     const validationResult = SaleDraftPayloadSchema.safeParse(payload)
     if (!validationResult.success) {
+      console.error('[DRAFTS] Validation failed:', {
+        errors: validationResult.error.issues,
+        payloadKeys: payload ? Object.keys(payload) : [],
+        payloadType: typeof payload,
+        hasFormData: !!(payload as any)?.formData,
+        formDataKeys: (payload as any)?.formData ? Object.keys((payload as any).formData) : []
+      })
       return NextResponse.json<ApiResponse>({
         ok: false,
         error: 'Invalid draft payload',
         code: 'VALIDATION_ERROR',
-        data: validationResult.error.issues
+        data: validationResult.error.issues,
+        details: validationResult.error.message
       }, { status: 400 })
     }
 
@@ -209,12 +223,18 @@ export async function POST(request: NextRequest) {
       data: { id: draft.id }
     })
   } catch (error) {
-    console.error('[DRAFTS] Unexpected error in POST:', error)
+    console.error('[DRAFTS] Unexpected error in POST:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : typeof error,
+      fullError: error
+    })
     Sentry.captureException(error, { tags: { operation: 'saveDraft' } })
     return NextResponse.json<ApiResponse>({
       ok: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
+      error: error instanceof Error ? error.message : 'Internal server error',
+      code: 'INTERNAL_ERROR',
+      details: error instanceof Error ? error.stack : undefined
     }, { status: 500 })
   }
 }

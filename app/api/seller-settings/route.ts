@@ -23,6 +23,13 @@ export async function GET() {
     .maybeSingle()
 
   if (error) {
+    console.error('[SELLER_SETTINGS] Error fetching settings:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      userId: user.id
+    })
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 

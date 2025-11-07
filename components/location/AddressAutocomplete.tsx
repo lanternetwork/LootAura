@@ -114,9 +114,8 @@ export default function AddressAutocomplete({
     const trimmedQuery = debouncedQuery?.trim() || ''
 
     // If we just selected a suggestion, suppress the next search triggered by programmatic value change
-    if (suppressNextFetchRef.current) {
-      suppressNextFetchRef.current = false
-      justSelectedRef.current = false
+    if (suppressNextFetchRef.current || justSelectedRef.current) {
+      // Don't reset flags here - they're managed in handleSelect
       setIsLoading(false)
       setIsOpen(false)
       setShowGoogleAttribution(false)
@@ -805,13 +804,11 @@ export default function AddressAutocomplete({
       setShowFallbackMessage(false)
       setShowGoogleAttribution(false)
 
-      // Update the input value (this will trigger onChange)
-      onChange(address)
-
       // Call onPlaceSelected to update all form fields atomically
+      // Use full label for address field to match what will be displayed in input
       if (onPlaceSelected) {
         const placeData = {
-          address: addressLine1 || address, // Use line1 if available, otherwise full label
+          address: address, // Use full label for consistency with input display
           city: city || '',
           state: state || '',
           zip: zip || '',
@@ -820,12 +817,24 @@ export default function AddressAutocomplete({
         }
         try {
           onPlaceSelected(placeData)
-          // Keep focus on input after selection
-          inputRef.current?.focus()
         } catch (error) {
           console.error('[AddressAutocomplete] Error calling onPlaceSelected:', error)
         }
       }
+      
+      // Update the input value to match (use full label for display)
+      // Use setTimeout to ensure parent's onChange completes first and prevent re-query
+      setTimeout(() => {
+        onChange(address)
+        // Keep focus on input after selection
+        inputRef.current?.focus()
+        // Keep suppress flag active for a bit longer to prevent debounced query
+        setTimeout(() => {
+          suppressNextFetchRef.current = false
+          justSelectedRef.current = false
+          setHasJustSelected(false)
+        }, 500)
+      }, 0)
     }
     run()
   }, [onChange, onPlaceSelected, googleSessionToken])

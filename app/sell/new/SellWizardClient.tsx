@@ -1170,8 +1170,10 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
           value={formData.address || ''}
           onChange={(address) => onChange('address', address)}
           onPlaceSelected={(place) => {
-            onChange('address', place.address)
-            // Always update all fields - use empty string if undefined
+            // Update all fields atomically - batch updates to prevent multiple re-renders
+            // Use the full label for address field if available, otherwise use line1
+            const addressValue = place.address || ''
+            onChange('address', addressValue)
             onChange('city', place.city || '')
             onChange('state', place.state || '')
             onChange('zip_code', place.zip || '')

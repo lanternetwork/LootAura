@@ -10,6 +10,7 @@ type ApiResponse<T = any> = {
   data?: T
   error?: string
   code?: string
+  details?: string
 }
 
 /**

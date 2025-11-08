@@ -246,6 +246,7 @@ export async function POST(request: NextRequest) {
         .select('id, name, sale_id')
 
       if (itemsError) {
+        // Always log full error details for debugging
         console.error('[DRAFTS_PUBLISH] Error creating items:', {
           saleId: sale.id,
           error: itemsError,
@@ -253,6 +254,13 @@ export async function POST(request: NextRequest) {
           message: itemsError.message,
           details: itemsError.details,
           hint: itemsError.hint,
+          itemsToInsert: itemsToInsert.map(i => ({
+            sale_id: i.sale_id,
+            name: i.name,
+            hasImages: !!i.images,
+            imagesType: Array.isArray(i.images) ? 'array' : typeof i.images,
+            imagesValue: i.images,
+          })),
         })
         // Try to clean up the sale (best effort) - use view (allows writes)
         await supabase.from('sales_v2').delete().eq('id', sale.id)

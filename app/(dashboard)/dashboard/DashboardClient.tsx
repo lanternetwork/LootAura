@@ -164,7 +164,12 @@ export default function DashboardClient({
         />
 
         {/* Row 3: Sales Panel */}
-        <SalesPanel sales={sales} />
+        <SalesPanel 
+          sales={sales} 
+          onSaleDelete={(saleId) => {
+            setSales((prev) => prev.filter((s) => s.id !== saleId))
+          }}
+        />
 
         {/* Row 4: Analytics + Preferences */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

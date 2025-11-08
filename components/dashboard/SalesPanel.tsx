@@ -1,15 +1,31 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { FaPlus } from 'react-icons/fa'
 import Link from 'next/link'
-import SaleCard from '@/components/SaleCard'
+import DashboardSaleCard from './DashboardSaleCard'
 import { Sale } from '@/lib/types'
 
 interface SalesPanelProps {
   sales: Sale[]
+  onSaleDelete?: (saleId: string) => void
 }
 
-export default function SalesPanel({ sales }: SalesPanelProps) {
+export default function SalesPanel({ sales, onSaleDelete }: SalesPanelProps) {
+  const [localSales, setLocalSales] = useState<Sale[]>(sales)
+
+  // Sync local sales with prop changes
+  useEffect(() => {
+    setLocalSales(sales)
+  }, [sales])
+
+  const handleSaleDelete = (saleId: string) => {
+    setLocalSales((prev) => prev.filter((s) => s.id !== saleId))
+    if (onSaleDelete) {
+      onSaleDelete(saleId)
+    }
+  }
+
   return (
     <div className="card">
       <div className="card-body-lg">
@@ -17,9 +33,9 @@ export default function SalesPanel({ sales }: SalesPanelProps) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <h2 className="card-title">Your Sales</h2>
-            {sales.length > 0 && (
+            {localSales.length > 0 && (
               <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-sm font-medium">
-                {sales.length}
+                {localSales.length}
               </span>
             )}
           </div>
@@ -34,7 +50,7 @@ export default function SalesPanel({ sales }: SalesPanelProps) {
         </div>
 
         {/* Body */}
-        {sales.length === 0 ? (
+        {localSales.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-600 mb-4">No sales yet. Create your first sale.</p>
             <Link href="/sell/new" className="btn-accent inline-flex items-center gap-1">
@@ -44,8 +60,8 @@ export default function SalesPanel({ sales }: SalesPanelProps) {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sales.map((sale) => (
-              <SaleCard key={sale.id} sale={sale} />
+            {localSales.map((sale) => (
+              <DashboardSaleCard key={sale.id} sale={sale} onDelete={handleSaleDelete} />
             ))}
           </div>
         )}

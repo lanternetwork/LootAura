@@ -89,7 +89,6 @@ export function Header() {
             <div className={`${isCollapsed ? 'hidden' : 'hidden md:block'} h-6 w-px bg-slate-200`} aria-hidden="true"></div>
             {/* Admin links cluster */}
             <div ref={adminRef} className={`${isCollapsed ? 'hidden' : 'hidden md:flex'} items-center gap-3`} aria-label="Account">
-              {hasUser && <Link href="/profile" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Profile</Link>}
               {hasUser && <Link href="/dashboard" className="text-sm sm:text-base text-[#3A2268] hover:text-[#3A2268]/80 whitespace-nowrap">Dashboard</Link>}
             </div>
             {/* Mobile-only filter button for /sales page */}
@@ -129,7 +128,6 @@ export function Header() {
             <Link href="/favorites" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Favorites</Link>
             <Link href="/sell/new" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Post Your Sale</Link>
             {hasUser && <hr className="my-2" />}
-            {hasUser && <Link href="/profile" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Profile</Link>}
             {hasUser && <Link href="/dashboard" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Dashboard</Link>}
           </div>
         </div>

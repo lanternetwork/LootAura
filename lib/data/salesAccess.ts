@@ -419,7 +419,15 @@ export async function getSaleWithItems(
       } : null,
       itemsCount: itemsRes.data?.length || 0,
       items: itemsRes.data?.map(i => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
+      // Debug: Check if sale status might be blocking items
+      saleStatus: sale.status,
     })
+    
+    // Additional debug: Try to query items directly to see if they exist
+    if (itemsRes.data?.length === 0 && process.env.NODE_ENV !== 'production') {
+      console.log('[SALES_ACCESS] No items found - checking if items exist in base table...')
+      // This is just for debugging - we can't query base table directly from here
+    }
 
     // Map items to SaleItem type
     // Handle both image_url (production) and images (array) formats

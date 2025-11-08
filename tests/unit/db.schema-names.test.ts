@@ -55,33 +55,36 @@ describe('Schema name validation', () => {
     }
   })
 
-  it('should not use schema-qualified table names in .from() calls', async () => {
-    const apiFiles = await glob('app/api/**/*.{ts,tsx}', {
-      ignore: ['**/node_modules/**', '**/.next/**'],
+  it('should not write to views (must use base tables)', async () => {
+    const files = await glob('**/*.{ts,tsx,js,jsx}', {
+      ignore: [
+        '**/node_modules/**',
+        '**/.next/**',
+        '**/dist/**',
+        '**/build/**',
+        '**/tests/**',
+        '**/*.test.{ts,tsx,js,jsx}',
+        '**/*.spec.{ts,tsx,js,jsx}',
+        '**/mocks/**',
+        '**/__mocks__/**',
+      ],
       cwd: process.cwd(),
     })
 
-    const relevantFiles = apiFiles.filter(
-      (file) =>
-        file.includes('drafts') ||
-        file.includes('sales') ||
-        file.includes('items')
-    )
-
     const violations: Array<{ file: string; line: number; content: string }> = []
 
-    for (const file of relevantFiles) {
+    for (const file of files) {
       try {
         const content = readFileSync(join(process.cwd(), file), 'utf-8')
         const lines = content.split('\n')
 
         lines.forEach((line, index) => {
-          // Check for .from() calls with schema-qualified names (should use client schema instead)
-          if (
-            /\.from\(['"]lootaura_v2\.(sale_drafts|sales|items)['"]\)/.test(line) ||
-            /\.from\(['"]public\.(sale_drafts|sales|items)['"]\)/.test(line)
-          ) {
-            // Allow if it's a comment or test file
+          // Check for writes to views: .from('(public.)?(sale_drafts|sales_v2|items_v2)').(insert|update|delete|upsert)(
+          // Pattern: .from('(public\.)?(sale_drafts|sales_v2|items_v2)').(insert|update|delete|upsert)(
+          const writeToViewPattern = /\.from\(['"](public\.)?(sale_drafts|sales_v2|items_v2)['"]\)\s*\.(insert|update|delete|upsert)\(/
+          
+          if (writeToViewPattern.test(line)) {
+            // Allow if it's a comment
             if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
               return
             }
@@ -93,6 +96,7 @@ describe('Schema name validation', () => {
           }
         })
       } catch (error) {
+        // Skip files that can't be read
         console.warn(`Could not read file: ${file}`, error)
       }
     }
@@ -102,7 +106,7 @@ describe('Schema name validation', () => {
         .map((v) => `  ${v.file}:${v.line} - ${v.content}`)
         .join('\n')
       throw new Error(
-        `Found ${violations.length} .from() call(s) with schema-qualified names (use client schema instead):\n${message}`
+        `Found ${violations.length} write operation(s) to views (must use base tables lootaura_v2.*):\n${message}`
       )
     }
   })

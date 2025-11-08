@@ -1,4 +1,5 @@
 /* eslint-disable no-undef */
+// NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Sale, PublicSale } from '@/lib/types'
@@ -834,7 +835,7 @@ async function postHandler(request: NextRequest) {
     // Views may not support INSERTs with all fields, so use base table directly
     const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
     const writeClient = createSupabaseWriteClient()
-    const fromSales = writeClient.from('sales_v2') as any
+    const fromSales = writeClient.from('lootaura_v2.sales') as any
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {

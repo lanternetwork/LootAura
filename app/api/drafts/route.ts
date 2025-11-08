@@ -1,3 +1,4 @@
+// NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest) {
     if (existingDraft) {
       // Update existing draft
       const { data: updatedDraft, error: updateError } = await supabase
-        .from('sale_drafts')
+        .from('lootaura_v2.sale_drafts')
         .update({
           title,
           payload: validatedPayload,
@@ -224,7 +225,7 @@ export async function POST(request: NextRequest) {
     } else {
       // Insert new draft
       const { data: newDraft, error: insertError } = await supabase
-        .from('sale_drafts')
+        .from('lootaura_v2.sale_drafts')
         .insert({
           user_id: user.id,
           draft_key: draftKey,
@@ -316,7 +317,7 @@ export async function DELETE(request: NextRequest) {
     const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
     const writeClient = createSupabaseWriteClient()
     const { error } = await writeClient
-      .from('sale_drafts')
+      .from('lootaura_v2.sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)

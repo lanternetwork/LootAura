@@ -215,6 +215,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Create items
+    console.log('[DRAFTS_PUBLISH] Items check:', {
+      saleId: sale.id,
+      hasItems: !!items,
+      itemsLength: items?.length || 0,
+      items: items?.map(i => ({ name: i.name, category: i.category, hasImage: !!i.image_url })),
+    })
+    
     if (items && items.length > 0) {
       const itemsToInsert = items.map(item => ({
         sale_id: sale.id,
@@ -227,12 +234,26 @@ export async function POST(request: NextRequest) {
         images: item.image_url ? [item.image_url] : null
       }))
 
-      const { error: itemsError } = await supabase
+      console.log('[DRAFTS_PUBLISH] Inserting items:', {
+        saleId: sale.id,
+        itemsCount: itemsToInsert.length,
+        itemsToInsert: itemsToInsert.map(i => ({ name: i.name, sale_id: i.sale_id })),
+      })
+
+      const { data: insertedItems, error: itemsError } = await supabase
         .from('lootaura_v2.items')
         .insert(itemsToInsert)
+        .select('id, name, sale_id')
 
       if (itemsError) {
-        console.error('[DRAFTS] Error creating items:', itemsError)
+        console.error('[DRAFTS_PUBLISH] Error creating items:', {
+          saleId: sale.id,
+          error: itemsError,
+          code: itemsError.code,
+          message: itemsError.message,
+          details: itemsError.details,
+          hint: itemsError.hint,
+        })
         // Try to clean up the sale (best effort)
         await supabase.from('lootaura_v2.sales').delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
@@ -242,6 +263,18 @@ export async function POST(request: NextRequest) {
           code: 'ITEMS_CREATE_ERROR'
         }, { status: 500 })
       }
+
+      console.log('[DRAFTS_PUBLISH] Items created successfully:', {
+        saleId: sale.id,
+        insertedCount: insertedItems?.length || 0,
+        insertedItems: insertedItems?.map(i => ({ id: i.id, name: i.name, sale_id: i.sale_id })),
+      })
+    } else {
+      console.log('[DRAFTS_PUBLISH] No items to create:', {
+        saleId: sale.id,
+        hasItems: !!items,
+        itemsLength: items?.length || 0,
+      })
     }
 
     // 3. Mark draft as published

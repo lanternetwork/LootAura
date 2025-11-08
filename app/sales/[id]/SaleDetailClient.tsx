@@ -12,13 +12,15 @@ import { useAuth, useFavorites } from '@/lib/hooks/useAuth'
 import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
 import CategoryChips from '@/components/ui/CategoryChips'
 import type { SaleWithOwnerInfo } from '@/lib/data'
+import type { SaleItem } from '@/lib/types'
 
 interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo
   displayCategories?: string[]
+  items?: SaleItem[]
 }
 
-export default function SaleDetailClient({ sale, displayCategories = [] }: SaleDetailClientProps) {
+export default function SaleDetailClient({ sale, displayCategories = [], items = [] }: SaleDetailClientProps) {
   const searchParams = useSearchParams()
   
   // Get viewport params from URL to preserve on back navigation
@@ -242,27 +244,49 @@ export default function SaleDetailClient({ sale, displayCategories = [] }: SaleD
           {/* Items Grid */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Items for Sale</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Mock items - in real app, these would come from the database */}
-              {[
-                { name: 'Vintage Coffee Table', price: 50, condition: 'Good' },
-                { name: 'Dining Room Chairs (Set of 4)', price: 80, condition: 'Excellent' },
-                { name: 'Bookshelf', price: 25, condition: 'Fair' },
-                { name: 'Kitchen Appliances', price: 120, condition: 'Good' },
-                { name: 'Children\'s Toys', price: 30, condition: 'Good' },
-                { name: 'Garden Tools', price: 40, condition: 'Excellent' },
-              ].map((item, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-900 mb-2">{item.name}</h3>
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold text-green-600">
-                      ${item.price}
-                    </span>
-                    <span className="text-sm text-gray-500">{item.condition}</span>
+            {items.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No items listed yet.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {items.map((item) => (
+                  <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    {item.photo && (
+                      <div className="relative w-full h-48 mb-3 rounded-lg overflow-hidden bg-gray-100">
+                        <Image
+                          src={item.photo}
+                          alt={item.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        />
+                      </div>
+                    )}
+                    <h3 className="font-medium text-gray-900 mb-2">{item.name}</h3>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        {item.price !== undefined ? (
+                          <span className="text-lg font-semibold text-green-600">
+                            ${item.price.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-500 italic">Price not specified</span>
+                        )}
+                        {item.condition && (
+                          <span className="text-sm text-gray-500">{item.condition}</span>
+                        )}
+                      </div>
+                      {item.category && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 w-fit">
+                          {item.category}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

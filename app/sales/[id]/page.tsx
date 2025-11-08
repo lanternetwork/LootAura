@@ -31,7 +31,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       <Suspense fallback={<div className="p-4">Loading...</div>}>
-        <SaleDetailClient sale={sale} displayCategories={displayCategories} />
+        <SaleDetailClient sale={sale} displayCategories={displayCategories} items={items} />
       </Suspense>
     </div>
   )

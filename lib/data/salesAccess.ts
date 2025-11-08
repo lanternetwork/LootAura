@@ -212,6 +212,56 @@ export async function getUserDrafts(
 }
 
 /**
+ * Fetch items for a sale (for sale details page)
+ * Reads from public.items_v2 view (reads from views allowed)
+ * @param supabase - Authenticated Supabase client
+ * @param saleId - Sale ID to fetch items for
+ * @param limit - Maximum number of items to return (default: 100)
+ * @returns Array of sale items, or empty array on error
+ */
+export async function getItemsForSale(
+  supabase: SupabaseClient,
+  saleId: string,
+  limit: number = 100
+): Promise<SaleItem[]> {
+  try {
+    const { data: items, error } = await supabase
+      .from('items_v2')
+      .select('id, sale_id, name, category, condition, price, images, is_sold, created_at, updated_at')
+      .eq('sale_id', saleId)
+      .order('created_at', { ascending: true })
+      .limit(limit)
+
+    if (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[SALES_ACCESS] Error fetching items for sale:', error)
+      }
+      return []
+    }
+
+    // Map items to SaleItem type
+    const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => ({
+      id: item.id,
+      sale_id: item.sale_id,
+      name: item.name,
+      category: item.category || undefined,
+      condition: item.condition || undefined,
+      price: item.price || undefined,
+      photo: Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : undefined,
+      purchased: item.is_sold || false,
+      created_at: item.created_at,
+    }))
+
+    return mappedItems
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[SALES_ACCESS] Unexpected error in getItemsForSale:', error)
+    }
+    return []
+  }
+}
+
+/**
  * Fetch sale with its items (for sale details page)
  * Reads sale from public.sales_v2 view and items from public.items_v2 view
  * Also fetches owner profile and stats to match SaleWithOwnerInfo type

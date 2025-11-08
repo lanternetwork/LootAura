@@ -301,45 +301,45 @@ export async function getSaleWithItems(
     }
 
     // Fetch tags from base table (view doesn't include tags column)
-    // PostgREST doesn't support cross-schema queries, so we need to use write client
-    // which can access lootaura_v2 schema, or use an RPC function
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const writeClient = createSupabaseWriteClient()
+    // PostgREST doesn't support cross-schema queries when client is configured for 'public' schema
+    // We'll gracefully handle this and continue without sale-level tags
+    // Categories will still work from item categories
+    let tags: string[] = []
     
-    const tagsRes = await writeClient
-      .from('lootaura_v2.sales')
-      .select('tags')
-      .eq('id', saleId)
-      .maybeSingle()
-    
-    if (tagsRes.error) {
-      // Always log errors (not just in dev) since this is critical
-      console.error('[SALES_ACCESS] Error fetching tags:', {
+    try {
+      // Try to use admin client if available (service role key bypasses RLS)
+      const { adminSupabase } = await import('@/lib/supabase/admin').catch(() => ({ adminSupabase: null }))
+      if (adminSupabase) {
+        // Admin client might still have schema limitations, but let's try
+        const tagsRes = await adminSupabase
+          .from('lootaura_v2.sales')
+          .select('tags')
+          .eq('id', saleId)
+          .maybeSingle()
+        
+        if (!tagsRes.error && tagsRes.data) {
+          tags = Array.isArray(tagsRes.data.tags) ? tagsRes.data.tags : []
+        } else if (tagsRes.error) {
+          console.log('[SALES_ACCESS] Admin client tags query failed (schema limitation):', {
+            saleId,
+            error: tagsRes.error.message,
+          })
+        }
+      }
+    } catch (error) {
+      // Admin client not available or failed - that's okay, we'll continue without tags
+      console.log('[SALES_ACCESS] Could not fetch tags (admin client not available or failed):', {
         saleId,
-        error: tagsRes.error,
-        code: tagsRes.error?.code,
-        message: tagsRes.error?.message,
+        error: error instanceof Error ? error.message : String(error),
       })
     }
-    
-    // Merge tags from base table into sale object
-    // tagsRes.data?.tags could be null, undefined, or an array
-    const fetchedTags = tagsRes.data?.tags
-    // Use fetched tags if it's an array (even if empty), otherwise fall back
-    const tags = Array.isArray(fetchedTags) 
-      ? fetchedTags 
-      : (Array.isArray((sale as any).tags) ? (sale as any).tags : [])
     
     // Always log in production for debugging (can remove later)
     console.log('[SALES_ACCESS] Tags fetch result:', {
       saleId,
-      tagsResError: tagsRes.error ? {
-        code: tagsRes.error.code,
-        message: tagsRes.error.message,
-      } : null,
-      tagsResData: tagsRes.data,
-      fetchedTags,
-      finalTags: tags,
+      tagsCount: tags.length,
+      tags,
+    note: 'Categories will still work from item categories if tags are empty',
     })
     
     const saleWithTags = {

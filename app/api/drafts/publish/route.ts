@@ -177,9 +177,9 @@ export async function POST(request: NextRequest) {
     // Note: Supabase doesn't support true transactions across multiple operations,
     // so we'll do them sequentially and handle errors
 
-    // 1. Create sale
+    // 1. Create sale - use view (allows writes)
     const { data: sale, error: saleError } = await supabase
-      .from('lootaura_v2.sales')
+      .from('sales_v2')
       .insert({
         owner_id: user.id,
         title: formData.title,
@@ -240,8 +240,9 @@ export async function POST(request: NextRequest) {
         itemsToInsert: itemsToInsert.map(i => ({ name: i.name, sale_id: i.sale_id })),
       })
 
+      // Use view (allows writes)
       const { data: insertedItems, error: itemsError } = await supabase
-        .from('lootaura_v2.items')
+        .from('items_v2')
         .insert(itemsToInsert)
         .select('id, name, sale_id')
 
@@ -254,8 +255,8 @@ export async function POST(request: NextRequest) {
           details: itemsError.details,
           hint: itemsError.hint,
         })
-        // Try to clean up the sale (best effort)
-        await supabase.from('lootaura_v2.sales').delete().eq('id', sale.id)
+        // Try to clean up the sale (best effort) - use view
+        await supabase.from('sales_v2').delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
         return NextResponse.json<ApiResponse>({
           ok: false,
@@ -277,9 +278,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 3. Mark draft as published
+    // 3. Mark draft as published - use view (allows writes)
     const { error: updateError } = await supabase
-      .from('lootaura_v2.sale_drafts')
+      .from('sale_drafts')
       .update({ status: 'published' })
       .eq('id', draft.id)
 

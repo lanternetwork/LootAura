@@ -222,7 +222,9 @@ export async function POST(request: NextRequest) {
         description: item.description || null,
         price: item.price || null,
         category: item.category || null,
-        image_url: item.image_url || null
+        image_url: item.image_url || null,
+        // Also populate images array for compatibility with items_v2 view
+        images: item.image_url ? [item.image_url] : null
       }))
 
       const { error: itemsError } = await supabase

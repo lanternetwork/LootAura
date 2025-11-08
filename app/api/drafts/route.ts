@@ -194,21 +194,50 @@ export async function POST(request: NextRequest) {
       payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
     })
     
-    const { data: draft, error } = await supabase
+    // Check if draft exists first (views don't support ON CONFLICT the same way)
+    const { data: existingDraft } = await supabase
       .from('sale_drafts')
-      .upsert({
-        user_id: user.id,
-        draft_key: draftKey,
-        title,
-        payload: validatedPayload,
-        status: 'active',
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
-      }, {
-        onConflict: 'user_id,draft_key',
-        ignoreDuplicates: false
-      })
-      .select('id, draft_key, title, status, updated_at')
-      .single()
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('draft_key', draftKey)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    let draft: any
+    let error: any
+
+    if (existingDraft) {
+      // Update existing draft
+      const { data: updatedDraft, error: updateError } = await supabase
+        .from('sale_drafts')
+        .update({
+          title,
+          payload: validatedPayload,
+          status: 'active',
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        })
+        .eq('id', existingDraft.id)
+        .select('id, draft_key, title, status, updated_at')
+        .single()
+      draft = updatedDraft
+      error = updateError
+    } else {
+      // Insert new draft
+      const { data: newDraft, error: insertError } = await supabase
+        .from('sale_drafts')
+        .insert({
+          user_id: user.id,
+          draft_key: draftKey,
+          title,
+          payload: validatedPayload,
+          status: 'active',
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        })
+        .select('id, draft_key, title, status, updated_at')
+        .single()
+      draft = newDraft
+      error = insertError
+    }
 
     if (error) {
       console.error('[DRAFTS] Error saving draft:', {

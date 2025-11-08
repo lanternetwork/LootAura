@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
         images: photos && photos.length > 1 ? photos.slice(1) : null,
         pricing_mode: formData.pricing_mode || 'negotiable',
         status: 'published',
-        privacy_mode: 'exact',
+        privacy_mode: 'exact', // Required field
         is_featured: false
       })
       .select('id')

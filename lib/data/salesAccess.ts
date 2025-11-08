@@ -227,7 +227,7 @@ export async function getItemsForSale(
   try {
     const { data: items, error } = await supabase
       .from('items_v2')
-      .select('id, sale_id, name, category, price, images, is_sold, created_at, updated_at')
+      .select('id, sale_id, name, category, price, image_url, is_sold, created_at, updated_at')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: true })
       .limit(limit)
@@ -248,6 +248,7 @@ export async function getItemsForSale(
     }
 
     // Map items to SaleItem type
+    // Handle both image_url (production) and images (array) formats
     const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => ({
       id: item.id,
       sale_id: item.sale_id,
@@ -255,7 +256,7 @@ export async function getItemsForSale(
       category: item.category || undefined,
       condition: item.condition || undefined,
       price: item.price || undefined,
-      photo: Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : undefined,
+      photo: item.image_url || (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : undefined),
       purchased: item.is_sold || false,
       created_at: item.created_at,
     }))
@@ -382,7 +383,7 @@ export async function getSaleWithItems(
         .maybeSingle(),
       supabase
         .from('items_v2')
-        .select('id, sale_id, name, category, price, images, is_sold, created_at, updated_at')
+        .select('id, sale_id, name, category, price, image_url, is_sold, created_at, updated_at')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: false }),
     ])
@@ -416,6 +417,7 @@ export async function getSaleWithItems(
     })
 
     // Map items to SaleItem type
+    // Handle both image_url (production) and images (array) formats
     const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => ({
       id: item.id,
       sale_id: item.sale_id,
@@ -423,7 +425,7 @@ export async function getSaleWithItems(
       category: item.category || undefined,
       condition: item.condition || undefined,
       price: item.price || undefined,
-      photo: Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : undefined,
+      photo: item.image_url || (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : undefined),
       purchased: item.is_sold || false,
       created_at: item.created_at,
     }))

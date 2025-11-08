@@ -328,7 +328,7 @@ export default function SalesClient({
           bbox: bbox
         })
         setMapSales(filtered)
-        setMapMarkers(deduplicated
+        setMapMarkers(filtered
           .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
           .map(sale => ({
             id: sale.id,

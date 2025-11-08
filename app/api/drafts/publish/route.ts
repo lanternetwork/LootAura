@@ -229,8 +229,7 @@ export async function POST(request: NextRequest) {
         description: item.description || null,
         price: item.price || null,
         category: item.category || null,
-        image_url: item.image_url || null,
-        // Also populate images array for compatibility with items_v2 view
+        // items_v2 view uses images (TEXT[]) not image_url
         images: item.image_url ? [item.image_url] : null
       }))
 

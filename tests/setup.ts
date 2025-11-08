@@ -223,6 +223,9 @@ const ALLOWED_PATTERNS = [
   // Profile API error logging (app/api/profile/route.ts)
   /^\[PROFILE\] GET update_profile RPC failed:/, // Expected RPC error in profile not found test - tests/unit/auth/profile.test.ts
   /^\[PROFILE\] GET update_profile RPC exception:/, // Expected RPC exception in profile not found test - tests/unit/auth/profile.test.ts
+  
+  // Sales API error logging (app/api/sales/route.ts)
+  /^\[SALES\] Unexpected error:/, // Expected error logging in sales POST handler - tests/integration/sales.imageFields.persist.test.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {

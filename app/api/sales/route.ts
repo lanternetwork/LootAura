@@ -964,15 +964,10 @@ async function postHandler(request: NextRequest) {
     
     return NextResponse.json({ ok: true, sale: data })
   } catch (error: any) {
-    console.error('[SALES] Unexpected error:', { 
-      event: 'sales-create', 
-      status: 'fail',
-      message: error?.message,
-      stack: error?.stack,
-      name: error?.name,
-      error: error instanceof Error ? error.message : String(error),
-      fullError: error
-    })
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorName = error?.name || 'Unknown'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error(`[SALES] Unexpected error: ${errorMessage} (name: ${errorName}${errorStack ? `, stack: ${errorStack.substring(0, 200)}` : ''})`)
     return NextResponse.json({ 
       error: 'Internal server error',
       message: error?.message || 'Unknown error',

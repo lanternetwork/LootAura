@@ -56,20 +56,6 @@ export async function getUserSales(
       .limit(limit)
 
     if (!error && sales) {
-      // Debug: log image data for first sale (always log for debugging)
-      if (sales.length > 0) {
-        const firstSale = sales[0] as any
-        console.log('[SALES_ACCESS] Sample sale image data:', {
-          id: firstSale.id,
-          title: firstSale.title,
-          cover_image_url: firstSale.cover_image_url,
-          images: firstSale.images,
-          imagesType: typeof firstSale.images,
-          imagesIsArray: Array.isArray(firstSale.images),
-          imagesLength: Array.isArray(firstSale.images) ? firstSale.images.length : 'N/A',
-          allKeys: Object.keys(firstSale),
-        })
-      }
       return {
         data: sales as Sale[],
         source: 'view',
@@ -86,11 +72,13 @@ export async function getUserSales(
         error.message?.includes('does not exist')
 
       if (isPermissionError) {
-        console.warn('[SALES_ACCESS] View query failed, falling back to base table:', {
-          error: error.code,
-          message: error.message,
-          hint: error.hint,
-        })
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[SALES_ACCESS] View query failed, falling back to base table:', {
+            error: error.code,
+            message: error.message,
+            hint: error.hint,
+          })
+        }
       } else {
         // Non-permission error, throw it
         throw error
@@ -110,10 +98,12 @@ export async function getUserSales(
       throw error
     }
 
-    console.warn('[SALES_ACCESS] View query failed, falling back to base table:', {
-      error: error?.code,
-      message: error?.message,
-    })
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[SALES_ACCESS] View query failed, falling back to base table:', {
+        error: error?.code,
+        message: error?.message,
+      })
+    }
   }
 
   // Fallback: query base table directly
@@ -133,11 +123,13 @@ export async function getUserSales(
       }
     }
 
-    // Log fallback usage for observability
-    console.warn('[SALES_ACCESS] Using base-table fallback. View may need attention.', {
-      userId,
-      count: sales?.length || 0,
-    })
+    // Log fallback usage for observability (dev only)
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[SALES_ACCESS] Using base-table fallback. View may need attention.', {
+        userId,
+        count: sales?.length || 0,
+      })
+    }
 
     return {
       data: (sales || []) as Sale[],
@@ -167,8 +159,6 @@ export async function getUserDrafts(
   offset: number = 0
 ): Promise<{ data: DraftListing[]; error?: any }> {
   try {
-    console.log('[SALES_ACCESS] Fetching drafts for user:', userId, 'limit:', limit, 'offset:', offset)
-    
     // Use write client for reading drafts (they're in lootaura_v2 schema)
     const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
     const writeClient = createSupabaseWriteClient()
@@ -182,20 +172,20 @@ export async function getUserDrafts(
       .range(offset, offset + limit - 1)
 
     if (error) {
-      console.error('[SALES_ACCESS] Error fetching drafts:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        userId,
-      })
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[SALES_ACCESS] Error fetching drafts:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          userId,
+        })
+      }
       return {
         data: [],
         error,
       }
     }
-
-    console.log('[SALES_ACCESS] Found', drafts?.length || 0, 'drafts for user:', userId)
 
     // Map to DraftListing format, extracting title from payload if not set
     const mappedDrafts: DraftListing[] = (drafts || []).map((draft: any) => ({
@@ -210,7 +200,9 @@ export async function getUserDrafts(
       data: mappedDrafts,
     }
   } catch (error) {
-    console.error('[SALES_ACCESS] Unexpected error fetching drafts:', error)
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[SALES_ACCESS] Unexpected error fetching drafts:', error)
+    }
     return {
       data: [],
       error,

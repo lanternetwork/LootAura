@@ -44,19 +44,9 @@ export default function SalesPanel({ sales }: SalesPanelProps) {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sales.map((sale) => {
-              // Debug: log image data (always log for debugging)
-              console.log('[SALES_PANEL] Sale image data:', {
-                id: sale.id,
-                title: sale.title,
-                cover_image_url: sale.cover_image_url,
-                images: sale.images,
-                imagesLength: sale.images?.length,
-                imagesType: typeof sale.images,
-                imagesIsArray: Array.isArray(sale.images),
-              })
-              return <SaleCard key={sale.id} sale={sale} />
-            })}
+            {sales.map((sale) => (
+              <SaleCard key={sale.id} sale={sale} />
+            ))}
           </div>
         )}
       </div>

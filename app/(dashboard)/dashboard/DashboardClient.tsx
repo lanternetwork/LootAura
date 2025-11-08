@@ -1,26 +1,37 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
+import { ProfileSummaryCard } from '@/components/dashboard/ProfileSummaryCard'
 import DraftsPanel from '@/components/dashboard/DraftsPanel'
 import SalesPanel from '@/components/dashboard/SalesPanel'
 import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
+import { PreferencesCard } from '@/components/dashboard/PreferencesCard'
 import type { DraftListing } from '@/lib/data/salesAccess'
+import type { ProfileData, Metrics7d, UserPreferences } from '@/lib/data/profileAccess'
 import { Sale } from '@/lib/types'
+import { FaPlus } from 'react-icons/fa'
+import Link from 'next/link'
 
-export default function DashboardClient({ 
-  initialSales,
-  initialDrafts = []
-}: { 
+interface DashboardClientProps {
   initialSales: Sale[]
   initialDrafts?: DraftListing[]
-}) {
+  initialProfile?: ProfileData | null
+  initialMetrics?: Metrics7d | null
+  initialPreferences?: UserPreferences
+}
+
+export default function DashboardClient({
+  initialSales,
+  initialDrafts = [],
+  initialProfile,
+  initialMetrics,
+  initialPreferences,
+}: DashboardClientProps) {
   const [sales, setSales] = useState<Sale[]>(initialSales)
   const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [draftsError, setDraftsError] = useState<any>(null)
   const [saving, setSaving] = useState(false)
-  const [emailOptIn, setEmailOptIn] = useState(false)
-  const [defaultRadiusKm, setDefaultRadiusKm] = useState<number>(10)
 
   const handleDraftDelete = (draftKey: string) => {
     setDrafts((prev) => prev.filter((d) => d.draft_key !== draftKey))
@@ -29,15 +40,23 @@ export default function DashboardClient({
   const handleDraftPublish = (_draftKey: string, _saleId: string) => {
     // Remove draft from list on successful publish
     setDrafts((prev) => prev.filter((d) => d.draft_key !== _draftKey))
+    // Emit revalidation event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'create', id: _saleId } }))
+    }
     // Refresh sales to show the new sale
     fetch('/api/sales_v2?my_sales=true')
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data.sales && Array.isArray(data.sales)) {
           setSales(data.sales as Sale[])
         }
       })
-      .catch(err => console.error('[DASHBOARD_CLIENT] Error refreshing sales:', err))
+      .catch((err) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[DASHBOARD_CLIENT] Error refreshing sales:', err)
+        }
+      })
   }
 
   const handleRetryDrafts = async () => {
@@ -65,48 +84,85 @@ export default function DashboardClient({
     }
   }
 
-  // If no sales from server, fetch from API (which works)
-  useEffect(() => {
-    console.log('[DASHBOARD_CLIENT] Initial sales received:', initialSales?.length || 0)
-    if (initialSales && initialSales.length > 0) {
-      console.log('[DASHBOARD_CLIENT] Sample sale:', initialSales[0])
-    } else {
-      console.warn('[DASHBOARD_CLIENT] No sales from server - fetching from API...')
-      // Fetch sales directly from API (which successfully finds them)
-      fetch('/api/sales_v2?my_sales=true')
-        .then(res => res.json())
-        .then(data => {
-          console.log('[DASHBOARD_CLIENT] API response:', data)
-          if (data.sales && Array.isArray(data.sales) && data.sales.length > 0) {
-            console.log('[DASHBOARD_CLIENT] Found', data.sales.length, 'sales via API, updating state')
-            setSales(data.sales as Sale[])
-          } else {
-            console.warn('[DASHBOARD_CLIENT] API returned no sales')
-          }
-        })
-        .catch(err => console.error('[DASHBOARD_CLIENT] API fetch error:', err))
-    }
-  }, [initialSales])
-
-  useEffect(() => {
-    const loadSettings = async () => {
-      const res = await fetch('/api/seller-settings')
-      const j = await res.json()
-      if (j?.ok && j.data) {
-        setEmailOptIn(Boolean(j.data.email_opt_in))
-        setDefaultRadiusKm(Number(j.data.default_radius_km ?? 10))
+  const handlePreferencesSave = async (prefs: UserPreferences) => {
+    setSaving(true)
+    try {
+      // Save preferences
+      const prefsRes = await fetch('/api/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: prefs.theme, units: prefs.units }),
+      })
+      if (!prefsRes.ok) {
+        const j = await prefsRes.json().catch(() => ({}))
+        throw new Error(j?.error || 'Failed to save preferences')
       }
+
+      // Save seller settings (radius and email opt-in)
+      const settingsRes = await fetch('/api/seller-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email_opt_in: prefs.email_opt_in,
+          default_radius_km: prefs.default_radius_km,
+        }),
+      })
+      if (!settingsRes.ok) {
+        const j = await settingsRes.json().catch(() => ({}))
+        throw new Error(j?.error || 'Failed to save settings')
+      }
+
+      // Emit revalidation event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('profile:mutated'))
+      }
+    } catch (error: any) {
+      throw error
+    } finally {
+      setSaving(false)
     }
-    loadSettings()
-  }, [])
+  }
+
+  // If no sales from server, fetch from API (fallback)
+  useEffect(() => {
+    if (initialSales && initialSales.length > 0) {
+      return // Server data is good
+    }
+
+    // Fallback: fetch from API
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[DASHBOARD_CLIENT] No sales from server - fetching from API...')
+    }
+    fetch('/api/sales_v2?my_sales=true')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.sales && Array.isArray(data.sales) && data.sales.length > 0) {
+          setSales(data.sales as Sale[])
+        }
+      })
+      .catch((err) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[DASHBOARD_CLIENT] API fetch error:', err)
+        }
+      })
+  }, [initialSales])
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">Seller Dashboard</h1>
-      
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-semibold">Seller Dashboard</h1>
+        <Link href="/sell/new" className="btn-accent flex items-center gap-1 text-sm">
+          <FaPlus className="w-4 h-4" />
+          New Sale
+        </Link>
+      </div>
+
       <div className="space-y-6">
-        {/* Drafts Panel */}
-        <DraftsPanel 
+        {/* Row 1: Profile Summary + Quick Stats */}
+        <ProfileSummaryCard profile={initialProfile || null} />
+
+        {/* Row 2: Drafts Panel */}
+        <DraftsPanel
           drafts={drafts}
           isLoading={draftsLoading}
           error={draftsError}
@@ -115,68 +171,18 @@ export default function DashboardClient({
           onRetry={handleRetryDrafts}
         />
 
-        {/* Sales Panel */}
+        {/* Row 3: Sales Panel */}
         <SalesPanel sales={sales} />
 
-        {/* Analytics Panel */}
-        <AnalyticsPanel />
-
-        {/* Settings Panel */}
-        <div className="card">
-          <div className="card-body-lg">
-            <h2 className="card-title mb-4">Settings</h2>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault()
-                if (!Number.isFinite(defaultRadiusKm) || defaultRadiusKm < 1 || defaultRadiusKm > 50) {
-                  alert('Default radius must be between 1 and 50 km')
-                  return
-                }
-                setSaving(true)
-                const res = await fetch('/api/seller-settings', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ email_opt_in: emailOptIn, default_radius_km: defaultRadiusKm }),
-                })
-                const j = await res.json()
-                setSaving(false)
-                if (!res.ok) {
-                  alert(j?.error || 'Failed to save settings')
-                  return
-                }
-                if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                  // eslint-disable-next-line no-console
-                  console.log('[DASHBOARD] settings: upsert success')
-                }
-              }}
-            >
-              <div className="space-y-4">
-                <label className="flex items-center gap-3">
-                  <input type="checkbox" className="rounded border-gray-300" checked={emailOptIn} onChange={(e) => setEmailOptIn(e.target.checked)} />
-                  <span>Email me occasional tips and updates</span>
-                </label>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Default search radius (km)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={defaultRadiusKm}
-                    onChange={(e) => setDefaultRadiusKm(Number(e.target.value))}
-                    className="w-40 px-3 py-2 border rounded"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button type="submit" className="btn-accent" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
-                  <button type="button" className="rounded px-4 py-2 border" onClick={() => { setEmailOptIn(false); setDefaultRadiusKm(10) }}>Reset</button>
-                </div>
-              </div>
-            </form>
-          </div>
+        {/* Row 4: Analytics + Preferences */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <AnalyticsPanel metrics7d={initialMetrics || null} />
+          <PreferencesCard
+            preferences={initialPreferences || { theme: 'system', units: 'imperial', default_radius_km: 10, email_opt_in: false }}
+            onSave={handlePreferencesSave}
+          />
         </div>
       </div>
     </div>
   )
 }
-
-

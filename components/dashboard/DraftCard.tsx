@@ -60,6 +60,10 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
     // Set session keys for resume
     sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
     sessionStorage.setItem('draft:returnStep', 'review')
+    // Store draft_key so wizard can load the specific draft
+    if (draft.draft_key) {
+      sessionStorage.setItem('draft:key', draft.draft_key)
+    }
     router.push('/sell/new?resume=review')
   }
 
@@ -69,13 +73,19 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
       const result = await publishDraftServer(draft.draft_key)
       if (result.ok && result.data?.saleId) {
         onPublish(draft.draft_key, result.data.saleId)
+        // Emit revalidation event
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'create', id: result.data.saleId } }))
+        }
         toast.success('Draft published successfully!')
         router.push(`/sales/${result.data.saleId}`)
       } else {
         toast.error(result.error || 'Failed to publish draft')
       }
     } catch (error) {
-      console.error('[DRAFT_CARD] Error publishing:', error)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[DRAFT_CARD] Error publishing:', error)
+      }
       toast.error('Failed to publish draft. Please try again.')
     } finally {
       setIsPublishing(false)
@@ -93,7 +103,9 @@ export default function DraftCard({ draft, onDelete, onPublish }: DraftCardProps
         toast.error(result.error || 'Failed to delete draft')
       }
     } catch (error) {
-      console.error('[DRAFT_CARD] Error deleting:', error)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[DRAFT_CARD] Error deleting:', error)
+      }
       toast.error('Failed to delete draft. Please try again.')
     } finally {
       setIsDeleting(false)

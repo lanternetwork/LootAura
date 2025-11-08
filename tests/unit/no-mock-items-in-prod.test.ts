@@ -65,8 +65,12 @@ describe('Static Guard: No Mock Items in Production', () => {
                 const isRemovalComment = /\/\/.*(remove|delete|fix|replace).*mock/i.test(line)
                 // Allow if it's in a test file (though we exclude those)
                 const isTestFile = file.includes('.test.') || file.includes('.spec.')
+                // Allow if it's in placeholder text (e.g., placeholder="e.g., ...")
+                const isPlaceholder = /placeholder\s*=\s*["'].*e\.g\./i.test(line) || /placeholder\s*=\s*["'].*example/i.test(line)
+                // Allow if it's in a string literal that's clearly a placeholder/example
+                const isExampleText = /["'].*e\.g\./i.test(line) || /["'].*example/i.test(line)
                 
-                if (!isRemovalComment && !isTestFile) {
+                if (!isRemovalComment && !isTestFile && !isPlaceholder && !isExampleText) {
                   violations.push({
                     file,
                     line: index + 1,

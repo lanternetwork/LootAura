@@ -376,12 +376,6 @@ export async function getSaleWithItems(
       created_at: item.created_at,
     }))
 
-    // Merge tags from base table into sale object
-    const saleWithTags = {
-      ...(sale as Sale),
-      tags: Array.isArray(tagsRes.data?.tags) ? tagsRes.data.tags : (sale as any).tags || [],
-    }
-
     return {
       sale: {
         ...saleWithTags,

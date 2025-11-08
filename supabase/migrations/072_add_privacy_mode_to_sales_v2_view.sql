@@ -1,6 +1,10 @@
 -- Add privacy_mode column to sales_v2 view
 -- This column is required for sale creation but was missing from the view
 
+-- First, ensure the column exists in the base table
+ALTER TABLE IF EXISTS lootaura_v2.sales
+ADD COLUMN IF NOT EXISTS privacy_mode TEXT DEFAULT 'exact' CHECK (privacy_mode IN ('exact', 'block_until_24h'));
+
 -- Drop existing view
 DROP VIEW IF EXISTS public.sales_v2 CASCADE;
 

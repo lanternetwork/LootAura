@@ -241,13 +241,30 @@ export async function getSaleWithItems(
       return null
     }
 
+    // Fetch tags from base table (view doesn't include tags column)
+    // Use write client to read from lootaura_v2.sales (RLS allows public reads)
+    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
+    const writeClient = createSupabaseWriteClient()
+    
+    const tagsRes = await writeClient
+      .from('lootaura_v2.sales')
+      .select('tags')
+      .eq('id', saleId)
+      .maybeSingle()
+    
+    // Merge tags from base table into sale object
+    const saleWithTags = {
+      ...(sale as Sale),
+      tags: Array.isArray(tagsRes.data?.tags) ? tagsRes.data.tags : (sale as any).tags || [],
+    }
+
     if (!sale.owner_id) {
       if (process.env.NODE_ENV !== 'production') {
         console.error('[SALES_ACCESS] Sale found but missing owner_id')
       }
       return {
         sale: {
-          ...(sale as Sale),
+          ...saleWithTags,
           owner_profile: null,
           owner_stats: {
             total_sales: 0,
@@ -263,6 +280,7 @@ export async function getSaleWithItems(
     const ownerId = sale.owner_id
 
     // Fetch owner profile, stats, and items in parallel
+    // (tags already fetched above)
     const [profileRes, statsRes, itemsRes] = await Promise.all([
       supabase
         .from('profiles_v2')
@@ -291,6 +309,9 @@ export async function getSaleWithItems(
     if (itemsRes.error && process.env.NODE_ENV !== 'production') {
       console.error('[SALES_ACCESS] Error fetching items:', itemsRes.error)
     }
+    if (tagsRes.error && process.env.NODE_ENV !== 'production') {
+      console.error('[SALES_ACCESS] Error fetching tags:', tagsRes.error)
+    }
 
     // Map items to SaleItem type
     const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => ({
@@ -305,9 +326,15 @@ export async function getSaleWithItems(
       created_at: item.created_at,
     }))
 
+    // Merge tags from base table into sale object
+    const saleWithTags = {
+      ...(sale as Sale),
+      tags: Array.isArray(tagsRes.data?.tags) ? tagsRes.data.tags : (sale as any).tags || [],
+    }
+
     return {
       sale: {
-        ...(sale as Sale),
+        ...saleWithTags,
         owner_profile: profileRes.data ?? null,
         owner_stats: statsRes.data ?? {
           total_sales: 0,

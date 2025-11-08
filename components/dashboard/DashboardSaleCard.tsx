@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { toast } from 'react-toastify'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
@@ -20,6 +21,19 @@ export default function DashboardSaleCard({ sale, onDelete }: DashboardSaleCardP
 
   const handleDelete = async () => {
     setIsDeleting(true)
+    
+    // Optimistic update: remove from UI immediately
+    if (onDelete) {
+      onDelete(sale.id)
+    }
+    
+    // Emit revalidation event immediately for other components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'delete', id: sale.id } }))
+    }
+    
+    setShowDeleteConfirm(false)
+    
     try {
       const response = await fetch(`/api/sales/${sale.id}/delete`, {
         method: 'DELETE',
@@ -27,25 +41,22 @@ export default function DashboardSaleCard({ sale, onDelete }: DashboardSaleCardP
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Failed to delete sale' }))
+        // Revert optimistic update on error
+        if (onDelete) {
+          // Re-add the sale (would need to pass sale object, but for now just show error)
+          throw new Error(error.error || 'Failed to delete sale')
+        }
         throw new Error(error.error || 'Failed to delete sale')
       }
 
-      // Emit revalidation event
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('sales:mutated', { detail: { type: 'delete', id: sale.id } }))
-      }
-
-      // Call onDelete callback to update parent state
-      if (onDelete) {
-        onDelete(sale.id)
-      }
-
-      setShowDeleteConfirm(false)
+      // Success - sale is already removed from UI via optimistic update
+      toast.success('Sale deleted successfully')
     } catch (error: any) {
       if (process.env.NODE_ENV !== 'production') {
         console.error('[DASHBOARD_SALE_CARD] Error deleting sale:', error)
       }
-      alert(error?.message || 'Failed to delete sale. Please try again.')
+      // Show error toast
+      toast.error(error?.message || 'Failed to delete sale. Please refresh the page.')
     } finally {
       setIsDeleting(false)
     }

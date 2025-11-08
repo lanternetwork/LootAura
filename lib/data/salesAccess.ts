@@ -302,10 +302,31 @@ export async function getSaleWithItems(
       .eq('id', saleId)
       .maybeSingle()
     
+    if (tagsRes.error && process.env.NODE_ENV !== 'production') {
+      console.error('[SALES_ACCESS] Error fetching tags:', tagsRes.error)
+    }
+    
     // Merge tags from base table into sale object
+    // tagsRes.data?.tags could be null, undefined, or an array
+    const fetchedTags = tagsRes.data?.tags
+    // Use fetched tags if it's an array (even if empty), otherwise fall back
+    const tags = Array.isArray(fetchedTags) 
+      ? fetchedTags 
+      : (Array.isArray((sale as any).tags) ? (sale as any).tags : [])
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[SALES_ACCESS] Tags fetch result:', {
+        saleId,
+        tagsResError: tagsRes.error,
+        tagsResData: tagsRes.data,
+        fetchedTags,
+        finalTags: tags,
+      })
+    }
+    
     const saleWithTags = {
       ...(sale as Sale),
-      tags: Array.isArray(tagsRes.data?.tags) ? tagsRes.data.tags : (sale as any).tags || [],
+      tags,
     }
 
     if (!sale.owner_id) {

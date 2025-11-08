@@ -308,10 +308,11 @@ export async function getSaleWithItems(
     
     try {
       // Try to use admin client if available (service role key bypasses RLS)
-      const { adminSupabase } = await import('@/lib/supabase/admin').catch(() => ({ adminSupabase: null }))
-      if (adminSupabase) {
+      // Note: adminSupabase is exported as a constant, not a function
+      const adminModule = await import('@/lib/supabase/admin').catch(() => null)
+      if (adminModule?.adminSupabase) {
         // Admin client might still have schema limitations, but let's try
-        const tagsRes = await adminSupabase
+        const tagsRes = await adminModule.adminSupabase
           .from('lootaura_v2.sales')
           .select('tags')
           .eq('id', saleId)

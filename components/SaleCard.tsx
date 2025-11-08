@@ -15,6 +15,17 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   if (!sale) return null
   const cover = getSaleCoverUrl(sale)
   
+  // Debug: log cover image resolution
+  if (!cover) {
+    console.log('[SALE_CARD] No cover image found for sale:', {
+      id: sale.id,
+      title: sale.title,
+      cover_image_url: sale.cover_image_url,
+      images: sale.images,
+      imagesLength: sale.images?.length,
+    })
+  }
+  
   // Build detail page URL with viewport params to restore view on back
   const detailUrl = viewport 
     ? `/sales/${sale.id}?lat=${viewport.center.lat}&lng=${viewport.center.lng}&zoom=${viewport.zoom}`

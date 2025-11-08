@@ -47,6 +47,37 @@ export function createSupabaseServerClient() {
         cookieStore.set({ name, value: '', ...options, maxAge: 0 })
       },
     },
-    db: { schema: 'public' }, // Force public schema
+    db: { schema: 'public' }, // Use public schema for reading views (sales_v2, items_v2)
+  });
+}
+
+/**
+ * Create Supabase client for writing to base tables
+ * Note: PostgREST only supports 'public' and 'graphql_public' schemas in client config
+ * Tables in lootaura_v2 schema must be accessed through views in public schema
+ */
+export function createSupabaseWriteClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anon) {
+    throw new Error('Supabase credentials missing');
+  }
+
+  const cookieStore = cookies()
+
+  return createServerClient(url, anon, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value
+      },
+      set(name: string, value: string, options: CookieOptions) {
+        cookieStore.set({ name, value, ...options })
+      },
+      remove(name: string, options: CookieOptions) {
+        cookieStore.set({ name, value: '', ...options, maxAge: 0 })
+      },
+    },
+    db: { schema: 'public' }, // PostgREST only supports public/graphql_public schemas
   });
 }

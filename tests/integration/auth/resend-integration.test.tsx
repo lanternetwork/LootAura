@@ -2,24 +2,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import ResendConfirmation from '@/components/auth/ResendConfirmation'
 
-// Mock fetch
-global.fetch = vi.fn()
-
 describe('Resend Confirmation Integration', () => {
   beforeEach(() => {
     // Clear mocks before each test
     vi.clearAllMocks()
-    vi.mocked(fetch).mockClear()
+    vi.stubGlobal('fetch', vi.fn())
   })
 
   afterEach(() => {
     // Clean up mocks and reset state
     cleanup()
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('should show resend link and handle successful resend', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({
+    (fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ message: 'Confirmation email sent' }),
     } as Response)
@@ -54,7 +52,7 @@ describe('Resend Confirmation Integration', () => {
   })
 
   it('should handle resend failure', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce({
+    (fetch as any).mockResolvedValueOnce({
       ok: false,
       json: async () => ({ message: 'Rate limit exceeded' }),
     } as Response)
@@ -70,7 +68,7 @@ describe('Resend Confirmation Integration', () => {
   })
 
   it('should handle network error', async () => {
-    vi.mocked(fetch).mockRejectedValueOnce(new Error('Network error'))
+    (fetch as any).mockRejectedValueOnce(new Error('Network error'))
 
     render(<ResendConfirmation email="test@example.com" />)
 

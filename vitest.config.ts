@@ -6,7 +6,10 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
-    setupFiles: [path.resolve(__dirname, 'tests/setup.ts')],
+    setupFiles: [
+      path.resolve(__dirname, 'tests/setup/msw.server.ts'),
+      path.resolve(__dirname, 'tests/setup.ts'),
+    ],
     globals: true,
     exclude: [
       '**/node_modules/**',
@@ -19,14 +22,8 @@ export default defineConfig({
     // Ensure no network calls in tests
     testTimeout: 10000,
     hookTimeout: 10000,
-    // Memory optimization settings
-    pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-        isolate: false,
-      },
-    },
+    // Ensure jsdom environment is available to tests
+    pool: 'threads',
     // Reduce memory usage
     maxConcurrency: 1,
     // Constrain worker count to prevent OOMs

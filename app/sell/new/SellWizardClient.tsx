@@ -1,18 +1,36 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
-import CloudinaryUploadWidget from '@/components/upload/CloudinaryUploadWidget'
+import ImageUploadCard from '@/components/sales/ImageUploadCard'
 import ImageThumbnailGrid from '@/components/upload/ImageThumbnailGrid'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { containsUnsavory } from '@/lib/filters/profanity'
+import AddressAutocomplete from '@/components/location/AddressAutocomplete'
+import TimePicker30 from '@/components/TimePicker30'
+import ItemFormModal from '@/components/sales/ItemFormModal'
+import ItemCard from '@/components/sales/ItemCard'
+import Toast from '@/components/sales/Toast'
+import ConfirmationModal from '@/components/sales/ConfirmationModal'
+import type { CategoryValue } from '@/lib/types'
+import { getDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalDraft } from '@/lib/draft/localDraft'
+import { saveDraftServer, getLatestDraftServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
+import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 
 interface WizardStep {
   id: string
   title: string
   description: string
 }
+
+// Single source of truth for step indexes
+const STEPS = {
+  DETAILS: 0,
+  PHOTOS: 1,
+  ITEMS: 2,
+  REVIEW: 3
+} as const
 
 const WIZARD_STEPS: WizardStep[] = [
   {
@@ -37,7 +55,7 @@ const WIZARD_STEPS: WizardStep[] = [
   }
 ]
 
-export default function SellWizardClient({ initialData, isEdit: _isEdit = false, saleId: _saleId }: { initialData?: Partial<SaleInput>; isEdit?: boolean; saleId?: string }) {
+export default function SellWizardClient({ initialData, isEdit: _isEdit = false, saleId: _saleId, userLat, userLng }: { initialData?: Partial<SaleInput>; isEdit?: boolean; saleId?: string; userLat?: number; userLng?: number }) {
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
   const [currentStep, setCurrentStep] = useState(0)
@@ -50,27 +68,113 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     state: initialData?.state || '',
     zip_code: initialData?.zip_code || '',
     date_start: initialData?.date_start || '',
-    time_start: initialData?.time_start || '',
+    time_start: initialData?.time_start || '09:00', // Default to 9:00 AM
     date_end: initialData?.date_end || '',
     time_end: initialData?.time_end || '',
-    price: initialData?.price,
+    duration_hours: initialData?.duration_hours || 4, // Default 4 hours
     tags: initialData?.tags || [],
     pricing_mode: initialData?.pricing_mode || 'negotiable',
     status: initialData?.status || 'draft'
   })
   const [photos, setPhotos] = useState<string[]>([])
-  const [items, setItems] = useState<Array<{ name: string; price?: number; description?: string; image_url?: string }>>([])
+  const [items, setItems] = useState<Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>>([])
   const [loading, setLoading] = useState(false)
   const [_errors, setErrors] = useState<Record<string, string>>({})
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
+  const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [showToast, setShowToast] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const hasResumedRef = useRef(false)
+  const draftKeyRef = useRef<string | null>(null)
+  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastServerSaveRef = useRef<number>(0)
+  const isNavigatingRef = useRef(false)
+  const searchParams = useSearchParams()
+
+  const normalizeTimeToNearest30 = useCallback((value: string | undefined | null): string | undefined => {
+    if (!value || typeof value !== 'string' || !value.includes(':')) return value || undefined
+    const parts = value.split(':')
+    const hRaw = parts[0]
+    const mRaw = parts[1]
+    const h0 = Math.max(0, Math.min(23, parseInt(hRaw, 10) || 0))
+    const m0 = Math.max(0, Math.min(59, parseInt(mRaw, 10) || 0))
+    let snapped = Math.round(m0 / 30) * 30 // round to nearest 0 or 30
+    let h = h0
+    if (snapped === 60) { // carry over
+      snapped = 0
+      h = (h + 1) % 24
+    }
+    return `${String(h).padStart(2, '0')}:${String(snapped).padStart(2, '0')}`
+  }, [])
+
+  // Helper to build draft payload (defined early so it can be used in useEffects)
+  const buildDraftPayload = useCallback((): SaleDraftPayload => {
+    return {
+      formData: {
+        title: formData.title,
+        description: formData.description,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zip_code,
+        lat: formData.lat,
+        lng: formData.lng,
+        date_start: formData.date_start,
+        time_start: formData.time_start,
+        date_end: formData.date_end,
+        time_end: formData.time_end,
+        duration_hours: formData.duration_hours,
+        tags: formData.tags,
+        pricing_mode: formData.pricing_mode,
+      },
+      photos,
+      items: items.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        description: item.description,
+        image_url: item.image_url,
+        category: item.category,
+      })),
+      currentStep,
+    }
+  }, [formData, photos, items, currentStep])
 
   // Check authentication status
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
+      console.log('[SELL_WIZARD] Auth check:', { hasUser: !!user, userId: user?.id })
       setUser(user)
     }
     checkUser()
+
+    // Listen for auth state changes (e.g., after login)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[SELL_WIZARD] Auth state change:', { event, hasUser: !!session?.user, userId: session?.user?.id })
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user)
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [supabase.auth])
+
+  // Save local draft to server when user signs in mid-wizard
+  useEffect(() => {
+    if (user && draftKeyRef.current && hasLocalDraft()) {
+      const payload = buildDraftPayload()
+      saveDraftServer(payload, draftKeyRef.current).catch(() => {
+        // Silent fail - already saved locally
+      })
+    }
+  }, [user, buildDraftPayload])
 
   // Save draft to localStorage whenever form data changes
   useEffect(() => {
@@ -85,47 +189,284 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
   }, [])
 
-  // Save draft to localStorage whenever form data changes
+  // Initialize draft key on mount
   useEffect(() => {
-    const draftData = {
-      formData,
-      photos,
-      items,
-      currentStep
+    if (!draftKeyRef.current) {
+      draftKeyRef.current = getDraftKey()
     }
-    localStorage.setItem('sale_draft', JSON.stringify(draftData))
-  }, [formData, photos, items, currentStep])
+  }, [])
 
-  // Load draft from localStorage on mount
+  // Debounced autosave (local + server)
   useEffect(() => {
-    if (!initialData) {
-      const savedDraft = localStorage.getItem('sale_draft')
-      if (savedDraft) {
-        try {
-          const draft = JSON.parse(savedDraft)
-          setFormData(draft.formData || {})
-          setPhotos(draft.photos || [])
-          setItems(draft.items || [])
-          setCurrentStep(draft.currentStep || 0)
-        } catch (error) {
-          console.error('Error loading draft:', error)
+    // Clear existing timeout
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current)
+    }
+
+    // Set new timeout for debounced save (1.5s)
+    autosaveTimeoutRef.current = setTimeout(() => {
+      const payload = buildDraftPayload()
+      
+      // Always save locally
+      saveLocalDraft(payload)
+      setSaveStatus('saved')
+
+      // Save to server if authenticated (throttle to max 1x per 10s)
+      if (user && draftKeyRef.current) {
+        const now = Date.now()
+        const timeSinceLastSave = now - lastServerSaveRef.current
+        
+        if (timeSinceLastSave >= 10000) {
+          setSaveStatus('saving')
+          saveDraftServer(payload, draftKeyRef.current)
+            .then((result) => {
+              if (result.ok) {
+                lastServerSaveRef.current = Date.now()
+                setSaveStatus('saved')
+              } else {
+                setSaveStatus('error')
+                // Don't show error toast for autosave failures - just log
+                console.warn('[SELL_WIZARD] Autosave to server failed:', result.error)
+              }
+            })
+            .catch((error) => {
+              setSaveStatus('error')
+              console.error('[SELL_WIZARD] Autosave error:', error)
+            })
         }
       }
+    }, 1500)
+
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current)
+      }
     }
-  }, [initialData])
+  }, [formData, photos, items, currentStep, user, buildDraftPayload])
+
+  // Save on beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const payload = buildDraftPayload()
+      saveLocalDraft(payload)
+      if (user && draftKeyRef.current) {
+        // Fire and forget - don't wait for response
+        saveDraftServer(payload, draftKeyRef.current).catch(() => {})
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [buildDraftPayload, user])
+
+
+  // Resume draft on mount (priority: server > local)
+  useEffect(() => {
+    if (initialData || hasResumedRef.current) return
+
+    const resumeDraft = async () => {
+      const resume = searchParams.get('resume')
+      const isReviewResume = resume === 'review'
+      
+      let draftToRestore: SaleDraftPayload | null = null
+      let source: 'server' | 'local' | null = null
+
+      // Priority 1: If authenticated, try server draft
+      if (user) {
+        const serverResult = await getLatestDraftServer()
+        if (serverResult.ok && serverResult.data?.payload) {
+          draftToRestore = serverResult.data.payload
+          source = 'server'
+          console.log('[SELL_WIZARD] Found server draft')
+        }
+      }
+
+      // Priority 2: If no server draft, try local draft
+      if (!draftToRestore) {
+        const localDraft = loadLocalDraft()
+        if (localDraft) {
+          draftToRestore = localDraft
+          source = 'local'
+          console.log('[SELL_WIZARD] Found local draft')
+        }
+      }
+
+      // Priority 3: Backward compatibility - check old localStorage format
+      if (!draftToRestore) {
+        const oldDraft = localStorage.getItem('sale_draft')
+        if (oldDraft) {
+          try {
+            const parsed = JSON.parse(oldDraft)
+            if (parsed && typeof parsed === 'object') {
+              // Convert old format to new format
+              draftToRestore = {
+                formData: parsed.formData || {},
+                photos: parsed.photos || [],
+                items: (parsed.items || []).map((item: any) => ({
+                  id: item.id || `item-${Date.now()}-${Math.random()}`,
+                  name: item.name || '',
+                  price: item.price,
+                  description: item.description,
+                  image_url: item.image_url,
+                  category: item.category,
+                })),
+                currentStep: parsed.currentStep || 0,
+              }
+              source = 'local'
+              console.log('[SELL_WIZARD] Found old format draft')
+            }
+          } catch (error) {
+            console.error('[SELL_WIZARD] Error parsing old draft:', error)
+          }
+        }
+      }
+
+      // Restore draft if found
+      if (draftToRestore) {
+        hasResumedRef.current = true
+        
+        // Restore form data
+        if (draftToRestore.formData) {
+          const nextForm = { ...draftToRestore.formData }
+          if (nextForm.time_start) {
+            nextForm.time_start = normalizeTimeToNearest30(nextForm.time_start) || nextForm.time_start
+          }
+          setFormData(nextForm as Partial<SaleInput>)
+        }
+
+        // Restore photos
+        if (draftToRestore.photos) {
+          setPhotos(draftToRestore.photos)
+        }
+
+        // Restore items (ensure IDs)
+        if (draftToRestore.items) {
+          const loadedItems = draftToRestore.items.map(item => ({
+            id: item.id || `item-${Date.now()}-${Math.random()}`,
+            name: item.name,
+            price: item.price,
+            description: item.description,
+            image_url: item.image_url,
+            category: item.category,
+          }))
+          setItems(loadedItems)
+        }
+
+        // Restore step: if resume=review, force Review step; otherwise use saved step
+        if (isReviewResume) {
+          setCurrentStep(STEPS.REVIEW)
+          setToastMessage('Draft restored. Ready to review your sale.')
+        } else if (draftToRestore.currentStep !== undefined) {
+          setCurrentStep(draftToRestore.currentStep)
+          setToastMessage(`Draft restored${source === 'server' ? ' from cloud' : ''}`)
+        }
+
+        setShowToast(true)
+
+        // If user is authenticated and we restored local draft, save to server
+        if (user && source === 'local' && draftKeyRef.current) {
+          saveDraftServer(draftToRestore, draftKeyRef.current).catch(() => {
+            // Silent fail - already saved locally
+          })
+        }
+      } else if (isReviewResume) {
+        // Draft not found but resume=review - still go to Review step
+        setCurrentStep(STEPS.REVIEW)
+        setToastMessage('Draft not found; please review details.')
+        setShowToast(true)
+      }
+
+      // Clear sessionStorage keys after resume
+      if (isReviewResume) {
+        sessionStorage.removeItem('auth:postLoginRedirect')
+        sessionStorage.removeItem('draft:returnStep')
+      }
+    }
+
+    resumeDraft()
+  }, [initialData, user, normalizeTimeToNearest30, searchParams])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
+
+      // Snap start time to 30-minute increments (nearest 00/30 with carry)
+      if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
+        updated.time_start = normalizeTimeToNearest30(value)
+      }
+      
+      // Calculate end date/time when duration, start date, or start time changes
+      if (field === 'duration_hours' || field === 'date_start' || field === 'time_start') {
+        const dateStart = updated.date_start || prev.date_start
+        const timeStart = updated.time_start || prev.time_start
+        const durationHours = updated.duration_hours || prev.duration_hours || 4
+        
+        if (dateStart && timeStart && durationHours) {
+          // Validate duration doesn't exceed 24 hours
+          const maxDuration = 24
+          const actualDuration = Math.min(durationHours, maxDuration)
+          
+          // Calculate end time
+          const startDateTime = new Date(`${dateStart}T${timeStart}`)
+          const endDateTime = new Date(startDateTime.getTime() + actualDuration * 60 * 60 * 1000)
+          
+          // Format end date (YYYY-MM-DD)
+          const endDate = endDateTime.toISOString().split('T')[0]
+          // Format end time (HH:MM)
+          const endTime = endDateTime.toTimeString().split(' ')[0].substring(0, 5)
+          
+          updated.date_end = endDate
+          updated.time_end = endTime
+        }
+      }
+      
+      return updated
+    })
   }
 
   const validateDetails = (): Record<string, string> => {
     const nextErrors: Record<string, string> = {}
     if (!formData.title) nextErrors.title = 'Title is required'
-    if (!formData.address) nextErrors.address = 'Address is required'
-    if (!formData.city) nextErrors.city = 'City is required'
-    if (!formData.state) nextErrors.state = 'State is required'
+    if (!formData.address || formData.address.trim().length < 5) {
+      nextErrors.address = 'Address is required (minimum 5 characters)'
+    }
+    if (!formData.city || formData.city.trim().length < 2) {
+      nextErrors.city = 'City is required (minimum 2 characters)'
+    }
+    if (!formData.state || formData.state.trim().length < 2) {
+      nextErrors.state = 'State is required (minimum 2 characters)'
+    }
+    if (formData.zip_code && !/^\d{5}(-\d{4})?$/.test(formData.zip_code)) {
+      nextErrors.zip_code = 'ZIP code must be 5 digits or 5+4 format'
+    }
+    if (!formData.lat || !formData.lng) {
+      nextErrors.address = 'Please enter a complete address (street, city, state) and leave the field to get location coordinates'
+    }
     if (!formData.date_start) nextErrors.date_start = 'Start date is required'
-    if (!formData.time_start) nextErrors.time_start = 'Start time is required'
+    
+    // Ensure time_start has a value (default to 09:00 if empty)
+    let timeStart = formData.time_start
+    if (!timeStart || !timeStart.includes(':')) {
+      timeStart = '09:00'
+      // Update formData with default time if it's missing
+      setFormData(prev => ({ ...prev, time_start: timeStart }))
+    }
+    
+    if (!timeStart) nextErrors.time_start = 'Start time is required'
+    
+    // Validate duration
+    const durationHours = formData.duration_hours || 4
+    if (durationHours > 24) {
+      nextErrors.duration_hours = 'Sale cannot last more than 24 hours'
+    }
+    if (durationHours <= 0) {
+      nextErrors.duration_hours = 'Duration must be greater than 0'
+    }
+    
     // Unsavory language checks (client-side guard; server also validates)
     const unsavoryFields: Array<[keyof SaleInput, string | undefined]> = [
       ['title', formData.title],
@@ -141,25 +482,265 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     return nextErrors
   }
 
-  const handleNext = () => {
-    // Require core fields on the Details step before advancing
-    if (currentStep === 0) {
-      const nextErrors = validateDetails()
-      setErrors(nextErrors)
-      if (Object.keys(nextErrors).length > 0) {
-        return
+  const handleNext = async () => {
+    // Guard against duplicate clicks
+    if (isNavigatingRef.current) return
+    isNavigatingRef.current = true
+
+    try {
+      // Require core fields on the Details step before advancing
+      if (currentStep === STEPS.DETAILS) {
+        const nextErrors = validateDetails()
+        setErrors(nextErrors)
+        if (Object.keys(nextErrors).length > 0) {
+          isNavigatingRef.current = false
+          return
+        }
       }
-    }
-    if (currentStep < WIZARD_STEPS.length - 1) {
-      setCurrentStep(currentStep + 1)
+
+      // Build and save draft before advancing
+      const payload = buildDraftPayload()
+      
+      // Save to localStorage first (await to ensure it's written)
+      try {
+        saveLocalDraft(payload)
+      } catch (error) {
+        console.error('[SELL_WIZARD] Error saving local draft:', error)
+        // Continue anyway - don't block navigation
+      }
+
+      // Auth gate: Items (2) → Review (3)
+      // Check auth state synchronously to ensure we have the latest value
+      if (currentStep === STEPS.ITEMS) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+        console.log('[SELL_WIZARD] Auth gate check:', { currentStep, hasUser: !!currentUser, userId: currentUser?.id })
+        
+        if (!currentUser) {
+          // Set redirect keys
+          sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
+          sessionStorage.setItem('draft:returnStep', 'review')
+          
+          // Update user state
+          setUser(null)
+          
+          // Redirect to login (encode redirectTo to preserve query params)
+          const redirectUrl = encodeURIComponent('/sell/new?resume=review')
+          router.push(`/auth/signin?redirectTo=${redirectUrl}`)
+          isNavigatingRef.current = false
+          return // Don't advance step
+        } else {
+          // Update user state if it was null
+          if (!user) {
+            setUser(currentUser)
+          }
+        }
+      }
+
+      // Fire-and-forget server save (throttled, non-blocking)
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (currentUser && draftKeyRef.current) {
+        const now = Date.now()
+        if (now - lastServerSaveRef.current > 10000) {
+          lastServerSaveRef.current = now
+          saveDraftServer(payload, draftKeyRef.current).catch(() => {
+            // Silent fail - already saved locally
+          })
+        }
+      }
+
+      // Normal navigation
+      if (currentStep < WIZARD_STEPS.length - 1) {
+        setCurrentStep(currentStep + 1)
+      }
+    } finally {
+      // Reset navigation guard after a short delay
+      setTimeout(() => {
+        isNavigatingRef.current = false
+      }, 500)
     }
   }
 
   const handlePrevious = () => {
-    if (currentStep > 0) {
+    if (currentStep > STEPS.DETAILS) {
       setCurrentStep(currentStep - 1)
     }
   }
+
+  // Helper to build sale payload (for direct publish without draft)
+  const buildSalePayload = useCallback(() => {
+    // Ensure time_start is normalized
+    let normalizedTimeStart = formData.time_start
+    if (normalizedTimeStart) {
+      normalizedTimeStart = normalizeTimeToNearest30(normalizedTimeStart) || normalizedTimeStart
+    }
+
+    // Prepare sale data with cover image
+    const { duration_hours: _duration_hours, ...restFormData } = formData
+    const saleData = {
+      ...restFormData,
+      time_start: normalizedTimeStart,
+      cover_image_url: photos.length > 0 ? photos[0] : undefined,
+      images: photos.length > 1 ? photos.slice(1) : undefined,
+      status: 'published' as const
+    }
+
+    return {
+      saleData,
+      items: items.map(item => ({
+        name: item.name,
+        price: item.price,
+        description: item.description,
+        category: item.category,
+        image_url: item.image_url
+      }))
+    }
+  }, [formData, photos, items, normalizeTimeToNearest30])
+
+  // Helper to create items for a sale
+  const createItemsForSale = useCallback(async (saleId: string, itemsToCreate: Array<{ name: string; price?: number; description?: string; category?: CategoryValue; image_url?: string }>) => {
+    if (itemsToCreate.length === 0) return
+
+    const itemPromises = itemsToCreate.map(item =>
+      fetch('/api/items_v2', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sale_id: saleId,
+          title: item.name,
+          description: item.description,
+          price: item.price,
+          category: item.category,
+          image_url: item.image_url
+        }),
+      })
+    )
+
+    const results = await Promise.allSettled(itemPromises)
+    const failures = results.filter(r => r.status === 'rejected')
+    if (failures.length > 0) {
+      console.warn('Some items failed to create:', failures)
+    }
+  }, [])
+
+  // Helper to submit sale payload (used by both handleSubmit and auto-resume)
+  const submitSalePayload = useCallback(async (payload: { saleData: any; items: any[] }) => {
+    setLoading(true)
+    setSubmitError(null)
+
+    try {
+      const response = await fetch('/api/sales', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload.saleData),
+      })
+
+      const result = await response.json()
+
+      if (response.status === 401) {
+        // Save draft to sessionStorage
+        sessionStorage.setItem('draft:sale:new', JSON.stringify(payload))
+        sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
+        sessionStorage.setItem('draft:returnStep', 'review')
+        
+        // Redirect to login
+        router.push('/auth/signin?redirectTo=/sell/new?resume=review')
+        setLoading(false)
+        return
+      }
+
+      if (!response.ok) {
+        const errorData = result || { error: 'Failed to create sale' }
+        console.error('[SELL_WIZARD] Failed to create sale:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData.error,
+          details: errorData.details,
+          code: errorData.code,
+          fullResponse: errorData
+        })
+        const errorMessage = errorData.error || errorData.details || `Failed to create sale (${response.status})`
+        setSubmitError(errorMessage)
+        setLoading(false)
+        return
+      }
+
+      // API returns { ok: true, sale: {...} } or { sale: {...} }
+      const sale = result.sale || result
+      if (!sale || !sale.id) {
+        console.error('Invalid sale response:', result)
+        setSubmitError('Invalid response from server')
+        setLoading(false)
+        return
+      }
+      const saleId = sale.id
+
+      // Create items for the sale
+      if (payload.items && payload.items.length > 0) {
+        await createItemsForSale(saleId, payload.items)
+      }
+
+      // Clear draft keys and sessionStorage
+      clearLocalDraft()
+      sessionStorage.removeItem('auth:postLoginRedirect')
+      sessionStorage.removeItem('draft:returnStep')
+
+      // Show confirmation modal
+      setCreatedSaleId(saleId)
+      setConfirmationModalOpen(true)
+    } catch (error) {
+      console.error('Error creating sale:', error)
+      setSubmitError(error instanceof Error ? error.message : 'Failed to create sale')
+    } finally {
+      setLoading(false)
+    }
+  }, [router, createItemsForSale])
+
+  // Auto-resume after login (resume=1 param)
+  // If user returns after login and has a draft, auto-publish it
+  useEffect(() => {
+    const resume = searchParams.get('resume')
+    if (resume === '1' && user && !hasResumedRef.current && draftKeyRef.current && hasLocalDraft()) {
+      hasResumedRef.current = true
+      
+      // Validate before auto-publishing
+      const nextErrors = validateDetails()
+      if (Object.keys(nextErrors).length > 0) {
+        // Don't auto-publish if validation fails - let user fix it
+        setToastMessage('Please complete all required fields before publishing')
+        setShowToast(true)
+        hasResumedRef.current = false
+        return
+      }
+
+      // Auto-publish the draft
+      setLoading(true)
+      publishDraftServer(draftKeyRef.current)
+        .then((result) => {
+          if (result.ok && result.data?.saleId) {
+            clearLocalDraft()
+            setCreatedSaleId(result.data.saleId)
+            setConfirmationModalOpen(true)
+          } else {
+            setToastMessage(result.error || 'Failed to publish sale. Please try again.')
+            setShowToast(true)
+            hasResumedRef.current = false // Allow retry
+          }
+        })
+        .catch((error) => {
+          console.error('[SELL_WIZARD] Error auto-publishing draft:', error)
+          setToastMessage('Failed to publish sale. Please try again.')
+          setShowToast(true)
+          hasResumedRef.current = false // Allow retry
+        })
+        .finally(() => {
+          setLoading(false)
+        })
+    }
+  }, [searchParams, user, validateDetails])
 
   const handleSubmit = async () => {
     // Client-side required validation
@@ -168,57 +749,96 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     if (Object.keys(nextErrors).length > 0) {
       return
     }
+
     // Check if user is authenticated
     if (!user) {
-      // Save current draft and redirect to auth
-      const draftData = {
-        formData,
-        photos,
-        items,
-        currentStep
-      }
-      localStorage.setItem('sale_draft', JSON.stringify(draftData))
+      // Build draft payload and save locally
+      const draftPayload = buildDraftPayload()
+      saveLocalDraft(draftPayload)
+      sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
+      sessionStorage.setItem('draft:returnStep', 'review')
       
-      // Redirect to auth with return URL
-      const returnUrl = encodeURIComponent(window.location.pathname)
-      router.push(`/auth/signin?redirectTo=${returnUrl}`)
+      // Redirect to login
+      router.push('/auth/signin?redirectTo=/sell/new?resume=review')
       return
     }
 
-    setLoading(true)
-    try {
-      // Prepare sale data with cover image
-      const saleData = {
-        ...formData,
-        cover_image_url: photos.length > 0 ? photos[0] : undefined
+    // User is authenticated - try to publish draft if exists, else create directly
+    if (draftKeyRef.current && hasLocalDraft()) {
+      // First, ensure draft is saved to server (in case it's only local)
+      const localPayload = buildDraftPayload()
+      try {
+        await saveDraftServer(localPayload, draftKeyRef.current)
+      } catch (error) {
+        console.warn('[SELL_WIZARD] Failed to save draft to server before publish:', error)
+        // Continue anyway - might already exist on server
       }
 
-      const response = await fetch('/api/sales', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(saleData),
-      })
+      // Publish draft (transactional)
+      setLoading(true)
+      setSubmitError(null)
 
-      if (response.ok) {
-        const { sale } = await response.json()
-        // Clear draft after successful submission
-        localStorage.removeItem('sale_draft')
-        router.push(`/sales/${sale.id}`)
-      } else {
-        console.error('Failed to create sale')
+      try {
+        const result = await publishDraftServer(draftKeyRef.current)
+        
+        if (!result.ok) {
+          if (result.code === 'AUTH_REQUIRED') {
+            // Should not happen since we checked user, but handle gracefully
+            const redirectUrl = encodeURIComponent('/sell/new?resume=review')
+            router.push(`/auth/signin?redirectTo=${redirectUrl}`)
+            setLoading(false)
+            return
+          }
+          
+          // If draft not found, fall back to direct creation
+          if (result.code === 'DRAFT_NOT_FOUND') {
+            console.log('[SELL_WIZARD] Draft not found on server, creating sale directly')
+            const payload = buildSalePayload()
+            await submitSalePayload(payload)
+            setLoading(false)
+            return
+          }
+          
+          setSubmitError(result.error || 'Failed to publish sale')
+          setLoading(false)
+          return
+        }
+
+        const saleId = result.data?.saleId
+        if (!saleId) {
+          setSubmitError('Invalid response from server')
+          setLoading(false)
+          return
+        }
+
+        // Clear drafts and sessionStorage keys
+        clearLocalDraft()
+        sessionStorage.removeItem('auth:postLoginRedirect')
+        sessionStorage.removeItem('draft:returnStep')
+        if (draftKeyRef.current) {
+          // Draft is already marked as published on server
+        }
+
+        // Show confirmation modal
+        setCreatedSaleId(saleId)
+        setConfirmationModalOpen(true)
+      } catch (error) {
+        console.error('[SELL_WIZARD] Error publishing draft:', error)
+        setSubmitError(error instanceof Error ? error.message : 'Failed to publish sale')
+      } finally {
+        setLoading(false)
       }
-    } catch (error) {
-      console.error('Error creating sale:', error)
-    } finally {
-      setLoading(false)
+    } else {
+      // No draft exists, create sale directly (existing flow)
+      const payload = buildSalePayload()
+      await submitSalePayload(payload)
     }
   }
 
-  const handlePhotoUpload = (urls: string[]) => {
-    setPhotos(prev => [...prev, ...urls])
-  }
+  const handlePhotoUpload = useCallback((urls: string[]) => {
+    // Replace photos array with new URLs (ImageUploadCard emits all done URLs)
+    setPhotos(urls)
+  }, [])
 
   const handleReorderPhotos = (fromIndex: number, toIndex: number) => {
     setPhotos(prev => {
@@ -243,30 +863,38 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     setPhotos(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleAddItem = () => {
-    setItems(prev => [...prev, { name: '', price: undefined, description: '' }])
-  }
+  const handleAddItem = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category: CategoryValue }) => {
+    setItems(prev => {
+      if (prev.length >= 50) return prev
+      return [...prev, item]
+    })
+  }, [])
 
-  const handleUpdateItem = (index: number, field: string, value: any) => {
-    setItems(prev => prev.map((item, i) => 
-      i === index ? { ...item, [field]: value } : item
-    ))
-  }
+  const handleUpdateItem = useCallback((updated: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }) => {
+    setItems(prev => {
+      const next = prev.slice()
+      const i = next.findIndex(it => it.id === updated.id)
+      if (i !== -1) {
+        next[i] = { ...next[i], ...updated }
+      }
+      return next
+    })
+  }, [])
 
-  const handleRemoveItem = (index: number) => {
-    setItems(prev => prev.filter((_, i) => i !== index))
-  }
+  const handleRemoveItem = useCallback((id: string) => {
+    setItems(prev => prev.filter(it => it.id !== id))
+  }, [])
 
   const renderStep = () => {
     switch (currentStep) {
-      case 0:
-        return <DetailsStep formData={formData} onChange={handleInputChange} errors={_errors} />
-      case 1:
+      case STEPS.DETAILS:
+        return <DetailsStep formData={formData} onChange={handleInputChange} errors={_errors} userLat={userLat} userLng={userLng} />
+      case STEPS.PHOTOS:
         return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
-      case 2:
+      case STEPS.ITEMS:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
-      case 3:
-        return <ReviewStep formData={formData} photos={photos} items={items} />
+      case STEPS.REVIEW:
+        return <ReviewStep formData={formData} photos={photos} items={items} onPublish={handleSubmit} loading={loading} submitError={submitError} />
       default:
         return null
     }
@@ -274,12 +902,68 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">List Your Sale</h1>
-        <p className="text-gray-600">Create a listing to reach more buyers in your area</p>
-        <p className="text-sm text-gray-500 mt-2">You can fill this out without an account. We'll ask you to sign in when you submit.</p>
-      </div>
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold text-gray-900">List Your Sale</h1>
+              {saveStatus === 'saving' && (
+                <span className="text-sm text-gray-500 flex items-center gap-1">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400"></div>
+                  Saving...
+                </span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="text-sm text-green-600 flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Saved
+                </span>
+              )}
+              {saveStatus === 'error' && (
+                <span className="text-sm text-red-600">Save failed</span>
+              )}
+            </div>
+            <p className="text-gray-600">Create a listing to reach more buyers in your area</p>
+            <p className="text-sm text-gray-500 mt-2">You can fill this out without an account. We'll ask you to sign in when you submit.</p>
+            {hasLocalDraft() && (
+              <button
+                onClick={() => {
+                  if (confirm('Are you sure you want to discard this draft? This cannot be undone.')) {
+                    clearLocalDraft()
+                    if (user && draftKeyRef.current) {
+                      deleteDraftServer(draftKeyRef.current).catch(() => {})
+                    }
+                    // Reset form
+                    setFormData({
+                      title: '',
+                      description: '',
+                      address: '',
+                      city: '',
+                      state: '',
+                      zip_code: '',
+                      date_start: '',
+                      time_start: '09:00',
+                      date_end: '',
+                      time_end: '',
+                      duration_hours: 4,
+                      tags: [],
+                      pricing_mode: 'negotiable',
+                      status: 'draft'
+                    })
+                    setPhotos([])
+                    setItems([])
+                    setCurrentStep(0)
+                    setToastMessage('Draft discarded')
+                    setShowToast(true)
+                  }
+                }}
+                className="text-sm text-red-600 hover:text-red-700 mt-2 underline"
+              >
+                Discard draft
+              </button>
+            )}
+          </div>
 
       {/* Progress Steps */}
       <div className="mb-8">
@@ -315,15 +999,16 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       </div>
 
       {/* Step Content */}
-      <div className="bg-white rounded-lg shadow-sm p-8">
+      <div className="bg-white rounded-lg shadow-sm p-8 mb-24">
         {renderStep()}
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between mt-8">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between">
         <button
           onClick={handlePrevious}
-          disabled={currentStep === 0}
+          disabled={currentStep === STEPS.DETAILS}
           className="inline-flex items-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
         >
           <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -363,13 +1048,33 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
             )}
           </button>
         )}
+        </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {createdSaleId && (
+        <ConfirmationModal
+          open={confirmationModalOpen}
+          onClose={() => {
+            setConfirmationModalOpen(false)
+            router.push('/dashboard')
+          }}
+          saleId={createdSaleId}
+        />
+      )}
+
+      {/* Toast for errors */}
+      <Toast
+        message={toastMessage || ''}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   )
 }
 
 // Step Components
-function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void, errors?: Record<string, string> }) {
+function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formData: Partial<SaleInput>, onChange: (field: keyof SaleInput, value: any) => void, errors?: Record<string, string>, userLat?: number, userLng?: number }) {
   return (
     <div className="space-y-6">
       <div>
@@ -422,59 +1127,74 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Start Time *
           </label>
-          <input
-            type="time"
+          <TimePicker30
             value={formData.time_start || ''}
-            onChange={(e) => onChange('time_start', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+            onChange={(t) => onChange('time_start', t)}
             required
           />
-        {errors?.time_start && (
-          <p className="mt-1 text-sm text-red-600">{errors.time_start}</p>
-        )}
+          {errors?.time_start && (
+            <p className="mt-1 text-sm text-red-600">{errors.time_start}</p>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            End Date (Optional)
-          </label>
-          <input
-            type="date"
-            value={formData.date_end || ''}
-            onChange={(e) => onChange('date_end', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            End Time (Optional)
-          </label>
-          <input
-            type="time"
-            value={formData.time_end || ''}
-            onChange={(e) => onChange('time_end', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-          />
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Duration (Hours) *
+        </label>
+        <input
+          type="number"
+          min="1"
+          max="24"
+          step="0.5"
+          value={formData.duration_hours || 4}
+          onChange={(e) => {
+            const raw = (e.currentTarget as HTMLInputElement).valueAsNumber
+            const hours = Number.isFinite(raw) ? raw : 4
+            const clamped = Math.max(1, Math.min(24, hours))
+            onChange('duration_hours', clamped)
+          }}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+          required
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Sale duration (1-24 hours). End time is calculated automatically.
+        </p>
+        {errors?.duration_hours && (
+          <p className="mt-1 text-sm text-red-600">{errors.duration_hours}</p>
+        )}
+        {formData.date_end && formData.time_end && (
+          <p className="mt-1 text-sm text-gray-600">
+            Ends: {new Date(`${formData.date_end}T${formData.time_end}`).toLocaleString()}
+          </p>
+        )}
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Address *
         </label>
-        <input
-          type="text"
+        <AddressAutocomplete
           value={formData.address || ''}
-          onChange={(e) => onChange('address', e.target.value)}
-          placeholder="Street address"
+          onChange={(address) => onChange('address', address)}
+          onPlaceSelected={(place) => {
+            // Update all fields atomically - batch updates to prevent multiple re-renders
+            // Use the full label for address field if available, otherwise use line1
+            const addressValue = place.address || ''
+            onChange('address', addressValue)
+            onChange('city', place.city || '')
+            onChange('state', place.state || '')
+            onChange('zip_code', place.zip || '')
+            onChange('lat', place.lat)
+            onChange('lng', place.lng)
+          }}
+          placeholder="Start typing your address..."
+          userLat={userLat}
+          userLng={userLng}
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           required
+          error={errors?.address}
         />
-        {errors?.address && (
-          <p className="mt-1 text-sm text-red-600">{errors.address}</p>
-        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -489,6 +1209,9 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
             placeholder="City"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
             required
+            minLength={2}
+            pattern="[A-Za-z\s]+"
+            title="City name (letters only)"
           />
         {errors?.city && (
           <p className="mt-1 text-sm text-red-600">{errors.city}</p>
@@ -501,10 +1224,14 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           <input
             type="text"
             value={formData.state || ''}
-            onChange={(e) => onChange('state', e.target.value)}
-            placeholder="State"
+            onChange={(e) => onChange('state', e.target.value.toUpperCase().slice(0, 2))}
+            placeholder="State (e.g., KY)"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             required
+            minLength={2}
+            maxLength={2}
+            pattern="[A-Z]{2}"
+            title="Two-letter state code (e.g., KY, CA)"
           />
         {errors?.state && (
           <p className="mt-1 text-sm text-red-600">{errors.state}</p>
@@ -517,10 +1244,18 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
           <input
             type="text"
             value={formData.zip_code || ''}
-            onChange={(e) => onChange('zip_code', e.target.value)}
-            placeholder="ZIP Code"
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, '').slice(0, 5)
+              onChange('zip_code', value)
+            }}
+            placeholder="ZIP Code (5 digits)"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            pattern="\d{5}"
+            title="5-digit ZIP code"
           />
+        {errors?.zip_code && (
+          <p className="mt-1 text-sm text-red-600">{errors.zip_code}</p>
+        )}
         </div>
       </div>
 
@@ -543,21 +1278,6 @@ function DetailsStep({ formData, onChange, errors }: { formData: Partial<SaleInp
         </p>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Starting Price (Optional)
-        </label>
-        <input
-          type="number"
-          value={formData.price || ''}
-          onChange={(e) => onChange('price', e.target.value ? parseFloat(e.target.value) : undefined)}
-          placeholder="0.00"
-          min="0"
-          step="0.01"
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-        <p className="text-sm text-gray-500 mt-1">Leave blank if items are free</p>
-      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -609,10 +1329,11 @@ function PhotosStep({ photos, onUpload, onRemove, onReorder, onSetCover }: {
           Add photos to showcase your items. You can upload up to 10 photos.
         </p>
         
-        <CloudinaryUploadWidget 
-          onUpload={onUpload}
-          maxFiles={10 - photos.length}
-          className="mb-6"
+        <ImageUploadCard
+          value={photos}
+          onChange={onUpload}
+          maxFiles={10}
+          maxSizeMB={5}
         />
       </div>
 
@@ -635,135 +1356,122 @@ function PhotosStep({ photos, onUpload, onRemove, onReorder, onSetCover }: {
 }
 
 function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
-  items: Array<{ name: string; price?: number; description?: string; image_url?: string }>,
-  onAdd: () => void,
-  onUpdate: (index: number, field: string, value: any) => void,
-  onRemove: (index: number) => void
+  items: Array<{ id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>,
+  onAdd: (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category: CategoryValue }) => void,
+  onUpdate: (item: { id: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }) => void,
+  onRemove: (id: string) => void
 }) {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [showToast, setShowToast] = useState(false)
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  const MAX_ITEMS = 50
+
+  const handleOpenModal = useCallback(() => {
+    if (items.length >= MAX_ITEMS) {
+      setToastMessage('Item limit reached (50)')
+      setShowToast(true)
+      return
+    }
+    setEditingItemId(null)
+    setIsModalOpen(true)
+  }, [items.length])
+
+  const handleCloseModal = useCallback(() => {
+    setIsModalOpen(false)
+    setEditingItemId(null)
+    // Return focus to +Add Item button
+    setTimeout(() => {
+      addButtonRef.current?.focus()
+    }, 100)
+  }, [])
+
+  const handleSubmit = useCallback((item: { id: string; name: string; price?: number; description?: string; image_url?: string; category: CategoryValue }) => {
+    if (editingItemId && item.id === editingItemId) {
+      onUpdate(item)
+    } else {
+      onAdd(item)
+    }
+    setIsModalOpen(false)
+    setEditingItemId(null)
+    // Return focus to +Add Item button
+    setTimeout(() => {
+      addButtonRef.current?.focus()
+    }, 100)
+  }, [editingItemId, onAdd, onUpdate])
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium text-gray-900">Items for Sale</h3>
-        <button
-          onClick={onAdd}
-          className="inline-flex items-center px-4 py-2 btn-accent min-h-[44px]"
-        >
-          <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Add Item
-        </button>
+    <>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">Items for Sale</h3>
+            {items.length > 0 && (
+              <p className="text-sm text-gray-500 mt-1">
+                {items.length} {items.length === 1 ? 'item' : 'items'} added
+              </p>
+            )}
+          </div>
+          <button
+            ref={addButtonRef}
+            onClick={handleOpenModal}
+            disabled={items.length >= MAX_ITEMS}
+            className="inline-flex items-center px-4 py-2 btn-accent min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Add item"
+          >
+            <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Item
+          </button>
+        </div>
+
+        {items.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            <p>No items added yet. Click "Add Item" to get started.</p>
+          </div>
+        ) : (
+          <div className="overflow-y-auto max-h-[calc(100vh-300px)] pr-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {items.map((item) => (
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  onDelete={() => onRemove(item.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {items.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          <svg className="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
-          <p>No items added yet. Click "Add Item" to get started.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {items.map((item, index) => (
-            <div key={index} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex justify-between items-start mb-4">
-                <h4 className="font-medium text-gray-900">Item {index + 1}</h4>
-                <button
-                  onClick={() => onRemove(index)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Item Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={item.name}
-                    onChange={(e) => onUpdate(index, 'name', e.target.value)}
-                    placeholder="e.g., Vintage Coffee Table"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Price (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    value={item.price || ''}
-                    onChange={(e) => onUpdate(index, 'price', e.target.value ? parseFloat(e.target.value) : undefined)}
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-                  />
-                </div>
-              </div>
-              
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description (Optional)
-                </label>
-                <textarea
-                  value={item.description || ''}
-                  onChange={(e) => onUpdate(index, 'description', e.target.value)}
-                  placeholder="Describe the item's condition, age, etc."
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
-                />
-              </div>
+      <ItemFormModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onSubmit={handleSubmit}
+        initialItem={editingItemId ? items.find(it => it.id === editingItemId) : undefined}
+      />
 
-              {/* Item Image Upload */}
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Item Photo (Optional)
-                </label>
-                <CloudinaryUploadWidget 
-                  onUpload={(urls) => onUpdate(index, 'image_url', urls[0])}
-                  maxFiles={1}
-                  className="mb-3"
-                />
-                {item.image_url && (
-                  <div className="mt-2">
-                    <div className="relative inline-block">
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-                      />
-                      <button
-                        onClick={() => onUpdate(index, 'image_url', undefined)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+      <Toast
+        message={toastMessage || ''}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
+    </>
   )
 }
 
-function ReviewStep({ formData, photos, items }: {
+function ReviewStep({ formData, photos, items, onPublish, loading, submitError }: {
   formData: Partial<SaleInput>,
   photos: string[],
-  items: Array<{ name: string; price?: number; description?: string }>
+  items: Array<{ id?: string; name: string; price?: number; description?: string; category?: CategoryValue }>,
+  onPublish: () => void,
+  loading: boolean,
+  submitError?: string | null
 }) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -823,8 +1531,8 @@ function ReviewStep({ formData, photos, items }: {
           <div>
             <h4 className="font-medium text-gray-900">Items ({items.length})</h4>
             <div className="mt-2 space-y-2">
-              {items.map((item, index) => (
-                <div key={index} className="text-sm text-gray-600">
+              {items.map((item) => (
+                <div key={item.id || `review-item-${item.name}`} className="text-sm text-gray-600">
                   <strong>{item.name}</strong>
                   {item.price && ` - $${item.price}`}
                   {item.description && <div className="text-xs text-gray-500">{item.description}</div>}
@@ -848,6 +1556,34 @@ function ReviewStep({ formData, photos, items }: {
           </div>
         </div>
       </div>
+      
+      <div className="mt-6 mb-6">
+        {submitError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {submitError}
+          </div>
+        )}
+        <button
+          onClick={onPublish}
+          disabled={loading}
+          className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
+        >
+          {loading ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Publishing...
+            </>
+          ) : (
+            <>
+              Publish Sale
+              <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </>
+          )}
+        </button>
+      </div>
     </div>
   )
 }
+

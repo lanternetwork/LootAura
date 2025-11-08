@@ -115,6 +115,25 @@ export function createFavoritesMetadata(): Metadata {
   })
 }
 
+export function createProfileMetadata(profile: {
+  displayName?: string | null
+  username?: string | null
+  bio?: string | null
+  avatarUrl?: string | null
+}): Metadata {
+  const title = profile.displayName || profile.username || 'Profile'
+  const description = profile.bio || `View ${title}'s profile on Loot Aura`
+  const image = profile.avatarUrl || undefined
+  
+  return createPageMetadata({
+    title,
+    description,
+    path: `/u/${profile.username}`,
+    image,
+    type: 'website',
+  })
+}
+
 // JSON-LD structured data for the homepage
 export function createHomepageStructuredData() {
   return {

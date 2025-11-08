@@ -12,12 +12,27 @@ async function callbackHandler(request: NextRequest) {
     const url = new URL(request.url)
     const code = url.searchParams.get('code')
     const error = url.searchParams.get('error')
-    const next = url.searchParams.get('next') || '/sales'
+    // Check for redirectTo (preferred) or next (fallback)
+    // Note: We can't access sessionStorage from server-side, so we rely on the query param
+    // The client-side signin page will handle sessionStorage fallback
+    let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
+    
+    // If no redirectTo in query, default to /sales
+    if (!redirectTo) {
+      redirectTo = '/sales'
+    }
+    
+    // Decode the redirectTo if it was encoded
+    try {
+      redirectTo = decodeURIComponent(redirectTo)
+    } catch (e) {
+      // If decoding fails, use as-is
+    }
 
     authDebug.logAuthFlow('oauth-callback', 'start', 'start', {
       hasCode: !!code,
       hasError: !!error,
-      next
+      redirectTo
     })
 
     if (error) {
@@ -77,8 +92,8 @@ async function callbackHandler(request: NextRequest) {
       }
 
       // Success: user session cookies are automatically set by auth-helpers
-      authDebug.logAuthFlow('oauth-callback', 'redirect', 'success', { next })
-      return NextResponse.redirect(new URL(next, url.origin))
+      authDebug.logAuthFlow('oauth-callback', 'redirect', 'success', { redirectTo })
+      return NextResponse.redirect(new URL(redirectTo, url.origin))
     }
 
     authDebug.logAuthFlow('oauth-callback', 'no-session', 'error')

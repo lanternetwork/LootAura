@@ -20,6 +20,7 @@ const mockSupabaseClient = {
       })),
     })),
   })),
+  rpc: vi.fn(),
 }
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -37,6 +38,8 @@ describe('Profile Management', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     delete process.env.NEXT_PUBLIC_DEBUG
+    // Reset rpc mock to ensure it's a proper function
+    mockSupabaseClient.rpc = vi.fn()
   })
 
   describe('POST /api/profile', () => {
@@ -63,19 +66,56 @@ describe('Profile Management', () => {
         error: null,
       })
 
-      // Mock profile doesn't exist
-      const mockFrom = vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
-          })),
-        })),
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn().mockResolvedValueOnce({ data: mockNewProfile, error: null }),
-          })),
-        })),
-      }))
+      // Mock profile doesn't exist, then insert, then fetch from profiles_v2
+      let callCount = 0
+      const mockFrom = vi.fn(() => {
+        callCount++
+        if (callCount === 1) {
+          // First call: check if profile exists
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
+                single: vi.fn(),
+              })),
+            })),
+            insert: vi.fn(),
+            update: vi.fn(),
+          }
+        } else if (callCount === 2) {
+          // Second call: insert into profiles table
+          return {
+            select: vi.fn(),
+            insert: vi.fn(() => ({
+              select: vi.fn(() => ({
+                single: vi.fn().mockResolvedValueOnce({ data: mockNewProfile, error: null }),
+              })),
+            })),
+            update: vi.fn(),
+          }
+        } else if (callCount === 3) {
+          // Third call: update profile after insert
+          return {
+            select: vi.fn(),
+            insert: vi.fn(),
+            update: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValueOnce({ error: null }),
+            })),
+          }
+        } else {
+          // Fourth call: fetch from profiles_v2
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValueOnce({ data: mockNewProfile, error: null }),
+                single: vi.fn(),
+              })),
+            })),
+            insert: vi.fn(),
+            update: vi.fn(),
+          }
+        }
+      })
       
       mockSupabaseClient.from = mockFrom
 
@@ -88,8 +128,9 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
+      expect(data.ok).toBe(true)
       expect(data.created).toBe(true)
-      expect(data.profile).toEqual(mockNewProfile)
+      expect(data.data).toEqual(mockNewProfile)
       expect(data.message).toBe('Profile created successfully')
     })
 
@@ -135,8 +176,9 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
+      expect(data.ok).toBe(true)
       expect(data.created).toBe(false)
-      expect(data.profile).toEqual(mockExistingProfile)
+      expect(data.data).toEqual(mockExistingProfile)
       expect(data.message).toBe('Profile already exists')
     })
 
@@ -154,6 +196,7 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(401)
+      expect(data.ok).toBe(false)
       expect(data.error).toBe('Unauthorized')
     })
 
@@ -171,21 +214,36 @@ describe('Profile Management', () => {
       })
 
       // Mock profile doesn't exist but creation fails
-      const mockFrom = vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
-          })),
-        })),
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn().mockResolvedValueOnce({ 
-              data: null, 
-              error: { message: 'Database error' } 
-            }),
-          })),
-        })),
-      }))
+      let callCount = 0
+      const mockFrom = vi.fn(() => {
+        callCount++
+        if (callCount === 1) {
+          // First call: check if profile exists
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
+                single: vi.fn(),
+              })),
+            })),
+            insert: vi.fn(),
+            update: vi.fn(),
+          }
+        } else {
+          // Second call: insert fails
+          return {
+            select: vi.fn(),
+            insert: vi.fn(() => ({
+              select: vi.fn(() => ({
+                single: vi.fn().mockResolvedValueOnce({ 
+                  data: null,
+                  error: { message: 'Database error' } 
+                }),
+              })),
+            })),
+          }
+        }
+      })
       
       mockSupabaseClient.from = mockFrom
 
@@ -198,6 +256,7 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(500)
+      expect(data.ok).toBe(false)
       expect(data.error).toBe('Failed to create profile')
       
       consoleSpy.mockRestore()
@@ -217,21 +276,58 @@ describe('Profile Management', () => {
         error: null,
       })
 
-      const mockFrom = vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
-          })),
-        })),
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn().mockResolvedValueOnce({ 
-              data: { id: 'user123' }, 
-              error: null 
-            }),
-          })),
-        })),
-      }))
+      let callCount = 0
+      const mockFrom = vi.fn(() => {
+        callCount++
+        if (callCount === 1) {
+          // First call: check if profile exists
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValueOnce({ data: null, error: null }),
+                single: vi.fn(),
+              })),
+            })),
+            insert: vi.fn(),
+            update: vi.fn(),
+          }
+        } else if (callCount === 2) {
+          // Second call: insert into profiles table
+          return {
+            select: vi.fn(),
+            insert: vi.fn(() => ({
+              select: vi.fn(() => ({
+                single: vi.fn().mockResolvedValueOnce({ data: { id: 'user123' }, error: null }),
+              })),
+            })),
+            update: vi.fn(),
+          }
+        } else if (callCount === 3) {
+          // Third call: update profile after insert
+          return {
+            select: vi.fn(),
+            insert: vi.fn(),
+            update: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValueOnce({ error: null }),
+            })),
+          }
+        } else {
+          // Fourth call: fetch from profiles_v2
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValueOnce({ 
+                  data: { id: 'user123' }, 
+                  error: null 
+                }),
+                single: vi.fn(),
+              })),
+            })),
+            insert: vi.fn(),
+            update: vi.fn(),
+          }
+        }
+      })
       
       mockSupabaseClient.from = mockFrom
 
@@ -295,7 +391,8 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data.profile).toEqual(mockProfile)
+      expect(data.ok).toBe(true)
+      expect(data.data).toEqual(mockProfile)
     })
 
     it('should return 404 when profile not found', async () => {
@@ -320,7 +417,36 @@ describe('Profile Management', () => {
         })),
       }))
       
-      mockSupabaseClient.from = mockFrom
+      // Mock direct query to base table as last resort (also returns null)
+      const mockBaseTableFrom = vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn().mockResolvedValueOnce({
+            data: null,
+            error: null,
+          }),
+        })),
+      }))
+      
+      // Override from to return different mock for base table query
+      mockSupabaseClient.from = vi.fn((table: string) => {
+        if (table === 'profiles') {
+          return mockBaseTableFrom()
+        }
+        return mockFrom()
+      })
+      
+      // Mock rpc calls - GET handler calls get_profile first, then update_profile
+      // First call: get_profile RPC returns null (profile not found)
+      // Second call: update_profile RPC returns null (profile creation failed)
+      mockSupabaseClient.rpc
+        .mockResolvedValueOnce({
+          data: null,
+          error: { message: 'Profile not found' },
+        })
+        .mockResolvedValueOnce({
+          data: null,
+          error: { message: 'RPC failed' },
+        })
 
       const request = new NextRequest('https://example.com/api/profile', {
         method: 'GET',
@@ -331,6 +457,7 @@ describe('Profile Management', () => {
       const data = await response.json()
 
       expect(response.status).toBe(404)
+      expect(data.ok).toBe(false)
       expect(data.error).toBe('Profile not found')
     })
   })

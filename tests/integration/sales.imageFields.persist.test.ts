@@ -31,6 +31,7 @@ const mockSupabaseClient = {
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient,
+  createSupabaseWriteClient: () => mockSupabaseClient,
 }))
 
 // Mock rate limiting

@@ -18,9 +18,29 @@ export default function SignIn() {
 
   useEffect(() => {
     if (!authLoading && currentUser) {
-      router.replace('/sales')
+      // Small delay to ensure auth state is fully propagated
+      const timeoutId = setTimeout(() => {
+        // Check for redirect query param (accept both 'redirect' and 'redirectTo' for consistency)
+        const redirectParam = params.get('redirectTo') || params.get('redirect')
+        const storageRedirect = sessionStorage.getItem('auth:postLoginRedirect')
+        const redirectTo = redirectParam || storageRedirect || '/sales'
+        console.log('[SIGNIN] Redirecting after login:', { 
+          redirectTo, 
+          hasParam: !!redirectParam, 
+          paramValue: redirectParam,
+          hasStorage: !!storageRedirect,
+          storageValue: storageRedirect
+        })
+        // Clear sessionStorage redirect if used
+        if (storageRedirect) {
+          sessionStorage.removeItem('auth:postLoginRedirect')
+          sessionStorage.removeItem('draft:returnStep')
+        }
+        router.replace(redirectTo)
+      }, 200) // Increased delay to ensure auth state propagation
+      return () => clearTimeout(timeoutId)
     }
-  }, [authLoading, currentUser, router])
+  }, [authLoading, currentUser, router, params])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -28,8 +48,7 @@ export default function SignIn() {
 
     try {
       await signIn.mutateAsync({ email, password })
-      const redirectTo = params.get('redirectTo') || '/sales'
-      window.location.href = redirectTo
+      // Redirect will be handled by the useEffect above
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
     }

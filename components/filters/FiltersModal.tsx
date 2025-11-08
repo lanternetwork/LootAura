@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { CATEGORIES } from '@/lib/data/categories'
 // Simple SVG icons
 const CloseIcon = () => (
   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,20 +52,8 @@ interface FilterState {
   categories: string[]
 }
 
-const CATEGORY_OPTIONS = [
-  { value: 'tools', label: 'Tools', icon: '🔧' },
-  { value: 'toys', label: 'Toys', icon: '🧸' },
-  { value: 'furniture', label: 'Furniture', icon: '🪑' },
-  { value: 'electronics', label: 'Electronics', icon: '📱' },
-  { value: 'clothing', label: 'Clothing', icon: '👕' },
-  { value: 'books', label: 'Books', icon: '📚' },
-  { value: 'sports', label: 'Sports', icon: '⚽' },
-  { value: 'home', label: 'Home & Garden', icon: '🏠' },
-  { value: 'automotive', label: 'Automotive', icon: '🚗' },
-  { value: 'collectibles', label: 'Collectibles', icon: '🎯' },
-  { value: 'antiques', label: 'Antiques', icon: '🏺' },
-  { value: 'misc', label: 'Miscellaneous', icon: '📦' }
-]
+// Use shared categories - single source of truth
+const CATEGORY_OPTIONS = CATEGORIES
 
 export default function FiltersModal({ isOpen, onClose, className = '', filters: externalFilters, onFiltersChange }: FiltersModalProps) {
   const router = useRouter()

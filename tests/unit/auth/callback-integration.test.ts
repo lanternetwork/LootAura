@@ -28,8 +28,8 @@ const mockSupabaseClient = {
   },
 }
 
-vi.mock('@supabase/ssr', () => ({
-  createServerClient: vi.fn(() => mockSupabaseClient),
+vi.mock('@/lib/auth/server-session', () => ({
+  createServerSupabaseClient: vi.fn(() => mockSupabaseClient),
 }))
 
 // Mock fetch for profile creation
@@ -227,7 +227,7 @@ describe('OAuth Callback Route', () => {
         expect.objectContaining({
           hasCode: true,
           hasError: false,
-          next: '/sales',
+          redirectTo: '/sales',
         })
       )
 

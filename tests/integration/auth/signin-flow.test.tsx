@@ -211,7 +211,7 @@ describe('Sign In Page Integration', () => {
   })
 
   describe('Navigation and Redirects', () => {
-    it('should redirect authenticated users to sales page', () => {
+    it('should redirect authenticated users to sales page', async () => {
       mockUseAuth.mockReturnValue({
         data: { id: 'user123', email: 'test@example.com' },
         isLoading: false,
@@ -219,7 +219,10 @@ describe('Sign In Page Integration', () => {
 
       render(<SignIn />)
 
-      expect(mockReplace).toHaveBeenCalledWith('/sales')
+      // Wait for the redirect (there's a 200ms delay in the component)
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith('/sales')
+      }, { timeout: 500 })
     })
 
     it('should redirect to specified page after successful sign in', async () => {

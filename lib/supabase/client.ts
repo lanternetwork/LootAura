@@ -19,6 +19,6 @@ export function createSupabaseBrowserClient() {
     throw new Error(error);
   }
 
-  // Force public schema for REST access; PostgREST only exposes public/graphql_public
+  // Use public schema for reading views (sales_v2, items_v2)
   return createBrowserClient(url, anon, { db: { schema: 'public' } });
 }

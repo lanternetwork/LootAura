@@ -64,63 +64,29 @@ export function MapPreviewSection() {
         return // IP geolocation succeeded - use it
       }
       
-      // IP geolocation failed - try browser geolocation (but it won't change with VPN)
-      if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-            console.log('[MapPreview] Using browser geolocation:', loc)
-            setLocation(loc)
-          },
-          () => {
-            // Browser geolocation failed - try localStorage as fallback
-            try {
-              const saved = window.localStorage.getItem('loot-aura:lastLocation')
-              if (saved) {
-                try {
-                  const parsed = JSON.parse(saved)
-                  if (parsed && parsed.zip) {
-                    console.log('[MapPreview] Using localStorage ZIP:', parsed.zip)
-                    setLocation({ zip: parsed.zip })
-                    return
-                  }
-                } catch {
-                  // Invalid JSON, continue
-                }
-              }
-            } catch {
-              // localStorage might be unavailable
+      // IP geolocation failed - do NOT prompt for browser geolocation; fall back to localStorage or city fallback
+      try {
+        const saved = window.localStorage.getItem('loot-aura:lastLocation')
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved)
+            if (parsed && parsed.zip) {
+              console.log('[MapPreview] Using localStorage ZIP:', parsed.zip)
+              setLocation({ zip: parsed.zip })
+              return
             }
-            
-            // Final fallback city
-            console.log('[MapPreview] Using fallback Louisville')
-            const fallback = { zip: '40204' }
-            setLocation(fallback)
-          },
-          { enableHighAccuracy: false, timeout: 3500 }
-        )
-      } else {
-        // No geolocation API - try localStorage
-        try {
-          const saved = window.localStorage.getItem('loot-aura:lastLocation')
-          if (saved) {
-            try {
-              const parsed = JSON.parse(saved)
-              if (parsed && parsed.zip) {
-                setLocation({ zip: parsed.zip })
-                return
-              }
-            } catch {
-              // Invalid JSON, continue
-            }
+          } catch {
+            // Invalid JSON, continue
           }
-        } catch {
-          // localStorage might be unavailable
         }
-        
-        // Final fallback
-        setLocation({ zip: '40204' })
+      } catch {
+        // localStorage might be unavailable
       }
+      
+      // Final fallback city
+      console.log('[MapPreview] Using fallback Louisville')
+      const fallback = { zip: '40204' }
+      setLocation(fallback)
     })
   }, [searchParams])
 

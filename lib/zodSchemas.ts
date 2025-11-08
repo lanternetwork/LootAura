@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CATEGORY_VALUES } from './data/categories'
 
 export const SaleSchema = z.object({
   title: z.string().min(3),
@@ -18,9 +19,12 @@ export const SaleSchema = z.object({
   photos: z.array(z.string()).default([])
 })
 
+// Category enum schema - validates against shared category values
+export const zCategory = z.enum(CATEGORY_VALUES as [string, ...string[]])
+
 export const SaleItemSchema = z.object({
   name: z.string().min(1),
-  category: z.string().optional(),
+  category: zCategory.optional(),
   condition: z.string().optional(),
   price: z.number().optional(),
   photo: z.string().optional(),

@@ -23,6 +23,11 @@ export default async function ShortlinkPage({ params }: PageProps) {
   try {
     const supabase = createSupabaseServerClient()
 
+    if (!supabase) {
+      console.error('Failed to create Supabase client')
+      notFound()
+    }
+
     // Retrieve shared state from database
     const { data, error } = await supabase
       .from('shared_states')
@@ -32,6 +37,11 @@ export default async function ShortlinkPage({ params }: PageProps) {
 
     if (error || !data) {
       console.error('Failed to retrieve shared state:', error)
+      notFound()
+    }
+
+    if (!data.state_json) {
+      console.error('Shared state missing state_json field')
       notFound()
     }
 

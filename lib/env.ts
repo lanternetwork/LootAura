@@ -46,7 +46,16 @@ const serverSchema = z.object({
     z.string().url().optional()
   ),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(10).optional(),
-  NOMINATIM_APP_EMAIL: z.string().email().optional(),
+  NOMINATIM_APP_EMAIL: z.preprocess(
+    (val) => {
+      // In production, require email; in dev, allow optional with default
+      if (process.env.NODE_ENV === 'production' && (!val || typeof val !== 'string' || val.trim() === '')) {
+        throw new Error('NOMINATIM_APP_EMAIL is required in production')
+      }
+      return val || 'admin@lootaura.com'
+    },
+    z.string().email()
+  ),
 })
 
 // Validate public environment variables

@@ -1,0 +1,1119 @@
+'use client'
+
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { geocodeAddress, fetchSuggestions, fetchOverpassAddresses, AddressSuggestion } from '@/lib/geocode'
+import { googleAutocomplete, googlePlaceDetails } from '@/lib/providers/googlePlaces'
+import PoweredBy from './PoweredBy'
+// Generate session tokens using Web Crypto if available
+function newSessionToken(): string {
+  try {
+    // @ts-ignore
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      // @ts-ignore
+      return crypto.randomUUID()
+    }
+  } catch {}
+  return Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
+import { useDebounce } from '@/lib/hooks/useDebounce'
+import { haversineMeters } from '@/lib/geo/distance'
+import OSMAttribution from './OSMAttribution'
+
+interface AddressAutocompleteProps {
+  value: string
+  onChange: (address: string) => void
+  onPlaceSelected?: (place: {
+    address: string
+    city?: string
+    state?: string
+    zip?: string
+    lat: number
+    lng: number
+  }) => void
+  placeholder?: string
+  className?: string
+  required?: boolean
+  error?: string
+  userLat?: number
+  userLng?: number
+}
+
+export default function AddressAutocomplete({
+  value,
+  onChange,
+  onPlaceSelected,
+  placeholder = 'Start typing your address...',
+  className = '',
+  required = false,
+  error,
+  userLat: propUserLat,
+  userLng: propUserLng
+}: AddressAutocompleteProps) {
+  // Helper function to sort suggestions by distance
+  const sortByDistance = useCallback((suggestions: AddressSuggestion[], lat?: number, lng?: number): AddressSuggestion[] => {
+    if (!lat || !lng) return suggestions
+    return [...suggestions].sort((a, b) => {
+      const distA = haversineMeters(lat, lng, a.lat, a.lng)
+      const distB = haversineMeters(lat, lng, b.lat, b.lng)
+      return distA - distB
+    })
+  }, [])
+  const inputRef = useRef<HTMLInputElement>(null)
+  const listboxRef = useRef<HTMLUListElement>(null)
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([])
+  const [isOpen, setIsOpen] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [isGeocoding, setIsGeocoding] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [showFallbackMessage, setShowFallbackMessage] = useState(false)
+  const [userLat, setUserLat] = useState<number | undefined>(undefined)
+  const [userLng, setUserLng] = useState<number | undefined>(undefined)
+  const [googleSessionToken, setGoogleSessionToken] = useState<string | null>(null)
+  const [showGoogleAttribution, setShowGoogleAttribution] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const lastHadCoordsRef = useRef<boolean>(false)
+  const requestIdRef = useRef(0)
+  const geoWaitRef = useRef<boolean>(false)
+  const suppressNextFetchRef = useRef<boolean>(false)
+  const justSelectedRef = useRef<boolean>(false)
+  const [hasJustSelected, setHasJustSelected] = useState(false)
+  const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
+
+  // Debounce search query (250ms per spec to avoid "empty flashes")
+  const debouncedQuery = useDebounce(value, 250)
+
+  // Use location from props if provided, otherwise try browser geolocation first (high accuracy), then IP geolocation
+  useEffect(() => {
+    if (propUserLat && propUserLng) {
+      // Location provided via props (from server-side) - use it directly
+      setUserLat(propUserLat)
+      setUserLng(propUserLng)
+      geoWaitRef.current = false
+    } else {
+      // No props provided - use IP geolocation only (never prompt the user)
+      geoWaitRef.current = true
+      fetch('/api/geolocation/ip')
+        .then(res => res.ok ? res.json() : null)
+        .then(ipData => {
+          if (ipData?.lat && ipData?.lng) {
+            console.log('[AddressAutocomplete] Using IP geolocation:', { lat: ipData.lat, lng: ipData.lng, source: ipData.source })
+            setUserLat(ipData.lat)
+            setUserLng(ipData.lng)
+          }
+          geoWaitRef.current = false
+        })
+        .catch(() => {
+          geoWaitRef.current = false
+        })
+    }
+  }, [propUserLat, propUserLng])
+
+  // (session token creation handled inside handleFocus; reset in handleBlur)
+
+  // Fetch suggestions when query changes
+  useEffect(() => {
+    const trimmedQuery = debouncedQuery?.trim() || ''
+
+    // If we just selected a suggestion, suppress the next search triggered by programmatic value change
+    // Also check if the query looks like a complete formatted address (has multiple commas) - this indicates a selection was made
+    // This prevents searching when the value is accidentally set to the full formatted address
+    const looksLikeFormattedAddress = trimmedQuery.includes(',') && trimmedQuery.split(',').length >= 3
+    if (suppressNextFetchRef.current || justSelectedRef.current || hasJustSelected || isSuppressing || looksLikeFormattedAddress) {
+      // Don't reset flags here - they're managed in handleSelect
+      setIsLoading(false)
+      setIsOpen(false)
+      setShowGoogleAttribution(false)
+      setShowFallbackMessage(false)
+      return
+    }
+    
+    // Check query patterns
+    const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
+    const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].+)$/)
+    const isDigitsStreet = digitsStreetMatch !== null
+    const hasCoords = Boolean(userLat && userLng)
+    
+    // Minimum length: 1 for numeric-only, 2 for general text
+    const minLength = isNumericOnly ? 1 : 2
+    
+    console.log(`[AddressAutocomplete] Query processing: "${trimmedQuery}" (length: ${trimmedQuery.length}, minLength: ${minLength}, isNumericOnly: ${isNumericOnly}, isDigitsStreet: ${isDigitsStreet}, hasCoords: ${hasCoords})`)
+    
+    if (!trimmedQuery || trimmedQuery.length < minLength) {
+      console.log(`[AddressAutocomplete] Query too short: "${trimmedQuery}" (length: ${trimmedQuery.length} < ${minLength})`)
+      setSuggestions([])
+      setIsOpen(false)
+      setShowFallbackMessage(false)
+      return
+    }
+    
+    const currentId = ++requestIdRef.current
+    setIsLoading(true)
+    setShowFallbackMessage(false)
+
+    // Don't block on location - send request immediately (with or without coords)
+    // Will refresh automatically when coords arrive (see useEffect below)
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    lastHadCoordsRef.current = hasCoords
+    
+    // Try Google first when we have coords and minimum length
+    const minLen = isNumericOnly ? 1 : 2
+
+    if (hasCoords && trimmedQuery.length >= minLen && googleSessionToken) {
+      if (abortRef.current) abortRef.current.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      googleAutocomplete(trimmedQuery, userLat as number, userLng as number, googleSessionToken, controller.signal)
+        .then(async (predictions) => {
+          if (requestIdRef.current !== currentId) return
+          if (predictions && predictions.length > 0) {
+            setShowGoogleAttribution(true)
+            // Render predictions as suggestions (without coords) using their primary/secondary text
+            const limited = predictions.slice(0, 2)
+            const suggestions: AddressSuggestion[] = limited.map((p, _idx) => ({
+              id: `google:${p.placeId}`,
+              label: p.primaryText + (p.secondaryText ? `, ${p.secondaryText}` : ''),
+              lat: userLat as number,
+              lng: userLng as number,
+            }))
+            setSuggestions(suggestions)
+            setIsOpen(suggestions.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+            setIsLoading(false)
+          } else {
+            // Google returned empty → fallback to OSM
+            setShowGoogleAttribution(false)
+            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+              .then((results) => {
+                if (requestIdRef.current !== currentId) return
+                const unique: AddressSuggestion[] = []
+                const seen = new Set<string>()
+                for (const s of results) {
+                  const key = s.id
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    unique.push(s)
+                  }
+                }
+                setSuggestions(unique)
+                setIsOpen(unique.length > 0)
+                setSelectedIndex(-1)
+                setShowFallbackMessage(unique.length > 0)
+              })
+              .finally(() => setIsLoading(false))
+          }
+        })
+        .catch(() => {
+          // Google error → fallback
+          if (requestIdRef.current !== currentId) return
+          setShowGoogleAttribution(false)
+          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results) => {
+              if (requestIdRef.current !== currentId) return
+              const unique: AddressSuggestion[] = []
+              const seen = new Set<string>()
+              for (const s of results) {
+                const key = s.id
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(s)
+                }
+              }
+              setSuggestions(unique)
+              setIsOpen(unique.length > 0)
+              setSelectedIndex(-1)
+              setShowFallbackMessage(unique.length > 0)
+            })
+            .finally(() => setIsLoading(false))
+        })
+      return
+    }
+
+    // For digits+street queries with coords, try Overpass first
+    if (isDigitsStreet && hasCoords && digitsStreetMatch?.groups) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AddressAutocomplete] Fetching Overpass addresses (digits+street)', { q: trimmedQuery, userLat, userLng })
+      }
+      
+      fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
+        .then((response) => {
+          if (requestIdRef.current !== currentId) return
+          
+          // Always log for debugging distance issues
+          console.log(`[AddressAutocomplete] Overpass response (digits+street): ok=${response.ok}, dataCount=${response.data?.length || 0}, userCoords=[${userLat}, ${userLng}]`)
+          console.log('[AddressAutocomplete] Overpass response (digits+street) details:', {
+            ok: response.ok,
+            code: response.code,
+            dataCount: response.data?.length || 0,
+            userCoords: [userLat, userLng],
+            debug: response._debug,
+            fullResponse: response, // Full response for debugging
+            firstResult: response.data?.[0] ? {
+              label: response.data[0].label,
+              coords: [response.data[0].lat, response.data[0].lng],
+              address: response.data[0].address
+            } : null
+          })
+          
+          if (response.ok && response.data && response.data.length > 0) {
+            // Overpass succeeded
+            const unique: AddressSuggestion[] = []
+            const seen = new Set<string>()
+            for (const s of response.data) {
+              const key = s.id
+              if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(s)
+              }
+            }
+            
+            // Calculate distances and sort by distance (closest first)
+            const withDistances = unique.map(s => {
+              const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
+              const dy = (s.lat - (userLat as number)) * 111320
+              const distanceM = Math.sqrt(dx * dx + dy * dy)
+              return {
+                suggestion: s,
+                distanceM: distanceM,
+                distanceKm: (distanceM / 1000).toFixed(2)
+              }
+            })
+            
+            // Sort by distance (closest first)
+            withDistances.sort((a, b) => a.distanceM - b.distanceM)
+            
+            // Extract sorted suggestions
+            const sortedUnique = withDistances.map(item => item.suggestion)
+            
+            // Log first result distance directly for visibility
+            if (withDistances.length > 0) {
+              console.log(`[AddressAutocomplete] FIRST RESULT (digits+street): "${withDistances[0].suggestion.label}" - Distance: ${withDistances[0].distanceKm} km (${Math.round(withDistances[0].distanceM)} m)`)
+              if (withDistances.length > 1) {
+                console.log(`[AddressAutocomplete] SECOND RESULT (digits+street): "${withDistances[1].suggestion.label}" - Distance: ${withDistances[1].distanceKm} km (${Math.round(withDistances[1].distanceM)} m)`)
+              }
+            }
+            
+            console.log('[AddressAutocomplete] Overpass results with distances (digits+street, sorted):', {
+              count: sortedUnique.length,
+              results: withDistances.map(item => ({
+                label: item.suggestion.label,
+                coords: [item.suggestion.lat, item.suggestion.lng],
+                distanceM: Math.round(item.distanceM),
+                distanceKm: item.distanceKm
+              })),
+              rawResults: sortedUnique.map(s => ({
+                id: s.id,
+                label: s.label,
+                lat: s.lat,
+                lng: s.lng,
+                address: s.address
+              })),
+              debug: response._debug
+            })
+            
+            if (process.env.NODE_ENV === 'development' && sortedUnique.length > 0) {
+              console.log('[AddressAutocomplete] Received Overpass addresses (digits+street, sorted by distance)', {
+                count: sortedUnique.length,
+                first: sortedUnique[0]?.label,
+                all: sortedUnique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
+                debug: response._debug
+              })
+            }
+            setSuggestions(sortedUnique)
+            setIsOpen(sortedUnique.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+            if (requestIdRef.current === currentId) setIsLoading(false)
+          } else {
+            // Overpass failed or returned empty - fallback to Nominatim
+            console.warn(`[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim for "${trimmedQuery}"`)
+            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+              .then((results) => {
+                if (requestIdRef.current !== currentId) return
+                const unique: AddressSuggestion[] = []
+                const seen = new Set<string>()
+                for (const s of results) {
+                  const key = s.id
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    unique.push(s)
+                  }
+                }
+                
+                // Calculate and log distances for Nominatim fallback results
+                // Filter to only actual street addresses (with house number or matching street pattern)
+                // For very short street inputs (e.g., 'pr'), skip aggressive filtering to avoid losing valid results
+                const streetInput = (trimmedQuery.match(/^\d+\s+(.+)$/)?.[1] || '').trim()
+                const isShortStreet = streetInput.length > 0 && streetInput.length < 3
+                const filteredUnique = (isShortStreet ? unique : unique.filter(s => {
+                  // Include if it has a house number
+                  if (s.address?.houseNumber) return true
+                  // Include if label matches pattern like "5001 Main St" or starts with number
+                  if (s.label.match(/^\d+\s+[A-Za-z]/)) return true
+                  // Include if it has a road and label starts with number
+                  if (s.address?.road && s.label.match(/^\d+/)) return true
+                  return false
+                }))
+                
+                // Recalculate distances for filtered results
+                const filteredWithDistances = filteredUnique.map(s => {
+                  const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
+                  const dy = (s.lat - (userLat as number)) * 111320
+                  const distanceM = Math.sqrt(dx * dx + dy * dy)
+                  return {
+                    suggestion: s,
+                    distanceM: distanceM,
+                    distanceKm: (distanceM / 1000).toFixed(2)
+                  }
+                })
+                
+                // Sort by distance (closest first)
+                filteredWithDistances.sort((a, b) => a.distanceM - b.distanceM)
+                
+                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} total, ${filteredUnique.length} after filtering`)
+                if (filteredWithDistances.length > 0) {
+                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${filteredWithDistances[0].suggestion.label}" - Distance: ${filteredWithDistances[0].distanceKm} km (${Math.round(filteredWithDistances[0].distanceM)} m)`)
+                  if (filteredWithDistances.length > 1) {
+                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${filteredWithDistances[1].suggestion.label}" - Distance: ${filteredWithDistances[1].distanceKm} km (${Math.round(filteredWithDistances[1].distanceM)} m)`)
+                  }
+                }
+                
+                // Extract sorted suggestions
+                const sortedUnique = filteredWithDistances.map(item => item.suggestion)
+                
+                setSuggestions(sortedUnique)
+                setIsOpen(sortedUnique.length > 0)
+                setSelectedIndex(-1)
+                setShowFallbackMessage(sortedUnique.length > 0)
+                if (requestIdRef.current === currentId) setIsLoading(false)
+              })
+          }
+        })
+        .catch((err) => {
+          if (requestIdRef.current !== currentId) return
+          if (err?.name === 'AbortError') {
+            if (requestIdRef.current === currentId) setIsLoading(false)
+            return
+          }
+          
+          // Fallback to Nominatim on error
+          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results) => {
+              if (requestIdRef.current !== currentId) return
+              const unique: AddressSuggestion[] = []
+              const seen = new Set<string>()
+              for (const s of results) {
+                const key = s.id
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(s)
+                }
+              }
+              setSuggestions(unique)
+              setIsOpen(unique.length > 0)
+              setSelectedIndex(-1)
+              setShowFallbackMessage(unique.length > 0)
+              if (requestIdRef.current === currentId) setIsLoading(false)
+            })
+            .catch((fallbackErr) => {
+              if (requestIdRef.current !== currentId) return
+              if (fallbackErr?.name === 'AbortError') {
+                if (requestIdRef.current === currentId) setIsLoading(false)
+                return
+              }
+              console.error('Suggest error:', fallbackErr)
+              setSuggestions([])
+              setIsOpen(false)
+              if (requestIdRef.current === currentId) setIsLoading(false)
+            })
+        })
+    } else if (isNumericOnly && hasCoords) {
+      // For numeric-only queries with coords, try Overpass first
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AddressAutocomplete] Fetching Overpass addresses', { prefix: trimmedQuery, userLat, userLng })
+      }
+      
+      fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
+        .then((response) => {
+          if (requestIdRef.current !== currentId) return
+          
+          // Always log for debugging distance issues
+          console.log(`[AddressAutocomplete] Overpass response (numeric-only): ok=${response.ok}, dataCount=${response.data?.length || 0}, userCoords=[${userLat}, ${userLng}], prefix="${trimmedQuery}"`)
+          if (response.data?.length === 0) {
+            console.warn(`[AddressAutocomplete] Overpass returned 0 results for prefix "${trimmedQuery}" at [${userLat}, ${userLng}] - will fallback to Nominatim`)
+          }
+          console.log('[AddressAutocomplete] Overpass response (numeric-only) details:', {
+            ok: response.ok,
+            code: response.code,
+            dataCount: response.data?.length || 0,
+            userCoords: [userLat, userLng],
+            prefix: trimmedQuery,
+            debug: response._debug,
+            fullResponse: response, // Full response for debugging
+            firstResult: response.data?.[0] ? {
+              label: response.data[0].label,
+              coords: [response.data[0].lat, response.data[0].lng],
+              address: response.data[0].address
+            } : null
+          })
+          
+          if (response.ok && response.data && response.data.length > 0) {
+            // Overpass succeeded
+            const unique: AddressSuggestion[] = []
+            const seen = new Set<string>()
+            for (const s of response.data) {
+              const key = s.id
+              if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(s)
+              }
+            }
+            
+            // Calculate distances and sort by distance (closest first)
+            const withDistances = unique.map(s => {
+              const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
+              const dy = (s.lat - (userLat as number)) * 111320
+              const distanceM = Math.sqrt(dx * dx + dy * dy)
+              return {
+                suggestion: s,
+                distanceM: distanceM,
+                distanceKm: (distanceM / 1000).toFixed(2)
+              }
+            })
+            
+            // Sort by distance (closest first)
+            withDistances.sort((a, b) => a.distanceM - b.distanceM)
+            
+            // Extract sorted suggestions
+            const sortedUnique = withDistances.map(item => item.suggestion)
+            
+            // Log first result distance directly for visibility
+            if (withDistances.length > 0) {
+              console.log(`[AddressAutocomplete] FIRST RESULT (numeric-only): "${withDistances[0].suggestion.label}" - Distance: ${withDistances[0].distanceKm} km (${Math.round(withDistances[0].distanceM)} m)`)
+              if (withDistances.length > 1) {
+                console.log(`[AddressAutocomplete] SECOND RESULT (numeric-only): "${withDistances[1].suggestion.label}" - Distance: ${withDistances[1].distanceKm} km (${Math.round(withDistances[1].distanceM)} m)`)
+              }
+            }
+            
+            console.log('[AddressAutocomplete] Overpass results with distances (numeric-only, sorted):', {
+              count: sortedUnique.length,
+              results: withDistances.map(item => ({
+                label: item.suggestion.label,
+                coords: [item.suggestion.lat, item.suggestion.lng],
+                distanceM: Math.round(item.distanceM),
+                distanceKm: item.distanceKm
+              })),
+              rawResults: sortedUnique.map(s => ({
+                id: s.id,
+                label: s.label,
+                lat: s.lat,
+                lng: s.lng,
+                address: s.address
+              })),
+              debug: response._debug
+            })
+            
+            if (process.env.NODE_ENV === 'development' && sortedUnique.length > 0) {
+              console.log('[AddressAutocomplete] Received Overpass addresses (sorted by distance)', { 
+                count: sortedUnique.length, 
+                first: sortedUnique[0]?.label,
+                all: sortedUnique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
+                debug: response._debug
+              })
+            }
+            setSuggestions(sortedUnique)
+            setIsOpen(sortedUnique.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+            if (requestIdRef.current === currentId) setIsLoading(false)
+          } else {
+            // Overpass failed or returned empty
+            // For numeric-only queries, don't fallback to Nominatim because free-text search
+            // for just a number returns irrelevant results (places with the number in the name, not addresses)
+            console.warn(`[AddressAutocomplete] Overpass returned 0 results for numeric-only query "${trimmedQuery}" - showing no results (Nominatim fallback disabled for numeric-only queries)`)
+            setSuggestions([])
+            setIsOpen(false)
+            setShowFallbackMessage(false)
+            if (requestIdRef.current === currentId) setIsLoading(false)
+            return
+          }
+        })
+        .catch((err) => {
+          if (requestIdRef.current !== currentId) return
+          if (err?.name === 'AbortError') {
+            if (requestIdRef.current === currentId) setIsLoading(false)
+            return
+          }
+          
+          // On error, also don't fallback for numeric-only queries
+          console.warn(`[AddressAutocomplete] Overpass error for numeric-only query "${trimmedQuery}" - showing no results`)
+          setSuggestions([])
+          setIsOpen(false)
+          if (requestIdRef.current === currentId) setIsLoading(false)
+        })
+      } else {
+        // For non-numeric queries, use Nominatim directly (existing behavior)
+        console.log(`[AddressAutocomplete] Fetching Nominatim suggestions for non-numeric query: "${trimmedQuery.substring(0, 30)}"`, { userLat, userLng, hasCoords: !!userLat && !!userLng })
+        fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+          .then((results) => {
+            if (requestIdRef.current !== currentId) return
+            console.log(`[AddressAutocomplete] Nominatim returned ${results.length} results for "${trimmedQuery.substring(0, 30)}"`)
+            const unique: AddressSuggestion[] = []
+            const seen = new Set<string>()
+            for (const s of results) {
+              const key = s.id
+              if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(s)
+              }
+            }
+            console.log(`[AddressAutocomplete] Nominatim unique results: ${unique.length} (after deduplication)`)
+            if (unique.length > 0) {
+              console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim): "${unique[0]?.label}"`)
+            }
+            setSuggestions(unique)
+            setIsOpen(unique.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+          })
+          .catch((err) => {
+            if (requestIdRef.current !== currentId) return
+            if (err?.name === 'AbortError') return
+            console.error(`[AddressAutocomplete] Nominatim error for "${trimmedQuery.substring(0, 30)}":`, err)
+            setSuggestions([])
+            setIsOpen(false)
+          })
+          .finally(() => {
+            if (requestIdRef.current === currentId) setIsLoading(false)
+          })
+      }
+    }, [debouncedQuery, userLat, userLng])
+
+  // If last fetch lacked coords and coords arrive, abort stale request and refetch with coords
+  useEffect(() => {
+    const trimmedQuery = debouncedQuery?.trim() || ''
+    const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
+    const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].+)$/)
+    const isDigitsStreet = digitsStreetMatch !== null
+    const minLength = isNumericOnly ? 1 : 2
+    
+    if (!trimmedQuery || trimmedQuery.length < minLength) return
+    if (!userLat || !userLng) return
+    if (lastHadCoordsRef.current) return
+    
+    const currentId = ++requestIdRef.current
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setIsLoading(true)
+    setShowFallbackMessage(false)
+    
+    // For digits+street queries, use Overpass with full query string
+    if (isDigitsStreet && digitsStreetMatch?.groups) {
+      fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
+        .then((response) => {
+          if (requestIdRef.current !== currentId) return
+          if (response.ok && response.data && response.data.length > 0) {
+            const unique: AddressSuggestion[] = []
+            const seen = new Set<string>()
+            for (const s of response.data) {
+              const key = s.id
+              if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(s)
+              }
+            }
+            setSuggestions(unique)
+            setIsOpen(unique.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+          } else {
+            // Fallback to Nominatim
+            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+              .then((results) => {
+                if (requestIdRef.current !== currentId) return
+                const unique: AddressSuggestion[] = []
+                const seen = new Set<string>()
+                for (const s of results) {
+                  const key = s.id
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    unique.push(s)
+                  }
+                }
+                // Sort by distance for digits+street mode
+                const sorted = sortByDistance(unique, userLat, userLng)
+                setSuggestions(sorted)
+                setIsOpen(sorted.length > 0)
+                setSelectedIndex(-1)
+                setShowFallbackMessage(sorted.length > 0)
+              })
+          }
+        })
+        .catch(() => {
+          // Fallback to Nominatim on error
+          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results) => {
+              if (requestIdRef.current !== currentId) return
+              const unique: AddressSuggestion[] = []
+              const seen = new Set<string>()
+              for (const s of results) {
+                const key = s.id
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(s)
+                }
+              }
+              // Sort by distance for digits+street mode
+              const sorted = sortByDistance(unique, userLat, userLng)
+              setSuggestions(sorted)
+              setIsOpen(sorted.length > 0)
+              setSelectedIndex(-1)
+              setShowFallbackMessage(sorted.length > 0)
+            })
+            .catch(() => {})
+        })
+        .finally(() => setIsLoading(false))
+    } else if (isNumericOnly) {
+      // For numeric-only queries, use Overpass; otherwise use Nominatim
+      fetchOverpassAddresses(trimmedQuery, userLat, userLng, 2, controller.signal)
+        .then((response) => {
+          if (requestIdRef.current !== currentId) return
+          if (response.ok && response.data && response.data.length > 0) {
+            const unique: AddressSuggestion[] = []
+            const seen = new Set<string>()
+            for (const s of response.data) {
+              const key = s.id
+              if (!seen.has(key)) {
+                seen.add(key)
+                unique.push(s)
+              }
+            }
+            setSuggestions(unique)
+            setIsOpen(unique.length > 0)
+            setSelectedIndex(-1)
+            setShowFallbackMessage(false)
+          } else {
+            // Fallback to Nominatim
+            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+              .then((results) => {
+                if (requestIdRef.current !== currentId) return
+                const unique: AddressSuggestion[] = []
+                const seen = new Set<string>()
+                for (const s of results) {
+                  const key = s.id
+                  if (!seen.has(key)) {
+                    seen.add(key)
+                    unique.push(s)
+                  }
+                }
+                // Sort by distance for numeric-only mode
+                const sorted = sortByDistance(unique, userLat, userLng)
+                setSuggestions(sorted)
+                setIsOpen(sorted.length > 0)
+                setSelectedIndex(-1)
+                setShowFallbackMessage(sorted.length > 0)
+              })
+          }
+        })
+        .catch(() => {
+          // Fallback to Nominatim on error
+          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results) => {
+              if (requestIdRef.current !== currentId) return
+              const unique: AddressSuggestion[] = []
+              const seen = new Set<string>()
+              for (const s of results) {
+                const key = s.id
+                if (!seen.has(key)) {
+                  seen.add(key)
+                  unique.push(s)
+                }
+              }
+              // Sort by distance for numeric-only mode
+              const sorted = sortByDistance(unique, userLat, userLng)
+              setSuggestions(sorted)
+              setIsOpen(sorted.length > 0)
+              setSelectedIndex(-1)
+              setShowFallbackMessage(sorted.length > 0)
+            })
+            .catch(() => {})
+        })
+        .finally(() => setIsLoading(false))
+    } else {
+      fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+        .then((results) => {
+          if (requestIdRef.current !== currentId) return
+          const unique: AddressSuggestion[] = []
+          const seen = new Set<string>()
+          for (const s of results) {
+            const key = s.id
+            if (!seen.has(key)) {
+              seen.add(key)
+              unique.push(s)
+            }
+          }
+          setSuggestions(unique)
+          setIsOpen(unique.length > 0)
+          setSelectedIndex(-1)
+          setShowFallbackMessage(false)
+        })
+        .catch(() => {})
+        .finally(() => setIsLoading(false))
+    }
+  }, [userLat, userLng, debouncedQuery])
+
+  // Handle suggestion selection
+  const handleSelect = useCallback((suggestion: AddressSuggestion) => {
+    const run = async () => {
+      let final = suggestion
+      
+      // ALWAYS fetch Place Details for Google suggestions (never short-circuit)
+      if (suggestion.id?.startsWith('google:') && googleSessionToken) {
+        const placeId = suggestion.id.split(':')[1]
+        const details = await googlePlaceDetails(placeId, googleSessionToken).catch((error) => {
+          console.error('[AddressAutocomplete] Error fetching Google Place Details:', error)
+          return null
+        })
+        if (details) {
+          final = details
+        } else {
+          // If Details fails, fall back to original suggestion but log warning
+          console.warn('[AddressAutocomplete] Google Place Details returned null, using original suggestion')
+        }
+        // End session after selection
+        setGoogleSessionToken(null)
+      }
+
+      // Extract address components from normalized suggestion
+      const addressLine1 = final.address?.line1 || final.address?.road || ''
+      const city = final.address?.city || ''
+      const state = final.address?.state || ''
+      const zip = final.address?.zip || final.address?.postcode || ''
+      const _country = final.address?.country || 'US' // Extracted but not currently used in callback
+      
+      // Use line1 (street address) for the address field, not the full formatted label
+      // Parse from label only if address components are missing, but never use full label
+      let streetAddress = addressLine1
+      if (!streetAddress && final.label) {
+        // Try to extract street address from label (first part before first comma)
+        const firstPart = final.label.split(',')[0]?.trim()
+        if (firstPart && firstPart.length > 0) {
+          streetAddress = firstPart
+        }
+      }
+      // Safety check: if streetAddress looks like a full formatted address (contains multiple commas),
+      // extract just the first part
+      if (streetAddress && streetAddress.includes(',')) {
+        streetAddress = streetAddress.split(',')[0]?.trim() || ''
+      }
+      // If still no street address, use empty string rather than full label
+      if (!streetAddress) {
+        streetAddress = ''
+      }
+
+      // Prevent an immediate re-query from the newly populated address value
+      suppressNextFetchRef.current = true
+      justSelectedRef.current = true
+      setHasJustSelected(true)
+      setIsSuppressing(true) // Update state for JSX render
+      
+      // Close dropdown first
+      setIsOpen(false)
+      setSuggestions([])
+      setShowFallbackMessage(false)
+      setShowGoogleAttribution(false)
+
+      // Call onPlaceSelected to update all form fields atomically
+      // Use street address (line1) for address field, not full formatted label
+      if (onPlaceSelected) {
+        const placeData = {
+          address: streetAddress, // Use street address (number + street name)
+          city: city || '',
+          state: state || '',
+          zip: zip || '',
+          lat: final.lat,
+          lng: final.lng
+        }
+        try {
+          onPlaceSelected(placeData)
+        } catch (error) {
+          console.error('[AddressAutocomplete] Error calling onPlaceSelected:', error)
+        }
+      }
+      
+      // Update the input value to match (use street address for display)
+      // Use setTimeout to ensure parent's onChange completes first and prevent re-query
+      setTimeout(() => {
+        onChange(streetAddress)
+        // Keep focus on input after selection
+        inputRef.current?.focus()
+        // Keep suppress flag active for longer to prevent debounced query and blur geocoding
+        setTimeout(() => {
+          suppressNextFetchRef.current = false
+          justSelectedRef.current = false
+          setHasJustSelected(false)
+          setIsSuppressing(false) // Update state for JSX render
+        }, 2000) // Increased to 2 seconds to prevent blur handler from geocoding
+      }, 0)
+    }
+    run()
+  }, [onChange, onPlaceSelected, googleSessionToken])
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen || suggestions.length === 0) {
+      const trimmedValue = value?.trim() || ''
+      const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
+      const minLength = isNumericOnly ? 1 : 2
+      if (e.key === 'Enter' && value.length >= minLength) {
+        handleBlur()
+      }
+      return
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1))
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
+          handleSelect(suggestions[selectedIndex])
+        }
+        break
+      case 'Escape':
+        e.preventDefault()
+        setIsOpen(false)
+        setSuggestions([])
+        break
+    }
+  }
+
+  // Handle blur (geocode if no selection)
+  const handleBlur = async () => {
+    // Don't reset session token on blur if we just selected (allow Details call to complete)
+    if (!justSelectedRef.current) {
+      setGoogleSessionToken(null)
+    }
+    // Delay to allow click on suggestion to register
+    setTimeout(async () => {
+      // Only geocode if:
+      // 1. Dropdown is closed
+      // 2. We didn't just select (check both ref and state)
+      // 3. Not already geocoding
+      // 4. Value is long enough
+      // 5. Suppress flag is not active (additional safety check)
+      if (
+        value && 
+        value.length >= 5 && 
+        onPlaceSelected && 
+        !isGeocoding && 
+        !isOpen && 
+        !justSelectedRef.current && 
+        !hasJustSelected &&
+        !suppressNextFetchRef.current
+      ) {
+        setIsGeocoding(true)
+        try {
+          const result = await geocodeAddress(value)
+          if (result) {
+            onPlaceSelected({
+              address: result.formatted_address,
+              city: result.city || '',
+              state: result.state || '',
+              zip: result.zip || '',
+              lat: result.lat,
+              lng: result.lng
+            })
+          }
+        } catch (err) {
+          console.error('Geocoding error:', err)
+        } finally {
+          setIsGeocoding(false)
+        }
+      }
+    }, 200)
+  }
+
+  // Handle input focus
+  const handleFocus = () => {
+    if (!googleSessionToken) setGoogleSessionToken(newSessionToken())
+    const trimmedQuery = debouncedQuery?.trim() || ''
+    const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
+    const minLength = isNumericOnly ? 1 : 2
+    if (trimmedQuery && trimmedQuery.length >= minLength && suggestions.length > 0) {
+      setIsOpen(true)
+    }
+  }
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node) &&
+        listboxRef.current &&
+        !listboxRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
+
+  return (
+    <div>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => {
+            // Only reset selection flags if user is manually typing (not programmatic update)
+            if (!suppressNextFetchRef.current) {
+              justSelectedRef.current = false
+              setHasJustSelected(false)
+            }
+            onChange(e.target.value)
+          }}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          onFocus={handleFocus}
+          placeholder={placeholder}
+          className={className}
+          required={required}
+          minLength={5}
+          disabled={isGeocoding}
+          autoComplete="section-sell address-line1"
+          name="sale_address_line1"
+          aria-autocomplete="list"
+          aria-expanded={isOpen}
+          aria-controls="address-suggestions"
+          aria-activedescendant={selectedIndex >= 0 ? `suggestion-${selectedIndex}` : undefined}
+          role="combobox"
+        />
+        
+        {error && (
+          <p className="mt-1 text-sm text-red-600">{error}</p>
+        )}
+        
+        {(() => {
+          const trimmedValue = value?.trim() || ''
+          const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
+          const minLength = isNumericOnly ? 1 : 2
+          if (value && value.length < minLength && !error) {
+            return <p className="mt-1 text-xs text-gray-500">Type at least {minLength} {minLength === 1 ? 'character' : 'characters'}</p>
+          }
+          return null
+        })()}
+        
+        {isGeocoding && (
+          <p className="mt-1 text-xs text-gray-500">Looking up address...</p>
+        )}
+
+        {isLoading && ((() => {
+          const trimmedValue = value?.trim() || ''
+          const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
+          const minLength = isNumericOnly ? 1 : 2
+          return value.length >= minLength
+        })()) && (
+          <p className="mt-1 text-xs text-gray-500">Searching...</p>
+        )}
+
+        {/* Fallback message */}
+        {showFallbackMessage && !isLoading && suggestions.length > 0 && (
+          <p className="mt-1 text-xs text-gray-500 italic">Showing broader matches—add a street name for more precise results.</p>
+        )}
+
+        {/* No results state */}
+        {!isLoading && !hasJustSelected && !isSuppressing && (() => {
+          const trimmedValue = value?.trim() || ''
+          // Don't show "No results found" if the value looks like a complete address (has commas, city/state/zip pattern)
+          const looksLikeCompleteAddress = /,/.test(trimmedValue) && trimmedValue.length > 10
+          if (looksLikeCompleteAddress) return false
+          // Don't show "No results found" if the value looks like a selected street address
+          // (starts with number, has street name, but no commas - typical of a selected address)
+          const looksLikeSelectedAddress = /^\d+\s+[A-Za-z].*[A-Za-z]/.test(trimmedValue) && !/,/.test(trimmedValue) && trimmedValue.length > 5
+          if (looksLikeSelectedAddress) return false
+          const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
+          const minLength = isNumericOnly ? 1 : 2
+          return value.length >= minLength && debouncedQuery.length >= minLength && !isOpen && suggestions.length === 0 && !error
+        })() && (
+          <p className="mt-1 text-xs text-gray-500">No results found</p>
+        )}
+
+        {/* Suggestions listbox */}
+        {isOpen && suggestions.length > 0 && (
+          <ul
+            ref={listboxRef}
+            id="address-suggestions"
+            role="listbox"
+            className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+          >
+            {suggestions.map((suggestion, index) => (
+              <li
+                key={suggestion.id}
+                id={`suggestion-${index}`}
+                role="option"
+                aria-selected={selectedIndex === index}
+                className={`px-4 py-2 cursor-pointer hover:bg-gray-100 ${
+                  selectedIndex === index ? 'bg-gray-100' : ''
+                }`}
+                onMouseDown={(e) => {
+                  e.preventDefault() // Prevent input blur
+                  handleSelect(suggestion)
+                }}
+                onMouseEnter={() => setSelectedIndex(index)}
+              >
+                <div className="font-medium">{suggestion.label}</div>
+                {suggestion.address && (() => {
+                  // Build address string from components
+                  const addressString = [
+                    suggestion.address.houseNumber,
+                    suggestion.address.road,
+                    suggestion.address.city,
+                    suggestion.address.state,
+                    suggestion.address.postcode
+                  ]
+                    .filter(Boolean)
+                    .join(', ')
+                  
+                  // Only show secondary line if it's different from the label
+                  if (addressString && addressString !== suggestion.label) {
+                    return (
+                      <div className="text-xs text-gray-500">
+                        {addressString}
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
+              </li>
+            ))}
+          </ul>
+        )}
+        {isOpen && showGoogleAttribution && <PoweredBy provider="google" />}
+      </div>
+      
+      {/* OSM Attribution - only show when OSM-based suggestions are visible (i.e., not Google) */}
+      {isOpen && !showGoogleAttribution && (
+        <div className="mt-2">
+          <OSMAttribution showGeocoding={true} />
+        </div>
+      )}
+    </div>
+  )
+}

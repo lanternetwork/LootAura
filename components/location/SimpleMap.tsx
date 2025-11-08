@@ -7,6 +7,7 @@ import { Sale } from "@/lib/types"
 import { PinsProps, HybridPinsProps } from "@/lib/pins/types"
 import PinsOverlay from "./PinsOverlay"
 import HybridPinsOverlay from "./HybridPinsOverlay"
+import OSMAttribution from "./OSMAttribution"
 
 interface SimpleMapProps {
   center: { lat: number; lng: number }
@@ -380,6 +381,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
           <div>Pins: {pins ? pins.sales.length : sales.length}</div>
         </div>
       )}
+      
+      {/* OSM Attribution */}
+      <div className="absolute bottom-2 right-2 z-40 pointer-events-none">
+        <OSMAttribution showGeocoding={false} className="bg-white bg-opacity-80 px-2 py-1 rounded" />
+      </div>
     </div>
   )
 })

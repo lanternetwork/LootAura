@@ -43,6 +43,10 @@ export type SaleItem = {
   created_at?: string
 }
 
+// Category type - must match values from lib/data/categories.ts
+import { CATEGORY_VALUES } from './data/categories'
+export type CategoryValue = (typeof CATEGORY_VALUES)[number]
+
 export type Profile = {
   id: string
   display_name?: string
@@ -63,3 +67,24 @@ export type Marker = {
   lat: number
   lng: number
 }
+
+// Draft types
+export type DraftStatus = 'active' | 'published' | 'archived'
+
+// Import type for use in SaleDraft
+import type { SaleDraftPayload as _SaleDraftPayload } from '@/lib/validation/saleDraft'
+
+export type SaleDraft = {
+  id: string
+  user_id: string
+  draft_key: string
+  title?: string
+  payload: _SaleDraftPayload
+  status: DraftStatus
+  created_at: string
+  updated_at: string
+  expires_at: string
+}
+
+// Re-export from validation schema
+export type { SaleDraftPayload, SaleDraftItem } from '@/lib/validation/saleDraft'

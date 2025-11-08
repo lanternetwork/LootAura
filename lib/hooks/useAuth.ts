@@ -26,11 +26,12 @@ export function useProfile() {
     queryFn: async () => {
       if (!user) return null
 
+      // Use profiles_v2 view instead of direct profiles table to avoid RLS/schema issues
       const { data, error } = await sb
-        .from('profiles')
-        .select('*')
+        .from('profiles_v2')
+        .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
 
       if (error && error.code !== 'PGRST116') { // Not found error
         throw new Error(error.message)

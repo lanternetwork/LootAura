@@ -20,6 +20,9 @@ export const Policies = {
   AUTH_CALLBACK:     { name: 'AUTH_CALLBACK',     limit: 10, windowSec: 60, scope: 'ip' as const }, // tiny burst
   GEO_ZIP_SHORT:     { name: 'GEO_ZIP_SHORT',     limit: 10, windowSec: 60, scope: 'ip' as const },
   GEO_ZIP_HOURLY:    { name: 'GEO_ZIP_HOURLY',    limit: 300, windowSec: 3600, scope: 'ip' as const },
+  GEO_SUGGEST_SHORT: { name: 'GEO_SUGGEST_SHORT', limit: 60, windowSec: 60, scope: 'ip' as const },
+  GEO_REVERSE_SHORT: { name: 'GEO_REVERSE_SHORT', limit: 10, windowSec: 60, scope: 'ip' as const },
+  GEO_OVERPASS_SHORT: { name: 'GEO_OVERPASS_SHORT', limit: 30, windowSec: 60, scope: 'ip' as const },
   SALES_VIEW_30S:    { name: 'SALES_VIEW_30S',    limit: 20, windowSec: 30, burstSoft: 2, softWindowSec: 5, scope: 'ip' as const },
   SALES_VIEW_HOURLY: { name: 'SALES_VIEW_HOURLY', limit: 800, windowSec: 3600, scope: 'ip' as const },
   MUTATE_MINUTE:     { name: 'MUTATE_MINUTE',     limit: 3,  windowSec: 60, scope: 'user' as const },

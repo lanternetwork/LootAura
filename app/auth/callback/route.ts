@@ -6,12 +6,25 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const code = url.searchParams.get('code')
   const error = url.searchParams.get('error')
-  const next = url.searchParams.get('next') || '/sales' // Default redirect to sales page
+  // Check for redirectTo (preferred) or next (fallback)
+  let redirectTo = url.searchParams.get('redirectTo') || url.searchParams.get('next')
+  
+  // If no redirectTo in query, default to /sales
+  if (!redirectTo) {
+    redirectTo = '/sales'
+  }
+  
+  // Decode the redirectTo if it was encoded
+  try {
+    redirectTo = decodeURIComponent(redirectTo)
+  } catch (e) {
+    // If decoding fails, use as-is
+  }
 
   console.log('[AUTH_CALLBACK] Processing OAuth callback:', { 
     hasCode: !!code, 
     hasError: !!error, 
-    next,
+    redirectTo,
     url: url.href 
   })
 
@@ -91,8 +104,8 @@ export async function GET(req: Request) {
       }
       
       // Success: user session cookies are automatically set by auth-helpers
-      console.log('[AUTH_CALLBACK] Redirecting to:', next)
-      return NextResponse.redirect(new URL(next, url.origin))
+      console.log('[AUTH_CALLBACK] Redirecting to:', redirectTo)
+      return NextResponse.redirect(new URL(redirectTo, url.origin))
     } else {
       console.log('[AUTH_CALLBACK] Code exchange succeeded but no session received')
       return NextResponse.redirect(new URL('/auth/error?error=no_session', url.origin))

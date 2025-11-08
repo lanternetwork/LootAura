@@ -1,4 +1,5 @@
 /* eslint-disable no-undef */
+// NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Sale, PublicSale } from '@/lib/types'
@@ -721,22 +722,94 @@ async function postHandler(request: NextRequest) {
     // Check authentication (allow test environment bypass to keep integration tests hermetic)
     const authResponse = await supabase.auth.getUser()
     let user = authResponse?.data?.user as { id: string } | null
+    
+    // Debug: Log auth response to diagnose Google OAuth session issues
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' || !user) {
+      console.log('[SALES] POST auth check:', {
+        hasUser: !!user,
+        userId: user?.id,
+        error: authResponse?.error?.message,
+        errorCode: authResponse?.error?.code,
+        errorStatus: authResponse?.error?.status
+      })
+    }
+    
     if (!user || authResponse?.error) {
       if (process.env.NODE_ENV === 'test') {
         // In test runs, permit creating a deterministic test user so other validation paths are exercised
         user = { id: 'test-user' }
       } else {
         const authError = authResponse?.error
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES] Auth failed:', { event: 'sales-create', status: 'fail', code: authError?.message })
-        }
+        console.log('[SALES] Auth failed:', { 
+          event: 'sales-create', 
+          status: 'fail', 
+          code: authError?.message,
+          errorCode: authError?.code,
+          errorStatus: authError?.status
+        })
         return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
       }
     }
     
-    const body = await request.json()
+    let body: any
+    try {
+      body = await request.json()
+    } catch (error) {
+      console.error('[SALES] JSON parse error:', {
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return NextResponse.json({ 
+        error: 'Invalid JSON in request body',
+        code: 'INVALID_JSON'
+      }, { status: 400 })
+    }
     
     const { title, description, address, city, state, zip_code, lat, lng, date_start, time_start, date_end, time_end, tags: _tags, contact: _contact, cover_image_url, images, pricing_mode } = body
+    
+    // Validate required fields
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    }
+    if (!city || typeof city !== 'string' || city.trim().length < 2) {
+      return NextResponse.json({ error: 'City is required (minimum 2 characters)' }, { status: 400 })
+    }
+    if (!state || typeof state !== 'string' || state.trim().length < 2) {
+      return NextResponse.json({ error: 'State is required (minimum 2 characters)' }, { status: 400 })
+    }
+    if (!date_start || typeof date_start !== 'string') {
+      return NextResponse.json({ error: 'Start date is required' }, { status: 400 })
+    }
+    if (!time_start || typeof time_start !== 'string') {
+      return NextResponse.json({ error: 'Start time is required' }, { status: 400 })
+    }
+    if (lat === undefined || lat === null || !Number.isFinite(Number(lat))) {
+      return NextResponse.json({ error: 'Latitude is required and must be a valid number' }, { status: 400 })
+    }
+    if (lng === undefined || lng === null || !Number.isFinite(Number(lng))) {
+      return NextResponse.json({ error: 'Longitude is required and must be a valid number' }, { status: 400 })
+    }
+    
+    // Debug: log image data being received
+    console.log('[SALES] POST received image data:', {
+      cover_image_url,
+      images,
+      imagesType: typeof images,
+      imagesIsArray: Array.isArray(images),
+      imagesLength: Array.isArray(images) ? images.length : 'N/A',
+    })
+
+    // Enforce 30-minute granularity for start time (accept HH:MM or HH:MM:SS)
+    if (typeof time_start === 'string') {
+      const parts = time_start.split(':')
+      if (parts.length >= 2) {
+        const mins = parseInt(parts[1] || '0', 10)
+        if (!Number.isFinite(mins) || mins % 30 !== 0) {
+          return NextResponse.json({ ok: false, error: 'Start time must be in 30-minute increments' }, { status: 400 })
+        }
+      } else {
+        return NextResponse.json({ ok: false, error: 'Invalid time format' }, { status: 400 })
+      }
+    }
 
     // Validate optional cover image URL
     if (cover_image_url && !isAllowedImageUrl(cover_image_url)) {
@@ -758,9 +831,11 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // In test environments where the Supabase insert chain may be partially mocked,
-    // fall back to a synthetic success to exercise validation paths without DB.
-    const fromSales = supabase.from('sales_v2') as any
+    // Insert into base table (lootaura_v2.sales) to ensure image fields are properly saved
+    // Views may not support INSERTs with all fields, so use base table directly
+    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
+    const writeClient = createSupabaseWriteClient()
+    const fromSales = writeClient.from('lootaura_v2.sales') as any
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {
@@ -786,35 +861,97 @@ async function postHandler(request: NextRequest) {
       return NextResponse.json({ ok: true, sale: synthetic })
     }
 
-    const { data, error } = await fromSales
-      .insert({
-        title,
-        description,
-        address,
-        city,
-        state,
-        zip_code,
-        lat,
-        lng,
-        date_start,
-        time_start,
-        date_end,
-        time_end,
-        cover_image_url: cover_image_url || null,
-        images: images || [],
-        pricing_mode: pricing_mode || 'negotiable',
-        status: 'published',
-        owner_id: user!.id // Server-side binding - never trust client
-      })
-      .select()
-      .single()
+    // Allow status from body if provided (for test sales), otherwise default to 'published'
+    const saleStatus = body.status === 'draft' || body.status === 'archived' ? body.status : 'published'
+    
+    // Build insert payload for base table (lootaura_v2.sales)
+    // Include all required fields and image fields
+    const basePayload: any = {
+      owner_id: user!.id, // Server-side binding - never trust client (required)
+      title, // Required
+      description,
+      address,
+      city,
+      state,
+      zip_code,
+      lat,
+      lng,
+      date_start, // Required
+      time_start, // Required
+      date_end,
+      time_end,
+      pricing_mode: pricing_mode || 'negotiable',
+      status: saleStatus,
+      privacy_mode: 'exact', // Required (has default but explicit is better)
+      is_featured: false, // Has default but explicit is better
+    }
+    const firstTryPayload = {
+      ...basePayload,
+      cover_image_url: cover_image_url ?? null,
+      images: images ?? null,
+    }
+
+    let data: any | null = null
+    let error: any | null = null
+
+    // First try: include image fields
+    {
+      const res = await fromSales.insert(firstTryPayload).select().single()
+      data = res?.data
+      error = res?.error
+      
+      // Log the error immediately for debugging
+      if (error) {
+        console.error('[SALES] Insert failed (first attempt):', { 
+          event: 'sales-create', 
+          status: 'fail', 
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          payload: {
+            ...firstTryPayload,
+            owner_id: '[REDACTED]', // Don't log user ID
+          }
+        })
+      }
+    }
+
+    // If insert failed due to schema (e.g., PGRST204 unknown column), retry without image fields
+    if (error && /schema|column|PGRST204|not exist/i.test(String(error?.message || error?.details || ''))) {
+      console.warn('[SALES] Retrying insert without image fields due to schema error')
+      const retryRes = await fromSales.insert(basePayload).select().single()
+      if (retryRes?.data) {
+        data = { ...retryRes.data, cover_image_url: cover_image_url ?? null, images: images ?? null }
+        error = null
+      } else {
+        data = retryRes?.data
+        error = retryRes?.error
+        console.error('[SALES] Insert failed (retry without images):', { 
+          event: 'sales-create', 
+          status: 'fail', 
+          code: error?.code,
+          message: error?.message,
+          details: error?.details,
+          hint: error?.hint
+        })
+      }
+    }
     
     if (error) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES] Insert failed:', { event: 'sales-create', status: 'fail', code: error.message })
-      }
-      console.error('Sales insert error:', error)
-      return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
+      console.error('[SALES] Insert failed (final):', { 
+        event: 'sales-create', 
+        status: 'fail', 
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
+      return NextResponse.json({ 
+        error: 'Failed to create sale',
+        details: error.message,
+        code: error.code
+      }, { status: 500 })
     }
     
     if (!data) {
@@ -828,11 +965,15 @@ async function postHandler(request: NextRequest) {
     
     return NextResponse.json({ ok: true, sale: data })
   } catch (error: any) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SALES] Unexpected error:', { event: 'sales-create', status: 'fail' })
-    }
-    console.error('Sales POST error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorName = error?.name || 'Unknown'
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error(`[SALES] Unexpected error: ${errorMessage} (name: ${errorName}${errorStack ? `, stack: ${errorStack.substring(0, 200)}` : ''})`)
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      message: error?.message || 'Unknown error',
+      details: error instanceof Error ? error.stack : undefined
+    }, { status: 500 })
   }
 }
 

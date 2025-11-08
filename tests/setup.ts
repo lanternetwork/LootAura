@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 
-import { vi } from 'vitest'
-import { makeStableSupabaseClient } from './utils/mocks/supabaseServerStable'
+import { vi, afterEach as vitestAfterEach } from 'vitest'
+import makeStableSupabaseClient from './utils/mocks/supabaseServerStable'
 
 // never re-create this per test, keep it stable
 const stableSupabase = makeStableSupabaseClient()
@@ -133,47 +133,11 @@ vi.mock('@/lib/supabase/server', () => {
   }
 })
 
-// Geocode mock ensuring non-null for valid addresses
-// @ts-ignore vitest mock hoisting in test env
-vi.mock('@/lib/geocode', () => ({
-  geocodeAddress: vi.fn(async (addr: string) => {
-    if (!addr || /invalid|fail/i.test(addr)) return null
-    return {
-      lat: 38.1405,
-      lng: -85.6936,
-      formatted_address: '123 Test St, Louisville, KY',
-      city: 'Louisville',
-      state: 'KY',
-      zip: '40201',
-    }
-  }),
-  clearGeocodeCache: vi.fn(),
-}))
+// Prefer real geocode module in combination with MSW; keep minimal mocks local to specific tests
 
-// Fetch mock for Nominatim fallback used by geocode module (always override)
-const g: any = globalThis as any
-g.fetch = vi.fn(async (input: any) => {
-  const url = typeof input === 'string' ? input : input?.url ?? ''
-  if (/nominatim\.openstreetmap\.org/.test(url)) {
-    if (/invalid|fail/i.test(url)) {
-      return new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    }
-    return new Response(
-      JSON.stringify([
-        {
-          lat: '38.1405',
-          lon: '-85.6936',
-          display_name: '123 Test St, Louisville, KY',
-          address: { city: 'Louisville', state: 'KY', postcode: '40201' },
-        },
-      ]),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
-  return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-})
+// Do not globally stub fetch; MSW server (tests/setup/msw.server.ts) will intercept network calls
 
-// Mock window.matchMedia for JSDOM test environment
+// Mock window.matchMedia for JSDOM test environment (guard Node environment)
 const mockMatchMedia = vi.fn().mockImplementation((query: string) => ({
   matches: false,
   media: query,
@@ -185,19 +149,23 @@ const mockMatchMedia = vi.fn().mockImplementation((query: string) => ({
   dispatchEvent: vi.fn(),
 }))
 
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: mockMatchMedia,
-})
+if (typeof window !== 'undefined' && (window as any)) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: mockMatchMedia,
+  })
+}
 
-// Also mock it on globalThis for broader compatibility
-Object.defineProperty(globalThis, 'matchMedia', {
-  writable: true,
-  value: mockMatchMedia,
-})
+if (typeof globalThis !== 'undefined') {
+  Object.defineProperty(globalThis as any, 'matchMedia', {
+    writable: true,
+    value: mockMatchMedia,
+  })
+}
 
-// Ensure it's available on the global object as well
-;(global as any).matchMedia = mockMatchMedia
+try {
+  (global as any).matchMedia = mockMatchMedia
+} catch {}
 
 // Console noise guardrail - fail tests on unexpected console output
 const originalConsoleError = console.error
@@ -251,6 +219,13 @@ const ALLOWED_PATTERNS = [
   // FeaturedSalesSection logging (components/landing/FeaturedSalesSection.tsx)
   /^\[FeaturedSales\]/, // FeaturedSales debug logging - tests/integration/landing.featured-demo.test.tsx
   /^Failed to fetch featured sales:/, // FeaturedSales error logging - tests/integration/landing.featured-demo.test.tsx
+  
+  // Profile API error logging (app/api/profile/route.ts)
+  /^\[PROFILE\] GET update_profile RPC failed:/, // Expected RPC error in profile not found test - tests/unit/auth/profile.test.ts
+  /^\[PROFILE\] GET update_profile RPC exception:/, // Expected RPC exception in profile not found test - tests/unit/auth/profile.test.ts
+  
+  // Sales API error logging (app/api/sales/route.ts)
+  /^\[SALES\] Unexpected error:/, // Expected error logging in sales POST handler - tests/integration/sales.imageFields.persist.test.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {
@@ -267,9 +242,31 @@ console.error = (...args: any[]) => {
 
 console.warn = (...args: any[]) => {
   const message = args.join(' ')
+  // Allow GoTrueClient warning about multiple instances (common in tests)
+  if (message.includes('Multiple GoTrueClient instances')) {
+    return // Suppress this warning
+  }
   if (!isAllowedMessage(message)) {
     throw new Error(`Unexpected console.warn: ${message}`)
   }
   originalConsoleWarn(...args)
 }
+
+// Clear geocode caches after each test to ensure determinism for TTL-based tests
+vitestAfterEach(async () => {
+  try {
+    const mod = await import('@/lib/geocode')
+    if (typeof (mod as any).clearGeocodeCache === 'function') {
+      (mod as any).clearGeocodeCache()
+    }
+  } catch {}
+  try {
+    const clear = (globalThis as any).__clearSuggestCache
+    if (typeof clear === 'function') clear()
+  } catch {}
+  try {
+    const clear = (globalThis as any).__clearOverpassCache
+    if (typeof clear === 'function') clear()
+  } catch {}
+})
 

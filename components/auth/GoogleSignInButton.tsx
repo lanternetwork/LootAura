@@ -16,9 +16,19 @@ export default function GoogleSignInButton() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
-      const redirectTo = `${window.location.origin}/auth/callback`
       
-      console.log('[GOOGLE_AUTH] Redirect URL:', redirectTo)
+      // Preserve redirect query param or sessionStorage redirect
+      const urlParams = new URLSearchParams(window.location.search)
+      const redirectParam = urlParams.get('redirectTo') || sessionStorage.getItem('auth:postLoginRedirect')
+      
+      // Build callback URL with redirectTo param
+      const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+      if (redirectParam) {
+        callbackUrl.searchParams.set('redirectTo', redirectParam)
+      }
+      const redirectTo = callbackUrl.toString()
+      
+      console.log('[GOOGLE_AUTH] Redirect URL:', redirectTo, { redirectParam })
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

@@ -77,6 +77,9 @@ export default function SalesClient({
   // Sales data state - map is source of truth
   const [mapSales, setMapSales] = useState<Sale[]>(initialSales)
   const [loading, setLoading] = useState(false)
+  
+  // Track deleted sale IDs to filter them out immediately
+  const deletedSaleIdsRef = useRef<Set<string>>(new Set())
   const [zipError, setZipError] = useState<string | null>(null)
   const [, setMapMarkers] = useState<{id: string; title: string; lat: number; lng: number}[]>([])
   const [pendingBounds, setPendingBounds] = useState<{ west: number; south: number; east: number; north: number } | null>(null)
@@ -92,6 +95,32 @@ export default function SalesClient({
   
   // Track window width for mobile detection
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
+  
+  // Listen for sales:mutated events to filter out deleted sales
+  useEffect(() => {
+    const handleSalesMutated = (event: CustomEvent) => {
+      const detail = event.detail
+      if (detail?.type === 'delete' && detail?.id) {
+        // Mark sale as deleted
+        deletedSaleIdsRef.current.add(detail.id)
+        // Remove from mapSales immediately
+        setMapSales((prev) => prev.filter((s) => s.id !== detail.id))
+      } else if (detail?.type === 'create' && detail?.id) {
+        // Remove from deleted set if it was recreated
+        deletedSaleIdsRef.current.delete(detail.id)
+      }
+    }
+    
+    window.addEventListener('sales:mutated', handleSalesMutated as EventListener)
+    return () => {
+      window.removeEventListener('sales:mutated', handleSalesMutated as EventListener)
+    }
+  }, [])
+  
+  // Filter out deleted sales from any fetched data
+  const filterDeletedSales = useCallback((sales: Sale[]) => {
+    return sales.filter((sale) => !deletedSaleIdsRef.current.has(sale.id))
+  }, [])
   
   useEffect(() => {
     const handleResize = () => {
@@ -290,13 +319,16 @@ export default function SalesClient({
       })
         
         const deduplicated = deduplicateSales(data.data)
+        // Filter out deleted sales
+        const filtered = filterDeletedSales(deduplicated)
         console.log('[FETCH] Sales received:', { 
           raw: data.data.length, 
           deduplicated: deduplicated.length,
+          filtered: filtered.length,
           bbox: bbox
         })
-        setMapSales(deduplicated)
-        setMapMarkers(deduplicated
+        setMapSales(filtered)
+        setMapMarkers(filtered
           .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
           .map(sale => ({
             id: sale.id,

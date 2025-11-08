@@ -1,11 +1,43 @@
 import { Suspense } from 'react'
+import { headers } from 'next/headers'
 import SellWizardClient from './SellWizardClient'
 
-export default function SellNewPage() {
+export default async function SellNewPage() {
+  // Get user location server-side (same pattern as sales page)
+  let userLat: number | undefined
+  let userLng: number | undefined
+  
+  try {
+    const headersList = await headers()
+    // Try Vercel headers directly first (faster, no API call)
+    const vercelLat = headersList.get('x-vercel-ip-latitude')
+    const vercelLng = headersList.get('x-vercel-ip-longitude')
+    
+    if (vercelLat && vercelLng) {
+      userLat = Number(vercelLat)
+      userLng = Number(vercelLng)
+    } else {
+      // Fallback to IP geolocation API
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+      const ipRes = await fetch(`${baseUrl}/api/geolocation/ip`, { cache: 'no-store' })
+      if (ipRes.ok) {
+        const g = await ipRes.json()
+        if (g?.lat && g?.lng) {
+          userLat = Number(g.lat)
+          userLng = Number(g.lng)
+        }
+      }
+    }
+  } catch (e) {
+    // Location fetch failed - continue without it
+    console.warn('[SellNewPage] Failed to get location:', e)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Suspense fallback={<SellWizardSkeleton />}>
-        <SellWizardClient />
+        <SellWizardClient userLat={userLat} userLng={userLng} />
       </Suspense>
     </div>
   )

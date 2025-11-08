@@ -65,28 +65,9 @@ export function WeekendStats() {
     tryIPGeolocation().then((ipSuccess) => {
       if (ipSuccess) return
       
-      // 3) Fallback to browser geolocation (requires permission)
-      if (!navigator.geolocation) {
-        console.log('[WeekendStats] Geolocation not available')
-        setStatus('error')
-        return
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          console.log('[WeekendStats] Using browser geolocation:', position.coords)
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          })
-          setStatus('ready')
-        },
-        (error) => {
-          console.warn('[WeekendStats] Geolocation error:', error)
-          setStatus('error')
-        },
-        { timeout: 5000, maximumAge: 60000 }
-      )
+      // Do NOT call browser geolocation; rely on inferred IP/location or fallback
+      console.log('[WeekendStats] Geolocation disabled by policy; using inferred or fallback location')
+      setStatus('ready')
     })
   }, [searchParams])
 

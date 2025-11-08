@@ -19,26 +19,11 @@ export interface LocationError {
 }
 
 /**
- * Get user's current location using navigator.geolocation
- * Falls back to IP geolocation if geolocation fails
+ * Get user's current location using IP geolocation (no browser prompt)
+ * Note: Browser geolocation is skipped to avoid permission prompts
  */
 export async function getCurrentLocation(): Promise<LocationResult> {
-  // Try geolocation first
-  if (navigator.geolocation) {
-    try {
-      const position = await getGeolocationPosition()
-      return {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        source: 'geolocation'
-      }
-    } catch (error) {
-      console.warn('Geolocation failed, falling back to IP geolocation:', error)
-    }
-  }
-
-  // Fallback to IP geolocation
+  // Use IP geolocation directly (no browser prompt)
   try {
     return await getIPLocation()
   } catch (error) {
@@ -141,6 +126,7 @@ export function isGeolocationSupported(): boolean {
 
 /**
  * Check if geolocation permissions are granted
+ * Note: This does NOT request geolocation - it only checks permission state
  */
 export async function checkGeolocationPermission(): Promise<boolean> {
   if (!isGeolocationSupported()) {
@@ -151,14 +137,9 @@ export async function checkGeolocationPermission(): Promise<boolean> {
     const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
     return permission.state === 'granted'
   } catch (error) {
-    // Fallback: try to get position with very short timeout
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        () => resolve(true),
-        () => resolve(false),
-        { timeout: 1000, maximumAge: 60000 }
-      )
-    })
+    // Permission query failed - don't request geolocation as fallback (would trigger prompt)
+    // Return false instead
+    return false
   }
 }
 

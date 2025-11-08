@@ -10,6 +10,7 @@ type ApiResponse<T = any> = {
   data?: T
   error?: string
   code?: string
+  details?: string
 }
 
 // POST: Publish draft (transactional: create sale + items, mark draft as published)

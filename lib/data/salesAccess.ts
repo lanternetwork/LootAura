@@ -170,7 +170,7 @@ export async function getUserDrafts(
     console.log('[SALES_ACCESS] Fetching drafts for user:', userId, 'limit:', limit, 'offset:', offset)
     
     const { data: drafts, error } = await supabase
-      .from('lootaura_v2.sale_drafts')
+      .from('sale_drafts')
       .select('id, draft_key, title, updated_at, payload')
       .eq('user_id', userId)
       .eq('status', 'active')

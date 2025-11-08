@@ -80,10 +80,11 @@ describe('Drafts API', () => {
 
   describe('POST /api/drafts', () => {
     it('should use correct schema for sale_drafts table', () => {
-      // Verify that the code uses lootaura_v2.sale_drafts
-      const tableName = 'lootaura_v2.sale_drafts'
-      expect(tableName).toBe('lootaura_v2.sale_drafts')
+      // Verify that the code uses sale_drafts (schema is set in client config)
+      const tableName = 'sale_drafts'
+      expect(tableName).toBe('sale_drafts')
       expect(tableName).not.toContain('public.')
+      expect(tableName).not.toContain('lootaura_v2.') // Schema prefix not needed when client schema is set
     })
 
     it('should validate draft payload schema', () => {
@@ -110,27 +111,31 @@ describe('Drafts API', () => {
 
   describe('GET /api/drafts', () => {
     it('should use correct schema for sale_drafts table', () => {
-      const tableName = 'lootaura_v2.sale_drafts'
-      expect(tableName).toBe('lootaura_v2.sale_drafts')
+      // Verify that the code uses sale_drafts (schema is set in client config)
+      const tableName = 'sale_drafts'
+      expect(tableName).toBe('sale_drafts')
       expect(tableName).not.toContain('public.')
+      expect(tableName).not.toContain('lootaura_v2.') // Schema prefix not needed when client schema is set
     })
   })
 
   describe('POST /api/drafts/publish', () => {
     it('should use correct schema for all tables', () => {
+      // Tables use base names (schema is set in client config)
       const tables = {
-        sale_drafts: 'lootaura_v2.sale_drafts',
-        sales: 'lootaura_v2.sales',
-        items: 'lootaura_v2.items',
+        sale_drafts: 'sale_drafts',
+        sales: 'sales',
+        items: 'items',
       }
 
-      expect(tables.sale_drafts).toBe('lootaura_v2.sale_drafts')
-      expect(tables.sales).toBe('lootaura_v2.sales')
-      expect(tables.items).toBe('lootaura_v2.items')
+      expect(tables.sale_drafts).toBe('sale_drafts')
+      expect(tables.sales).toBe('sales')
+      expect(tables.items).toBe('items')
 
-      // Verify no public. prefix
+      // Verify no schema prefix (schema is set in client config)
       Object.values(tables).forEach((table) => {
         expect(table).not.toContain('public.')
+        expect(table).not.toContain('lootaura_v2.') // Schema prefix not needed when client schema is set
       })
     })
 
@@ -149,20 +154,19 @@ describe('Drafts API', () => {
 
   describe('RLS policies', () => {
     it('should use base tables (not views) for writes', () => {
-      // Verify that we use lootaura_v2.* tables, not views
+      // Verify that we use base table names (schema is set in client config)
       // Views typically end with _v2 (e.g., sales_v2), base tables don't
       const writeTables = [
-        'lootaura_v2.sale_drafts',
-        'lootaura_v2.sales',
-        'lootaura_v2.items',
+        'sale_drafts',
+        'sales',
+        'items',
       ]
 
       writeTables.forEach((table) => {
-        expect(table).toContain('lootaura_v2.')
         expect(table).not.toContain('public.')
+        expect(table).not.toContain('lootaura_v2.') // Schema prefix not needed when client schema is set
         // Check that table name itself doesn't end with _v2 (view indicator)
-        const tableName = table.split('.').pop() || ''
-        expect(tableName).not.toMatch(/_v2$/) // Table name shouldn't end with _v2
+        expect(table).not.toMatch(/_v2$/) // Table name shouldn't end with _v2
       })
     })
   })

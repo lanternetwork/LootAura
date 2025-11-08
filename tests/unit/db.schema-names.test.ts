@@ -55,7 +55,7 @@ describe('Schema name validation', () => {
     }
   })
 
-  it('should use lootaura_v2.* for base tables in API routes', async () => {
+  it('should not use schema-qualified table names in .from() calls', async () => {
     const apiFiles = await glob('app/api/**/*.{ts,tsx}', {
       ignore: ['**/node_modules/**', '**/.next/**'],
       cwd: process.cwd(),
@@ -76,11 +76,10 @@ describe('Schema name validation', () => {
         const lines = content.split('\n')
 
         lines.forEach((line, index) => {
-          // Check for .from() calls that should use lootaura_v2.*
+          // Check for .from() calls with schema-qualified names (should use client schema instead)
           if (
-            /\.from\(['"]sale_drafts['"]\)/.test(line) ||
-            /\.from\(['"]sales['"]\)/.test(line) ||
-            /\.from\(['"]items['"]\)/.test(line)
+            /\.from\(['"]lootaura_v2\.(sale_drafts|sales|items)['"]\)/.test(line) ||
+            /\.from\(['"]public\.(sale_drafts|sales|items)['"]\)/.test(line)
           ) {
             // Allow if it's a comment or test file
             if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
@@ -103,7 +102,7 @@ describe('Schema name validation', () => {
         .map((v) => `  ${v.file}:${v.line} - ${v.content}`)
         .join('\n')
       throw new Error(
-        `Found ${violations.length} .from() call(s) without lootaura_v2.* prefix:\n${message}`
+        `Found ${violations.length} .from() call(s) with schema-qualified names (use client schema instead):\n${message}`
       )
     }
   })

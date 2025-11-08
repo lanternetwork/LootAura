@@ -319,12 +319,15 @@ export default function SalesClient({
       })
         
         const deduplicated = deduplicateSales(data.data)
+        // Filter out deleted sales
+        const filtered = filterDeletedSales(deduplicated)
         console.log('[FETCH] Sales received:', { 
           raw: data.data.length, 
           deduplicated: deduplicated.length,
+          filtered: filtered.length,
           bbox: bbox
         })
-        setMapSales(deduplicated)
+        setMapSales(filtered)
         setMapMarkers(deduplicated
           .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
           .map(sale => ({

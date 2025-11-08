@@ -33,8 +33,10 @@ export async function GET(_request: NextRequest) {
     const allDrafts = searchParams.get('all') === 'true'
 
     if (allDrafts) {
-      // Return all active drafts for user
-      const { data: drafts, error } = await supabase
+      // Return all active drafts for user (use write client for lootaura_v2 schema)
+      const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
+      const writeClient = createSupabaseWriteClient()
+      const { data: drafts, error } = await writeClient
         .from('sale_drafts')
         .select('id, draft_key, title, payload, updated_at')
         .eq('user_id', user.id)
@@ -58,8 +60,10 @@ export async function GET(_request: NextRequest) {
       })
     }
 
-    // Fetch latest active draft for user (original behavior)
-    const { data: draft, error } = await supabase
+    // Fetch latest active draft for user (original behavior) - use write client for lootaura_v2 schema
+    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
+    const writeClient = createSupabaseWriteClient()
+    const { data: draft, error } = await writeClient
       .from('sale_drafts')
       .select('id, payload, updated_at')
       .eq('user_id', user.id)
@@ -123,7 +127,8 @@ export async function GET(_request: NextRequest) {
 // POST: Save or update draft
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
+    const supabase = createSupabaseWriteClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -277,8 +282,10 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Mark draft as archived (soft delete)
-    const { error } = await supabase
+    // Mark draft as archived (soft delete) - use write client for lootaura_v2 schema
+    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
+    const writeClient = createSupabaseWriteClient()
+    const { error } = await writeClient
       .from('sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)

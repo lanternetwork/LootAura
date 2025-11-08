@@ -169,7 +169,11 @@ export async function getUserDrafts(
   try {
     console.log('[SALES_ACCESS] Fetching drafts for user:', userId, 'limit:', limit, 'offset:', offset)
     
-    const { data: drafts, error } = await supabase
+    // Use write client for reading drafts (they're in lootaura_v2 schema)
+    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
+    const writeClient = createSupabaseWriteClient()
+    
+    const { data: drafts, error } = await writeClient
       .from('sale_drafts')
       .select('id, draft_key, title, updated_at, payload')
       .eq('user_id', userId)

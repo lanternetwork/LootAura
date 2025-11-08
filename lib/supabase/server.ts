@@ -47,6 +47,36 @@ export function createSupabaseServerClient() {
         cookieStore.set({ name, value: '', ...options, maxAge: 0 })
       },
     },
-    db: { schema: 'lootaura_v2' }, // Use lootaura_v2 schema; use table names without schema prefix in .from() calls
+    db: { schema: 'public' }, // Use public schema for reading views (sales_v2, items_v2)
+  });
+}
+
+/**
+ * Create Supabase client for writing to base tables in lootaura_v2 schema
+ * Use this for writes to base tables (sales, items, sale_drafts)
+ */
+export function createSupabaseWriteClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anon) {
+    throw new Error('Supabase credentials missing');
+  }
+
+  const cookieStore = cookies()
+
+  return createServerClient(url, anon, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value
+      },
+      set(name: string, value: string, options: CookieOptions) {
+        cookieStore.set({ name, value, ...options })
+      },
+      remove(name: string, options: CookieOptions) {
+        cookieStore.set({ name, value: '', ...options, maxAge: 0 })
+      },
+    },
+    db: { schema: 'lootaura_v2' }, // Use lootaura_v2 schema for writes to base tables
   });
 }

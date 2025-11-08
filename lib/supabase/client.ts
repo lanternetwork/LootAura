@@ -19,6 +19,6 @@ export function createSupabaseBrowserClient() {
     throw new Error(error);
   }
 
-  // Use lootaura_v2 schema; use table names without schema prefix in .from() calls
-  return createBrowserClient(url, anon, { db: { schema: 'lootaura_v2' } });
+  // Use public schema for reading views (sales_v2, items_v2)
+  return createBrowserClient(url, anon, { db: { schema: 'public' } });
 }

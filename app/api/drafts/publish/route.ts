@@ -16,7 +16,8 @@ type ApiResponse<T = any> = {
 // POST: Publish draft (transactional: create sale + items, mark draft as published)
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
+    const supabase = createSupabaseWriteClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {

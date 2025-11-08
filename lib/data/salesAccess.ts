@@ -435,14 +435,17 @@ export async function getSaleWithItems(
             .eq('sale_id', saleId)
             .limit(10)
           
+          // Type assertion needed because admin client types may not be fully inferred
+          const adminItems = adminItemsRes.data as Array<{ id: string; sale_id: string; name: string; category: string | null }> | null
+          
           console.log('[SALES_ACCESS] Admin client items check (bypasses RLS):', {
             saleId,
-            adminItemsCount: adminItemsRes.data?.length || 0,
+            adminItemsCount: adminItems?.length || 0,
             adminItemsError: adminItemsRes.error ? {
               code: adminItemsRes.error.code,
               message: adminItemsRes.error.message,
             } : null,
-            adminItems: adminItemsRes.data?.map(i => ({ id: i.id, name: i.name, category: i.category })),
+            adminItems: adminItems?.map(i => ({ id: i.id, name: i.name, category: i.category })),
             note: 'If admin finds items but view returns 0, there may be a view/RLS issue',
           })
         }

@@ -238,6 +238,14 @@ export async function getItemsForSale(
       }
       return []
     }
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[SALES_ACCESS] getItemsForSale result:', {
+        saleId,
+        itemsCount: items?.length || 0,
+        items,
+      })
+    }
 
     // Map items to SaleItem type
     const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => ({
@@ -377,6 +385,15 @@ export async function getSaleWithItems(
     }
     if (itemsRes.error && process.env.NODE_ENV !== 'production') {
       console.error('[SALES_ACCESS] Error fetching items:', itemsRes.error)
+    }
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[SALES_ACCESS] Items fetch result:', {
+        saleId,
+        itemsResError: itemsRes.error,
+        itemsCount: itemsRes.data?.length || 0,
+        items: itemsRes.data,
+      })
     }
     if (tagsRes.error && process.env.NODE_ENV !== 'production') {
       console.error('[SALES_ACCESS] Error fetching tags:', tagsRes.error)

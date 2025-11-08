@@ -227,7 +227,7 @@ export async function getItemsForSale(
   try {
     const { data: items, error } = await supabase
       .from('items_v2')
-      .select('id, sale_id, name, category, condition, price, images, is_sold, created_at, updated_at')
+      .select('id, sale_id, name, category, price, images, is_sold, created_at, updated_at')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: true })
       .limit(limit)
@@ -382,7 +382,7 @@ export async function getSaleWithItems(
         .maybeSingle(),
       supabase
         .from('items_v2')
-        .select('id, sale_id, name, category, condition, price, images, is_sold, created_at, updated_at')
+        .select('id, sale_id, name, category, price, images, is_sold, created_at, updated_at')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: false }),
     ])

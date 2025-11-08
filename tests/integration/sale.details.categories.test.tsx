@@ -59,6 +59,26 @@ vi.mock('@/lib/images/cover', () => ({
   getSaleCoverUrl: vi.fn(() => null),
 }))
 
+// Mock SimpleMap
+vi.mock('@/components/location/SimpleMap', () => ({
+  default: () => <div data-testid="simple-map">Map</div>,
+}))
+
+// Mock SellerActivityCard
+vi.mock('@/components/sales/SellerActivityCard', () => ({
+  SellerActivityCard: () => <div data-testid="seller-activity-card">Seller Activity</div>,
+}))
+
+// Mock SalePlaceholder
+vi.mock('@/components/placeholders/SalePlaceholder', () => ({
+  default: () => <div data-testid="sale-placeholder">Placeholder</div>,
+}))
+
+// Mock next/image
+vi.mock('next/image', () => ({
+  default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
+}))
+
 const mockSale = {
   id: 'test-sale-id',
   owner_id: 'test-owner-id',

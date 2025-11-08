@@ -5,6 +5,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Sale, SaleItem } from '@/lib/types'
+import type { SaleWithOwnerInfo } from '@/lib/data/sales'
 
 export interface SaleListing {
   id: string
@@ -212,15 +213,16 @@ export async function getUserDrafts(
 
 /**
  * Fetch sale with its items (for sale details page)
- * Reads sale from public.sales_v2 view and items from lootaura_v2.items base table
+ * Reads sale from public.sales_v2 view and items from public.items_v2 view
+ * Also fetches owner profile and stats to match SaleWithOwnerInfo type
  * @param supabase - Authenticated Supabase client
  * @param saleId - Sale ID to fetch
- * @returns Sale and items, or null if sale not found
+ * @returns Sale with owner info and items, or null if sale not found
  */
 export async function getSaleWithItems(
   supabase: SupabaseClient,
   saleId: string
-): Promise<{ sale: Sale; items: SaleItem[] } | null> {
+): Promise<{ sale: SaleWithOwnerInfo; items: SaleItem[] } | null> {
   try {
     // Read sale from view (public.sales_v2)
     const { data: sale, error: saleError } = await supabase
@@ -239,26 +241,59 @@ export async function getSaleWithItems(
       return null
     }
 
-    // Read items from view (public.items_v2) - reads are allowed from views
-    const { data: items, error: itemsError } = await supabase
-      .from('items_v2')
-      .select('id, sale_id, name, category, condition, price, images, is_sold, created_at, updated_at')
-      .eq('sale_id', saleId)
-      .order('created_at', { ascending: false })
-
-    if (itemsError) {
+    if (!sale.owner_id) {
       if (process.env.NODE_ENV !== 'production') {
-        console.error('[SALES_ACCESS] Error fetching items:', itemsError)
+        console.error('[SALES_ACCESS] Sale found but missing owner_id')
       }
-      // Return sale even if items fetch fails
       return {
-        sale: sale as Sale,
+        sale: {
+          ...sale,
+          owner_profile: null,
+          owner_stats: {
+            total_sales: 0,
+            avg_rating: 5.0,
+            ratings_count: 0,
+            last_sale_at: null,
+          },
+        } as SaleWithOwnerInfo,
         items: [],
       }
     }
 
+    const ownerId = sale.owner_id
+
+    // Fetch owner profile, stats, and items in parallel
+    const [profileRes, statsRes, itemsRes] = await Promise.all([
+      supabase
+        .from('profiles_v2')
+        .select('id, created_at, full_name')
+        .eq('id', ownerId)
+        .maybeSingle(),
+      supabase
+        .from('owner_stats')
+        .select('user_id, total_sales, last_sale_at, avg_rating, ratings_count')
+        .eq('user_id', ownerId)
+        .maybeSingle(),
+      supabase
+        .from('items_v2')
+        .select('id, sale_id, name, category, condition, price, images, is_sold, created_at, updated_at')
+        .eq('sale_id', saleId)
+        .order('created_at', { ascending: false }),
+    ])
+
+    // Log errors but don't fail - return with defaults
+    if (profileRes.error && process.env.NODE_ENV !== 'production') {
+      console.error('[SALES_ACCESS] Error fetching owner profile:', profileRes.error)
+    }
+    if (statsRes.error && process.env.NODE_ENV !== 'production') {
+      console.error('[SALES_ACCESS] Error fetching owner stats:', statsRes.error)
+    }
+    if (itemsRes.error && process.env.NODE_ENV !== 'production') {
+      console.error('[SALES_ACCESS] Error fetching items:', itemsRes.error)
+    }
+
     // Map items to SaleItem type
-    const mappedItems: SaleItem[] = (items || []).map((item: any) => ({
+    const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => ({
       id: item.id,
       sale_id: item.sale_id,
       name: item.name,
@@ -271,7 +306,16 @@ export async function getSaleWithItems(
     }))
 
     return {
-      sale: sale as Sale,
+      sale: {
+        ...sale,
+        owner_profile: profileRes.data ?? null,
+        owner_stats: statsRes.data ?? {
+          total_sales: 0,
+          avg_rating: 5.0,
+          ratings_count: 0,
+          last_sale_at: null,
+        },
+      } as SaleWithOwnerInfo,
       items: mappedItems,
     }
   } catch (error) {

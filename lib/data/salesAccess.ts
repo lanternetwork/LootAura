@@ -300,16 +300,25 @@ export async function getSaleWithItems(
     }
 
     // Fetch tags from base table (view doesn't include tags column)
-    // Try using the regular client first (RLS should allow public reads for published sales)
-    // If that fails, we'll fall back gracefully
-    const tagsRes = await supabase
+    // PostgREST doesn't support cross-schema queries, so we need to use write client
+    // which can access lootaura_v2 schema, or use an RPC function
+    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
+    const writeClient = createSupabaseWriteClient()
+    
+    const tagsRes = await writeClient
       .from('lootaura_v2.sales')
       .select('tags')
       .eq('id', saleId)
       .maybeSingle()
     
-    if (tagsRes.error && process.env.NODE_ENV !== 'production') {
-      console.error('[SALES_ACCESS] Error fetching tags:', tagsRes.error)
+    if (tagsRes.error) {
+      // Always log errors (not just in dev) since this is critical
+      console.error('[SALES_ACCESS] Error fetching tags:', {
+        saleId,
+        error: tagsRes.error,
+        code: tagsRes.error?.code,
+        message: tagsRes.error?.message,
+      })
     }
     
     // Merge tags from base table into sale object
@@ -320,15 +329,17 @@ export async function getSaleWithItems(
       ? fetchedTags 
       : (Array.isArray((sale as any).tags) ? (sale as any).tags : [])
     
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[SALES_ACCESS] Tags fetch result:', {
-        saleId,
-        tagsResError: tagsRes.error,
-        tagsResData: tagsRes.data,
-        fetchedTags,
-        finalTags: tags,
-      })
-    }
+    // Always log in production for debugging (can remove later)
+    console.log('[SALES_ACCESS] Tags fetch result:', {
+      saleId,
+      tagsResError: tagsRes.error ? {
+        code: tagsRes.error.code,
+        message: tagsRes.error.message,
+      } : null,
+      tagsResData: tagsRes.data,
+      fetchedTags,
+      finalTags: tags,
+    })
     
     const saleWithTags = {
       ...(sale as Sale),
@@ -383,21 +394,26 @@ export async function getSaleWithItems(
     if (statsRes.error && process.env.NODE_ENV !== 'production') {
       console.error('[SALES_ACCESS] Error fetching owner stats:', statsRes.error)
     }
-    if (itemsRes.error && process.env.NODE_ENV !== 'production') {
-      console.error('[SALES_ACCESS] Error fetching items:', itemsRes.error)
-    }
-    
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[SALES_ACCESS] Items fetch result:', {
+    if (itemsRes.error) {
+      // Always log errors (not just in dev) since this is critical
+      console.error('[SALES_ACCESS] Error fetching items:', {
         saleId,
-        itemsResError: itemsRes.error,
-        itemsCount: itemsRes.data?.length || 0,
-        items: itemsRes.data,
+        error: itemsRes.error,
+        code: itemsRes.error?.code,
+        message: itemsRes.error?.message,
       })
     }
-    if (tagsRes.error && process.env.NODE_ENV !== 'production') {
-      console.error('[SALES_ACCESS] Error fetching tags:', tagsRes.error)
-    }
+    
+    // Always log in production for debugging (can remove later)
+    console.log('[SALES_ACCESS] Items fetch result:', {
+      saleId,
+      itemsResError: itemsRes.error ? {
+        code: itemsRes.error.code,
+        message: itemsRes.error.message,
+      } : null,
+      itemsCount: itemsRes.data?.length || 0,
+      items: itemsRes.data?.map(i => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
+    })
 
     // Map items to SaleItem type
     const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => ({

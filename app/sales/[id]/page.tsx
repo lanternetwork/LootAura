@@ -26,17 +26,15 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const itemCats = items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
-  // Debug logging (remove after fixing)
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[SALE_DETAILS] Categories debug:', {
-      saleId: params.id,
-      saleTags: sale.tags,
-      saleCats,
-      itemCats,
-      displayCategories,
-      itemsCount: items.length,
-    })
-  }
+  // Always log in production for debugging (can remove later)
+  console.log('[SALE_DETAILS] Categories debug:', {
+    saleId: params.id,
+    saleTags: sale.tags,
+    saleCats,
+    itemCats,
+    displayCategories,
+    itemsCount: items.length,
+  })
 
   const _metadata = createSaleMetadata(sale)
 

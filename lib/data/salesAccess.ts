@@ -423,14 +423,16 @@ export async function getSaleWithItems(
       saleStatus: sale.status,
     })
     
-    // Additional debug: Try to query items directly using admin client to see if they exist
-    // This helps diagnose if items exist but are being filtered by RLS or view
+    // Additional debug: Try to query items using admin client via items_v2 view
+    // This helps diagnose if items exist but are being filtered by RLS
+    // Admin client bypasses RLS, so if it finds items but regular query doesn't, it's an RLS issue
     if (itemsRes.data?.length === 0) {
       try {
         const adminModule = await import('@/lib/supabase/admin').catch(() => null)
         if (adminModule?.adminSupabase) {
+          // Query via items_v2 view (admin client can access it and bypasses RLS on base table)
           const adminItemsRes = await adminModule.adminSupabase
-            .from('lootaura_v2.items')
+            .from('items_v2')
             .select('id, sale_id, name, category')
             .eq('sale_id', saleId)
             .limit(10)
@@ -446,7 +448,7 @@ export async function getSaleWithItems(
               message: adminItemsRes.error.message,
             } : null,
             adminItems: adminItems?.map(i => ({ id: i.id, name: i.name, category: i.category })),
-            note: 'If admin finds items but view returns 0, there may be a view/RLS issue',
+            note: 'If admin finds items but regular query returns 0, there may be an RLS issue',
           })
         }
       } catch (error) {

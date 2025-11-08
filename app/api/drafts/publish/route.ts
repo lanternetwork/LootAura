@@ -255,7 +255,7 @@ export async function POST(request: NextRequest) {
           details: itemsError.details,
           hint: itemsError.hint,
         })
-        // Try to clean up the sale (best effort) - use view
+        // Try to clean up the sale (best effort) - use view (allows writes)
         await supabase.from('sales_v2').delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
         return NextResponse.json<ApiResponse>({

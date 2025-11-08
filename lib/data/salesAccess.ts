@@ -292,11 +292,9 @@ export async function getSaleWithItems(
     }
 
     // Fetch tags from base table (view doesn't include tags column)
-    // Use write client to read from lootaura_v2.sales (RLS allows public reads)
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const writeClient = createSupabaseWriteClient()
-    
-    const tagsRes = await writeClient
+    // Try using the regular client first (RLS should allow public reads for published sales)
+    // If that fails, we'll fall back gracefully
+    const tagsRes = await supabase
       .from('lootaura_v2.sales')
       .select('tags')
       .eq('id', saleId)

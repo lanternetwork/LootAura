@@ -1,7 +1,6 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import type { ProfileData } from '@/lib/data/profileAccess'
 
 interface ProfileSummaryCardProps {

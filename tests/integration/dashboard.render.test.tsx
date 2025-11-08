@@ -2,8 +2,10 @@
  * @vitest-environment jsdom
  */
 
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 // Note: DashboardPage is a server component, so we test it indirectly through DashboardClient
 import DashboardClient from '@/app/(dashboard)/dashboard/DashboardClient'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -114,8 +116,23 @@ describe('Dashboard Client', () => {
     vi.clearAllMocks()
   })
 
+  const renderWithQueryClient = (component: React.ReactElement) => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    })
+    return render(
+      <QueryClientProvider client={queryClient}>
+        {component}
+      </QueryClientProvider>
+    )
+  }
+
   it('should render ProfileSummaryCard with profile data', () => {
-    const { container } = render(
+    const { container } = renderWithQueryClient(
       <DashboardClient
         initialSales={mockSales}
         initialDrafts={mockDrafts}
@@ -131,7 +148,7 @@ describe('Dashboard Client', () => {
   })
 
   it('should render DraftsPanel with draft count', () => {
-    const { container } = render(
+    const { container } = renderWithQueryClient(
       <DashboardClient
         initialSales={mockSales}
         initialDrafts={mockDrafts}
@@ -147,7 +164,7 @@ describe('Dashboard Client', () => {
   })
 
   it('should render SalesPanel with sales count', () => {
-    const { container } = render(
+    const { container } = renderWithQueryClient(
       <DashboardClient
         initialSales={mockSales}
         initialDrafts={mockDrafts}
@@ -163,7 +180,7 @@ describe('Dashboard Client', () => {
   })
 
   it('should render AnalyticsPanel', () => {
-    const { container } = render(
+    const { container } = renderWithQueryClient(
       <DashboardClient
         initialSales={mockSales}
         initialDrafts={mockDrafts}
@@ -178,7 +195,7 @@ describe('Dashboard Client', () => {
   })
 
   it('should render PreferencesCard', () => {
-    const { container } = render(
+    const { container } = renderWithQueryClient(
       <DashboardClient
         initialSales={mockSales}
         initialDrafts={mockDrafts}

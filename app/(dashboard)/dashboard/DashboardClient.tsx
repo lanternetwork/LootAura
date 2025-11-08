@@ -31,7 +31,6 @@ export default function DashboardClient({
   const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [draftsError, setDraftsError] = useState<any>(null)
-  const [saving, setSaving] = useState(false)
 
   const handleDraftDelete = (draftKey: string) => {
     setDrafts((prev) => prev.filter((d) => d.draft_key !== draftKey))
@@ -85,41 +84,34 @@ export default function DashboardClient({
   }
 
   const handlePreferencesSave = async (prefs: UserPreferences) => {
-    setSaving(true)
-    try {
-      // Save preferences
-      const prefsRes = await fetch('/api/preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme: prefs.theme, units: prefs.units }),
-      })
-      if (!prefsRes.ok) {
-        const j = await prefsRes.json().catch(() => ({}))
-        throw new Error(j?.error || 'Failed to save preferences')
-      }
+    // Save preferences
+    const prefsRes = await fetch('/api/preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: prefs.theme, units: prefs.units }),
+    })
+    if (!prefsRes.ok) {
+      const j = await prefsRes.json().catch(() => ({}))
+      throw new Error(j?.error || 'Failed to save preferences')
+    }
 
-      // Save seller settings (radius and email opt-in)
-      const settingsRes = await fetch('/api/seller-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email_opt_in: prefs.email_opt_in,
-          default_radius_km: prefs.default_radius_km,
-        }),
-      })
-      if (!settingsRes.ok) {
-        const j = await settingsRes.json().catch(() => ({}))
-        throw new Error(j?.error || 'Failed to save settings')
-      }
+    // Save seller settings (radius and email opt-in)
+    const settingsRes = await fetch('/api/seller-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email_opt_in: prefs.email_opt_in,
+        default_radius_km: prefs.default_radius_km,
+      }),
+    })
+    if (!settingsRes.ok) {
+      const j = await settingsRes.json().catch(() => ({}))
+      throw new Error(j?.error || 'Failed to save settings')
+    }
 
-      // Emit revalidation event
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('profile:mutated'))
-      }
-    } catch (error: any) {
-      throw error
-    } finally {
-      setSaving(false)
+    // Emit revalidation event
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('profile:mutated'))
     }
   }
 

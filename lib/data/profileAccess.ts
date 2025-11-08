@@ -4,7 +4,6 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export interface ProfileData {
   id: string
@@ -81,13 +80,13 @@ export async function getUserProfile(
 
 /**
  * Fetch user metrics for last 7 days (SSR)
- * @param supabase - Authenticated Supabase client
- * @param userId - User ID to fetch metrics for
+ * @param _supabase - Authenticated Supabase client (unused for now)
+ * @param _userId - User ID to fetch metrics for (unused for now)
  * @returns Metrics data with defaults if not available
  */
 export async function getUserMetrics7d(
-  supabase: SupabaseClient,
-  userId: string
+  _supabase: SupabaseClient,
+  _userId: string
 ): Promise<Metrics7d> {
   // TODO: Implement real 7-day metrics aggregation
   // For now, return defaults matching the API stub
@@ -113,7 +112,7 @@ export async function getUserPreferences(
 ): Promise<UserPreferences> {
   try {
     // Fetch from user_preferences table
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('user_preferences')
       .select('theme, units')
       .eq('user_id', userId)

@@ -796,7 +796,24 @@ export default function AddressAutocomplete({
       const _country = final.address?.country || 'US' // Extracted but not currently used in callback
       
       // Use line1 (street address) for the address field, not the full formatted label
-      const streetAddress = addressLine1 || final.label.split(',')[0].trim() || final.label
+      // Parse from label only if address components are missing, but never use full label
+      let streetAddress = addressLine1
+      if (!streetAddress && final.label) {
+        // Try to extract street address from label (first part before first comma)
+        const firstPart = final.label.split(',')[0]?.trim()
+        if (firstPart && firstPart.length > 0) {
+          streetAddress = firstPart
+        }
+      }
+      // Safety check: if streetAddress looks like a full formatted address (contains multiple commas),
+      // extract just the first part
+      if (streetAddress && streetAddress.includes(',')) {
+        streetAddress = streetAddress.split(',')[0]?.trim() || ''
+      }
+      // If still no street address, use empty string rather than full label
+      if (!streetAddress) {
+        streetAddress = ''
+      }
 
       // Prevent an immediate re-query from the newly populated address value
       suppressNextFetchRef.current = true

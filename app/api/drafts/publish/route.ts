@@ -61,6 +61,18 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (fetchError || !draft) {
+      console.error('[DRAFTS_PUBLISH] Error fetching draft:', {
+        fetchError: fetchError ? {
+          code: fetchError.code,
+          message: fetchError.message,
+          details: fetchError.details,
+          hint: fetchError.hint
+        } : null,
+        draftKey,
+        userId: user.id,
+        hasDraft: !!draft
+      })
+      
       // Check if already published (idempotency)
       const { data: publishedDraft } = await supabase
         .from('sale_drafts')
@@ -83,7 +95,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json<ApiResponse>({
         ok: false,
         error: 'Draft not found',
-        code: 'DRAFT_NOT_FOUND'
+        code: 'DRAFT_NOT_FOUND',
+        details: fetchError?.message || 'Draft may not have been saved successfully'
       }, { status: 404 })
     }
 

@@ -218,13 +218,14 @@ export async function POST(request: NextRequest) {
         hint: error.hint,
         draftKey,
         userId: user.id,
+        fullError: error
       })
       Sentry.captureException(error, { tags: { operation: 'saveDraft' } })
       return NextResponse.json<ApiResponse>({
         ok: false,
         error: 'Failed to save draft',
         code: 'SAVE_ERROR',
-        details: error.message
+        details: error.message || error.details || 'Unknown database error'
       }, { status: 500 })
     }
 

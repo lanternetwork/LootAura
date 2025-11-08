@@ -247,7 +247,7 @@ export async function getSaleWithItems(
       }
       return {
         sale: {
-          ...sale,
+          ...(sale as Sale),
           owner_profile: null,
           owner_stats: {
             total_sales: 0,
@@ -307,7 +307,7 @@ export async function getSaleWithItems(
 
     return {
       sale: {
-        ...sale,
+        ...(sale as Sale),
         owner_profile: profileRes.data ?? null,
         owner_stats: statsRes.data ?? {
           total_sales: 0,

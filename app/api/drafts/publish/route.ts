@@ -268,7 +268,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json<ApiResponse>({
           ok: false,
           error: 'Failed to create items',
-          code: 'ITEMS_CREATE_ERROR'
+          code: 'ITEMS_CREATE_ERROR',
+          details: itemsError.message || itemsError.details || itemsError.hint || 'Unknown error',
         }, { status: 500 })
       }
 

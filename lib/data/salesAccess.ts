@@ -227,7 +227,7 @@ export async function getItemsForSale(
   try {
     const { data: items, error } = await supabase
       .from('items_v2')
-      .select('id, sale_id, name, category, price, image_url, is_sold, created_at, updated_at')
+      .select('id, sale_id, name, category, price, image_url, created_at, updated_at')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: true })
       .limit(limit)
@@ -257,7 +257,7 @@ export async function getItemsForSale(
       condition: item.condition || undefined,
       price: item.price || undefined,
       photo: item.image_url || (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : undefined),
-      purchased: item.is_sold || false,
+      purchased: item.is_sold || false, // is_sold may not exist in view, default to false
       created_at: item.created_at,
     }))
 
@@ -383,7 +383,7 @@ export async function getSaleWithItems(
         .maybeSingle(),
       supabase
         .from('items_v2')
-        .select('id, sale_id, name, category, price, image_url, is_sold, created_at, updated_at')
+        .select('id, sale_id, name, category, price, image_url, created_at, updated_at')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: false }),
     ])
@@ -426,7 +426,7 @@ export async function getSaleWithItems(
       condition: item.condition || undefined,
       price: item.price || undefined,
       photo: item.image_url || (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : undefined),
-      purchased: item.is_sold || false,
+      purchased: item.is_sold || false, // is_sold may not exist in view, default to false
       created_at: item.created_at,
     }))
 

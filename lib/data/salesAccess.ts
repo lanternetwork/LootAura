@@ -319,7 +319,11 @@ export async function getSaleWithItems(
           .maybeSingle()
         
         if (!tagsRes.error && tagsRes.data) {
-          tags = Array.isArray(tagsRes.data.tags) ? tagsRes.data.tags : []
+          // Type assertion needed because admin client types may not be fully inferred
+          const data = tagsRes.data as { tags?: string[] | null } | null
+          if (data && Array.isArray(data.tags)) {
+            tags = data.tags
+          }
         } else if (tagsRes.error) {
           console.log('[SALES_ACCESS] Admin client tags query failed (schema limitation):', {
             saleId,
@@ -340,7 +344,7 @@ export async function getSaleWithItems(
       saleId,
       tagsCount: tags.length,
       tags,
-    note: 'Categories will still work from item categories if tags are empty',
+      note: 'Categories will still work from item categories if tags are empty',
     })
     
     const saleWithTags = {

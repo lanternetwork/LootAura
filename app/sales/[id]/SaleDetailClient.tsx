@@ -10,13 +10,15 @@ import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
 import { useAuth, useFavorites } from '@/lib/hooks/useAuth'
 import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
+import CategoryChips from '@/components/ui/CategoryChips'
 import type { SaleWithOwnerInfo } from '@/lib/data'
 
 interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo
+  displayCategories?: string[]
 }
 
-export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
+export default function SaleDetailClient({ sale, displayCategories = [] }: SaleDetailClientProps) {
   const searchParams = useSearchParams()
   
   // Get viewport params from URL to preserve on back navigation
@@ -208,23 +210,12 @@ export default function SaleDetailClient({ sale }: SaleDetailClientProps) {
               </div>
 
               {/* Right: Categories */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Categories</h3>
-                {sale.tags && sale.tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {sale.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No categories specified</p>
-                )}
-              </div>
+              {displayCategories.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Categories</h3>
+                  <CategoryChips categories={displayCategories} />
+                </div>
+              )}
             </div>
           </div>
 

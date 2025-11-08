@@ -4,7 +4,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
-import { Sale } from '@/lib/types'
+import { Sale, SaleItem } from '@/lib/types'
 
 export interface SaleListing {
   id: string
@@ -207,6 +207,78 @@ export async function getUserDrafts(
       data: [],
       error,
     }
+  }
+}
+
+/**
+ * Fetch sale with its items (for sale details page)
+ * Reads sale from public.sales_v2 view and items from lootaura_v2.items base table
+ * @param supabase - Authenticated Supabase client
+ * @param saleId - Sale ID to fetch
+ * @returns Sale and items, or null if sale not found
+ */
+export async function getSaleWithItems(
+  supabase: SupabaseClient,
+  saleId: string
+): Promise<{ sale: Sale; items: SaleItem[] } | null> {
+  try {
+    // Read sale from view (public.sales_v2)
+    const { data: sale, error: saleError } = await supabase
+      .from('sales_v2')
+      .select('*')
+      .eq('id', saleId)
+      .single()
+
+    if (saleError || !sale) {
+      if (saleError?.code === 'PGRST116') {
+        return null // No rows returned
+      }
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[SALES_ACCESS] Error fetching sale:', saleError)
+      }
+      return null
+    }
+
+    // Read items from view (public.items_v2) - reads are allowed from views
+    const { data: items, error: itemsError } = await supabase
+      .from('items_v2')
+      .select('id, sale_id, name, category, condition, price, images, is_sold, created_at, updated_at')
+      .eq('sale_id', saleId)
+      .order('created_at', { ascending: false })
+
+    if (itemsError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[SALES_ACCESS] Error fetching items:', itemsError)
+      }
+      // Return sale even if items fetch fails
+      return {
+        sale: sale as Sale,
+        items: [],
+      }
+    }
+
+    // Map items to SaleItem type
+    const mappedItems: SaleItem[] = (items || []).map((item: any) => ({
+      id: item.id,
+      sale_id: item.sale_id,
+      name: item.name,
+      category: item.category || undefined,
+      condition: item.condition || undefined,
+      price: item.price || undefined,
+      photo: Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : undefined,
+      purchased: item.is_sold || false,
+      created_at: item.created_at,
+    }))
+
+    return {
+      sale: sale as Sale,
+      items: mappedItems,
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[SALES_ACCESS] Unexpected error in getSaleWithItems:', error)
+    }
+    return null
   }
 }
 

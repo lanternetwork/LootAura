@@ -241,21 +241,36 @@ export async function POST(request: NextRequest) {
     }
 
     if (error) {
-      console.error('[DRAFTS] Error saving draft:', {
+      const errorDetails = {
         code: error.code,
         message: error.message,
         details: error.details,
         hint: error.hint,
         draftKey,
         userId: user.id,
+        operation: existingDraft ? 'update' : 'insert',
         fullError: error
-      })
+      }
+      console.error('[DRAFTS] Error saving draft:', errorDetails)
       Sentry.captureException(error, { tags: { operation: 'saveDraft' } })
       return NextResponse.json<ApiResponse>({
         ok: false,
         error: 'Failed to save draft',
         code: 'SAVE_ERROR',
-        details: error.message || error.details || 'Unknown database error'
+        details: error.message || error.details || error.hint || 'Unknown database error'
+      }, { status: 500 })
+    }
+
+    if (!draft) {
+      console.error('[DRAFTS] Draft save succeeded but no draft returned:', {
+        draftKey,
+        userId: user.id,
+        operation: existingDraft ? 'update' : 'insert',
+      })
+      return NextResponse.json<ApiResponse>({
+        ok: false,
+        error: 'Draft save succeeded but no data returned',
+        code: 'NO_DATA_ERROR'
       }, { status: 500 })
     }
 

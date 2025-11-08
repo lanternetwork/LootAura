@@ -52,8 +52,9 @@ export function createSupabaseServerClient() {
 }
 
 /**
- * Create Supabase client for writing to base tables in lootaura_v2 schema
- * Use this for writes to base tables (sales, items, sale_drafts)
+ * Create Supabase client for writing to base tables
+ * Note: PostgREST only supports 'public' and 'graphql_public' schemas in client config
+ * Tables in lootaura_v2 schema must be accessed through views in public schema
  */
 export function createSupabaseWriteClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -77,6 +78,6 @@ export function createSupabaseWriteClient() {
         cookieStore.set({ name, value: '', ...options, maxAge: 0 })
       },
     },
-    db: { schema: 'lootaura_v2' }, // Use lootaura_v2 schema for writes to base tables
+    db: { schema: 'public' }, // PostgREST only supports public/graphql_public schemas
   });
 }

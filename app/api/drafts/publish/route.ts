@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Create sale
     const { data: sale, error: saleError } = await supabase
-      .from('sales')
+      .from('sales_v2')
       .insert({
         owner_id: user.id,
         title: formData.title,
@@ -225,13 +225,13 @@ export async function POST(request: NextRequest) {
       }))
 
       const { error: itemsError } = await supabase
-        .from('items')
+        .from('items_v2')
         .insert(itemsToInsert)
 
       if (itemsError) {
         console.error('[DRAFTS] Error creating items:', itemsError)
         // Try to clean up the sale (best effort)
-        await supabase.from('sales').delete().eq('id', sale.id)
+        await supabase.from('sales_v2').delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
         return NextResponse.json<ApiResponse>({
           ok: false,

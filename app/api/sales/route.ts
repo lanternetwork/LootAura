@@ -834,7 +834,7 @@ async function postHandler(request: NextRequest) {
     // Views may not support INSERTs with all fields, so use base table directly
     const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
     const writeClient = createSupabaseWriteClient()
-    const fromSales = writeClient.from('sales') as any
+    const fromSales = writeClient.from('sales_v2') as any
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {

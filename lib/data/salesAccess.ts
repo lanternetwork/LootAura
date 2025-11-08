@@ -423,10 +423,35 @@ export async function getSaleWithItems(
       saleStatus: sale.status,
     })
     
-    // Additional debug: Try to query items directly to see if they exist
-    if (itemsRes.data?.length === 0 && process.env.NODE_ENV !== 'production') {
-      console.log('[SALES_ACCESS] No items found - checking if items exist in base table...')
-      // This is just for debugging - we can't query base table directly from here
+    // Additional debug: Try to query items directly using admin client to see if they exist
+    // This helps diagnose if items exist but are being filtered by RLS or view
+    if (itemsRes.data?.length === 0) {
+      try {
+        const adminModule = await import('@/lib/supabase/admin').catch(() => null)
+        if (adminModule?.adminSupabase) {
+          const adminItemsRes = await adminModule.adminSupabase
+            .from('lootaura_v2.items')
+            .select('id, sale_id, name, category')
+            .eq('sale_id', saleId)
+            .limit(10)
+          
+          console.log('[SALES_ACCESS] Admin client items check (bypasses RLS):', {
+            saleId,
+            adminItemsCount: adminItemsRes.data?.length || 0,
+            adminItemsError: adminItemsRes.error ? {
+              code: adminItemsRes.error.code,
+              message: adminItemsRes.error.message,
+            } : null,
+            adminItems: adminItemsRes.data?.map(i => ({ id: i.id, name: i.name, category: i.category })),
+            note: 'If admin finds items but view returns 0, there may be a view/RLS issue',
+          })
+        }
+      } catch (error) {
+        console.log('[SALES_ACCESS] Could not check items via admin client:', {
+          saleId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
 
     // Map items to SaleItem type

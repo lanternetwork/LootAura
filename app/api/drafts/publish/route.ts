@@ -257,18 +257,44 @@ export async function POST(request: NextRequest) {
         console.log('[DRAFTS_PUBLISH] View insert failed, trying admin client:', {
           error: itemsError.message,
           code: itemsError.code,
+          details: itemsError.details,
+          hint: itemsError.hint,
         })
         
         try {
           const adminModule = await import('@/lib/supabase/admin').catch(() => null)
           if (adminModule?.adminSupabase) {
-            // Admin client can access base table directly
-            // Use type assertion since admin client may not have schema.table types
-            // Cast the entire chain to bypass TypeScript's strict type checking
-            const adminRes = await ((adminModule.adminSupabase as any)
-              .from('lootaura_v2.items')
+            // Try inserting via items_v2 view first (admin client can bypass RLS on view)
+            let adminRes = await ((adminModule.adminSupabase as any)
+              .from('items_v2')
               .insert(itemsToInsert) as any)
               .select('id, name, sale_id')
+            
+            // If view insert fails, try base table directly
+            if (adminRes.error) {
+              console.log('[DRAFTS_PUBLISH] Admin client view insert failed, trying base table:', {
+                error: adminRes.error.message,
+                code: adminRes.error.code,
+              })
+              
+              // Try base table - might need different column mapping
+              // Base table might use image_url instead of images
+              const baseTableItems = itemsToInsert.map((item: any) => ({
+                sale_id: item.sale_id,
+                name: item.name,
+                description: item.description || null,
+                price: item.price || null,
+                category: item.category || null,
+                // Try image_url if base table uses it
+                image_url: item.images && item.images.length > 0 ? item.images[0] : null,
+                images: item.images || null,
+              }))
+              
+              adminRes = await ((adminModule.adminSupabase as any)
+                .from('lootaura_v2.items')
+                .insert(baseTableItems) as any)
+                .select('id, name, sale_id')
+            }
             
             if (!adminRes.error) {
               insertedItems = adminRes.data
@@ -276,11 +302,22 @@ export async function POST(request: NextRequest) {
               console.log('[DRAFTS_PUBLISH] Admin client insert succeeded')
             } else {
               itemsError = adminRes.error
-              console.error('[DRAFTS_PUBLISH] Admin client insert also failed:', adminRes.error)
+              console.error('[DRAFTS_PUBLISH] Admin client insert also failed:', {
+                error: adminRes.error,
+                code: adminRes.error.code,
+                message: adminRes.error.message,
+                details: adminRes.error.details,
+                hint: adminRes.error.hint,
+              })
             }
+          } else {
+            console.log('[DRAFTS_PUBLISH] Admin client not available')
           }
         } catch (adminError) {
-          console.error('[DRAFTS_PUBLISH] Admin client not available:', adminError)
+          console.error('[DRAFTS_PUBLISH] Admin client error:', {
+            error: adminError instanceof Error ? adminError.message : String(adminError),
+            stack: adminError instanceof Error ? adminError.stack : undefined,
+          })
           // Keep original error
         }
       }

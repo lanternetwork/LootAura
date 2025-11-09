@@ -34,6 +34,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseWriteClient: () => mockSupabaseClient,
 }))
 
+// Mock admin client - use same mock since tests don't need RLS bypass
+vi.mock('@/lib/supabase/admin', () => ({
+  adminSupabase: mockSupabaseClient,
+}))
+
 // Mock rate limiting
 vi.mock('@/lib/rateLimit/withRateLimit', () => ({
 	withRateLimit: (handler: any) => handler

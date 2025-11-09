@@ -104,8 +104,15 @@ export async function GET(req: Request) {
       }
       
       // Success: user session cookies are automatically set by auth-helpers
-      console.log('[AUTH_CALLBACK] Redirecting to:', redirectTo)
-      return NextResponse.redirect(new URL(redirectTo, url.origin))
+      // Prevent redirect loops: never redirect to auth pages
+      let finalRedirectTo = redirectTo
+      if (redirectTo.startsWith('/auth/') || redirectTo.startsWith('/login') || redirectTo.startsWith('/signin')) {
+        console.warn('[AUTH_CALLBACK] Preventing redirect loop - redirectTo is an auth page, using default:', redirectTo)
+        finalRedirectTo = '/sales'
+      }
+      
+      console.log('[AUTH_CALLBACK] Redirecting to:', finalRedirectTo)
+      return NextResponse.redirect(new URL(finalRedirectTo, url.origin))
     } else {
       console.log('[AUTH_CALLBACK] Code exchange succeeded but no session received')
       return NextResponse.redirect(new URL('/auth/error?error=no_session', url.origin))

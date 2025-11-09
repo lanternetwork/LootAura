@@ -51,6 +51,5 @@ export function fromBase(
   if (table.includes('.')) {
     throw new Error(`Use schema('lootaura_v2') + unqualified table name. Got: ${table}`)
   }
-  // @ts-expect-error supabase types
   return db.from(table)
 }

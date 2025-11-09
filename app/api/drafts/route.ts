@@ -15,11 +15,7 @@ export async function GET(_request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Authentication required',
-        code: 'AUTH_REQUIRED'
-      }, { status: 401 })
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
     }
 
     // Check if we should return all drafts or just the latest
@@ -89,11 +85,7 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Authentication required',
-        code: 'AUTH_REQUIRED'
-      }, { status: 401 })
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
     }
 
     let body: any
@@ -103,21 +95,13 @@ export async function POST(request: NextRequest) {
       console.error('[DRAFTS] JSON parse error:', {
         error: error instanceof Error ? error.message : String(error)
       })
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Invalid JSON in request body',
-        code: 'INVALID_JSON'
-      }, { status: 400 })
+      return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
     }
     
     const { payload, draftKey } = body
 
     if (!draftKey || typeof draftKey !== 'string') {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'draftKey is required',
-        code: 'INVALID_INPUT'
-      }, { status: 400 })
+      return fail(400, 'INVALID_INPUT', 'draftKey is required')
     }
 
     // Validate payload
@@ -130,13 +114,7 @@ export async function POST(request: NextRequest) {
         hasFormData: !!(payload as any)?.formData,
         formDataKeys: (payload as any)?.formData ? Object.keys((payload as any).formData) : []
       })
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Invalid draft payload',
-        code: 'VALIDATION_ERROR',
-        data: validationResult.error.issues,
-        details: validationResult.error.message
-      }, { status: 400 })
+      return fail(400, 'VALIDATION_ERROR', 'Invalid draft payload', { data: validationResult.error.issues, details: validationResult.error.message })
     }
 
     const validatedPayload = validationResult.data
@@ -226,22 +204,14 @@ export async function DELETE(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Authentication required',
-        code: 'AUTH_REQUIRED'
-      }, { status: 401 })
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
     }
 
     const { searchParams } = new URL(request.url)
     const draftKey = searchParams.get('draftKey')
 
     if (!draftKey) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'draftKey is required',
-        code: 'INVALID_INPUT'
-      }, { status: 400 })
+      return fail(400, 'INVALID_INPUT', 'draftKey is required')
     }
 
     // Mark draft as archived (soft delete) - write to base table using schema-scoped client

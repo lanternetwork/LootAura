@@ -1,6 +1,7 @@
-// NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
+// NOTE: Uses public.sale_drafts view (with INSTEAD OF triggers) for draft access
+// Uses schema-scoped clients for sales and items writes
 import { NextRequest, NextResponse } from 'next/server'
-import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import * as Sentry from '@sentry/nextjs'
@@ -54,12 +55,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Fetch draft using RLS client (for reading the draft under RLS)
-    if (process.env.NODE_ENV !== 'production') {
-      console.info('[DB] Using schema-scoped client lootaura_v2 in this handler')
-    }
-    const rls = getRlsDb()
-    const { data: draft, error: fetchError } = await fromBase(rls, 'sale_drafts')
+    // Fetch draft from public view
+    const { data: draft, error: fetchError } = await supabase
+      .from('sale_drafts')
       .select('id, payload, status')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
@@ -80,7 +78,8 @@ export async function POST(request: NextRequest) {
       })
       
       // Check if already published (idempotency)
-      const { data: publishedDraft } = await fromBase(rls, 'sale_drafts')
+      const { data: publishedDraft } = await supabase
+        .from('sale_drafts')
         .select('id')
         .eq('user_id', user.id)
         .eq('draft_key', draftKey)
@@ -317,8 +316,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 3. Mark draft as published - use RLS client
-    const { error: updateError } = await fromBase(rls, 'sale_drafts')
+    // 3. Mark draft as published - write through public view (INSTEAD OF trigger handles it)
+    const { error: updateError } = await supabase
+      .from('sale_drafts')
       .update({ status: 'published' })
       .eq('id', draft.id)
 

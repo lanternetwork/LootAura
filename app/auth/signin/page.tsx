@@ -21,7 +21,17 @@ export default function SignIn() {
       // Small delay to ensure auth state is fully propagated
       const timeoutId = setTimeout(() => {
         // Check for redirect query param (accept both 'redirect' and 'redirectTo' for consistency)
-        const redirectParam = params.get('redirectTo') || params.get('redirect')
+        let redirectParam = params.get('redirectTo') || params.get('redirect')
+        
+        // Decode the redirectTo if it was encoded
+        if (redirectParam) {
+          try {
+            redirectParam = decodeURIComponent(redirectParam)
+          } catch (e) {
+            // If decoding fails, use as-is
+          }
+        }
+        
         const storageRedirect = sessionStorage.getItem('auth:postLoginRedirect')
         const redirectTo = redirectParam || storageRedirect || '/sales'
         console.log('[SIGNIN] Redirecting after login:', { 

@@ -277,17 +277,18 @@ export async function POST(request: NextRequest) {
                 code: adminRes.error.code,
               })
               
-              // Try base table - might need different column mapping
-              // Base table might use image_url instead of images
+              // Try base table - use image_url (TEXT) instead of images (TEXT[])
+              // Base table schema: image_url TEXT (not images TEXT[])
               const baseTableItems = itemsToInsert.map((item: any) => ({
                 sale_id: item.sale_id,
                 name: item.name,
                 description: item.description || null,
                 price: item.price || null,
                 category: item.category || null,
-                // Try image_url if base table uses it
-                image_url: item.images && item.images.length > 0 ? item.images[0] : null,
-                images: item.images || null,
+                // Base table uses image_url (TEXT), not images (TEXT[])
+                image_url: item.images && Array.isArray(item.images) && item.images.length > 0 
+                  ? item.images[0] 
+                  : (item.images && typeof item.images === 'string' ? item.images : null),
               }))
               
               adminRes = await ((adminModule.adminSupabase as any)

@@ -71,7 +71,7 @@ describe('Schema name validation', () => {
         '**/mocks/**',
         '**/__mocks__/**',
         '**/scripts/**', // Utility scripts may use fully-qualified names for one-off operations
-        '**/lib/supabase/clients.ts', // fromBase() helper legitimately uses fully-qualified names
+        '**/lib/supabase/clients.ts', // fromBase() helper legitimately checks for qualified names
       ],
       cwd: process.cwd(),
     })
@@ -81,20 +81,23 @@ describe('Schema name validation', () => {
     for (const file of files) {
       try {
         const content = readFileSync(join(process.cwd(), file), 'utf-8')
+        const lines = content.split('\n')
         
-        // Static guard: check for .from('lootaura_v2.*)
-        if (/from\(['"`]lootaura_v2\.[a-z_]+['"`]\)/.test(content)) {
-          const lines = content.split('\n')
-          lines.forEach((line, index) => {
-            if (/from\(['"`]lootaura_v2\.[a-z_]+['"`]\)/.test(line)) {
-              violations.push({
-                file,
-                line: index + 1,
-                content: line.trim(),
-              })
+        lines.forEach((line, index) => {
+          // Static guard: check for .from('lootaura_v2.*) anywhere
+          // Also check for any reference to lootaura_v2. in from() calls
+          if (/from\(['"`]lootaura_v2\./.test(line)) {
+            // Allow if it's a comment
+            if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
+              return
             }
-          })
-        }
+            violations.push({
+              file,
+              line: index + 1,
+              content: line.trim(),
+            })
+          }
+        })
       } catch (error) {
         // Skip files that can't be read
         console.warn(`Could not read file: ${file}`, error)

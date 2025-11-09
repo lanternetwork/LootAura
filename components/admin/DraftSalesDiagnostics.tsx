@@ -110,7 +110,7 @@ export default function DraftSalesDiagnostics() {
             name: 'Test Item',
             price: 5.0,
             category: 'furniture',
-            image_url: 'https://dummyimage.com/400x300/ccc/000.jpg&text=diag',
+            // Note: image_url omitted - must be Cloudinary URL for publish to work
           },
         ],
       },

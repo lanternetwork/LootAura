@@ -232,9 +232,11 @@ export async function POST(request: NextRequest) {
       const itemsToInsert = items.map(item => {
         // Normalize images: if image_url exists, convert to images array
         // Strip any transient client fields (e.g., File objects) before calling Supabase
+        // Type assertion needed because item type may have images property that's not in the type definition
+        const itemAny = item as any
         const images: string[] = item.image_url 
           ? [item.image_url] 
-          : (Array.isArray(item.images) ? item.images.filter((url): url is string => typeof url === 'string') : [])
+          : (Array.isArray(itemAny.images) ? itemAny.images.filter((url: any): url is string => typeof url === 'string') : [])
         
         return {
           sale_id: sale.id,

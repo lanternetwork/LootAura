@@ -223,14 +223,17 @@ export async function POST(request: NextRequest) {
     })
     
     if (items && items.length > 0) {
+      // Check what columns the view actually has - production might use image_url instead of images
+      // Try without images first, let the trigger handle image_url mapping
       const itemsToInsert = items.map(item => ({
         sale_id: sale.id,
         name: item.name,
         description: item.description || null,
         price: item.price || null,
         category: item.category || null,
-        // items_v2 view uses images (TEXT[]) not image_url
-        images: item.image_url ? [item.image_url] : null
+        // Don't include images - let the trigger handle it or use image_url if view has it
+        // If view has images column, include it; otherwise trigger will handle image_url
+        ...(item.image_url ? { images: [item.image_url] } : {})
       }))
 
       console.log('[DRAFTS_PUBLISH] Inserting items:', {

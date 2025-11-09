@@ -54,10 +54,10 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Fetch draft using schema-scoped RLS client (user-scoped is fine for drafts)
+    // Fetch draft using RLS client with fully-qualified table name
     const rls = getUserServerDb()
-    const { data: draft, error: fetchError } = await rls
-      .from('sale_drafts')
+    const { data: draft, error: fetchError } = await (rls
+      .from('lootaura_v2.sale_drafts') as any)
       .select('id, payload, status')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
       })
       
       // Check if already published (idempotency)
-      const { data: publishedDraft } = await rls
-        .from('sale_drafts')
+      const { data: publishedDraft } = await (rls
+        .from('lootaura_v2.sale_drafts') as any)
         .select('id')
         .eq('user_id', user.id)
         .eq('draft_key', draftKey)
@@ -182,9 +182,9 @@ export async function POST(request: NextRequest) {
     // Use admin client for sale + items creation (bypasses RLS for cross-table operations)
     const admin = getAdminDb()
 
-    // 1. Create sale - write to base table using schema-scoped admin client
-    const { data: sale, error: saleError } = await admin
-      .from('sales')
+    // 1. Create sale - write to base table using fully-qualified name
+    const { data: sale, error: saleError } = await (admin
+      .from('lootaura_v2.sales') as any)
       .insert({
         owner_id: user.id,
         title: formData.title,
@@ -260,9 +260,9 @@ export async function POST(request: NextRequest) {
         })),
       })
 
-      // Write to base table using schema-scoped admin client
-      const { data: insertedItems, error: itemsError } = await admin
-        .from('items')
+      // Write to base table using fully-qualified name
+      const { data: insertedItems, error: itemsError } = await (admin
+        .from('lootaura_v2.items') as any)
         .insert(itemsToInsert)
         .select('id, name, sale_id')
 
@@ -283,8 +283,8 @@ export async function POST(request: NextRequest) {
             imagesValue: i.images,
           })),
         })
-        // Try to clean up the sale (best effort) - write to base table using admin client
-        await admin.from('sales').delete().eq('id', sale.id)
+        // Try to clean up the sale (best effort) - write to base table using fully-qualified name
+        await (admin.from('lootaura_v2.sales') as any).delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
         // Return detailed error for debugging
         const errorDetails = itemsError.message || itemsError.details || itemsError.hint || 'Unknown error'
@@ -318,9 +318,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 3. Mark draft as published - use RLS client (user-scoped is fine for draft updates)
-    const { error: updateError } = await rls
-      .from('sale_drafts')
+    // 3. Mark draft as published - use RLS client with fully-qualified name
+    const { error: updateError } = await (rls
+      .from('lootaura_v2.sale_drafts') as any)
       .update({ status: 'published' })
       .eq('id', draft.id)
 

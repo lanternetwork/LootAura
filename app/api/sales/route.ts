@@ -831,10 +831,10 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // Insert into base table using schema-scoped RLS client
+    // Insert into base table using fully-qualified name
     const { getUserServerDb } = await import('@/lib/supabase/clients')
     const db = getUserServerDb()
-    const fromSales = db.from('sales')
+    const fromSales = (db.from('lootaura_v2.sales') as any)
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {

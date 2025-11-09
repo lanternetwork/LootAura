@@ -107,12 +107,12 @@ export async function getUserSales(
     }
   }
 
-  // Fallback: query base table directly using schema-scoped client
+  // Fallback: query base table directly using fully-qualified name
   try {
     const { getUserServerDb } = await import('@/lib/supabase/clients')
     const db = getUserServerDb()
-    const { data: sales, error } = await db
-      .from('sales')
+    const { data: sales, error } = await (db
+      .from('lootaura_v2.sales') as any)
       .select('*')
       .eq('owner_id', userId)
       .order('updated_at', { ascending: false })
@@ -339,11 +339,11 @@ export async function getSaleWithItems(
     
     try {
       // Try to use admin client if available (service role key bypasses RLS)
-      // Use schema-scoped admin client for tags query
+      // Use fully-qualified table name for tags query
       const { getAdminDb } = await import('@/lib/supabase/clients')
       const admin = getAdminDb()
-      const tagsRes = await admin
-        .from('sales')
+      const tagsRes = await (admin
+        .from('lootaura_v2.sales') as any)
         .select('tags')
         .eq('id', saleId)
         .maybeSingle()

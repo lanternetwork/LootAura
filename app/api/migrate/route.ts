@@ -9,8 +9,8 @@ export async function POST(_request: NextRequest) {
     
     // Step 1: Add address_key column
     console.log('[MIGRATE] Step 1: Adding address_key column...')
-    const { error: addColumnError } = await db
-      .from('sales')
+    const { error: addColumnError } = await (db
+      .from('lootaura_v2.sales') as any)
       .select('address_key')
       .limit(1)
     

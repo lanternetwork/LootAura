@@ -652,8 +652,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
         sessionStorage.setItem('draft:returnStep', 'review')
         
-        // Redirect to login
-        router.push('/auth/signin?redirectTo=/sell/new?resume=review')
+        // Redirect to login (encode redirectTo to preserve query params)
+        const redirectUrl = encodeURIComponent('/sell/new?resume=review')
+        router.push(`/auth/signin?redirectTo=${redirectUrl}`)
         setLoading(false)
         return
       }
@@ -784,8 +785,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
       sessionStorage.setItem('draft:returnStep', 'review')
       
-      // Redirect to login
-      router.push('/auth/signin?redirectTo=/sell/new?resume=review')
+      // Redirect to login (encode redirectTo to preserve query params)
+      const redirectUrl = encodeURIComponent('/sell/new?resume=review')
+      router.push(`/auth/signin?redirectTo=${redirectUrl}`)
       return
     }
 

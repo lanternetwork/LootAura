@@ -3,7 +3,6 @@ import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 // Simple per-process cache for ZIP lookups (60s TTL)
 const zipCache = new Map<string, { data: any; expires: number }>()
@@ -129,8 +128,6 @@ async function zipHandler(request: NextRequest) {
         }
       })
     }
-    
-    const supabase = createSupabaseServerClient()
     
     // 1. Try local lookup first (exact TEXT match)
     console.log('[ZIP] source=local', {

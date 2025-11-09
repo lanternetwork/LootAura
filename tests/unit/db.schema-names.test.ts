@@ -111,47 +111,6 @@ describe('Schema name validation', () => {
     }
   })
 
-    const violations: Array<{ file: string; line: number; content: string }> = []
-
-    for (const file of files) {
-      try {
-        const content = readFileSync(join(process.cwd(), file), 'utf-8')
-        const lines = content.split('\n')
-
-        lines.forEach((line, index) => {
-          // Check for fully-qualified table names: .from('lootaura_v2.*')
-          // Pattern: .from('lootaura_v2\.[a-z_]+')
-          const qualifiedTablePattern = /\.from\(['"]lootaura_v2\.[a-z_]+['"]\)/
-          
-          if (qualifiedTablePattern.test(line)) {
-            // Allow if it's a comment
-            if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
-              return
-            }
-            // This is a violation - must use schema-scoped clients with unqualified names
-            violations.push({
-              file,
-              line: index + 1,
-              content: line.trim(),
-            })
-          }
-        })
-      } catch (error) {
-        // Skip files that can't be read
-        console.warn(`Could not read file: ${file}`, error)
-      }
-    }
-
-    if (violations.length > 0) {
-      const message = violations
-        .map((v) => `  ${v.file}:${v.line} - ${v.content}`)
-        .join('\n')
-      throw new Error(
-        `Found ${violations.length} usage(s) of fully-qualified table names (must use schema-scoped clients with unqualified names via fromBase()):\n${message}`
-      )
-    }
-  })
-
   it('should not write to views (must use base tables)', async () => {
     // NOTE: Writes must go to base tables using schema-scoped clients.
     // Reads from views (public.sale_drafts, public.sales_v2, public.items_v2) are allowed for reads only.

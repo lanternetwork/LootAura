@@ -128,9 +128,10 @@ describe('Sales API - Image Support', () => {
 
 		expect(response.status).toBe(200)
 		expect(data.ok).toBe(true)
+		expect(data.saleId).toBe('test-sale-id')
 		expect(mockIsAllowedImageUrl).toHaveBeenCalledWith('https://res.cloudinary.com/test/image/upload/v123/cover.jpg')
-		// Assert persisted cover_image_url reflected in response payload
-		expect(data.sale?.cover_image_url).toBe('https://res.cloudinary.com/test/image/upload/v123/cover.jpg')
+		// Assert persisted cover_image_url was included in the insert payload
+		expect(lastInsertedPayload?.cover_image_url).toBe('https://res.cloudinary.com/test/image/upload/v123/cover.jpg')
 	})
 
 	it('should accept and validate images array', async () => {

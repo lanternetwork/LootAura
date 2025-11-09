@@ -106,10 +106,11 @@ export default function DraftSalesDiagnostics() {
         },
         items: [
           {
+            id: generateUUID(),
             name: 'Test Item',
             price: 5.0,
             category: 'furniture',
-            images: ['https://dummyimage.com/400x300/ccc/000.jpg&text=diag'],
+            image_url: 'https://dummyimage.com/400x300/ccc/000.jpg&text=diag',
           },
         ],
       },
@@ -203,14 +204,13 @@ export default function DraftSalesDiagnostics() {
       pricing_mode: 'negotiable',
       status: 'published',
       privacy_mode: 'exact',
-      cover_image_url: 'https://dummyimage.com/400x300/ccc/000.jpg&text=direct',
+      cover_image_url: null,
       images: [],
       items: [
         {
           name: 'Direct Item',
           price: 7.0,
           category: 'furniture',
-          image_url: 'https://dummyimage.com/400x300/ccc/000.jpg&text=direct',
         },
       ],
     }

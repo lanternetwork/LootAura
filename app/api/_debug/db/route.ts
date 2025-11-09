@@ -4,7 +4,7 @@ import { ok, fail } from '@/lib/http/json'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Try admin client first (no auth required, more reliable for diagnostics)
     let db

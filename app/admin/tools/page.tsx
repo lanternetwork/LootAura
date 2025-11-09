@@ -18,6 +18,7 @@ import CloudinaryDiagnostics from '@/components/admin/CloudinaryDiagnostics'
 import ImageStatsView from '@/components/admin/ImageStatsView'
 import ZipCodeImport from '@/components/admin/ZipCodeImport'
 import GeolocationDiagnostics from '@/components/admin/GeolocationDiagnostics'
+import DraftSalesDiagnostics from '@/components/admin/DraftSalesDiagnostics'
 import { useState, useRef } from 'react'
 // MapRef is a namespace in react-map-gl v7, not a type
 
@@ -59,6 +60,9 @@ export default function AdminToolsPage() {
 
           {/* Geolocation Diagnostics */}
           <GeolocationDiagnostics />
+
+          {/* Draft & Sales Diagnostics */}
+          <DraftSalesDiagnostics />
 
           {/* Cloudinary Diagnostics */}
           <CloudinaryDiagnostics />

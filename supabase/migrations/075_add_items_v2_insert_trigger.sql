@@ -10,6 +10,8 @@ DROP TRIGGER IF EXISTS items_v2_delete_trigger ON public.items_v2;
 -- Create INSTEAD OF INSERT trigger function
 CREATE OR REPLACE FUNCTION public.items_v2_insert()
 RETURNS TRIGGER AS $$
+DECLARE
+    inserted_id UUID;
 BEGIN
     INSERT INTO lootaura_v2.items (
         sale_id,
@@ -25,11 +27,11 @@ BEGIN
     ) VALUES (
         NEW.sale_id,
         NEW.name,
-        NEW.description,
-        NEW.price,
-        NEW.category,
-        NEW.condition,
-        NEW.images,
+        COALESCE(NEW.description, NULL),
+        COALESCE(NEW.price, NULL),
+        COALESCE(NEW.category, NULL),
+        COALESCE(NEW.condition, NULL),
+        COALESCE(NEW.images, NULL),
         COALESCE(NEW.is_sold, FALSE),
         COALESCE(NEW.updated_at, NOW()),
         -- If images array exists, use first element for image_url
@@ -38,7 +40,11 @@ BEGIN
             ELSE NULL
         END
     )
-    RETURNING * INTO NEW;
+    RETURNING id INTO inserted_id;
+    
+    -- Populate NEW with the inserted row data for RETURNING clause
+    SELECT * INTO NEW FROM lootaura_v2.items WHERE id = inserted_id;
+    
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

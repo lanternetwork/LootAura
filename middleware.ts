@@ -133,10 +133,17 @@ export async function middleware(req: NextRequest) {
     }
     
     // For pages, redirect to signin
+    // Prevent redirect loops: don't redirect if we're already going to signin
+    if (pathname.startsWith('/auth/signin') || pathname.startsWith('/auth/login')) {
+      console.log('[MIDDLEWARE] Already on signin page, allowing access to prevent loop')
+      return NextResponse.next()
+    }
+    
     const loginUrl = new URL('/auth/signin', req.url)
     // Only allow same-origin relative paths for redirectTo
     const redirectTo = req.nextUrl.pathname.startsWith('/') ? req.nextUrl.pathname : '/'
-    loginUrl.searchParams.set('redirectTo', redirectTo)
+    // Encode redirectTo to handle query parameters properly
+    loginUrl.searchParams.set('redirectTo', encodeURIComponent(redirectTo + req.nextUrl.search))
     return NextResponse.redirect(loginUrl)
   }
 

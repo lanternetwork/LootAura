@@ -58,7 +58,7 @@ export default function DraftSalesDiagnostics() {
     const start = Date.now()
 
     try {
-      const response = await fetch('/api/_debug/db')
+      const response = await fetch('/api/debug/db')
       const elapsed = Date.now() - start
       const data: ApiResponse = await response.json()
 

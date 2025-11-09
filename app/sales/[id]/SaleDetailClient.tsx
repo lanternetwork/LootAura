@@ -252,8 +252,8 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {items.map((item) => (
                   <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    {item.photo && (
-                      <div className="relative w-full h-48 mb-3 rounded-lg overflow-hidden bg-gray-100">
+                    <div className="relative w-full h-48 mb-3 rounded-lg overflow-hidden bg-gray-100">
+                      {item.photo ? (
                         <Image
                           src={item.photo}
                           alt={item.name}
@@ -261,8 +261,12 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                           className="object-cover"
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         />
-                      </div>
-                    )}
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                          <span className="text-gray-400 text-sm">No image</span>
+                        </div>
+                      )}
+                    </div>
                     <h3 className="font-medium text-gray-900 mb-2">{item.name}</h3>
                     <div className="flex flex-col gap-2">
                       <div className="flex justify-between items-center">

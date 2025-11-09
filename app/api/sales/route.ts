@@ -832,10 +832,9 @@ async function postHandler(request: NextRequest) {
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
     // Insert into base table (lootaura_v2.sales) to ensure image fields are properly saved
-    // Views may not support INSERTs with all fields, so use base table directly
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const writeClient = createSupabaseWriteClient()
-    const fromSales = writeClient.from('lootaura_v2.sales') as any
+    // Write to base table lootaura_v2.sales using admin client
+    const { adminSupabase } = await import('@/lib/supabase/admin')
+    const fromSales = adminSupabase.from('lootaura_v2.sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {

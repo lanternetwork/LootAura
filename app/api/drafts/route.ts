@@ -207,10 +207,13 @@ export async function POST(request: NextRequest) {
     let draft: any
     let error: any
 
+    // Import admin client for writes to base tables
+    const { adminSupabase } = await import('@/lib/supabase/admin')
+
     if (existingDraft) {
-      // Update existing draft - use view (allows writes)
-      const { data: updatedDraft, error: updateError } = await supabase
-        .from('sale_drafts')
+      // Update existing draft - write to base table lootaura_v2.sale_drafts
+      const { data: updatedDraft, error: updateError } = await adminSupabase
+        .from('lootaura_v2.sale_drafts')
         .update({
           title,
           payload: validatedPayload,
@@ -223,9 +226,9 @@ export async function POST(request: NextRequest) {
       draft = updatedDraft
       error = updateError
     } else {
-      // Insert new draft - use view (allows writes)
-      const { data: newDraft, error: insertError } = await supabase
-        .from('sale_drafts')
+      // Insert new draft - write to base table lootaura_v2.sale_drafts
+      const { data: newDraft, error: insertError } = await adminSupabase
+        .from('lootaura_v2.sale_drafts')
         .insert({
           user_id: user.id,
           draft_key: draftKey,
@@ -328,11 +331,10 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Mark draft as archived (soft delete) - use view (allows writes)
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const writeClient = createSupabaseWriteClient()
-    const { error } = await writeClient
-      .from('sale_drafts')
+    // Mark draft as archived (soft delete) - write to base table lootaura_v2.sale_drafts
+    const { adminSupabase } = await import('@/lib/supabase/admin')
+    const { error } = await adminSupabase
+      .from('lootaura_v2.sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)

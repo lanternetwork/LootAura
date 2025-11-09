@@ -177,9 +177,12 @@ export async function POST(request: NextRequest) {
     // Note: Supabase doesn't support true transactions across multiple operations,
     // so we'll do them sequentially and handle errors
 
-    // 1. Create sale - use view (allows writes)
-    const { data: sale, error: saleError } = await supabase
-      .from('sales_v2')
+    // Import admin client for writes to base tables
+    const { adminSupabase } = await import('@/lib/supabase/admin')
+
+    // 1. Create sale - write to base table lootaura_v2.sales
+    const { data: sale, error: saleError } = await adminSupabase
+      .from('lootaura_v2.sales')
       .insert({
         owner_id: user.id,
         title: formData.title,
@@ -223,57 +226,41 @@ export async function POST(request: NextRequest) {
     })
     
     if (items && items.length > 0) {
-      // Check what columns the view actually has - production might use image_url instead of images
-      // Try without images first, let the trigger handle image_url mapping
-      const itemsToInsert = items.map(item => ({
-        sale_id: sale.id,
-        name: item.name,
-        description: item.description || null,
-        price: item.price || null,
-        category: item.category || null,
-        // Don't include images - let the trigger handle it or use image_url if view has it
-        // If view has images column, include it; otherwise trigger will handle image_url
-        ...(item.image_url ? { images: [item.image_url] } : {})
-      }))
+      // Normalize images to string[] format (required: images: string[])
+      // Transform legacy image_url (string) to images (string[])
+      const itemsToInsert = items.map(item => {
+        // Normalize images: if image_url exists, convert to images array
+        // Strip any transient client fields (e.g., File objects) before calling Supabase
+        const images: string[] = item.image_url 
+          ? [item.image_url] 
+          : (Array.isArray(item.images) ? item.images.filter((url): url is string => typeof url === 'string') : [])
+        
+        return {
+          sale_id: sale.id,
+          name: item.name,
+          description: item.description || null,
+          price: item.price || null,
+          category: item.category || null,
+          images: images.length > 0 ? images : null, // Store as TEXT[] in base table
+        }
+      })
 
       console.log('[DRAFTS_PUBLISH] Inserting items:', {
         saleId: sale.id,
         itemsCount: itemsToInsert.length,
-        itemsToInsert: itemsToInsert.map(i => ({ name: i.name, sale_id: i.sale_id })),
+        itemsToInsert: itemsToInsert.map(i => ({ 
+          name: i.name, 
+          sale_id: i.sale_id,
+          hasImages: !!i.images,
+          imagesCount: Array.isArray(i.images) ? i.images.length : 0
+        })),
       })
 
-      // Try using view first (allows writes through PostgREST)
-      // If that fails, fall back to admin client for base table access
-      let insertedItems: any = null
-      let itemsError: any = null
-      
-      const itemsRes = await supabase
-        .from('items_v2')
+      // Write to base table lootaura_v2.items using admin client
+      const { data: insertedItems, error: itemsError } = await adminSupabase
+        .from('lootaura_v2.items')
         .insert(itemsToInsert)
         .select('id, name, sale_id')
-      
-      insertedItems = itemsRes.data
-      itemsError = itemsRes.error
-      
-      // If view insert fails, log the error (triggers should make view insertable)
-      // Admin client can't access lootaura_v2.items directly due to PostgREST schema limitations
-      if (itemsError) {
-        console.error('[DRAFTS_PUBLISH] View insert failed (triggers should make this work):', {
-          error: itemsError.message,
-          code: itemsError.code,
-          details: itemsError.details,
-          hint: itemsError.hint,
-          itemsToInsert: itemsToInsert.map(i => ({
-            sale_id: i.sale_id,
-            name: i.name,
-            hasImages: !!i.images,
-            imagesType: Array.isArray(i.images) ? 'array' : typeof i.images,
-            imagesLength: Array.isArray(i.images) ? i.images.length : undefined,
-          })),
-        })
-        // Don't try admin client fallback - it can't access lootaura_v2.items due to PostgREST limitations
-        // The view insert should work with INSTEAD OF triggers
-      }
 
       if (itemsError) {
         // Always log full error details for debugging
@@ -292,8 +279,8 @@ export async function POST(request: NextRequest) {
             imagesValue: i.images,
           })),
         })
-        // Try to clean up the sale (best effort) - use view (allows writes)
-        await supabase.from('sales_v2').delete().eq('id', sale.id)
+        // Try to clean up the sale (best effort) - write to base table
+        await adminSupabase.from('lootaura_v2.sales').delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
         // Return detailed error for debugging
         const errorDetails = itemsError.message || itemsError.details || itemsError.hint || 'Unknown error'
@@ -327,9 +314,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 3. Mark draft as published - use view (allows writes)
-    const { error: updateError } = await supabase
-      .from('sale_drafts')
+    // 3. Mark draft as published - write to base table lootaura_v2.sale_drafts
+    const { error: updateError } = await adminSupabase
+      .from('lootaura_v2.sale_drafts')
       .update({ status: 'published' })
       .eq('id', draft.id)
 

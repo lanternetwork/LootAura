@@ -225,9 +225,10 @@ export async function getItemsForSale(
   limit: number = 100
 ): Promise<SaleItem[]> {
   try {
+    // Read from view (reads allowed) - select both images and image_url for compatibility
     const { data: items, error } = await supabase
       .from('items_v2')
-      .select('id, sale_id, name, category, price, image_url, created_at, updated_at')
+      .select('id, sale_id, name, category, price, images, image_url, created_at, updated_at')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: true })
       .limit(limit)
@@ -248,18 +249,46 @@ export async function getItemsForSale(
     }
 
     // Map items to SaleItem type
-    // Handle both image_url (production) and images (array) formats
-    const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => ({
-      id: item.id,
-      sale_id: item.sale_id,
-      name: item.name,
-      category: item.category || undefined,
-      condition: item.condition || undefined,
-      price: item.price || undefined,
-      photo: item.image_url || (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : undefined),
-      purchased: item.is_sold || false, // is_sold may not exist in view, default to false
-      created_at: item.created_at,
-    }))
+    // Normalize images: guarantee images: string[] with fallback to image_url
+    const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => {
+      // Normalize images: prefer images array, fallback to image_url
+      const images: string[] = Array.isArray(item.images) && item.images.length > 0
+        ? item.images.filter((url): url is string => typeof url === 'string')
+        : (item.image_url ? [item.image_url] : [])
+      
+      // Log dev-only fallback when using image_url
+      if (process.env.NODE_ENV !== 'production' && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
+        console.log('[SALES_ACCESS] Item image fallback (image_url → images[]):', {
+          itemId: item.id,
+          itemName: item.name,
+          hadImageUrl: !!item.image_url,
+          hadImages: !!item.images,
+          imagesCount: images.length,
+        })
+      }
+      
+      // Log dev-only when item has neither images nor image_url
+      if (process.env.NODE_ENV !== 'production' && images.length === 0) {
+        console.log('[SALES_ACCESS] Item has no images:', {
+          itemId: item.id,
+          itemName: item.name,
+          hadImageUrl: !!item.image_url,
+          hadImages: !!item.images,
+        })
+      }
+      
+      return {
+        id: item.id,
+        sale_id: item.sale_id,
+        name: item.name,
+        category: item.category || undefined,
+        condition: item.condition || undefined,
+        price: item.price || undefined,
+        photo: images.length > 0 ? images[0] : undefined, // Use first image as photo
+        purchased: item.is_sold || false, // is_sold may not exist in view, default to false
+        created_at: item.created_at,
+      }
+    })
 
     return mappedItems
   } catch (error) {

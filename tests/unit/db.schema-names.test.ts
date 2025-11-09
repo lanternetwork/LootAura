@@ -55,12 +55,10 @@ describe('Schema name validation', () => {
     }
   })
 
-  it('should not write to views (must use base tables) - EXCEPT: PostgREST limitation requires views', async () => {
-    // NOTE: PostgREST only supports 'public' and 'graphql_public' schemas in client config.
-    // When the client is configured for 'public' schema, it cannot query tables in 'lootaura_v2' schema
-    // using the schema.table format. Therefore, we MUST use views (sale_drafts, sales_v2, items_v2)
-    // which have INSERT, UPDATE, DELETE permissions granted. This test is kept for documentation
-    // but writes to views are now the correct approach.
+  it('should not write to views (must use base tables lootaura_v2.*)', async () => {
+    // NOTE: Writes must go to base tables (lootaura_v2.*) using admin client.
+    // Reads from views (public.sale_drafts, public.sales_v2, public.items_v2) are allowed.
+    // This test enforces that writes use base tables, not views.
     const files = await glob('**/*.{ts,tsx,js,jsx}', {
       ignore: [
         '**/node_modules/**',
@@ -93,9 +91,12 @@ describe('Schema name validation', () => {
             if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
               return
             }
-            // Allow writes to views - this is now the correct approach due to PostgREST limitations
-            // Views have INSERT, UPDATE, DELETE permissions granted in migrations
-            return
+            // This is a violation - writes must use base tables (lootaura_v2.*)
+            violations.push({
+              file,
+              line: index + 1,
+              content: line.trim(),
+            })
           }
         })
       } catch (error) {
@@ -104,8 +105,14 @@ describe('Schema name validation', () => {
       }
     }
 
-    // No violations - writes to views are now allowed and correct
-    expect(violations.length).toBe(0)
+    if (violations.length > 0) {
+      const message = violations
+        .map((v) => `  ${v.file}:${v.line} - ${v.content}`)
+        .join('\n')
+      throw new Error(
+        `Found ${violations.length} write operation(s) to views (must use base tables lootaura_v2.*):\n${message}`
+      )
+    }
   })
 })
 

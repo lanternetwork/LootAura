@@ -107,10 +107,12 @@ export async function getUserSales(
     }
   }
 
-  // Fallback: query base table directly
+  // Fallback: query base table directly using schema-scoped client
   try {
-    const { data: sales, error } = await supabase
-      .from('lootaura_v2.sales')
+    const { getUserServerDb } = await import('@/lib/supabase/clients')
+    const db = getUserServerDb()
+    const { data: sales, error } = await db
+      .from('sales')
       .select('*')
       .eq('owner_id', userId)
       .order('updated_at', { ascending: false })
@@ -337,28 +339,27 @@ export async function getSaleWithItems(
     
     try {
       // Try to use admin client if available (service role key bypasses RLS)
-      // Note: adminSupabase is exported as a constant, not a function
-      const adminModule = await import('@/lib/supabase/admin').catch(() => null)
-      if (adminModule?.adminSupabase) {
-        // Admin client might still have schema limitations, but let's try
-        const tagsRes = await adminModule.adminSupabase
-          .from('lootaura_v2.sales')
-          .select('tags')
-          .eq('id', saleId)
-          .maybeSingle()
-        
-        if (!tagsRes.error && tagsRes.data) {
-          // Type assertion needed because admin client types may not be fully inferred
-          const data = tagsRes.data as { tags?: string[] | null } | null
-          if (data && Array.isArray(data.tags)) {
-            tags = data.tags
-          }
-        } else if (tagsRes.error) {
-          console.log('[SALES_ACCESS] Admin client tags query failed (schema limitation):', {
-            saleId,
-            error: tagsRes.error.message,
-          })
+      // Use schema-scoped admin client for tags query
+      const { getAdminDb } = await import('@/lib/supabase/clients')
+      const admin = getAdminDb()
+      const tagsRes = await admin
+        .from('sales')
+        .select('tags')
+        .eq('id', saleId)
+        .maybeSingle()
+      
+      if (!tagsRes.error && tagsRes.data) {
+        // Type assertion needed because admin client types may not be fully inferred
+        const data = tagsRes.data as { tags?: string[] | null } | null
+        if (data && Array.isArray(data.tags)) {
+          tags = data.tags
         }
+      } else if (tagsRes.error) {
+        console.log('[SALES_ACCESS] Admin client tags query failed (schema limitation):', {
+          saleId,
+          error: tagsRes.error.message,
+        })
+      }
       }
     } catch (error) {
       // Admin client not available or failed - that's okay, we'll continue without tags

@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getUserServerDb } from '@/lib/supabase/clients'
 
 export async function POST(_request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const db = getUserServerDb()
     
     console.log('[MIGRATE] Starting dual-link reviews system migration...')
     
     // Step 1: Add address_key column
     console.log('[MIGRATE] Step 1: Adding address_key column...')
-    const { error: addColumnError } = await supabase
-      .from('lootaura_v2.sales')
+    const { error: addColumnError } = await db
+      .from('sales')
       .select('address_key')
       .limit(1)
     

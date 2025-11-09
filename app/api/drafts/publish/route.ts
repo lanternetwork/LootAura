@@ -1,6 +1,5 @@
 // NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getUserServerDb, getAdminDb } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'

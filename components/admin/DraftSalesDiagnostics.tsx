@@ -394,7 +394,7 @@ export default function DraftSalesDiagnostics() {
                   {result.response?.ok && (result.response?.data?.saleId || result.response?.saleId) && (
                     <div className="mt-2">
                       <a
-                        href={`/s/${result.response.data?.saleId ?? result.response.saleId}`}
+                        href={`/sales/${result.response.data?.saleId ?? result.response.saleId}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:text-blue-800 text-sm"

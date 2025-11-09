@@ -139,14 +139,21 @@ export async function POST(request: NextRequest) {
         ? [item.image_url] 
         : (Array.isArray(itemAny.images) ? itemAny.images.filter((url: any): url is string => typeof url === 'string') : [])
       
-      return {
+      // Build payload - only include images if we have them (as array)
+      const payload: any = {
         sale_id: saleRow.id,
         name: item.name,
         description: item.description || null,
         price: item.price || null,
         category: item.category || null,
-        images: images.length > 0 ? images : null,
       }
+      
+      // Only include images if we have them (PostgREST expects text[] array)
+      if (images.length > 0) {
+        payload.images = images
+      }
+      
+      return payload
     }) : []
 
     // 2. Create items if any

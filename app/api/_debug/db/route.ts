@@ -1,9 +1,10 @@
+import { NextRequest } from 'next/server'
 import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Try admin client first (no auth required, more reliable for diagnostics)
     let db

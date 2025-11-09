@@ -373,16 +373,22 @@ export default function AddressAutocomplete({
                 // Sort by distance (closest first)
                 filteredWithDistances.sort((a, b) => a.distanceM - b.distanceM)
                 
-                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} total, ${filteredUnique.length} after filtering`)
-                if (filteredWithDistances.length > 0) {
-                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${filteredWithDistances[0].suggestion.label}" - Distance: ${filteredWithDistances[0].distanceKm} km (${Math.round(filteredWithDistances[0].distanceM)} m)`)
-                  if (filteredWithDistances.length > 1) {
-                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${filteredWithDistances[1].suggestion.label}" - Distance: ${filteredWithDistances[1].distanceKm} km (${Math.round(filteredWithDistances[1].distanceM)} m)`)
+                // Filter by maximum distance (50km) to avoid showing results thousands of km away
+                const MAX_DISTANCE_M = 50 * 1000 // 50km
+                const withinDistance = filteredWithDistances.filter(item => item.distanceM <= MAX_DISTANCE_M)
+                
+                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} total, ${filteredUnique.length} after filtering, ${withinDistance.length} within 50km`)
+                if (withinDistance.length > 0) {
+                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${withinDistance[0].suggestion.label}" - Distance: ${withinDistance[0].distanceKm} km (${Math.round(withinDistance[0].distanceM)} m)`)
+                  if (withinDistance.length > 1) {
+                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${withinDistance[1].suggestion.label}" - Distance: ${withinDistance[1].distanceKm} km (${Math.round(withinDistance[1].distanceM)} m)`)
                   }
+                } else if (filteredWithDistances.length > 0) {
+                  console.warn(`[AddressAutocomplete] All Nominatim results are >50km away. Closest: "${filteredWithDistances[0].suggestion.label}" at ${filteredWithDistances[0].distanceKm} km`)
                 }
                 
-                // Extract sorted suggestions
-                const sortedUnique = filteredWithDistances.map(item => item.suggestion)
+                // Extract sorted suggestions (only within distance)
+                const sortedUnique = withinDistance.map(item => item.suggestion)
                 
                 setSuggestions(sortedUnique)
                 setIsOpen(sortedUnique.length > 0)
@@ -791,7 +797,8 @@ export default function AddressAutocomplete({
       // Extract address components from normalized suggestion
       const addressLine1 = final.address?.line1 || final.address?.road || ''
       const city = final.address?.city || ''
-      const state = final.address?.state || ''
+      const stateRaw = final.address?.state || ''
+      const state = normalizeState(stateRaw) // Convert state name to abbreviation if needed
       const zip = final.address?.zip || final.address?.postcode || ''
       const _country = final.address?.country || 'US' // Extracted but not currently used in callback
       

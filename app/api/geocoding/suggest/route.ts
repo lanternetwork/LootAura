@@ -244,10 +244,14 @@ async function suggestHandler(request: NextRequest) {
       lat: parseFloat(item.lat) || 0,
       lng: parseFloat(item.lon) || 0,
       address: item.address ? {
+        // Combine houseNumber + road into line1 for easier parsing
+        line1: [item.address.house_number, item.address.road].filter(Boolean).join(' ').trim() || undefined,
         houseNumber: item.address.house_number,
         road: item.address.road,
         city: item.address.city || item.address.town || item.address.village,
         state: item.address.state,
+        // Add zip alias for postcode
+        zip: item.address.postcode,
         postcode: item.address.postcode,
         country: item.address.country
       } : undefined,

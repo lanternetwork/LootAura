@@ -181,8 +181,9 @@ export async function POST(request: NextRequest) {
     const { adminSupabase } = await import('@/lib/supabase/admin')
 
     // 1. Create sale - write to base table lootaura_v2.sales
-    const { data: sale, error: saleError } = await adminSupabase
-      .from('lootaura_v2.sales')
+    // Type assertion needed because admin client types don't include lootaura_v2 schema
+    const { data: sale, error: saleError } = await (adminSupabase
+      .from('lootaura_v2.sales') as any)
       .insert({
         owner_id: user.id,
         title: formData.title,
@@ -257,8 +258,9 @@ export async function POST(request: NextRequest) {
       })
 
       // Write to base table lootaura_v2.items using admin client
-      const { data: insertedItems, error: itemsError } = await adminSupabase
-        .from('lootaura_v2.items')
+      // Type assertion needed because admin client types don't include lootaura_v2 schema
+      const { data: insertedItems, error: itemsError } = await (adminSupabase
+        .from('lootaura_v2.items') as any)
         .insert(itemsToInsert)
         .select('id, name, sale_id')
 
@@ -280,7 +282,7 @@ export async function POST(request: NextRequest) {
           })),
         })
         // Try to clean up the sale (best effort) - write to base table
-        await adminSupabase.from('lootaura_v2.sales').delete().eq('id', sale.id)
+        await (adminSupabase.from('lootaura_v2.sales') as any).delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
         // Return detailed error for debugging
         const errorDetails = itemsError.message || itemsError.details || itemsError.hint || 'Unknown error'
@@ -315,8 +317,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Mark draft as published - write to base table lootaura_v2.sale_drafts
-    const { error: updateError } = await adminSupabase
-      .from('lootaura_v2.sale_drafts')
+    // Type assertion needed because admin client types don't include lootaura_v2 schema
+    const { error: updateError } = await (adminSupabase
+      .from('lootaura_v2.sale_drafts') as any)
       .update({ status: 'published' })
       .eq('id', draft.id)
 

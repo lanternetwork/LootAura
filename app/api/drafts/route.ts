@@ -212,8 +212,9 @@ export async function POST(request: NextRequest) {
 
     if (existingDraft) {
       // Update existing draft - write to base table lootaura_v2.sale_drafts
-      const { data: updatedDraft, error: updateError } = await adminSupabase
-        .from('lootaura_v2.sale_drafts')
+      // Type assertion needed because admin client types don't include lootaura_v2 schema
+      const { data: updatedDraft, error: updateError } = await (adminSupabase
+        .from('lootaura_v2.sale_drafts') as any)
         .update({
           title,
           payload: validatedPayload,
@@ -227,8 +228,9 @@ export async function POST(request: NextRequest) {
       error = updateError
     } else {
       // Insert new draft - write to base table lootaura_v2.sale_drafts
-      const { data: newDraft, error: insertError } = await adminSupabase
-        .from('lootaura_v2.sale_drafts')
+      // Type assertion needed because admin client types don't include lootaura_v2 schema
+      const { data: newDraft, error: insertError } = await (adminSupabase
+        .from('lootaura_v2.sale_drafts') as any)
         .insert({
           user_id: user.id,
           draft_key: draftKey,
@@ -333,8 +335,9 @@ export async function DELETE(request: NextRequest) {
 
     // Mark draft as archived (soft delete) - write to base table lootaura_v2.sale_drafts
     const { adminSupabase } = await import('@/lib/supabase/admin')
-    const { error } = await adminSupabase
-      .from('lootaura_v2.sale_drafts')
+    // Type assertion needed because admin client types don't include lootaura_v2 schema
+    const { error } = await (adminSupabase
+      .from('lootaura_v2.sale_drafts') as any)
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)

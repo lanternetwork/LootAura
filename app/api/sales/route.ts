@@ -834,7 +834,8 @@ async function postHandler(request: NextRequest) {
     // Insert into base table (lootaura_v2.sales) to ensure image fields are properly saved
     // Write to base table lootaura_v2.sales using admin client
     const { adminSupabase } = await import('@/lib/supabase/admin')
-    const fromSales = adminSupabase.from('lootaura_v2.sales')
+    // Type assertion needed because admin client types don't include lootaura_v2 schema
+    const fromSales = (adminSupabase.from('lootaura_v2.sales') as any)
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {

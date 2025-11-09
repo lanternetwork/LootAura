@@ -1,5 +1,7 @@
+// NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 
 export const dynamic = 'force-dynamic'
@@ -74,9 +76,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Sale ID is required' }, { status: 400 })
     }
     
-    // Verify user owns the sale
-    const { data: sale, error: saleError } = await supabase
-      .from('sales_v2')
+    // Verify user owns the sale (read from base table - sales_v2 view doesn't include owner_id for security)
+    const db = getRlsDb()
+    const { data: sale, error: saleError } = await fromBase(db, 'sales')
       .select('id, owner_id')
       .eq('id', sale_id)
       .eq('owner_id', user.id)
@@ -94,8 +96,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid image_url' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
-      .from('items_v2')
+    // Write to base table using schema-scoped client (reuse db from above)
+    const { data, error } = await fromBase(db, 'items')
       .insert({
         sale_id,
         name: title,
@@ -103,8 +105,7 @@ export async function POST(request: NextRequest) {
         price,
         category,
         condition,
-        image_url: image_url || null,
-        owner_id: user.id // This will be enforced by RLS
+        images: image_url ? [image_url] : null // Convert image_url to images array
       })
       .select()
       .single()
@@ -149,15 +150,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid image_url' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
-      .from('items_v2')
+    // Write to base table using schema-scoped client
+    const db = getRlsDb()
+    const { data, error } = await fromBase(db, 'items')
       .update({
         name: title,
         description,
         price,
         category,
         condition,
-        image_url: image_url || null
+        images: image_url ? [image_url] : null // Convert image_url to images array
       })
       .eq('id', itemId)
       .select()
@@ -196,8 +198,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Item ID is required' }, { status: 400 })
     }
     
-    const { data, error } = await supabase
-      .from('items_v2')
+    // Write to base table using schema-scoped client
+    const db = getRlsDb()
+    const { data, error } = await fromBase(db, 'items')
       .delete()
       .eq('id', itemId)
       .select()

@@ -1142,14 +1142,16 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="date_start" className="block text-sm font-medium text-gray-700 mb-2 cursor-pointer">
             Start Date *
           </label>
           <input
+            id="date_start"
             type="date"
             value={formData.date_start || ''}
             onChange={(e) => onChange('date_start', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+            onClick={(e) => e.currentTarget.showPicker?.()}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] cursor-pointer"
             required
           />
         {errors?.date_start && (

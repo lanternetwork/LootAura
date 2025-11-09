@@ -2,9 +2,7 @@
  * Schema-scoped Supabase client helpers
  * 
  * NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
- * 
- * IMPORTANT: We don't set a schema in the client config to allow fully-qualified table names
- * like lootaura_v2.sale_drafts to work. The fromBase() helper constructs these names.
+ * Do not write to views.
  */
 
 import { cookies } from 'next/headers'
@@ -13,10 +11,7 @@ import { createClient } from '@supabase/supabase-js'
 import { ENV_PUBLIC, ENV_SERVER } from '../env'
 
 /**
- * RLS-aware client for route handlers (user session).
- * No schema set in config to allow fully-qualified names like lootaura_v2.sale_drafts.
- * 
- * IMPORTANT: Use fromBase() helper to access lootaura_v2 tables with unqualified names.
+ * RLS-aware client for route handlers (user session). Writes/reads to lootaura_v2.
  */
 export function getRlsDb() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -40,17 +35,13 @@ export function getRlsDb() {
         cookieStore.set({ name, value: '', ...options, maxAge: 0 })
       },
     },
-    // Don't set schema - allows fully-qualified names like lootaura_v2.sale_drafts to work
   })
 
-  return sb
+  return sb.schema('lootaura_v2')
 }
 
 /**
- * Service-role client for trusted server ops (never import in client components).
- * No schema set in config to allow fully-qualified names like lootaura_v2.sale_drafts.
- * 
- * IMPORTANT: Use fromBase() helper to access lootaura_v2 tables with unqualified names.
+ * Service-role client (trusted server ops only; NEVER import in client components).
  */
 export function getAdminDb() {
   // Check process.env first to avoid triggering ENV_SERVER validation during build
@@ -73,29 +64,20 @@ export function getAdminDb() {
   const url = ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
   const admin = createClient(url, serviceRoleKey, {
     auth: { persistSession: false },
-    // Don't set schema - allows fully-qualified names like lootaura_v2.sale_drafts to work
   })
 
-  return admin
+  return admin.schema('lootaura_v2')
 }
 
 /**
- * Helper to access lootaura_v2 base tables using fully-qualified names.
- * 
- * @param db - Client from getRlsDb() or getAdminDb() (no schema set in config)
- * @param table - Unqualified table name (e.g., 'sales', not 'lootaura_v2.sales')
- * @returns The query builder for the specified table in lootaura_v2 schema
+ * Guard wrapper: prevent qualified names in .from()
  */
-export function fromBase(
-  db: ReturnType<typeof getRlsDb> | ReturnType<typeof getAdminDb>,
+export function fromBase<T extends ReturnType<typeof getRlsDb> | ReturnType<typeof getAdminDb>>(
+  db: T,
   table: string
 ) {
   if (table.includes('.')) {
-    throw new Error(
-      `Do not qualify table names: received "${table}". Use fromBase(db, '<unqualified>') which will qualify it as lootaura_v2.<table>`
-    )
+    throw new Error(`Do not qualify table names. Use schema('lootaura_v2').from('<unqualified>')`)
   }
-  // Use fully-qualified names to access lootaura_v2 tables (works when no schema is set in client config)
-  return db.from(`lootaura_v2.${table}`)
+  return db.from(table)
 }
-

@@ -58,7 +58,6 @@ describe('Schema name validation', () => {
   it('should not use fully-qualified table names directly (must use fromBase() helper)', async () => {
     // NOTE: All writes must use schema-scoped clients (getRlsDb() or getAdminDb())
     // with unqualified table names via fromBase() helper (e.g., fromBase(db, 'sales') not .from('lootaura_v2.sales'))
-    // The fromBase() helper internally constructs fully-qualified names due to PostgREST limitations.
     // This test enforces that code uses fromBase() rather than directly qualifying table names.
     const files = await glob('**/*.{ts,tsx,js,jsx}', {
       ignore: [
@@ -71,6 +70,7 @@ describe('Schema name validation', () => {
         '**/*.spec.{ts,tsx,js,jsx}',
         '**/mocks/**',
         '**/__mocks__/**',
+        '**/scripts/**', // Utility scripts may use fully-qualified names for one-off operations
         '**/lib/supabase/clients.ts', // fromBase() helper legitimately uses fully-qualified names
       ],
       cwd: process.cwd(),
@@ -84,9 +84,9 @@ describe('Schema name validation', () => {
         const lines = content.split('\n')
 
         lines.forEach((line, index) => {
-          // Check for fully-qualified table names: .from('lootaura_v2.sales|items|sale_drafts')
-          // Pattern: .from('lootaura_v2\.(sales|items|sale_drafts)')
-          const qualifiedTablePattern = /\.from\(['"]lootaura_v2\.(sales|items|sale_drafts)['"]\)/
+          // Check for fully-qualified table names: .from('lootaura_v2.*')
+          // Pattern: .from('lootaura_v2\.[a-z_]+')
+          const qualifiedTablePattern = /\.from\(['"]lootaura_v2\.[a-z_]+['"]\)/
           
           if (qualifiedTablePattern.test(line)) {
             // Allow if it's a comment
@@ -145,7 +145,7 @@ describe('Schema name validation', () => {
 
         lines.forEach((line, index) => {
           // Check for writes to views: .from('(public.)?(sale_drafts|sales_v2|items_v2)').(insert|update|delete|upsert)(
-          const writeToViewPattern = /\.from\(['"](public\.)?(sale_drafts|sales_v2|items_v2)['"]\)\s*\.(insert|update|delete|upsert)\(/
+          const writeToViewPattern = /\.from\(['"`](public\.)?(sale_drafts|sales_v2|items_v2)['"`]\)\s*\.(insert|update|delete|upsert)\(/
           
           if (writeToViewPattern.test(line)) {
             // Allow if it's a comment

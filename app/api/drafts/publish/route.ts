@@ -1,8 +1,7 @@
-// NOTE: Uses public views (with INSTEAD OF triggers) for all writes:
-// - public.sale_drafts for draft access
-// - public.sales_v2 for sale creation
-// - public.items_v2 for item creation
+// NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import * as Sentry from '@sentry/nextjs'
@@ -20,8 +19,7 @@ type ApiResponse<T = any> = {
 // POST: Publish draft (transactional: create sale + items, mark draft as published)
 export async function POST(request: NextRequest) {
   try {
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const supabase = createSupabaseWriteClient()
+    const supabase = createSupabaseServerClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -56,9 +54,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Fetch draft from public view
-    const { data: draft, error: fetchError } = await supabase
-      .from('sale_drafts')
+    // Read draft with RLS
+    const rls = getRlsDb()
+    const { data: draft, error: fetchError } = await fromBase(rls, 'sale_drafts')
       .select('id, payload, status')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
@@ -79,8 +77,7 @@ export async function POST(request: NextRequest) {
       })
       
       // Check if already published (idempotency)
-      const { data: publishedDraft } = await supabase
-        .from('sale_drafts')
+      const { data: publishedDraft } = await fromBase(rls, 'sale_drafts')
         .select('id')
         .eq('user_id', user.id)
         .eq('draft_key', draftKey)
@@ -180,9 +177,11 @@ export async function POST(request: NextRequest) {
     // Note: Supabase doesn't support true transactions across multiple operations,
     // so we'll do them sequentially and handle errors
 
-    // 1. Create sale - write through public.sales_v2 view (INSTEAD OF trigger handles it)
-    const { data: sale, error: saleError } = await supabase
-      .from('sales_v2')
+    // Write sale/items with admin (or RLS if policies allow)
+    const admin = getAdminDb()
+
+    // 1. Create sale - write to base table using schema-scoped client
+    const { data: sale, error: saleError } = await fromBase(admin, 'sales')
       .insert({
         owner_id: user.id,
         title: formData.title,
@@ -258,9 +257,8 @@ export async function POST(request: NextRequest) {
         })),
       })
 
-      // Write through public.items_v2 view (INSTEAD OF trigger handles it)
-      const { data: insertedItems, error: itemsError } = await supabase
-        .from('items_v2')
+      // Write to base table using schema-scoped client
+      const { data: insertedItems, error: itemsError } = await fromBase(admin, 'items')
         .insert(itemsToInsert)
         .select('id, name, sale_id')
 
@@ -281,8 +279,8 @@ export async function POST(request: NextRequest) {
             imagesValue: i.images,
           })),
         })
-        // Try to clean up the sale (best effort) - write through public.sales_v2 view
-        await supabase.from('sales_v2').delete().eq('id', sale.id)
+        // Try to clean up the sale (best effort) - write to base table using schema-scoped client
+        await fromBase(admin, 'sales').delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
         // Return detailed error for debugging
         const errorDetails = itemsError.message || itemsError.details || itemsError.hint || 'Unknown error'
@@ -316,9 +314,8 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 3. Mark draft as published - write through public view (INSTEAD OF trigger handles it)
-    const { error: updateError } = await supabase
-      .from('sale_drafts')
+    // 3. Mark draft as published - use RLS client
+    const { error: updateError } = await fromBase(rls, 'sale_drafts')
       .update({ status: 'published' })
       .eq('id', draft.id)
 

@@ -1,5 +1,7 @@
+// NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,11 +53,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
+    // Write to base table using schema-scoped client
+    const db = getRlsDb()
+    
     // Validate that the sale belongs to the authenticated user
     if (body.sale_id) {
-      const { data: sale, error: saleError } = await supabase
-        .from('sales_v2')
-        .select('owner_id')
+      // Read from base table to check ownership (sales_v2 view doesn't include owner_id for security)
+      const { data: sale, error: saleError } = await fromBase(db, 'sales')
+        .select('id, owner_id')
         .eq('id', body.sale_id)
         .single()
       
@@ -68,12 +73,10 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    const { data: item, error } = await supabase
-      .from('items_v2')
+    const { data: item, error } = await fromBase(db, 'items')
       .insert({
-        owner_id: user.id,
         sale_id: body.sale_id,
-        title: body.title,
+        name: body.title,
         description: body.description,
         price: body.price,
         category: body.category,
@@ -112,11 +115,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const { data: item, error } = await supabase
-      .from('items_v2')
+    // Write to base table using schema-scoped client
+    const db = getRlsDb()
+    const { data: item, error } = await fromBase(db, 'items')
       .update(body)
       .eq('id', itemId)
-      .eq('owner_id', user.id) // Ensure user can only update their own items
       .select()
       .single()
     
@@ -152,11 +155,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const { error } = await supabase
-      .from('items_v2')
+    // Write to base table using schema-scoped client
+    const db = getRlsDb()
+    const { error } = await fromBase(db, 'items')
       .delete()
       .eq('id', itemId)
-      .eq('owner_id', user.id) // Ensure user can only delete their own items
     
     if (error) {
       console.error('Error deleting item:', error)

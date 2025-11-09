@@ -1,6 +1,7 @@
-// NOTE: Uses public.sale_drafts view (with INSTEAD OF triggers) to access lootaura_v2.sale_drafts
+// NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import * as Sentry from '@sentry/nextjs'
 
@@ -34,9 +35,9 @@ export async function GET(_request: NextRequest) {
     const allDrafts = searchParams.get('all') === 'true'
 
     if (allDrafts) {
-      // Return all active drafts for user (read from public view)
-      const { data: drafts, error } = await supabase
-        .from('sale_drafts')
+      // Return all active drafts for user (read from base table via schema-scoped client)
+      const db = getRlsDb()
+      const { data: drafts, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, title, payload, updated_at')
         .eq('user_id', user.id)
         .eq('status', 'active')
@@ -59,9 +60,9 @@ export async function GET(_request: NextRequest) {
       })
     }
 
-    // Fetch latest active draft for user (read from public view)
-    const { data: draft, error } = await supabase
-      .from('sale_drafts')
+    // Fetch latest active draft for user (read from base table via schema-scoped client)
+    const db = getRlsDb()
+    const { data: draft, error } = await fromBase(db, 'sale_drafts')
       .select('id, payload, updated_at')
       .eq('user_id', user.id)
       .eq('status', 'active')
@@ -191,9 +192,11 @@ export async function POST(request: NextRequest) {
       payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
     })
     
-    // Check if draft exists first (read from public view)
-    const { data: existingDraft } = await supabase
-      .from('sale_drafts')
+    // Get schema-scoped client for writes to base table
+    const db = getRlsDb()
+    
+    // Check if draft exists first
+    const { data: existingDraft } = await fromBase(db, 'sale_drafts')
       .select('id')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
@@ -204,9 +207,8 @@ export async function POST(request: NextRequest) {
     let error: any
 
     if (existingDraft) {
-      // Update existing draft - write through public view (INSTEAD OF trigger handles it)
-      const { data: updatedDraft, error: updateError } = await supabase
-        .from('sale_drafts')
+      // Update existing draft - write to base table using schema-scoped client
+      const { data: updatedDraft, error: updateError } = await fromBase(db, 'sale_drafts')
         .update({
           title,
           payload: validatedPayload,
@@ -219,9 +221,8 @@ export async function POST(request: NextRequest) {
       draft = updatedDraft
       error = updateError
     } else {
-      // Insert new draft - write through public view (INSTEAD OF trigger handles it)
-      const { data: newDraft, error: insertError } = await supabase
-        .from('sale_drafts')
+      // Insert new draft - write to base table using schema-scoped client
+      const { data: newDraft, error: insertError } = await fromBase(db, 'sale_drafts')
         .insert({
           user_id: user.id,
           draft_key: draftKey,
@@ -324,9 +325,9 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Mark draft as archived (soft delete) - write through public view (INSTEAD OF trigger handles it)
-    const { error } = await supabase
-      .from('sale_drafts')
+    // Mark draft as archived (soft delete) - write to base table using schema-scoped client
+    const db = getRlsDb()
+    const { error } = await fromBase(db, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)

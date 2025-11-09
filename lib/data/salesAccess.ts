@@ -161,12 +161,11 @@ export async function getUserDrafts(
   offset: number = 0
 ): Promise<{ data: DraftListing[]; error?: any }> {
   try {
-    // Use write client for reading drafts (they're in lootaura_v2 schema)
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const writeClient = createSupabaseWriteClient()
+    // Read from base table via schema-scoped client
+    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+    const db = getRlsDb()
     
-    const { data: drafts, error } = await writeClient
-      .from('sale_drafts')
+    const { data: drafts, error } = await fromBase(db, 'sale_drafts')
       .select('id, draft_key, title, updated_at, payload')
       .eq('user_id', userId)
       .eq('status', 'active')

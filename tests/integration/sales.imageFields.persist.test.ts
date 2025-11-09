@@ -39,11 +39,11 @@ vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: () => mockSupabaseClient,
   getAdminDb: () => mockSupabaseClient,
   fromBase: (db: any, table: string) => {
-    // Simulate fully-qualified name behavior: fromBase(db, 'sales') -> db.from('lootaura_v2.sales')
+    // fromBase() receives a schema-scoped client, so just use .from() directly
     if (table.includes('.')) {
       throw new Error(`Do not qualify table names: received "${table}"`)
     }
-    return db.from(`lootaura_v2.${table}`)
+    return db.from(table)
   },
 }))
 

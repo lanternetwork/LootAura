@@ -1,5 +1,7 @@
+// NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const supabase = createSupabaseServerClient()
@@ -9,8 +11,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const saleId = params.id
   const { status } = await req.json().catch(() => ({ status: 'completed' }))
   
-  const { data, error } = await supabase
-    .from('sales_v2')
+  // Write to base table using schema-scoped client
+  const db = getRlsDb()
+  const { data, error } = await fromBase(db, 'sales')
     .update({ status })
     .eq('id', saleId)
     .eq('owner_id', user.user.id)

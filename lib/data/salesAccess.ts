@@ -360,7 +360,6 @@ export async function getSaleWithItems(
           error: tagsRes.error.message,
         })
       }
-      }
     } catch (error) {
       // Admin client not available or failed - that's okay, we'll continue without tags
       console.log('[SALES_ACCESS] Could not fetch tags (admin client not available or failed):', {

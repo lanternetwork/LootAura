@@ -34,6 +34,12 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseWriteClient: () => mockSupabaseClient,
 }))
 
+// Mock schema-scoped clients - use same mock since tests don't need RLS bypass
+vi.mock('@/lib/supabase/clients', () => ({
+  getUserServerDb: () => mockSupabaseClient,
+  getAdminDb: () => mockSupabaseClient,
+}))
+
 // Mock admin client - use same mock since tests don't need RLS bypass
 vi.mock('@/lib/supabase/admin', () => ({
   adminSupabase: mockSupabaseClient,

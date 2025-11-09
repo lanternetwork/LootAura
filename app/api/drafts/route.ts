@@ -1,6 +1,7 @@
 // NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getUserServerDb } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import * as Sentry from '@sentry/nextjs'
 
@@ -34,10 +35,9 @@ export async function GET(_request: NextRequest) {
     const allDrafts = searchParams.get('all') === 'true'
 
     if (allDrafts) {
-      // Return all active drafts for user (use write client for lootaura_v2 schema)
-      const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-      const writeClient = createSupabaseWriteClient()
-      const { data: drafts, error } = await writeClient
+      // Return all active drafts for user (read from base table via schema-scoped client)
+      const db = getUserServerDb()
+      const { data: drafts, error } = await db
         .from('sale_drafts')
         .select('id, draft_key, title, payload, updated_at')
         .eq('user_id', user.id)
@@ -195,8 +195,11 @@ export async function POST(request: NextRequest) {
       payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
     })
     
-    // Check if draft exists first (views don't support ON CONFLICT the same way)
-    const { data: existingDraft } = await supabase
+    // Get schema-scoped client for writes to base table
+    const db = getUserServerDb()
+    
+    // Check if draft exists first
+    const { data: existingDraft } = await db
       .from('sale_drafts')
       .select('id')
       .eq('user_id', user.id)
@@ -207,14 +210,10 @@ export async function POST(request: NextRequest) {
     let draft: any
     let error: any
 
-    // Import admin client for writes to base tables
-    const { adminSupabase } = await import('@/lib/supabase/admin')
-
     if (existingDraft) {
-      // Update existing draft - write to base table lootaura_v2.sale_drafts
-      // Type assertion needed because admin client types don't include lootaura_v2 schema
-      const { data: updatedDraft, error: updateError } = await (adminSupabase
-        .from('lootaura_v2.sale_drafts') as any)
+      // Update existing draft - write to base table using schema-scoped client
+      const { data: updatedDraft, error: updateError } = await db
+        .from('sale_drafts')
         .update({
           title,
           payload: validatedPayload,
@@ -227,10 +226,9 @@ export async function POST(request: NextRequest) {
       draft = updatedDraft
       error = updateError
     } else {
-      // Insert new draft - write to base table lootaura_v2.sale_drafts
-      // Type assertion needed because admin client types don't include lootaura_v2 schema
-      const { data: newDraft, error: insertError } = await (adminSupabase
-        .from('lootaura_v2.sale_drafts') as any)
+      // Insert new draft - write to base table using schema-scoped client
+      const { data: newDraft, error: insertError } = await db
+        .from('sale_drafts')
         .insert({
           user_id: user.id,
           draft_key: draftKey,
@@ -333,11 +331,10 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Mark draft as archived (soft delete) - write to base table lootaura_v2.sale_drafts
-    const { adminSupabase } = await import('@/lib/supabase/admin')
-    // Type assertion needed because admin client types don't include lootaura_v2 schema
-    const { error } = await (adminSupabase
-      .from('lootaura_v2.sale_drafts') as any)
+    // Mark draft as archived (soft delete) - write to base table using schema-scoped client
+    const db = getUserServerDb()
+    const { error } = await db
+      .from('sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)

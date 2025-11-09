@@ -1,5 +1,7 @@
 // NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getUserServerDb, getAdminDb } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import * as Sentry from '@sentry/nextjs'
@@ -53,8 +55,9 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Fetch draft by user_id + draft_key with status active
-    const { data: draft, error: fetchError } = await supabase
+    // Fetch draft using schema-scoped RLS client (user-scoped is fine for drafts)
+    const rls = getUserServerDb()
+    const { data: draft, error: fetchError } = await rls
       .from('sale_drafts')
       .select('id, payload, status')
       .eq('user_id', user.id)
@@ -76,7 +79,7 @@ export async function POST(request: NextRequest) {
       })
       
       // Check if already published (idempotency)
-      const { data: publishedDraft } = await supabase
+      const { data: publishedDraft } = await rls
         .from('sale_drafts')
         .select('id')
         .eq('user_id', user.id)
@@ -177,13 +180,12 @@ export async function POST(request: NextRequest) {
     // Note: Supabase doesn't support true transactions across multiple operations,
     // so we'll do them sequentially and handle errors
 
-    // Import admin client for writes to base tables
-    const { adminSupabase } = await import('@/lib/supabase/admin')
+    // Use admin client for sale + items creation (bypasses RLS for cross-table operations)
+    const admin = getAdminDb()
 
-    // 1. Create sale - write to base table lootaura_v2.sales
-    // Type assertion needed because admin client types don't include lootaura_v2 schema
-    const { data: sale, error: saleError } = await (adminSupabase
-      .from('lootaura_v2.sales') as any)
+    // 1. Create sale - write to base table using schema-scoped admin client
+    const { data: sale, error: saleError } = await admin
+      .from('sales')
       .insert({
         owner_id: user.id,
         title: formData.title,
@@ -259,10 +261,9 @@ export async function POST(request: NextRequest) {
         })),
       })
 
-      // Write to base table lootaura_v2.items using admin client
-      // Type assertion needed because admin client types don't include lootaura_v2 schema
-      const { data: insertedItems, error: itemsError } = await (adminSupabase
-        .from('lootaura_v2.items') as any)
+      // Write to base table using schema-scoped admin client
+      const { data: insertedItems, error: itemsError } = await admin
+        .from('items')
         .insert(itemsToInsert)
         .select('id, name, sale_id')
 
@@ -283,8 +284,8 @@ export async function POST(request: NextRequest) {
             imagesValue: i.images,
           })),
         })
-        // Try to clean up the sale (best effort) - write to base table
-        await (adminSupabase.from('lootaura_v2.sales') as any).delete().eq('id', sale.id)
+        // Try to clean up the sale (best effort) - write to base table using admin client
+        await admin.from('sales').delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
         // Return detailed error for debugging
         const errorDetails = itemsError.message || itemsError.details || itemsError.hint || 'Unknown error'
@@ -318,10 +319,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 3. Mark draft as published - write to base table lootaura_v2.sale_drafts
-    // Type assertion needed because admin client types don't include lootaura_v2 schema
-    const { error: updateError } = await (adminSupabase
-      .from('lootaura_v2.sale_drafts') as any)
+    // 3. Mark draft as published - use RLS client (user-scoped is fine for draft updates)
+    const { error: updateError } = await rls
+      .from('sale_drafts')
       .update({ status: 'published' })
       .eq('id', draft.id)
 

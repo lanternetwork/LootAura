@@ -831,11 +831,10 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // Insert into base table (lootaura_v2.sales) to ensure image fields are properly saved
-    // Write to base table lootaura_v2.sales using admin client
-    const { adminSupabase } = await import('@/lib/supabase/admin')
-    // Type assertion needed because admin client types don't include lootaura_v2 schema
-    const fromSales = (adminSupabase.from('lootaura_v2.sales') as any)
+    // Insert into base table using schema-scoped RLS client
+    const { getUserServerDb } = await import('@/lib/supabase/clients')
+    const db = getUserServerDb()
+    const fromSales = db.from('sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {

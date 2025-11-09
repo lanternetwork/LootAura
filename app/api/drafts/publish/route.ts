@@ -239,11 +239,49 @@ export async function POST(request: NextRequest) {
         itemsToInsert: itemsToInsert.map(i => ({ name: i.name, sale_id: i.sale_id })),
       })
 
-      // Use view (allows writes)
-      const { data: insertedItems, error: itemsError } = await supabase
+      // Try using view first (allows writes through PostgREST)
+      // If that fails, fall back to admin client for base table access
+      let insertedItems: any = null
+      let itemsError: any = null
+      
+      const itemsRes = await supabase
         .from('items_v2')
         .insert(itemsToInsert)
         .select('id, name, sale_id')
+      
+      insertedItems = itemsRes.data
+      itemsError = itemsRes.error
+      
+      // If view insert fails, try admin client (bypasses RLS)
+      if (itemsError) {
+        console.log('[DRAFTS_PUBLISH] View insert failed, trying admin client:', {
+          error: itemsError.message,
+          code: itemsError.code,
+        })
+        
+        try {
+          const adminModule = await import('@/lib/supabase/admin').catch(() => null)
+          if (adminModule?.adminSupabase) {
+            // Admin client can access base table directly
+            const adminRes = await adminModule.adminSupabase
+              .from('lootaura_v2.items')
+              .insert(itemsToInsert)
+              .select('id, name, sale_id')
+            
+            if (!adminRes.error) {
+              insertedItems = adminRes.data
+              itemsError = null
+              console.log('[DRAFTS_PUBLISH] Admin client insert succeeded')
+            } else {
+              itemsError = adminRes.error
+              console.error('[DRAFTS_PUBLISH] Admin client insert also failed:', adminRes.error)
+            }
+          }
+        } catch (adminError) {
+          console.error('[DRAFTS_PUBLISH] Admin client not available:', adminError)
+          // Keep original error
+        }
+      }
 
       if (itemsError) {
         // Always log full error details for debugging

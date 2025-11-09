@@ -55,10 +55,11 @@ describe('Schema name validation', () => {
     }
   })
 
-  it('should not use fully-qualified table names (must use schema-scoped clients with unqualified names)', async () => {
+  it('should not use fully-qualified table names directly (must use fromBase() helper)', async () => {
     // NOTE: All writes must use schema-scoped clients (getRlsDb() or getAdminDb())
     // with unqualified table names via fromBase() helper (e.g., fromBase(db, 'sales') not .from('lootaura_v2.sales'))
-    // This test enforces the schema-scoped pattern with unqualified names.
+    // The fromBase() helper internally constructs fully-qualified names due to PostgREST limitations.
+    // This test enforces that code uses fromBase() rather than directly qualifying table names.
     const files = await glob('**/*.{ts,tsx,js,jsx}', {
       ignore: [
         '**/node_modules/**',
@@ -70,6 +71,7 @@ describe('Schema name validation', () => {
         '**/*.spec.{ts,tsx,js,jsx}',
         '**/mocks/**',
         '**/__mocks__/**',
+        '**/lib/supabase/clients.ts', // fromBase() helper legitimately uses fully-qualified names
       ],
       cwd: process.cwd(),
     })

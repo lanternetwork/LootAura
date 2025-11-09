@@ -3,8 +3,8 @@
  * 
  * NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
  * 
- * All writes go to base tables using schema-scoped Supabase clients.
- * No .from('lootaura_v2.*') anywhere. Keep reads from views intact.
+ * IMPORTANT: PostgREST doesn't support custom schemas in client config, so we use 'public' schema
+ * and access lootaura_v2 tables using fully-qualified names via fromBase().
  */
 
 import { cookies } from 'next/headers'
@@ -14,9 +14,9 @@ import { ENV_PUBLIC, ENV_SERVER } from '../env'
 
 /**
  * RLS-aware client for route handlers (user session).
- * Returns a client scoped to lootaura_v2 schema.
+ * Uses 'public' schema (PostgREST limitation) but accesses lootaura_v2 tables via fully-qualified names.
  * 
- * IMPORTANT: Use unqualified table names: fromBase(db, 'sales') not .from('lootaura_v2.sales')
+ * IMPORTANT: Use fromBase() helper to access lootaura_v2 tables with unqualified names.
  */
 export function getRlsDb() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -40,18 +40,17 @@ export function getRlsDb() {
         cookieStore.set({ name, value: '', ...options, maxAge: 0 })
       },
     },
-    db: { schema: 'lootaura_v2' }, // Schema-scoped for base table access
+    db: { schema: 'public' }, // PostgREST limitation: must use 'public', access lootaura_v2 via qualified names
   })
 
-  // IMPORTANT: schema is set in config above, use unqualified table names in .from()
   return sb
 }
 
 /**
  * Service-role client for trusted server ops (never import in client components).
- * Returns a client scoped to lootaura_v2 schema.
+ * Uses 'public' schema (PostgREST limitation) but accesses lootaura_v2 tables via fully-qualified names.
  * 
- * IMPORTANT: Use unqualified table names: fromBase(db, 'sales') not .from('lootaura_v2.sales')
+ * IMPORTANT: Use fromBase() helper to access lootaura_v2 tables with unqualified names.
  */
 export function getAdminDb() {
   // Check process.env first to avoid triggering ENV_SERVER validation during build
@@ -74,19 +73,18 @@ export function getAdminDb() {
   const url = ENV_PUBLIC.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
   const admin = createClient(url, serviceRoleKey, {
     auth: { persistSession: false },
-    db: { schema: 'lootaura_v2' }, // Schema-scoped for base table access
+    db: { schema: 'public' }, // PostgREST limitation: must use 'public', access lootaura_v2 via qualified names
   })
 
-  // IMPORTANT: schema is set in config above, use unqualified table names in .from()
   return admin
 }
 
 /**
- * Guard helper: prevent qualified table names from slipping in.
+ * Helper to access lootaura_v2 base tables using fully-qualified names.
  * 
- * @param db - Schema-scoped client from getRlsDb() or getAdminDb()
+ * @param db - Client from getRlsDb() or getAdminDb() (configured with 'public' schema)
  * @param table - Unqualified table name (e.g., 'sales', not 'lootaura_v2.sales')
- * @returns The query builder for the specified table
+ * @returns The query builder for the specified table in lootaura_v2 schema
  */
 export function fromBase(
   db: ReturnType<typeof getRlsDb> | ReturnType<typeof getAdminDb>,
@@ -94,9 +92,10 @@ export function fromBase(
 ) {
   if (table.includes('.')) {
     throw new Error(
-      `Do not qualify table names: received "${table}". Use schema('lootaura_v2').from('<unqualified>')`
+      `Do not qualify table names: received "${table}". Use fromBase(db, '<unqualified>') which will qualify it as lootaura_v2.<table>`
     )
   }
-  return db.from(table)
+  // PostgREST limitation: must use fully-qualified names to access lootaura_v2 tables
+  return db.from(`lootaura_v2.${table}`)
 }
 

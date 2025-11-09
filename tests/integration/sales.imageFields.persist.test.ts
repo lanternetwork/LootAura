@@ -38,7 +38,13 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: () => mockSupabaseClient,
   getAdminDb: () => mockSupabaseClient,
-  fromBase: (db: any, table: string) => db.from(table),
+  fromBase: (db: any, table: string) => {
+    // Simulate fully-qualified name behavior: fromBase(db, 'sales') -> db.from('lootaura_v2.sales')
+    if (table.includes('.')) {
+      throw new Error(`Do not qualify table names: received "${table}"`)
+    }
+    return db.from(`lootaura_v2.${table}`)
+  },
 }))
 
 // Mock admin client - use same mock since tests don't need RLS bypass

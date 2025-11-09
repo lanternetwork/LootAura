@@ -2,7 +2,7 @@
 // NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
 import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'

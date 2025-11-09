@@ -211,8 +211,81 @@ export default function AddressAutocomplete({
             setShowFallbackMessage(false)
             setIsLoading(false)
           } else {
-            // Google returned empty → fallback to OSM
+            // Google returned empty → check if digits+street and use Overpass, otherwise fallback to Nominatim
             setShowGoogleAttribution(false)
+            
+            // Check if this is a digits+street query and use Overpass
+            const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].*)$/)
+            if (digitsStreetMatch?.groups && hasCoords) {
+              console.log('[AddressAutocomplete] Google empty, trying Overpass (digits+street)', { q: trimmedQuery, userLat, userLng })
+              return fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
+                .then((response) => {
+                  if (requestIdRef.current !== currentId) return
+                  
+                  if (response.ok && response.data && response.data.length > 0) {
+                    const unique: AddressSuggestion[] = []
+                    const seen = new Set<string>()
+                    for (const s of response.data) {
+                      const key = s.id
+                      if (!seen.has(key)) {
+                        seen.add(key)
+                        unique.push(s)
+                      }
+                    }
+                    setSuggestions(unique)
+                    setIsOpen(unique.length > 0)
+                    setSelectedIndex(-1)
+                    setShowFallbackMessage(unique.length > 0)
+                    setIsLoading(false)
+                    return
+                  }
+                  
+                  // Overpass failed, fallback to Nominatim
+                  console.warn(`[AddressAutocomplete] Overpass failed/empty after Google, falling back to Nominatim for "${trimmedQuery}"`)
+                  return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+                    .then((results) => {
+                      if (requestIdRef.current !== currentId) return
+                      const unique: AddressSuggestion[] = []
+                      const seen = new Set<string>()
+                      for (const s of results) {
+                        const key = s.id
+                        if (!seen.has(key)) {
+                          seen.add(key)
+                          unique.push(s)
+                        }
+                      }
+                      setSuggestions(unique)
+                      setIsOpen(unique.length > 0)
+                      setSelectedIndex(-1)
+                      setShowFallbackMessage(unique.length > 0)
+                    })
+                    .finally(() => setIsLoading(false))
+                })
+                .catch(() => {
+                  // Overpass error, fallback to Nominatim
+                  if (requestIdRef.current !== currentId) return
+                  return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+                    .then((results) => {
+                      if (requestIdRef.current !== currentId) return
+                      const unique: AddressSuggestion[] = []
+                      const seen = new Set<string>()
+                      for (const s of results) {
+                        const key = s.id
+                        if (!seen.has(key)) {
+                          seen.add(key)
+                          unique.push(s)
+                        }
+                      }
+                      setSuggestions(unique)
+                      setIsOpen(unique.length > 0)
+                      setSelectedIndex(-1)
+                      setShowFallbackMessage(unique.length > 0)
+                    })
+                    .finally(() => setIsLoading(false))
+                })
+            }
+            
+            // Not digits+street, use Nominatim
             return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
               .then((results) => {
                 if (requestIdRef.current !== currentId) return
@@ -234,9 +307,83 @@ export default function AddressAutocomplete({
           }
         })
         .catch(() => {
-          // Google error → fallback
+          // Google error → check if digits+street and use Overpass, otherwise fallback to Nominatim
           if (requestIdRef.current !== currentId) return
           setShowGoogleAttribution(false)
+          
+          // Check if this is a digits+street query and use Overpass
+          const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].*)$/)
+          if (digitsStreetMatch?.groups && hasCoords) {
+            console.log('[AddressAutocomplete] Google error, trying Overpass (digits+street)', { q: trimmedQuery, userLat, userLng })
+            fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
+              .then((response) => {
+                if (requestIdRef.current !== currentId) return
+                
+                if (response.ok && response.data && response.data.length > 0) {
+                  const unique: AddressSuggestion[] = []
+                  const seen = new Set<string>()
+                  for (const s of response.data) {
+                    const key = s.id
+                    if (!seen.has(key)) {
+                      seen.add(key)
+                      unique.push(s)
+                    }
+                  }
+                  setSuggestions(unique)
+                  setIsOpen(unique.length > 0)
+                  setSelectedIndex(-1)
+                  setShowFallbackMessage(unique.length > 0)
+                  setIsLoading(false)
+                  return
+                }
+                
+                // Overpass failed, fallback to Nominatim
+                console.warn(`[AddressAutocomplete] Overpass failed/empty after Google error, falling back to Nominatim for "${trimmedQuery}"`)
+                return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+                  .then((results) => {
+                    if (requestIdRef.current !== currentId) return
+                    const unique: AddressSuggestion[] = []
+                    const seen = new Set<string>()
+                    for (const s of results) {
+                      const key = s.id
+                      if (!seen.has(key)) {
+                        seen.add(key)
+                        unique.push(s)
+                      }
+                    }
+                    setSuggestions(unique)
+                    setIsOpen(unique.length > 0)
+                    setSelectedIndex(-1)
+                    setShowFallbackMessage(unique.length > 0)
+                  })
+                  .finally(() => setIsLoading(false))
+              })
+              .catch(() => {
+                // Overpass error, fallback to Nominatim
+                if (requestIdRef.current !== currentId) return
+                fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+                  .then((results) => {
+                    if (requestIdRef.current !== currentId) return
+                    const unique: AddressSuggestion[] = []
+                    const seen = new Set<string>()
+                    for (const s of results) {
+                      const key = s.id
+                      if (!seen.has(key)) {
+                        seen.add(key)
+                        unique.push(s)
+                      }
+                    }
+                    setSuggestions(unique)
+                    setIsOpen(unique.length > 0)
+                    setSelectedIndex(-1)
+                    setShowFallbackMessage(unique.length > 0)
+                  })
+                  .finally(() => setIsLoading(false))
+              })
+            return
+          }
+          
+          // Not digits+street, use Nominatim
           fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
             .then((results) => {
               if (requestIdRef.current !== currentId) return

@@ -253,7 +253,7 @@ export async function getItemsForSale(
     const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => {
       // Normalize images: prefer images array, fallback to image_url
       const images: string[] = Array.isArray(item.images) && item.images.length > 0
-        ? item.images.filter((url): url is string => typeof url === 'string')
+        ? item.images.filter((url: any): url is string => typeof url === 'string')
         : (item.image_url ? [item.image_url] : [])
       
       // Log dev-only fallback when using image_url

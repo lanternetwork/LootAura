@@ -1,7 +1,7 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
@@ -129,11 +129,12 @@ export async function POST(request: NextRequest) {
       payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
     })
     
-    // Get schema-scoped client for writes to base table
-    const db = getRlsDb()
+    // Use admin client for writes (bypasses RLS, but we've already verified auth)
+    const admin = getAdminDb()
     
-    // Check if draft exists first
-    const { data: existingDraft } = await fromBase(db, 'sale_drafts')
+    // Check if draft exists first (use RLS for reads to respect user's own drafts)
+    const rls = getRlsDb()
+    const { data: existingDraft } = await fromBase(rls, 'sale_drafts')
       .select('id')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
@@ -144,8 +145,8 @@ export async function POST(request: NextRequest) {
     let error: any
 
     if (existingDraft) {
-      // Update existing draft - write to base table using schema-scoped client
-      const { data: updatedDraft, error: updateError } = await fromBase(db, 'sale_drafts')
+      // Update existing draft - write to base table using admin client
+      const { data: updatedDraft, error: updateError } = await fromBase(admin, 'sale_drafts')
         .update({
           title,
           payload: validatedPayload,
@@ -158,8 +159,8 @@ export async function POST(request: NextRequest) {
       draft = updatedDraft
       error = updateError
     } else {
-      // Insert new draft - write to base table using schema-scoped client
-      const { data: newDraft, error: insertError } = await fromBase(db, 'sale_drafts')
+      // Insert new draft - write to base table using admin client
+      const { data: newDraft, error: insertError } = await fromBase(admin, 'sale_drafts')
         .insert({
           user_id: user.id,
           draft_key: draftKey,

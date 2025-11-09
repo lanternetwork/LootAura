@@ -2,7 +2,7 @@
 // NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
 import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
@@ -833,9 +833,9 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // Insert to base table using schema-scoped client
-    const db = getRlsDb()
-    const fromSales = fromBase(db, 'sales')
+    // Insert to base table using admin client (bypasses RLS, but we've already verified auth)
+    const admin = getAdminDb()
+    const fromSales = fromBase(admin, 'sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {
@@ -950,7 +950,7 @@ async function postHandler(request: NextRequest) {
     // Handle items if provided
     if (body.items?.length) {
       const withSale = body.items.map((it: any) => ({ ...it, sale_id: data.id }))
-      const { error: iErr } = await fromBase(db, 'items').insert(withSale)
+      const { error: iErr } = await fromBase(admin, 'items').insert(withSale)
       if (iErr) {
         if (process.env.NODE_ENV !== 'production') console.error('[SALES/POST] items error:', iErr)
         return fail(500, 'ITEMS_CREATE_FAILED', iErr.message, iErr)

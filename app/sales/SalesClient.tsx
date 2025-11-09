@@ -527,14 +527,17 @@ export default function SalesClient({
   }, [])
 
   // Distance to zoom level mapping (miles to zoom level)
+  // Zoom levels approximate: 8=~100mi, 9=~50mi, 10=~25mi, 11=~12mi, 12=~6mi, 13=~3mi, 14=~1.5mi, 15=~0.75mi
   const distanceToZoom = (distance: number): number => {
-    switch (distance) {
-      case 2: return 14  // Very close - high zoom
-      case 5: return 12  // Close - medium-high zoom
-      case 10: return 10 // Medium - medium zoom
-      case 25: return 8  // Far - low zoom
-      default: return 10 // Default to medium zoom
-    }
+    if (distance <= 1) return 15  // Very close - high zoom
+    if (distance <= 2) return 14  // Close - high zoom
+    if (distance <= 5) return 13  // Medium-close - medium-high zoom
+    if (distance <= 10) return 12 // Medium - medium zoom
+    if (distance <= 15) return 11 // Medium-far - medium-low zoom
+    if (distance <= 25) return 10 // Far - low zoom
+    if (distance <= 50) return 9  // Very far - very low zoom
+    if (distance <= 75) return 8  // Extremely far - extremely low zoom
+    return 8 // Default for 100+ miles
   }
 
   // Handle filter changes

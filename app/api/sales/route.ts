@@ -831,13 +831,8 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // Insert into base table using schema-scoped client
-    if (process.env.NODE_ENV !== 'production') {
-      console.info('[DB] Using schema-scoped client lootaura_v2 in this handler')
-    }
-    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
-    const db = getRlsDb()
-    const fromSales = fromBase(db, 'sales')
+    // Insert through public.sales_v2 view (INSTEAD OF trigger handles it)
+    const fromSales = supabase.from('sales_v2')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {
@@ -866,7 +861,7 @@ async function postHandler(request: NextRequest) {
     // Allow status from body if provided (for test sales), otherwise default to 'published'
     const saleStatus = body.status === 'draft' || body.status === 'archived' ? body.status : 'published'
     
-    // Build insert payload for base table (lootaura_v2.sales)
+    // Build insert payload for sales_v2 view
     // Include all required fields and image fields
     const basePayload: any = {
       owner_id: user!.id, // Server-side binding - never trust client (required)

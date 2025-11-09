@@ -263,9 +263,11 @@ export async function POST(request: NextRequest) {
           const adminModule = await import('@/lib/supabase/admin').catch(() => null)
           if (adminModule?.adminSupabase) {
             // Admin client can access base table directly
-            const adminRes = await adminModule.adminSupabase
+            // Use type assertion since admin client may not have schema.table types
+            // Cast the entire chain to bypass TypeScript's strict type checking
+            const adminRes = await ((adminModule.adminSupabase as any)
               .from('lootaura_v2.items')
-              .insert(itemsToInsert)
+              .insert(itemsToInsert) as any)
               .select('id, name, sale_id')
             
             if (!adminRes.error) {
@@ -314,7 +316,7 @@ export async function POST(request: NextRequest) {
       console.log('[DRAFTS_PUBLISH] Items created successfully:', {
         saleId: sale.id,
         insertedCount: insertedItems?.length || 0,
-        insertedItems: insertedItems?.map(i => ({ id: i.id, name: i.name, sale_id: i.sale_id })),
+        insertedItems: insertedItems?.map((i: { id: string; name: string; sale_id: string }) => ({ id: i.id, name: i.name, sale_id: i.sale_id })),
       })
     } else {
       console.log('[DRAFTS_PUBLISH] No items to create:', {

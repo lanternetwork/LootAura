@@ -959,8 +959,12 @@ export default function AddressAutocomplete({
         try {
           const result = await geocodeAddress(value)
           if (result) {
+            // Parse formatted_address to extract street address (first part before comma)
+            // Don't use the full formatted_address for the address field
+            const streetAddress = result.formatted_address?.split(',')[0]?.trim() || result.formatted_address || ''
+            
             onPlaceSelected({
-              address: result.formatted_address,
+              address: streetAddress, // Use parsed street address, not full formatted address
               city: result.city || '',
               state: result.state || '',
               zip: result.zip || '',

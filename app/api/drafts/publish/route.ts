@@ -343,11 +343,22 @@ export async function POST(request: NextRequest) {
         // Try to clean up the sale (best effort) - use view (allows writes)
         await supabase.from('sales_v2').delete().eq('id', sale.id)
         Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
+        // Return detailed error for debugging
+        const errorDetails = itemsError.message || itemsError.details || itemsError.hint || 'Unknown error'
+        const errorCode = itemsError.code || 'ITEMS_CREATE_ERROR'
+        
+        console.error('[DRAFTS_PUBLISH] Returning error to client:', {
+          code: errorCode,
+          message: itemsError.message,
+          details: errorDetails,
+          hint: itemsError.hint,
+        })
+        
         return NextResponse.json<ApiResponse>({
           ok: false,
           error: 'Failed to create items',
-          code: 'ITEMS_CREATE_ERROR',
-          details: itemsError.message || itemsError.details || itemsError.hint || 'Unknown error',
+          code: errorCode,
+          details: errorDetails,
         }, { status: 500 })
       }
 

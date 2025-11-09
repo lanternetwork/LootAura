@@ -58,7 +58,9 @@ export default function DraftSalesDiagnostics() {
     const start = Date.now()
 
     try {
-      const response = await fetch('/api/debug/db')
+      const response = await fetch('/api/debug/db', {
+        credentials: 'include',
+      })
       const elapsed = Date.now() - start
       const data: ApiResponse = await response.json()
 
@@ -120,6 +122,7 @@ export default function DraftSalesDiagnostics() {
       const response = await fetch('/api/drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(payload),
       })
       const elapsed = Date.now() - start
@@ -157,6 +160,7 @@ export default function DraftSalesDiagnostics() {
       const response = await fetch('/api/drafts/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(payload),
       })
       const elapsed = Date.now() - start
@@ -219,6 +223,7 @@ export default function DraftSalesDiagnostics() {
       const response = await fetch('/api/sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(payload),
       })
       const elapsed = Date.now() - start

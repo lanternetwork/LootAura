@@ -87,7 +87,7 @@ export default function DraftSalesDiagnostics() {
     const start = Date.now()
 
     const payload = {
-      draft_key: draftKey,
+      draftKey: draftKey,
       payload: {
         formData: {
           title: 'Diagnostics Sale',
@@ -188,25 +188,23 @@ export default function DraftSalesDiagnostics() {
     const start = Date.now()
 
     const payload = {
-      sale: {
-        title: 'Direct Sale (Diag)',
-        description: ownerNotes || null,
-        address: '123 Test St',
-        city: 'Louisville',
-        state: 'KY',
-        zip_code: '40202',
-        lat: 38.2527,
-        lng: -85.7585,
-        date_start: new Date().toISOString().split('T')[0],
-        time_start: '12:00',
-        date_end: new Date().toISOString().split('T')[0],
-        time_end: '16:00',
-        pricing_mode: 'negotiable',
-        status: 'published',
-        privacy_mode: 'exact',
-        cover_image_url: 'https://dummyimage.com/400x300/ccc/000.jpg&text=direct',
-        images: [],
-      },
+      title: 'Direct Sale (Diag)',
+      description: ownerNotes || null,
+      address: '123 Test St',
+      city: 'Louisville',
+      state: 'KY',
+      zip_code: '40202',
+      lat: 38.2527,
+      lng: -85.7585,
+      date_start: new Date().toISOString().split('T')[0],
+      time_start: '12:00',
+      date_end: new Date().toISOString().split('T')[0],
+      time_end: '16:00',
+      pricing_mode: 'negotiable',
+      status: 'published',
+      privacy_mode: 'exact',
+      cover_image_url: 'https://dummyimage.com/400x300/ccc/000.jpg&text=direct',
+      images: [],
       items: [
         {
           name: 'Direct Item',

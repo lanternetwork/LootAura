@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserServerDb } from '@/lib/supabase/clients'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 
 export async function POST(_request: NextRequest) {
   try {
-    const db = getUserServerDb()
+    const db = getRlsDb()
     
     console.log('[MIGRATE] Starting dual-link reviews system migration...')
     
     // Step 1: Add address_key column
     console.log('[MIGRATE] Step 1: Adding address_key column...')
-    const { error: addColumnError } = await (db
-      .from('lootaura_v2.sales') as any)
+    const { error: addColumnError } = await fromBase(db, 'sales')
       .select('address_key')
       .limit(1)
     

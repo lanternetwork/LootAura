@@ -55,11 +55,10 @@ describe('Schema name validation', () => {
     }
   })
 
-  it('should use fully-qualified table names with getUserServerDb/getAdminDb clients', async () => {
-    // NOTE: PostgREST only supports 'public' and 'graphql_public' schemas in client config.
-    // To access lootaura_v2 tables, we must use fully-qualified names (e.g., .from('lootaura_v2.sales'))
-    // with clients from getUserServerDb() or getAdminDb().
-    // This test ensures writes use the helper functions with fully-qualified names.
+  it('should not use fully-qualified table names (must use schema-scoped clients with unqualified names)', async () => {
+    // NOTE: All writes must use schema-scoped clients (getRlsDb() or getAdminDb())
+    // with unqualified table names via fromBase() helper (e.g., fromBase(db, 'sales') not .from('lootaura_v2.sales'))
+    // This test enforces the schema-scoped pattern with unqualified names.
     const files = await glob('**/*.{ts,tsx,js,jsx}', {
       ignore: [
         '**/node_modules/**',
@@ -83,27 +82,16 @@ describe('Schema name validation', () => {
         const lines = content.split('\n')
 
         lines.forEach((line, index) => {
-          // Check for writes to lootaura_v2 tables without using helper functions
-          // Pattern: .from('lootaura_v2.(sales|items|sale_drafts)').(insert|update|delete|upsert)(
-          const writePattern = /\.from\(['"]lootaura_v2\.(sales|items|sale_drafts)['"]\)\s*\.(insert|update|delete|upsert)\(/
+          // Check for fully-qualified table names: .from('lootaura_v2.sales|items|sale_drafts')
+          // Pattern: .from('lootaura_v2\.(sales|items|sale_drafts)')
+          const qualifiedTablePattern = /\.from\(['"]lootaura_v2\.(sales|items|sale_drafts)['"]\)/
           
-          if (writePattern.test(line)) {
+          if (qualifiedTablePattern.test(line)) {
             // Allow if it's a comment
             if (line.trim().startsWith('//') || line.trim().startsWith('*')) {
               return
             }
-            
-            // Check if this line is preceded by getUserServerDb() or getAdminDb() usage
-            // Look back up to 10 lines for the helper function call
-            const contextStart = Math.max(0, index - 10)
-            const context = lines.slice(contextStart, index + 1).join('\n')
-            
-            // Allow if getUserServerDb or getAdminDb is used nearby
-            if (context.includes('getUserServerDb') || context.includes('getAdminDb')) {
-              return
-            }
-            
-            // This is a violation - must use helper functions
+            // This is a violation - must use schema-scoped clients with unqualified names
             violations.push({
               file,
               line: index + 1,
@@ -122,7 +110,7 @@ describe('Schema name validation', () => {
         .map((v) => `  ${v.file}:${v.line} - ${v.content}`)
         .join('\n')
       throw new Error(
-        `Found ${violations.length} write operation(s) to lootaura_v2 tables without using getUserServerDb() or getAdminDb():\n${message}`
+        `Found ${violations.length} usage(s) of fully-qualified table names (must use schema-scoped clients with unqualified names via fromBase()):\n${message}`
       )
     }
   })

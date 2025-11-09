@@ -1,7 +1,7 @@
-// NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
+// NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getUserServerDb } from '@/lib/supabase/clients'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import * as Sentry from '@sentry/nextjs'
 
@@ -35,10 +35,12 @@ export async function GET(_request: NextRequest) {
     const allDrafts = searchParams.get('all') === 'true'
 
     if (allDrafts) {
-      // Return all active drafts for user (read from base table via fully-qualified name)
-      const db = getUserServerDb()
-      const { data: drafts, error } = await (db
-        .from('lootaura_v2.sale_drafts') as any)
+      // Return all active drafts for user (read from base table via schema-scoped client)
+      if (process.env.NODE_ENV !== 'production') {
+        console.info('[DB] Using schema-scoped client lootaura_v2 in this handler')
+      }
+      const db = getRlsDb()
+      const { data: drafts, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, title, payload, updated_at')
         .eq('user_id', user.id)
         .eq('status', 'active')
@@ -61,11 +63,12 @@ export async function GET(_request: NextRequest) {
       })
     }
 
-    // Fetch latest active draft for user (original behavior) - use write client for lootaura_v2 schema
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const writeClient = createSupabaseWriteClient()
-    const { data: draft, error } = await writeClient
-      .from('sale_drafts')
+    // Fetch latest active draft for user (read from base table via schema-scoped client)
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[DB] Using schema-scoped client lootaura_v2 in this handler')
+    }
+    const db = getRlsDb()
+    const { data: draft, error } = await fromBase(db, 'sale_drafts')
       .select('id, payload, updated_at')
       .eq('user_id', user.id)
       .eq('status', 'active')
@@ -195,12 +198,14 @@ export async function POST(request: NextRequest) {
       payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
     })
     
-    // Get client for writes to base table (use fully-qualified table names)
-    const db = getUserServerDb()
+    // Get schema-scoped client for writes to base table
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[DB] Using schema-scoped client lootaura_v2 in this handler')
+    }
+    const db = getRlsDb()
     
-    // Check if draft exists first (use fully-qualified table name)
-    const { data: existingDraft } = await (db
-      .from('lootaura_v2.sale_drafts') as any)
+    // Check if draft exists first
+    const { data: existingDraft } = await fromBase(db, 'sale_drafts')
       .select('id')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
@@ -211,9 +216,8 @@ export async function POST(request: NextRequest) {
     let error: any
 
     if (existingDraft) {
-      // Update existing draft - write to base table using fully-qualified name
-      const { data: updatedDraft, error: updateError } = await (db
-        .from('lootaura_v2.sale_drafts') as any)
+      // Update existing draft - write to base table using schema-scoped client
+      const { data: updatedDraft, error: updateError } = await fromBase(db, 'sale_drafts')
         .update({
           title,
           payload: validatedPayload,
@@ -226,9 +230,8 @@ export async function POST(request: NextRequest) {
       draft = updatedDraft
       error = updateError
     } else {
-      // Insert new draft - write to base table using fully-qualified name
-      const { data: newDraft, error: insertError } = await (db
-        .from('lootaura_v2.sale_drafts') as any)
+      // Insert new draft - write to base table using schema-scoped client
+      const { data: newDraft, error: insertError } = await fromBase(db, 'sale_drafts')
         .insert({
           user_id: user.id,
           draft_key: draftKey,
@@ -331,10 +334,12 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Mark draft as archived (soft delete) - write to base table using fully-qualified name
-    const db = getUserServerDb()
-    const { error } = await (db
-      .from('lootaura_v2.sale_drafts') as any)
+    // Mark draft as archived (soft delete) - write to base table using schema-scoped client
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[DB] Using schema-scoped client lootaura_v2 in this handler')
+    }
+    const db = getRlsDb()
+    const { error } = await fromBase(db, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)

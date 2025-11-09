@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-// NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
+// NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { Sale, PublicSale } from '@/lib/types'
@@ -831,10 +831,13 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // Insert into base table using fully-qualified name
-    const { getUserServerDb } = await import('@/lib/supabase/clients')
-    const db = getUserServerDb()
-    const fromSales = (db.from('lootaura_v2.sales') as any)
+    // Insert into base table using schema-scoped client
+    if (process.env.NODE_ENV !== 'production') {
+      console.info('[DB] Using schema-scoped client lootaura_v2 in this handler')
+    }
+    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+    const db = getRlsDb()
+    const fromSales = fromBase(db, 'sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {

@@ -389,10 +389,16 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }, [initialData, user, normalizeTimeToNearest30, searchParams])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
-    console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
+    // Only log in development to reduce console noise
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
+    }
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
-      console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
+      // Only log in development to reduce console noise
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
+      }
 
       // Snap start time to 30-minute increments (nearest 00/30 with carry)
       if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {

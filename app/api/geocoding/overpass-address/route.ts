@@ -73,8 +73,9 @@ async function overpassHandler(request: NextRequest) {
       prefix = q
       streetParam = undefined
     } else {
-      const digitsStreetMatch = q.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].+)$/)
-      if (digitsStreetMatch?.groups) {
+      // More lenient regex: allow digits followed by space and at least one letter (can be abbreviated like "h", "hy", "hwy")
+      const digitsStreetMatch = q.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].*)$/)
+      if (digitsStreetMatch?.groups && digitsStreetMatch.groups.street.trim().length > 0) {
         mode = 'digits+street'
         prefix = digitsStreetMatch.groups.num
         streetParam = digitsStreetMatch.groups.street.trim()

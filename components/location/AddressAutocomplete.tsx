@@ -155,14 +155,15 @@ export default function AddressAutocomplete({
     
     // Check query patterns
     const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
-    const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].+)$/)
+    // More lenient regex: allow digits followed by space and at least one letter (can be abbreviated like "h", "hy", "hwy")
+    const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].*)$/)
     const isDigitsStreet = digitsStreetMatch !== null
     const hasCoords = Boolean(userLat && userLng)
     
     // Minimum length: 1 for numeric-only, 2 for general text
     const minLength = isNumericOnly ? 1 : 2
     
-    console.log(`[AddressAutocomplete] Query processing: "${trimmedQuery}" (length: ${trimmedQuery.length}, minLength: ${minLength}, isNumericOnly: ${isNumericOnly}, isDigitsStreet: ${isDigitsStreet}, hasCoords: ${hasCoords})`)
+    console.log(`[AddressAutocomplete] Query processing: "${trimmedQuery}" (length: ${trimmedQuery.length}, minLength: ${minLength}, isNumericOnly: ${isNumericOnly}, isDigitsStreet: ${isDigitsStreet}, hasCoords: ${hasCoords}, hasGoogleToken: ${!!googleSessionToken}, digitsStreetMatch: ${!!digitsStreetMatch?.groups})`)
     
     if (!trimmedQuery || trimmedQuery.length < minLength) {
       console.log(`[AddressAutocomplete] Query too short: "${trimmedQuery}" (length: ${trimmedQuery.length} < ${minLength})`)
@@ -260,9 +261,7 @@ export default function AddressAutocomplete({
 
     // For digits+street queries with coords, try Overpass first
     if (isDigitsStreet && hasCoords && digitsStreetMatch?.groups) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[AddressAutocomplete] Fetching Overpass addresses (digits+street)', { q: trimmedQuery, userLat, userLng })
-      }
+      console.log('[AddressAutocomplete] Fetching Overpass addresses (digits+street)', { q: trimmedQuery, userLat, userLng, hasGroups: !!digitsStreetMatch?.groups })
       
       fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
         .then((response) => {

@@ -91,7 +91,17 @@ export default function AnalyticsDiagnosticsCard() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to seed events')
+        let errorMessage = 'Failed to seed events'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorMessage
+        } catch {
+          // If response is not JSON, use status text
+          errorMessage = response.status === 400
+            ? 'Bad request: Check if analytics table exists'
+            : `Failed to seed events (${response.status})`
+        }
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
@@ -99,7 +109,8 @@ export default function AnalyticsDiagnosticsCard() {
       setShowSeedDialog(false)
       await fetchSummary()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to seed events')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to seed events'
+      toast.error(errorMessage)
     } finally {
       setSeeding(false)
     }

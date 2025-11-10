@@ -140,8 +140,24 @@ export async function POST(request: NextRequest) {
       .select('id')
 
     if (insertError) {
-      console.error('[ANALYTICS_SEED] Error inserting events:', insertError)
-      return NextResponse.json({ error: 'Failed to seed events' }, { status: 500 })
+      const errorCode = (insertError as any)?.code
+      const errorMessage = (insertError as any)?.message || 'Unknown error'
+      
+      console.error('[ANALYTICS_SEED] Error inserting events:', {
+        code: errorCode,
+        message: errorMessage,
+      })
+      
+      // Check if table doesn't exist
+      if (errorCode === '42P01' || errorMessage.includes('does not exist')) {
+        return NextResponse.json({ 
+          error: 'Analytics table does not exist. Please run database migrations first.' 
+        }, { status: 400 })
+      }
+      
+      return NextResponse.json({ 
+        error: `Failed to seed events: ${errorMessage}` 
+      }, { status: 500 })
     }
 
     return NextResponse.json({

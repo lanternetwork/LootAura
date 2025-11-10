@@ -33,8 +33,24 @@ export async function POST(request: NextRequest) {
     const { data: deleted, error: deleteError } = await query.select('id')
 
     if (deleteError) {
-      console.error('[ANALYTICS_PURGE] Error deleting events:', deleteError)
-      return NextResponse.json({ error: 'Failed to purge events' }, { status: 500 })
+      const errorCode = (deleteError as any)?.code
+      const errorMessage = (deleteError as any)?.message || 'Unknown error'
+      
+      console.error('[ANALYTICS_PURGE] Error deleting events:', {
+        code: errorCode,
+        message: errorMessage,
+      })
+      
+      // Check if table doesn't exist
+      if (errorCode === '42P01' || errorMessage.includes('does not exist')) {
+        return NextResponse.json({ 
+          error: 'Analytics table does not exist. Please run database migrations first.' 
+        }, { status: 400 })
+      }
+      
+      return NextResponse.json({ 
+        error: `Failed to purge events: ${errorMessage}` 
+      }, { status: 500 })
     }
 
     return NextResponse.json({

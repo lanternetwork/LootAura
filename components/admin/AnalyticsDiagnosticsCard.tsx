@@ -130,14 +130,25 @@ export default function AnalyticsDiagnosticsCard() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to purge events')
+        let errorMessage = 'Failed to purge events'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorMessage
+        } catch {
+          // If response is not JSON, use status text
+          errorMessage = response.status === 400
+            ? 'Bad request: Check if analytics table exists'
+            : `Failed to purge events (${response.status})`
+        }
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
       toast.success(`Purged ${data.deleted} test events`)
       await fetchSummary()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to purge events')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to purge events'
+      toast.error(errorMessage)
     } finally {
       setPurging(false)
     }

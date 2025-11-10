@@ -873,7 +873,7 @@ export default function SalesClient({
           style={{ 
             height: isMobile 
               ? `calc(100vh - ${FILTERS_HEIGHT}px)` 
-              : '100%' 
+              : '100%'
           }}
         >
           <div className="w-full h-full">

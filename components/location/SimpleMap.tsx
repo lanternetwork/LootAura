@@ -389,7 +389,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       
       {/* OSM Attribution */}
       {showOSMAttribution && (
-        <AttributionOSM position={attributionPosition} />
+        <AttributionOSM position={attributionPosition} containerRef={containerRef} />
       )}
     </div>
   )

@@ -11,6 +11,7 @@ import { useLocationSearch } from '@/lib/location/useLocation'
 import { useAuth, useFavorites } from '@/lib/hooks/useAuth'
 import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
 import CategoryChips from '@/components/ui/CategoryChips'
+import OSMAttribution from '@/components/location/OSMAttribution'
 import type { SaleWithOwnerInfo } from '@/lib/data'
 import type { SaleItem } from '@/lib/types'
 
@@ -314,6 +315,12 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
             <div className="mt-4 text-sm text-gray-600">
               <p>{sale.address}</p>
               <p>{sale.city}, {sale.state} {sale.zip_code}</p>
+              {/* OSM Attribution - show when address exists (addresses are geocoded via Nominatim/OSM) */}
+              {sale.address && (
+                <div className="mt-2">
+                  <OSMAttribution showGeocoding={true} />
+                </div>
+              )}
             </div>
           </div>
 

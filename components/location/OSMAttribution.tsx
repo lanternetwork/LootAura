@@ -7,7 +7,7 @@ interface OSMAttributionProps {
 
 export default function OSMAttribution({ className = '', showGeocoding = true }: OSMAttributionProps) {
   return (
-    <div className={`text-xs text-gray-500 ${className}`}>
+    <div className={`text-xs text-gray-500 ${className}`} role="contentinfo">
       <span>
         ©{' '}
         <a
@@ -15,6 +15,7 @@ export default function OSMAttribution({ className = '', showGeocoding = true }:
           target="_blank"
           rel="noopener noreferrer"
           className="underline hover:text-gray-700"
+          aria-label="OpenStreetMap copyright information"
         >
           OpenStreetMap
         </a>{' '}

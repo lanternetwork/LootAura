@@ -1,6 +1,5 @@
 // NOTE: Writes → lootaura_v2.* only. Reads may use views.
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getAdminDb, getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 
@@ -48,7 +47,6 @@ export async function POST(request: NextRequest) {
 
     if (saleId) {
       // Use specific sale
-      const supabase = createSupabaseServerClient()
       const db = getRlsDb()
       const { data: sale, error: saleError } = await fromBase(db, 'sales')
         .select('id, owner_id')
@@ -62,7 +60,6 @@ export async function POST(request: NextRequest) {
       targetSales = [sale]
     } else if (ownerId) {
       // Fetch up to 25 recent sales for owner
-      const supabase = createSupabaseServerClient()
       const db = getRlsDb()
       const { data: sales, error: salesError } = await fromBase(db, 'sales')
         .select('id, owner_id')
@@ -77,7 +74,6 @@ export async function POST(request: NextRequest) {
       targetSales = sales || []
     } else {
       // Use current user's sales
-      const supabase = createSupabaseServerClient()
       const db = getRlsDb()
       const { data: sales, error: salesError } = await fromBase(db, 'sales')
         .select('id, owner_id')

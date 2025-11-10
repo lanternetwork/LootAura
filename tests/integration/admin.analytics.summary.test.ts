@@ -69,8 +69,13 @@ describe('Admin Analytics Summary API', () => {
     })
     mockSupabase.from.mockReturnValue(mockViewQuery as any)
 
-    // Mock fromBase for analytics_events query
+    // Mock fromBase to handle multiple calls (analytics_events and sales)
     const { fromBase } = await import('@/lib/supabase/clients')
+    const mockSalesQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { id: 'sale-1', owner_id: 'admin-user-id' }, error: null }),
+    }
     const mockEventsQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -78,7 +83,12 @@ describe('Admin Analytics Summary API', () => {
       lte: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: mockEvents, error: null }),
     }
-    vi.mocked(fromBase).mockImplementation(() => mockEventsQuery as any)
+    vi.mocked(fromBase).mockImplementation((_db: any, table: string) => {
+      if (table === 'sales') {
+        return mockSalesQuery as any
+      }
+      return mockEventsQuery as any
+    })
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/summary?days=7', {
       method: 'GET',
@@ -123,6 +133,11 @@ describe('Admin Analytics Summary API', () => {
 
     // Mock fromBase for analytics_events query (should return empty)
     const { fromBase } = await import('@/lib/supabase/clients')
+    const mockSalesQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { id: 'sale-1', owner_id: 'admin-user-id' }, error: null }),
+    }
     const mockEventsQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -130,7 +145,12 @@ describe('Admin Analytics Summary API', () => {
       lte: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: [], error: null }),
     }
-    vi.mocked(fromBase).mockImplementation(() => mockEventsQuery as any)
+    vi.mocked(fromBase).mockImplementation((_db: any, table: string) => {
+      if (table === 'sales') {
+        return mockSalesQuery as any
+      }
+      return mockEventsQuery as any
+    })
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/summary?days=7', {
       method: 'GET',
@@ -157,6 +177,11 @@ describe('Admin Analytics Summary API', () => {
 
     // Mock fromBase for analytics_events query
     const { fromBase } = await import('@/lib/supabase/clients')
+    const mockSalesQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: { id: 'sale-1', owner_id: 'admin-user-id' }, error: null }),
+    }
     const mockEventsQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -164,7 +189,12 @@ describe('Admin Analytics Summary API', () => {
       lte: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: [], error: null }),
     }
-    vi.mocked(fromBase).mockImplementation(() => mockEventsQuery as any)
+    vi.mocked(fromBase).mockImplementation((_db: any, table: string) => {
+      if (table === 'sales') {
+        return mockSalesQuery as any
+      }
+      return mockEventsQuery as any
+    })
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/summary?days=14', {
       method: 'GET',

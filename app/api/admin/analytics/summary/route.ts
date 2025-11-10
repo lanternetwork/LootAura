@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
       const date = new Date(event.ts).toISOString().split('T')[0]
       const eventType = event.event_type as keyof typeof totals
 
-      if (totals.hasOwnProperty(eventType)) {
+      if (Object.prototype.hasOwnProperty.call(totals, eventType)) {
         totals[eventType]++
 
         if (!seriesMap.has(date)) {

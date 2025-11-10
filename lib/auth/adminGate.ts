@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server'
  * Assert that the current user is an admin
  * Throws NextResponse with 403 if not admin
  */
-export async function assertAdminOrThrow(req: Request): Promise<{ user: { id: string; email?: string } }> {
+export async function assertAdminOrThrow(_req: Request): Promise<{ user: { id: string; email?: string } }> {
   const supabase = createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   

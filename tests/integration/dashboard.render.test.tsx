@@ -135,7 +135,7 @@ describe('Dashboard Client', () => {
     expect(container.textContent).toContain('@testuser')
   })
 
-  it('should render DraftsPanel with draft count', () => {
+  it('should render Drafts tab in SalesPanel with draft count', () => {
     const { container } = renderWithQueryClient(
       <DashboardClient
         initialSales={mockSales}
@@ -145,7 +145,8 @@ describe('Dashboard Client', () => {
       />
     )
     
-    // Check for drafts panel
+    // Check for drafts tab in sales panel
+    expect(container.textContent).toContain('Your Sales')
     expect(container.textContent).toContain('Drafts')
     expect(container.textContent).toContain('1') // Draft count badge
   })
@@ -160,10 +161,11 @@ describe('Dashboard Client', () => {
       />
     )
     
-    // Check for sales panel
+    // Check for sales panel with all tabs
     expect(container.textContent).toContain('Your Sales')
     expect(container.textContent).toContain('Live')
     expect(container.textContent).toContain('Archived')
+    expect(container.textContent).toContain('Drafts')
     expect(container.textContent).toContain('2') // Live sales count
   })
 

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { ProfileSummaryCard } from '@/components/dashboard/ProfileSummaryCard'
-import DraftsPanel from '@/components/dashboard/DraftsPanel'
 import SalesPanel from '@/components/dashboard/SalesPanel'
 import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
 import type { DraftListing } from '@/lib/data/salesAccess'
@@ -119,25 +118,21 @@ export default function DashboardClient({
         {/* Row 1: Profile Summary + Quick Stats */}
         <ProfileSummaryCard profile={initialProfile || null} />
 
-        {/* Row 2: Drafts Panel */}
-        <DraftsPanel
-          drafts={drafts}
-          isLoading={draftsLoading}
-          error={draftsError}
-          onDelete={handleDraftDelete}
-          onPublish={handleDraftPublish}
-          onRetry={handleRetryDrafts}
-        />
-
-        {/* Row 3: Sales Panel */}
+        {/* Row 2: Sales Panel (with Live, Archived, and Drafts tabs) */}
         <SalesPanel 
-          sales={sales} 
+          sales={sales}
+          drafts={drafts}
+          isLoadingDrafts={draftsLoading}
+          draftsError={draftsError}
           onSaleDelete={(saleId) => {
             setSales((prev) => prev.filter((s) => s.id !== saleId))
           }}
+          onDraftDelete={handleDraftDelete}
+          onDraftPublish={handleDraftPublish}
+          onRetryDrafts={handleRetryDrafts}
         />
 
-        {/* Row 4: Analytics */}
+        {/* Row 3: Analytics */}
         <AnalyticsPanel metrics7d={initialMetrics || null} />
       </div>
     </div>

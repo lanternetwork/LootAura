@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth/server-session'
 
 export async function middleware(req: NextRequest) {
-  const { pathname, searchParams } = req.nextUrl;
+  const { pathname } = req.nextUrl;
   
   // 0. Bypass auth callback route completely to prevent redirect loops
   if (pathname === '/auth/callback') {

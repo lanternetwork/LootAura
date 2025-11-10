@@ -33,46 +33,37 @@ describe('OAuth Callback Middleware', () => {
     vi.clearAllMocks()
   })
 
-  it('should redirect /?code=abc123 to /auth/callback?code=abc123', async () => {
-    const request = new NextRequest('https://example.com/?code=abc123')
+  it('should bypass /auth/callback route completely', async () => {
+    const request = new NextRequest('https://example.com/auth/callback?code=abc123')
     const { NextResponse } = await import('next/server')
     
     await middleware(request)
     
-    expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        href: 'https://example.com/auth/callback?code=abc123'
-      }),
-      307
-    )
+    // Middleware should bypass /auth/callback to prevent redirect loops
+    expect(NextResponse.next).toHaveBeenCalled()
+    expect(NextResponse.redirect).not.toHaveBeenCalled()
   })
 
-  it('should redirect /?error=access_denied to /auth/callback?error=access_denied', async () => {
-    const request = new NextRequest('https://example.com/?error=access_denied')
+  it('should allow OAuth callbacks to go directly to /auth/callback without middleware interference', async () => {
+    const request = new NextRequest('https://example.com/auth/callback?error=access_denied')
     const { NextResponse } = await import('next/server')
     
     await middleware(request)
     
-    expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        href: 'https://example.com/auth/callback?error=access_denied'
-      }),
-      307
-    )
+    // Middleware should bypass /auth/callback to prevent redirect loops
+    expect(NextResponse.next).toHaveBeenCalled()
+    expect(NextResponse.redirect).not.toHaveBeenCalled()
   })
 
-  it('should preserve all query parameters when redirecting', async () => {
-    const request = new NextRequest('https://example.com/?code=abc123&state=xyz&next=/sales')
+  it('should allow /auth/callback with all query parameters to pass through', async () => {
+    const request = new NextRequest('https://example.com/auth/callback?code=abc123&state=xyz&next=/sales')
     const { NextResponse } = await import('next/server')
     
     await middleware(request)
     
-    expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        href: 'https://example.com/auth/callback?code=abc123&state=xyz&next=%2Fsales'
-      }),
-      307
-    )
+    // Middleware should bypass /auth/callback to prevent redirect loops
+    expect(NextResponse.next).toHaveBeenCalled()
+    expect(NextResponse.redirect).not.toHaveBeenCalled()
   })
 
   it('should not redirect if no code or error parameters', async () => {

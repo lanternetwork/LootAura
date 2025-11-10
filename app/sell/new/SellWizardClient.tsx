@@ -1197,23 +1197,23 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Duration (Hours) *
         </label>
-        <input
-          type="number"
-          min="1"
-          max="24"
-          step="0.5"
+        <select
           value={formData.duration_hours || 4}
           onChange={(e) => {
-            const raw = (e.currentTarget as HTMLInputElement).valueAsNumber
-            const hours = Number.isFinite(raw) ? raw : 4
-            const clamped = Math.max(1, Math.min(24, hours))
-            onChange('duration_hours', clamped)
+            const hours = parseInt(e.target.value, 10)
+            onChange('duration_hours', hours)
           }}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] bg-white cursor-pointer"
           required
-        />
+        >
+          {Array.from({ length: 8 }, (_, i) => i + 1).map((hours) => (
+            <option key={hours} value={hours}>
+              {hours} {hours === 1 ? 'hour' : 'hours'}
+            </option>
+          ))}
+        </select>
         <p className="mt-1 text-xs text-gray-500">
-          Sale duration (1-24 hours). End time is calculated automatically.
+          Sale duration (1-8 hours). End time is calculated automatically.
         </p>
         {errors?.duration_hours && (
           <p className="mt-1 text-sm text-red-600">{errors.duration_hours}</p>

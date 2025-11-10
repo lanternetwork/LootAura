@@ -26,8 +26,8 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/data/salesAccess', () => ({
   getUserSales: vi.fn(() => Promise.resolve({
     data: [
-      { id: 'sale-1', title: 'Test Sale 1', owner_id: 'test-user-id' },
-      { id: 'sale-2', title: 'Test Sale 2', owner_id: 'test-user-id' },
+      { id: 'sale-1', title: 'Test Sale 1', owner_id: 'test-user-id', status: 'published' },
+      { id: 'sale-2', title: 'Test Sale 2', owner_id: 'test-user-id', status: 'published' },
     ],
     source: 'view' as const,
   })),
@@ -66,8 +66,8 @@ vi.mock('@/lib/data/profileAccess', () => ({
 
 describe('Dashboard Client', () => {
   const mockSales = [
-    { id: 'sale-1', title: 'Test Sale 1', owner_id: 'test-user-id' },
-    { id: 'sale-2', title: 'Test Sale 2', owner_id: 'test-user-id' },
+    { id: 'sale-1', title: 'Test Sale 1', owner_id: 'test-user-id', status: 'published' },
+    { id: 'sale-2', title: 'Test Sale 2', owner_id: 'test-user-id', status: 'published' },
   ] as any
 
   const mockDrafts = [
@@ -148,7 +148,7 @@ describe('Dashboard Client', () => {
     expect(container.textContent).toContain('1') // Draft count badge
   })
 
-  it('should render SalesPanel with sales count', () => {
+  it('should render SalesPanel with sales count and tabs', () => {
     const { container } = renderWithQueryClient(
       <DashboardClient
         initialSales={mockSales}
@@ -160,7 +160,9 @@ describe('Dashboard Client', () => {
     
     // Check for sales panel
     expect(container.textContent).toContain('Your Sales')
-    expect(container.textContent).toContain('2') // Sales count
+    expect(container.textContent).toContain('Live')
+    expect(container.textContent).toContain('Archived')
+    expect(container.textContent).toContain('2') // Live sales count
   })
 
   it('should render AnalyticsPanel', () => {

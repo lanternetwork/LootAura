@@ -15,8 +15,22 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('[ItemDiagnostics] Error fetching items:', error)
+      const errorCode = (error as any)?.code
+      const errorMessage = (error as any)?.message || 'Unknown error'
+      
+      // Check if table doesn't exist
+      if (errorCode === '42P01' || 
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('Could not find the table') ||
+          errorMessage.includes('schema cache')) {
+        return NextResponse.json(
+          { error: 'Items table does not exist. Please run database migrations first.', details: errorMessage },
+          { status: 400 }
+        )
+      }
+      
       return NextResponse.json(
-        { error: 'Failed to fetch items', details: error.message },
+        { error: 'Failed to fetch items', details: errorMessage, code: errorCode },
         { status: 500 }
       )
     }
@@ -91,9 +105,14 @@ export async function GET(request: Request) {
       errors,
     })
   } catch (error: any) {
+    // Handle NextResponse thrown by assertAdminOrThrow
+    if (error instanceof NextResponse) {
+      return error
+    }
+    
     console.error('[ItemDiagnostics] Unexpected error:', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: error.message || 'Internal server error', details: error.stack },
       { status: error.status || 500 }
     )
   }

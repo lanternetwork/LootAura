@@ -41,7 +41,9 @@ export default function ItemImagesDiagnostics() {
       const response = await fetch('/api/admin/items/diagnostics')
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || `HTTP ${response.status}`)
+        const errorMessage = errorData.error || `HTTP ${response.status}`
+        const errorDetails = errorData.details ? `: ${errorData.details}` : ''
+        throw new Error(`${errorMessage}${errorDetails}`)
       }
 
       const data = await response.json()

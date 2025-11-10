@@ -303,31 +303,49 @@ export default function OSMAttributionDiagnostics() {
       let pointerEventsDetails: Record<string, any> = {}
       
       try {
-        const attributionElements = Array.from(document.querySelectorAll('*')).filter(el => 
+        // Find the outer container with role="contentinfo"
+        const outerContainer = Array.from(document.querySelectorAll('[role="contentinfo"]')).find(el => 
           el.textContent?.includes('OpenStreetMap')
-        )
+        ) as HTMLElement
         
-        if (attributionElements.length > 0) {
-          const element = attributionElements[0] as HTMLElement
-          const link = element.querySelector('a[href*="openstreetmap.org"]') as HTMLAnchorElement
+        if (outerContainer) {
+          const link = outerContainer.querySelector('a[href*="openstreetmap.org"]') as HTMLAnchorElement
+          const innerDiv = outerContainer.querySelector('div.pointer-events-auto') as HTMLElement
           
-          if (link) {
+          if (link && innerDiv) {
             const linkStyle = window.getComputedStyle(link)
-            const parentStyle = window.getComputedStyle(element)
+            const outerStyle = window.getComputedStyle(outerContainer)
+            const innerStyle = window.getComputedStyle(innerDiv)
             
-            pointerEventsOk = linkStyle.pointerEvents !== 'none' && parentStyle.pointerEvents !== 'auto'
+            // Outer should be 'none', inner should be 'auto', link should be clickable
+            const outerIsNone = outerStyle.pointerEvents === 'none'
+            const innerIsAuto = innerStyle.pointerEvents === 'auto'
+            const linkIsClickable = linkStyle.pointerEvents !== 'none'
+            
+            pointerEventsOk = outerIsNone && innerIsAuto && linkIsClickable
             
             pointerEventsDetails = {
+              outerPointerEvents: outerStyle.pointerEvents,
+              innerPointerEvents: innerStyle.pointerEvents,
               linkPointerEvents: linkStyle.pointerEvents,
-              parentPointerEvents: parentStyle.pointerEvents,
-              linkIsClickable: linkStyle.pointerEvents !== 'none',
-              parentAllowsClick: parentStyle.pointerEvents === 'none' || parentStyle.pointerEvents === 'auto'
+              outerIsNone,
+              innerIsAuto,
+              linkIsClickable,
+              structure: {
+                hasOuterContainer: !!outerContainer,
+                hasInnerDiv: !!innerDiv,
+                hasLink: !!link
+              }
             }
           } else {
-            pointerEventsDetails = { error: 'No link found in attribution' }
+            pointerEventsDetails = { 
+              error: 'Missing elements', 
+              hasLink: !!link, 
+              hasInnerDiv: !!innerDiv 
+            }
           }
         } else {
-          pointerEventsDetails = { error: 'No attribution element found' }
+          pointerEventsDetails = { error: 'No attribution container found with role="contentinfo"' }
         }
       } catch (e) {
         console.log('Pointer events test failed:', e)
@@ -376,7 +394,7 @@ export default function OSMAttributionDiagnostics() {
         {/* Test Map for Diagnostics */}
         <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
           <p className="text-sm text-gray-600 mb-2">
-            Test map with OSM attribution (bottom-right):
+            Test map (Mapbox attribution includes OSM):
           </p>
           <div
             ref={testMapRef}
@@ -385,8 +403,7 @@ export default function OSMAttributionDiagnostics() {
             <SimpleMap
               center={{ lat: 38.2527, lng: -85.7585 }}
               zoom={10}
-              attributionPosition="bottom-right"
-              showOSMAttribution={true}
+              showOSMAttribution={false}
             />
           </div>
         </div>

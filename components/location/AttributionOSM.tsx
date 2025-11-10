@@ -19,8 +19,9 @@ export default function AttributionOSM({
 
   return (
     <div 
-      className={`absolute ${positionClasses[position]} z-[2] pointer-events-none ${className}`}
+      className={`absolute ${positionClasses[position]} z-[100] pointer-events-none ${className}`}
       role="contentinfo"
+      style={{ position: 'absolute' }}
     >
       <div className="pointer-events-auto bg-white/80 dark:bg-zinc-900/80 rounded px-2 py-1 shadow opacity-80 hover:opacity-100 transition-opacity">
         <div className="text-[10px] leading-tight text-gray-700 dark:text-gray-300">

@@ -412,8 +412,8 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         const durationHours = updated.duration_hours || prev.duration_hours || 4
         
         if (dateStart && timeStart && durationHours) {
-          // Validate duration doesn't exceed 24 hours
-          const maxDuration = 24
+          // Validate duration doesn't exceed 8 hours
+          const maxDuration = 8
           const actualDuration = Math.min(durationHours, maxDuration)
           
           // Calculate end time
@@ -464,13 +464,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     
     if (!timeStart) nextErrors.time_start = 'Start time is required'
     
-    // Validate duration
+    // Validate duration (1-8 hours)
     const durationHours = formData.duration_hours || 4
-    if (durationHours > 24) {
-      nextErrors.duration_hours = 'Sale cannot last more than 24 hours'
-    }
-    if (durationHours <= 0) {
-      nextErrors.duration_hours = 'Duration must be greater than 0'
+    if (durationHours < 1 || durationHours > 8) {
+      nextErrors.duration_hours = 'Duration must be between 1 and 8 hours'
     }
     
     // Unsavory language checks (client-side guard; server also validates)

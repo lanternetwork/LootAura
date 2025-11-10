@@ -19,13 +19,16 @@ function isMobile(): boolean {
   if (typeof window === 'undefined') return false
   
   // Check user agent
-  const ua = navigator.userAgent || navigator.userAgentData?.brand
+  const ua = navigator.userAgent
   const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i
   if (mobileRegex.test(ua)) return true
   
-  // Check navigator.userAgentData if available
-  if ('userAgentData' in navigator && (navigator as any).userAgentData?.mobile) {
-    return true
+  // Check navigator.userAgentData if available (experimental API)
+  if ('userAgentData' in navigator) {
+    const userAgentData = (navigator as any).userAgentData
+    if (userAgentData?.mobile) {
+      return true
+    }
   }
   
   // Check screen width as fallback

@@ -26,12 +26,18 @@ describe('buildShareTargets', () => {
     expect(Array.isArray(targets)).toBe(true)
     expect(targets.length).toBeGreaterThan(0)
 
-    // Check that URLs include UTM params
+    // Check that URLs include UTM params (URL-encoded)
     const twitterTarget = targets.find(t => t.id === 'twitter')
     expect(twitterTarget).toBeDefined()
-    expect(twitterTarget?.url).toContain('utm_source=share')
-    expect(twitterTarget?.url).toContain('utm_medium=social')
-    expect(twitterTarget?.url).toContain('utm_campaign=sale')
+    // Extract the url parameter from the Twitter share URL
+    const urlMatch = twitterTarget?.url.match(/url=([^&]+)/)
+    expect(urlMatch).toBeDefined()
+    if (urlMatch) {
+      const decodedUrl = decodeURIComponent(urlMatch[1])
+      expect(decodedUrl).toContain('utm_source=share')
+      expect(decodedUrl).toContain('utm_medium=social')
+      expect(decodedUrl).toContain('utm_campaign=sale')
+    }
   })
 
   it('should normalize relative URLs to absolute', () => {
@@ -53,7 +59,13 @@ describe('buildShareTargets', () => {
     })
 
     const twitterTarget = targets.find(t => t.id === 'twitter')
-    expect(twitterTarget?.url).toContain('https://example.com')
+    // Extract the url parameter from the Twitter share URL
+    const urlMatch = twitterTarget?.url.match(/url=([^&]+)/)
+    expect(urlMatch).toBeDefined()
+    if (urlMatch) {
+      const decodedUrl = decodeURIComponent(urlMatch[1])
+      expect(decodedUrl).toContain('https://example.com')
+    }
   })
 
   it('should include copy link target', () => {
@@ -157,9 +169,15 @@ describe('buildShareTargets', () => {
     })
 
     const twitterTarget = targets.find(t => t.id === 'twitter')
-    expect(twitterTarget?.url).toContain('utm_source=custom')
-    expect(twitterTarget?.url).toContain('utm_medium=email')
-    expect(twitterTarget?.url).toContain('utm_campaign=promo')
+    // Extract the url parameter from the Twitter share URL
+    const urlMatch = twitterTarget?.url.match(/url=([^&]+)/)
+    expect(urlMatch).toBeDefined()
+    if (urlMatch) {
+      const decodedUrl = decodeURIComponent(urlMatch[1])
+      expect(decodedUrl).toContain('utm_source=custom')
+      expect(decodedUrl).toContain('utm_medium=email')
+      expect(decodedUrl).toContain('utm_campaign=promo')
+    }
   })
 
   it('should encode special characters in URLs', () => {
@@ -183,7 +201,13 @@ describe('buildShareTargets', () => {
     })
 
     const twitterTarget = targets.find(t => t.id === 'twitter')
-    expect(twitterTarget?.url).toContain('https://example.com/sales/test-id')
+    // Extract the url parameter from the Twitter share URL
+    const urlMatch = twitterTarget?.url.match(/url=([^&]+)/)
+    expect(urlMatch).toBeDefined()
+    if (urlMatch) {
+      const decodedUrl = decodeURIComponent(urlMatch[1])
+      expect(decodedUrl).toContain('https://example.com/sales/test-id')
+    }
   })
 })
 

@@ -88,6 +88,9 @@ export function createSaleMetadata(sale: Sale): Metadata {
   let description = sale.description
   if (!description) {
     const parts: string[] = []
+    if (sale.address) {
+      parts.push(sale.address)
+    }
     if (locationParts.length > 0) {
       parts.push(`Yard sale in ${locationParts.join(', ')}`)
     } else {

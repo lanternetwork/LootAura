@@ -80,8 +80,8 @@ describe('Geocode Cache TTL', () => {
     await geocodeAddress('123 Test St, Louisville, KY')
     expect(mockFetch).toHaveBeenCalledTimes(1)
 
-    // Second call - after 10 minutes, should fetch again
-    mockNow.mockReturnValue(1000000 + (11 * 60 * 1000)) // 11 minutes later
+    // Second call - after 24 hours, should fetch again
+    mockNow.mockReturnValue(1000000 + (24 * 60 * 60 * 1000) + 1) // 24 hours + 1ms later
     await geocodeAddress('123 Test St, Louisville, KY')
     expect(mockFetch).toHaveBeenCalledTimes(2) // Should fetch again
   })

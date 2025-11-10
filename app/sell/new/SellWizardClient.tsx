@@ -694,6 +694,14 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       clearLocalDraft()
       sessionStorage.removeItem('auth:postLoginRedirect')
       sessionStorage.removeItem('draft:returnStep')
+      
+      // Delete server-side draft if it exists
+      if (draftKeyRef.current && user) {
+        await deleteDraftServer(draftKeyRef.current).catch((error) => {
+          // Log error but don't fail the sale creation
+          console.warn('[SELL_WIZARD] Failed to delete server draft:', error)
+        })
+      }
 
       // Show confirmation modal
       setCreatedSaleId(saleId)
@@ -843,6 +851,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         clearLocalDraft()
         sessionStorage.removeItem('auth:postLoginRedirect')
         sessionStorage.removeItem('draft:returnStep')
+        
+        // Note: Server-side draft is already marked as 'published' by publishDraftServer
+        // No need to delete it explicitly, but we clear the draft key ref to prevent reuse
+        draftKeyRef.current = null
         if (draftKeyRef.current) {
           // Draft is already marked as published on server
         }

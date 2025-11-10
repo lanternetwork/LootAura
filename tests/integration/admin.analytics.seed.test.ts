@@ -19,20 +19,29 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabase,
 }))
 
+const mockRlsDb = {
+  from: vi.fn(),
+  schema: vi.fn().mockReturnThis(),
+}
+
+const mockAdminDb = {
+  from: vi.fn(),
+  schema: vi.fn().mockReturnThis(),
+}
+
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => ({
-    from: vi.fn(),
-  }),
-  getAdminDb: () => ({
-    from: vi.fn(),
-  }),
-  fromBase: (db: any, table: string) => ({
-    select: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    single: vi.fn(),
+  getRlsDb: () => mockRlsDb,
+  getAdminDb: () => mockAdminDb,
+  fromBase: vi.fn((db: any, table: string) => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      single: vi.fn(),
+    }
+    return query
   }),
 }))
 
@@ -57,24 +66,30 @@ describe('Admin Analytics Seed API', () => {
 
     const mockInserted = Array.from({ length: 10 }, (_, i) => ({ id: `event-${i}` }))
 
-    mockSupabase.from.mockReturnValue({
+    const { fromBase } = await import('@/lib/supabase/clients')
+    
+    // Mock sales query
+    const mockSalesQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue({ data: mockSales, error: null }),
-    })
-
-    const { fromBase } = await import('@/lib/supabase/clients')
-    const mockQuery = fromBase({}, 'sales')
-    mockQuery.select = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockResolvedValue({ data: mockSales, error: null }),
-    })
-
-    const mockInsertQuery = fromBase({}, 'analytics_events')
-    mockInsertQuery.insert = vi.fn().mockReturnValue({
+    }
+    
+    // Mock insert query
+    const mockInsertQuery = {
+      insert: vi.fn().mockReturnThis(),
       select: vi.fn().mockResolvedValue({ data: mockInserted, error: null }),
+    }
+
+    // Setup fromBase to return different queries based on table
+    vi.mocked(fromBase).mockImplementation((db: any, table: string) => {
+      if (table === 'sales') {
+        return mockSalesQuery as any
+      } else if (table === 'analytics_events') {
+        return mockInsertQuery as any
+      }
+      return {} as any
     })
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/seed', {
@@ -100,11 +115,22 @@ describe('Admin Analytics Seed API', () => {
   })
 
   it('should handle missing sales gracefully', async () => {
-    mockSupabase.from.mockReturnValue({
+    const { fromBase } = await import('@/lib/supabase/clients')
+    
+    // Mock sales query to return empty array
+    const mockSalesQuery = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }
+
+    // Setup fromBase to return empty sales
+    vi.mocked(fromBase).mockImplementation((db: any, table: string) => {
+      if (table === 'sales') {
+        return mockSalesQuery as any
+      }
+      return {} as any
     })
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/seed', {

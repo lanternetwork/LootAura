@@ -19,16 +19,23 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabase,
 }))
 
+const mockRlsDb = {
+  from: vi.fn(),
+  schema: vi.fn().mockReturnThis(),
+}
+
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => ({
-    from: vi.fn(),
-  }),
-  fromBase: (db: any, table: string) => ({
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    gte: vi.fn().mockReturnThis(),
-    lte: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
+  getRlsDb: () => mockRlsDb,
+  fromBase: vi.fn((db: any, table: string) => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      single: vi.fn(),
+    }
+    return query
   }),
 }))
 
@@ -52,23 +59,26 @@ describe('Admin Analytics Summary API', () => {
       { event_type: 'click', ts: new Date().toISOString() },
     ]
 
-    mockSupabase.from.mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
+    // Mock view query (for table existence check)
+    const mockViewQuery = Promise.resolve({ data: [{ ts: new Date().toISOString() }], error: null })
+    Object.assign(mockViewQuery, {
+      select: vi.fn().mockReturnValue(mockViewQuery),
+      limit: vi.fn().mockReturnValue(mockViewQuery),
+      order: vi.fn().mockReturnValue(mockViewQuery),
+      eq: vi.fn().mockReturnValue(mockViewQuery),
     })
+    mockSupabase.from.mockReturnValue(mockViewQuery as any)
 
+    // Mock fromBase for analytics_events query
     const { fromBase } = await import('@/lib/supabase/clients')
-    const mockQuery = fromBase({}, 'analytics_events')
-    mockQuery.select = vi.fn().mockReturnValue({
+    const mockEventsQuery = {
+      select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       gte: vi.fn().mockReturnThis(),
       lte: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: mockEvents, error: null }),
-    })
+    }
+    vi.mocked(fromBase).mockReturnValue(mockEventsQuery as any)
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/summary?days=7', {
       method: 'GET',
@@ -98,12 +108,29 @@ describe('Admin Analytics Summary API', () => {
   })
 
   it('should handle missing table gracefully', async () => {
-    mockSupabase.from.mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockRejectedValue({ code: '42P01' }), // relation does not exist
+    // Mock view query to return error with code '42P01' (relation does not exist)
+    // The query chain is: from().select().limit().order().eq() then await
+    // In Supabase, the query builder methods return 'this' for chaining, but the query itself is a Promise
+    // When we await the query, it should return the error
+    const mockViewQuery = Promise.resolve({ data: null, error: { code: '42P01' } })
+    Object.assign(mockViewQuery, {
+      select: vi.fn().mockReturnValue(mockViewQuery),
+      limit: vi.fn().mockReturnValue(mockViewQuery),
+      order: vi.fn().mockReturnValue(mockViewQuery),
+      eq: vi.fn().mockReturnValue(mockViewQuery),
     })
+    mockSupabase.from.mockReturnValue(mockViewQuery as any)
+
+    // Mock fromBase for analytics_events query (should return empty)
+    const { fromBase } = await import('@/lib/supabase/clients')
+    const mockEventsQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }
+    vi.mocked(fromBase).mockReturnValue(mockEventsQuery as any)
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/summary?days=7', {
       method: 'GET',
@@ -118,6 +145,27 @@ describe('Admin Analytics Summary API', () => {
   })
 
   it('should respect days parameter', async () => {
+    // Mock view query (for table existence check)
+    const mockViewQuery = Promise.resolve({ data: [{ ts: new Date().toISOString() }], error: null })
+    Object.assign(mockViewQuery, {
+      select: vi.fn().mockReturnValue(mockViewQuery),
+      limit: vi.fn().mockReturnValue(mockViewQuery),
+      order: vi.fn().mockReturnValue(mockViewQuery),
+      eq: vi.fn().mockReturnValue(mockViewQuery),
+    })
+    mockSupabase.from.mockReturnValue(mockViewQuery as any)
+
+    // Mock fromBase for analytics_events query
+    const { fromBase } = await import('@/lib/supabase/clients')
+    const mockEventsQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+    }
+    vi.mocked(fromBase).mockReturnValue(mockEventsQuery as any)
+
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/summary?days=14', {
       method: 'GET',
     })

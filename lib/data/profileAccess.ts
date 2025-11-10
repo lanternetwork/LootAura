@@ -22,6 +22,13 @@ export interface Metrics7d {
   saves7d?: number
   ctr7d?: number
   salesFulfilled?: number
+  series?: {
+    date: string
+    views: number
+    saves: number
+    clicks: number
+    fulfilled: number
+  }[]
 }
 
 export interface UserPreferences {
@@ -80,23 +87,127 @@ export async function getUserProfile(
 
 /**
  * Fetch user metrics for last 7 days (SSR)
- * @param _supabase - Authenticated Supabase client (unused for now)
- * @param _userId - User ID to fetch metrics for (unused for now)
+ * @param supabase - Authenticated Supabase client
+ * @param userId - User ID to fetch metrics for
  * @returns Metrics data with defaults if not available
  */
 export async function getUserMetrics7d(
-  _supabase: SupabaseClient,
-  _userId: string
+  supabase: SupabaseClient,
+  userId: string
 ): Promise<Metrics7d> {
-  // TODO: Implement real 7-day metrics aggregation
-  // For now, return defaults matching the API stub
-  // The metrics API (/api/profile/metrics) currently returns stub data
-  // Once real metrics are implemented, query from analytics/events tables
-  return {
-    views7d: 0,
-    saves7d: 0,
-    ctr7d: 0,
-    salesFulfilled: 0,
+  try {
+    // Calculate date range (last 7 days)
+    const to = new Date()
+    const from = new Date(to)
+    from.setDate(from.getDate() - 7)
+
+    // Query analytics events from the view (which reads from base table)
+    const { data: events, error: eventsError } = await supabase
+      .from('analytics_events_v2')
+      .select('event_type, ts')
+      .eq('owner_id', userId)
+      .eq('is_test', false)
+      .gte('ts', from.toISOString())
+      .lte('ts', to.toISOString())
+      .order('ts', { ascending: true })
+
+    // If table doesn't exist or query fails, return defaults
+    if (eventsError) {
+      const errorCode = (eventsError as any)?.code
+      if (errorCode === '42P01' || errorCode === 'PGRST116') {
+        // Table doesn't exist - return defaults
+        return {
+          views7d: 0,
+          saves7d: 0,
+          ctr7d: 0,
+          salesFulfilled: 0,
+          series: [],
+        }
+      }
+      // Other error - log and return defaults
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[PROFILE_ACCESS] Error fetching analytics events:', eventsError)
+      }
+      return {
+        views7d: 0,
+        saves7d: 0,
+        ctr7d: 0,
+        salesFulfilled: 0,
+        series: [],
+      }
+    }
+
+    // Query fulfilled sales (completed sales) from the last 7 days
+    const { data: sales, error: salesError } = await supabase
+      .from('sales_v2')
+      .select('id, updated_at')
+      .eq('owner_id', userId)
+      .eq('status', 'completed')
+      .gte('updated_at', from.toISOString())
+      .lte('updated_at', to.toISOString())
+
+    // Count events by type
+    const views7d = events?.filter(e => e.event_type === 'view').length || 0
+    const saves7d = events?.filter(e => e.event_type === 'save').length || 0
+    const clicks7d = events?.filter(e => e.event_type === 'click').length || 0
+
+    // Calculate CTR (Click-Through Rate): clicks / views * 100
+    const ctr7d = views7d > 0 ? (clicks7d / views7d) * 100 : 0
+    const salesFulfilled = salesError ? 0 : (sales?.length || 0)
+
+    // Build daily time series
+    const seriesMap = new Map<string, { views: number; saves: number; clicks: number; fulfilled: number }>()
+    
+    // Initialize all 7 days with zeros
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(from)
+      date.setDate(date.getDate() + i)
+      const dateStr = date.toISOString().split('T')[0]
+      seriesMap.set(dateStr, { views: 0, saves: 0, clicks: 0, fulfilled: 0 })
+    }
+
+    // Aggregate events by date
+    events?.forEach((event: any) => {
+      const date = new Date(event.ts).toISOString().split('T')[0]
+      if (seriesMap.has(date)) {
+        const dayData = seriesMap.get(date)!
+        if (event.event_type === 'view') dayData.views++
+        if (event.event_type === 'save') dayData.saves++
+        if (event.event_type === 'click') dayData.clicks++
+      }
+    })
+
+    // Aggregate fulfilled sales by date
+    sales?.forEach((sale: any) => {
+      const date = new Date(sale.updated_at).toISOString().split('T')[0]
+      if (seriesMap.has(date)) {
+        seriesMap.get(date)!.fulfilled++
+      }
+    })
+
+    // Convert to array and sort by date
+    const series = Array.from(seriesMap.entries())
+      .map(([date, counts]) => ({ date, ...counts }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+
+    return {
+      views7d,
+      saves7d,
+      ctr7d,
+      salesFulfilled,
+      series,
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[PROFILE_ACCESS] Error fetching metrics:', error)
+    }
+    // Return defaults on error
+    return {
+      views7d: 0,
+      saves7d: 0,
+      ctr7d: 0,
+      salesFulfilled: 0,
+    }
   }
 }
 

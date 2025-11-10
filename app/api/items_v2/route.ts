@@ -73,6 +73,11 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Normalize images: prefer images array, fallback to image_url
+    const images = Array.isArray(body.images) && body.images.length > 0
+      ? body.images
+      : (body.image_url ? [body.image_url] : [])
+    
     const { data: item, error } = await fromBase(db, 'items')
       .insert({
         sale_id: body.sale_id,
@@ -81,7 +86,7 @@ export async function POST(request: NextRequest) {
         price: body.price,
         category: body.category,
         condition: body.condition,
-        images: body.images || []
+        images: images.length > 0 ? images : null
       })
       .select()
       .single()

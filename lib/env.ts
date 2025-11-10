@@ -95,3 +95,8 @@ export const ENV_SERVER = new Proxy({} as z.infer<typeof serverSchema>, {
 // Type exports for better TypeScript support
 export type PublicEnv = z.infer<typeof publicSchema>
 export type ServerEnv = z.infer<typeof serverSchema>
+
+// Getter for Nominatim email (single source of truth)
+export function getNominatimEmail(): string {
+  return getEnvServer().NOMINATIM_APP_EMAIL
+}

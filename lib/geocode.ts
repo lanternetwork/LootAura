@@ -1,5 +1,7 @@
 // Geocoding utilities with caching to avoid repeated API calls
 
+import { getNominatimEmail } from './env'
+
 export interface GeocodeResult {
   lat: number
   lng: number
@@ -12,11 +14,11 @@ export interface GeocodeResult {
 // In-memory cache with TTL and size limits
 interface CacheEntry {
   result: GeocodeResult
-  expires: number
+  expiresAt: number
 }
 
 const geocodeCache = new Map<string, CacheEntry>()
-const CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 const MAX_CACHE_SIZE = 100
 
 function evictCacheIfNeeded(): void {
@@ -36,7 +38,7 @@ function getCachedResult(key: string): GeocodeResult | null {
   }
   
   // Check expiration
-  if (Date.now() > entry.expires) {
+  if (Date.now() > entry.expiresAt) {
     geocodeCache.delete(key)
     return null
   }
@@ -65,7 +67,7 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
       evictCacheIfNeeded()
       geocodeCache.set(cacheKey, {
         result,
-        expires: Date.now() + CACHE_TTL_MS
+        expiresAt: Date.now() + CACHE_TTL_MS
       })
       return result
     }
@@ -79,13 +81,13 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
 
 
 async function geocodeWithNominatim(address: string): Promise<GeocodeResult | null> {
-  const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
+  const email = getNominatimEmail()
   
   const response = await fetch(
     `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&email=${email}&limit=1`,
     {
       headers: {
-        'User-Agent': `LootAura/1.0 (${email})`
+        'User-Agent': `LootAura/1.0 (contact: ${email})`
       }
     }
   )

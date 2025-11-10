@@ -5,24 +5,9 @@ import { validateSession } from '@/lib/auth/server-session'
 export async function middleware(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
   
-  // 0. Handle OAuth callbacks - redirect to /auth/callback if code or error present
-  const hasCode = searchParams.has('code')
-  const hasError = searchParams.has('error')
-  
-  if (hasCode || hasError) {
-    console.log('[MIDDLEWARE] OAuth callback detected, redirecting to /auth/callback:', { 
-      hasCode, 
-      hasError, 
-      pathname 
-    })
-    
-    const callbackUrl = new URL('/auth/callback', req.url)
-    // Preserve entire querystring (code, error, state, next, etc.)
-    searchParams.forEach((value, key) => {
-      callbackUrl.searchParams.set(key, value)
-    })
-    
-    return NextResponse.redirect(callbackUrl, 307)
+  // 0. Bypass auth callback route completely to prevent redirect loops
+  if (pathname === '/auth/callback') {
+    return NextResponse.next()
   }
   
   // 1. Public pages that don't require authentication

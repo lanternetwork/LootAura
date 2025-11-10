@@ -42,7 +42,10 @@ export async function POST(request: NextRequest) {
       })
       
       // Check if table doesn't exist
-      if (errorCode === '42P01' || errorMessage.includes('does not exist')) {
+      if (errorCode === '42P01' || 
+          errorMessage.includes('does not exist') ||
+          errorMessage.includes('Could not find the table') ||
+          errorMessage.includes('schema cache')) {
         return NextResponse.json({ 
           error: 'Analytics table does not exist. Please run database migrations first.' 
         }, { status: 400 })

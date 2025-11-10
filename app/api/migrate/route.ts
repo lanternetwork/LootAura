@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 
 export async function POST(_request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const db = getRlsDb()
     
     console.log('[MIGRATE] Starting dual-link reviews system migration...')
     
     // Step 1: Add address_key column
     console.log('[MIGRATE] Step 1: Adding address_key column...')
-    const { error: addColumnError } = await supabase
-      .from('lootaura_v2.sales')
+    const { error: addColumnError } = await fromBase(db, 'sales')
       .select('address_key')
       .limit(1)
     
@@ -21,9 +20,11 @@ export async function POST(_request: NextRequest) {
       console.log('Column already exists or other error:', addColumnError?.message)
     }
     
-    // Step 2: Test if we can query sales_v2
+    // Step 2: Test if we can query sales_v2 (read from view using public schema client)
     console.log('[MIGRATE] Step 2: Testing sales_v2 access...')
-    const { data: testSales, error: testError } = await supabase
+    const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+    const publicClient = createSupabaseServerClient()
+    const { data: testSales, error: testError } = await publicClient
       .from('sales_v2')
       .select('id, title')
       .limit(1)

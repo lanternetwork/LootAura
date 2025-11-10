@@ -219,10 +219,10 @@ describe('Sign In Page Integration', () => {
 
       render(<SignIn />)
 
-      // Wait for the redirect (there's a 200ms delay in the component)
+      // Wait for the redirect (there's a 500ms delay in the component)
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/sales')
-      }, { timeout: 500 })
+      }, { timeout: 1000 })
     })
 
     it('should redirect to specified page after successful sign in', async () => {

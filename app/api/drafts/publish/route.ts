@@ -1,115 +1,52 @@
-// NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
-import { NextRequest, NextResponse } from 'next/server'
+// NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
+import { NextRequest } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
+import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
 
 export const dynamic = 'force-dynamic'
 
-type ApiResponse<T = any> = {
-  ok: boolean
-  data?: T
-  error?: string
-  code?: string
-  details?: string
-}
-
 // POST: Publish draft (transactional: create sale + items, mark draft as published)
 export async function POST(request: NextRequest) {
   try {
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const supabase = createSupabaseWriteClient()
+    const supabase = createSupabaseServerClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Authentication required',
-        code: 'AUTH_REQUIRED'
-      }, { status: 401 })
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
     }
 
     let body: any
     try {
       body = await request.json()
     } catch (error) {
-      console.error('[DRAFTS_PUBLISH] JSON parse error:', {
-        error: error instanceof Error ? error.message : String(error)
-      })
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Invalid JSON in request body',
-        code: 'INVALID_JSON'
-      }, { status: 400 })
+      return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
     }
     
     const { draftKey } = body
 
     if (!draftKey || typeof draftKey !== 'string') {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'draftKey is required',
-        code: 'INVALID_INPUT'
-      }, { status: 400 })
+      return fail(400, 'INVALID_INPUT', 'draftKey is required')
     }
 
-    // Fetch draft by user_id + draft_key with status active
-    const { data: draft, error: fetchError } = await supabase
-      .from('sale_drafts')
-      .select('id, payload, status')
-      .eq('user_id', user.id)
+    // Read draft with RLS
+    const rls = getRlsDb()
+    const { data: draft, error: dErr } = await fromBase(rls, 'sale_drafts')
+      .select('*')
       .eq('draft_key', draftKey)
       .eq('status', 'active')
-      .single()
+      .maybeSingle()
 
-    if (fetchError || !draft) {
-      console.error('[DRAFTS_PUBLISH] Error fetching draft:', {
-        fetchError: fetchError ? {
-          code: fetchError.code,
-          message: fetchError.message,
-          details: fetchError.details,
-          hint: fetchError.hint
-        } : null,
-        draftKey,
-        userId: user.id,
-        hasDraft: !!draft
-      })
-      
-      // Check if already published (idempotency)
-      const { data: publishedDraft } = await supabase
-        .from('sale_drafts')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('draft_key', draftKey)
-        .eq('status', 'published')
-        .maybeSingle()
-
-      if (publishedDraft) {
-        // Find the sale that was created from this draft
-        // We'll need to track this - for now, return error asking to republish
-        return NextResponse.json<ApiResponse>({
-          ok: false,
-          error: 'Draft already published',
-          code: 'ALREADY_PUBLISHED'
-        }, { status: 400 })
-      }
-
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Draft not found',
-        code: 'DRAFT_NOT_FOUND',
-        details: fetchError?.message || 'Draft may not have been saved successfully'
-      }, { status: 404 })
-    }
+    if (dErr) return fail(500, 'DRAFT_LOOKUP_FAILED', dErr.message, dErr)
+    if (!draft) return fail(404, 'DRAFT_NOT_FOUND', 'Draft not found')
 
     // Validate payload
     const validationResult = SaleDraftPayloadSchema.safeParse(draft.payload)
     if (!validationResult.success) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Invalid draft payload',
-        code: 'VALIDATION_ERROR'
-      }, { status: 400 })
+      return fail(400, 'VALIDATION_ERROR', 'Invalid draft payload')
     }
 
     const payload = validationResult.data
@@ -117,11 +54,7 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!formData.title || !formData.city || !formData.state || !formData.date_start || !formData.time_start) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Missing required fields',
-        code: 'MISSING_FIELDS'
-      }, { status: 400 })
+      return fail(400, 'MISSING_FIELDS', 'Missing required fields')
     }
 
     // Validate image URLs
@@ -129,11 +62,7 @@ export async function POST(request: NextRequest) {
     if (allImages.length > 0) {
       for (const imageUrl of allImages) {
         if (!isAllowedImageUrl(imageUrl)) {
-          return NextResponse.json<ApiResponse>({
-            ok: false,
-            error: `Invalid image URL: ${imageUrl}`,
-            code: 'INVALID_IMAGE_URL'
-          }, { status: 400 })
+          return fail(400, 'INVALID_IMAGE_URL', `Invalid image URL: ${imageUrl}`)
         }
       }
     }
@@ -141,11 +70,7 @@ export async function POST(request: NextRequest) {
     // Validate item image URLs
     for (const item of items || []) {
       if (item.image_url && !isAllowedImageUrl(item.image_url)) {
-        return NextResponse.json<ApiResponse>({
-          ok: false,
-          error: `Invalid item image URL: ${item.image_url}`,
-          code: 'INVALID_IMAGE_URL'
-        }, { status: 400 })
+        return fail(400, 'INVALID_IMAGE_URL', `Invalid item image URL: ${item.image_url}`)
       }
     }
 
@@ -164,11 +89,7 @@ export async function POST(request: NextRequest) {
     // Get lat/lng from formData (should be set by address autocomplete)
     // If missing, we'll need to geocode - for now, require it
     if (!formData.lat || !formData.lng) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Location (lat/lng) is required',
-        code: 'MISSING_LOCATION'
-      }, { status: 400 })
+      return fail(400, 'MISSING_LOCATION', 'Location (lat/lng) is required')
     }
     const lat = formData.lat
     const lng = formData.lng
@@ -177,95 +98,85 @@ export async function POST(request: NextRequest) {
     // Note: Supabase doesn't support true transactions across multiple operations,
     // so we'll do them sequentially and handle errors
 
-    // 1. Create sale
-    const { data: sale, error: saleError } = await supabase
-      .from('lootaura_v2.sales')
-      .insert({
-        owner_id: user.id,
-        title: formData.title,
-        description: formData.description || null,
-        address: formData.address || null,
-        city: formData.city,
-        state: formData.state,
-        zip_code: formData.zip_code || null,
-        lat: parseFloat(String(lat)),
-        lng: parseFloat(String(lng)),
-        date_start: formData.date_start,
-        time_start: normalizedTimeStart,
-        date_end: formData.date_end || null,
-        time_end: formData.time_end || null,
-        cover_image_url: photos && photos.length > 0 ? photos[0] : null,
-        images: photos && photos.length > 1 ? photos.slice(1) : null,
-        pricing_mode: formData.pricing_mode || 'negotiable',
-        status: 'published',
-        privacy_mode: 'exact', // Required field
-        is_featured: false
-      })
+    // Write sale/items with admin (or RLS if policies allow)
+    const admin = getAdminDb()
+
+    // Build salePayload
+    const salePayload = {
+      owner_id: user.id,
+      title: formData.title,
+      description: formData.description || null,
+      address: formData.address || null,
+      city: formData.city,
+      state: formData.state,
+      zip_code: formData.zip_code || null,
+      lat: parseFloat(String(lat)),
+      lng: parseFloat(String(lng)),
+      date_start: formData.date_start,
+      time_start: normalizedTimeStart,
+      date_end: formData.date_end || null,
+      time_end: formData.time_end || null,
+      cover_image_url: photos && photos.length > 0 ? photos[0] : null,
+      images: photos && photos.length > 1 ? photos.slice(1) : null,
+      pricing_mode: formData.pricing_mode || 'negotiable',
+      status: 'published',
+      privacy_mode: 'exact', // Required field
+      is_featured: false
+    }
+
+    // 1. Create sale - write to base table using schema-scoped client
+    const { data: saleRow, error: sErr } = await fromBase(admin, 'sales')
+      .insert(salePayload)
       .select('id')
       .single()
 
-    if (saleError || !sale) {
-      console.error('[DRAFTS] Error creating sale:', saleError)
-      Sentry.captureException(saleError, { tags: { operation: 'publishDraft', step: 'createSale' } })
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Failed to create sale',
-        code: 'SALE_CREATE_ERROR'
-      }, { status: 500 })
-    }
+    if (sErr) return fail(500, 'SALE_CREATE_FAILED', sErr.message, sErr)
 
-    // 2. Create items
-    if (items && items.length > 0) {
-      const itemsToInsert = items.map(item => ({
-        sale_id: sale.id,
+    // Build itemsPayload
+    // Note: We don't include the 'images' field because the database schema may not have this column
+    // Items use image_url (single string) instead of images (array) in the current schema
+    const itemsPayload = items && items.length > 0 ? items.map((item: any) => {
+      // Build payload without images field to avoid schema cache errors
+      const payload: any = {
+        sale_id: saleRow.id,
         name: item.name,
         description: item.description || null,
         price: item.price || null,
         category: item.category || null,
-        image_url: item.image_url || null
-      }))
+      }
+      
+      // Note: images field is omitted because the database schema doesn't support it
+      // If images support is needed, a migration must be applied first
+      
+      return payload
+    }) : []
 
-      const { error: itemsError } = await supabase
-        .from('lootaura_v2.items')
-        .insert(itemsToInsert)
-
-      if (itemsError) {
-        console.error('[DRAFTS] Error creating items:', itemsError)
+    // 2. Create items if any
+    if (itemsPayload.length) {
+      const { error: iErr } = await fromBase(admin, 'items').insert(itemsPayload)
+      if (iErr) {
         // Try to clean up the sale (best effort)
-        await supabase.from('lootaura_v2.sales').delete().eq('id', sale.id)
-        Sentry.captureException(itemsError, { tags: { operation: 'publishDraft', step: 'createItems' } })
-        return NextResponse.json<ApiResponse>({
-          ok: false,
-          error: 'Failed to create items',
-          code: 'ITEMS_CREATE_ERROR'
-        }, { status: 500 })
+        await fromBase(admin, 'sales').delete().eq('id', saleRow.id)
+        return fail(500, 'ITEMS_CREATE_FAILED', iErr.message, iErr)
       }
     }
 
     // 3. Mark draft as published
-    const { error: updateError } = await supabase
-      .from('lootaura_v2.sale_drafts')
+    const { error: uErr } = await fromBase(rls, 'sale_drafts')
       .update({ status: 'published' })
       .eq('id', draft.id)
 
-    if (updateError) {
-      console.error('[DRAFTS] Error updating draft status:', updateError)
+    if (uErr) {
       // Sale and items are already created, so we'll log but not fail
-      Sentry.captureException(updateError, { tags: { operation: 'publishDraft', step: 'updateDraft' } })
+      if (process.env.NODE_ENV !== 'production') console.error('[PUBLISH/POST] draft update error:', uErr)
+      Sentry.captureException(uErr, { tags: { operation: 'publishDraft', step: 'updateDraft' } })
     }
 
-    return NextResponse.json<ApiResponse>({
-      ok: true,
-      data: { saleId: sale.id }
-    })
-  } catch (error) {
-    console.error('[DRAFTS] Unexpected error in publish:', error)
-    Sentry.captureException(error, { tags: { operation: 'publishDraft' } })
-    return NextResponse.json<ApiResponse>({
-      ok: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
-    }, { status: 500 })
+    return ok({ data: { saleId: saleRow.id } })
+  } catch (e: any) {
+    if (process.env.NODE_ENV !== 'production') console.error('[PUBLISH/POST] thrown:', e)
+    Sentry.captureException(e, { tags: { operation: 'publishDraft' } })
+    return fail(500, 'PUBLISH_FAILED', e.message)
   }
 }
 

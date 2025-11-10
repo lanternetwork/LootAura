@@ -3,26 +3,11 @@ import { cookies } from 'next/headers'
 import { validateSession } from '@/lib/auth/server-session'
 
 export async function middleware(req: NextRequest) {
-  const { pathname, searchParams } = req.nextUrl;
+  const { pathname } = req.nextUrl;
   
-  // 0. Handle OAuth callbacks - redirect to /auth/callback if code or error present
-  const hasCode = searchParams.has('code')
-  const hasError = searchParams.has('error')
-  
-  if (hasCode || hasError) {
-    console.log('[MIDDLEWARE] OAuth callback detected, redirecting to /auth/callback:', { 
-      hasCode, 
-      hasError, 
-      pathname 
-    })
-    
-    const callbackUrl = new URL('/auth/callback', req.url)
-    // Preserve entire querystring (code, error, state, next, etc.)
-    searchParams.forEach((value, key) => {
-      callbackUrl.searchParams.set(key, value)
-    })
-    
-    return NextResponse.redirect(callbackUrl, 307)
+  // 0. Bypass auth callback route completely to prevent redirect loops
+  if (pathname === '/auth/callback') {
+    return NextResponse.next()
   }
   
   // 1. Public pages that don't require authentication
@@ -133,10 +118,17 @@ export async function middleware(req: NextRequest) {
     }
     
     // For pages, redirect to signin
+    // Prevent redirect loops: don't redirect if we're already going to signin
+    if (pathname.startsWith('/auth/signin') || pathname.startsWith('/auth/login')) {
+      console.log('[MIDDLEWARE] Already on signin page, allowing access to prevent loop')
+      return NextResponse.next()
+    }
+    
     const loginUrl = new URL('/auth/signin', req.url)
     // Only allow same-origin relative paths for redirectTo
     const redirectTo = req.nextUrl.pathname.startsWith('/') ? req.nextUrl.pathname : '/'
-    loginUrl.searchParams.set('redirectTo', redirectTo)
+    // Encode redirectTo to handle query parameters properly
+    loginUrl.searchParams.set('redirectTo', encodeURIComponent(redirectTo + req.nextUrl.search))
     return NextResponse.redirect(loginUrl)
   }
 

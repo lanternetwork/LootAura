@@ -1,6 +1,6 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getUserSales, getUserDrafts } from '@/lib/data/salesAccess'
-import { getUserProfile, getUserMetrics7d, getUserPreferences } from '@/lib/data/profileAccess'
+import { getUserProfile, getUserMetrics7d } from '@/lib/data/profileAccess'
 import DashboardClient from './DashboardClient'
 
 export const dynamic = 'force-dynamic'
@@ -21,12 +21,11 @@ export default async function DashboardPage() {
   }
 
   // Fetch all data in parallel via SSR helpers
-  const [salesResult, draftsResult, profile, metrics, preferences] = await Promise.all([
+  const [salesResult, draftsResult, profile, metrics] = await Promise.all([
     getUserSales(supabase, user.id, 24),
     getUserDrafts(supabase, user.id, 12, 0),
     getUserProfile(supabase, user.id),
     getUserMetrics7d(supabase, user.id),
-    getUserPreferences(supabase, user.id),
   ])
 
   const sales = salesResult.data || []
@@ -44,7 +43,6 @@ export default async function DashboardPage() {
       initialDrafts={drafts}
       initialProfile={profile}
       initialMetrics={metrics}
-      initialPreferences={preferences}
     />
   )
 }

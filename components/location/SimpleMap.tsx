@@ -7,7 +7,7 @@ import { Sale } from "@/lib/types"
 import { PinsProps, HybridPinsProps } from "@/lib/pins/types"
 import PinsOverlay from "./PinsOverlay"
 import HybridPinsOverlay from "./HybridPinsOverlay"
-import OSMAttribution from "./OSMAttribution"
+import AttributionOSM from "./AttributionOSM"
 
 interface SimpleMapProps {
   center: { lat: number; lng: number }
@@ -27,6 +27,9 @@ interface SimpleMapProps {
   isTransitioning?: boolean
   transitionMessage?: string
   interactive?: boolean // Disable all map interactions when false
+  attributionPosition?: 'top-right' | 'bottom-right' | 'top-left' | 'bottom-left' // Position of OSM attribution overlay
+  showOSMAttribution?: boolean // Show OSM attribution overlay
+  attributionControl?: boolean // Show Mapbox attribution control (default: true)
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -42,7 +45,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   onViewportChange,
   isTransitioning = false,
   transitionMessage = "Loading...",
-  interactive = true
+  interactive = true,
+  attributionPosition = 'bottom-right',
+  showOSMAttribution = true,
+  attributionControl = true
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -262,7 +268,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   }, [loaded])
 
   return (
-    <div ref={containerRef} className="relative min-h-0 min-w-0 w-full h-full">
+    <div ref={containerRef} className="relative min-h-0 min-w-0 w-full h-full" style={{ overflow: 'visible' }}>
       <Map
         ref={mapRef}
         mapboxAccessToken={token}
@@ -292,6 +298,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         touchZoom={interactive}
         touchRotate={interactive}
         keyboard={interactive}
+        attributionControl={attributionControl}
       >
         {/* Custom pin rendering - no Mapbox Markers */}
         {hybridPins ? (
@@ -383,9 +390,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       )}
       
       {/* OSM Attribution */}
-      <div className="absolute bottom-2 right-2 z-40 pointer-events-none">
-        <OSMAttribution showGeocoding={false} className="bg-white bg-opacity-80 px-2 py-1 rounded" />
-      </div>
+      {showOSMAttribution && (
+        <AttributionOSM position={attributionPosition} containerRef={containerRef} />
+      )}
     </div>
   )
 })

@@ -389,10 +389,16 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }, [initialData, user, normalizeTimeToNearest30, searchParams])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
-    console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
+    // Only log in development to reduce console noise
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
+    }
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
-      console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
+      // Only log in development to reduce console noise
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
+      }
 
       // Snap start time to 30-minute increments (nearest 00/30 with carry)
       if (field === 'time_start' && typeof value === 'string' && value.includes(':')) {
@@ -646,8 +652,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
         sessionStorage.setItem('draft:returnStep', 'review')
         
-        // Redirect to login
-        router.push('/auth/signin?redirectTo=/sell/new?resume=review')
+        // Redirect to login (encode redirectTo to preserve query params)
+        const redirectUrl = encodeURIComponent('/sell/new?resume=review')
+        router.push(`/auth/signin?redirectTo=${redirectUrl}`)
         setLoading(false)
         return
       }
@@ -743,12 +750,32 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }, [searchParams, user, validateDetails])
 
   const handleSubmit = async () => {
+    console.log('[SELL_WIZARD] handleSubmit called', { 
+      currentStep, 
+      hasDraftKey: !!draftKeyRef.current,
+      hasLocalDraft: hasLocalDraft(),
+      formData: {
+        title: formData.title,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        lat: formData.lat,
+        lng: formData.lng,
+        date_start: formData.date_start,
+        time_start: formData.time_start,
+      }
+    })
+    
     // Client-side required validation
     const nextErrors = validateDetails()
+    console.log('[SELL_WIZARD] Validation errors:', nextErrors)
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) {
+      console.log('[SELL_WIZARD] Validation failed, preventing submit')
       return
     }
+    
+    console.log('[SELL_WIZARD] Validation passed, proceeding with submit')
 
     // Check if user is authenticated
     if (!user) {
@@ -758,8 +785,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       sessionStorage.setItem('auth:postLoginRedirect', '/sell/new?resume=review')
       sessionStorage.setItem('draft:returnStep', 'review')
       
-      // Redirect to login
-      router.push('/auth/signin?redirectTo=/sell/new?resume=review')
+      // Redirect to login (encode redirectTo to preserve query params)
+      const redirectUrl = encodeURIComponent('/sell/new?resume=review')
+      router.push(`/auth/signin?redirectTo=${redirectUrl}`)
       return
     }
 
@@ -1029,7 +1057,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
           </button>
         ) : (
           <button
-            onClick={handleSubmit}
+            onClick={(e) => {
+              console.log('[SELL_WIZARD] Publish button clicked (main)', { loading, currentStep, disabled: loading })
+              e.preventDefault()
+              e.stopPropagation()
+              handleSubmit()
+            }}
             disabled={loading}
             className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
           >
@@ -1109,14 +1142,16 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="date_start" className="block text-sm font-medium text-gray-700 mb-2 cursor-pointer">
             Start Date *
           </label>
           <input
+            id="date_start"
             type="date"
             value={formData.date_start || ''}
             onChange={(e) => onChange('date_start', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+            onClick={(e) => e.currentTarget.showPicker?.()}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] cursor-pointer"
             required
           />
         {errors?.date_start && (
@@ -1564,7 +1599,12 @@ function ReviewStep({ formData, photos, items, onPublish, loading, submitError }
           </div>
         )}
         <button
-          onClick={onPublish}
+          onClick={(e) => {
+            console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading })
+            e.preventDefault()
+            e.stopPropagation()
+            onPublish()
+          }}
           disabled={loading}
           className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
         >

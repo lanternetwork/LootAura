@@ -46,7 +46,7 @@ describe('Nominatim Headers', () => {
       expect.stringContaining('nominatim.openstreetmap.org'),
       expect.objectContaining({
         headers: expect.objectContaining({
-          'User-Agent': 'LootAura/1.0 (test@example.com)'
+          'User-Agent': 'LootAura/1.0 (contact: test@example.com)'
         })
       })
     )
@@ -101,7 +101,7 @@ describe('Nominatim Headers', () => {
     const args2 = (mockFetch as any).mock.calls[0]
     expect(String(args2[0])).toMatch(/email=(admin@lootaura\.com|admin%40lootaura\.com)/)
     expect(args2[1]).toEqual(expect.objectContaining({
-      headers: expect.objectContaining({ 'User-Agent': 'LootAura/1.0 (admin@lootaura.com)' })
+      headers: expect.objectContaining({ 'User-Agent': 'LootAura/1.0 (contact: admin@lootaura.com)' })
     }))
   })
 })

@@ -1,7 +1,9 @@
 /* eslint-disable no-undef */
-// NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
+// NOTE: Writes → lootaura_v2.* only via schema-scoped clients. Reads from public views allowed.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { ok, fail } from '@/lib/http/json'
 import { Sale, PublicSale } from '@/lib/types'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
@@ -831,11 +833,9 @@ async function postHandler(request: NextRequest) {
     
     // Ensure owner_id is set server-side from authenticated user
     // Never trust client payload for owner_id
-    // Insert into base table (lootaura_v2.sales) to ensure image fields are properly saved
-    // Views may not support INSERTs with all fields, so use base table directly
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const writeClient = createSupabaseWriteClient()
-    const fromSales = writeClient.from('lootaura_v2.sales') as any
+    // Insert to base table using admin client (bypasses RLS, but we've already verified auth)
+    const admin = getAdminDb()
+    const fromSales = fromBase(admin, 'sales')
     const canInsert = typeof fromSales?.insert === 'function'
     if (!canInsert && process.env.NODE_ENV === 'test') {
       const synthetic = {
@@ -939,41 +939,28 @@ async function postHandler(request: NextRequest) {
     }
     
     if (error) {
-      console.error('[SALES] Insert failed (final):', { 
-        event: 'sales-create', 
-        status: 'fail', 
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      })
-      return NextResponse.json({ 
-        error: 'Failed to create sale',
-        details: error.message,
-        code: error.code
-      }, { status: 500 })
+      if (process.env.NODE_ENV !== 'production') console.error('[SALES/POST] supabase error:', error)
+      return fail(500, 'SALE_CREATE_FAILED', error.message, error)
     }
     
     if (!data) {
-      console.error('Sales insert succeeded but returned no data')
-      return NextResponse.json({ error: 'Failed to create sale' }, { status: 500 })
+      return fail(500, 'SALE_CREATE_FAILED', 'Sale insert succeeded but returned no data')
     }
     
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SALES] Sale created:', { event: 'sales-create', status: 'ok', saleId: data.id })
+    // Handle items if provided
+    if (body.items?.length) {
+      const withSale = body.items.map((it: any) => ({ ...it, sale_id: data.id }))
+      const { error: iErr } = await fromBase(admin, 'items').insert(withSale)
+      if (iErr) {
+        if (process.env.NODE_ENV !== 'production') console.error('[SALES/POST] items error:', iErr)
+        return fail(500, 'ITEMS_CREATE_FAILED', iErr.message, iErr)
+      }
     }
     
-    return NextResponse.json({ ok: true, sale: data })
-  } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    const errorName = error?.name || 'Unknown'
-    const errorStack = error instanceof Error ? error.stack : undefined
-    console.error(`[SALES] Unexpected error: ${errorMessage} (name: ${errorName}${errorStack ? `, stack: ${errorStack.substring(0, 200)}` : ''})`)
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      message: error?.message || 'Unknown error',
-      details: error instanceof Error ? error.stack : undefined
-    }, { status: 500 })
+    return ok({ saleId: data.id })
+  } catch (e: any) {
+    if (process.env.NODE_ENV !== 'production') console.error('[SALES/POST] thrown:', e)
+    return fail(500, 'SALE_CREATE_FAILED', e.message)
   }
 }
 

@@ -26,7 +26,7 @@ describe('Geocode Cache TTL', () => {
     vi.unstubAllGlobals()
   })
 
-  it('should cache results for 10 minutes', async () => {
+  it('should cache results for 24 hours', async () => {
     process.env.NOMINATIM_APP_EMAIL = 'test@example.com'
     
     mockFetch.mockResolvedValue({
@@ -50,8 +50,8 @@ describe('Geocode Cache TTL', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1)
     expect(result1).toBeTruthy()
 
-    // Second call - should use cache (within 10 minutes)
-    mockNow.mockReturnValue(1000000 + (5 * 60 * 1000)) // 5 minutes later
+    // Second call - should use cache (within 24 hours)
+    mockNow.mockReturnValue(1000000 + (12 * 60 * 60 * 1000)) // 12 hours later
     const result2 = await geocodeAddress('123 Test St, Louisville, KY')
     expect(mockFetch).toHaveBeenCalledTimes(1) // Still only 1 call
     expect(result2).toEqual(result1)
@@ -80,8 +80,8 @@ describe('Geocode Cache TTL', () => {
     await geocodeAddress('123 Test St, Louisville, KY')
     expect(mockFetch).toHaveBeenCalledTimes(1)
 
-    // Second call - after 10 minutes, should fetch again
-    mockNow.mockReturnValue(1000000 + (11 * 60 * 1000)) // 11 minutes later
+    // Second call - after 24 hours, should fetch again
+    mockNow.mockReturnValue(1000000 + (24 * 60 * 60 * 1000) + 1) // 24 hours + 1ms later
     await geocodeAddress('123 Test St, Louisville, KY')
     expect(mockFetch).toHaveBeenCalledTimes(2) // Should fetch again
   })

@@ -142,7 +142,9 @@ export async function publishDraftServer(draftKey: string): Promise<ApiResponse<
         status: response.status,
         statusText: response.statusText,
         error: errorData.error,
-        code: errorData.code
+        code: errorData.code,
+        details: errorData.details,
+        hint: errorData.hint
       })
       
       return {

@@ -73,7 +73,8 @@ export const ENV_PUBLIC = publicSchema.parse({
 let _ENV_SERVER: z.infer<typeof serverSchema> | null = null
 
 function getEnvServer() {
-  if (!_ENV_SERVER) {
+  // In test environment, always re-parse to pick up env changes
+  if (process.env.NODE_ENV === 'test' || !_ENV_SERVER) {
     _ENV_SERVER = serverSchema.parse({
       SUPABASE_SERVICE_ROLE: process.env.SUPABASE_SERVICE_ROLE,
       VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
@@ -95,3 +96,8 @@ export const ENV_SERVER = new Proxy({} as z.infer<typeof serverSchema>, {
 // Type exports for better TypeScript support
 export type PublicEnv = z.infer<typeof publicSchema>
 export type ServerEnv = z.infer<typeof serverSchema>
+
+// Getter for Nominatim email (single source of truth)
+export function getNominatimEmail(): string {
+  return getEnvServer().NOMINATIM_APP_EMAIL
+}

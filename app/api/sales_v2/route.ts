@@ -1,5 +1,7 @@
+// NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { assertNoUnsavory } from '@/lib/filters/profanity'
 
 export async function GET(request: NextRequest) {
@@ -79,8 +81,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Inappropriate language in ${cleanCheck.field}` }, { status: 400 })
     }
 
-    const { data: sale, error } = await supabase
-      .from('sales_v2')
+    // Write to base table using schema-scoped client
+    const db = getRlsDb()
+    const { data: sale, error } = await fromBase(db, 'sales')
       .insert({
         owner_id: user.id,
         title: body.title,
@@ -130,8 +133,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
     
-    const { data: sale, error } = await supabase
-      .from('sales_v2')
+    // Write to base table using schema-scoped client
+    const db = getRlsDb()
+    const { data: sale, error } = await fromBase(db, 'sales')
       .update(body)
       .eq('id', saleId)
       .eq('owner_id', user.id) // Ensure user can only update their own sales
@@ -170,8 +174,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
     
-    const { error } = await supabase
-      .from('sales_v2')
+    // Write to base table using schema-scoped client
+    const db = getRlsDb()
+    const { error } = await fromBase(db, 'sales')
       .delete()
       .eq('id', saleId)
       .eq('owner_id', user.id) // Ensure user can only delete their own sales

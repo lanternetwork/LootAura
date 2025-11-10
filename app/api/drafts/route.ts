@@ -1,19 +1,12 @@
-// NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
-import { NextRequest, NextResponse } from 'next/server'
+// NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
+import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
+import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
 
 export const dynamic = 'force-dynamic'
-
-// API Response type
-type ApiResponse<T = any> = {
-  ok: boolean
-  data?: T
-  error?: string
-  code?: string
-  details?: string
-}
 
 // GET: Get latest draft for authenticated user
 export async function GET(_request: NextRequest) {
@@ -22,11 +15,7 @@ export async function GET(_request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Authentication required',
-        code: 'AUTH_REQUIRED'
-      }, { status: 401 })
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
     }
 
     // Check if we should return all drafts or just the latest
@@ -34,38 +23,27 @@ export async function GET(_request: NextRequest) {
     const allDrafts = searchParams.get('all') === 'true'
 
     if (allDrafts) {
-      // Return all active drafts for user (use write client for lootaura_v2 schema)
-      const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-      const writeClient = createSupabaseWriteClient()
-      const { data: drafts, error } = await writeClient
-        .from('sale_drafts')
+      // Return all active drafts for user (read from base table via schema-scoped client)
+      const db = getRlsDb()
+      const { data: drafts, error } = await fromBase(db, 'sale_drafts')
         .select('id, draft_key, title, payload, updated_at')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('updated_at', { ascending: false })
         .limit(50)
 
-      if (error) {
-        console.error('[DRAFTS] Error fetching drafts:', error)
-        Sentry.captureException(error, { tags: { operation: 'getAllDrafts' } })
-        return NextResponse.json<ApiResponse>({
-          ok: false,
-          error: 'Failed to fetch drafts',
-          code: 'FETCH_ERROR'
-        }, { status: 500 })
-      }
-
-      return NextResponse.json<ApiResponse>({
-        ok: true,
-        data: drafts || []
-      })
+    if (error) {
+      if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/GET] supabase error:', error)
+      Sentry.captureException(error, { tags: { operation: 'getAllDrafts' } })
+      return fail(500, 'FETCH_ERROR', 'Failed to fetch drafts', { supabase: error.message, hint: error.hint, details: error.details, code: error.code })
     }
 
-    // Fetch latest active draft for user (original behavior) - use write client for lootaura_v2 schema
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const writeClient = createSupabaseWriteClient()
-    const { data: draft, error } = await writeClient
-      .from('sale_drafts')
+    return ok({ data: drafts || [] })
+    }
+
+    // Fetch latest active draft for user (read from base table via schema-scoped client)
+    const db = getRlsDb()
+    const { data: draft, error } = await fromBase(db, 'sale_drafts')
       .select('id, payload, updated_at')
       .eq('user_id', user.id)
       .eq('status', 'active')
@@ -74,20 +52,13 @@ export async function GET(_request: NextRequest) {
       .maybeSingle()
 
     if (error) {
-      console.error('[DRAFTS] Error fetching draft:', error)
+      if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/GET] supabase error:', error)
       Sentry.captureException(error, { tags: { operation: 'getLatestDraft' } })
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Failed to fetch draft',
-        code: 'FETCH_ERROR'
-      }, { status: 500 })
+      return fail(500, 'FETCH_ERROR', 'Failed to fetch draft', { supabase: error.message, hint: error.hint, details: error.details, code: error.code })
     }
 
     if (!draft) {
-      return NextResponse.json<ApiResponse>({
-        ok: true,
-        data: null
-      })
+      return ok({ data: null })
     }
 
     // Validate payload
@@ -95,33 +66,14 @@ export async function GET(_request: NextRequest) {
     if (!validationResult.success) {
       console.error('[DRAFTS] Invalid draft payload:', validationResult.error)
       // Return null rather than error - draft may be corrupted but don't break the flow
-      return NextResponse.json<ApiResponse>({
-        ok: true,
-        data: null
-      })
+      return ok({ data: null })
     }
 
-    return NextResponse.json<ApiResponse>({
-      ok: true,
-      data: {
-        id: draft.id,
-        payload: validationResult.data
-      }
-    })
-  } catch (error) {
-    console.error('[DRAFTS] Unexpected error in GET:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : typeof error,
-      fullError: error
-    })
-    Sentry.captureException(error, { tags: { operation: 'getLatestDraft' } })
-    return NextResponse.json<ApiResponse>({
-      ok: false,
-      error: error instanceof Error ? error.message : 'Internal server error',
-      code: 'INTERNAL_ERROR',
-      details: error instanceof Error ? error.stack : undefined
-    }, { status: 500 })
+    return ok({ data: { id: draft.id, payload: validationResult.data } })
+  } catch (e: any) {
+    if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/GET] thrown:', e)
+    Sentry.captureException(e, { tags: { operation: 'getLatestDraft' } })
+    return fail(500, 'INTERNAL_ERROR', e.message)
   }
 }
 
@@ -133,11 +85,7 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Authentication required',
-        code: 'AUTH_REQUIRED'
-      }, { status: 401 })
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
     }
 
     let body: any
@@ -147,21 +95,13 @@ export async function POST(request: NextRequest) {
       console.error('[DRAFTS] JSON parse error:', {
         error: error instanceof Error ? error.message : String(error)
       })
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Invalid JSON in request body',
-        code: 'INVALID_JSON'
-      }, { status: 400 })
+      return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
     }
     
     const { payload, draftKey } = body
 
     if (!draftKey || typeof draftKey !== 'string') {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'draftKey is required',
-        code: 'INVALID_INPUT'
-      }, { status: 400 })
+      return fail(400, 'INVALID_INPUT', 'draftKey is required')
     }
 
     // Validate payload
@@ -174,13 +114,7 @@ export async function POST(request: NextRequest) {
         hasFormData: !!(payload as any)?.formData,
         formDataKeys: (payload as any)?.formData ? Object.keys((payload as any).formData) : []
       })
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Invalid draft payload',
-        code: 'VALIDATION_ERROR',
-        data: validationResult.error.issues,
-        details: validationResult.error.message
-      }, { status: 400 })
+      return fail(400, 'VALIDATION_ERROR', 'Invalid draft payload', { data: validationResult.error.issues, details: validationResult.error.message })
     }
 
     const validatedPayload = validationResult.data
@@ -195,9 +129,12 @@ export async function POST(request: NextRequest) {
       payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
     })
     
-    // Check if draft exists first (views don't support ON CONFLICT the same way)
-    const { data: existingDraft } = await supabase
-      .from('sale_drafts')
+    // Use admin client for writes (bypasses RLS, but we've already verified auth)
+    const admin = getAdminDb()
+    
+    // Check if draft exists first (use RLS for reads to respect user's own drafts)
+    const rls = getRlsDb()
+    const { data: existingDraft } = await fromBase(rls, 'sale_drafts')
       .select('id')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
@@ -208,9 +145,8 @@ export async function POST(request: NextRequest) {
     let error: any
 
     if (existingDraft) {
-      // Update existing draft
-      const { data: updatedDraft, error: updateError } = await supabase
-        .from('lootaura_v2.sale_drafts')
+      // Update existing draft - write to base table using admin client
+      const { data: updatedDraft, error: updateError } = await fromBase(admin, 'sale_drafts')
         .update({
           title,
           payload: validatedPayload,
@@ -223,9 +159,8 @@ export async function POST(request: NextRequest) {
       draft = updatedDraft
       error = updateError
     } else {
-      // Insert new draft
-      const { data: newDraft, error: insertError } = await supabase
-        .from('lootaura_v2.sale_drafts')
+      // Insert new draft - write to base table using admin client
+      const { data: newDraft, error: insertError } = await fromBase(admin, 'sale_drafts')
         .insert({
           user_id: user.id,
           draft_key: draftKey,
@@ -241,50 +176,25 @@ export async function POST(request: NextRequest) {
     }
 
     if (error) {
-      console.error('[DRAFTS] Error saving draft:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        draftKey,
-        userId: user.id,
-        fullError: error
-      })
+      if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/POST] supabase error:', error)
       Sentry.captureException(error, { tags: { operation: 'saveDraft' } })
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Failed to save draft',
-        code: 'SAVE_ERROR',
-        details: error.message || error.details || 'Unknown database error'
-      }, { status: 500 })
+      return fail(500, 'SAVE_ERROR', 'Failed to save draft', { supabase: error.message, hint: error.hint, details: error.details, code: error.code })
     }
 
-    console.log('[DRAFTS] Draft saved successfully:', {
-      id: draft?.id,
-      draftKey: draft?.draft_key,
-      title: draft?.title,
-      status: draft?.status,
-      updatedAt: draft?.updated_at,
-    })
+    if (!draft) {
+      console.error('[DRAFTS] Draft save succeeded but no draft returned:', {
+        draftKey,
+        userId: user.id,
+        operation: existingDraft ? 'update' : 'insert',
+      })
+      return fail(500, 'NO_DATA_ERROR', 'Draft save succeeded but no data returned')
+    }
 
-    return NextResponse.json<ApiResponse>({
-      ok: true,
-      data: { id: draft.id }
-    })
-  } catch (error) {
-    console.error('[DRAFTS] Unexpected error in POST:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : typeof error,
-      fullError: error
-    })
-    Sentry.captureException(error, { tags: { operation: 'saveDraft' } })
-    return NextResponse.json<ApiResponse>({
-      ok: false,
-      error: error instanceof Error ? error.message : 'Internal server error',
-      code: 'INTERNAL_ERROR',
-      details: error instanceof Error ? error.stack : undefined
-    }, { status: 500 })
+    return ok({ data: { id: draft.id } })
+  } catch (e: any) {
+    if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/POST] thrown:', e)
+    Sentry.captureException(e, { tags: { operation: 'saveDraft' } })
+    return fail(500, 'SAVE_ERROR', e.message)
   }
 }
 
@@ -295,56 +205,35 @@ export async function DELETE(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Authentication required',
-        code: 'AUTH_REQUIRED'
-      }, { status: 401 })
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
     }
 
     const { searchParams } = new URL(request.url)
     const draftKey = searchParams.get('draftKey')
 
     if (!draftKey) {
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'draftKey is required',
-        code: 'INVALID_INPUT'
-      }, { status: 400 })
+      return fail(400, 'INVALID_INPUT', 'draftKey is required')
     }
 
-    // Mark draft as archived (soft delete) - use write client for lootaura_v2 schema
-    const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
-    const writeClient = createSupabaseWriteClient()
-    const { error } = await writeClient
-      .from('lootaura_v2.sale_drafts')
+    // Mark draft as archived (soft delete) - write to base table using admin client (bypasses RLS, but we've already verified auth)
+    const admin = getAdminDb()
+    const { error } = await fromBase(admin, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
       .eq('status', 'active')
 
     if (error) {
-      console.error('[DRAFTS] Error deleting draft:', error)
+      if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/DELETE] supabase error:', error)
       Sentry.captureException(error, { tags: { operation: 'deleteDraft' } })
-      return NextResponse.json<ApiResponse>({
-        ok: false,
-        error: 'Failed to delete draft',
-        code: 'DELETE_ERROR'
-      }, { status: 500 })
+      return fail(500, 'DELETE_ERROR', 'Failed to delete draft', { supabase: error.message, hint: error.hint, details: error.details, code: error.code })
     }
 
-    return NextResponse.json<ApiResponse>({
-      ok: true,
-      data: {}
-    })
-  } catch (error) {
-    console.error('[DRAFTS] Unexpected error in DELETE:', error)
-    Sentry.captureException(error, { tags: { operation: 'deleteDraft' } })
-    return NextResponse.json<ApiResponse>({
-      ok: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_ERROR'
-    }, { status: 500 })
+    return ok({ data: {} })
+  } catch (e: any) {
+    if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/DELETE] thrown:', e)
+    Sentry.captureException(e, { tags: { operation: 'deleteDraft' } })
+    return fail(500, 'INTERNAL_ERROR', e.message)
   }
 }
 

@@ -19,6 +19,32 @@ import { useDebounce } from '@/lib/hooks/useDebounce'
 import { haversineMeters } from '@/lib/geo/distance'
 import OSMAttribution from './OSMAttribution'
 
+// Convert US state name to abbreviation
+function normalizeState(state: string): string {
+  if (!state) return state
+  const stateUpper = state.toUpperCase().trim()
+  
+  // If already 2 letters, assume it's already an abbreviation
+  if (stateUpper.length === 2) return stateUpper
+  
+  // Map of common state names to abbreviations
+  const stateMap: Record<string, string> = {
+    'ALABAMA': 'AL', 'ALASKA': 'AK', 'ARIZONA': 'AZ', 'ARKANSAS': 'AR', 'CALIFORNIA': 'CA',
+    'COLORADO': 'CO', 'CONNECTICUT': 'CT', 'DELAWARE': 'DE', 'FLORIDA': 'FL', 'GEORGIA': 'GA',
+    'HAWAII': 'HI', 'IDAHO': 'ID', 'ILLINOIS': 'IL', 'INDIANA': 'IN', 'IOWA': 'IA',
+    'KANSAS': 'KS', 'KENTUCKY': 'KY', 'LOUISIANA': 'LA', 'MAINE': 'ME', 'MARYLAND': 'MD',
+    'MASSACHUSETTS': 'MA', 'MICHIGAN': 'MI', 'MINNESOTA': 'MN', 'MISSISSIPPI': 'MS', 'MISSOURI': 'MO',
+    'MONTANA': 'MT', 'NEBRASKA': 'NE', 'NEVADA': 'NV', 'NEW HAMPSHIRE': 'NH', 'NEW JERSEY': 'NJ',
+    'NEW MEXICO': 'NM', 'NEW YORK': 'NY', 'NORTH CAROLINA': 'NC', 'NORTH DAKOTA': 'ND', 'OHIO': 'OH',
+    'OKLAHOMA': 'OK', 'OREGON': 'OR', 'PENNSYLVANIA': 'PA', 'RHODE ISLAND': 'RI', 'SOUTH CAROLINA': 'SC',
+    'SOUTH DAKOTA': 'SD', 'TENNESSEE': 'TN', 'TEXAS': 'TX', 'UTAH': 'UT', 'VERMONT': 'VT',
+    'VIRGINIA': 'VA', 'WASHINGTON': 'WA', 'WEST VIRGINIA': 'WV', 'WISCONSIN': 'WI', 'WYOMING': 'WY',
+    'DISTRICT OF COLUMBIA': 'DC', 'D.C.': 'DC', 'DC': 'DC'
+  }
+  
+  return stateMap[stateUpper] || state // Return abbreviation if found, otherwise return original
+}
+
 interface AddressAutocompleteProps {
   value: string
   onChange: (address: string) => void
@@ -129,14 +155,15 @@ export default function AddressAutocomplete({
     
     // Check query patterns
     const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
-    const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].+)$/)
+    // More lenient regex: allow digits followed by space and at least one letter (can be abbreviated like "h", "hy", "hwy")
+    const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].*)$/)
     const isDigitsStreet = digitsStreetMatch !== null
     const hasCoords = Boolean(userLat && userLng)
     
     // Minimum length: 1 for numeric-only, 2 for general text
     const minLength = isNumericOnly ? 1 : 2
     
-    console.log(`[AddressAutocomplete] Query processing: "${trimmedQuery}" (length: ${trimmedQuery.length}, minLength: ${minLength}, isNumericOnly: ${isNumericOnly}, isDigitsStreet: ${isDigitsStreet}, hasCoords: ${hasCoords})`)
+    console.log(`[AddressAutocomplete] Query processing: "${trimmedQuery}" (length: ${trimmedQuery.length}, minLength: ${minLength}, isNumericOnly: ${isNumericOnly}, isDigitsStreet: ${isDigitsStreet}, hasCoords: ${hasCoords}, hasGoogleToken: ${!!googleSessionToken}, digitsStreetMatch: ${!!digitsStreetMatch?.groups})`)
     
     if (!trimmedQuery || trimmedQuery.length < minLength) {
       console.log(`[AddressAutocomplete] Query too short: "${trimmedQuery}" (length: ${trimmedQuery.length} < ${minLength})`)
@@ -184,8 +211,81 @@ export default function AddressAutocomplete({
             setShowFallbackMessage(false)
             setIsLoading(false)
           } else {
-            // Google returned empty → fallback to OSM
+            // Google returned empty → check if digits+street and use Overpass, otherwise fallback to Nominatim
             setShowGoogleAttribution(false)
+            
+            // Check if this is a digits+street query and use Overpass
+            const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].*)$/)
+            if (digitsStreetMatch?.groups && hasCoords) {
+              console.log('[AddressAutocomplete] Google empty, trying Overpass (digits+street)', { q: trimmedQuery, userLat, userLng })
+              return fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
+                .then((response) => {
+                  if (requestIdRef.current !== currentId) return
+                  
+                  if (response.ok && response.data && response.data.length > 0) {
+                    const unique: AddressSuggestion[] = []
+                    const seen = new Set<string>()
+                    for (const s of response.data) {
+                      const key = s.id
+                      if (!seen.has(key)) {
+                        seen.add(key)
+                        unique.push(s)
+                      }
+                    }
+                    setSuggestions(unique)
+                    setIsOpen(unique.length > 0)
+                    setSelectedIndex(-1)
+                    setShowFallbackMessage(unique.length > 0)
+                    setIsLoading(false)
+                    return
+                  }
+                  
+                  // Overpass failed, fallback to Nominatim
+                  console.warn(`[AddressAutocomplete] Overpass failed/empty after Google, falling back to Nominatim for "${trimmedQuery}"`)
+                  return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+                    .then((results) => {
+                      if (requestIdRef.current !== currentId) return
+                      const unique: AddressSuggestion[] = []
+                      const seen = new Set<string>()
+                      for (const s of results) {
+                        const key = s.id
+                        if (!seen.has(key)) {
+                          seen.add(key)
+                          unique.push(s)
+                        }
+                      }
+                      setSuggestions(unique)
+                      setIsOpen(unique.length > 0)
+                      setSelectedIndex(-1)
+                      setShowFallbackMessage(unique.length > 0)
+                    })
+                    .finally(() => setIsLoading(false))
+                })
+                .catch(() => {
+                  // Overpass error, fallback to Nominatim
+                  if (requestIdRef.current !== currentId) return
+                  return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+                    .then((results) => {
+                      if (requestIdRef.current !== currentId) return
+                      const unique: AddressSuggestion[] = []
+                      const seen = new Set<string>()
+                      for (const s of results) {
+                        const key = s.id
+                        if (!seen.has(key)) {
+                          seen.add(key)
+                          unique.push(s)
+                        }
+                      }
+                      setSuggestions(unique)
+                      setIsOpen(unique.length > 0)
+                      setSelectedIndex(-1)
+                      setShowFallbackMessage(unique.length > 0)
+                    })
+                    .finally(() => setIsLoading(false))
+                })
+            }
+            
+            // Not digits+street, use Nominatim
             return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
               .then((results) => {
                 if (requestIdRef.current !== currentId) return
@@ -207,9 +307,83 @@ export default function AddressAutocomplete({
           }
         })
         .catch(() => {
-          // Google error → fallback
+          // Google error → check if digits+street and use Overpass, otherwise fallback to Nominatim
           if (requestIdRef.current !== currentId) return
           setShowGoogleAttribution(false)
+          
+          // Check if this is a digits+street query and use Overpass
+          const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].*)$/)
+          if (digitsStreetMatch?.groups && hasCoords) {
+            console.log('[AddressAutocomplete] Google error, trying Overpass (digits+street)', { q: trimmedQuery, userLat, userLng })
+            fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
+              .then((response) => {
+                if (requestIdRef.current !== currentId) return
+                
+                if (response.ok && response.data && response.data.length > 0) {
+                  const unique: AddressSuggestion[] = []
+                  const seen = new Set<string>()
+                  for (const s of response.data) {
+                    const key = s.id
+                    if (!seen.has(key)) {
+                      seen.add(key)
+                      unique.push(s)
+                    }
+                  }
+                  setSuggestions(unique)
+                  setIsOpen(unique.length > 0)
+                  setSelectedIndex(-1)
+                  setShowFallbackMessage(unique.length > 0)
+                  setIsLoading(false)
+                  return
+                }
+                
+                // Overpass failed, fallback to Nominatim
+                console.warn(`[AddressAutocomplete] Overpass failed/empty after Google error, falling back to Nominatim for "${trimmedQuery}"`)
+                return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+                  .then((results) => {
+                    if (requestIdRef.current !== currentId) return
+                    const unique: AddressSuggestion[] = []
+                    const seen = new Set<string>()
+                    for (const s of results) {
+                      const key = s.id
+                      if (!seen.has(key)) {
+                        seen.add(key)
+                        unique.push(s)
+                      }
+                    }
+                    setSuggestions(unique)
+                    setIsOpen(unique.length > 0)
+                    setSelectedIndex(-1)
+                    setShowFallbackMessage(unique.length > 0)
+                  })
+                  .finally(() => setIsLoading(false))
+              })
+              .catch(() => {
+                // Overpass error, fallback to Nominatim
+                if (requestIdRef.current !== currentId) return
+                fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+                  .then((results) => {
+                    if (requestIdRef.current !== currentId) return
+                    const unique: AddressSuggestion[] = []
+                    const seen = new Set<string>()
+                    for (const s of results) {
+                      const key = s.id
+                      if (!seen.has(key)) {
+                        seen.add(key)
+                        unique.push(s)
+                      }
+                    }
+                    setSuggestions(unique)
+                    setIsOpen(unique.length > 0)
+                    setSelectedIndex(-1)
+                    setShowFallbackMessage(unique.length > 0)
+                  })
+                  .finally(() => setIsLoading(false))
+              })
+            return
+          }
+          
+          // Not digits+street, use Nominatim
           fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
             .then((results) => {
               if (requestIdRef.current !== currentId) return
@@ -234,9 +408,7 @@ export default function AddressAutocomplete({
 
     // For digits+street queries with coords, try Overpass first
     if (isDigitsStreet && hasCoords && digitsStreetMatch?.groups) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[AddressAutocomplete] Fetching Overpass addresses (digits+street)', { q: trimmedQuery, userLat, userLng })
-      }
+      console.log('[AddressAutocomplete] Fetching Overpass addresses (digits+street)', { q: trimmedQuery, userLat, userLng, hasGroups: !!digitsStreetMatch?.groups })
       
       fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
         .then((response) => {
@@ -373,16 +545,22 @@ export default function AddressAutocomplete({
                 // Sort by distance (closest first)
                 filteredWithDistances.sort((a, b) => a.distanceM - b.distanceM)
                 
-                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} total, ${filteredUnique.length} after filtering`)
-                if (filteredWithDistances.length > 0) {
-                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${filteredWithDistances[0].suggestion.label}" - Distance: ${filteredWithDistances[0].distanceKm} km (${Math.round(filteredWithDistances[0].distanceM)} m)`)
-                  if (filteredWithDistances.length > 1) {
-                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${filteredWithDistances[1].suggestion.label}" - Distance: ${filteredWithDistances[1].distanceKm} km (${Math.round(filteredWithDistances[1].distanceM)} m)`)
+                // Filter by maximum distance (50km) to avoid showing results thousands of km away
+                const MAX_DISTANCE_M = 50 * 1000 // 50km
+                const withinDistance = filteredWithDistances.filter(item => item.distanceM <= MAX_DISTANCE_M)
+                
+                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} total, ${filteredUnique.length} after filtering, ${withinDistance.length} within 50km`)
+                if (withinDistance.length > 0) {
+                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${withinDistance[0].suggestion.label}" - Distance: ${withinDistance[0].distanceKm} km (${Math.round(withinDistance[0].distanceM)} m)`)
+                  if (withinDistance.length > 1) {
+                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${withinDistance[1].suggestion.label}" - Distance: ${withinDistance[1].distanceKm} km (${Math.round(withinDistance[1].distanceM)} m)`)
                   }
+                } else if (filteredWithDistances.length > 0) {
+                  console.warn(`[AddressAutocomplete] All Nominatim results are >50km away. Closest: "${filteredWithDistances[0].suggestion.label}" at ${filteredWithDistances[0].distanceKm} km`)
                 }
                 
-                // Extract sorted suggestions
-                const sortedUnique = filteredWithDistances.map(item => item.suggestion)
+                // Extract sorted suggestions (only within distance)
+                const sortedUnique = withinDistance.map(item => item.suggestion)
                 
                 setSuggestions(sortedUnique)
                 setIsOpen(sortedUnique.length > 0)
@@ -791,7 +969,8 @@ export default function AddressAutocomplete({
       // Extract address components from normalized suggestion
       const addressLine1 = final.address?.line1 || final.address?.road || ''
       const city = final.address?.city || ''
-      const state = final.address?.state || ''
+      const stateRaw = final.address?.state || ''
+      const state = normalizeState(stateRaw) // Convert state name to abbreviation if needed
       const zip = final.address?.zip || final.address?.postcode || ''
       const _country = final.address?.country || 'US' // Extracted but not currently used in callback
       
@@ -926,8 +1105,12 @@ export default function AddressAutocomplete({
         try {
           const result = await geocodeAddress(value)
           if (result) {
+            // Parse formatted_address to extract street address (first part before comma)
+            // Don't use the full formatted_address for the address field
+            const streetAddress = result.formatted_address?.split(',')[0]?.trim() || result.formatted_address || ''
+            
             onPlaceSelected({
-              address: result.formatted_address,
+              address: streetAddress, // Use parsed street address, not full formatted address
               city: result.city || '',
               state: result.state || '',
               zip: result.zip || '',

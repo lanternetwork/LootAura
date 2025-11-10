@@ -5,9 +5,8 @@ import { ProfileSummaryCard } from '@/components/dashboard/ProfileSummaryCard'
 import DraftsPanel from '@/components/dashboard/DraftsPanel'
 import SalesPanel from '@/components/dashboard/SalesPanel'
 import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
-import { PreferencesCard } from '@/components/dashboard/PreferencesCard'
 import type { DraftListing } from '@/lib/data/salesAccess'
-import type { ProfileData, Metrics7d, UserPreferences } from '@/lib/data/profileAccess'
+import type { ProfileData, Metrics7d } from '@/lib/data/profileAccess'
 import { Sale } from '@/lib/types'
 import { FaPlus } from 'react-icons/fa'
 import Link from 'next/link'
@@ -17,7 +16,6 @@ interface DashboardClientProps {
   initialDrafts?: DraftListing[]
   initialProfile?: ProfileData | null
   initialMetrics?: Metrics7d | null
-  initialPreferences?: UserPreferences
 }
 
 export default function DashboardClient({
@@ -25,7 +23,6 @@ export default function DashboardClient({
   initialDrafts = [],
   initialProfile,
   initialMetrics,
-  initialPreferences,
 }: DashboardClientProps) {
   const [sales, setSales] = useState<Sale[]>(initialSales)
   const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
@@ -83,37 +80,6 @@ export default function DashboardClient({
     }
   }
 
-  const handlePreferencesSave = async (prefs: UserPreferences) => {
-    // Save preferences
-    const prefsRes = await fetch('/api/preferences', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ theme: prefs.theme, units: prefs.units }),
-    })
-    if (!prefsRes.ok) {
-      const j = await prefsRes.json().catch(() => ({}))
-      throw new Error(j?.error || 'Failed to save preferences')
-    }
-
-    // Save seller settings (radius and email opt-in)
-    const settingsRes = await fetch('/api/seller-settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email_opt_in: prefs.email_opt_in,
-        default_radius_km: prefs.default_radius_km,
-      }),
-    })
-    if (!settingsRes.ok) {
-      const j = await settingsRes.json().catch(() => ({}))
-      throw new Error(j?.error || 'Failed to save settings')
-    }
-
-    // Emit revalidation event
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('profile:mutated'))
-    }
-  }
 
   // If no sales from server, fetch from API (fallback)
   useEffect(() => {
@@ -171,14 +137,8 @@ export default function DashboardClient({
           }}
         />
 
-        {/* Row 4: Analytics + Preferences */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <AnalyticsPanel metrics7d={initialMetrics || null} />
-          <PreferencesCard
-            preferences={initialPreferences || { theme: 'system', units: 'imperial', default_radius_km: 10, email_opt_in: false }}
-            onSave={handlePreferencesSave}
-          />
-        </div>
+        {/* Row 4: Analytics */}
+        <AnalyticsPanel metrics7d={initialMetrics || null} />
       </div>
     </div>
   )

@@ -34,6 +34,24 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseWriteClient: () => mockSupabaseClient,
 }))
 
+// Mock schema-scoped clients - use same mock since tests don't need RLS bypass
+vi.mock('@/lib/supabase/clients', () => ({
+  getRlsDb: () => mockSupabaseClient,
+  getAdminDb: () => mockSupabaseClient,
+  fromBase: (db: any, table: string) => {
+    // fromBase() receives a schema-scoped client, so just use .from() directly
+    if (table.includes('.')) {
+      throw new Error(`Do not qualify table names: received "${table}"`)
+    }
+    return db.from(table)
+  },
+}))
+
+// Mock admin client - use same mock since tests don't need RLS bypass
+vi.mock('@/lib/supabase/admin', () => ({
+  adminSupabase: mockSupabaseClient,
+}))
+
 // Mock rate limiting
 vi.mock('@/lib/rateLimit/withRateLimit', () => ({
 	withRateLimit: (handler: any) => handler
@@ -110,9 +128,10 @@ describe('Sales API - Image Support', () => {
 
 		expect(response.status).toBe(200)
 		expect(data.ok).toBe(true)
+		expect(data.saleId).toBe('test-sale-id')
 		expect(mockIsAllowedImageUrl).toHaveBeenCalledWith('https://res.cloudinary.com/test/image/upload/v123/cover.jpg')
-		// Assert persisted cover_image_url reflected in response payload
-		expect(data.sale?.cover_image_url).toBe('https://res.cloudinary.com/test/image/upload/v123/cover.jpg')
+		// Assert persisted cover_image_url was included in the insert payload
+		expect(lastInsertedPayload?.cover_image_url).toBe('https://res.cloudinary.com/test/image/upload/v123/cover.jpg')
 	})
 
 	it('should accept and validate images array', async () => {

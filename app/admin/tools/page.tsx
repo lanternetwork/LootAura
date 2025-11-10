@@ -18,6 +18,8 @@ import CloudinaryDiagnostics from '@/components/admin/CloudinaryDiagnostics'
 import ImageStatsView from '@/components/admin/ImageStatsView'
 import ZipCodeImport from '@/components/admin/ZipCodeImport'
 import GeolocationDiagnostics from '@/components/admin/GeolocationDiagnostics'
+import DraftSalesDiagnostics from '@/components/admin/DraftSalesDiagnostics'
+import OSMAttributionDiagnostics from '@/components/admin/OSMAttributionDiagnostics'
 import { useState, useRef } from 'react'
 // MapRef is a namespace in react-map-gl v7, not a type
 
@@ -59,6 +61,9 @@ export default function AdminToolsPage() {
 
           {/* Geolocation Diagnostics */}
           <GeolocationDiagnostics />
+
+          {/* Draft & Sales Diagnostics */}
+          <DraftSalesDiagnostics />
 
           {/* Cloudinary Diagnostics */}
           <CloudinaryDiagnostics />
@@ -184,6 +189,9 @@ export default function AdminToolsPage() {
 
           {/* Map Pins Diagnostics */}
           <MapPinsDiagnostics mapRef={diagMapRef} />
+
+          {/* OSM Attribution Diagnostics */}
+          <OSMAttributionDiagnostics />
 
           {/* Diagnostic Tools Validator */}
           <DiagnosticToolsValidator />

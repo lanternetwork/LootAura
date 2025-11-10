@@ -194,7 +194,7 @@ describe('Suggest Route Integration', () => {
     expect(mockFetch).toHaveBeenCalled()
     const call = mockFetch.mock.calls[0]
     expect(String(call[0])).toContain('nominatim.openstreetmap.org')
-    expect(call[1]?.headers?.['User-Agent'] || call[1]?.headers?.get?.('User-Agent')).toBe('LootAura/1.0 (test@example.com)')
+    expect(call[1]?.headers?.['User-Agent'] || call[1]?.headers?.get?.('User-Agent')).toBe('LootAura/1.0 (contact: test@example.com)')
   })
 })
 

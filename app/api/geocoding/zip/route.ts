@@ -3,7 +3,6 @@ import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 // Simple per-process cache for ZIP lookups (60s TTL)
 const zipCache = new Map<string, { data: any; expires: number }>()
@@ -130,15 +129,15 @@ async function zipHandler(request: NextRequest) {
       })
     }
     
-    const supabase = createSupabaseServerClient()
-    
     // 1. Try local lookup first (exact TEXT match)
     console.log('[ZIP] source=local', {
       input: escapeForLogging(rawZip),
       normalized: escapeForLogging(normalizedZip)
     })
-    const { data: localData, error: localError } = await supabase
-      .from('lootaura_v2.zipcodes')
+    // Read from base table via schema-scoped client
+    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+    const db = getRlsDb()
+    const { data: localData, error: localError } = await fromBase(db, 'zipcodes')
       .select('zip, lat, lng, city, state')
       .eq('zip', normalizedZip) // TEXT comparison, no parseInt
       .single()
@@ -308,8 +307,10 @@ async function zipHandler(request: NextRequest) {
         const enableWriteback = process.env.ENABLE_ZIP_WRITEBACK === 'true'
         if (enableWriteback) {
           try {
-            await supabase
-              .from('lootaura_v2.zipcodes')
+            // Write to base table via schema-scoped client
+            const { getAdminDb, fromBase } = await import('@/lib/supabase/clients')
+            const admin = getAdminDb()
+            await fromBase(admin, 'zipcodes')
               .upsert({
                 zip: normalizedZip, // Use normalized ZIP for storage
                 lat,

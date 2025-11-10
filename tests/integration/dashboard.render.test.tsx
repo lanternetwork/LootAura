@@ -62,12 +62,6 @@ vi.mock('@/lib/data/profileAccess', () => ({
     ctr7d: 0,
     salesFulfilled: 0,
   })),
-  getUserPreferences: vi.fn(() => Promise.resolve({
-    theme: 'system',
-    units: 'imperial',
-    default_radius_km: 10,
-    email_opt_in: false,
-  })),
 }))
 
 describe('Dashboard Client', () => {
@@ -105,13 +99,6 @@ describe('Dashboard Client', () => {
     salesFulfilled: 0,
   }
 
-  const mockPreferences = {
-    theme: 'system',
-    units: 'imperial',
-    default_radius_km: 10,
-    email_opt_in: false,
-  }
-
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -138,7 +125,6 @@ describe('Dashboard Client', () => {
         initialDrafts={mockDrafts}
         initialProfile={mockProfile}
         initialMetrics={mockMetrics}
-        initialPreferences={mockPreferences}
       />
     )
     
@@ -154,7 +140,6 @@ describe('Dashboard Client', () => {
         initialDrafts={mockDrafts}
         initialProfile={mockProfile}
         initialMetrics={mockMetrics}
-        initialPreferences={mockPreferences}
       />
     )
     
@@ -170,7 +155,6 @@ describe('Dashboard Client', () => {
         initialDrafts={mockDrafts}
         initialProfile={mockProfile}
         initialMetrics={mockMetrics}
-        initialPreferences={mockPreferences}
       />
     )
     
@@ -186,27 +170,11 @@ describe('Dashboard Client', () => {
         initialDrafts={mockDrafts}
         initialProfile={mockProfile}
         initialMetrics={mockMetrics}
-        initialPreferences={mockPreferences}
       />
     )
     
     // Check for analytics panel
     expect(container.textContent).toContain('Analytics')
-  })
-
-  it('should render PreferencesCard', () => {
-    const { container } = renderWithQueryClient(
-      <DashboardClient
-        initialSales={mockSales}
-        initialDrafts={mockDrafts}
-        initialProfile={mockProfile}
-        initialMetrics={mockMetrics}
-        initialPreferences={mockPreferences}
-      />
-    )
-    
-    // Check for preferences card
-    expect(container.textContent).toContain('Preferences')
   })
 })
 

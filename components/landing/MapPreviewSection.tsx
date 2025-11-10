@@ -232,6 +232,7 @@ export function MapPreviewSection() {
                       hybridPins={hybridPins}
                       onViewportChange={() => {}} // Disabled - no viewport changes
                       interactive={false} // Disable all map interactions
+                      attributionPosition="top-right"
                     />
                   </div>
                   

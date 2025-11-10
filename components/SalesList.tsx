@@ -28,7 +28,12 @@ export default function SalesList({ sales, mode, viewport }: SalesListProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-4 md:grid md:grid-cols-2 lg:grid-cols-3" data-testid="sales-list" data-debug={`mode:${mode}|items:${sales.length}`}>
+    <div 
+      className="flex flex-col gap-3 sm:gap-4 md:grid md:grid-cols-2 lg:grid-cols-3" 
+      data-testid="sales-list" 
+      data-debug={`mode:${mode}|items:${sales.length}`}
+      style={{ width: '100%' }}
+    >
       {sales.map(sale => (
         <SaleCard key={sale.id} sale={sale} viewport={viewport} />
       ))}

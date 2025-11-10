@@ -527,14 +527,31 @@ export default function SalesClient({
   }, [])
 
   // Distance to zoom level mapping (miles to zoom level)
+  // Zoom levels approximate: 8=~100mi, 9=~50mi, 10=~25mi, 11=~12mi, 12=~6mi, 13=~3mi, 14=~1.5mi, 15=~0.75mi
   const distanceToZoom = (distance: number): number => {
-    switch (distance) {
-      case 2: return 14  // Very close - high zoom
-      case 5: return 12  // Close - medium-high zoom
-      case 10: return 10 // Medium - medium zoom
-      case 25: return 8  // Far - low zoom
-      default: return 10 // Default to medium zoom
-    }
+    if (distance <= 1) return 15  // Very close - high zoom
+    if (distance <= 2) return 14  // Close - high zoom
+    if (distance <= 5) return 13  // Medium-close - medium-high zoom
+    if (distance <= 10) return 12 // Medium - medium zoom
+    if (distance <= 15) return 11 // Medium-far - medium-low zoom
+    if (distance <= 25) return 10 // Far - low zoom
+    if (distance <= 50) return 9  // Very far - very low zoom
+    if (distance <= 75) return 8  // Extremely far - extremely low zoom
+    return 8 // Default for 100+ miles
+  }
+
+  // Inverse function: zoom level to distance (miles)
+  // This ensures the distance dropdown matches the actual zoom level on first load
+  const zoomToDistance = (zoom: number): number => {
+    if (zoom >= 15) return 1
+    if (zoom >= 14) return 2
+    if (zoom >= 13) return 5
+    if (zoom >= 12) return 10
+    if (zoom >= 11) return 15
+    if (zoom >= 10) return 25
+    if (zoom >= 9) return 50
+    if (zoom >= 8) return 75
+    return 100 // Default for zoom < 8
   }
 
   // Handle filter changes
@@ -584,6 +601,32 @@ export default function SalesClient({
   }
 
   // Initial fetch will be triggered by map onLoad event with proper bounds
+
+  // Sync distance filter with initial zoom level on first load
+  // This ensures the distance dropdown shows the correct value matching the actual zoom level
+  useEffect(() => {
+    if (!mapView) return // Wait for map view to be initialized
+    
+    // Get the initial zoom level (from URL or default)
+    const initialZoom = mapView.zoom
+    
+    // Calculate the distance that corresponds to this zoom level
+    const correspondingDistance = zoomToDistance(initialZoom)
+    
+    // Only update if the current distance doesn't match the zoom level
+    // This prevents unnecessary updates if the distance was already set from URL params
+    if (filters.distance !== correspondingDistance) {
+      // Check if distance was explicitly set in URL params
+      const urlDistance = searchParams.get('dist')
+      if (!urlDistance) {
+        // No distance in URL, so sync with zoom level
+        updateFilters({ distance: correspondingDistance }, true) // skipUrlUpdate to prevent URL change
+        console.log('[DISTANCE] Synced distance filter with initial zoom:', { zoom: initialZoom, distance: correspondingDistance })
+      }
+    }
+  // Only run once on mount when mapView is initialized
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapView?.zoom])
 
   // Restore ZIP from URL on page load only (not on every URL change)
   // Skip if initialCenter already matches ZIP (server-side lookup succeeded)
@@ -830,7 +873,7 @@ export default function SalesClient({
           style={{ 
             height: isMobile 
               ? `calc(100vh - ${FILTERS_HEIGHT}px)` 
-              : '100%' 
+              : '100%'
           }}
         >
           <div className="w-full h-full">
@@ -857,13 +900,16 @@ export default function SalesClient({
                   viewport: currentViewport!
                 }}
                 onViewportChange={handleViewportChange}
+                attributionPosition="top-right"
+                showOSMAttribution={true}
+                attributionControl={false}
               />
             ) : null}
           </div>
         </div>
 
         {/* Sales List - Below map on mobile, Right panel on desktop */}
-        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 min-w-0 h-full overflow-y-auto">
+        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto" style={{ width: '628px', minWidth: '628px' }}>
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
@@ -885,7 +931,7 @@ export default function SalesClient({
                 </div>
                 </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4" style={{ width: '100%' }}>
             {loading && (
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (

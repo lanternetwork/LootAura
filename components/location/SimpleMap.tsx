@@ -386,13 +386,17 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       )}
       
       {/* OSM Attribution */}
-      <div className={`absolute ${osmAttributionPosition === 'top' ? 'top-2' : 'bottom-2'} right-2 z-[100] pointer-events-none`}>
-        <OSMAttribution 
-          showGeocoding={false} 
-          className={`${osmAttributionPosition === 'top' 
-            ? 'bg-white bg-opacity-90 px-1 py-0.5 rounded text-[0.375rem] leading-tight shadow-sm text-gray-600' 
-            : 'bg-white bg-opacity-95 px-2 py-1 rounded shadow-md text-xs text-gray-700'}`} 
-        />
+      <div className={`absolute ${osmAttributionPosition === 'top' ? 'top-2' : 'bottom-2'} right-2 z-[9999] pointer-events-none`} style={{ position: 'absolute' }}>
+        <div className={`${osmAttributionPosition === 'top' 
+          ? 'bg-white bg-opacity-90 px-1 py-0.5 rounded text-[0.375rem] leading-tight shadow-sm' 
+          : 'bg-white px-2 py-1 rounded shadow-lg'}`}>
+          <OSMAttribution 
+            showGeocoding={false} 
+            className={`${osmAttributionPosition === 'top' 
+              ? 'text-gray-600' 
+              : 'text-gray-800 text-xs'}`} 
+          />
+        </div>
       </div>
     </div>
   )

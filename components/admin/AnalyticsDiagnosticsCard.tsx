@@ -53,13 +53,26 @@ export default function AnalyticsDiagnosticsCard() {
     try {
       const response = await fetch(`/api/admin/analytics/summary?days=${days}`)
       if (!response.ok) {
-        throw new Error('Failed to fetch analytics summary')
+        let errorMessage = 'Failed to fetch analytics summary'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorMessage
+        } catch {
+          // If response is not JSON, use status text
+          errorMessage = response.status === 403 
+            ? 'Forbidden: Admin access required' 
+            : response.status === 401
+            ? 'Unauthorized: Please sign in'
+            : `Failed to fetch analytics summary (${response.status})`
+        }
+        throw new Error(errorMessage)
       }
       const data = await response.json()
       setSummary(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-      toast.error('Failed to load analytics summary')
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }

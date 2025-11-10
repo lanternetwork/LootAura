@@ -51,7 +51,7 @@ export default function AnalyticsDiagnosticsCard() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`/api/admin/analytics/summary?days=${days}`)
+      const response = await fetch(`/api/admin/analytics/summary?days=${days}&includeTest=true`)
       if (!response.ok) {
         let errorMessage = 'Failed to fetch analytics summary'
         try {

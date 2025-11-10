@@ -102,14 +102,22 @@ export async function getUserMetrics7d(
     from.setDate(from.getDate() - 7)
 
     // Query analytics events from the view (which reads from base table)
-    const { data: events, error: eventsError } = await supabase
+    // Include test events in debug mode for testing purposes
+    const includeTestEvents = process.env.NEXT_PUBLIC_DEBUG === 'true'
+    let eventsQuery = supabase
       .from('analytics_events_v2')
       .select('event_type, ts')
       .eq('owner_id', userId)
-      .eq('is_test', false)
       .gte('ts', from.toISOString())
       .lte('ts', to.toISOString())
       .order('ts', { ascending: true })
+    
+    // Filter out test events unless in debug mode
+    if (!includeTestEvents) {
+      eventsQuery = eventsQuery.eq('is_test', false)
+    }
+    
+    const { data: events, error: eventsError } = await eventsQuery
 
     // If table doesn't exist or query fails, return defaults
     if (eventsError) {

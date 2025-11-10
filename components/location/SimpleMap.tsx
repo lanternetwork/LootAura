@@ -29,6 +29,7 @@ interface SimpleMapProps {
   interactive?: boolean // Disable all map interactions when false
   attributionPosition?: 'top-right' | 'bottom-right' | 'top-left' | 'bottom-left' // Position of OSM attribution overlay
   showOSMAttribution?: boolean // Show OSM attribution overlay
+  attributionControl?: boolean // Show Mapbox attribution control (default: true)
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -46,7 +47,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   transitionMessage = "Loading...",
   interactive = true,
   attributionPosition = 'bottom-right',
-  showOSMAttribution = true
+  showOSMAttribution = true,
+  attributionControl = true
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -296,7 +298,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         touchZoom={interactive}
         touchRotate={interactive}
         keyboard={interactive}
-        attributionControl={true}
+        attributionControl={attributionControl}
       >
         {/* Custom pin rendering - no Mapbox Markers */}
         {hybridPins ? (

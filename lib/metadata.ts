@@ -104,7 +104,12 @@ export function createSaleMetadata(sale: Sale): Metadata {
   
   // Get cover image
   const cover = getSaleCoverUrl(sale)
-  const image = cover?.url || `${baseUrl}/og-sale.jpg`
+  let image = cover?.url || `${baseUrl}/og-sale.jpg`
+  
+  // Ensure image URL is absolute
+  if (image && !image.startsWith('http://') && !image.startsWith('https://')) {
+    image = image.startsWith('/') ? `${baseUrl}${image}` : `${baseUrl}/${image}`
+  }
   
   // Build canonical URL (without UTM params)
   const path = `/sales/${sale.id}`
@@ -113,10 +118,19 @@ export function createSaleMetadata(sale: Sale): Metadata {
   // Truncate title for metadata (max 60 chars)
   const metaTitle = title.length > 60 ? title.substring(0, 57) + '...' : title
 
+  // Safely construct metadataBase
+  let metadataBaseUrl: URL | undefined
+  try {
+    metadataBaseUrl = new URL(baseUrl)
+  } catch (error) {
+    // If baseUrl is invalid, don't set metadataBase
+    console.warn('[METADATA] Invalid baseUrl for metadataBase:', baseUrl)
+  }
+
   return {
     title: `${metaTitle} | ${siteName}`,
     description,
-    metadataBase: new URL(baseUrl),
+    ...(metadataBaseUrl && { metadataBase: metadataBaseUrl }),
     openGraph: {
       type: 'website',
       title: metaTitle,

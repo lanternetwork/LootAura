@@ -264,7 +264,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   }, [loaded])
 
   return (
-    <div ref={containerRef} className="relative min-h-0 min-w-0 w-full h-full">
+    <div ref={containerRef} className="relative min-h-0 min-w-0 w-full h-full" style={{ overflow: 'visible' }}>
       <Map
         ref={mapRef}
         mapboxAccessToken={token}
@@ -386,18 +386,36 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       )}
       
       {/* OSM Attribution */}
-      <div className={`absolute ${osmAttributionPosition === 'top' ? 'top-2' : 'bottom-2'} right-2 z-[9999] pointer-events-none`} style={{ position: 'absolute' }}>
-        <div className={`${osmAttributionPosition === 'top' 
-          ? 'bg-white bg-opacity-90 px-1 py-0.5 rounded text-[0.375rem] leading-tight shadow-sm' 
-          : 'bg-white px-2 py-1 rounded shadow-lg'}`}>
-          <OSMAttribution 
-            showGeocoding={false} 
-            className={`${osmAttributionPosition === 'top' 
-              ? 'text-gray-600' 
-              : 'text-gray-800 text-xs'}`} 
-          />
+      {osmAttributionPosition === 'bottom' ? (
+        <div className="absolute bottom-2 right-2 z-[9999] pointer-events-none" style={{ position: 'absolute' }}>
+          <div className="bg-white px-2 py-1 rounded shadow-lg border border-gray-200">
+            <div className="text-xs text-gray-800" role="contentinfo">
+              <span>
+                ©{' '}
+                <a
+                  href="https://www.openstreetmap.org/copyright"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-gray-900 text-gray-800"
+                  aria-label="OpenStreetMap copyright information"
+                >
+                  OpenStreetMap
+                </a>{' '}
+                contributors
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="absolute top-2 right-2 z-[9999] pointer-events-none" style={{ position: 'absolute' }}>
+          <div className="bg-white bg-opacity-90 px-1 py-0.5 rounded text-[0.375rem] leading-tight shadow-sm">
+            <OSMAttribution 
+              showGeocoding={false} 
+              className="text-gray-600" 
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 })

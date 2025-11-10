@@ -7,7 +7,7 @@ import { Sale } from "@/lib/types"
 import { PinsProps, HybridPinsProps } from "@/lib/pins/types"
 import PinsOverlay from "./PinsOverlay"
 import HybridPinsOverlay from "./HybridPinsOverlay"
-import OSMAttribution from "./OSMAttribution"
+import AttributionOSM from "./AttributionOSM"
 
 interface SimpleMapProps {
   center: { lat: number; lng: number }
@@ -27,7 +27,8 @@ interface SimpleMapProps {
   isTransitioning?: boolean
   transitionMessage?: string
   interactive?: boolean // Disable all map interactions when false
-  osmAttributionPosition?: 'top' | 'bottom' // Position of OSM attribution overlay
+  attributionPosition?: 'top-right' | 'bottom-right' | 'top-left' | 'bottom-left' // Position of OSM attribution overlay
+  showOSMAttribution?: boolean // Show OSM attribution overlay
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -44,7 +45,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   isTransitioning = false,
   transitionMessage = "Loading...",
   interactive = true,
-  osmAttributionPosition = 'top'
+  attributionPosition = 'bottom-right',
+  showOSMAttribution = true
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -294,7 +296,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         touchZoom={interactive}
         touchRotate={interactive}
         keyboard={interactive}
-        attributionControl={false}
+        attributionControl={true}
       >
         {/* Custom pin rendering - no Mapbox Markers */}
         {hybridPins ? (
@@ -386,35 +388,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       )}
       
       {/* OSM Attribution */}
-      {osmAttributionPosition === 'bottom' ? (
-        <div className="absolute bottom-2 right-2 z-[9999] pointer-events-none" style={{ position: 'absolute' }}>
-          <div className="bg-white px-2 py-1 rounded shadow-lg border border-gray-200">
-            <div className="text-xs text-gray-800" role="contentinfo">
-              <span>
-                ©{' '}
-                <a
-                  href="https://www.openstreetmap.org/copyright"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-gray-900 text-gray-800"
-                  aria-label="OpenStreetMap copyright information"
-                >
-                  OpenStreetMap
-                </a>{' '}
-                contributors
-              </span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="absolute top-2 right-2 z-[9999] pointer-events-none" style={{ position: 'absolute' }}>
-          <div className="bg-white bg-opacity-90 px-1 py-0.5 rounded text-[0.375rem] leading-tight shadow-sm">
-            <OSMAttribution 
-              showGeocoding={false} 
-              className="text-gray-600" 
-            />
-          </div>
-        </div>
+      {showOSMAttribution && (
+        <AttributionOSM position={attributionPosition} />
       )}
     </div>
   )

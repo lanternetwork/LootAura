@@ -900,7 +900,7 @@ export default function SalesClient({
                   viewport: currentViewport!
                 }}
                 onViewportChange={handleViewportChange}
-                osmAttributionPosition="bottom"
+                attributionPosition="bottom-right"
               />
             ) : null}
           </div>

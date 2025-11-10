@@ -853,11 +853,8 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         sessionStorage.removeItem('draft:returnStep')
         
         // Note: Server-side draft is already marked as 'published' by publishDraftServer
-        // No need to delete it explicitly, but we clear the draft key ref to prevent reuse
+        // Clear the draft key ref to prevent reuse
         draftKeyRef.current = null
-        if (draftKeyRef.current) {
-          // Draft is already marked as published on server
-        }
 
         // Show confirmation modal
         setCreatedSaleId(saleId)

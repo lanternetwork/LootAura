@@ -15,12 +15,6 @@ export default function RateLimitStatus() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Only show in debug mode
-    if (process.env.NEXT_PUBLIC_DEBUG !== 'true') {
-      setLoading(false)
-      return
-    }
-
     // Fetch rate limiting status from performance metrics
     const fetchStatus = async () => {
       try {
@@ -60,14 +54,6 @@ export default function RateLimitStatus() {
 
     fetchStatus()
   }, [])
-
-  if (process.env.NEXT_PUBLIC_DEBUG !== 'true') {
-    return (
-      <div className="text-sm text-gray-500">
-        Rate limiting status only available in debug mode
-      </div>
-    )
-  }
 
   if (loading) {
     return (

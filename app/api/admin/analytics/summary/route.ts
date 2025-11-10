@@ -82,39 +82,67 @@ export async function GET(request: NextRequest) {
     const from = new Date(to)
     from.setDate(from.getDate() - days)
 
-    // Build query
-    let query = fromBase(db, 'analytics_events')
-      .select('event_type, ts')
-      .gte('ts', from.toISOString())
-      .lte('ts', to.toISOString())
-      .order('ts', { ascending: true })
+    // Build query - handle case where table doesn't exist
+    let events: any[] = []
+    let queryError: any = null
 
-    if (ownerId) {
-      query = query.eq('owner_id', ownerId)
-    }
+    try {
+      let query = fromBase(db, 'analytics_events')
+        .select('event_type, ts')
+        .gte('ts', from.toISOString())
+        .lte('ts', to.toISOString())
+        .order('ts', { ascending: true })
 
-    if (saleId) {
-      // Verify sale belongs to owner (or admin override)
-      const { data: sale } = await fromBase(db, 'sales')
-        .select('owner_id')
-        .eq('id', saleId)
-        .single()
-
-      if (sale && sale.owner_id !== ownerId && ownerId !== user.id) {
-        return NextResponse.json({ error: 'Sale does not belong to owner' }, { status: 403 })
+      if (ownerId) {
+        query = query.eq('owner_id', ownerId)
       }
 
-      query = query.eq('sale_id', saleId)
+      if (saleId) {
+        // Verify sale belongs to owner (or admin override)
+        const { data: sale } = await fromBase(db, 'sales')
+          .select('owner_id')
+          .eq('id', saleId)
+          .single()
+
+        if (sale && sale.owner_id !== ownerId && ownerId !== user.id) {
+          return NextResponse.json({ error: 'Sale does not belong to owner' }, { status: 403 })
+        }
+
+        query = query.eq('sale_id', saleId)
+      }
+
+      if (!includeTest) {
+        query = query.eq('is_test', false)
+      }
+
+      const { data, error } = await query
+      
+      if (error) {
+        const errorCode = (error as any)?.code
+        if (errorCode === '42P01' || errorCode === 'PGRST116') {
+          // Table doesn't exist or no rows - return empty results
+          events = []
+        } else {
+          queryError = error
+        }
+      } else {
+        events = data || []
+      }
+    } catch (err) {
+      // Table might not exist or other error - handle gracefully
+      const errorCode = (err as any)?.code
+      if (errorCode === '42P01' || errorCode === 'PGRST116') {
+        // Table doesn't exist or no rows - return empty results
+        events = []
+      } else {
+        console.error('[ANALYTICS_SUMMARY] Error building query:', err)
+        queryError = err
+      }
     }
 
-    if (!includeTest) {
-      query = query.eq('is_test', false)
-    }
-
-    const { data: events, error } = await query
-
-    if (error) {
-      console.error('[ANALYTICS_SUMMARY] Error fetching events:', error)
+    // If there's a non-recoverable error, return 500
+    if (queryError) {
+      console.error('[ANALYTICS_SUMMARY] Error fetching events:', queryError)
       return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 })
     }
 
@@ -130,7 +158,7 @@ export async function GET(request: NextRequest) {
     // Group by date and event type
     const seriesMap = new Map<string, typeof totals>()
 
-    events?.forEach((event: any) => {
+    events.forEach((event: any) => {
       const date = new Date(event.ts).toISOString().split('T')[0]
       const eventType = event.event_type as keyof typeof totals
 

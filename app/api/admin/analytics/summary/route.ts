@@ -84,7 +84,6 @@ export async function GET(request: NextRequest) {
 
     // Build query - handle case where table doesn't exist
     let events: any[] = []
-    let queryError: any = null
 
     try {
       let query = fromBase(db, 'analytics_events')
@@ -118,32 +117,26 @@ export async function GET(request: NextRequest) {
       const { data, error } = await query
       
       if (error) {
+        // Log error but return empty results - table might not exist yet
         const errorCode = (error as any)?.code
-        if (errorCode === '42P01' || errorCode === 'PGRST116') {
-          // Table doesn't exist or no rows - return empty results
-          events = []
-        } else {
-          queryError = error
-        }
+        const errorMessage = (error as any)?.message || 'Unknown error'
+        console.warn('[ANALYTICS_SUMMARY] Query error (returning empty results):', {
+          code: errorCode,
+          message: errorMessage,
+        })
+        events = []
       } else {
         events = data || []
       }
     } catch (err) {
-      // Table might not exist or other error - handle gracefully
+      // Table might not exist or other error - return empty results gracefully
       const errorCode = (err as any)?.code
-      if (errorCode === '42P01' || errorCode === 'PGRST116') {
-        // Table doesn't exist or no rows - return empty results
-        events = []
-      } else {
-        console.error('[ANALYTICS_SUMMARY] Error building query:', err)
-        queryError = err
-      }
-    }
-
-    // If there's a non-recoverable error, return 500
-    if (queryError) {
-      console.error('[ANALYTICS_SUMMARY] Error fetching events:', queryError)
-      return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 })
+      const errorMessage = (err as any)?.message || 'Unknown error'
+      console.warn('[ANALYTICS_SUMMARY] Query exception (returning empty results):', {
+        code: errorCode,
+        message: errorMessage,
+      })
+      events = []
     }
 
     // Aggregate totals

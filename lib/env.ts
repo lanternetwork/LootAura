@@ -73,7 +73,8 @@ export const ENV_PUBLIC = publicSchema.parse({
 let _ENV_SERVER: z.infer<typeof serverSchema> | null = null
 
 function getEnvServer() {
-  if (!_ENV_SERVER) {
+  // In test environment, always re-parse to pick up env changes
+  if (process.env.NODE_ENV === 'test' || !_ENV_SERVER) {
     _ENV_SERVER = serverSchema.parse({
       SUPABASE_SERVICE_ROLE: process.env.SUPABASE_SERVICE_ROLE,
       VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,

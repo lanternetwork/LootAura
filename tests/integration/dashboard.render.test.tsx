@@ -61,6 +61,7 @@ vi.mock('@/lib/data/profileAccess', () => ({
     saves7d: 0,
     ctr7d: 0,
     salesFulfilled: 0,
+    series: [],
   })),
 }))
 
@@ -97,6 +98,7 @@ describe('Dashboard Client', () => {
     saves7d: 0,
     ctr7d: 0,
     salesFulfilled: 0,
+    series: [],
   }
 
   beforeEach(() => {

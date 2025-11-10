@@ -1,7 +1,7 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   const supabase = createSupabaseServerClient()
@@ -10,14 +10,15 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   
   const saleId = params.id
   
-  // Write to base table using schema-scoped client
-  const db = getRlsDb()
-  const { error } = await fromBase(db, 'sales')
+  // Write to base table using admin client (bypasses RLS, but we've already verified auth and ownership)
+  const admin = getAdminDb()
+  const { error } = await fromBase(admin, 'sales')
     .delete()
     .eq('id', saleId)
     .eq('owner_id', user.user.id)
   
   if (error) {
+    console.error('[SALES/DELETE] Error deleting sale:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
   

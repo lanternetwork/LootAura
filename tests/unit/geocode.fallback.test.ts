@@ -82,7 +82,7 @@ describe('Geocoding Fallback', () => {
     // Override the Nominatim handler to capture headers
     server.use(
       http.get('https://nominatim.openstreetmap.org/search', ({ request }) => {
-        capturedHeaders = request.headers
+        capturedHeaders = request.headers as Headers
         const url = new URL(request.url)
         const q = url.searchParams.get('q') || ''
         if (/invalid|fail/i.test(q)) {
@@ -116,8 +116,10 @@ describe('Geocoding Fallback', () => {
 
     // Verify User-Agent header is present
     expect(capturedHeaders).toBeTruthy()
-    expect(capturedHeaders?.get('User-Agent')).toContain('LootAura/1.0')
-    expect(capturedHeaders?.get('User-Agent')).toContain('test@example.com')
+    if (capturedHeaders) {
+      expect(capturedHeaders.get('User-Agent')).toContain('LootAura/1.0')
+      expect(capturedHeaders.get('User-Agent')).toContain('test@example.com')
+    }
   })
 
   it('should cache results to avoid repeated API calls', async () => {

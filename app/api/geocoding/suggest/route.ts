@@ -139,7 +139,7 @@ async function suggestHandler(request: NextRequest) {
     let url = base.toString()
     const response = await fetch(url, {
       headers: {
-        'User-Agent': `LootAura/1.0 (${email})`
+        'User-Agent': `LootAura/1.0 (contact: ${email})`
       }
     })
     
@@ -192,7 +192,7 @@ async function suggestHandler(request: NextRequest) {
         url = fallbackBase.toString()
         const fallbackResponse = await fetch(url, {
           headers: {
-            'User-Agent': `LootAura/1.0 (${email})`
+            'User-Agent': `LootAura/1.0 (contact: ${email})`
           }
         })
         

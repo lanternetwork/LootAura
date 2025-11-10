@@ -116,10 +116,9 @@ describe('Geocoding Fallback', () => {
 
     // Verify User-Agent header is present
     expect(capturedHeaders).toBeTruthy()
-    if (capturedHeaders) {
-      expect(capturedHeaders.get('User-Agent')).toContain('LootAura/1.0')
-      expect(capturedHeaders.get('User-Agent')).toContain('test@example.com')
-    }
+    const headers = capturedHeaders!
+    expect(headers.get('User-Agent')).toContain('LootAura/1.0')
+    expect(headers.get('User-Agent')).toContain('test@example.com')
   })
 
   it('should cache results to avoid repeated API calls', async () => {

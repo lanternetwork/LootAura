@@ -702,6 +702,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
           console.warn('[SELL_WIZARD] Failed to delete server draft:', error)
         })
       }
+      
+      // Clear draft key ref - a new one will be generated when needed
+      // clearLocalDraft() already removed the key from localStorage,
+      // so getDraftKey() will generate a new one on next access
+      draftKeyRef.current = null
 
       // Show confirmation modal
       setCreatedSaleId(saleId)

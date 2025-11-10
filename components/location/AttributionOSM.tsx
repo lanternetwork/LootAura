@@ -141,8 +141,8 @@ export default function AttributionOSM({
         ...(containerRef ? safePosition : {})
       }}
     >
-      <div className="pointer-events-auto bg-white/80 dark:bg-zinc-900/80 rounded px-2 py-1 shadow opacity-80 hover:opacity-100 transition-opacity">
-        <div className="text-[10px] leading-tight text-gray-700 dark:text-gray-300">
+      <div className="pointer-events-auto rounded px-2 py-1">
+        <div className="text-[10px] leading-tight text-gray-500 dark:text-gray-400">
           <span>
             ©{' '}
             <a

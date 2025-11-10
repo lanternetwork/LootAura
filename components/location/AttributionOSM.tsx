@@ -153,8 +153,7 @@ export default function AttributionOSM({
               aria-label="OpenStreetMap copyright information"
             >
               OpenStreetMap
-            </a>{' '}
-            contributors
+            </a>
           </span>
         </div>
       </div>

@@ -15,24 +15,27 @@ interface SimpleLineChartProps {
 }
 
 function SimpleLineChart({ data, color = '#3b82f6', height = 60 }: SimpleLineChartProps) {
-  // Handle empty data
-  if (!data || data.length === 0) {
-    return (
-      <div className="w-full flex items-center justify-center text-neutral-400 text-xs" style={{ height: `${height}px` }}>
-        No data
-      </div>
-    )
-  }
-
-  const maxValue = Math.max(...data, 1)
-  const minValue = Math.min(...data, 0)
-  const range = maxValue - minValue || 1
+  // Calculate values before early return to ensure hooks are always called
+  const maxValue = useMemo(() => {
+    if (!data || data.length === 0) return 1
+    return Math.max(...data, 1)
+  }, [data])
+  
+  const minValue = useMemo(() => {
+    if (!data || data.length === 0) return 0
+    return Math.min(...data, 0)
+  }, [data])
+  
+  const range = useMemo(() => {
+    return maxValue - minValue || 1
+  }, [maxValue, minValue])
 
   const gradientId = useMemo(() => {
     return `gradient-${color.replace('#', '')}`
   }, [color])
 
   const points = useMemo(() => {
+    if (!data || data.length === 0) return ''
     if (data.length === 1) {
       // Single point - draw a horizontal line
       return `0,50 100,50`
@@ -43,6 +46,15 @@ function SimpleLineChart({ data, color = '#3b82f6', height = 60 }: SimpleLineCha
       return `${x},${y}`
     }).join(' ')
   }, [data, minValue, range])
+
+  // Handle empty data after hooks
+  if (!data || data.length === 0) {
+    return (
+      <div className="w-full flex items-center justify-center text-neutral-400 text-xs" style={{ height: `${height}px` }}>
+        No data
+      </div>
+    )
+  }
 
   const pathData = `M ${points}`
 
@@ -137,7 +149,6 @@ export default function AnalyticsPanel({ metrics7d, loading }: AnalyticsPanelPro
   // Extract time series data for each metric
   const viewsData = metrics.series?.map(d => d.views) || []
   const savesData = metrics.series?.map(d => d.saves) || []
-  const clicksData = metrics.series?.map(d => d.clicks) || []
   const ctrData = metrics.series?.map(d => {
     const views = d.views || 0
     const clicks = d.clicks || 0

@@ -76,13 +76,17 @@ describe('Admin Analytics Summary API', () => {
       eq: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: { id: 'sale-1', owner_id: 'admin-user-id' }, error: null }),
     }
-    const mockEventsQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({ data: mockEvents, error: null }),
-    }
+    // Create a Promise-like query object that supports chaining
+    const mockEventsQueryPromise = Promise.resolve({ data: mockEvents, error: null })
+    const mockEventsQuery: any = {}
+    mockEventsQuery.select = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.eq = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.gte = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.lte = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.order = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.then = mockEventsQueryPromise.then.bind(mockEventsQueryPromise)
+    mockEventsQuery.catch = mockEventsQueryPromise.catch.bind(mockEventsQueryPromise)
+    mockEventsQuery.finally = mockEventsQueryPromise.finally.bind(mockEventsQueryPromise)
     vi.mocked(fromBase).mockImplementation((_db: any, table: string) => {
       if (table === 'sales') {
         return mockSalesQuery as any
@@ -138,13 +142,17 @@ describe('Admin Analytics Summary API', () => {
       eq: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: { id: 'sale-1', owner_id: 'admin-user-id' }, error: null }),
     }
-    const mockEventsQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
-    }
+    // Create a Promise-like query object that supports chaining
+    const mockEventsQueryPromise = Promise.resolve({ data: [], error: null })
+    const mockEventsQuery: any = {}
+    mockEventsQuery.select = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.eq = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.gte = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.lte = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.order = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.then = mockEventsQueryPromise.then.bind(mockEventsQueryPromise)
+    mockEventsQuery.catch = mockEventsQueryPromise.catch.bind(mockEventsQueryPromise)
+    mockEventsQuery.finally = mockEventsQueryPromise.finally.bind(mockEventsQueryPromise)
     vi.mocked(fromBase).mockImplementation((_db: any, table: string) => {
       if (table === 'sales') {
         return mockSalesQuery as any
@@ -182,13 +190,17 @@ describe('Admin Analytics Summary API', () => {
       eq: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: { id: 'sale-1', owner_id: 'admin-user-id' }, error: null }),
     }
-    const mockEventsQuery = {
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      gte: vi.fn().mockReturnThis(),
-      lte: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
-    }
+    // Create a Promise-like query object that supports chaining
+    const mockEventsQueryPromise = Promise.resolve({ data: [], error: null })
+    const mockEventsQuery: any = {}
+    mockEventsQuery.select = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.eq = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.gte = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.lte = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.order = vi.fn().mockReturnValue(mockEventsQuery)
+    mockEventsQuery.then = mockEventsQueryPromise.then.bind(mockEventsQueryPromise)
+    mockEventsQuery.catch = mockEventsQueryPromise.catch.bind(mockEventsQueryPromise)
+    mockEventsQuery.finally = mockEventsQueryPromise.finally.bind(mockEventsQueryPromise)
     vi.mocked(fromBase).mockImplementation((_db: any, table: string) => {
       if (table === 'sales') {
         return mockSalesQuery as any

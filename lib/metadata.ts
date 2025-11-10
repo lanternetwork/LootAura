@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import { Sale } from '@/lib/types'
+import { getSaleCoverUrl } from '@/lib/images/cover'
 
 const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app').replace(/\/$/, '')
 const siteName = 'Loot Aura'
@@ -61,18 +62,90 @@ export function createPageMetadata({
 }
 
 export function createSaleMetadata(sale: Sale): Metadata {
-  const title = sale.title
-  const description = sale.description || `Yard sale at ${sale.address || sale.city || 'your area'}. ${sale.date_start ? `Starts ${new Date(sale.date_start).toLocaleDateString()}` : ''}`
-  const image = '/og-sale.jpg' // photos field doesn't exist in new schema
-  const path = `/sale/${sale.id}`
+  const title = sale.title || 'Yard Sale'
+  
+  // Build description with location and date info
+  const locationParts: string[] = []
+  if (sale.city && sale.state) {
+    locationParts.push(`${sale.city}, ${sale.state}`)
+  } else if (sale.city) {
+    locationParts.push(sale.city)
+  } else if (sale.state) {
+    locationParts.push(sale.state)
+  }
+  
+  const dateParts: string[] = []
+  if (sale.date_start) {
+    const startDate = new Date(sale.date_start)
+    if (sale.date_end && sale.date_end !== sale.date_start) {
+      const endDate = new Date(sale.date_end)
+      dateParts.push(`${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)
+    } else {
+      dateParts.push(startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+    }
+  }
+  
+  let description = sale.description
+  if (!description) {
+    const parts: string[] = []
+    if (locationParts.length > 0) {
+      parts.push(`Yard sale in ${locationParts.join(', ')}`)
+    } else {
+      parts.push('Yard sale')
+    }
+    if (dateParts.length > 0) {
+      parts.push(`— ${dateParts.join(', ')}`)
+    }
+    description = parts.join(' ')
+  }
+  
+  // Get cover image
+  const cover = getSaleCoverUrl(sale)
+  const image = cover?.url || `${baseUrl}/og-sale.jpg`
+  
+  // Build canonical URL (without UTM params)
+  const path = `/sales/${sale.id}`
+  const canonicalUrl = `${baseUrl}${path}`
 
-  return createPageMetadata({
-    title,
+  // Truncate title for metadata (max 60 chars)
+  const metaTitle = title.length > 60 ? title.substring(0, 57) + '...' : title
+
+  return {
+    title: `${metaTitle} | ${siteName}`,
     description,
-    path,
-    image,
-    type: 'article'
-  })
+    metadataBase: new URL(baseUrl),
+    openGraph: {
+      type: 'website',
+      title: metaTitle,
+      description,
+      url: canonicalUrl,
+      siteName,
+      images: [
+        {
+          url: image,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: metaTitle,
+      description,
+      images: [image],
+    },
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    robots: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  }
 }
 
 export function createExploreMetadata(): Metadata {

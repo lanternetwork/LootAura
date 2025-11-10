@@ -12,6 +12,7 @@ import { useAuth, useFavorites } from '@/lib/hooks/useAuth'
 import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
 import CategoryChips from '@/components/ui/CategoryChips'
 import OSMAttribution from '@/components/location/OSMAttribution'
+import SaleShareButton from '@/components/share/SaleShareButton'
 import type { SaleWithOwnerInfo } from '@/lib/data'
 import type { SaleItem } from '@/lib/types'
 
@@ -87,22 +88,26 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
     }
   }
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: sale.title,
-          text: `Check out this yard sale: ${sale.title}`,
-          url: window.location.href,
-        })
-      } catch (error) {
-        console.error('Error sharing:', error)
-      }
+  // Build share URL (canonical, without UTM params)
+  const shareUrl = typeof window !== 'undefined' 
+    ? window.location.origin + `/sales/${sale.id}`
+    : `/sales/${sale.id}`
+  
+  // Build share text with location and date info
+  const shareTextParts: string[] = []
+  if (sale.city && sale.state) {
+    shareTextParts.push(`${sale.city}, ${sale.state}`)
+  }
+  if (sale.date_start) {
+    const startDate = new Date(sale.date_start)
+    if (sale.date_end && sale.date_end !== sale.date_start) {
+      const endDate = new Date(sale.date_end)
+      shareTextParts.push(`${startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`)
     } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href)
+      shareTextParts.push(startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
     }
   }
+  const shareText = shareTextParts.length > 0 ? shareTextParts.join(' — ') : undefined
 
   const currentCenter = location || { lat: sale.lat || 38.2527, lng: sale.lng || -85.7585 }
 
@@ -154,7 +159,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                 </div>
               </div>
               
-              <div className="flex gap-2 ml-4">
+              <div className="flex gap-2 ml-4 flex-shrink-0">
                 <button
                   onClick={handleFavoriteToggle}
                   className={`inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors min-h-[44px] ${
@@ -169,15 +174,12 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                   {isFavorited ? 'Saved' : 'Save'}
                 </button>
                 
-                <button
-                  onClick={handleShare}
-                  className="inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors min-h-[44px] bg-[rgba(147,51,234,0.15)] text-[#3A2268] hover:bg-[rgba(147,51,234,0.25)]"
-                >
-                  <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                  </svg>
-                  Share
-                </button>
+                <SaleShareButton
+                  url={shareUrl}
+                  title={sale.title || 'Yard Sale'}
+                  text={shareText}
+                  saleId={sale.id}
+                />
               </div>
             </div>
             </div>

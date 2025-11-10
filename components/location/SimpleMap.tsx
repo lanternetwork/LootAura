@@ -294,6 +294,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         touchZoom={interactive}
         touchRotate={interactive}
         keyboard={interactive}
+        attributionControl={false}
       >
         {/* Custom pin rendering - no Mapbox Markers */}
         {hybridPins ? (
@@ -385,7 +386,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       )}
       
       {/* OSM Attribution */}
-      <div className={`absolute ${osmAttributionPosition === 'top' ? 'top-2' : 'bottom-2'} right-2 z-40 pointer-events-none`}>
+      <div className={`absolute ${osmAttributionPosition === 'top' ? 'top-2' : 'bottom-2'} right-2 z-[100] pointer-events-none`}>
         <OSMAttribution showGeocoding={false} className={`bg-white bg-opacity-80 ${osmAttributionPosition === 'top' ? 'px-1 py-0.5 rounded text-[0.375rem] leading-tight' : 'px-2 py-1 rounded'}`} />
       </div>
     </div>

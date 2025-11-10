@@ -1092,6 +1092,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
             setConfirmationModalOpen(false)
             router.push('/dashboard')
           }}
+          onViewSale={() => {
+            // Navigate to sale detail page
+            router.push(`/sales/${createdSaleId}`)
+            // Close the modal state
+            setConfirmationModalOpen(false)
+          }}
           saleId={createdSaleId}
         />
       )}

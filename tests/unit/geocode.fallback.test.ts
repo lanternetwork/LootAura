@@ -195,8 +195,9 @@ describe('Geocoding Fallback', () => {
     
     // Mock Date.now to simulate 24 hours + 1ms passing
     const originalNow = Date.now
-    const mockNow = vi.fn(() => originalNow() + 24 * 60 * 60 * 1000 + 1)
-    Date.now = mockNow
+    const baseTime = originalNow()
+    const mockNow = vi.fn(() => baseTime + 24 * 60 * 60 * 1000 + 1)
+    Date.now = mockNow as any
     
     // Third call should bypass cache (expired) and make new request
     const result3 = await geocodeAddress(testAddress.address)

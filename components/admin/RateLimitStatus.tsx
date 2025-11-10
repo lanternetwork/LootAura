@@ -26,25 +26,18 @@ export default function RateLimitStatus() {
         const data = await response.json()
         
         // Extract rate limiting info from metrics
-        const rateLimitInfo = data.metrics?.rateLimit || {
-          enabled: process.env.NODE_ENV === 'production' && process.env.RATE_LIMITING_ENABLED === 'true',
-          backend: process.env.UPSTASH_REDIS_REST_URL ? 'upstash' : 'memory',
-          policies: [
-            'AUTH_DEFAULT (5/30s)',
-            'AUTH_HOURLY (60/3600s)', 
-            'GEO_ZIP_SHORT (10/60s)',
-            'GEO_ZIP_HOURLY (300/3600s)',
-            'SALES_VIEW_30S (20/30s)',
-            'SALES_VIEW_HOURLY (800/3600s)',
-            'MUTATE_MINUTE (3/60s)',
-            'MUTATE_DAILY (100/86400s)',
-            'ADMIN_TOOLS (3/30s)',
-            'ADMIN_HOURLY (60/3600s)'
-          ],
-          recentBlocks: 0
+        const rateLimitInfo = data.metrics?.rateLimit
+        
+        if (!rateLimitInfo) {
+          throw new Error('Rate limiting status not available in metrics response')
         }
         
-        setStatus(rateLimitInfo)
+        setStatus({
+          enabled: rateLimitInfo.enabled,
+          backend: rateLimitInfo.backend === 'unknown' ? 'memory' : rateLimitInfo.backend,
+          policies: rateLimitInfo.policies || [],
+          recentBlocks: rateLimitInfo.recentBlocks || 0
+        })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -116,9 +109,8 @@ export default function RateLimitStatus() {
       </div>
 
       <div className="text-xs text-gray-500">
-        <p>• Rate limiting is {status.enabled ? 'active' : 'bypassed'} in {process.env.NODE_ENV}</p>
-        <p>• Backend: {status.backend === 'upstash' ? 'Production Redis' : 'Development Memory'}</p>
-        <p>• Environment: RATE_LIMITING_ENABLED = {process.env.RATE_LIMITING_ENABLED || 'not set'}</p>
+        <p>• Rate limiting is {status.enabled ? 'active' : 'bypassed'}</p>
+        <p>• Backend: {status.backend === 'upstash' ? 'Production Redis' : 'In-Memory'}</p>
       </div>
     </div>
   )

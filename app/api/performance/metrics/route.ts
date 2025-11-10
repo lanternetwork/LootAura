@@ -4,6 +4,7 @@ import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { cookies } from 'next/headers'
 import { authDebug } from '@/lib/debug/authDebug'
+import { getRateLimitStatus } from '@/lib/rateLimit/ops'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,13 @@ interface PerformanceMetrics {
     heapUsed: number
     heapTotal: number
     external: number
+  }
+  rateLimit: {
+    enabled: boolean
+    backend: 'upstash' | 'memory' | 'unknown'
+    policies: string[]
+    environment: string
+    recentBlocks?: number
   }
   timestamp: string
 }
@@ -55,11 +63,38 @@ async function metricsHandler(_request: NextRequest) {
     
     // Get memory metrics
     const memoryMetrics = await getMemoryMetrics()
+    
+    // Get rate limiting status
+    const rateLimitStatus = getRateLimitStatus()
+    const rateLimitMetrics = {
+      enabled: rateLimitStatus.enabled,
+      backend: rateLimitStatus.backend,
+      policies: rateLimitStatus.policies.map(p => {
+        // Format policies with their limits (this is a simplified mapping)
+        const policyMap: Record<string, string> = {
+          'AUTH_DEFAULT': 'AUTH_DEFAULT (5/30s)',
+          'AUTH_HOURLY': 'AUTH_HOURLY (60/3600s)',
+          'AUTH_CALLBACK': 'AUTH_CALLBACK (10/60s)',
+          'GEO_ZIP_SHORT': 'GEO_ZIP_SHORT (10/60s)',
+          'GEO_ZIP_HOURLY': 'GEO_ZIP_HOURLY (300/3600s)',
+          'SALES_VIEW_30S': 'SALES_VIEW_30S (20/30s)',
+          'SALES_VIEW_HOURLY': 'SALES_VIEW_HOURLY (800/3600s)',
+          'MUTATE_MINUTE': 'MUTATE_MINUTE (3/60s)',
+          'MUTATE_DAILY': 'MUTATE_DAILY (100/86400s)',
+          'ADMIN_TOOLS': 'ADMIN_TOOLS (3/30s)',
+          'ADMIN_HOURLY': 'ADMIN_HOURLY (60/3600s)'
+        }
+        return policyMap[p] || p
+      }),
+      environment: rateLimitStatus.environment,
+      recentBlocks: 0 // TODO: Track recent blocks if needed
+    }
 
     const metrics: PerformanceMetrics = {
       database: dbMetrics,
       api: apiMetrics,
       memory: memoryMetrics,
+      rateLimit: rateLimitMetrics,
       timestamp: new Date().toISOString()
     }
 

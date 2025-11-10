@@ -387,7 +387,12 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       
       {/* OSM Attribution */}
       <div className={`absolute ${osmAttributionPosition === 'top' ? 'top-2' : 'bottom-2'} right-2 z-[100] pointer-events-none`}>
-        <OSMAttribution showGeocoding={false} className={`bg-white bg-opacity-80 ${osmAttributionPosition === 'top' ? 'px-1 py-0.5 rounded text-[0.375rem] leading-tight' : 'px-2 py-1 rounded'}`} />
+        <OSMAttribution 
+          showGeocoding={false} 
+          className={`${osmAttributionPosition === 'top' 
+            ? 'bg-white bg-opacity-90 px-1 py-0.5 rounded text-[0.375rem] leading-tight shadow-sm text-gray-600' 
+            : 'bg-white bg-opacity-95 px-2 py-1 rounded shadow-md text-xs text-gray-700'}`} 
+        />
       </div>
     </div>
   )

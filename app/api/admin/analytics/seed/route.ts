@@ -133,6 +133,13 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Check if we have events to insert
+    if (events.length === 0) {
+      return NextResponse.json({ 
+        error: 'No events generated to insert. Check event mix configuration.' 
+      }, { status: 400 })
+    }
+
     // Write with admin client
     const adminDb = getAdminDb()
     const { data: inserted, error: insertError } = await fromBase(adminDb, 'analytics_events')
@@ -168,8 +175,29 @@ export async function POST(request: NextRequest) {
     if (error instanceof NextResponse) {
       return error
     }
-    console.error('[ANALYTICS_SEED] Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    
+    // Log the full error for debugging
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorCode = (error as any)?.code
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    console.error('[ANALYTICS_SEED] Unexpected error:', {
+      message: errorMessage,
+      code: errorCode,
+      stack: errorStack,
+      error,
+    })
+    
+    // Check if it's a table doesn't exist error
+    if (errorCode === '42P01' || errorMessage.includes('does not exist')) {
+      return NextResponse.json({ 
+        error: 'Analytics table does not exist. Please run database migrations first.' 
+      }, { status: 400 })
+    }
+    
+    return NextResponse.json({ 
+      error: `Internal server error: ${errorMessage}` 
+    }, { status: 500 })
   }
 }
 

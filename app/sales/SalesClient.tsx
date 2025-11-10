@@ -602,10 +602,12 @@ export default function SalesClient({
 
   // Initial fetch will be triggered by map onLoad event with proper bounds
 
-  // Sync distance filter with initial zoom level on first load
+  // Sync distance filter with initial zoom level on first load only
   // This ensures the distance dropdown shows the correct value matching the actual zoom level
+  // IMPORTANT: This should only run once on initial load, not when user zooms the map
+  const hasSyncedDistanceRef = useRef(false)
   useEffect(() => {
-    if (!mapView) return // Wait for map view to be initialized
+    if (!mapView || hasSyncedDistanceRef.current) return // Wait for map view to be initialized, and only run once
     
     // Get the initial zoom level (from URL or default)
     const initialZoom = mapView.zoom
@@ -624,9 +626,12 @@ export default function SalesClient({
         console.log('[DISTANCE] Synced distance filter with initial zoom:', { zoom: initialZoom, distance: correspondingDistance })
       }
     }
+    
+    // Mark as synced so this only runs once
+    hasSyncedDistanceRef.current = true
   // Only run once on mount when mapView is initialized
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapView?.zoom])
+  }, [mapView])
 
   // Restore ZIP from URL on page load only (not on every URL change)
   // Skip if initialCenter already matches ZIP (server-side lookup succeeded)

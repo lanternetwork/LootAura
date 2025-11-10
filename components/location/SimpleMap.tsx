@@ -383,8 +383,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       )}
       
       {/* OSM Attribution */}
-      <div className="absolute bottom-2 right-2 z-40 pointer-events-none">
-        <OSMAttribution showGeocoding={false} className="bg-white bg-opacity-80 px-2 py-1 rounded" />
+      <div className="absolute top-2 right-2 z-40 pointer-events-none">
+        <OSMAttribution showGeocoding={false} className="bg-white bg-opacity-80 px-1 py-0.5 rounded text-[0.375rem] leading-tight" />
       </div>
     </div>
   )

@@ -74,6 +74,7 @@ describe('Admin Analytics Seed API', () => {
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue({ data: mockSales, error: null }),
+      single: vi.fn().mockResolvedValue({ data: mockSales[0], error: null }),
     }
     
     // Mock insert query
@@ -83,13 +84,18 @@ describe('Admin Analytics Seed API', () => {
     }
 
     // Setup fromBase to return different queries based on table
-    vi.mocked(fromBase).mockImplementation((db: any, table: string) => {
+    vi.mocked(fromBase).mockImplementation((_db: any, table: string) => {
       if (table === 'sales') {
         return mockSalesQuery as any
       } else if (table === 'analytics_events') {
         return mockInsertQuery as any
       }
-      return {} as any
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+      } as any
     })
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/seed', {
@@ -123,14 +129,20 @@ describe('Admin Analytics Seed API', () => {
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+      single: vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
     }
 
     // Setup fromBase to return empty sales
-    vi.mocked(fromBase).mockImplementation((db: any, table: string) => {
+    vi.mocked(fromBase).mockImplementation((_db: any, table: string) => {
       if (table === 'sales') {
         return mockSalesQuery as any
       }
-      return {} as any
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+      } as any
     })
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/seed', {

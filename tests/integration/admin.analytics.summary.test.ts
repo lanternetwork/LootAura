@@ -78,7 +78,7 @@ describe('Admin Analytics Summary API', () => {
       lte: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: mockEvents, error: null }),
     }
-    vi.mocked(fromBase).mockReturnValue(mockEventsQuery as any)
+    vi.mocked(fromBase).mockImplementation(() => mockEventsQuery as any)
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/summary?days=7', {
       method: 'GET',
@@ -130,7 +130,7 @@ describe('Admin Analytics Summary API', () => {
       lte: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: [], error: null }),
     }
-    vi.mocked(fromBase).mockReturnValue(mockEventsQuery as any)
+    vi.mocked(fromBase).mockImplementation(() => mockEventsQuery as any)
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/summary?days=7', {
       method: 'GET',
@@ -164,7 +164,7 @@ describe('Admin Analytics Summary API', () => {
       lte: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: [], error: null }),
     }
-    vi.mocked(fromBase).mockReturnValue(mockEventsQuery as any)
+    vi.mocked(fromBase).mockImplementation(() => mockEventsQuery as any)
 
     const request = new NextRequest('http://localhost:3000/api/admin/analytics/summary?days=14', {
       method: 'GET',

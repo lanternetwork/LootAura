@@ -215,9 +215,9 @@ export async function DELETE(request: NextRequest) {
       return fail(400, 'INVALID_INPUT', 'draftKey is required')
     }
 
-    // Mark draft as archived (soft delete) - write to base table using schema-scoped client
-    const db = getRlsDb()
-    const { error } = await fromBase(db, 'sale_drafts')
+    // Mark draft as archived (soft delete) - write to base table using admin client (bypasses RLS, but we've already verified auth)
+    const admin = getAdminDb()
+    const { error } = await fromBase(admin, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)

@@ -482,14 +482,17 @@ export async function getSaleWithItems(
     // Always log in production for debugging (can remove later)
     console.log('[SALES_ACCESS] Items fetch result:', {
       saleId,
+      hasError: !!itemsRes.error,
       itemsResError: itemsRes.error ? {
         code: itemsRes.error?.code || 'unknown',
         message: itemsRes.error?.message || 'unknown error',
+        errorType: itemsRes.error?.constructor?.name || typeof itemsRes.error,
       } : null,
       itemsCount: itemsRes.data?.length || 0,
       items: itemsRes.data?.map((i: any) => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
       // Debug: Check if sale status might be blocking items
       saleStatus: sale.status,
+      saleIdMatch: sale.id === saleId,
     })
     
     // Additional debug: Try to query items using admin client via items_v2 view

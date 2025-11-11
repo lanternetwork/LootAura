@@ -131,6 +131,8 @@ describe('POST /api/profile/social-links', () => {
 
     // Create fresh mock chain with the expected return value
     const chain = createMockChain()
+    // Reset and set the return value explicitly
+    chain.mockSingle.mockReset()
     chain.mockSingle.mockResolvedValue({
       data: {
         social_links: {
@@ -164,6 +166,8 @@ describe('POST /api/profile/social-links', () => {
 
     // Create fresh mock chain with the expected return value
     const chain = createMockChain()
+    // Reset and set the return value explicitly
+    chain.mockSingle.mockReset()
     chain.mockSingle.mockResolvedValue({
       data: {
         social_links: {

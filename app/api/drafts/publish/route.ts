@@ -194,15 +194,23 @@ export async function POST(request: NextRequest) {
       console.log('[DRAFT_PUBLISH] No items to create for sale:', saleRow.id)
     }
 
-    // 3. Mark draft as published
-    const { error: uErr } = await fromBase(rls, 'sale_drafts')
-      .update({ status: 'published' })
+    // 3. Delete the draft after successful publication (hard delete)
+    // We delete instead of marking as 'published' since the sale is now live
+    const { error: dErr } = await fromBase(rls, 'sale_drafts')
+      .delete()
       .eq('id', draft.id)
 
-    if (uErr) {
+    if (dErr) {
       // Sale and items are already created, so we'll log but not fail
-      if (process.env.NODE_ENV !== 'production') console.error('[PUBLISH/POST] draft update error:', uErr)
-      Sentry.captureException(uErr, { tags: { operation: 'publishDraft', step: 'updateDraft' } })
+      // The draft will remain but the sale is published, which is acceptable
+      if (process.env.NODE_ENV !== 'production') console.error('[PUBLISH/POST] draft delete error:', dErr)
+      Sentry.captureException(dErr, { tags: { operation: 'publishDraft', step: 'deleteDraft' } })
+    } else {
+      console.log('[PUBLISH/POST] Draft deleted successfully after publication:', {
+        draftId: draft.id,
+        draftKey: draft.draft_key,
+        saleId: saleRow.id,
+      })
     }
 
     return ok({ data: { saleId: saleRow.id } })

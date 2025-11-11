@@ -61,16 +61,6 @@ export default function ItemImagesDiagnostics() {
     fetchDiagnostics()
   }, [])
 
-  const testImageLoad = (url: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const img = new Image()
-      img.onload = () => resolve(true)
-      img.onerror = () => resolve(false)
-      img.src = url
-      // Timeout after 5 seconds
-      setTimeout(() => resolve(false), 5000)
-    })
-  }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">

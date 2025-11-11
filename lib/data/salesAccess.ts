@@ -464,7 +464,7 @@ export async function getSaleWithItems(
         message: itemsRes.error.message,
       } : null,
       itemsCount: itemsRes.data?.length || 0,
-      items: itemsRes.data?.map(i => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
+      items: itemsRes.data?.map((i: any) => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
       // Debug: Check if sale status might be blocking items
       saleStatus: sale.status,
     })

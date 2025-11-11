@@ -139,6 +139,10 @@ describe('POST /api/profile/social-links', () => {
     const response = await POST(request)
     const data = await response.json()
 
+    if (!data.ok) {
+      console.error('Response error:', data)
+    }
+
     expect(data.ok).toBe(true)
     expect(data.data.social_links.twitter).toBe('https://twitter.com/johndoe')
   })
@@ -177,6 +181,10 @@ describe('POST /api/profile/social-links', () => {
 
     const response = await POST(request)
     const data = await response.json()
+
+    if (!data.ok) {
+      console.error('Response error:', data)
+    }
 
     expect(data.ok).toBe(true)
     expect(data.data.social_links.twitter).toBe('https://twitter.com/johndoe')

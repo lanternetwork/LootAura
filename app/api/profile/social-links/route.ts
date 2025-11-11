@@ -11,7 +11,15 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const authResult = await supabase.auth.getUser()
+
+    // Guard against undefined/null auth result
+    if (!authResult || typeof authResult !== 'object') {
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+    }
+
+    const { data, error: authError } = authResult
+    const user = data?.user
 
     if (authError || !user) {
       return fail(401, 'AUTH_REQUIRED', 'Authentication required')

@@ -3,13 +3,22 @@ import { POST } from '@/app/api/profile/social-links/route'
 import { NextRequest } from 'next/server'
 
 // Mock dependencies
-vi.mock('@/lib/supabase/server', () => ({
-  createSupabaseServerClient: vi.fn(() => ({
-    auth: {
-      getUser: vi.fn(),
-    },
-  })),
-}))
+// Use a factory function to ensure fresh mocks after clearAllMocks
+vi.mock('@/lib/supabase/server', () => {
+  return {
+    createSupabaseServerClient: vi.fn(() => {
+      // Always return a fresh mock client with a properly configured getUser
+      return {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: null },
+            error: null,
+          }),
+        },
+      }
+    }),
+  }
+})
 
 // Create fresh mocks for each test to avoid state issues
 const createMockChain = () => {

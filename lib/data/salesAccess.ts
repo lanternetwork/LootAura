@@ -414,7 +414,7 @@ export async function getSaleWithItems(
       // If error is about missing images column, retry without it
       if (itemsRes.error && 
           (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('images')) ||
-          itemsRes.error.code === 'PGRST301') {
+          itemsRes.error?.code === 'PGRST301') {
         console.log('[SALES_ACCESS] images column not found, falling back to image_url only')
         itemsRes = await supabase
           .from('items_v2')
@@ -426,7 +426,7 @@ export async function getSaleWithItems(
       // If error is about missing updated_at column, retry without it
       if (itemsRes.error && 
           (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('updated_at')) ||
-          itemsRes.error.code === '42703') {
+          itemsRes.error?.code === '42703') {
         console.log('[SALES_ACCESS] updated_at column not found, retrying without it')
         itemsRes = await supabase
           .from('items_v2')

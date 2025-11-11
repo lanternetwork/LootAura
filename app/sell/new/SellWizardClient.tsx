@@ -622,8 +622,32 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
     const results = await Promise.allSettled(itemPromises)
     const failures = results.filter(r => r.status === 'rejected')
+    const successes = results.filter(r => r.status === 'fulfilled')
+    
+    // Log detailed results
+    console.log('[SELL_WIZARD] Item creation results:', {
+      total: itemsToCreate.length,
+      succeeded: successes.length,
+      failed: failures.length,
+      failures: failures.map(f => f.status === 'rejected' ? f.reason : null),
+    })
+    
+    // Check for HTTP errors in successful promises
+    for (const result of successes) {
+      if (result.status === 'fulfilled') {
+        const response = await result.value
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('[SELL_WIZARD] Item creation HTTP error:', {
+            status: response.status,
+            error: errorData,
+          })
+        }
+      }
+    }
+    
     if (failures.length > 0) {
-      console.warn('Some items failed to create:', failures)
+      console.error('[SELL_WIZARD] Some items failed to create:', failures)
     }
   }, [])
 

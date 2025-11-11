@@ -133,10 +133,9 @@ export async function POST(request: NextRequest) {
     if (sErr) return fail(500, 'SALE_CREATE_FAILED', sErr.message, sErr)
 
     // Build itemsPayload
-    // Note: We don't include the 'images' field because the database schema may not have this column
-    // Items use image_url (single string) instead of images (array) in the current schema
+    // Include image_url (single string) - the database supports this column
+    // Also try to include images array if the column exists (will be handled gracefully by the API)
     const itemsPayload = items && items.length > 0 ? items.map((item: any) => {
-      // Build payload without images field to avoid schema cache errors
       const payload: any = {
         sale_id: saleRow.id,
         name: item.name,
@@ -145,8 +144,19 @@ export async function POST(request: NextRequest) {
         category: item.category || null,
       }
       
-      // Note: images field is omitted because the database schema doesn't support it
-      // If images support is needed, a migration must be applied first
+      // Include image_url if provided
+      if (item.image_url) {
+        payload.image_url = item.image_url
+      }
+      
+      // Also try to include images array if provided (for future compatibility)
+      // The items_v2 API route will handle this gracefully
+      if (item.images && Array.isArray(item.images) && item.images.length > 0) {
+        payload.images = item.images
+      } else if (item.image_url) {
+        // Convert single image_url to images array for compatibility
+        payload.images = [item.image_url]
+      }
       
       return payload
     }) : []

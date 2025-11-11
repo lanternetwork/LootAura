@@ -79,7 +79,10 @@ export async function POST(request: NextRequest) {
       : (body.image_url ? [body.image_url] : [])
     
     // Get first image URL for image_url column (fallback for compatibility)
-    const firstImageUrl = images.length > 0 ? images[0] : (body.image_url || null)
+    // Always use body.image_url if provided, even if empty string (to allow clearing)
+    const firstImageUrl = body.image_url !== undefined 
+      ? (body.image_url || null)  // Allow empty string to be saved as null
+      : (images.length > 0 ? images[0] : null)
     
     // Build insert payload - try to include both images array and image_url
     const insertPayload: any = {
@@ -92,13 +95,24 @@ export async function POST(request: NextRequest) {
     }
     
     // Add image_url (this column definitely exists)
-    if (firstImageUrl) {
-      insertPayload.image_url = firstImageUrl
-    }
+    // Always set it, even if null, to ensure it's saved
+    insertPayload.image_url = firstImageUrl
     
     // Add images array if we have images (this column might not exist, but we'll try)
     if (images.length > 0) {
       insertPayload.images = images
+    }
+    
+    // Log for debugging (only in non-production)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ITEMS_V2] Creating item with image data:', {
+        hasImageUrl: !!body.image_url,
+        imageUrl: body.image_url,
+        hasImages: Array.isArray(body.images) && body.images.length > 0,
+        images: body.images,
+        firstImageUrl,
+        insertPayloadImageUrl: insertPayload.image_url,
+      })
     }
     
     const { data: item, error } = await fromBase(db, 'items')

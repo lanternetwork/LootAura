@@ -178,9 +178,9 @@ export async function POST(request: NextRequest) {
         itemIds: insertedItems?.map((i: any) => i.id),
       })
       
-      // Verify items are readable via view (using admin client to bypass RLS for verification)
-      const { data: verifyItems, error: verifyErr } = await admin
-        .from('items_v2')
+      // Verify items are readable from base table (using admin client to bypass RLS for verification)
+      // Note: admin client is schema-scoped to lootaura_v2, so we query the base table, not the view
+      const { data: verifyItems, error: verifyErr } = await fromBase(admin, 'items')
         .select('id, name, sale_id, image_url')
         .eq('sale_id', saleRow.id)
       

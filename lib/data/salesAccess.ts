@@ -226,9 +226,10 @@ export async function getItemsForSale(
 ): Promise<SaleItem[]> {
   try {
     // Read from view (reads allowed) - select both images and image_url for compatibility
+    // Note: updated_at doesn't exist in the view, only created_at
     const { data: items, error } = await supabase
       .from('items_v2')
-      .select('id, sale_id, name, category, price, images, image_url, created_at, updated_at')
+      .select('id, sale_id, name, category, price, images, image_url, created_at')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: true })
       .limit(limit)
@@ -406,7 +407,7 @@ export async function getSaleWithItems(
     try {
       itemsRes = await supabase
         .from('items_v2')
-        .select('id, sale_id, name, category, price, image_url, images, created_at, updated_at')
+        .select('id, sale_id, name, category, price, image_url, images, created_at')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: false })
       
@@ -417,7 +418,19 @@ export async function getSaleWithItems(
         console.log('[SALES_ACCESS] images column not found, falling back to image_url only')
         itemsRes = await supabase
           .from('items_v2')
-          .select('id, sale_id, name, category, price, image_url, created_at, updated_at')
+          .select('id, sale_id, name, category, price, image_url, created_at')
+          .eq('sale_id', saleId)
+          .order('created_at', { ascending: false })
+      }
+      
+      // If error is about missing updated_at column, retry without it
+      if (itemsRes.error && 
+          (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('updated_at')) ||
+          itemsRes.error.code === '42703') {
+        console.log('[SALES_ACCESS] updated_at column not found, retrying without it')
+        itemsRes = await supabase
+          .from('items_v2')
+          .select('id, sale_id, name, category, price, image_url, created_at')
           .eq('sale_id', saleId)
           .order('created_at', { ascending: false })
       }

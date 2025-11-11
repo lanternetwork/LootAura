@@ -12,22 +12,34 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }))
 
-const mockSingle = vi.fn().mockResolvedValue({
-  data: null,
-  error: null,
+// Create fresh mocks for each test to avoid state issues
+const createMockChain = () => {
+  const mockSingle = vi.fn().mockResolvedValue({
+    data: null,
+    error: null,
+  })
+  const mockSelect = vi.fn(() => ({
+    single: mockSingle,
+  }))
+  const mockEq = vi.fn(() => ({
+    select: mockSelect,
+  }))
+  const mockUpdate = vi.fn(() => ({
+    eq: mockEq,
+  }))
+  return { mockSingle, mockUpdate }
+}
+
+let currentMockChain: ReturnType<typeof createMockChain> | null = null
+
+const fromBaseMock = vi.fn((db: any, table: string) => {
+  if (!currentMockChain) {
+    currentMockChain = createMockChain()
+  }
+  return {
+    update: currentMockChain.mockUpdate,
+  }
 })
-
-const mockSelect = vi.fn(() => ({
-  single: mockSingle,
-}))
-
-const mockEq = vi.fn(() => ({
-  select: mockSelect,
-}))
-
-const mockUpdate = vi.fn(() => ({
-  eq: mockEq,
-}))
 
 vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: vi.fn(() => ({
@@ -35,9 +47,7 @@ vi.mock('@/lib/supabase/clients', () => ({
       from: vi.fn(),
     })),
   })),
-  fromBase: vi.fn((db, table) => ({
-    update: mockUpdate,
-  })),
+  fromBase: fromBaseMock,
 }))
 
 vi.mock('@sentry/nextjs', () => ({
@@ -49,11 +59,8 @@ vi.mock('@sentry/nextjs', () => ({
 describe('POST /api/profile/social-links', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset mocks to default state
-    mockSingle.mockResolvedValue({
-      data: null,
-      error: null,
-    })
+    // Create fresh mock chain for each test
+    currentMockChain = createMockChain()
   })
 
   it('should require authentication', async () => {
@@ -63,6 +70,14 @@ describe('POST /api/profile/social-links', () => {
       data: { user: null },
       error: { message: 'Not authenticated' },
     })
+
+    // Ensure mockSingle returns a valid structure (though it shouldn't be called)
+    if (currentMockChain) {
+      currentMockChain.mockSingle.mockResolvedValue({
+        data: null,
+        error: null,
+      })
+    }
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',
@@ -85,14 +100,16 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
 
-    mockSingle.mockResolvedValue({
+    if (currentMockChain) {
+      currentMockChain.mockSingle.mockResolvedValue({
       data: {
         social_links: {
           twitter: 'https://twitter.com/johndoe',
         },
       },
       error: null,
-    })
+      })
+    }
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',
@@ -115,14 +132,16 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
 
-    mockSingle.mockResolvedValue({
+    if (currentMockChain) {
+      currentMockChain.mockSingle.mockResolvedValue({
       data: {
         social_links: {
           twitter: 'https://twitter.com/johndoe',
         },
       },
       error: null,
-    })
+      })
+    }
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',

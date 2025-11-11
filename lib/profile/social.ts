@@ -34,9 +34,14 @@ function normalizeProviderUrl(provider: SocialProvider, input: string): string |
     // Basic URL validation
     try {
       const url = new URL(trimmed)
-      // For website provider, accept any valid URL
+      // For website provider, accept any valid URL (normalize trailing slash)
       if (provider === 'website') {
-        return url.href
+        let href = url.href
+        // Remove trailing slash for cleaner URLs
+        if (href.endsWith('/') && href !== 'http://' && href !== 'https://') {
+          href = href.slice(0, -1)
+        }
+        return href
       }
       
       // For other providers, validate domain matches
@@ -54,6 +59,11 @@ function normalizeProviderUrl(provider: SocialProvider, input: string): string |
       
       const allowed = expectedDomains[provider as Exclude<SocialProvider, 'website'>]
       if (allowed.some(d => domain === d || domain.endsWith('.' + d))) {
+        // For Twitter, normalize x.com to twitter.com
+        if (provider === 'twitter' && (domain === 'x.com' || domain.endsWith('.x.com'))) {
+          const path = url.pathname
+          return `https://twitter.com${path}`
+        }
         return url.href
       }
     } catch {

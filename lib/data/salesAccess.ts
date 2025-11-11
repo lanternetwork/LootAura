@@ -436,7 +436,17 @@ export async function getSaleWithItems(
       }
     } catch (err) {
       // If there's an exception, create a mock error response
-      itemsRes = { data: null, error: err }
+      // Ensure error is an object with code and message properties
+      itemsRes = { 
+        data: null, 
+        error: err instanceof Error ? {
+          code: (err as any).code || 'UNKNOWN',
+          message: err.message || 'Unknown error',
+        } : {
+          code: 'UNKNOWN',
+          message: String(err) || 'Unknown error',
+        }
+      }
     }
     
     const [profileRes, statsRes] = await Promise.all([
@@ -473,8 +483,8 @@ export async function getSaleWithItems(
     console.log('[SALES_ACCESS] Items fetch result:', {
       saleId,
       itemsResError: itemsRes.error ? {
-        code: itemsRes.error.code,
-        message: itemsRes.error.message,
+        code: itemsRes.error?.code || 'unknown',
+        message: itemsRes.error?.message || 'unknown error',
       } : null,
       itemsCount: itemsRes.data?.length || 0,
       items: itemsRes.data?.map((i: any) => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
@@ -503,8 +513,8 @@ export async function getSaleWithItems(
             saleId,
             adminItemsCount: adminItems?.length || 0,
             adminItemsError: adminItemsRes.error ? {
-              code: adminItemsRes.error.code,
-              message: adminItemsRes.error.message,
+              code: adminItemsRes.error?.code || 'unknown',
+              message: adminItemsRes.error?.message || 'unknown error',
             } : null,
             adminItems: adminItems?.map(i => ({ id: i.id, name: i.name, category: i.category })),
             note: 'If admin finds items but regular query returns 0, there may be an RLS issue',

@@ -131,16 +131,15 @@ describe('POST /api/profile/social-links', () => {
 
     // Create fresh mock chain with the expected return value
     const chain = createMockChain()
-    // Reset and set the return value explicitly
-    chain.mockSingle.mockReset()
-    chain.mockSingle.mockResolvedValue({
+    // Override the default return value using mockImplementation to ensure it works
+    chain.mockSingle.mockImplementation(() => Promise.resolve({
       data: {
         social_links: {
           twitter: 'https://twitter.com/johndoe',
         },
       },
       error: null,
-    })
+    }))
     mockState.currentMockChain = chain
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
@@ -166,16 +165,15 @@ describe('POST /api/profile/social-links', () => {
 
     // Create fresh mock chain with the expected return value
     const chain = createMockChain()
-    // Reset and set the return value explicitly
-    chain.mockSingle.mockReset()
-    chain.mockSingle.mockResolvedValue({
+    // Override the default return value using mockImplementation to ensure it works
+    chain.mockSingle.mockImplementation(() => Promise.resolve({
       data: {
         social_links: {
           twitter: 'https://twitter.com/johndoe',
         },
       },
       error: null,
-    })
+    }))
     mockState.currentMockChain = chain
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {

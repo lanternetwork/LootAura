@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { POST } from '@/app/api/profile/social-links/route'
 import { NextRequest } from 'next/server'
-import * as socialUtils from '@/lib/profile/social'
 
 // Mock dependencies
 vi.mock('@/lib/supabase/server', () => ({
@@ -27,7 +26,7 @@ const createMockChain = () => {
   const mockUpdate = vi.fn(() => ({
     eq: mockEq,
   }))
-  return { mockSingle, mockUpdate }
+  return { mockSingle, mockUpdate, mockEq, mockSelect }
 }
 
 // Use a mutable object to store the current mock chain
@@ -35,9 +34,20 @@ const mockState = { currentMockChain: null as ReturnType<typeof createMockChain>
 
 vi.mock('@/lib/supabase/clients', () => {
   const fromBaseMock = vi.fn((db: any, table: string) => {
+    // Always ensure we have a mock chain with properly configured functions
+    const wasNew = !mockState.currentMockChain
     if (!mockState.currentMockChain) {
       mockState.currentMockChain = createMockChain()
     }
+    // Only set default return value if we just created the chain
+    // (tests may have already set up specific return values)
+    if (wasNew) {
+      mockState.currentMockChain.mockSingle.mockResolvedValue({
+        data: null,
+        error: null,
+      })
+    }
+    // Return the update method which will chain to eq -> select -> single
     return {
       update: mockState.currentMockChain.mockUpdate,
     }
@@ -62,8 +72,8 @@ vi.mock('@sentry/nextjs', () => ({
 describe('POST /api/profile/social-links', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Create fresh mock chain for each test
-    mockState.currentMockChain = createMockChain()
+    // Reset mock chain - it will be re-initialized when fromBase is called
+    mockState.currentMockChain = null
   })
 
   it('should require authentication', async () => {
@@ -73,14 +83,6 @@ describe('POST /api/profile/social-links', () => {
       data: { user: null },
       error: { message: 'Not authenticated' },
     })
-
-    // Ensure mockSingle returns a valid structure (though it shouldn't be called)
-    if (mockState.currentMockChain) {
-      mockState.currentMockChain.mockSingle.mockResolvedValue({
-        data: null,
-        error: null,
-      })
-    }
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',
@@ -103,16 +105,16 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
 
-    if (mockState.currentMockChain) {
-      mockState.currentMockChain.mockSingle.mockResolvedValue({
+    // Create mock chain and set up return value before POST is called
+    mockState.currentMockChain = createMockChain()
+    mockState.currentMockChain.mockSingle.mockResolvedValue({
       data: {
         social_links: {
           twitter: 'https://twitter.com/johndoe',
         },
       },
       error: null,
-      })
-    }
+    })
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',
@@ -135,16 +137,16 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
 
-    if (mockState.currentMockChain) {
-      mockState.currentMockChain.mockSingle.mockResolvedValue({
+    // Create mock chain and set up return value before POST is called
+    mockState.currentMockChain = createMockChain()
+    mockState.currentMockChain.mockSingle.mockResolvedValue({
       data: {
         social_links: {
           twitter: 'https://twitter.com/johndoe',
         },
       },
       error: null,
-      })
-    }
+    })
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',

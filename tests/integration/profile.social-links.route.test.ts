@@ -22,12 +22,8 @@ vi.mock('@/lib/supabase/server', () => {
 
 // Create fresh mocks for each test to avoid state issues
 const createMockChain = () => {
-  // Create mockSingle with a default return value that will fail validation
-  // Tests should override this with mockResolvedValue
-  const mockSingle = vi.fn().mockResolvedValue({
-    data: null,
-    error: { message: 'Mock not configured', code: 'MOCK_NOT_CONFIGURED' },
-  })
+  // Don't set a default - each test must set it explicitly
+  const mockSingle = vi.fn()
   const mockSelect = vi.fn(() => ({
     single: mockSingle, // This will be called as .single(), so mockSingle must be a function
   }))
@@ -46,16 +42,9 @@ const mockState = { currentMockChain: null as ReturnType<typeof createMockChain>
 vi.mock('@/lib/supabase/clients', () => {
   const fromBaseMock = vi.fn((db: any, table: string) => {
     // Use the mock chain set up by the test
-    // If not set, create a default chain that returns an error
+    // If not set, throw an error to catch test setup issues
     if (!mockState.currentMockChain) {
-      const defaultChain = createMockChain()
-      defaultChain.mockSingle.mockResolvedValue({
-        data: null,
-        error: { message: 'Mock chain not set up in test', code: 'MOCK_ERROR' },
-      })
-      return {
-        update: defaultChain.mockUpdate,
-      }
+      throw new Error('fromBase called but mockState.currentMockChain is not set. Ensure the test sets up the mock chain before calling the route handler.')
     }
     // Return the update method which will chain to eq -> select -> single
     return {
@@ -131,15 +120,15 @@ describe('POST /api/profile/social-links', () => {
 
     // Create fresh mock chain with the expected return value
     const chain = createMockChain()
-    // Override the default return value using mockImplementation to ensure it works
-    chain.mockSingle.mockImplementation(() => Promise.resolve({
+    // Set the return value explicitly - must be set before fromBase is called
+    chain.mockSingle.mockResolvedValue({
       data: {
         social_links: {
           twitter: 'https://twitter.com/johndoe',
         },
       },
       error: null,
-    }))
+    })
     mockState.currentMockChain = chain
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
@@ -165,15 +154,15 @@ describe('POST /api/profile/social-links', () => {
 
     // Create fresh mock chain with the expected return value
     const chain = createMockChain()
-    // Override the default return value using mockImplementation to ensure it works
-    chain.mockSingle.mockImplementation(() => Promise.resolve({
+    // Set the return value explicitly - must be set before fromBase is called
+    chain.mockSingle.mockResolvedValue({
       data: {
         social_links: {
           twitter: 'https://twitter.com/johndoe',
         },
       },
       error: null,
-    }))
+    })
     mockState.currentMockChain = chain
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {

@@ -1,0 +1,66 @@
+// NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed.
+import { NextRequest } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { normalizeSocialLinks, type SocialLinks } from '@/lib/profile/social'
+import { ok, fail } from '@/lib/http/json'
+import * as Sentry from '@sentry/nextjs'
+
+export const dynamic = 'force-dynamic'
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createSupabaseServerClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+    }
+
+    let body: any
+    try {
+      body = await request.json()
+    } catch (error) {
+      return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
+    }
+
+    if (!body || typeof body !== 'object' || !body.links) {
+      return fail(400, 'INVALID_INPUT', 'Missing or invalid links field')
+    }
+
+    // Normalize social links
+    const normalizedLinks = normalizeSocialLinks(body.links as Partial<SocialLinks>)
+
+    // Update profile using RLS client with schema scope
+    // Note: profiles.id matches auth.uid(), RLS policy enforces ownership
+    const rls = getRlsDb()
+    const { data: updatedProfile, error: updateError } = await fromBase(rls, 'profiles')
+      .update({
+        social_links: normalizedLinks,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id)
+      .select('social_links')
+      .single()
+
+    if (updateError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[PROFILE/SOCIAL_LINKS] Update error:', updateError)
+      }
+      Sentry.captureException(updateError, { tags: { operation: 'updateSocialLinks' } })
+      return fail(500, 'UPDATE_FAILED', 'Failed to update social links', {
+        supabase: updateError.message,
+        code: updateError.code,
+      })
+    }
+
+    return ok({ data: { social_links: updatedProfile?.social_links || normalizedLinks } })
+  } catch (e: any) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[PROFILE/SOCIAL_LINKS] Unexpected error:', e)
+    }
+    Sentry.captureException(e, { tags: { operation: 'updateSocialLinks' } })
+    return fail(500, 'INTERNAL_ERROR', e.message)
+  }
+}
+

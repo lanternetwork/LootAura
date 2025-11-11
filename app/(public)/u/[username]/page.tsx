@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { deriveCategories } from '@/lib/profile/deriveCategories'
 import { createPageMetadata } from '@/lib/metadata'
 import { IdentityCard } from '@/components/profile/IdentityCard'
+import { SocialLinksRow } from '@/components/profile/SocialLinksRow'
 import { AboutCard } from '@/components/profile/AboutCard'
 import { PreferredCategories } from '@/components/profile/PreferredCategories'
 import { SellerSignals } from '@/components/profile/SellerSignals'
@@ -74,14 +75,14 @@ async function fetchProfileData(slug: string) {
     // Treat as user_id
     prof = await supabase
       .from('profiles_v2')
-      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, social_links')
       .eq('id', slug)
       .maybeSingle()
   } else {
     // Treat as username
     prof = await supabase
       .from('profiles_v2')
-      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, social_links')
       .eq('username', slug)
       .maybeSingle()
   }
@@ -196,18 +197,21 @@ export default async function PublicProfilePage({ params, searchParams }: Public
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <Suspense fallback={<ProfileSkeleton />}>
-        <IdentityCard
-          profile={{
-            displayName: profile.display_name,
-            username: profile.username,
-            avatarUrl: profile.avatar_url ? `${profile.avatar_url}?v=${Date.now()}` : null,
-            locationCity: profile.location_city,
-            locationRegion: profile.location_region,
-            createdAt: profile.created_at,
-            verified: profile.verified,
-          }}
-          mode="public"
-        />
+        <div>
+          <IdentityCard
+            profile={{
+              displayName: profile.display_name,
+              username: profile.username,
+              avatarUrl: profile.avatar_url ? `${profile.avatar_url}?v=${Date.now()}` : null,
+              locationCity: profile.location_city,
+              locationRegion: profile.location_region,
+              createdAt: profile.created_at,
+              verified: profile.verified,
+            }}
+            mode="public"
+          />
+          <SocialLinksRow socialLinks={profile.social_links as any} />
+        </div>
       </Suspense>
       
       <Suspense fallback={<div className="card animate-pulse"><div className="card-body-lg h-32 bg-neutral-200 rounded" /></div>}>

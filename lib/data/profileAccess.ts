@@ -5,6 +5,8 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 
+import type { SocialLinks } from '@/lib/profile/social'
+
 export interface ProfileData {
   id: string
   username?: string | null
@@ -15,6 +17,7 @@ export interface ProfileData {
   location_region?: string | null
   created_at?: string | null
   verified?: boolean | null
+  social_links?: SocialLinks | null
 }
 
 export interface Metrics7d {
@@ -52,7 +55,7 @@ export async function getUserProfile(
     // Try profiles_v2 view first
     const { data, error } = await supabase
       .from('profiles_v2')
-      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, social_links')
       .eq('id', userId)
       .maybeSingle()
 

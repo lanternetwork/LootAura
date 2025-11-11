@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { ProfileSummaryCard } from '@/components/dashboard/ProfileSummaryCard'
+import SocialLinksCard from '@/components/dashboard/SocialLinksCard'
 import SalesPanel from '@/components/dashboard/SalesPanel'
 import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
 import type { DraftListing } from '@/lib/data/salesAccess'
@@ -115,10 +116,13 @@ export default function DashboardClient({
       </div>
 
       <div className="space-y-6">
-        {/* Row 1: Profile Summary + Quick Stats */}
+        {/* Row 1: Profile Summary */}
         <ProfileSummaryCard profile={initialProfile || null} />
 
-        {/* Row 2: Sales Panel (with Live, Archived, and Drafts tabs) */}
+        {/* Row 2: Social Links */}
+        <SocialLinksCard initial={initialProfile?.social_links || null} />
+
+        {/* Row 3: Sales Panel (with Live, Archived, and Drafts tabs) */}
         <SalesPanel 
           sales={sales}
           drafts={drafts}
@@ -132,7 +136,7 @@ export default function DashboardClient({
           onRetryDrafts={handleRetryDrafts}
         />
 
-        {/* Row 3: Analytics */}
+        {/* Row 4: Analytics */}
         <AnalyticsPanel metrics7d={initialMetrics || null} />
       </div>
     </div>

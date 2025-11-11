@@ -78,16 +78,31 @@ export async function POST(request: NextRequest) {
       ? body.images
       : (body.image_url ? [body.image_url] : [])
     
+    // Get first image URL for image_url column (fallback for compatibility)
+    const firstImageUrl = images.length > 0 ? images[0] : (body.image_url || null)
+    
+    // Build insert payload - try to include both images array and image_url
+    const insertPayload: any = {
+      sale_id: body.sale_id,
+      name: body.title,
+      description: body.description,
+      price: body.price,
+      category: body.category,
+      condition: body.condition,
+    }
+    
+    // Add image_url (this column definitely exists)
+    if (firstImageUrl) {
+      insertPayload.image_url = firstImageUrl
+    }
+    
+    // Add images array if we have images (this column might not exist, but we'll try)
+    if (images.length > 0) {
+      insertPayload.images = images
+    }
+    
     const { data: item, error } = await fromBase(db, 'items')
-      .insert({
-        sale_id: body.sale_id,
-        name: body.title,
-        description: body.description,
-        price: body.price,
-        category: body.category,
-        condition: body.condition,
-        images: images.length > 0 ? images : null
-      })
+      .insert(insertPayload)
       .select()
       .single()
     

@@ -154,12 +154,44 @@ export async function POST(request: NextRequest) {
 
     // 2. Create items if any
     if (itemsPayload.length) {
-      const { error: iErr } = await fromBase(admin, 'items').insert(itemsPayload)
+      console.log('[DRAFT_PUBLISH] Creating items:', {
+        saleId: saleRow.id,
+        saleStatus: salePayload.status,
+        itemsCount: itemsPayload.length,
+        items: itemsPayload.map((i: any) => ({ name: i.name, hasImage: !!i.image_url })),
+      })
+      
+      const { data: insertedItems, error: iErr } = await fromBase(admin, 'items')
+        .insert(itemsPayload)
+        .select('id, name, sale_id, image_url')
+      
       if (iErr) {
+        console.error('[DRAFT_PUBLISH] Failed to create items:', iErr)
         // Try to clean up the sale (best effort)
         await fromBase(admin, 'sales').delete().eq('id', saleRow.id)
         return fail(500, 'ITEMS_CREATE_FAILED', iErr.message, iErr)
       }
+      
+      console.log('[DRAFT_PUBLISH] Items created successfully:', {
+        saleId: saleRow.id,
+        itemsCreated: insertedItems?.length || 0,
+        itemIds: insertedItems?.map((i: any) => i.id),
+      })
+      
+      // Verify items are readable via view (using admin client to bypass RLS for verification)
+      const { data: verifyItems, error: verifyErr } = await admin
+        .from('items_v2')
+        .select('id, name, sale_id, image_url')
+        .eq('sale_id', saleRow.id)
+      
+      console.log('[DRAFT_PUBLISH] Items verification (admin client):', {
+        saleId: saleRow.id,
+        itemsFound: verifyItems?.length || 0,
+        error: verifyErr,
+        itemIds: verifyItems?.map((i: any) => i.id),
+      })
+    } else {
+      console.log('[DRAFT_PUBLISH] No items to create for sale:', saleRow.id)
     }
 
     // 3. Mark draft as published

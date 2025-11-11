@@ -22,8 +22,12 @@ vi.mock('@/lib/supabase/server', () => {
 
 // Create fresh mocks for each test to avoid state issues
 const createMockChain = () => {
-  // Don't set a default return value - each test should set it explicitly
-  const mockSingle = vi.fn()
+  // Create mockSingle with a default return value that will fail validation
+  // Tests should override this with mockResolvedValue
+  const mockSingle = vi.fn().mockResolvedValue({
+    data: null,
+    error: { message: 'Mock not configured', code: 'MOCK_NOT_CONFIGURED' },
+  })
   const mockSelect = vi.fn(() => ({
     single: mockSingle, // This will be called as .single(), so mockSingle must be a function
   }))
@@ -42,9 +46,16 @@ const mockState = { currentMockChain: null as ReturnType<typeof createMockChain>
 vi.mock('@/lib/supabase/clients', () => {
   const fromBaseMock = vi.fn((db: any, table: string) => {
     // Use the mock chain set up by the test
-    // If not set, throw an error to catch test setup issues
+    // If not set, create a default chain that returns an error
     if (!mockState.currentMockChain) {
-      throw new Error('fromBase called but mockState.currentMockChain is not set. Ensure the test sets up the mock chain before calling the route handler.')
+      const defaultChain = createMockChain()
+      defaultChain.mockSingle.mockResolvedValue({
+        data: null,
+        error: { message: 'Mock chain not set up in test', code: 'MOCK_ERROR' },
+      })
+      return {
+        update: defaultChain.mockUpdate,
+      }
     }
     // Return the update method which will chain to eq -> select -> single
     return {

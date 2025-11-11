@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     // Update profile using RLS client with schema scope
     // Note: profiles.id matches auth.uid(), RLS policy enforces ownership
     const rls = getRlsDb()
-    const { data: updatedProfile, error: updateError } = await fromBase(rls, 'profiles')
+    const updateResult = await fromBase(rls, 'profiles')
       .update({
         social_links: normalizedLinks,
         updated_at: new Date().toISOString(),
@@ -42,6 +42,16 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .select('social_links')
       .single()
+
+    if (!updateResult || typeof updateResult !== 'object' || updateResult === null) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[PROFILE/SOCIAL_LINKS] Update returned undefined or invalid')
+      }
+      Sentry.captureException(new Error('Update returned undefined or invalid'), { tags: { operation: 'updateSocialLinks' } })
+      return fail(500, 'UPDATE_FAILED', 'Failed to update social links')
+    }
+
+    const { data: updatedProfile, error: updateError } = updateResult
 
     if (updateError) {
       if (process.env.NODE_ENV !== 'production') {

@@ -22,7 +22,10 @@ vi.mock('@/lib/supabase/clients', () => ({
     update: vi.fn(() => ({
       eq: vi.fn(() => ({
         select: vi.fn(() => ({
-          single: vi.fn(),
+          single: vi.fn().mockResolvedValue({
+            data: null,
+            error: null,
+          }),
         })),
       })),
     })),

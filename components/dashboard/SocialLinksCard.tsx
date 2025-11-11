@@ -90,14 +90,14 @@ export default function SocialLinksCard({ initial }: SocialLinksCardProps) {
     if (!url.startsWith('http')) return url
     // Extract handle from URL
     const patterns: Record<typeof provider, RegExp> = {
-      twitter: /twitter\.com\/([^\/\?]+)/i,
-      instagram: /instagram\.com\/([^\/\?]+)/i,
-      facebook: /facebook\.com\/([^\/\?]+)/i,
-      tiktok: /tiktok\.com\/@?([^\/\?]+)/i,
-      youtube: /youtube\.com\/@?([^\/\?]+)/i,
-      threads: /threads\.net\/@?([^\/\?]+)/i,
-      pinterest: /pinterest\.com\/([^\/\?]+)/i,
-      linkedin: /linkedin\.com\/(in|company)\/([^\/\?]+)/i,
+      twitter: new RegExp('twitter\\.com/([^/?]+)', 'i'),
+      instagram: new RegExp('instagram\\.com/([^/?]+)', 'i'),
+      facebook: new RegExp('facebook\\.com/([^/?]+)', 'i'),
+      tiktok: new RegExp('tiktok\\.com/@?([^/?]+)', 'i'),
+      youtube: new RegExp('youtube\\.com/@?([^/?]+)', 'i'),
+      threads: new RegExp('threads\\.net/@?([^/?]+)', 'i'),
+      pinterest: new RegExp('pinterest\\.com/([^/?]+)', 'i'),
+      linkedin: new RegExp('linkedin\\.com/(in|company)/([^/?]+)', 'i'),
       website: /.*/,
     }
     const pattern = patterns[provider]

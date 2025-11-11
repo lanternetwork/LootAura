@@ -66,14 +66,14 @@ function normalizeProviderUrl(provider: SocialProvider, input: string): string |
   if (trimmed.includes('/')) {
     // Try to extract handle from common URL patterns
     const patterns: Record<SocialProvider, RegExp[]> = {
-      twitter: [/twitter\.com\/([^\/\?]+)/i, /x\.com\/([^\/\?]+)/i],
-      instagram: [/instagram\.com\/([^\/\?]+)/i],
-      facebook: [/facebook\.com\/([^\/\?]+)/i, /fb\.com\/([^\/\?]+)/i],
-      tiktok: [/tiktok\.com\/@?([^\/\?]+)/i],
-      youtube: [/youtube\.com\/@?([^\/\?]+)/i, /youtu\.be\/([^\/\?]+)/i],
-      threads: [/threads\.net\/@?([^\/\?]+)/i],
-      pinterest: [/pinterest\.com\/([^\/\?]+)/i],
-      linkedin: [/linkedin\.com\/(in|company)\/([^\/\?]+)/i],
+      twitter: [new RegExp('twitter\\.com/([^/?]+)', 'i'), new RegExp('x\\.com/([^/?]+)', 'i')],
+      instagram: [new RegExp('instagram\\.com/([^/?]+)', 'i')],
+      facebook: [new RegExp('facebook\\.com/([^/?]+)', 'i'), new RegExp('fb\\.com/([^/?]+)', 'i')],
+      tiktok: [new RegExp('tiktok\\.com/@?([^/?]+)', 'i')],
+      youtube: [new RegExp('youtube\\.com/@?([^/?]+)', 'i'), new RegExp('youtu\\.be/([^/?]+)', 'i')],
+      threads: [new RegExp('threads\\.net/@?([^/?]+)', 'i')],
+      pinterest: [new RegExp('pinterest\\.com/([^/?]+)', 'i')],
+      linkedin: [new RegExp('linkedin\\.com/(in|company)/([^/?]+)', 'i')],
       website: [],
     }
     

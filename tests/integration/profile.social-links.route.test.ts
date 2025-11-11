@@ -24,16 +24,14 @@ vi.mock('@/lib/supabase/server', () => {
 const createMockChain = () => {
   // Don't set a default - each test must set it explicitly
   const mockSingle = vi.fn()
-  const mockSelect = vi.fn(() => ({
+  // Create a query object that supports chaining, similar to other tests
+  const query = {
+    eq: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
     single: mockSingle, // This will be called as .single(), so mockSingle must be a function
-  }))
-  const mockEq = vi.fn(() => ({
-    select: mockSelect, // This will be called as .select(), so mockSelect must be a function
-  }))
-  const mockUpdate = vi.fn(() => ({
-    eq: mockEq, // This will be called as .eq(), so mockEq must be a function
-  }))
-  return { mockSingle, mockUpdate, mockEq, mockSelect }
+  }
+  const mockUpdate = vi.fn(() => query)
+  return { mockSingle, mockUpdate, query }
 }
 
 // Use a mutable object to store the current mock chain
@@ -46,7 +44,7 @@ vi.mock('@/lib/supabase/clients', () => {
     if (!mockState.currentMockChain) {
       throw new Error('fromBase called but mockState.currentMockChain is not set. Ensure the test sets up the mock chain before calling the route handler.')
     }
-    // Return the update method which will chain to eq -> select -> single
+    // Return an object with update method which will chain to eq -> select -> single
     return {
       update: mockState.currentMockChain.mockUpdate,
     }
@@ -139,11 +137,9 @@ describe('POST /api/profile/social-links', () => {
     const response = await POST(request)
     const data = await response.json()
 
-    if (!data.ok) {
-      console.error('Response error:', data)
-    }
-
+    // Debug: if it failed, the error details will be in the test output
     expect(data.ok).toBe(true)
+    expect(data.code).toBeUndefined() // Should not have an error code
     expect(data.data.social_links.twitter).toBe('https://twitter.com/johndoe')
   })
 
@@ -182,11 +178,9 @@ describe('POST /api/profile/social-links', () => {
     const response = await POST(request)
     const data = await response.json()
 
-    if (!data.ok) {
-      console.error('Response error:', data)
-    }
-
+    // Debug: if it failed, the error details will be in the test output
     expect(data.ok).toBe(true)
+    expect(data.code).toBeUndefined() // Should not have an error code
     expect(data.data.social_links.twitter).toBe('https://twitter.com/johndoe')
     expect(data.data.social_links.invalid).toBeUndefined()
   })

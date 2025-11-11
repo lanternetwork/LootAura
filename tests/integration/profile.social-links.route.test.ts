@@ -30,25 +30,28 @@ const createMockChain = () => {
   return { mockSingle, mockUpdate }
 }
 
-let currentMockChain: ReturnType<typeof createMockChain> | null = null
+// Use a mutable object to store the current mock chain
+const mockState = { currentMockChain: null as ReturnType<typeof createMockChain> | null }
 
-const fromBaseMock = vi.fn((db: any, table: string) => {
-  if (!currentMockChain) {
-    currentMockChain = createMockChain()
-  }
+vi.mock('@/lib/supabase/clients', () => {
+  const fromBaseMock = vi.fn((db: any, table: string) => {
+    if (!mockState.currentMockChain) {
+      mockState.currentMockChain = createMockChain()
+    }
+    return {
+      update: mockState.currentMockChain.mockUpdate,
+    }
+  })
+  
   return {
-    update: currentMockChain.mockUpdate,
+    getRlsDb: vi.fn(() => ({
+      schema: vi.fn(() => ({
+        from: vi.fn(),
+      })),
+    })),
+    fromBase: fromBaseMock,
   }
 })
-
-vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: vi.fn(() => ({
-    schema: vi.fn(() => ({
-      from: vi.fn(),
-    })),
-  })),
-  fromBase: fromBaseMock,
-}))
 
 vi.mock('@sentry/nextjs', () => ({
   default: {
@@ -60,7 +63,7 @@ describe('POST /api/profile/social-links', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Create fresh mock chain for each test
-    currentMockChain = createMockChain()
+    mockState.currentMockChain = createMockChain()
   })
 
   it('should require authentication', async () => {
@@ -72,8 +75,8 @@ describe('POST /api/profile/social-links', () => {
     })
 
     // Ensure mockSingle returns a valid structure (though it shouldn't be called)
-    if (currentMockChain) {
-      currentMockChain.mockSingle.mockResolvedValue({
+    if (mockState.currentMockChain) {
+      mockState.currentMockChain.mockSingle.mockResolvedValue({
         data: null,
         error: null,
       })
@@ -100,8 +103,8 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
 
-    if (currentMockChain) {
-      currentMockChain.mockSingle.mockResolvedValue({
+    if (mockState.currentMockChain) {
+      mockState.currentMockChain.mockSingle.mockResolvedValue({
       data: {
         social_links: {
           twitter: 'https://twitter.com/johndoe',
@@ -132,8 +135,8 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
 
-    if (currentMockChain) {
-      currentMockChain.mockSingle.mockResolvedValue({
+    if (mockState.currentMockChain) {
+      mockState.currentMockChain.mockSingle.mockResolvedValue({
       data: {
         social_links: {
           twitter: 'https://twitter.com/johndoe',

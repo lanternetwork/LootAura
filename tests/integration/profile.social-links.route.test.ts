@@ -35,13 +35,9 @@ const mockState = { currentMockChain: null as ReturnType<typeof createMockChain>
 vi.mock('@/lib/supabase/clients', () => {
   const fromBaseMock = vi.fn((db: any, table: string) => {
     // Always ensure we have a mock chain with properly configured functions
-    const wasNew = !mockState.currentMockChain
     if (!mockState.currentMockChain) {
       mockState.currentMockChain = createMockChain()
-    }
-    // Only set default return value if we just created the chain
-    // (tests may have already set up specific return values)
-    if (wasNew) {
+      // Set default return value for newly created chain
       mockState.currentMockChain.mockSingle.mockResolvedValue({
         data: null,
         error: null,
@@ -74,6 +70,12 @@ describe('POST /api/profile/social-links', () => {
     vi.clearAllMocks()
     // Reset mock chain - it will be re-initialized when fromBase is called
     mockState.currentMockChain = null
+    // Pre-initialize a default mock chain to ensure it always returns valid structure
+    mockState.currentMockChain = createMockChain()
+    mockState.currentMockChain.mockSingle.mockResolvedValue({
+      data: null,
+      error: null,
+    })
   })
 
   it('should require authentication', async () => {

@@ -44,11 +44,21 @@ export async function POST(request: NextRequest) {
       .single()
 
     // Check if updateResult is valid and has expected structure
-    if (!updateResult || typeof updateResult !== 'object' || updateResult === null || !('data' in updateResult || 'error' in updateResult)) {
+    // Must check for null/undefined first before using 'in' operator
+    if (updateResult == null || typeof updateResult !== 'object') {
       if (process.env.NODE_ENV !== 'production') {
-        console.error('[PROFILE/SOCIAL_LINKS] Update returned undefined or invalid')
+        console.error('[PROFILE/SOCIAL_LINKS] Update returned undefined or invalid:', updateResult)
       }
       Sentry.captureException(new Error('Update returned undefined or invalid'), { tags: { operation: 'updateSocialLinks' } })
+      return fail(500, 'UPDATE_FAILED', 'Failed to update social links')
+    }
+
+    // Now safe to check for properties
+    if (!('data' in updateResult || 'error' in updateResult)) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[PROFILE/SOCIAL_LINKS] Update result missing data/error properties:', updateResult)
+      }
+      Sentry.captureException(new Error('Update result missing expected properties'), { tags: { operation: 'updateSocialLinks' } })
       return fail(500, 'UPDATE_FAILED', 'Failed to update social links')
     }
 

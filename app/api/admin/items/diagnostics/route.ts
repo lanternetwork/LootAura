@@ -9,9 +9,29 @@ export async function GET(request: Request) {
     const db = getAdminDb()
 
     // Fetch all items with their image data
-    const { data: items, error } = await fromBase(db, 'items')
+    // Try to fetch with images column, but handle if it doesn't exist
+    let items: any[] | null = null
+    let error: any = null
+    
+    // First try with images column
+    const result = await fromBase(db, 'items')
       .select('id, sale_id, name, image_url, images')
-      .limit(100) // Limit to first 100 items for diagnostics
+      .limit(100)
+    
+    if (result.error) {
+      // If images column doesn't exist, try without it
+      if (result.error.message?.includes('column') && result.error.message?.includes('images')) {
+        const fallbackResult = await fromBase(db, 'items')
+          .select('id, sale_id, name, image_url')
+          .limit(100)
+        items = fallbackResult.data
+        error = fallbackResult.error
+      } else {
+        error = result.error
+      }
+    } else {
+      items = result.data
+    }
 
     if (error) {
       console.error('[ItemDiagnostics] Error fetching items:', error)
@@ -54,7 +74,8 @@ export async function GET(request: Request) {
     items?.forEach((item: any) => {
       try {
         const has_image_url = !!item.image_url
-        const images_array = item.images
+        // Handle case where images column doesn't exist (will be undefined)
+        const images_array = item.images !== undefined ? item.images : null
         const has_images_array = Array.isArray(images_array) && images_array.length > 0
         const images_length = Array.isArray(images_array) ? images_array.length : 0
         const first_image_url = has_images_array

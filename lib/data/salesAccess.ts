@@ -401,7 +401,32 @@ export async function getSaleWithItems(
 
     // Fetch owner profile, stats, and items in parallel
     // (tags already fetched above)
-    const [profileRes, statsRes, itemsRes] = await Promise.all([
+    // Try to fetch items with images column first, fallback if column doesn't exist
+    let itemsRes: any
+    try {
+      itemsRes = await supabase
+        .from('items_v2')
+        .select('id, sale_id, name, category, price, image_url, images, created_at, updated_at')
+        .eq('sale_id', saleId)
+        .order('created_at', { ascending: false })
+      
+      // If error is about missing images column, retry without it
+      if (itemsRes.error && 
+          (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('images')) ||
+          itemsRes.error.code === 'PGRST301') {
+        console.log('[SALES_ACCESS] images column not found, falling back to image_url only')
+        itemsRes = await supabase
+          .from('items_v2')
+          .select('id, sale_id, name, category, price, image_url, created_at, updated_at')
+          .eq('sale_id', saleId)
+          .order('created_at', { ascending: false })
+      }
+    } catch (err) {
+      // If there's an exception, create a mock error response
+      itemsRes = { data: null, error: err }
+    }
+    
+    const [profileRes, statsRes] = await Promise.all([
       supabase
         .from('profiles_v2')
         .select('id, created_at, full_name')
@@ -412,11 +437,6 @@ export async function getSaleWithItems(
         .select('user_id, total_sales, last_sale_at, avg_rating, ratings_count')
         .eq('user_id', ownerId)
         .maybeSingle(),
-      supabase
-        .from('items_v2')
-        .select('id, sale_id, name, category, price, image_url, images, created_at, updated_at')
-        .eq('sale_id', saleId)
-        .order('created_at', { ascending: false }),
     ])
 
     // Log errors but don't fail - return with defaults

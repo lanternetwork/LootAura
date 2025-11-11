@@ -11,6 +11,12 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     const supabase = createSupabaseServerClient()
+    
+    // Guard against undefined/null supabase client
+    if (!supabase || !supabase.auth) {
+      return fail(500, 'INTERNAL_ERROR', 'Failed to initialize Supabase client')
+    }
+    
     const authResult = await supabase.auth.getUser()
 
     // Guard against undefined/null auth result

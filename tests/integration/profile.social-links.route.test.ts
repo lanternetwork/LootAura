@@ -75,16 +75,28 @@ vi.mock('@sentry/nextjs', () => ({
 }))
 
 describe('POST /api/profile/social-links', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Reset call history but preserve implementations
     vi.clearAllMocks()
-    // Reset mock chain - it will be re-initialized when fromBase is called
+    
+    // Reset mock chain and re-initialize
     mockState.currentMockChain = null
-    // Pre-initialize a default mock chain to ensure it always returns valid structure
     mockState.currentMockChain = createMockChain()
     mockState.currentMockChain.mockSingle.mockResolvedValue({
       data: null,
       error: null,
     })
+    
+    // Re-setup the mock factory implementation after clearing
+    const mod = await import('@/lib/supabase/server')
+    vi.mocked(mod.createSupabaseServerClient).mockImplementation(() => ({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+          error: null,
+        }),
+      },
+    }))
   })
 
   it('should require authentication', async () => {

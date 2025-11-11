@@ -34,13 +34,14 @@ function normalizeProviderUrl(provider: SocialProvider, input: string): string |
     // Basic URL validation
     try {
       const url = new URL(trimmed)
-      // For website, allow any valid URL
+      // For website provider, accept any valid URL
       if (provider === 'website') {
         return url.href
       }
+      
       // For other providers, validate domain matches
       const domain = url.hostname.toLowerCase()
-      const expectedDomains: Record<SocialProvider, string[]> = {
+      const expectedDomains: Record<Exclude<SocialProvider, 'website'>, string[]> = {
         twitter: ['twitter.com', 'x.com'],
         instagram: ['instagram.com', 'www.instagram.com'],
         facebook: ['facebook.com', 'www.facebook.com', 'fb.com', 'www.fb.com'],
@@ -49,11 +50,10 @@ function normalizeProviderUrl(provider: SocialProvider, input: string): string |
         threads: ['threads.net', 'www.threads.net'],
         pinterest: ['pinterest.com', 'www.pinterest.com'],
         linkedin: ['linkedin.com', 'www.linkedin.com'],
-        website: [], // website accepts any domain
       }
       
-      const allowed = expectedDomains[provider]
-      if (provider === 'website' || allowed.some(d => domain === d || domain.endsWith('.' + d))) {
+      const allowed = expectedDomains[provider as Exclude<SocialProvider, 'website'>]
+      if (allowed.some(d => domain === d || domain.endsWith('.' + d))) {
         return url.href
       }
     } catch {

@@ -12,6 +12,23 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }))
 
+const mockSingle = vi.fn().mockResolvedValue({
+  data: null,
+  error: null,
+})
+
+const mockSelect = vi.fn(() => ({
+  single: mockSingle,
+}))
+
+const mockEq = vi.fn(() => ({
+  select: mockSelect,
+}))
+
+const mockUpdate = vi.fn(() => ({
+  eq: mockEq,
+}))
+
 vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: vi.fn(() => ({
     schema: vi.fn(() => ({
@@ -19,16 +36,7 @@ vi.mock('@/lib/supabase/clients', () => ({
     })),
   })),
   fromBase: vi.fn((db, table) => ({
-    update: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn().mockResolvedValue({
-            data: null,
-            error: null,
-          }),
-        })),
-      })),
-    })),
+    update: mockUpdate,
   })),
 }))
 
@@ -41,6 +49,11 @@ vi.mock('@sentry/nextjs', () => ({
 describe('POST /api/profile/social-links', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset mocks to default state
+    mockSingle.mockResolvedValue({
+      data: null,
+      error: null,
+    })
   })
 
   it('should require authentication', async () => {
@@ -65,7 +78,6 @@ describe('POST /api/profile/social-links', () => {
 
   it('should normalize and update social links', async () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-    const { fromBase } = await import('@/lib/supabase/clients')
     
     const mockClient = createSupabaseServerClient() as any
     mockClient.auth.getUser.mockResolvedValue({
@@ -73,23 +85,13 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
 
-    const mockUpdate = {
-      eq: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn().mockResolvedValue({
-            data: {
-              social_links: {
-                twitter: 'https://twitter.com/johndoe',
-              },
-            },
-            error: null,
-          }),
-        })),
-      })),
-    }
-
-    ;(fromBase as any).mockReturnValue({
-      update: vi.fn().mockReturnValue(mockUpdate),
+    mockSingle.mockResolvedValue({
+      data: {
+        social_links: {
+          twitter: 'https://twitter.com/johndoe',
+        },
+      },
+      error: null,
     })
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
@@ -106,7 +108,6 @@ describe('POST /api/profile/social-links', () => {
 
   it('should drop invalid links', async () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-    const { fromBase } = await import('@/lib/supabase/clients')
     
     const mockClient = createSupabaseServerClient() as any
     mockClient.auth.getUser.mockResolvedValue({
@@ -114,23 +115,13 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
 
-    const mockUpdate = {
-      eq: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn().mockResolvedValue({
-            data: {
-              social_links: {
-                twitter: 'https://twitter.com/johndoe',
-              },
-            },
-            error: null,
-          }),
-        })),
-      })),
-    }
-
-    ;(fromBase as any).mockReturnValue({
-      update: vi.fn().mockReturnValue(mockUpdate),
+    mockSingle.mockResolvedValue({
+      data: {
+        social_links: {
+          twitter: 'https://twitter.com/johndoe',
+        },
+      },
+      error: null,
     })
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {

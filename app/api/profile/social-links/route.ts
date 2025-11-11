@@ -43,7 +43,8 @@ export async function POST(request: NextRequest) {
       .select('social_links')
       .single()
 
-    if (!updateResult || typeof updateResult !== 'object' || updateResult === null) {
+    // Check if updateResult is valid and has expected structure
+    if (!updateResult || typeof updateResult !== 'object' || updateResult === null || !('data' in updateResult || 'error' in updateResult)) {
       if (process.env.NODE_ENV !== 'production') {
         console.error('[PROFILE/SOCIAL_LINKS] Update returned undefined or invalid')
       }
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       return fail(500, 'UPDATE_FAILED', 'Failed to update social links')
     }
 
-    const { data: updatedProfile, error: updateError } = updateResult
+    const { data: updatedProfile, error: updateError } = updateResult as { data: any; error: any }
 
     if (updateError) {
       if (process.env.NODE_ENV !== 'production') {

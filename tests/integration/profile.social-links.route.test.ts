@@ -76,8 +76,13 @@ vi.mock('@sentry/nextjs', () => ({
 
 describe('POST /api/profile/social-links', () => {
   beforeEach(async () => {
-    // Reset call history but preserve implementations
-    vi.resetAllMocks()
+    // Reset mock chain and re-initialize
+    mockState.currentMockChain = null
+    mockState.currentMockChain = createMockChain()
+    mockState.currentMockChain.mockSingle.mockResolvedValue({
+      data: null,
+      error: null,
+    })
     
     // Re-setup the mock factory implementation
     const mod = await import('@/lib/supabase/server')
@@ -88,15 +93,7 @@ describe('POST /api/profile/social-links', () => {
           error: null,
         }),
       },
-    }))
-    
-    // Reset mock chain and re-initialize
-    mockState.currentMockChain = null
-    mockState.currentMockChain = createMockChain()
-    mockState.currentMockChain.mockSingle.mockResolvedValue({
-      data: null,
-      error: null,
-    })
+    }) as any)
   })
 
   it('should require authentication', async () => {
@@ -128,16 +125,17 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
 
-    // Create mock chain and set up return value before POST is called
-    mockState.currentMockChain = createMockChain()
-    mockState.currentMockChain.mockSingle.mockResolvedValue({
-      data: {
-        social_links: {
-          twitter: 'https://twitter.com/johndoe',
+    // Update the existing mock chain's return value
+    if (mockState.currentMockChain) {
+      mockState.currentMockChain.mockSingle.mockResolvedValue({
+        data: {
+          social_links: {
+            twitter: 'https://twitter.com/johndoe',
+          },
         },
-      },
-      error: null,
-    })
+        error: null,
+      })
+    }
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',
@@ -160,16 +158,17 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
 
-    // Create mock chain and set up return value before POST is called
-    mockState.currentMockChain = createMockChain()
-    mockState.currentMockChain.mockSingle.mockResolvedValue({
-      data: {
-        social_links: {
-          twitter: 'https://twitter.com/johndoe',
+    // Update the existing mock chain's return value
+    if (mockState.currentMockChain) {
+      mockState.currentMockChain.mockSingle.mockResolvedValue({
+        data: {
+          social_links: {
+            twitter: 'https://twitter.com/johndoe',
+          },
         },
-      },
-      error: null,
-    })
+        error: null,
+      })
+    }
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',

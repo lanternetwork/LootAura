@@ -24,12 +24,20 @@ export default function EditProfileClient({ initialProfile }: EditProfileClientP
   const handleProfileSaved = useCallback((updatedProfile: ProfileData) => {
     setProfile(updatedProfile)
     toast.success('Profile updated successfully')
-  }, [])
+    // Navigate back to dashboard after a short delay to show the toast
+    setTimeout(() => {
+      router.push('/dashboard')
+    }, 1000)
+  }, [router])
 
   const handleSocialLinksSaved = useCallback((updatedLinks: SocialLinks) => {
     setProfile(prev => ({ ...prev, social_links: updatedLinks }))
     toast.success('Social links updated successfully')
-  }, [])
+    // Navigate back to dashboard after a short delay to show the toast
+    setTimeout(() => {
+      router.push('/dashboard')
+    }, 1000)
+  }, [router])
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">

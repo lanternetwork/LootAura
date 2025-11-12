@@ -5,7 +5,23 @@ import { validateSession } from '@/lib/auth/server-session'
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   
-  // 0. Bypass auth callback route completely to prevent redirect loops
+  // 0. Immediately bypass static PWA files and manifest (before any other checks)
+  if (
+    pathname === '/manifest.json' ||
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/favicon.ico' ||
+    pathname === '/robots.txt' ||
+    pathname === '/sitemap.xml' ||
+    pathname === '/sw.js' ||
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/icons/') ||
+    pathname.startsWith('/images/') ||
+    pathname.endsWith('.json') && pathname.startsWith('/')
+  ) {
+    return NextResponse.next()
+  }
+  
+  // 0.1. Bypass auth callback route completely to prevent redirect loops
   if (pathname === '/auth/callback') {
     return NextResponse.next()
   }

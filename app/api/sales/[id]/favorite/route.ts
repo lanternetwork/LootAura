@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
   const supabase = createSupabaseServerClient()
 
   // Auth check
@@ -10,7 +10,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const saleId = params.id
+  // Handle params as Promise (Next.js 15+) or object (Next.js 13/14)
+  const resolvedParams = await Promise.resolve(params)
+  const saleId = resolvedParams.id
 
   // Toggle favorite in base table through public view
   // First check if exists

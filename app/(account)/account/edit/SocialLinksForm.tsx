@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'react-toastify'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { normalizeSocialLinks, SUPPORTED_PROVIDERS, type SocialLinks } from '@/lib/profile/social'
 
 interface SocialLinksFormProps {

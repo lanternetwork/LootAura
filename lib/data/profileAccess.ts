@@ -192,22 +192,41 @@ export async function getUserMetrics7d(
     // Build daily time series
     const seriesMap = new Map<string, { views: number; saves: number; clicks: number; fulfilled: number }>()
     
-    // Initialize all 7 days with zeros
+    // Initialize all 7 days with zeros (from oldest to newest)
     for (let i = 0; i < 7; i++) {
       const date = new Date(from)
       date.setDate(date.getDate() + i)
-      const dateStr = date.toISOString().split('T')[0]
+      // Use UTC date to avoid timezone issues
+      const year = date.getUTCFullYear()
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(date.getUTCDate()).padStart(2, '0')
+      const dateStr = `${year}-${month}-${day}`
       seriesMap.set(dateStr, { views: 0, saves: 0, clicks: 0, fulfilled: 0 })
     }
 
     // Aggregate events by date
     events?.forEach((event: any) => {
-      const date = new Date(event.ts).toISOString().split('T')[0]
-      if (seriesMap.has(date)) {
-        const dayData = seriesMap.get(date)!
+      if (!event.ts) return
+      
+      // Parse event timestamp and get date string in YYYY-MM-DD format
+      const eventDate = new Date(event.ts)
+      const year = eventDate.getUTCFullYear()
+      const month = String(eventDate.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(eventDate.getUTCDate()).padStart(2, '0')
+      const dateStr = `${year}-${month}-${day}`
+      
+      if (seriesMap.has(dateStr)) {
+        const dayData = seriesMap.get(dateStr)!
         if (event.event_type === 'view') dayData.views++
         if (event.event_type === 'save') dayData.saves++
         if (event.event_type === 'click') dayData.clicks++
+      } else {
+        // Log if event date doesn't match any series date (shouldn't happen)
+        console.warn('[PROFILE_ACCESS] Event date not in series range:', {
+          eventDate: dateStr,
+          eventTs: event.ts,
+          seriesDates: Array.from(seriesMap.keys()),
+        })
       }
     })
 

@@ -50,21 +50,10 @@ export async function POST(request: NextRequest) {
 
     // Update profile using RLS client with schema scope
     // Note: profiles.id matches auth.uid(), RLS policy enforces ownership
-    // Use getRlsDb() which creates a fresh client with cookies, same as profile update route
-    // IMPORTANT: getRlsDb() creates a client that reads from the same cookies as createSupabaseServerClient()
-    // Both should have the same session. The session is automatically loaded from cookies.
+    // CRITICAL: getRlsDb() must be called AFTER we've verified the user session
+    // This ensures the cookies contain the session when getRlsDb() reads them
+    // The session is automatically loaded from cookies by createServerClient
     const rls = getRlsDb()
-    
-    // Verify the RLS client can access the session by checking if it has the auth property
-    // Note: schema-scoped clients may not expose auth directly, but the session should still be available
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[PROFILE/SOCIAL_LINKS] RLS client check:', {
-        userId: user.id,
-        hasAuth: 'auth' in (rls as any),
-        rlsType: typeof rls,
-      })
-    }
-    
     const updateResult = await fromBase(rls, 'profiles')
       .update({
         social_links: socialLinksValue,

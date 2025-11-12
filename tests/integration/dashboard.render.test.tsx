@@ -120,7 +120,7 @@ describe('Dashboard Client', () => {
     )
   }
 
-  it('should render ProfileInfoCard with profile data', () => {
+  it('should render ProfileSummaryCard with profile data', () => {
     const { container } = renderWithQueryClient(
       <DashboardClient
         initialSales={mockSales}
@@ -130,10 +130,12 @@ describe('Dashboard Client', () => {
       />
     )
     
-    // Check for profile info elements (ProfileInfoCard displays display_name, not username)
-    expect(container.textContent).toContain('Profile Information')
+    // Check for profile summary elements (ProfileSummaryCard displays display_name read-only)
     expect(container.textContent).toContain('Test User')
-    expect(container.textContent).toContain('Edit')
+    expect(container.textContent).toContain('Edit Profile')
+    // Verify Edit Profile link exists
+    const editProfileLink = screen.getByText('Edit Profile')
+    expect(editProfileLink).toHaveAttribute('href', '/account/edit')
   })
 
   it('should render Drafts tab in SalesPanel with draft count', () => {

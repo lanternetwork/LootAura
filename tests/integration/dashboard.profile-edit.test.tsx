@@ -1,17 +1,17 @@
 /**
  * @vitest-environment jsdom
+ * 
+ * NOTE: Profile editing has been moved to /account/edit page.
+ * The dashboard now shows a read-only ProfileSummaryCard with an "Edit Profile" link.
+ * These tests verify the dashboard displays the profile summary correctly.
  */
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import DashboardClient from '@/app/(dashboard)/dashboard/DashboardClient'
 import type { ProfileData } from '@/lib/data/profileAccess'
-
-// Mock fetch - will be properly set up in beforeEach
-const mockFetch = vi.fn()
 
 // Mock Supabase client
 vi.mock('@/lib/supabase/server', () => ({
@@ -25,15 +25,7 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }))
 
-// Mock toast
-vi.mock('react-toastify', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}))
-
-describe('Dashboard Profile Editing', () => {
+describe('Dashboard Profile Summary', () => {
   const mockSales = [
     { id: 'sale-1', title: 'Test Sale 1', owner_id: 'test-user-id', status: 'published' },
   ] as any
@@ -61,9 +53,6 @@ describe('Dashboard Profile Editing', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // Set up fetch mock
-    global.fetch = mockFetch as any
-    mockFetch.mockClear()
   })
 
   const renderWithQueryClient = (component: React.ReactElement) => {
@@ -81,7 +70,7 @@ describe('Dashboard Profile Editing', () => {
     )
   }
 
-  it('should render ProfileInfoCard with initial profile data', () => {
+  it('should render ProfileSummaryCard with profile data', () => {
     renderWithQueryClient(
       <DashboardClient
         initialSales={mockSales}
@@ -90,83 +79,19 @@ describe('Dashboard Profile Editing', () => {
       />
     )
     
-    expect(screen.getByText('Profile Information')).toBeInTheDocument()
-    // When not editing, values are displayed as text, not inputs
+    // ProfileSummaryCard displays profile information read-only
     expect(screen.getByText('Test User')).toBeInTheDocument()
-    expect(screen.getByText('Initial bio')).toBeInTheDocument()
+    expect(screen.getByText('@testuser')).toBeInTheDocument()
     expect(screen.getByText('Louisville')).toBeInTheDocument()
-    expect(screen.getByText('KY')).toBeInTheDocument()
-  })
-
-  it('should allow editing profile info and save changes', async () => {
-    const user = userEvent.setup()
+    expect(screen.getByText(', KY')).toBeInTheDocument()
     
-    // Mock successful API response
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        ok: true,
-        data: {
-          profile: {
-            ...mockProfile,
-            display_name: 'Updated Name',
-            bio: 'Updated bio',
-          },
-        },
-      }),
-    } as Response)
-
-    renderWithQueryClient(
-      <DashboardClient
-        initialSales={mockSales}
-        initialProfile={mockProfile}
-        initialMetrics={mockMetrics}
-      />
-    )
-
-    // Click Edit button in ProfileInfoCard (use getAllByText and filter by role/context)
-    const editButtons = screen.getAllByText('Edit')
-    // Find the button in ProfileInfoCard (should be a button, not a link)
-    const editButton = editButtons.find(btn => btn.tagName === 'BUTTON' && btn.textContent === 'Edit')
-    expect(editButton).toBeInTheDocument()
-    await user.click(editButton!)
-
-    // Change display name
-    const displayNameInput = screen.getByDisplayValue('Test User')
-    await user.clear(displayNameInput)
-    await user.type(displayNameInput, 'Updated Name')
-
-    // Change bio
-    const bioInput = screen.getByDisplayValue('Initial bio')
-    await user.clear(bioInput)
-    await user.type(bioInput, 'Updated bio')
-
-    // Click Save button
-    const saveButton = screen.getByText('Save')
-    expect(saveButton).not.toBeDisabled()
-    await user.click(saveButton)
-
-    // Wait for API call
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/profile/update',
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            display_name: 'Updated Name',
-            bio: 'Updated bio',
-            city: 'Louisville',
-            region: 'KY',
-          }),
-        })
-      )
-    })
+    // Should have "Edit Profile" link (not button) that goes to /account/edit
+    const editProfileLink = screen.getByText('Edit Profile')
+    expect(editProfileLink).toBeInTheDocument()
+    expect(editProfileLink).toHaveAttribute('href', '/account/edit')
   })
 
-  it('should disable Save button when no changes are made', async () => {
-    const user = userEvent.setup()
-
+  it('should render Edit Profile link that navigates to edit page', () => {
     renderWithQueryClient(
       <DashboardClient
         initialSales={mockSales}
@@ -174,53 +99,11 @@ describe('Dashboard Profile Editing', () => {
         initialMetrics={mockMetrics}
       />
     )
-
-    // Click Edit button in ProfileInfoCard
-    const editButtons = screen.getAllByText('Edit')
-    const editButton = editButtons.find(btn => btn.tagName === 'BUTTON' && btn.textContent === 'Edit')
-    expect(editButton).toBeInTheDocument()
-    await user.click(editButton!)
-
-    // Save button should be disabled initially (no changes)
-    const saveButton = screen.getByText('Save')
-    expect(saveButton).toBeDisabled()
-  })
-
-  it('should allow canceling edits and restore original values', async () => {
-    const user = userEvent.setup()
-
-    renderWithQueryClient(
-      <DashboardClient
-        initialSales={mockSales}
-        initialProfile={mockProfile}
-        initialMetrics={mockMetrics}
-      />
-    )
-
-    // Click Edit button in ProfileInfoCard
-    const editButtons = screen.getAllByText('Edit')
-    const editButton = editButtons.find(btn => btn.tagName === 'BUTTON' && btn.textContent === 'Edit')
-    expect(editButton).toBeInTheDocument()
-    await user.click(editButton!)
-
-    // Wait for edit mode to activate
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Test User')).toBeInTheDocument()
-    })
-
-    // Change display name
-    const displayNameInput = screen.getByDisplayValue('Test User')
-    await user.clear(displayNameInput)
-    await user.type(displayNameInput, 'Changed Name')
-
-    // Click Cancel button
-    const cancelButton = screen.getByText('Cancel')
-    await user.click(cancelButton)
-
-    // Should be back to view mode with original value
-    await waitFor(() => {
-      expect(screen.getByText('Test User')).toBeInTheDocument()
-    })
+    
+    // Verify Edit Profile link exists and points to /account/edit
+    const editProfileLink = screen.getByText('Edit Profile')
+    expect(editProfileLink.tagName).toBe('A')
+    expect(editProfileLink).toHaveAttribute('href', '/account/edit')
   })
 })
 

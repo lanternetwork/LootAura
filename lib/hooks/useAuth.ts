@@ -175,7 +175,7 @@ export function useToggleFavorite() {
   const { data: user } = useAuth()
 
   return useMutation({
-    mutationFn: async ({ saleId, isFavorited }: { saleId: string; isFavorited: boolean }) => {
+    mutationFn: async ({ saleId }: { saleId: string; isFavorited: boolean }) => {
       if (!user) throw new Error('Please sign in to save favorites')
 
       // Use API route for consistency with SaleDetailClient
@@ -194,7 +194,7 @@ export function useToggleFavorite() {
       const result = await response.json()
       return result
     },
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       // Invalidate with user ID to match useFavorites query key
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: ['favorites', user.id] })

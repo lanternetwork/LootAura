@@ -110,12 +110,11 @@ export async function POST(request: NextRequest) {
   } catch (e: any) {
     const errorMessage = e?.message || 'Unknown error'
     const errorStack = e?.stack || ''
+    const errorString = e ? JSON.stringify(e, Object.getOwnPropertyNames(e)) : 'No error object'
     
-    console.error('[PROFILE/SOCIAL_LINKS] Unexpected error:', {
-      message: errorMessage,
-      stack: errorStack,
-      error: e,
-    })
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[PROFILE/SOCIAL_LINKS] Unexpected error:', errorMessage, errorStack || '', errorString)
+    }
     
     Sentry.captureException(e, { 
       tags: { operation: 'updateSocialLinks' },

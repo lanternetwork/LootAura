@@ -115,19 +115,8 @@ describe('POST /api/profile/social-links', () => {
   it('should normalize and update social links', async () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     
-    // Set up the mock implementation before the route handler calls it
-    vi.mocked(createSupabaseServerClient).mockReturnValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-123' } },
-          error: null,
-        }),
-      },
-    } as any)
-
     // Create fresh mock chain with the expected return value
     const chain = createMockChain()
-    // Set the return value explicitly - must be set before fromBase is called
     chain.mockSingle.mockResolvedValue({
       data: {
         social_links: {
@@ -137,6 +126,23 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
     mockState.currentMockChain = chain
+    
+    // Set up the mock implementation before the route handler calls it
+    // The schema() method should return an object with a from() method
+    // fromBase calls db.from(table), which should return the query chain
+    vi.mocked(createSupabaseServerClient).mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        }),
+      },
+      schema: vi.fn(() => ({
+        from: vi.fn(() => ({
+          update: chain.mockUpdate,
+        })),
+      })),
+    } as any)
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',
@@ -154,16 +160,6 @@ describe('POST /api/profile/social-links', () => {
   it('should drop invalid links', async () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     
-    // Set up the mock implementation before the route handler calls it
-    vi.mocked(createSupabaseServerClient).mockReturnValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-123' } },
-          error: null,
-        }),
-      },
-    } as any)
-
     // Create fresh mock chain with the expected return value
     const chain = createMockChain()
     // Set the return value explicitly - must be set before fromBase is called
@@ -176,6 +172,23 @@ describe('POST /api/profile/social-links', () => {
       error: null,
     })
     mockState.currentMockChain = chain
+    
+    // Set up the mock implementation before the route handler calls it
+    // The schema() method should return an object with a from() method
+    // fromBase calls db.from(table), which should return the query chain
+    vi.mocked(createSupabaseServerClient).mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        }),
+      },
+      schema: vi.fn(() => ({
+        from: vi.fn(() => ({
+          update: chain.mockUpdate,
+        })),
+      })),
+    } as any)
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',

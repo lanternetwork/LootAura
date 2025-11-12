@@ -878,14 +878,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         sessionStorage.removeItem('auth:postLoginRedirect')
         sessionStorage.removeItem('draft:returnStep')
         
-        // Delete server-side draft if it exists
-        // Note: publishDraftServer marks it as 'published', but we should still delete it
-        if (draftKeyRef.current && user) {
-          await deleteDraftServer(draftKeyRef.current).catch((error) => {
-            // Log error but don't fail the sale creation
-            console.warn('[SELL_WIZARD] Failed to delete server draft after publish:', error)
-          })
-        }
+        // Note: The publish endpoint should have already deleted the draft server-side
+        // We don't need to delete it again here - the publish endpoint handles deletion
+        // This prevents race conditions and ensures consistency
         
         // Clear the draft key ref to prevent reuse
         draftKeyRef.current = null

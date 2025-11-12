@@ -206,10 +206,13 @@ export async function POST(request: NextRequest) {
     })
     
     // Delete the draft using admin client (bypasses RLS)
+    // Use both id and draft_key for extra safety and to ensure we match the right draft
     const { data: deleteData, error: deleteErr } = await fromBase(admin, 'sale_drafts')
       .delete()
       .eq('id', draft.id)
+      .eq('draft_key', draft.draft_key) // Match on draft_key as well for extra safety
       .eq('user_id', user.id) // Extra safety check: ensure we only delete drafts owned by the user
+      .eq('status', 'active') // Only delete active drafts
       .select('id') // Select to get deleted row count
 
     if (deleteErr) {

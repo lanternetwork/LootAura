@@ -125,8 +125,25 @@ export async function getUserMetrics7d(
     // If table doesn't exist or query fails, return defaults
     if (eventsError) {
       const errorCode = (eventsError as any)?.code
+      const errorMessage = (eventsError as any)?.message || 'Unknown error'
+      const errorDetails = (eventsError as any)?.details || ''
+      const errorHint = (eventsError as any)?.hint || ''
+      
+      // Log detailed error information
+      console.error('[PROFILE_ACCESS] Error fetching analytics events:', {
+        code: errorCode,
+        message: errorMessage,
+        details: errorDetails,
+        hint: errorHint,
+        userId,
+        from: from.toISOString(),
+        to: to.toISOString(),
+        fullError: eventsError,
+      })
+      
       if (errorCode === '42P01' || errorCode === 'PGRST116') {
-        // Table doesn't exist - return defaults
+        // Table/view doesn't exist - return defaults
+        console.warn('[PROFILE_ACCESS] Analytics events view does not exist, returning defaults')
         return {
           views7d: 0,
           saves7d: 0,
@@ -136,9 +153,6 @@ export async function getUserMetrics7d(
         }
       }
       // Other error - log and return defaults
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[PROFILE_ACCESS] Error fetching analytics events:', eventsError)
-      }
       return {
         views7d: 0,
         saves7d: 0,
@@ -146,6 +160,16 @@ export async function getUserMetrics7d(
         salesFulfilled: 0,
         series: [],
       }
+    }
+    
+    // Log successful query for debugging
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[PROFILE_ACCESS] Analytics events fetched:', {
+        userId,
+        eventCount: events?.length || 0,
+        from: from.toISOString(),
+        to: to.toISOString(),
+      })
     }
 
     // Query fulfilled sales (completed sales) from the last 7 days

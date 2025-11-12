@@ -102,29 +102,50 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
         },
       })
 
-      if (response.ok) {
-        const wasFavorited = isFavorited
-        setIsFavorited(!isFavorited)
-        
-        // Track save event if favoriting (not unfavoriting)
-        if (!wasFavorited) {
-          fetch('/api/analytics/track', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sale_id: sale.id,
-              event_type: 'save',
-            }),
-          }).catch((error) => {
-            // Silently fail - analytics tracking shouldn't break the page
-            if (process.env.NODE_ENV !== 'production') {
-              console.warn('[SALE_DETAIL] Failed to track save event:', error)
-            }
+      if (!response.ok) {
+        // Log error details
+        let errorMessage = 'Failed to save sale'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorMessage
+          console.error('[SALE_DETAIL] Favorite toggle failed:', {
+            status: response.status,
+            error: errorData,
+          })
+        } catch (e) {
+          console.error('[SALE_DETAIL] Favorite toggle failed:', {
+            status: response.status,
+            statusText: response.statusText,
           })
         }
+        // Show error to user (you might want to use a toast here)
+        alert(errorMessage)
+        return
+      }
+
+      const result = await response.json()
+      const wasFavorited = isFavorited
+      setIsFavorited(result.favorited ?? !isFavorited)
+      
+      // Track save event if favoriting (not unfavoriting)
+      if (result.favorited && !wasFavorited) {
+        fetch('/api/analytics/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sale_id: sale.id,
+            event_type: 'save',
+          }),
+        }).catch((error) => {
+          // Silently fail - analytics tracking shouldn't break the page
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('[SALE_DETAIL] Failed to track save event:', error)
+          }
+        })
       }
     } catch (error) {
-      console.error('Failed to toggle favorite:', error)
+      console.error('[SALE_DETAIL] Failed to toggle favorite:', error)
+      alert('Failed to save sale. Please try again.')
     }
   }
 

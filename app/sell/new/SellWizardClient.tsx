@@ -915,7 +915,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         
         // Clear the draft key ref to prevent reuse
         draftKeyRef.current = null
-        // Keep isPublishingRef.current = true to prevent any future autosaves
+        // Reset publishing flag since publish completed successfully
+        // The draft is deleted, so autosave won't recreate it anyway
+        isPublishingRef.current = false
 
         // Show confirmation modal
         setCreatedSaleId(saleId)
@@ -923,8 +925,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       } catch (error) {
         console.error('[SELL_WIZARD] Error publishing draft:', error)
         setSubmitError(error instanceof Error ? error.message : 'Failed to publish sale')
+        // Reset publishing flag on error so autosave can work again
         // Don't restore draftKeyRef - the draft should remain cleared even on error
         // User can start fresh if they need to
+        isPublishingRef.current = false
       } finally {
         setLoading(false)
       }

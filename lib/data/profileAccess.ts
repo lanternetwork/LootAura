@@ -224,6 +224,16 @@ export async function getUserMetrics7d(
       .map(([date, counts]) => ({ date, ...counts }))
       .sort((a, b) => a.date.localeCompare(b.date))
 
+    // Log series data for debugging
+    console.log('[PROFILE_ACCESS] Series data:', {
+      userId,
+      seriesLength: series.length,
+      series: series.map(s => ({ date: s.date, views: s.views, saves: s.saves, clicks: s.clicks })),
+      views7d,
+      saves7d,
+      clicks7d,
+    })
+
     return {
       views7d,
       saves7d,

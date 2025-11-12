@@ -62,6 +62,23 @@ export default function SocialLinksForm({ initialLinks, onSaved }: SocialLinksFo
         body: JSON.stringify({ links: normalized }),
       })
 
+      // Check if response is ok before trying to parse JSON
+      if (!response.ok) {
+        let errorMessage = `Server error: ${response.status} ${response.statusText}`
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorData.message || errorMessage
+          if (errorData.details) {
+            console.error('[SOCIAL_LINKS_FORM] Error details:', errorData.details)
+          }
+        } catch (e) {
+          // If JSON parsing fails, use the status text
+          console.error('[SOCIAL_LINKS_FORM] Failed to parse error response:', e)
+        }
+        toast.error(errorMessage)
+        return
+      }
+
       const result = await response.json()
 
       if (result.ok) {
@@ -75,11 +92,14 @@ export default function SocialLinksForm({ initialLinks, onSaved }: SocialLinksFo
           onSaved(result.data.social_links)
         }
       } else {
-        toast.error(result.error || 'Failed to update social links')
+        const errorMessage = result.error || result.message || 'Failed to update social links'
+        console.error('[SOCIAL_LINKS_FORM] API returned error:', result)
+        toast.error(errorMessage)
       }
     } catch (error) {
       console.error('[SOCIAL_LINKS_FORM] Save error:', error)
-      toast.error('Failed to update social links')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update social links'
+      toast.error(errorMessage)
     } finally {
       setSaving(false)
     }

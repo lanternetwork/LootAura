@@ -162,15 +162,14 @@ export async function getUserMetrics7d(
       }
     }
     
-    // Log successful query for debugging
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[PROFILE_ACCESS] Analytics events fetched:', {
-        userId,
-        eventCount: events?.length || 0,
-        from: from.toISOString(),
-        to: to.toISOString(),
-      })
-    }
+    // Log successful query for debugging (always log in production too for now)
+    console.log('[PROFILE_ACCESS] Analytics events fetched:', {
+      userId,
+      eventCount: events?.length || 0,
+      from: from.toISOString(),
+      to: to.toISOString(),
+      events: events?.slice(0, 5), // Log first 5 events for debugging
+    })
 
     // Query fulfilled sales (completed sales) from the last 7 days
     const { data: sales, error: salesError } = await supabase

@@ -136,6 +136,7 @@ describe('POST /api/profile/social-links', () => {
     mockState.currentMockChain = chain
     
     // Set up the mock implementation before the route handler calls it
+    // The route now uses supabase.schema('lootaura_v2'), so we need to mock schema()
     vi.mocked(createSupabaseServerClient).mockReturnValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -143,6 +144,19 @@ describe('POST /api/profile/social-links', () => {
           error: null,
         }),
       },
+      schema: vi.fn(() => {
+        // schema() returns an object that fromBase can use
+        // fromBase calls db.from(table), which should return the query chain
+        if (!mockState.currentMockChain) {
+          throw new Error('schema() called but mockState.currentMockChain is not set.')
+        }
+        const chain = mockState.currentMockChain
+        return {
+          from: vi.fn(() => ({
+            update: chain.mockUpdate,
+          })),
+        }
+      }),
     } as any)
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
@@ -175,6 +189,7 @@ describe('POST /api/profile/social-links', () => {
     mockState.currentMockChain = chain
     
     // Set up the mock implementation before the route handler calls it
+    // The route now uses supabase.schema('lootaura_v2'), so we need to mock schema()
     vi.mocked(createSupabaseServerClient).mockReturnValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -182,6 +197,19 @@ describe('POST /api/profile/social-links', () => {
           error: null,
         }),
       },
+      schema: vi.fn(() => {
+        // schema() returns an object that fromBase can use
+        // fromBase calls db.from(table), which should return the query chain
+        if (!mockState.currentMockChain) {
+          throw new Error('schema() called but mockState.currentMockChain is not set.')
+        }
+        const chain = mockState.currentMockChain
+        return {
+          from: vi.fn(() => ({
+            update: chain.mockUpdate,
+          })),
+        }
+      }),
     } as any)
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {

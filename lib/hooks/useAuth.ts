@@ -178,25 +178,28 @@ export function useToggleFavorite() {
     mutationFn: async ({ saleId, isFavorited }: { saleId: string; isFavorited: boolean }) => {
       if (!user) throw new Error('Please sign in to save favorites')
 
-      // Work directly against Supabase from the browser to avoid server-session 401s
-      if (isFavorited) {
-        const { error } = await sb
-          .from('favorites_v2')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('sale_id', saleId)
+      // Use API route for consistency with SaleDetailClient
+      const response = await fetch(`/api/sales/${saleId}/favorite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
 
-        if (error) throw new Error(error.message)
-      } else {
-        const { error } = await sb
-          .from('favorites_v2')
-          // upsert to avoid 409 conflict on rapid clicks
-          .upsert({ user_id: user.id, sale_id: saleId }, { onConflict: 'user_id,sale_id', ignoreDuplicates: true })
-
-        if (error) throw new Error(error.message)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to toggle favorite' }))
+        throw new Error(errorData.error || 'Failed to toggle favorite')
       }
+
+      const result = await response.json()
+      return result
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      // Invalidate with user ID to match useFavorites query key
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['favorites', user.id] })
+      }
+      // Also invalidate general favorites queries
       queryClient.invalidateQueries({ queryKey: ['favorites'] })
     },
   })

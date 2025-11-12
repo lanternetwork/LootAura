@@ -8,7 +8,7 @@ import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
-import { useAuth, useFavorites } from '@/lib/hooks/useAuth'
+import { useAuth, useFavorites, useToggleFavorite } from '@/lib/hooks/useAuth'
 import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
 import CategoryChips from '@/components/ui/CategoryChips'
 import OSMAttribution from '@/components/location/OSMAttribution'
@@ -38,6 +38,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   const [isFavorited, setIsFavorited] = useState(false)
   const { data: currentUser } = useAuth()
   const { data: favoriteSales = [] } = useFavorites()
+  const toggleFavorite = useToggleFavorite()
   const [showFullDescription, setShowFullDescription] = useState(false)
   const cover = getSaleCoverUrl(sale)
   const viewTrackedRef = useRef(false)
@@ -95,36 +96,15 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
         window.location.href = `/auth/signin?redirectTo=${encodeURIComponent(window.location.pathname)}`
         return
       }
-      const response = await fetch(`/api/sales/${sale.id}/favorite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+
+      const wasFavorited = isFavorited
+      
+      // Use the same hook as FavoriteButton for consistency
+      const result = await toggleFavorite.mutateAsync({ 
+        saleId: sale.id, 
+        isFavorited 
       })
 
-      if (!response.ok) {
-        // Log error details
-        let errorMessage = 'Failed to save sale'
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.error || errorMessage
-          console.error('[SALE_DETAIL] Favorite toggle failed:', {
-            status: response.status,
-            error: errorData,
-          })
-        } catch (e) {
-          console.error('[SALE_DETAIL] Favorite toggle failed:', {
-            status: response.status,
-            statusText: response.statusText,
-          })
-        }
-        // Show error to user (you might want to use a toast here)
-        alert(errorMessage)
-        return
-      }
-
-      const result = await response.json()
-      const wasFavorited = isFavorited
       setIsFavorited(result.favorited ?? !isFavorited)
       
       // Track save event if favoriting (not unfavoriting)
@@ -143,9 +123,9 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
           }
         })
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[SALE_DETAIL] Failed to toggle favorite:', error)
-      alert('Failed to save sale. Please try again.')
+      alert(error?.message || 'Failed to save sale. Please try again.')
     }
   }
 

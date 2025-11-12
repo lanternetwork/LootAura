@@ -232,9 +232,17 @@ export async function getUserMetrics7d(
 
     // Aggregate fulfilled sales by date
     sales?.forEach((sale: any) => {
-      const date = new Date(sale.updated_at).toISOString().split('T')[0]
-      if (seriesMap.has(date)) {
-        seriesMap.get(date)!.fulfilled++
+      if (!sale.updated_at) return
+      
+      // Parse sale updated_at and get date string in YYYY-MM-DD format (UTC)
+      const saleDate = new Date(sale.updated_at)
+      const year = saleDate.getUTCFullYear()
+      const month = String(saleDate.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(saleDate.getUTCDate()).padStart(2, '0')
+      const dateStr = `${year}-${month}-${day}`
+      
+      if (seriesMap.has(dateStr)) {
+        seriesMap.get(dateStr)!.fulfilled++
       }
     })
 

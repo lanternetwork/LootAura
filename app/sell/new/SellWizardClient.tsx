@@ -858,15 +858,21 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       setLoading(true)
       setSubmitError(null)
       
+      // Store draft key before clearing it (we need it for the publish call)
+      const draftKeyToPublish = draftKeyRef.current
+      
       // Clear any pending autosave and prevent future autosaves
       if (autosaveTimeoutRef.current) {
         clearTimeout(autosaveTimeoutRef.current)
         autosaveTimeoutRef.current = null
       }
       isPublishingRef.current = true
+      // Clear draftKeyRef immediately to prevent autosave from saving
+      // (even if a pending timeout executes, it won't have a draftKey to save to)
+      draftKeyRef.current = null
 
       try {
-        const result = await publishDraftServer(draftKeyRef.current)
+        const result = await publishDraftServer(draftKeyToPublish)
         
         if (!result.ok) {
           if (result.code === 'AUTH_REQUIRED') {

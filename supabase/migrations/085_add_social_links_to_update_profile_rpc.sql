@@ -1,6 +1,10 @@
 -- 085_add_social_links_to_update_profile_rpc.sql
 -- Add social_links parameter to update_profile RPC function
 
+-- Drop the existing function first to avoid ambiguity
+DROP FUNCTION IF EXISTS public.update_profile(uuid, text, text, text, text, text, text);
+
+-- Recreate with social_links parameter
 CREATE OR REPLACE FUNCTION public.update_profile(
   p_user_id uuid,
   p_avatar_url text DEFAULT NULL,

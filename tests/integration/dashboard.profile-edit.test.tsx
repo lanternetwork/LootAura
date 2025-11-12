@@ -10,8 +10,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import DashboardClient from '@/app/(dashboard)/dashboard/DashboardClient'
 import type { ProfileData } from '@/lib/data/profileAccess'
 
-// Mock fetch
-global.fetch = vi.fn() as any
+// Mock fetch - will be properly set up in beforeEach
+const mockFetch = vi.fn()
 
 // Mock Supabase client
 vi.mock('@/lib/supabase/server', () => ({
@@ -61,6 +61,9 @@ describe('Dashboard Profile Editing', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Set up fetch mock
+    global.fetch = mockFetch as any
+    mockFetch.mockClear()
   })
 
   const renderWithQueryClient = (component: React.ReactElement) => {
@@ -99,7 +102,7 @@ describe('Dashboard Profile Editing', () => {
     const user = userEvent.setup()
     
     // Mock successful API response
-    ;(global.fetch as any).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         ok: true,
@@ -145,7 +148,7 @@ describe('Dashboard Profile Editing', () => {
 
     // Wait for API call
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         '/api/profile/update',
         expect.objectContaining({
           method: 'POST',

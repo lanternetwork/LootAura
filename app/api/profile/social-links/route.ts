@@ -1,7 +1,7 @@
 // NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
 import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { normalizeSocialLinks, type SocialLinks } from '@/lib/profile/social'
 import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
@@ -48,10 +48,9 @@ export async function POST(request: NextRequest) {
     // Ensure normalizedLinks is a valid JSONB object (not null/undefined)
     const socialLinksValue = Object.keys(normalizedLinks).length > 0 ? normalizedLinks : {}
 
-    // Update profile using the same authenticated client with schema scope
-    // Use the supabase client that already has the user's session, but apply schema
+    // Update profile using RLS client with schema scope
     // Note: profiles.id matches auth.uid(), RLS policy enforces ownership
-    const rls = supabase.schema('lootaura_v2')
+    const rls = getRlsDb()
     const updateResult = await fromBase(rls, 'profiles')
       .update({
         social_links: socialLinksValue,

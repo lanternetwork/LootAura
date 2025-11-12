@@ -50,7 +50,20 @@ export async function POST(request: NextRequest) {
 
     // Update profile using RLS client with schema scope
     // Note: profiles.id matches auth.uid(), RLS policy enforces ownership
+    // Both getRlsDb() and createSupabaseServerClient() read from the same cookies,
+    // so they should have the same session. getRlsDb() returns sb.schema('lootaura_v2')
+    // which is properly configured for RLS operations.
     const rls = getRlsDb()
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[PROFILE/SOCIAL_LINKS] Updating social links:', {
+        userId: user.id,
+        socialLinksValue,
+        rlsClientType: typeof rls,
+        hasFrom: typeof (rls as any).from === 'function',
+      })
+    }
+    
     const updateResult = await fromBase(rls, 'profiles')
       .update({
         social_links: socialLinksValue,

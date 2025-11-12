@@ -90,11 +90,15 @@ describe('POST /api/profile/social-links', () => {
 
   it('should require authentication', async () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
-    const mockClient = createSupabaseServerClient() as any
-    mockClient.auth.getUser.mockResolvedValue({
-      data: { user: null },
-      error: { message: 'Not authenticated' },
-    })
+    // Set up the mock implementation before the route handler calls it
+    vi.mocked(createSupabaseServerClient).mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: null },
+          error: { message: 'Not authenticated' },
+        }),
+      },
+    } as any)
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
       method: 'POST',
@@ -111,11 +115,15 @@ describe('POST /api/profile/social-links', () => {
   it('should normalize and update social links', async () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     
-    const mockClient = createSupabaseServerClient() as any
-    mockClient.auth.getUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    })
+    // Set up the mock implementation before the route handler calls it
+    vi.mocked(createSupabaseServerClient).mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        }),
+      },
+    } as any)
 
     // Create fresh mock chain with the expected return value
     const chain = createMockChain()
@@ -138,10 +146,6 @@ describe('POST /api/profile/social-links', () => {
     const response = await POST(request)
     const data = await response.json()
 
-    // Debug: if it failed, log the actual response
-    if (!data.ok) {
-      console.error('Response data:', JSON.stringify(data, null, 2))
-    }
     expect(data.ok).toBe(true)
     expect(data.code).toBeUndefined() // Should not have an error code
     expect(data.data.social_links.twitter).toBe('https://twitter.com/johndoe')
@@ -150,11 +154,15 @@ describe('POST /api/profile/social-links', () => {
   it('should drop invalid links', async () => {
     const { createSupabaseServerClient } = await import('@/lib/supabase/server')
     
-    const mockClient = createSupabaseServerClient() as any
-    mockClient.auth.getUser.mockResolvedValue({
-      data: { user: { id: 'user-123' } },
-      error: null,
-    })
+    // Set up the mock implementation before the route handler calls it
+    vi.mocked(createSupabaseServerClient).mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-123' } },
+          error: null,
+        }),
+      },
+    } as any)
 
     // Create fresh mock chain with the expected return value
     const chain = createMockChain()
@@ -182,10 +190,6 @@ describe('POST /api/profile/social-links', () => {
     const response = await POST(request)
     const data = await response.json()
 
-    // Debug: if it failed, log the actual response
-    if (!data.ok) {
-      console.error('Response data:', JSON.stringify(data, null, 2))
-    }
     expect(data.ok).toBe(true)
     expect(data.code).toBeUndefined() // Should not have an error code
     expect(data.data.social_links.twitter).toBe('https://twitter.com/johndoe')

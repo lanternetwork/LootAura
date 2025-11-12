@@ -91,17 +91,17 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   }
 
   const handleFavoriteToggle = async () => {
-    try {
-      if (!currentUser) {
-        window.location.href = `/auth/signin?redirectTo=${encodeURIComponent(window.location.pathname)}`
-        return
-      }
+    if (!currentUser) {
+      window.location.href = `/auth/signin?redirectTo=${encodeURIComponent(window.location.pathname)}`
+      return
+    }
 
-      const wasFavorited = isFavorited
-      
-      // Optimistic UI update - update immediately for instant feedback
-      setIsFavorited(!isFavorited)
-      
+    const wasFavorited = isFavorited
+    
+    // Optimistic UI update - update immediately for instant feedback
+    setIsFavorited(!isFavorited)
+    
+    try {
       // Use the same hook as FavoriteButton for consistency
       const result = await toggleFavorite.mutateAsync({ 
         saleId: sale.id, 

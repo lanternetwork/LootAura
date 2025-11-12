@@ -11,7 +11,7 @@ import DashboardClient from '@/app/(dashboard)/dashboard/DashboardClient'
 import type { ProfileData } from '@/lib/data/profileAccess'
 
 // Mock fetch
-global.fetch = vi.fn()
+global.fetch = vi.fn() as any
 
 // Mock Supabase client
 vi.mock('@/lib/supabase/server', () => ({
@@ -88,17 +88,18 @@ describe('Dashboard Profile Editing', () => {
     )
     
     expect(screen.getByText('Profile Information')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Test User')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Initial bio')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Louisville')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('KY')).toBeInTheDocument()
+    // When not editing, values are displayed as text, not inputs
+    expect(screen.getByText('Test User')).toBeInTheDocument()
+    expect(screen.getByText('Initial bio')).toBeInTheDocument()
+    expect(screen.getByText('Louisville')).toBeInTheDocument()
+    expect(screen.getByText('KY')).toBeInTheDocument()
   })
 
   it('should allow editing profile info and save changes', async () => {
     const user = userEvent.setup()
     
     // Mock successful API response
-    vi.mocked(global.fetch).mockResolvedValueOnce({
+    ;(global.fetch as any).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         ok: true,
@@ -120,9 +121,12 @@ describe('Dashboard Profile Editing', () => {
       />
     )
 
-    // Click Edit button
-    const editButton = screen.getByText('Edit')
-    await user.click(editButton)
+    // Click Edit button in ProfileInfoCard (use getAllByText and filter by role/context)
+    const editButtons = screen.getAllByText('Edit')
+    // Find the button in ProfileInfoCard (should be a button, not a link)
+    const editButton = editButtons.find(btn => btn.tagName === 'BUTTON' && btn.textContent === 'Edit')
+    expect(editButton).toBeInTheDocument()
+    await user.click(editButton!)
 
     // Change display name
     const displayNameInput = screen.getByDisplayValue('Test User')
@@ -168,9 +172,11 @@ describe('Dashboard Profile Editing', () => {
       />
     )
 
-    // Click Edit button
-    const editButton = screen.getByText('Edit')
-    await user.click(editButton)
+    // Click Edit button in ProfileInfoCard
+    const editButtons = screen.getAllByText('Edit')
+    const editButton = editButtons.find(btn => btn.tagName === 'BUTTON' && btn.textContent === 'Edit')
+    expect(editButton).toBeInTheDocument()
+    await user.click(editButton!)
 
     // Save button should be disabled initially (no changes)
     const saveButton = screen.getByText('Save')
@@ -188,9 +194,16 @@ describe('Dashboard Profile Editing', () => {
       />
     )
 
-    // Click Edit button
-    const editButton = screen.getByText('Edit')
-    await user.click(editButton)
+    // Click Edit button in ProfileInfoCard
+    const editButtons = screen.getAllByText('Edit')
+    const editButton = editButtons.find(btn => btn.tagName === 'BUTTON' && btn.textContent === 'Edit')
+    expect(editButton).toBeInTheDocument()
+    await user.click(editButton!)
+
+    // Wait for edit mode to activate
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Test User')).toBeInTheDocument()
+    })
 
     // Change display name
     const displayNameInput = screen.getByDisplayValue('Test User')

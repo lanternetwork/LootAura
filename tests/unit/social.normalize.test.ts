@@ -60,8 +60,8 @@ describe('normalizeSocialLinks', () => {
     const result = normalizeSocialLinks(input)
 
     expect(result.twitter).toBe('https://twitter.com/johndoe')
-    expect(result.unknownKey).toBeUndefined()
-    expect(result.anotherUnknown).toBeUndefined()
+    expect('unknownKey' in result).toBe(false)
+    expect('anotherUnknown' in result).toBe(false)
   })
 
   it('should handle empty strings', () => {

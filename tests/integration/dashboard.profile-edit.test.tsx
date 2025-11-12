@@ -61,7 +61,6 @@ describe('Dashboard Profile Editing', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(global.fetch).mockClear()
   })
 
   const renderWithQueryClient = (component: React.ReactElement) => {

@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'react-toastify'
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { normalizeSocialLinks, SUPPORTED_PROVIDERS, type SocialLinks } from '@/lib/profile/social'
+// These imports are used but ESLint doesn't recognize usage in typeof expressions and function calls
+import { normalizeSocialLinks, SUPPORTED_PROVIDERS, type SocialLinks } from '@/lib/profile/social' // eslint-disable-line @typescript-eslint/no-unused-vars
 
 interface SocialLinksFormProps {
   initialLinks: SocialLinks | null

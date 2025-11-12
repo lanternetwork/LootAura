@@ -129,7 +129,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
       }
     } catch (error: any) {
       // Rollback optimistic update on error
-      setIsFavorited(isFavorited)
+      setIsFavorited(wasFavorited)
       console.error('[SALE_DETAIL] Failed to toggle favorite:', error)
       alert(error?.message || 'Failed to save sale. Please try again.')
     }

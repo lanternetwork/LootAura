@@ -108,8 +108,20 @@ export default function SaleShareButton({ url, title, text, saleId }: SaleShareB
         url,
       })
       
-      // Track analytics
+      // Track analytics (client-side)
       analytics.trackShare(saleId, 'webshare')
+      
+      // Track share event in database
+      fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sale_id: saleId,
+          event_type: 'share',
+        }),
+      }).catch(() => {
+        // Silently fail - analytics tracking shouldn't break the page
+      })
     } catch (error: any) {
       // User canceled or error occurred
       if (error.name !== 'AbortError') {
@@ -125,8 +137,20 @@ export default function SaleShareButton({ url, title, text, saleId }: SaleShareB
         await navigator.clipboard.writeText(target.url)
         toast.success('Link copied to clipboard')
         
-        // Track analytics
+        // Track analytics (client-side)
         analytics.trackShare(saleId, 'copy')
+        
+        // Track share event in database
+        fetch('/api/analytics/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sale_id: saleId,
+            event_type: 'share',
+          }),
+        }).catch(() => {
+          // Silently fail - analytics tracking shouldn't break the page
+        })
       } else if (document.execCommand) {
         // Fallback for older browsers
         const textArea = document.createElement('textarea')
@@ -165,9 +189,21 @@ export default function SaleShareButton({ url, title, text, saleId }: SaleShareB
     // Open share URL in new window
     window.open(target.url, '_blank', 'noopener,noreferrer')
     
-    // Track analytics
+    // Track analytics (client-side)
     const provider = target.id === 'twitter' ? 'twitter' : target.id === 'facebook' ? 'facebook' : target.id === 'reddit' ? 'reddit' : target.id === 'whatsapp' ? 'whatsapp' : target.id === 'email' ? 'email' : target.id === 'sms' ? 'sms' : 'unknown'
     analytics.trackShare(saleId, provider)
+    
+    // Track share event in database
+    fetch('/api/analytics/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sale_id: saleId,
+        event_type: 'share',
+      }),
+    }).catch(() => {
+      // Silently fail - analytics tracking shouldn't break the page
+    })
     
     setIsMenuOpen(false)
   }

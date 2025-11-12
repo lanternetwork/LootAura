@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
@@ -40,6 +40,28 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   const { data: favoriteSales = [] } = useFavorites()
   const [showFullDescription, setShowFullDescription] = useState(false)
   const cover = getSaleCoverUrl(sale)
+  const viewTrackedRef = useRef(false)
+
+  // Track view event when component mounts (only once)
+  useEffect(() => {
+    if (!viewTrackedRef.current) {
+      viewTrackedRef.current = true
+      // Track view event
+      fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sale_id: sale.id,
+          event_type: 'view',
+        }),
+      }).catch((error) => {
+        // Silently fail - analytics tracking shouldn't break the page
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[SALE_DETAIL] Failed to track view event:', error)
+        }
+      })
+    }
+  }, [sale.id])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -81,7 +103,25 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
       })
 
       if (response.ok) {
+        const wasFavorited = isFavorited
         setIsFavorited(!isFavorited)
+        
+        // Track save event if favoriting (not unfavoriting)
+        if (!wasFavorited) {
+          fetch('/api/analytics/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sale_id: sale.id,
+              event_type: 'save',
+            }),
+          }).catch((error) => {
+            // Silently fail - analytics tracking shouldn't break the page
+            if (process.env.NODE_ENV !== 'production') {
+              console.warn('[SALE_DETAIL] Failed to track save event:', error)
+            }
+          })
+        }
       }
     } catch (error) {
       console.error('Failed to toggle favorite:', error)

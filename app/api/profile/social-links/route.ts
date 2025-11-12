@@ -1,7 +1,6 @@
 // NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
 import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { normalizeSocialLinks, type SocialLinks } from '@/lib/profile/social'
 import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
@@ -48,55 +47,27 @@ export async function POST(request: NextRequest) {
     // Ensure normalizedLinks is a valid JSONB object (not null/undefined)
     const socialLinksValue = Object.keys(normalizedLinks).length > 0 ? normalizedLinks : {}
 
-    // Update profile using RLS client with schema scope
-    // Note: profiles.id matches auth.uid(), RLS policy enforces ownership
-    // CRITICAL: getRlsDb() must be called AFTER we've verified the user session
-    // This ensures the cookies contain the session when getRlsDb() reads them
-    // The session is automatically loaded from cookies by createServerClient
-    const rls = getRlsDb()
-    const updateResult = await fromBase(rls, 'profiles')
-      .update({
-        social_links: socialLinksValue,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', user.id)
-      .select('social_links')
-      .single()
+    // Update profile using RPC function which uses SECURITY DEFINER to bypass RLS
+    // This is more reliable than direct table updates when RLS session issues occur
+    // The RPC function validates that p_user_id matches the authenticated user
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('update_profile', {
+      p_user_id: user.id,
+      p_social_links: socialLinksValue,
+    })
 
-    // Check if updateResult is valid and has expected structure
-    // Must check for null/undefined first before using 'in' operator
-    if (updateResult == null || typeof updateResult !== 'object') {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[PROFILE/SOCIAL_LINKS] Update returned undefined or invalid:', updateResult)
-      }
-      Sentry.captureException(new Error('Update returned undefined or invalid'), { tags: { operation: 'updateSocialLinks' } })
-      return fail(500, 'UPDATE_FAILED', 'Failed to update social links')
-    }
-
-    // Now safe to check for properties
-    if (!('data' in updateResult || 'error' in updateResult)) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[PROFILE/SOCIAL_LINKS] Update result missing data/error properties:', updateResult)
-      }
-      Sentry.captureException(new Error('Update result missing expected properties'), { tags: { operation: 'updateSocialLinks' } })
-      return fail(500, 'UPDATE_FAILED', 'Failed to update social links')
-    }
-
-    const { data: updatedProfile, error: updateError } = updateResult as { data: any; error: any }
-
-    if (updateError) {
-      const errorMessage = updateError.message || 'Unknown error'
-      const errorCode = updateError.code || 'UNKNOWN'
-      const errorDetails = updateError.details || updateError.hint || ''
+    if (rpcError) {
+      const errorMessage = rpcError.message || 'Unknown error'
+      const errorCode = rpcError.code || 'UNKNOWN'
+      const errorDetails = rpcError.details || rpcError.hint || ''
       
-      console.error('[PROFILE/SOCIAL_LINKS] Update error:', {
+      console.error('[PROFILE/SOCIAL_LINKS] RPC update error:', {
         message: errorMessage,
         code: errorCode,
         details: errorDetails,
-        fullError: updateError,
+        fullError: rpcError,
       })
       
-      Sentry.captureException(updateError, { 
+      Sentry.captureException(rpcError, { 
         tags: { operation: 'updateSocialLinks' },
         extra: { errorMessage, errorCode, errorDetails },
       })
@@ -107,6 +78,9 @@ export async function POST(request: NextRequest) {
         details: errorDetails,
       })
     }
+
+    // RPC returns the updated profile as JSONB
+    const updatedProfile = typeof rpcResult === 'string' ? JSON.parse(rpcResult) : rpcResult
 
     return ok({ data: { social_links: updatedProfile?.social_links || normalizedLinks } })
   } catch (e: any) {

@@ -923,6 +923,8 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       } catch (error) {
         console.error('[SELL_WIZARD] Error publishing draft:', error)
         setSubmitError(error instanceof Error ? error.message : 'Failed to publish sale')
+        // Don't restore draftKeyRef - the draft should remain cleared even on error
+        // User can start fresh if they need to
       } finally {
         setLoading(false)
       }

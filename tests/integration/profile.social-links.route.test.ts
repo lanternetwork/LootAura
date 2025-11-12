@@ -52,11 +52,18 @@ vi.mock('@/lib/supabase/clients', () => {
   })
   
   return {
-    getRlsDb: vi.fn(() => ({
-      schema: vi.fn(() => ({
-        from: vi.fn(),
-      })),
-    })),
+    getRlsDb: vi.fn(() => {
+      // getRlsDb() returns a schema-scoped client that fromBase can use
+      // fromBase calls db.from(table), which should return the query chain
+      if (!mockState.currentMockChain) {
+        throw new Error('getRlsDb called but mockState.currentMockChain is not set. Ensure the test sets up the mock chain before calling the route handler.')
+      }
+      return {
+        from: vi.fn(() => ({
+          update: mockState.currentMockChain.mockUpdate,
+        })),
+      }
+    }),
     fromBase: fromBaseMock,
   }
 })
@@ -128,8 +135,6 @@ describe('POST /api/profile/social-links', () => {
     mockState.currentMockChain = chain
     
     // Set up the mock implementation before the route handler calls it
-    // The schema() method should return an object with a from() method
-    // fromBase calls db.from(table), which should return the query chain
     vi.mocked(createSupabaseServerClient).mockReturnValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -137,11 +142,6 @@ describe('POST /api/profile/social-links', () => {
           error: null,
         }),
       },
-      schema: vi.fn(() => ({
-        from: vi.fn(() => ({
-          update: chain.mockUpdate,
-        })),
-      })),
     } as any)
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
@@ -174,8 +174,6 @@ describe('POST /api/profile/social-links', () => {
     mockState.currentMockChain = chain
     
     // Set up the mock implementation before the route handler calls it
-    // The schema() method should return an object with a from() method
-    // fromBase calls db.from(table), which should return the query chain
     vi.mocked(createSupabaseServerClient).mockReturnValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -183,11 +181,6 @@ describe('POST /api/profile/social-links', () => {
           error: null,
         }),
       },
-      schema: vi.fn(() => ({
-        from: vi.fn(() => ({
-          update: chain.mockUpdate,
-        })),
-      })),
     } as any)
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {

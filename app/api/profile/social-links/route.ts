@@ -45,12 +45,15 @@ export async function POST(request: NextRequest) {
     // Normalize social links
     const normalizedLinks = normalizeSocialLinks(body.links as Partial<SocialLinks>)
 
+    // Ensure normalizedLinks is a valid JSONB object (not null/undefined)
+    const socialLinksValue = Object.keys(normalizedLinks).length > 0 ? normalizedLinks : {}
+
     // Update profile using RLS client with schema scope
     // Note: profiles.id matches auth.uid(), RLS policy enforces ownership
     const rls = getRlsDb()
     const updateResult = await fromBase(rls, 'profiles')
       .update({
-        social_links: normalizedLinks,
+        social_links: socialLinksValue,
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)
@@ -79,23 +82,46 @@ export async function POST(request: NextRequest) {
     const { data: updatedProfile, error: updateError } = updateResult as { data: any; error: any }
 
     if (updateError) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[PROFILE/SOCIAL_LINKS] Update error:', updateError)
-      }
-      Sentry.captureException(updateError, { tags: { operation: 'updateSocialLinks' } })
-      return fail(500, 'UPDATE_FAILED', 'Failed to update social links', {
-        supabase: updateError.message,
-        code: updateError.code,
+      const errorMessage = updateError.message || 'Unknown error'
+      const errorCode = updateError.code || 'UNKNOWN'
+      const errorDetails = updateError.details || updateError.hint || ''
+      
+      console.error('[PROFILE/SOCIAL_LINKS] Update error:', {
+        message: errorMessage,
+        code: errorCode,
+        details: errorDetails,
+        fullError: updateError,
+      })
+      
+      Sentry.captureException(updateError, { 
+        tags: { operation: 'updateSocialLinks' },
+        extra: { errorMessage, errorCode, errorDetails },
+      })
+      
+      return fail(500, 'UPDATE_FAILED', `Failed to update social links: ${errorMessage}`, {
+        supabase: errorMessage,
+        code: errorCode,
+        details: errorDetails,
       })
     }
 
     return ok({ data: { social_links: updatedProfile?.social_links || normalizedLinks } })
   } catch (e: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[PROFILE/SOCIAL_LINKS] Unexpected error:', e)
-    }
-    Sentry.captureException(e, { tags: { operation: 'updateSocialLinks' } })
-    return fail(500, 'INTERNAL_ERROR', e.message)
+    const errorMessage = e?.message || 'Unknown error'
+    const errorStack = e?.stack || ''
+    
+    console.error('[PROFILE/SOCIAL_LINKS] Unexpected error:', {
+      message: errorMessage,
+      stack: errorStack,
+      error: e,
+    })
+    
+    Sentry.captureException(e, { 
+      tags: { operation: 'updateSocialLinks' },
+      extra: { errorMessage, errorStack },
+    })
+    
+    return fail(500, 'INTERNAL_ERROR', errorMessage)
   }
 }
 

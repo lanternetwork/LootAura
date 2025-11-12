@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
@@ -42,6 +42,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   const [showFullDescription, setShowFullDescription] = useState(false)
   const cover = getSaleCoverUrl(sale)
   const viewTrackedRef = useRef(false)
+  const isOptimisticRef = useRef(false)
 
   // Track view event when component mounts (only once)
   useEffect(() => {
@@ -84,11 +85,15 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
 
 
   // Keep local favorite state in sync with favorites list
-  // (simple check each render; list is small)
-  const fromList = Array.isArray(favoriteSales) && favoriteSales.some((s: any) => s?.id === sale.id)
-  if (fromList !== isFavorited) {
-    setIsFavorited(fromList)
-  }
+  // Only sync when favorites list changes, not during optimistic updates
+  useEffect(() => {
+    if (!isOptimisticRef.current) {
+      const fromList = Array.isArray(favoriteSales) && favoriteSales.some((s: any) => s?.id === sale.id)
+      if (fromList !== isFavorited) {
+        setIsFavorited(fromList)
+      }
+    }
+  }, [favoriteSales, sale.id, isFavorited])
 
   const handleFavoriteToggle = async () => {
     if (!currentUser) {
@@ -99,6 +104,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
     const wasFavorited = isFavorited
     
     // Optimistic UI update - update immediately for instant feedback
+    isOptimisticRef.current = true
     setIsFavorited(!isFavorited)
     
     try {
@@ -132,6 +138,9 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
       setIsFavorited(wasFavorited)
       console.error('[SALE_DETAIL] Failed to toggle favorite:', error)
       alert(error?.message || 'Failed to save sale. Please try again.')
+    } finally {
+      // Allow sync to resume after API call completes
+      isOptimisticRef.current = false
     }
   }
 

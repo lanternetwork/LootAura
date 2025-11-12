@@ -52,6 +52,10 @@ vi.mock('@/lib/hooks/useAuth', () => ({
   useFavorites: vi.fn(() => ({
     data: [],
   })),
+  useToggleFavorite: vi.fn(() => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  })),
 }))
 
 // Mock getSaleCoverUrl

@@ -196,9 +196,12 @@ export async function POST(request: NextRequest) {
 
     // 3. Delete the draft after successful publication (hard delete)
     // We delete instead of marking as 'published' since the sale is now live
-    const { error: deleteErr } = await fromBase(rls, 'sale_drafts')
+    // Use admin client since we've already verified ownership via RLS read above
+    // This ensures the delete succeeds even if RLS has permission issues
+    const { error: deleteErr } = await fromBase(admin, 'sale_drafts')
       .delete()
       .eq('id', draft.id)
+      .eq('owner_id', user.id) // Extra safety check: ensure we only delete drafts owned by the user
 
     if (deleteErr) {
       // Sale and items are already created, so we'll log but not fail

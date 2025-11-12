@@ -67,7 +67,6 @@ export default function ProfileInfoForm({ initialProfile, onSaved }: ProfileInfo
 
       if (result.ok) {
         toast.success('Profile updated successfully')
-        setIsEditing(false)
         
         // Update local state with saved values
         setFormValues({

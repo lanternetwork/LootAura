@@ -82,8 +82,9 @@ describe('Dashboard Profile Summary', () => {
     // ProfileSummaryCard displays profile information read-only
     expect(screen.getByText('Test User')).toBeInTheDocument()
     expect(screen.getByText('@testuser')).toBeInTheDocument()
-    expect(screen.getByText('Louisville')).toBeInTheDocument()
-    expect(screen.getByText(', KY')).toBeInTheDocument()
+    // Location is rendered as "Louisville, KY" but may be split across text nodes
+    expect(screen.getByText(/Louisville/)).toBeInTheDocument()
+    expect(screen.getByText(/KY/)).toBeInTheDocument()
     
     // Should have "Edit Profile" link (not button) that goes to /account/edit
     const editProfileLink = screen.getByText('Edit Profile')

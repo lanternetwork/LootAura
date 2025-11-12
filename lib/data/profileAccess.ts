@@ -99,10 +99,11 @@ export async function getUserMetrics7d(
   userId: string
 ): Promise<Metrics7d> {
   try {
-    // Calculate date range (last 7 days)
+    // Calculate date range (last 7 days including today)
+    // We want 7 days total: today and the 6 days before it
     const to = new Date()
     const from = new Date(to)
-    from.setDate(from.getDate() - 7)
+    from.setDate(from.getDate() - 6) // 6 days ago + today = 7 days total
 
     // Query analytics events from the view (which reads from base table)
     // Include test events in debug mode for testing purposes

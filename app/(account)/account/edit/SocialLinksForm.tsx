@@ -67,9 +67,17 @@ export default function SocialLinksForm({ initialLinks, onSaved }: SocialLinksFo
         let errorMessage = `Server error: ${response.status} ${response.statusText}`
         try {
           const errorData = await response.json()
+          console.error('[SOCIAL_LINKS_FORM] Full error response:', JSON.stringify(errorData, null, 2))
           errorMessage = errorData.error || errorData.message || errorMessage
           if (errorData.details) {
-            console.error('[SOCIAL_LINKS_FORM] Error details:', errorData.details)
+            console.error('[SOCIAL_LINKS_FORM] Error details:', JSON.stringify(errorData.details, null, 2))
+            // Include details in error message if available
+            if (typeof errorData.details === 'object') {
+              const detailsStr = JSON.stringify(errorData.details)
+              if (detailsStr.length < 200) {
+                errorMessage += ` (${detailsStr})`
+              }
+            }
           }
         } catch (e) {
           // If JSON parsing fails, use the status text

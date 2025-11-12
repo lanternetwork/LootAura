@@ -11,7 +11,7 @@ import {
   Linkedin, 
   Globe 
 } from 'lucide-react'
-import type { SocialLinks } from '@/lib/profile/social'
+import { extractHandleFromUrl, SUPPORTED_SOCIAL_ORDER, type SocialLinks, type SocialProvider } from '@/lib/profile/social'
 
 interface SocialLinksRowProps {
   socialLinks?: SocialLinks | null
@@ -46,17 +46,25 @@ export function SocialLinksRow({ socialLinks }: SocialLinksRowProps) {
     return null
   }
 
-  const entries = Object.entries(socialLinks).filter(([_, url]) => url && typeof url === 'string')
+  // Filter to only configured (non-empty) links and iterate in display order
+  const configuredLinks: Array<[SocialProvider, string]> = []
+  for (const provider of SUPPORTED_SOCIAL_ORDER) {
+    const url = socialLinks[provider]
+    if (url && typeof url === 'string' && url.trim()) {
+      configuredLinks.push([provider, url])
+    }
+  }
 
-  if (entries.length === 0) {
+  if (configuredLinks.length === 0) {
     return null
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 mt-4">
-      {entries.map(([provider, url]) => {
-        const Icon = PROVIDER_ICONS[provider as keyof typeof PROVIDER_ICONS]
-        const label = PROVIDER_LABELS[provider as keyof typeof PROVIDER_LABELS] || provider
+    <div className="flex flex-wrap items-center gap-4 mt-4">
+      {configuredLinks.map(([provider, url]) => {
+        const Icon = PROVIDER_ICONS[provider]
+        const label = PROVIDER_LABELS[provider] || provider
+        const handle = extractHandleFromUrl(provider, url)
 
         if (!Icon || !url) return null
 
@@ -66,11 +74,13 @@ export function SocialLinksRow({ socialLinks }: SocialLinksRowProps) {
             href={url}
             target="_blank"
             rel="me noopener noreferrer"
-            className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-600 hover:text-neutral-900 transition-colors"
+            className="inline-flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors group"
             aria-label={`Visit ${label} profile`}
-            title={label}
           >
-            <Icon className="w-5 h-5" />
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-neutral-100 group-hover:bg-neutral-200 transition-colors">
+              <Icon className="w-5 h-5" />
+            </div>
+            <span className="text-sm font-medium">{handle}</span>
           </a>
         )
       })}

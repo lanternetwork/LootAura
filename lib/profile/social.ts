@@ -162,3 +162,70 @@ export function normalizeSocialLinks(input: Partial<SocialLinks>): SocialLinks {
   return normalized
 }
 
+/**
+ * Extract display handle from a canonical social URL
+ * Returns the handle/username portion for display purposes
+ */
+export function extractHandleFromUrl(provider: SocialProvider, url: string): string {
+  if (!url || typeof url !== 'string') return ''
+  
+  // If it's not a URL, return as-is (might already be a handle)
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return url.replace(/^@+/, '') // Remove @ prefix if present
+  }
+  
+  try {
+    const urlObj = new URL(url)
+    const pathname = urlObj.pathname
+    
+    // Extract handle based on provider
+    const patterns: Record<SocialProvider, RegExp> = {
+      twitter: new RegExp('^/([^/?]+)', 'i'),
+      instagram: new RegExp('^/([^/?]+)', 'i'),
+      facebook: new RegExp('^/([^/?]+)', 'i'),
+      tiktok: new RegExp('^/@?([^/?]+)', 'i'),
+      youtube: new RegExp('^/@?([^/?]+)', 'i'),
+      threads: new RegExp('^/@?([^/?]+)', 'i'),
+      pinterest: new RegExp('^/([^/?]+)', 'i'),
+      linkedin: new RegExp('^/(in|company)/([^/?]+)', 'i'),
+      website: /.*/,
+    }
+    
+    const pattern = patterns[provider]
+    const match = pathname.match(pattern)
+    
+    if (match) {
+      // For LinkedIn, return the last capture group (the actual handle)
+      if (provider === 'linkedin' && match.length > 2) {
+        return match[match.length - 1]
+      }
+      // For website, return the full URL
+      if (provider === 'website') {
+        return url
+      }
+      // For others, return the handle
+      return match[1] || match[0]
+    }
+    
+    // Fallback: return pathname without leading slash
+    return pathname.replace(/^\//, '') || url
+  } catch {
+    return url
+  }
+}
+
+/**
+ * Supported social providers in display order
+ */
+export const SUPPORTED_SOCIAL_ORDER: SocialProvider[] = [
+  'twitter',
+  'instagram',
+  'facebook',
+  'tiktok',
+  'youtube',
+  'threads',
+  'pinterest',
+  'linkedin',
+  'website',
+]
+

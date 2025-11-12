@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ProfileInfoCard } from '@/components/dashboard/ProfileInfoCard'
-import { SocialLinksEditorCard } from '@/components/dashboard/SocialLinksEditorCard'
+import { ProfileSummaryCard } from '@/components/dashboard/ProfileSummaryCard'
 import SalesPanel from '@/components/dashboard/SalesPanel'
 import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
 import type { DraftListing } from '@/lib/data/salesAccess'
@@ -28,7 +27,6 @@ export default function DashboardClient({
   const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [draftsError, setDraftsError] = useState<any>(null)
-  const [profile, setProfile] = useState<ProfileData | null>(initialProfile || null)
 
   const handleDraftDelete = (draftKey: string) => {
     setDrafts((prev) => prev.filter((d) => d.draft_key !== draftKey))
@@ -117,21 +115,8 @@ export default function DashboardClient({
       </div>
 
       <div className="space-y-6">
-        {/* Row 1: Profile Information */}
-        <ProfileInfoCard 
-          initialProfile={profile} 
-          onSaved={(updatedProfile) => {
-            setProfile(updatedProfile)
-          }}
-        />
-
-        {/* Row 2: Social Links */}
-        <SocialLinksEditorCard 
-          initialLinks={profile?.social_links || null}
-          onSaved={(updatedLinks) => {
-            setProfile(prev => prev ? { ...prev, social_links: updatedLinks } : null)
-          }}
-        />
+        {/* Row 1: Profile Summary (read-only with Edit Profile button) */}
+        <ProfileSummaryCard profile={initialProfile || null} />
 
         {/* Row 3: Sales Panel (with Live, Archived, and Drafts tabs) */}
         <SalesPanel 

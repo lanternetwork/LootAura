@@ -7,8 +7,6 @@ import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
 import type { DraftListing } from '@/lib/data/salesAccess'
 import type { ProfileData, Metrics7d } from '@/lib/data/profileAccess'
 import { Sale } from '@/lib/types'
-import { FaPlus } from 'react-icons/fa'
-import Link from 'next/link'
 
 interface DashboardClientProps {
   initialSales: Sale[]
@@ -106,12 +104,8 @@ export default function DashboardClient({
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h1 className="text-2xl font-semibold">Seller Dashboard</h1>
-        <Link href="/sell/new" className="btn-accent flex items-center gap-1 text-sm">
-          <FaPlus className="w-4 h-4" />
-          New Sale
-        </Link>
       </div>
 
       <div className="space-y-6">

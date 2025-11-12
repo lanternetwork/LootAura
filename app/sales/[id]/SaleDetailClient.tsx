@@ -99,13 +99,17 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
 
       const wasFavorited = isFavorited
       
+      // Optimistic UI update - update immediately for instant feedback
+      setIsFavorited(!isFavorited)
+      
       // Use the same hook as FavoriteButton for consistency
       const result = await toggleFavorite.mutateAsync({ 
         saleId: sale.id, 
         isFavorited 
       })
 
-      setIsFavorited(result.favorited ?? !isFavorited)
+      // Update with actual result (in case of any discrepancy)
+      setIsFavorited(result.favorited ?? !wasFavorited)
       
       // Track save event if favoriting (not unfavoriting)
       if (result.favorited && !wasFavorited) {
@@ -124,6 +128,8 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
         })
       }
     } catch (error: any) {
+      // Rollback optimistic update on error
+      setIsFavorited(isFavorited)
       console.error('[SALE_DETAIL] Failed to toggle favorite:', error)
       alert(error?.message || 'Failed to save sale. Please try again.')
     }

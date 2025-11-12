@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
     const { error: deleteErr } = await fromBase(admin, 'sale_drafts')
       .delete()
       .eq('id', draft.id)
-      .eq('owner_id', user.id) // Extra safety check: ensure we only delete drafts owned by the user
+      .eq('user_id', user.id) // Extra safety check: ensure we only delete drafts owned by the user
 
     if (deleteErr) {
       // Sale and items are already created, so we'll log but not fail

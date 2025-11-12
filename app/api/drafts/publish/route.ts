@@ -198,22 +198,77 @@ export async function POST(request: NextRequest) {
     // We delete instead of marking as 'published' since the sale is now live
     // Use admin client since we've already verified ownership via RLS read above
     // This ensures the delete succeeds even if RLS has permission issues
-    const { error: deleteErr } = await fromBase(admin, 'sale_drafts')
+    console.log('[PUBLISH/POST] Attempting to delete draft:', {
+      draftId: draft.id,
+      draftKey: draft.draft_key,
+      userId: user.id,
+      saleId: saleRow.id,
+    })
+    
+    // Delete the draft using admin client (bypasses RLS)
+    const { data: deleteData, error: deleteErr } = await fromBase(admin, 'sale_drafts')
       .delete()
       .eq('id', draft.id)
       .eq('user_id', user.id) // Extra safety check: ensure we only delete drafts owned by the user
+      .select('id') // Select to get deleted row count
 
     if (deleteErr) {
       // Sale and items are already created, so we'll log but not fail
       // The draft will remain but the sale is published, which is acceptable
-      if (process.env.NODE_ENV !== 'production') console.error('[PUBLISH/POST] draft delete error:', deleteErr)
-      Sentry.captureException(deleteErr, { tags: { operation: 'publishDraft', step: 'deleteDraft' } })
-    } else {
-      console.log('[PUBLISH/POST] Draft deleted successfully after publication:', {
+      console.error('[PUBLISH/POST] Draft delete error:', {
+        error: deleteErr,
+        message: deleteErr.message,
+        code: deleteErr.code,
+        details: deleteErr.details,
+        hint: deleteErr.hint,
         draftId: draft.id,
-        draftKey: draft.draft_key,
-        saleId: saleRow.id,
+        userId: user.id,
       })
+      Sentry.captureException(deleteErr, { 
+        tags: { operation: 'publishDraft', step: 'deleteDraft' },
+        extra: { draftId: draft.id, userId: user.id, saleId: saleRow.id },
+      })
+    } else {
+      // Verify deletion by checking if any rows were deleted
+      const deletedCount = deleteData?.length || 0
+      if (deletedCount === 0) {
+        // Try to verify by reading the draft again - if it still exists, the delete failed
+        const { data: verifyDraft, error: verifyErr } = await fromBase(admin, 'sale_drafts')
+          .select('id, status')
+          .eq('id', draft.id)
+          .maybeSingle()
+        
+        if (verifyDraft) {
+          console.error('[PUBLISH/POST] Draft still exists after delete attempt:', {
+            draftId: draft.id,
+            draftKey: draft.draft_key,
+            userId: user.id,
+            saleId: saleRow.id,
+            currentStatus: verifyDraft.status,
+            deleteData,
+            verifyError: verifyErr,
+          })
+          Sentry.captureMessage('Draft still exists after delete attempt', {
+            level: 'error',
+            tags: { operation: 'publishDraft', step: 'deleteDraft' },
+            extra: { draftId: draft.id, userId: user.id, saleId: saleRow.id, currentStatus: verifyDraft.status },
+          })
+        } else {
+          // Draft doesn't exist, so deletion succeeded even though select returned nothing
+          console.log('[PUBLISH/POST] Draft deleted successfully (verified by read):', {
+            draftId: draft.id,
+            draftKey: draft.draft_key,
+            saleId: saleRow.id,
+          })
+        }
+      } else {
+        console.log('[PUBLISH/POST] Draft deleted successfully after publication:', {
+          draftId: draft.id,
+          draftKey: draft.draft_key,
+          saleId: saleRow.id,
+          deletedCount,
+        })
+      }
     }
 
     return ok({ data: { saleId: saleRow.id } })

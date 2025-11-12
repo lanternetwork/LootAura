@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
-import { normalizeSocialLinks, SUPPORTED_PROVIDERS, type SocialLinks } from '@/lib/profile/social'
+import type { SocialLinks } from '@/lib/profile/social'
 import type { ProfileData } from '@/lib/data/profileAccess'
 import ProfileInfoForm from './ProfileInfoForm'
 import SocialLinksForm from './SocialLinksForm'

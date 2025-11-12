@@ -89,6 +89,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const hasResumedRef = useRef(false)
   const draftKeyRef = useRef<string | null>(null)
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isPublishingRef = useRef<boolean>(false) // Flag to prevent autosave during/after publish
   const lastServerSaveRef = useRef<number>(0)
   const isNavigatingRef = useRef(false)
   const searchParams = useSearchParams()
@@ -198,6 +199,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
   // Debounced autosave (local + server)
   useEffect(() => {
+    // Don't autosave if we're publishing or have already published
+    if (isPublishingRef.current) {
+      return
+    }
+    
     // Clear existing timeout
     if (autosaveTimeoutRef.current) {
       clearTimeout(autosaveTimeoutRef.current)
@@ -205,6 +211,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
     // Set new timeout for debounced save (1.5s)
     autosaveTimeoutRef.current = setTimeout(() => {
+      // Double-check we're not publishing before saving
+      if (isPublishingRef.current) {
+        return
+      }
+      
       const payload = buildDraftPayload()
       
       // Always save locally
@@ -212,7 +223,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       setSaveStatus('saved')
 
       // Save to server if authenticated (throttle to max 1x per 10s)
-      if (user && draftKeyRef.current) {
+      if (user && draftKeyRef.current && !isPublishingRef.current) {
         const now = Date.now()
         const timeSinceLastSave = now - lastServerSaveRef.current
         
@@ -220,6 +231,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
           setSaveStatus('saving')
           saveDraftServer(payload, draftKeyRef.current)
             .then((result) => {
+              // Check again before updating state
+              if (isPublishingRef.current) {
+                return
+              }
               if (result.ok) {
                 lastServerSaveRef.current = Date.now()
                 setSaveStatus('saved')
@@ -230,6 +245,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
               }
             })
             .catch((error) => {
+              if (isPublishingRef.current) {
+                return
+              }
               setSaveStatus('error')
               console.error('[SELL_WIZARD] Autosave error:', error)
             })
@@ -839,6 +857,13 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       // Publish draft (transactional)
       setLoading(true)
       setSubmitError(null)
+      
+      // Clear any pending autosave and prevent future autosaves
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current)
+        autosaveTimeoutRef.current = null
+      }
+      isPublishingRef.current = true
 
       try {
         const result = await publishDraftServer(draftKeyRef.current)
@@ -884,6 +909,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         
         // Clear the draft key ref to prevent reuse
         draftKeyRef.current = null
+        // Keep isPublishingRef.current = true to prevent any future autosaves
 
         // Show confirmation modal
         setCreatedSaleId(saleId)

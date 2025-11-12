@@ -30,7 +30,8 @@ const createMockChain = () => {
     select: vi.fn().mockReturnThis(),
     single: mockSingle, // This will be called as .single(), so mockSingle must be a function
   }
-  const mockUpdate = vi.fn(() => query)
+  // mockUpdate must be a function that returns the query object
+  const mockUpdate = () => query
   return { mockSingle, mockUpdate, query }
 }
 
@@ -137,7 +138,10 @@ describe('POST /api/profile/social-links', () => {
     const response = await POST(request)
     const data = await response.json()
 
-    // Debug: if it failed, the error details will be in the test output
+    // Debug: if it failed, log the actual response
+    if (!data.ok) {
+      console.error('Response data:', JSON.stringify(data, null, 2))
+    }
     expect(data.ok).toBe(true)
     expect(data.code).toBeUndefined() // Should not have an error code
     expect(data.data.social_links.twitter).toBe('https://twitter.com/johndoe')
@@ -178,7 +182,10 @@ describe('POST /api/profile/social-links', () => {
     const response = await POST(request)
     const data = await response.json()
 
-    // Debug: if it failed, the error details will be in the test output
+    // Debug: if it failed, log the actual response
+    if (!data.ok) {
+      console.error('Response data:', JSON.stringify(data, null, 2))
+    }
     expect(data.ok).toBe(true)
     expect(data.code).toBeUndefined() // Should not have an error code
     expect(data.data.social_links.twitter).toBe('https://twitter.com/johndoe')

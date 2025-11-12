@@ -15,6 +15,7 @@ vi.mock('@/lib/supabase/server', () => {
             error: null,
           }),
         },
+        rpc: vi.fn(), // Mock rpc method
       }
     }),
   }
@@ -89,6 +90,7 @@ describe('POST /api/profile/social-links', () => {
           error: null,
         }),
       },
+      rpc: vi.fn(), // Mock rpc method
     }) as any)
     
     // Create fresh mock chain after mocks are set up
@@ -106,6 +108,7 @@ describe('POST /api/profile/social-links', () => {
           error: { message: 'Not authenticated' },
         }),
       },
+      rpc: vi.fn(), // Mock rpc method
     } as any)
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
@@ -136,6 +139,12 @@ describe('POST /api/profile/social-links', () => {
     mockState.currentMockChain = chain
     
     // Set up the mock implementation before the route handler calls it
+    // The route now uses supabase.rpc('update_profile', ...) instead of direct table updates
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: JSON.stringify({ social_links: { twitter: 'https://twitter.com/johndoe' } }),
+      error: null,
+    })
+    
     vi.mocked(createSupabaseServerClient).mockReturnValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -143,6 +152,7 @@ describe('POST /api/profile/social-links', () => {
           error: null,
         }),
       },
+      rpc: mockRpc,
     } as any)
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
@@ -156,6 +166,12 @@ describe('POST /api/profile/social-links', () => {
     expect(data.ok).toBe(true)
     expect(data.code).toBeUndefined() // Should not have an error code
     expect(data.data.social_links.twitter).toBe('https://twitter.com/johndoe')
+    
+    // Verify RPC was called with correct parameters
+    expect(mockRpc).toHaveBeenCalledWith('update_profile', {
+      p_user_id: 'user-123',
+      p_social_links: { twitter: 'https://twitter.com/johndoe' },
+    })
   })
 
   it('should drop invalid links', async () => {
@@ -175,6 +191,12 @@ describe('POST /api/profile/social-links', () => {
     mockState.currentMockChain = chain
     
     // Set up the mock implementation before the route handler calls it
+    // The route now uses supabase.rpc('update_profile', ...) instead of direct table updates
+    const mockRpc = vi.fn().mockResolvedValue({
+      data: JSON.stringify({ social_links: { twitter: 'https://twitter.com/johndoe' } }),
+      error: null,
+    })
+    
     vi.mocked(createSupabaseServerClient).mockReturnValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -182,6 +204,7 @@ describe('POST /api/profile/social-links', () => {
           error: null,
         }),
       },
+      rpc: mockRpc,
     } as any)
 
     const request = new NextRequest('http://localhost/api/profile/social-links', {
@@ -201,6 +224,12 @@ describe('POST /api/profile/social-links', () => {
     expect(data.code).toBeUndefined() // Should not have an error code
     expect(data.data.social_links.twitter).toBe('https://twitter.com/johndoe')
     expect(data.data.social_links.invalid).toBeUndefined()
+    
+    // Verify RPC was called with correct parameters (invalid link should be dropped)
+    expect(mockRpc).toHaveBeenCalledWith('update_profile', {
+      p_user_id: 'user-123',
+      p_social_links: { twitter: 'https://twitter.com/johndoe' },
+    })
   })
 })
 

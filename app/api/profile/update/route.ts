@@ -1,0 +1,125 @@
+// NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed.
+import { NextRequest } from 'next/server'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { ok, fail } from '@/lib/http/json'
+import * as Sentry from '@sentry/nextjs'
+
+export const dynamic = 'force-dynamic'
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createSupabaseServerClient()
+    
+    // Guard against undefined/null supabase client
+    if (!supabase || !supabase.auth) {
+      return fail(500, 'INTERNAL_ERROR', 'Failed to initialize Supabase client')
+    }
+    
+    const authResult = await supabase.auth.getUser()
+
+    // Guard against undefined/null auth result
+    if (!authResult || typeof authResult !== 'object') {
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+    }
+
+    const { data, error: authError } = authResult
+    const user = data?.user
+
+    if (authError || !user) {
+      return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+    }
+
+    let body: any
+    try {
+      body = await request.json()
+    } catch (error) {
+      return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
+    }
+
+    if (!body || typeof body !== 'object') {
+      return fail(400, 'INVALID_INPUT', 'Invalid request body')
+    }
+
+    // Validate and sanitize input
+    const updateData: {
+      display_name?: string | null
+      bio?: string | null
+      location_city?: string | null
+      location_region?: string | null
+      updated_at: string
+    } = {
+      updated_at: new Date().toISOString(),
+    }
+
+    // Only include fields that are provided and valid
+    if ('display_name' in body) {
+      const displayName = typeof body.display_name === 'string' ? body.display_name.trim().slice(0, 80) : null
+      updateData.display_name = displayName || null
+    }
+
+    if ('bio' in body) {
+      const bio = typeof body.bio === 'string' ? body.bio.trim().slice(0, 250) : null
+      updateData.bio = bio || null
+    }
+
+    if ('city' in body) {
+      const city = typeof body.city === 'string' ? body.city.trim() : null
+      updateData.location_city = city || null
+    }
+
+    if ('region' in body) {
+      const region = typeof body.region === 'string' ? body.region.trim() : null
+      updateData.location_region = region || null
+    }
+
+    // Update profile using RLS client with schema scope
+    // Note: profiles.id matches auth.uid(), RLS policy enforces ownership
+    const rls = getRlsDb()
+    const updateResult = await fromBase(rls, 'profiles')
+      .update(updateData)
+      .eq('id', user.id)
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, social_links')
+      .single()
+
+    // Check if updateResult is valid and has expected structure
+    if (updateResult == null || typeof updateResult !== 'object') {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[PROFILE/UPDATE] Update returned undefined or invalid:', updateResult)
+      }
+      Sentry.captureException(new Error('Update returned undefined or invalid'), { tags: { operation: 'updateProfile' } })
+      return fail(500, 'UPDATE_FAILED', 'Failed to update profile')
+    }
+
+    // Now safe to check for properties
+    if (!('data' in updateResult || 'error' in updateResult)) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[PROFILE/UPDATE] Update result missing data/error properties:', updateResult)
+      }
+      Sentry.captureException(new Error('Update result missing expected properties'), { tags: { operation: 'updateProfile' } })
+      return fail(500, 'UPDATE_FAILED', 'Failed to update profile')
+    }
+
+    const { data: updatedProfile, error: updateError } = updateResult as { data: any; error: any }
+
+    if (updateError) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[PROFILE/UPDATE] Update error:', updateError)
+      }
+      Sentry.captureException(updateError, { tags: { operation: 'updateProfile' } })
+      return fail(500, 'UPDATE_FAILED', 'Failed to update profile', {
+        supabase: updateError.message,
+        code: updateError.code,
+      })
+    }
+
+    return ok({ data: { profile: updatedProfile } })
+  } catch (e: any) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[PROFILE/UPDATE] Unexpected error:', e)
+    }
+    Sentry.captureException(e, { tags: { operation: 'updateProfile' } })
+    return fail(500, 'INTERNAL_ERROR', e.message)
+  }
+}
+

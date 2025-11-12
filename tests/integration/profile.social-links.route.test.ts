@@ -58,9 +58,10 @@ vi.mock('@/lib/supabase/clients', () => {
       if (!mockState.currentMockChain) {
         throw new Error('getRlsDb called but mockState.currentMockChain is not set. Ensure the test sets up the mock chain before calling the route handler.')
       }
+      const chain = mockState.currentMockChain // TypeScript now knows it's not null
       return {
         from: vi.fn(() => ({
-          update: mockState.currentMockChain.mockUpdate,
+          update: chain.mockUpdate,
         })),
       }
     }),

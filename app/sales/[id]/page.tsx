@@ -4,7 +4,7 @@ import { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSaleWithItems } from '@/lib/data/salesAccess'
 import SaleDetailClient from './SaleDetailClient'
-import { createSaleMetadata } from '@/lib/metadata'
+import { createSaleMetadata, createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 
 interface SaleDetailPageProps {
   params: {
@@ -38,9 +38,26 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   })
 
   const _metadata = createSaleMetadata(sale)
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app').replace(/\/$/, '')
+  
+  // Create structured data for SEO
+  const eventStructuredData = createSaleEventStructuredData(sale)
+  const breadcrumbStructuredData = createBreadcrumbStructuredData([
+    { name: 'Home', url: '/' },
+    { name: 'Sales', url: '/sales' },
+    { name: sale.title || 'Sale', url: `/sales/${sale.id}` },
+  ])
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(eventStructuredData) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbStructuredData) }}
+      />
       <Suspense fallback={<div className="p-4">Loading...</div>}>
         <SaleDetailClient sale={sale} displayCategories={displayCategories} items={items} />
       </Suspense>

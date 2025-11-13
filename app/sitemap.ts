@@ -5,11 +5,11 @@ import { T } from '@/lib/supabase/tables'
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = createSupabaseServerClient()
   
-  // Get all active sales for dynamic URLs
+  // Get all published sales for dynamic URLs
   const { data: sales } = await supabase
     .from(T.sales)
     .select('id, updated_at')
-    .eq('status', 'active')
+    .eq('status', 'published')
     .order('updated_at', { ascending: false })
     .limit(1000) // Limit to prevent sitemap from being too large
 
@@ -36,25 +36,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/explore?tab=add`,
+      url: `${baseUrl}/sales`,
+      lastModified: new Date(),
+      changeFrequency: 'hourly',
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/sell/new`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/signin`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.5,
     },
   ]
 
   // Dynamic sale pages
   const salePages: MetadataRoute.Sitemap = (sales || []).map((sale) => ({
-    url: `${baseUrl}/sale/${sale.id}`,
+    url: `${baseUrl}/sales/${sale.id}`,
     lastModified: new Date(sale.updated_at),
     changeFrequency: 'weekly',
-    priority: 0.6,
+    priority: 0.7,
   }))
 
   return [...staticPages, ...salePages]

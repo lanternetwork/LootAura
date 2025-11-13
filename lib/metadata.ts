@@ -303,3 +303,76 @@ export function createOrganizationStructuredData() {
     }
   }
 }
+
+// JSON-LD structured data for sale events
+export function createSaleEventStructuredData(sale: Sale) {
+  const cover = getSaleCoverUrl(sale)
+  const startDate = sale.date_start ? `${sale.date_start}T${sale.time_start || '00:00:00'}` : undefined
+  const endDate = sale.date_end ? `${sale.date_end}T${sale.time_end || '23:59:59'}` : undefined
+  
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: sale.title || 'Yard Sale',
+    description: sale.description || `Yard sale in ${sale.city || ''}, ${sale.state || ''}`,
+    startDate,
+    endDate,
+    eventStatus: sale.status === 'published' 
+      ? 'https://schema.org/EventScheduled' 
+      : 'https://schema.org/EventCancelled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    location: {
+      '@type': 'Place',
+      name: sale.address || `${sale.city}, ${sale.state}`,
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: sale.address || undefined,
+        addressLocality: sale.city,
+        addressRegion: sale.state,
+        postalCode: sale.zip_code || undefined,
+        addressCountry: 'US',
+      },
+      ...(sale.lat && sale.lng ? {
+        geo: {
+          '@type': 'GeoCoordinates',
+          latitude: sale.lat,
+          longitude: sale.lng,
+        },
+      } : {}),
+    },
+    ...(sale.price ? {
+      offers: {
+        '@type': 'Offer',
+        price: sale.price,
+        priceCurrency: 'USD',
+        availability: 'https://schema.org/InStock',
+      },
+    } : {}),
+    ...(cover?.url ? {
+      image: cover.url,
+    } : {}),
+    organizer: {
+      '@type': 'Organization',
+      name: siteName,
+      url: baseUrl,
+    },
+    ...(sale.tags && sale.tags.length > 0 ? {
+      keywords: sale.tags.join(', '),
+    } : {}),
+    url: `${baseUrl}/sales/${sale.id}`,
+  }
+}
+
+// JSON-LD structured data for breadcrumbs
+export function createBreadcrumbStructuredData(items: Array<{ name: string; url: string }>) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      item: item.url.startsWith('http') ? item.url : `${baseUrl}${item.url}`,
+    })),
+  }
+}

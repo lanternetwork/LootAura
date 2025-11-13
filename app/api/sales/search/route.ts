@@ -101,12 +101,12 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Sales search error:', error)
-      return NextResponse.json({ error: 'Failed to search sales', detail: error.message }, { status: 500 })
+      return NextResponse.json({ ok: false, code: 'SEARCH_FAILED', error: 'Failed to search sales' }, { status: 500 })
     }
 
-    return NextResponse.json({ sales: sales || [] })
+    return NextResponse.json({ ok: true, sales: sales || [] })
   } catch (error: any) {
     console.error('Sales search error:', error)
-    return NextResponse.json({ error: 'Failed to search sales', detail: error.message }, { status: 500 })
+    return NextResponse.json({ ok: false, code: 'SEARCH_FAILED', error: 'Failed to search sales' }, { status: 500 })
   }
 }

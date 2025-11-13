@@ -50,6 +50,11 @@ export default function DiagnosticOverlay({ isVisible, onToggle }: DiagnosticOve
     }
   }, [])
 
+  // Only render in debug mode
+  if (process.env.NEXT_PUBLIC_DEBUG !== 'true') {
+    return null
+  }
+
   if (!isVisible) {
     return (
       <button

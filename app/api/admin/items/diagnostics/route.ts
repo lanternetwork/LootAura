@@ -44,13 +44,13 @@ export async function GET(request: Request) {
           errorMessage.includes('Could not find the table') ||
           errorMessage.includes('schema cache')) {
         return NextResponse.json(
-          { error: 'Items table does not exist. Please run database migrations first.', details: errorMessage },
+          { ok: false, error: 'Items table does not exist. Please run database migrations first.' },
           { status: 400 }
         )
       }
       
       return NextResponse.json(
-        { error: 'Failed to fetch items', details: errorMessage, code: errorCode },
+        { ok: false, error: 'Internal server error' },
         { status: 500 }
       )
     }
@@ -133,7 +133,7 @@ export async function GET(request: Request) {
     
     console.error('[ItemDiagnostics] Unexpected error:', error)
     return NextResponse.json(
-      { error: error.message || 'Internal server error', details: error.stack },
+      { ok: false, error: 'Internal server error' },
       { status: error.status || 500 }
     )
   }

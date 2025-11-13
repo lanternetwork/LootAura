@@ -58,7 +58,8 @@ async function overpassHandler(request: NextRequest) {
     const limitParam = searchParams.get('limit')
     const debugParam = searchParams.get('_debug')
     
-    const enableDebug = debugParam === '1' || process.env.NODE_ENV === 'development'
+    // Only enable debug in non-production environments
+    const enableDebug = (debugParam === '1' || process.env.NODE_ENV === 'development') && process.env.NODE_ENV !== 'production'
     
     // Classify input on server side
     // Numeric-only mode: /^\d{1,6}$/
@@ -161,7 +162,8 @@ async function overpassHandler(request: NextRequest) {
         data: sortedCached
       }
       
-      if (enableDebug) {
+      // Only include _debug in non-production environments
+      if (enableDebug && process.env.NODE_ENV !== 'production') {
         const distancesM = cachedWithDistance.slice(0, limit).map(addr => Math.round(addr.distanceM))
         
         respBody._debug = {
@@ -521,7 +523,8 @@ async function overpassHandler(request: NextRequest) {
       data: suggestions
     }
     
-    if (enableDebug) {
+    // Only include _debug in non-production environments
+    if (enableDebug && process.env.NODE_ENV !== 'production') {
       const distancesM = withDistance.slice(0, limit).map(addr => Math.round(addr.distanceM))
       
       respBody._debug = {

@@ -69,10 +69,14 @@ async function salesHandler(request: NextRequest) {
           if (geoData.ok && geoData.lat && geoData.lng) {
             latitude = parseFloat(geoData.lat)
             longitude = parseFloat(geoData.lng)
-            console.log(`[SALES] near=1: resolved zip=${zip} to lat=${latitude}, lng=${longitude}`)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log(`[SALES] near=1: resolved zip=${zip} to lat=${latitude}, lng=${longitude}`)
+            }
           } else {
             // ZIP not found - return empty result with 200
-            console.log(`[SALES] near=1: zip=${zip} not found, returning empty result`)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log(`[SALES] near=1: zip=${zip} not found, returning empty result`)
+            }
             return NextResponse.json({
               ok: true,
               data: [],
@@ -97,7 +101,9 @@ async function salesHandler(request: NextRequest) {
         longitude = parseFloat(lng)
       } else {
         // near=1 but no location provided - return empty result with 200
-        console.log(`[SALES] near=1: no location provided, returning empty result`)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[SALES] near=1: no location provided, returning empty result`)
+        }
         return NextResponse.json({
           ok: true,
           data: [],
@@ -123,7 +129,9 @@ async function salesHandler(request: NextRequest) {
         west: longitude - lngRange
       }
       
-      console.log(`[SALES] near=1: calculated bbox from lat=${latitude}, lng=${longitude}, radius=${distanceKm}km`)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[SALES] near=1: calculated bbox from lat=${latitude}, lng=${longitude}, radius=${distanceKm}km`)
+      }
     }
     
     // Normal location parsing (for non-near queries)
@@ -161,10 +169,12 @@ async function salesHandler(request: NextRequest) {
           actualBbox = validatedBbox
           
         } catch (error: any) {
-          console.log(`[SALES] Invalid bbox: ${error.message}`)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log(`[SALES] Invalid bbox: ${error.message}`)
+          }
           return NextResponse.json({ 
             ok: false, 
-            error: `Invalid bbox: ${error.message}` 
+            error: 'Invalid location parameters'
           }, { status: 400 })
         }
       } else if (lat && lng) {
@@ -757,12 +767,15 @@ async function postHandler(request: NextRequest) {
     try {
       body = await request.json()
     } catch (error) {
-      console.error('[SALES] JSON parse error:', {
-        error: error instanceof Error ? error.message : String(error)
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SALES] JSON parse error:', {
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
       return NextResponse.json({ 
-        error: 'Invalid JSON in request body',
-        code: 'INVALID_JSON'
+        ok: false,
+        code: 'INVALID_JSON',
+        error: 'Invalid request format'
       }, { status: 400 })
     }
     
@@ -939,8 +952,8 @@ async function postHandler(request: NextRequest) {
     }
     
     if (error) {
-      if (process.env.NODE_ENV !== 'production') console.error('[SALES/POST] supabase error:', error)
-      return fail(500, 'SALE_CREATE_FAILED', error.message, error)
+      console.error('[SALES/POST] supabase error:', error)
+      return fail(500, 'SALE_CREATE_FAILED', 'Failed to create sale', error)
     }
     
     if (!data) {

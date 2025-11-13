@@ -182,7 +182,10 @@ describe('Suggest Route Integration', () => {
     
     const data1 = await response1.json()
     const data2 = await response2.json()
-    expect(data1).toEqual(data2)
+    // Strip _debug fields before comparing (they may differ between calls)
+    const { _debug: _debug1, ...cleanData1 } = data1
+    const { _debug: _debug2, ...cleanData2 } = data2
+    expect(cleanData1).toEqual(cleanData2)
   })
 
   it('should include User-Agent header in Nominatim request', async () => {

@@ -163,14 +163,15 @@ export async function getUserMetrics7d(
       }
     }
     
-    // Log successful query for debugging (always log in production too for now)
-    console.log('[PROFILE_ACCESS] Analytics events fetched:', {
-      userId,
-      eventCount: events?.length || 0,
-      from: from.toISOString(),
-      to: to.toISOString(),
-      events: events?.slice(0, 5), // Log first 5 events for debugging
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[PROFILE_ACCESS] Analytics events fetched:', {
+        userId,
+        eventCount: events?.length || 0,
+        from: from.toISOString(),
+        to: to.toISOString(),
+        events: events?.slice(0, 5), // Log first 5 events for debugging
+      })
+    }
 
     // Query fulfilled sales (completed sales) from the last 7 days
     const { data: sales, error: salesError } = await supabase
@@ -252,15 +253,16 @@ export async function getUserMetrics7d(
       .map(([date, counts]) => ({ date, ...counts }))
       .sort((a, b) => a.date.localeCompare(b.date))
 
-    // Log series data for debugging
-    console.log('[PROFILE_ACCESS] Series data:', {
-      userId,
-      seriesLength: series.length,
-      series: series.map(s => ({ date: s.date, views: s.views, saves: s.saves, clicks: s.clicks })),
-      views7d,
-      saves7d,
-      clicks7d,
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[PROFILE_ACCESS] Series data:', {
+        userId,
+        seriesLength: series.length,
+        series: series.map(s => ({ date: s.date, views: s.views, saves: s.saves, clicks: s.clicks })),
+        views7d,
+        saves7d,
+        clicks7d,
+      })
+    }
 
     return {
       views7d,

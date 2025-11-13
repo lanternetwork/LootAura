@@ -147,14 +147,18 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      console.log('[SELL_WIZARD] Auth check:', { hasUser: !!user, userId: user?.id })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SELL_WIZARD] Auth check:', { hasUser: !!user, userId: user?.id })
+      }
       setUser(user)
     }
     checkUser()
 
     // Listen for auth state changes (e.g., after login)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[SELL_WIZARD] Auth state change:', { event, hasUser: !!session?.user, userId: session?.user?.id })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SELL_WIZARD] Auth state change:', { event, hasUser: !!session?.user, userId: session?.user?.id })
+      }
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user)
       } else if (event === 'SIGNED_OUT') {
@@ -297,7 +301,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         if (serverResult.ok && serverResult.data?.payload) {
           draftToRestore = serverResult.data.payload
           source = 'server'
-          console.log('[SELL_WIZARD] Found server draft')
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Found server draft')
+          }
         }
       }
 
@@ -307,7 +313,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         if (localDraft) {
           draftToRestore = localDraft
           source = 'local'
-          console.log('[SELL_WIZARD] Found local draft')
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Found local draft')
+          }
         }
       }
 
@@ -333,7 +341,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
                 currentStep: parsed.currentStep || 0,
               }
               source = 'local'
-              console.log('[SELL_WIZARD] Found old format draft')
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[SELL_WIZARD] Found old format draft')
+              }
             }
           } catch (error) {
             console.error('[SELL_WIZARD] Error parsing old draft:', error)
@@ -407,14 +417,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }, [initialData, user, normalizeTimeToNearest30, searchParams])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
-    // Only log in development to reduce console noise
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
     }
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
-      // Only log in development to reduce console noise
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
       }
 
@@ -534,7 +542,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       // Check auth state synchronously to ensure we have the latest value
       if (currentStep === STEPS.ITEMS) {
         const { data: { user: currentUser } } = await supabase.auth.getUser()
-        console.log('[SELL_WIZARD] Auth gate check:', { currentStep, hasUser: !!currentUser, userId: currentUser?.id })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SELL_WIZARD] Auth gate check:', { currentStep, hasUser: !!currentUser, userId: currentUser?.id })
+        }
         
         if (!currentUser) {
           // Set redirect keys
@@ -642,13 +652,14 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     const failures = results.filter(r => r.status === 'rejected')
     const successes = results.filter(r => r.status === 'fulfilled')
     
-    // Log detailed results
-    console.log('[SELL_WIZARD] Item creation results:', {
-      total: itemsToCreate.length,
-      succeeded: successes.length,
-      failed: failures.length,
-      failures: failures.map(f => f.status === 'rejected' ? f.reason : null),
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SELL_WIZARD] Item creation results:', {
+        total: itemsToCreate.length,
+        succeeded: successes.length,
+        failed: failures.length,
+        failures: failures.map(f => f.status === 'rejected' ? f.reason : null),
+      })
+    }
     
     // Check for HTTP errors in successful promises
     for (const result of successes) {
@@ -751,8 +762,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       setCreatedSaleId(saleId)
       setConfirmationModalOpen(true)
     } catch (error) {
-      console.error('Error creating sale:', error)
-      setSubmitError(error instanceof Error ? error.message : 'Failed to create sale')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('Error creating sale:', error)
+      }
+      setSubmitError('Something went wrong while creating your sale. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -885,7 +898,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
           
           // If draft not found, fall back to direct creation
           if (result.code === 'DRAFT_NOT_FOUND') {
-            console.log('[SELL_WIZARD] Draft not found on server, creating sale directly')
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Draft not found on server, creating sale directly')
+            }
             const payload = buildSalePayload()
             await submitSalePayload(payload)
             setLoading(false)
@@ -923,8 +938,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         setCreatedSaleId(saleId)
         setConfirmationModalOpen(true)
       } catch (error) {
-        console.error('[SELL_WIZARD] Error publishing draft:', error)
-        setSubmitError(error instanceof Error ? error.message : 'Failed to publish sale')
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[SELL_WIZARD] Error publishing draft:', error)
+        }
+        setSubmitError('Something went wrong while publishing your sale. Please try again.')
         // Reset publishing flag on error so autosave can work again
         // Don't restore draftKeyRef - the draft should remain cleared even on error
         // User can start fresh if they need to
@@ -1062,6 +1079,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
                     setShowToast(true)
                   }
                 }}
+                aria-label="Discard draft"
                 className="text-sm text-red-600 hover:text-red-700 mt-2 underline"
               >
                 Discard draft
@@ -1113,9 +1131,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         <button
           onClick={handlePrevious}
           disabled={currentStep === STEPS.DETAILS}
+          aria-label="Previous step"
           className="inline-flex items-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
         >
-          <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Previous
@@ -1124,24 +1143,28 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         {currentStep < WIZARD_STEPS.length - 1 ? (
           <button
             onClick={handleNext}
+            aria-label="Next step"
             className="inline-flex items-center px-6 py-3 btn-accent min-h-[44px]"
           >
             Next
-            <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         ) : (
-          <button
-            onClick={(e) => {
-              console.log('[SELL_WIZARD] Publish button clicked (main)', { loading, currentStep, disabled: loading })
-              e.preventDefault()
-              e.stopPropagation()
-              handleSubmit()
-            }}
-            disabled={loading}
-            className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
-          >
+                <button
+                  onClick={(e) => {
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[SELL_WIZARD] Publish button clicked (main)', { loading, currentStep, disabled: loading })
+                    }
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleSubmit()
+                  }}
+                  disabled={loading}
+                  aria-label="Publish sale"
+                  className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                >
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -1708,12 +1731,15 @@ function ReviewStep({ formData, photos, items, onPublish, loading, submitError }
         )}
         <button
           onClick={(e) => {
-            console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading })
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading })
+            }
             e.preventDefault()
             e.stopPropagation()
             onPublish()
           }}
           disabled={loading}
+          aria-label="Publish sale"
           className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
         >
           {loading ? (

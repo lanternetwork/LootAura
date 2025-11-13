@@ -1,6 +1,8 @@
+import { Metadata } from 'next'
 import SalesClient from './SalesClient'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies, headers } from 'next/headers'
+import { createPageMetadata } from '@/lib/metadata'
 
 interface SalesPageProps {
   searchParams: {
@@ -18,6 +20,12 @@ interface SalesPageProps {
 }
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = createPageMetadata({
+  title: 'Find Yard Sales',
+  description: 'Browse yard sales, garage sales, and estate sales on an interactive map. Find great deals near you.',
+  path: '/sales',
+})
 
 export default async function SalesPage({ searchParams }: SalesPageProps) {
   const supabase = createSupabaseServerClient()
@@ -50,7 +58,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   // 0) URL parameters (highest priority)
   if (_lat && _lng) {
     initialCenter = { lat: _lat, lng: _lng }
-    console.log(`[SALES_PAGE] Using URL parameters:`, initialCenter)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[SALES_PAGE] Using URL parameters:`, initialCenter)
+    }
   }
   
   // 0.5) ZIP code lookup (only if no lat/lng in URL)
@@ -65,7 +75,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
             lng: zipData.lng, 
             label: { zip: zipData.zip, city: zipData.city, state: zipData.state } 
           }
-          console.log(`[SALES_PAGE] Using ZIP lookup from URL:`, initialCenter)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log(`[SALES_PAGE] Using ZIP lookup from URL:`, initialCenter)
+          }
         }
       }
     } catch (error) {
@@ -77,7 +89,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   if (!initialCenter) {
     try {
       const c = cookieStore.get('la_loc')?.value
-      console.log(`[SALES_PAGE] la_loc cookie:`, c)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[SALES_PAGE] la_loc cookie:`, c)
+      }
       if (c) {
         const parsed = JSON.parse(c)
         if (parsed?.lat && parsed?.lng) {
@@ -86,11 +100,15 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
             lng: Number(parsed.lng),
             label: { zip: parsed.zip, city: parsed.city, state: parsed.state }
           }
-          console.log(`[SALES_PAGE] Using cookie location:`, initialCenter)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log(`[SALES_PAGE] Using cookie location:`, initialCenter)
+          }
         }
       }
     } catch (e) {
-      console.log(`[SALES_PAGE] Cookie parse error:`, e)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[SALES_PAGE] Cookie parse error:`, e)
+      }
     }
   }
 
@@ -126,7 +144,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
       const vercelCity = headersList.get('x-vercel-ip-city')
       const vercelState = headersList.get('x-vercel-ip-region')
       
-      console.log(`[SALES_PAGE] Vercel headers:`, { vercelLat, vercelLng, vercelCity, vercelState })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[SALES_PAGE] Vercel headers:`, { vercelLat, vercelLng, vercelCity, vercelState })
+      }
       
       if (vercelLat && vercelLng) {
         initialCenter = { 
@@ -134,30 +154,44 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
           lng: Number(vercelLng), 
           label: { city: vercelCity || undefined, state: vercelState || undefined } 
         }
-        console.log(`[SALES_PAGE] Using Vercel location:`, initialCenter)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[SALES_PAGE] Using Vercel location:`, initialCenter)
+        }
       } else if (baseUrl) {
         // Fallback to API
-        console.log(`[SALES_PAGE] Trying IP geolocation API: ${baseUrl}/api/geolocation/ip`)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[SALES_PAGE] Trying IP geolocation API: ${baseUrl}/api/geolocation/ip`)
+        }
         const ipRes = await fetch(`${baseUrl}/api/geolocation/ip`, { cache: 'no-store' })
         if (ipRes.ok) {
           const g = await ipRes.json()
-          console.log(`[SALES_PAGE] IP geolocation response:`, g)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log(`[SALES_PAGE] IP geolocation response:`, g)
+          }
           if (g?.lat && g?.lng) {
             initialCenter = { lat: Number(g.lat), lng: Number(g.lng), label: { city: g.city, state: g.state } }
-            console.log(`[SALES_PAGE] Using IP location:`, initialCenter)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log(`[SALES_PAGE] Using IP location:`, initialCenter)
+            }
           }
         } else {
-          console.log(`[SALES_PAGE] IP geolocation failed:`, ipRes.status)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log(`[SALES_PAGE] IP geolocation failed:`, ipRes.status)
+          }
         }
       }
     } catch (e) {
-      console.log(`[SALES_PAGE] IP geolocation error:`, e)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[SALES_PAGE] IP geolocation error:`, e)
+      }
     }
   }
 
   // 4) Neutral fallback if still missing
   if (!initialCenter) {
-    console.log(`[SALES_PAGE] Using neutral US center fallback`)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[SALES_PAGE] Using neutral US center fallback`)
+    }
     initialCenter = { lat: 39.8283, lng: -98.5795 }
   } else {
     // Set/refresh la_loc cookie for 24h when we have a real center

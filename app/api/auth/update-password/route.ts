@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       }
       
       return NextResponse.json(
-        { code: error.message, message: 'Failed to update password' },
+        { ok: false, code: 'PASSWORD_UPDATE_FAILED', error: 'Failed to update password. Please try again.' },
         { status: 400 }
       )
     }

@@ -284,7 +284,8 @@ async function suggestHandler(request: NextRequest) {
     }
     
     // Dev-only debug info (also log to console for troubleshooting)
-    if (process.env.NODE_ENV === 'development') {
+    // Only include _debug in development to prevent leaking internal details
+    if (process.env.NODE_ENV !== 'production') {
       respBody._debug = {
         viewboxApplied,
         upstreamLimit,
@@ -296,6 +297,9 @@ async function suggestHandler(request: NextRequest) {
         finalCount: finalSuggestions.length,
         distances: hasCoords && suggestions.length > 0 ? suggestions.slice(0, 3).map(s => ({ id: s.id, distanceKm: (s as any).__distanceKm })) : undefined
       }
+    }
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SUGGEST]', {
         query: query.substring(0, 20),
         hasCoords,
@@ -311,7 +315,6 @@ async function suggestHandler(request: NextRequest) {
         'Cache-Control': hasCoords ? 'public, max-age=60' : 'public, max-age=5'
       }
     })
-    
   } catch (error: any) {
     console.error('[SUGGEST] Error:', error)
     return NextResponse.json({

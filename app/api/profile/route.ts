@@ -74,7 +74,7 @@ export async function GET(_req: NextRequest) {
 
   if (error) {
     console.error('[PROFILE] GET table fetch error:', error)
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: false, code: 'FETCH_ERROR', error: 'Failed to fetch profile' }, { status: 500 })
   }
 
   if (!data) {

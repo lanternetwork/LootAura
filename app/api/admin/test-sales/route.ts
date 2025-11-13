@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 
 export async function POST(request: NextRequest) {
+  // Require admin access
+  try {
+    await assertAdminOrThrow(request)
+  } catch (error) {
+    if (error instanceof Response) {
+      return error
+    }
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const { zipCode, dateRange } = await request.json()
     
@@ -150,7 +160,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Sales data test error:', error)
+    console.error('[TEST_SALES] Error:', error)
     return NextResponse.json({ 
       error: 'Internal server error' 
     }, { status: 500 })

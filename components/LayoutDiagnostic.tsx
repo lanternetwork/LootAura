@@ -16,7 +16,7 @@ export default function LayoutDiagnostic({ containerRef, isVisible }: LayoutDiag
   }, [])
 
   useEffect(() => {
-    if (!containerRef.current || !isVisible) return
+    if (!containerRef.current) return
 
     const updateLayoutInfo = () => {
       const container = containerRef.current

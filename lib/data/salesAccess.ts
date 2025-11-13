@@ -353,26 +353,31 @@ export async function getSaleWithItems(
           tags = data.tags
         }
       } else if (tagsRes.error) {
-        console.log('[SALES_ACCESS] Admin client tags query failed (schema limitation):', {
-          saleId,
-          error: tagsRes.error.message,
-        })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALES_ACCESS] Admin client tags query failed (schema limitation):', {
+            saleId,
+            error: tagsRes.error.message,
+          })
+        }
       }
     } catch (error) {
       // Admin client not available or failed - that's okay, we'll continue without tags
-      console.log('[SALES_ACCESS] Could not fetch tags (admin client not available or failed):', {
-        saleId,
-        error: error instanceof Error ? error.message : String(error),
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES_ACCESS] Could not fetch tags (admin client not available or failed):', {
+          saleId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
     
-    // Always log in production for debugging (can remove later)
-    console.log('[SALES_ACCESS] Tags fetch result:', {
-      saleId,
-      tagsCount: tags.length,
-      tags,
-      note: 'Categories will still work from item categories if tags are empty',
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES_ACCESS] Tags fetch result:', {
+        saleId,
+        tagsCount: tags.length,
+        tags,
+        note: 'Categories will still work from item categories if tags are empty',
+      })
+    }
     
     const saleWithTags = {
       ...(sale as Sale),
@@ -415,7 +420,9 @@ export async function getSaleWithItems(
       if (itemsRes.error && 
           (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('images')) ||
           itemsRes.error?.code === 'PGRST301') {
-        console.log('[SALES_ACCESS] images column not found, falling back to image_url only')
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALES_ACCESS] images column not found, falling back to image_url only')
+        }
         itemsRes = await supabase
           .from('items_v2')
           .select('id, sale_id, name, category, price, image_url, created_at')
@@ -427,7 +434,9 @@ export async function getSaleWithItems(
       if (itemsRes.error && 
           (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('updated_at')) ||
           itemsRes.error?.code === '42703') {
-        console.log('[SALES_ACCESS] updated_at column not found, retrying without it')
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALES_ACCESS] updated_at column not found, retrying without it')
+        }
         itemsRes = await supabase
           .from('items_v2')
           .select('id, sale_id, name, category, price, image_url, created_at')
@@ -479,21 +488,22 @@ export async function getSaleWithItems(
       })
     }
     
-    // Always log in production for debugging (can remove later)
-    console.log('[SALES_ACCESS] Items fetch result:', {
-      saleId,
-      hasError: !!itemsRes.error,
-      itemsResError: itemsRes.error ? {
-        code: itemsRes.error?.code || 'unknown',
-        message: itemsRes.error?.message || 'unknown error',
-        errorType: itemsRes.error?.constructor?.name || typeof itemsRes.error,
-      } : null,
-      itemsCount: itemsRes.data?.length || 0,
-      items: itemsRes.data?.map((i: any) => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
-      // Debug: Check if sale status might be blocking items
-      saleStatus: sale.status,
-      saleIdMatch: sale.id === saleId,
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES_ACCESS] Items fetch result:', {
+        saleId,
+        hasError: !!itemsRes.error,
+        itemsResError: itemsRes.error ? {
+          code: itemsRes.error?.code || 'unknown',
+          message: itemsRes.error?.message || 'unknown error',
+          errorType: itemsRes.error?.constructor?.name || typeof itemsRes.error,
+        } : null,
+        itemsCount: itemsRes.data?.length || 0,
+        items: itemsRes.data?.map((i: any) => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
+        // Debug: Check if sale status might be blocking items
+        saleStatus: sale.status,
+        saleIdMatch: sale.id === saleId,
+      })
+    }
     
     // Additional debug: Try to query items using admin client via items_v2 view
     // This helps diagnose if items exist but are being filtered by RLS
@@ -512,22 +522,26 @@ export async function getSaleWithItems(
           // Type assertion needed because admin client types may not be fully inferred
           const adminItems = adminItemsRes.data as Array<{ id: string; sale_id: string; name: string; category: string | null }> | null
           
-          console.log('[SALES_ACCESS] Admin client items check (bypasses RLS):', {
-            saleId,
-            adminItemsCount: adminItems?.length || 0,
-            adminItemsError: adminItemsRes.error ? {
-              code: adminItemsRes.error?.code || 'unknown',
-              message: adminItemsRes.error?.message || 'unknown error',
-            } : null,
-            adminItems: adminItems?.map(i => ({ id: i.id, name: i.name, category: i.category })),
-            note: 'If admin finds items but regular query returns 0, there may be an RLS issue',
-          })
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SALES_ACCESS] Admin client items check (bypasses RLS):', {
+              saleId,
+              adminItemsCount: adminItems?.length || 0,
+              adminItemsError: adminItemsRes.error ? {
+                code: adminItemsRes.error?.code || 'unknown',
+                message: adminItemsRes.error?.message || 'unknown error',
+              } : null,
+              adminItems: adminItems?.map(i => ({ id: i.id, name: i.name, category: i.category })),
+              note: 'If admin finds items but regular query returns 0, there may be an RLS issue',
+            })
+          }
         }
       } catch (error) {
-        console.log('[SALES_ACCESS] Could not check items via admin client:', {
-          saleId,
-          error: error instanceof Error ? error.message : String(error),
-        })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALES_ACCESS] Could not check items via admin client:', {
+            saleId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
       }
     }
 

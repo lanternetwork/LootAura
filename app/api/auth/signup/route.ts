@@ -48,7 +48,7 @@ async function signupHandler(request: NextRequest) {
       }
       
       return NextResponse.json(
-        { code: error.message, message: 'Auth failed' },
+        { ok: false, code: 'SIGNUP_FAILED', error: 'Failed to create account. Please try again.' },
         { status: 400 }
       )
     }

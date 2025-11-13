@@ -250,16 +250,18 @@ export default function SalesClient({
     apiCallCounterRef.current += 1
     const callId = apiCallCounterRef.current
     
-    console.log('[FETCH] fetchMapSales called with bbox:', bbox)
-    console.log('[FETCH] API Call #' + callId + ' - Single fetch path verification')
-    console.log('[FETCH] Bbox range:', {
-      latRange: bbox.north - bbox.south,
-      lngRange: bbox.east - bbox.west,
-      center: {
-        lat: (bbox.north + bbox.south) / 2,
-        lng: (bbox.east + bbox.west) / 2
-      }
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[FETCH] fetchMapSales called with bbox:', bbox)
+      console.log('[FETCH] API Call #' + callId + ' - Single fetch path verification')
+      console.log('[FETCH] Bbox range:', {
+        latRange: bbox.north - bbox.south,
+        lngRange: bbox.east - bbox.west,
+        center: {
+          lat: (bbox.north + bbox.south) / 2,
+          lng: (bbox.east + bbox.west) / 2
+        }
+      })
+    }
     
     setLoading(true)
 
@@ -283,13 +285,15 @@ export default function SalesClient({
       // Request more sales to show all pins in viewport
       params.set('limit', '200')
       
-      console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
-      console.log('[FETCH] Viewport fetch with bbox:', bbox)
-      console.log('[FETCH] Bbox area (degrees):', {
-        latRange: bbox.north - bbox.south,
-        lngRange: bbox.east - bbox.west,
-        area: (bbox.north - bbox.south) * (bbox.east - bbox.west)
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
+        console.log('[FETCH] Viewport fetch with bbox:', bbox)
+        console.log('[FETCH] Bbox area (degrees):', {
+          latRange: bbox.north - bbox.south,
+          lngRange: bbox.east - bbox.west,
+          area: (bbox.north - bbox.south) * (bbox.east - bbox.west)
+        })
+      }
 
       const response = await fetch(`/api/sales?${params.toString()}`, {
         signal: abortControllerRef.current.signal
@@ -308,25 +312,29 @@ export default function SalesClient({
       }
       
       if (data.ok && Array.isArray(data.data)) {
-      console.log('[FETCH] API Response:', {
-        ok: data.ok,
-        dataCount: data.data.length,
-        center: data.center,
-        distanceKm: data.distanceKm,
-        degraded: data.degraded,
-        totalCount: data.totalCount,
-        bbox: bbox
-      })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FETCH] API Response:', {
+            ok: data.ok,
+            dataCount: data.data.length,
+            center: data.center,
+            distanceKm: data.distanceKm,
+            degraded: data.degraded,
+            totalCount: data.totalCount,
+            bbox: bbox
+          })
+        }
         
         const deduplicated = deduplicateSales(data.data)
         // Filter out deleted sales
         const filtered = filterDeletedSales(deduplicated)
-        console.log('[FETCH] Sales received:', { 
-          raw: data.data.length, 
-          deduplicated: deduplicated.length,
-          filtered: filtered.length,
-          bbox: bbox
-        })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FETCH] Sales received:', { 
+            raw: data.data.length, 
+            deduplicated: deduplicated.length,
+            filtered: filtered.length,
+            bbox: bbox
+          })
+        }
         setMapSales(filtered)
         setMapMarkers(filtered
           .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
@@ -337,14 +345,18 @@ export default function SalesClient({
             lng: sale.lng!
           })))
       } else {
-        console.log('[FETCH] No data in response:', data)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FETCH] No data in response:', data)
+        }
         setMapSales([])
         setMapMarkers([])
       }
     } catch (error) {
       // Don't log errors for aborted requests
       if (error instanceof Error && error.name === 'AbortError') {
-        console.log('[FETCH] Request aborted (newer request started)')
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FETCH] Request aborted (newer request started)')
+        }
         return
       }
       console.error('[FETCH] Map sales error:', error)
@@ -361,15 +373,17 @@ export default function SalesClient({
   // Handle viewport changes from SimpleMap
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
     
-    console.log('[SALES] handleViewportChange called with:', {
-      center,
-      zoom,
-      bounds,
-      boundsRange: {
-        latRange: bounds.north - bounds.south,
-        lngRange: bounds.east - bounds.west
-      }
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SALES] handleViewportChange called with:', {
+        center,
+        zoom,
+        bounds,
+        boundsRange: {
+          latRange: bounds.north - bounds.south,
+          lngRange: bounds.east - bounds.west
+        }
+      })
+    }
     
     // If a single location is selected and the user moves the map, exit location view
     if (selectedPinId) {
@@ -411,15 +425,19 @@ export default function SalesClient({
     debounceTimerRef.current = setTimeout(() => {
       // Skip second API call during initial load (map settling)
       if (initialLoadRef.current && lastBoundsRef.current) {
-        console.log('[SALES] Skipping second API call during initial load (map settling)')
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALES] Skipping second API call during initial load (map settling)')
+        }
         initialLoadRef.current = false // Mark initial load as complete
         return
       }
       
       // Always allow fetch on pan/zoom; debounce above prevents spam.
       
-      console.log('[SALES] Debounced fetchMapSales called with bounds:', bounds)
-      console.log('[SALES] Entry point: VIEWPORT_CHANGE - Single fetch verification')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Debounced fetchMapSales called with bounds:', bounds)
+        console.log('[SALES] Entry point: VIEWPORT_CHANGE - Single fetch verification')
+      }
       lastBoundsRef.current = bounds
       initialLoadRef.current = false // Mark initial load as complete
       fetchMapSales(bounds)
@@ -432,8 +450,10 @@ export default function SalesClient({
     setIsZipSearching(true) // Prevent map view changes from overriding ZIP search
     // Don't show transition overlay - just update map directly
     
-    console.log('[ZIP] Updating map center to:', { lat, lng, zip, city, state })
-    console.log('[ZIP] Received coordinates:', { lat, lng })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ZIP] Updating map center to:', { lat, lng, zip, city, state })
+      console.log('[ZIP] Received coordinates:', { lat, lng })
+    }
     
     // Calculate bounds for ZIP location (10 mile radius)
     const radiusKm = 16.09 // 10 miles in kilometers
@@ -450,7 +470,9 @@ export default function SalesClient({
     
     // Prefetch sales data for this ZIP location immediately
     // This ensures pins appear as soon as possible
-    console.log('[ZIP] Prefetching sales for ZIP location:', { lat, lng, bounds: calculatedBounds })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ZIP] Prefetching sales for ZIP location:', { lat, lng, bounds: calculatedBounds })
+    }
     fetchMapSales(calculatedBounds).catch(err => {
       console.error('[ZIP] Failed to prefetch sales:', err)
     })
@@ -467,7 +489,9 @@ export default function SalesClient({
           bounds: calculatedBounds,
           zoom: 9 // Lower zoom to prevent zoom-in after fitBounds applies
         }
-        console.log('[ZIP] New map view:', newView)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[ZIP] New map view:', newView)
+        }
         
         // Use fitBounds to ensure exactly 10-mile radius is visible
         // Set bounds immediately - map will apply when loaded (no animation)
@@ -487,7 +511,9 @@ export default function SalesClient({
         bounds: calculatedBounds,
         zoom: 9 // Lower zoom to prevent zoom-in after fitBounds applies
       }
-      console.log('[ZIP] New map view:', newView)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[ZIP] New map view:', newView)
+      }
       
       // Use fitBounds to ensure exactly 10-mile radius is visible
       // Set bounds - map will apply when ready (no animation)
@@ -558,8 +584,10 @@ export default function SalesClient({
   const handleFiltersChange = (newFilters: any) => {
     // Check if this is a distance change
     if (newFilters.distance && newFilters.distance !== filters.distance) {
-      console.log('[DISTANCE] Converting distance to zoom:', { distance: newFilters.distance, zoom: distanceToZoom(newFilters.distance) })
-      console.log('[DISTANCE] Entry point: DISTANCE_CHANGE - No direct fetch, viewport change will trigger fetch')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DISTANCE] Converting distance to zoom:', { distance: newFilters.distance, zoom: distanceToZoom(newFilters.distance) })
+        console.log('[DISTANCE] Entry point: DISTANCE_CHANGE - No direct fetch, viewport change will trigger fetch')
+      }
       
       // Update filters for UI state
       updateFilters(newFilters)
@@ -593,8 +621,10 @@ export default function SalesClient({
     // For other filter changes, trigger single fetch with current bounds
     updateFilters(newFilters) // Keep URL update for filter state
     if (mapView?.bounds) {
-      console.log('[FILTERS] Triggering single fetch with new filters:', newFilters)
-      console.log('[FILTERS] Entry point: FILTER_CHANGE - Single fetch verification')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTERS] Triggering single fetch with new filters:', newFilters)
+        console.log('[FILTERS] Entry point: FILTER_CHANGE - Single fetch verification')
+      }
       setLoading(true) // Show loading state immediately
       fetchMapSales(mapView.bounds, newFilters)
     }
@@ -623,7 +653,9 @@ export default function SalesClient({
       if (!urlDistance) {
         // No distance in URL, so sync with zoom level
         updateFilters({ distance: correspondingDistance }, true) // skipUrlUpdate to prevent URL change
-        console.log('[DISTANCE] Synced distance filter with initial zoom:', { zoom: initialZoom, distance: correspondingDistance })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[DISTANCE] Synced distance filter with initial zoom:', { zoom: initialZoom, distance: correspondingDistance })
+        }
       }
     }
     
@@ -649,7 +681,9 @@ export default function SalesClient({
     
     if (needsClientSideLookup) {
       // Trigger ZIP lookup from URL
-      console.log('[ZIP] Restoring from URL:', zipFromUrl)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[ZIP] Restoring from URL:', zipFromUrl)
+      }
       
       const performZipLookup = async () => {
         const trimmedZip = zipFromUrl.trim()
@@ -666,7 +700,9 @@ export default function SalesClient({
           const data = await response.json()
           
           if (data.ok && data.lat && data.lng) {
-            console.log('[ZIP] Lookup success from URL:', { zip: trimmedZip, lat: data.lat, lng: data.lng })
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[ZIP] Lookup success from URL:', { zip: trimmedZip, lat: data.lat, lng: data.lng })
+            }
             
             // Use the same handler as manual ZIP input
             const bbox = data.bbox ? [data.bbox[0], data.bbox[1], data.bbox[2], data.bbox[3]] as [number, number, number, number] : undefined
@@ -698,10 +734,12 @@ export default function SalesClient({
     if (selectedPinId && hybridResult) {
       const selectedLocation = hybridResult.locations.find((loc: any) => loc.id === selectedPinId)
       if (selectedLocation) {
-        console.log('[SALES] Showing sales for selected location:', { 
-          locationId: selectedPinId,
-          salesCount: selectedLocation.sales.length 
-        })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALES] Showing sales for selected location:', { 
+            locationId: selectedPinId,
+            salesCount: selectedLocation.sales.length 
+          })
+        }
         return selectedLocation.sales
       }
     }
@@ -880,6 +918,8 @@ export default function SalesClient({
               ? `calc(100vh - ${FILTERS_HEIGHT}px)` 
               : '100%'
           }}
+          role="region"
+          aria-label="Interactive map showing yard sales locations"
         >
           <div className="w-full h-full">
             {mapView ? (
@@ -895,11 +935,15 @@ export default function SalesClient({
                   sales: mapSales,
                   selectedId: selectedPinId,
                   onLocationClick: (locationId) => {
-                    console.log('[SALES] Location clicked:', locationId)
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[SALES] Location clicked:', locationId)
+                    }
                     setSelectedPinId(selectedPinId === locationId ? null : locationId)
                   },
                   onClusterClick: ({ lat, lng, expandToZoom }) => {
-                    console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
+                    }
                     // Note: map flyTo is handled in SimpleMap; we just rely on viewport→fetch debounce already in place
                   },
                   viewport: currentViewport!
@@ -954,7 +998,7 @@ export default function SalesClient({
             )}
 
             {!loading && visibleSales.length > 0 && (
-              <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
+              <SalesList sales={visibleSales} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
             )}
           </div>
           </div>
@@ -1024,7 +1068,7 @@ export default function SalesClient({
 
                 {!loading && visibleSales.length > 0 && (
                   <div className="p-4">
-                    <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
+                    <SalesList sales={visibleSales} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
                   </div>
                 )}
               </>

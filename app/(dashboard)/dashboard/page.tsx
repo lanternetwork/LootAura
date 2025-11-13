@@ -1,9 +1,17 @@
+import { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getUserSales, getUserDrafts } from '@/lib/data/salesAccess'
 import { getUserProfile, getUserMetrics7d } from '@/lib/data/profileAccess'
 import DashboardClient from './DashboardClient'
+import { createPageMetadata } from '@/lib/metadata'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = createPageMetadata({
+  title: 'Dashboard',
+  description: 'Manage your yard sales, view analytics, and track your listings.',
+  path: '/dashboard',
+})
 
 export default async function DashboardPage() {
   const supabase = createSupabaseServerClient()

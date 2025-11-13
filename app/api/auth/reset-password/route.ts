@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       }
       
       return NextResponse.json(
-        { code: error.message, message: 'Failed to send password reset email' },
+        { ok: false, code: 'RESET_FAILED', error: 'Failed to send password reset email. Please try again.' },
         { status: 400 }
       )
     }

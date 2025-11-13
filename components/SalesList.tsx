@@ -4,11 +4,11 @@ import { Sale } from '@/lib/types'
 
 interface SalesListProps {
   sales: Sale[]
-  mode?: string
+  _mode?: string
   viewport?: { center: { lat: number; lng: number }; zoom: number } | null
 }
 
-export default function SalesList({ sales, mode, viewport }: SalesListProps) {
+export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
   const isEmpty = !sales?.length
 
   if (isEmpty) {
@@ -31,7 +31,6 @@ export default function SalesList({ sales, mode, viewport }: SalesListProps) {
     <div 
       className="flex flex-col gap-3 sm:gap-4 md:grid md:grid-cols-2 lg:grid-cols-3" 
       data-testid="sales-list" 
-      data-debug={`mode:${mode}|items:${sales.length}`}
       style={{ width: '100%' }}
     >
       {sales.map(sale => (

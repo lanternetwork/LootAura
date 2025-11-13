@@ -64,24 +64,20 @@ export default function SocialLinksForm({ initialLinks, onSaved }: SocialLinksFo
 
       // Check if response is ok before trying to parse JSON
       if (!response.ok) {
-        let errorMessage = `Server error: ${response.status} ${response.statusText}`
+        let errorMessage = 'We couldn\'t save your social links. Please try again.'
         try {
           const errorData = await response.json()
-          console.error('[SOCIAL_LINKS_FORM] Full error response:', JSON.stringify(errorData, null, 2))
-          errorMessage = errorData.error || errorData.message || errorMessage
-          if (errorData.details) {
-            console.error('[SOCIAL_LINKS_FORM] Error details:', JSON.stringify(errorData.details, null, 2))
-            // Include details in error message if available
-            if (typeof errorData.details === 'object') {
-              const detailsStr = JSON.stringify(errorData.details)
-              if (detailsStr.length < 200) {
-                errorMessage += ` (${detailsStr})`
-              }
-            }
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.error('[SOCIAL_LINKS_FORM] Full error response:', JSON.stringify(errorData, null, 2))
+          }
+          // Only use error message if it's a safe, user-friendly message
+          if (errorData.error && typeof errorData.error === 'string' && !errorData.error.includes('PGRST') && !errorData.error.includes('SQL')) {
+            errorMessage = errorData.error
           }
         } catch (e) {
-          // If JSON parsing fails, use the status text
-          console.error('[SOCIAL_LINKS_FORM] Failed to parse error response:', e)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.error('[SOCIAL_LINKS_FORM] Failed to parse error response:', e)
+          }
         }
         toast.error(errorMessage)
         return
@@ -100,14 +96,16 @@ export default function SocialLinksForm({ initialLinks, onSaved }: SocialLinksFo
           onSaved(result.data.social_links)
         }
       } else {
-        const errorMessage = result.error || result.message || 'Failed to update social links'
-        console.error('[SOCIAL_LINKS_FORM] API returned error:', result)
-        toast.error(errorMessage)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[SOCIAL_LINKS_FORM] API returned error:', result)
+        }
+        toast.error('We couldn\'t save your social links. Please try again.')
       }
     } catch (error) {
-      console.error('[SOCIAL_LINKS_FORM] Save error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update social links'
-      toast.error(errorMessage)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SOCIAL_LINKS_FORM] Save error:', error)
+      }
+      toast.error('We couldn\'t save your social links. Please try again.')
     } finally {
       setSaving(false)
     }

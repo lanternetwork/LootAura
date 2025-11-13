@@ -6,6 +6,47 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const userAgent = req.headers.get('user-agent') || '';
   
+  // 0. Maintenance mode check (must be first, before any other logic)
+  const isMaintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+  
+  if (isMaintenanceMode) {
+    // Allow maintenance page itself to avoid infinite rewrites
+    if (pathname === '/maintenance') {
+      return NextResponse.next();
+    }
+    
+    // Allow admin pages (admin gating happens in the page itself)
+    if (pathname.startsWith('/admin')) {
+      return NextResponse.next();
+    }
+    
+    // Allow all API routes to stay online
+    if (pathname.startsWith('/api')) {
+      return NextResponse.next();
+    }
+    
+    // Allow static assets
+    if (
+      pathname.startsWith('/_next/') ||
+      pathname === '/favicon.ico' ||
+      pathname.startsWith('/assets/') ||
+      pathname.startsWith('/images/') ||
+      pathname.startsWith('/icons/') ||
+      pathname === '/manifest.json' ||
+      pathname === '/manifest.webmanifest' ||
+      pathname === '/robots.txt' ||
+      pathname === '/sitemap.xml' ||
+      pathname === '/sw.js' ||
+      pathname.startsWith('/icon')
+    ) {
+      return NextResponse.next();
+    }
+    
+    // Rewrite all other requests to maintenance page
+    const maintenanceUrl = new URL('/maintenance', req.url);
+    return NextResponse.rewrite(maintenanceUrl);
+  }
+  
   // 0. Immediately bypass static PWA files and manifest (before any other checks)
   if (
     pathname === '/manifest.json' ||
@@ -48,7 +89,9 @@ export async function middleware(req: NextRequest) {
     userAgent.includes('ia_archiver');
   
   if (isSocialMediaCrawler) {
-    console.log(`[MIDDLEWARE] allowing social media crawler access → ${pathname} (${userAgent.substring(0, 50)})`);
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[MIDDLEWARE] allowing social media crawler access → ${pathname} (${userAgent.substring(0, 50)})`);
+    }
     return NextResponse.next();
   }
   
@@ -61,7 +104,9 @@ export async function middleware(req: NextRequest) {
     pathname === '/admin/tools';
   
   if (isPublicPage) {
-    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    }
     return NextResponse.next();
   }
   
@@ -84,7 +129,9 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/icons/');
   
   if (isStaticAsset) {
-    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    }
     return NextResponse.next();
   }
   
@@ -97,7 +144,9 @@ export async function middleware(req: NextRequest) {
     pathname === '/api/lookup-sale';
   
   if (isPublicAPI) {
-    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    }
     return NextResponse.next();
   }
   
@@ -105,7 +154,9 @@ export async function middleware(req: NextRequest) {
   const accept = req.headers.get('accept') || '';
   const isManifestRequest = accept.includes('application/manifest+json') || pathname.endsWith('.json');
   if (isManifestRequest) {
-    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    }
     return NextResponse.next();
   }
   
@@ -117,7 +168,9 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/api/auth/');
   
   if (isAuthPage) {
-    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    }
     return NextResponse.next();
   }
   
@@ -136,7 +189,9 @@ export async function middleware(req: NextRequest) {
   
   // If it's not a protected route or write API, allow public access
   if (!isProtectedRoute && !isWriteAPI) {
-    console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
+    }
     return NextResponse.next();
   }
   
@@ -163,7 +218,9 @@ export async function middleware(req: NextRequest) {
     // For pages, redirect to signin
     // Prevent redirect loops: don't redirect if we're already going to signin
     if (pathname.startsWith('/auth/signin') || pathname.startsWith('/auth/login')) {
-      console.log('[MIDDLEWARE] Already on signin page, allowing access to prevent loop')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MIDDLEWARE] Already on signin page, allowing access to prevent loop')
+      }
       return NextResponse.next()
     }
     

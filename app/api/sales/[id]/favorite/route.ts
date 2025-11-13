@@ -45,7 +45,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: deleteError.message }, { status: 400 })
     }
 
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[FAVORITE_API] Deleted favorite:', { userId: user.id, saleId })
     }
 
@@ -62,7 +62,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: upsertError.message }, { status: 400 })
   }
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[FAVORITE_API] Added favorite:', { userId: user.id, saleId })
   }
 

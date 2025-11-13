@@ -19,7 +19,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   
   if (error) {
     console.error('[SALES/DELETE] Error deleting sale:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: false, code: 'DELETE_FAILED', error: 'Failed to delete sale' }, { status: 500 })
   }
   
   return NextResponse.json({ success: true })

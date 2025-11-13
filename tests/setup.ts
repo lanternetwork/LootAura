@@ -227,6 +227,12 @@ const ALLOWED_PATTERNS = [
   
   // Sales API error logging (app/api/sales/route.ts)
   /^\[SALES\] Unexpected error:/, // Expected error logging in sales POST handler - tests/integration/sales.imageFields.persist.test.ts
+  
+  // Map component error logging (components/location/SimpleMap.tsx)
+  /^\[SIMPLE_MAP\] Map error:/, // Expected map error logging in tests - tests/unit/a11y.smoke.test.tsx
+  
+  // React act() warnings (React 18 concurrent rendering in tests)
+  /^Error: Should not already be working/, // React act() warnings during component cleanup - tests/unit/a11y.smoke.test.tsx
 ]
 
 const isAllowedMessage = (message: string): boolean => {

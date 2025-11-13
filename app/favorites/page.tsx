@@ -41,12 +41,15 @@ export default function Favorites() {
   }
 
   if (error) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[FAVORITES] Error loading favorites:', error)
+    }
     return (
       <main className="max-w-6xl mx-auto p-4">
         <div className="text-center py-16 text-red-600">
           <div className="text-4xl mb-2">⚠️</div>
           <div className="text-lg font-medium">Error loading favorites</div>
-          <div className="text-sm mt-2">{error.message}</div>
+          <div className="text-sm mt-2">Something went wrong. Please try refreshing the page.</div>
         </div>
       </main>
     )

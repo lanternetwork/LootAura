@@ -222,7 +222,12 @@ const GridLayoutDiagnostic: React.FC<GridLayoutDiagnosticProps> = ({
     }
   }, [containerRef, isVisible, isHydrated])
 
-  if (!isVisible || process.env.NODE_ENV !== 'development' || !layoutInfo) {
+  // Only render in debug mode
+  if (process.env.NEXT_PUBLIC_DEBUG !== 'true' || !isVisible) {
+    return null
+  }
+
+  if (!layoutInfo) {
     return null
   }
 

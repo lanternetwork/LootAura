@@ -958,7 +958,7 @@ export default function SalesClient({
         </div>
 
         {/* Sales List - Below map on mobile, Right panel on desktop */}
-        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto md:w-[628px] md:min-w-[628px]">
+        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto lg:w-[420px] xl:w-[480px] 2xl:w-[540px] lg:min-w-[420px] xl:min-w-[480px] 2xl:min-w-[540px]">
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
@@ -1030,22 +1030,25 @@ export default function SalesClient({
                 Results near you ({visibleSales.length})
               </h2>
               <div className="flex items-center gap-2">
-                {/* Accessibility buttons for expand/collapse */}
-                <button
-                  onClick={() => setBottomSheetState(bottomSheetState === 'collapsed' ? 'mid' : 'collapsed')}
-                  className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-gray-900"
-                  aria-label={bottomSheetState === 'collapsed' ? 'Expand results' : 'Collapse results'}
-                >
-                  {bottomSheetState === 'collapsed' ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  )}
-                </button>
+                {/* Accessibility buttons for expand/collapse - text buttons for better accessibility */}
+                {bottomSheetState === 'collapsed' && (
+                  <button
+                    onClick={() => setBottomSheetState('mid')}
+                    className="md:hidden text-sm text-gray-600 hover:text-gray-900 underline min-h-[44px] px-2"
+                    aria-label="Show more results"
+                  >
+                    Show more
+                  </button>
+                )}
+                {bottomSheetState !== 'collapsed' && (
+                  <button
+                    onClick={() => setBottomSheetState('collapsed')}
+                    className="md:hidden text-sm text-gray-600 hover:text-gray-900 underline min-h-[44px] px-2"
+                    aria-label="Show less results"
+                  >
+                    Show less
+                  </button>
+                )}
                 {selectedPinId && (
                   <button
                     onClick={() => setSelectedPinId(null)}

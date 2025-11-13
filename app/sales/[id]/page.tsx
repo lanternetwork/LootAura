@@ -38,7 +38,6 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   })
 
   const _metadata = createSaleMetadata(sale)
-  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app').replace(/\/$/, '')
   
   // Create structured data for SEO
   const eventStructuredData = createSaleEventStructuredData(sale)

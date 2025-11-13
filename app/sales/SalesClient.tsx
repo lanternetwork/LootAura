@@ -998,7 +998,7 @@ export default function SalesClient({
             )}
 
             {!loading && visibleSales.length > 0 && (
-              <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
+              <SalesList sales={visibleSales} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
             )}
           </div>
           </div>
@@ -1068,7 +1068,7 @@ export default function SalesClient({
 
                 {!loading && visibleSales.length > 0 && (
                   <div className="p-4">
-                    <SalesList sales={visibleSales} mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
+                    <SalesList sales={visibleSales} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
                   </div>
                 )}
               </>

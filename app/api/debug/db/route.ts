@@ -1,10 +1,20 @@
 import { NextRequest } from 'next/server'
 import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
+import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
+  // Require admin access
+  try {
+    await assertAdminOrThrow(request)
+  } catch (error) {
+    if (error instanceof Response) {
+      return error
+    }
+    return fail(401, 'UNAUTHORIZED', 'Admin access required')
+  }
   try {
     // Try admin client first (no auth required, more reliable for diagnostics)
     let db
@@ -27,32 +37,20 @@ export async function GET(_request: NextRequest) {
         data = rlsResult.data
         error = rlsResult.error
       } catch (rlsErr: any) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.error('[DEBUG/DB] Both clients failed:', { admin: adminErr.message, rls: rlsErr.message })
-        }
-        return fail(500, 'DB_ERROR', 'Database connection failed', {
-          adminError: adminErr.message,
-          rlsError: rlsErr.message
-        })
+        console.error('[DEBUG/DB] Both clients failed:', { admin: adminErr.message, rls: rlsErr.message })
+        return fail(500, 'DB_ERROR', 'Database connection failed')
       }
     }
     
     if (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[DEBUG/DB] Query error:', error)
-      }
-      return fail(500, 'DB_ERROR', error.message || 'Database query failed', error)
+      console.error('[DEBUG/DB] Query error:', error)
+      return fail(500, 'DB_ERROR', 'Database query failed')
     }
     
     return ok({ data: data || [] })
   } catch (e: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[DEBUG/DB] Unexpected error:', e)
-    }
-    return fail(500, 'DB_ERROR', e.message || 'Database connection failed', {
-      error: e.message,
-      stack: process.env.NODE_ENV !== 'production' ? e.stack : undefined
-    })
+    console.error('[DEBUG/DB] Unexpected error:', e)
+    return fail(500, 'DB_ERROR', 'Database connection failed')
   }
 }
 

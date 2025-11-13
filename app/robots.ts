@@ -17,10 +17,6 @@ export default function robots(): MetadataRoute.Robots {
           '/sell/',
           '/favorites/',
           '/_next/',
-          '/check-categories/',
-          '/migrate/',
-          '/seed/',
-          '/setup-reviews/',
         ],
       },
       {

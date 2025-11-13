@@ -227,7 +227,21 @@ export default function AdminToolsPageClient() {
           {/* System Information */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold mb-4">System Information</h3>
-            <p className="text-sm text-gray-700">System status: OK</p>
+            <div className="space-y-2">
+              <p className="text-sm text-gray-700">System status: OK</p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">Maintenance Mode:</span>
+                {process.env.MAINTENANCE_MODE === 'true' ? (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    ON
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    OFF
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Quick Actions */}

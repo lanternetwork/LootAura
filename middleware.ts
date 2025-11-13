@@ -6,6 +6,47 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const userAgent = req.headers.get('user-agent') || '';
   
+  // 0. Maintenance mode check (must be first, before any other logic)
+  const isMaintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+  
+  if (isMaintenanceMode) {
+    // Allow maintenance page itself to avoid infinite rewrites
+    if (pathname === '/maintenance') {
+      return NextResponse.next();
+    }
+    
+    // Allow admin pages (admin gating happens in the page itself)
+    if (pathname.startsWith('/admin')) {
+      return NextResponse.next();
+    }
+    
+    // Allow all API routes to stay online
+    if (pathname.startsWith('/api')) {
+      return NextResponse.next();
+    }
+    
+    // Allow static assets
+    if (
+      pathname.startsWith('/_next/') ||
+      pathname === '/favicon.ico' ||
+      pathname.startsWith('/assets/') ||
+      pathname.startsWith('/images/') ||
+      pathname.startsWith('/icons/') ||
+      pathname === '/manifest.json' ||
+      pathname === '/manifest.webmanifest' ||
+      pathname === '/robots.txt' ||
+      pathname === '/sitemap.xml' ||
+      pathname === '/sw.js' ||
+      pathname.startsWith('/icon')
+    ) {
+      return NextResponse.next();
+    }
+    
+    // Rewrite all other requests to maintenance page
+    const maintenanceUrl = new URL('/maintenance', req.url);
+    return NextResponse.rewrite(maintenanceUrl);
+  }
+  
   // 0. Immediately bypass static PWA files and manifest (before any other checks)
   if (
     pathname === '/manifest.json' ||

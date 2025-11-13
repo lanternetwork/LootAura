@@ -89,7 +89,7 @@ export function Header() {
             {isSalesPage && (
               <button
                 onClick={handleMobileFilterClick}
-                className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                className="md:hidden flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                 aria-label="Open filters"
               >
                 <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,7 +102,7 @@ export function Header() {
               aria-label="Open navigation menu"
               aria-controls="site-menu"
               aria-expanded={menuOpen}
-              className={`flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors ${isCollapsed ? '' : 'sm:hidden'}`}
+              className={`flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors ${isCollapsed ? '' : 'sm:hidden'}`}
               onClick={() => setMenuOpen(v => !v)}
             >
               <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">

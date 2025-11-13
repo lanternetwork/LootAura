@@ -958,7 +958,7 @@ export default function SalesClient({
         </div>
 
         {/* Sales List - Below map on mobile, Right panel on desktop */}
-        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto" style={{ width: '628px', minWidth: '628px' }}>
+        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto md:w-[628px] md:min-w-[628px]">
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
@@ -1007,16 +1007,18 @@ export default function SalesClient({
       {/* Mobile Bottom Sheet - Only on mobile (<768px) */}
       {isMobile && (
         <div
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 rounded-t-2xl shadow-lg z-30 transition-all duration-300 ease-out"
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 rounded-t-2xl shadow-lg z-30 transition-transform duration-300 ease-out will-change-transform"
           style={{
             height: getBottomSheetHeight(bottomSheetState),
+            transform: `translateY(0)`,
           }}
         >
           {/* Drag Handle */}
           <div
-            className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none"
+            className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none touch-none"
             onMouseDown={handleDragStart}
             onTouchStart={handleDragStart}
+            aria-label="Drag to resize"
           >
             <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
           </div>
@@ -1027,20 +1029,38 @@ export default function SalesClient({
               <h2 className="text-base font-semibold">
                 Results near you ({visibleSales.length})
               </h2>
-              {selectedPinId && (
+              <div className="flex items-center gap-2">
+                {/* Accessibility buttons for expand/collapse */}
                 <button
-                  onClick={() => setSelectedPinId(null)}
-                  className="text-sm link-accent underline"
+                  onClick={() => setBottomSheetState(bottomSheetState === 'collapsed' ? 'mid' : 'collapsed')}
+                  className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-gray-900"
+                  aria-label={bottomSheetState === 'collapsed' ? 'Expand results' : 'Collapse results'}
                 >
-                  Show All
+                  {bottomSheetState === 'collapsed' ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  )}
                 </button>
-              )}
+                {selectedPinId && (
+                  <button
+                    onClick={() => setSelectedPinId(null)}
+                    className="text-sm link-accent underline min-h-[44px] px-2"
+                  >
+                    Show All
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Sheet Content */}
           <div 
-            className="overflow-y-auto"
+            className="overflow-y-auto touch-pan-y"
             style={{ 
               height: bottomSheetState === 'collapsed' 
                 ? '0px' 

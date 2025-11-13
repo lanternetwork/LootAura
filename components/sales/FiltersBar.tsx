@@ -279,7 +279,7 @@ export default function FiltersBar({
                     aria-label={isSelected ? `Remove ${category.label} filter` : `Filter by ${category.label}`}
                     aria-pressed={isSelected}
                     className={`
-                      shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
+                      shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap min-h-[44px]
                       ${isLoading 
                         ? 'opacity-50 cursor-not-allowed' 
                         : ''

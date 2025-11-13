@@ -143,11 +143,23 @@ async function fetchListings(userId: string, page: number) {
   
   const q = await supabase
     .from('sales_v2')
-    .select('id, title, cover_url, address, status, owner_id', { count: 'exact' })
+    .select('id, title, cover_image_url, images, address, status, owner_id, created_at', { count: 'exact' })
     .eq('owner_id', userId)
     .eq('status', 'published')
     .order('created_at', { ascending: false })
     .range(from, to)
+  
+  if (q.error) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[PROFILE] Error fetching listings:', q.error)
+    }
+    return {
+      items: [],
+      total: 0,
+      page,
+      hasMore: false,
+    }
+  }
   
   return {
     items: q.data || [],
@@ -250,22 +262,28 @@ export default async function PublicProfilePage({ params, searchParams }: Public
                 </div>
               }>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                  {listings.items.map((it: any) => (
-                    <div key={it.id} className="card">
-                      <div className="card-body">
-                        <div
-                          className="w-full h-32 rounded mb-2 bg-neutral-200"
-                          style={it.cover_url ? { backgroundImage: `url(${it.cover_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
-                          aria-label={it.title}
-                        />
-                        <div className="font-medium truncate mb-1">{it.title}</div>
-                        {it.address && <div className="text-sm text-neutral-600 truncate mb-2">{it.address}</div>}
-                        <Link href={`/sales/${it.id}`} className="link-accent text-sm">
-                          View →
-                        </Link>
+                  {listings.items.map((it: any) => {
+                    // Get cover image - prefer cover_image_url, fallback to first image in images array
+                    const coverImage = it.cover_image_url || 
+                      (Array.isArray(it.images) && it.images.length > 0 ? it.images[0] : null)
+                    
+                    return (
+                      <div key={it.id} className="card">
+                        <div className="card-body">
+                          <div
+                            className="w-full h-32 rounded mb-2 bg-neutral-200"
+                            style={coverImage ? { backgroundImage: `url(${coverImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                            aria-label={it.title}
+                          />
+                          <div className="font-medium truncate mb-1">{it.title}</div>
+                          {it.address && <div className="text-sm text-neutral-600 truncate mb-2">{it.address}</div>}
+                          <Link href={`/sales/${it.id}`} className="link-accent text-sm">
+                            View →
+                          </Link>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </Suspense>
               

@@ -61,10 +61,13 @@ export function createPageMetadata({
   }
 }
 
-export function createSaleMetadata(sale: Sale): Metadata {
+export function createSaleMetadata(
+  sale: Sale,
+  options?: { categories?: string[] }
+): Metadata {
   const title = sale.title || 'Yard Sale'
   
-  // Build description with location and date info
+  // Build description with location, date, and categories
   const locationParts: string[] = []
   if (sale.city && sale.state) {
     locationParts.push(`${sale.city}, ${sale.state}`)
@@ -85,28 +88,57 @@ export function createSaleMetadata(sale: Sale): Metadata {
     }
   }
   
+  // Extract top 2-3 categories from tags and provided categories
+  const allCategories = [
+    ...(Array.isArray(sale.tags) ? sale.tags : []),
+    ...(options?.categories || [])
+  ]
+  const uniqueCategories = Array.from(new Set(allCategories)).filter(Boolean).slice(0, 3)
+  const categoryText = uniqueCategories.length > 0 
+    ? uniqueCategories.join(', ')
+    : null
+  
+  // Build description: prioritize sale.description, but enhance with location/date/categories if missing
   let description = sale.description
-  if (!description) {
+  if (!description || description.trim().length === 0) {
     const parts: string[] = []
-    if (sale.address) {
-      parts.push(sale.address)
-    }
+    
+    // Location
     if (locationParts.length > 0) {
       parts.push(`Yard sale in ${locationParts.join(', ')}`)
     } else {
       parts.push('Yard sale')
     }
+    
+    // Date
     if (dateParts.length > 0) {
-      parts.push(`— ${dateParts.join(', ')}`)
+      parts.push(`on ${dateParts.join(', ')}`)
     }
+    
+    // Categories (if available)
+    if (categoryText) {
+      parts.push(`— ${categoryText}`)
+    }
+    
     description = parts.join(' ')
+  } else if (categoryText) {
+    // If description exists, append categories if they add value and we have room
+    const descWithCats = `${description} — ${categoryText}`
+    if (descWithCats.length <= 160) {
+      description = descWithCats
+    }
   }
   
-  // Get cover image
-  const cover = getSaleCoverUrl(sale)
-  let image = cover?.url || `${baseUrl}/og-sale.jpg`
+  // Truncate description to ~160 characters for optimal social sharing
+  if (description.length > 160) {
+    description = description.substring(0, 157) + '...'
+  }
   
-  // Ensure image URL is absolute
+  // Get cover image - prefer cover_image_url, then first image from images array
+  const cover = getSaleCoverUrl(sale)
+  let image = cover?.url || `${baseUrl}/og-default.png`
+  
+  // Ensure image URL is absolute (Cloudinary URLs are already absolute, but handle relative paths)
   if (image && !image.startsWith('http://') && !image.startsWith('https://')) {
     image = image.startsWith('/') ? `${baseUrl}${image}` : `${baseUrl}/${image}`
   }

@@ -53,7 +53,7 @@ describe('createPageMetadata', () => {
 })
 
 describe('createSaleMetadata', () => {
-  it('should create sale metadata', () => {
+  it('should create sale metadata with title and description', () => {
     const sale: Sale = {
       id: 'test-id',
       owner_id: 'user-123',
@@ -82,11 +82,60 @@ describe('createSaleMetadata', () => {
 
     expect(metadata.title).toBe('Test Sale | Loot Aura')
     expect(metadata.description).toContain('Test description')
-    // OpenGraph type property doesn't exist in the metadata type
-    // Photos field doesn't exist in new schema, so no image URL expected
+    expect(metadata.openGraph?.title).toBe('Test Sale')
+    expect(metadata.openGraph?.type).toBe('website')
+    expect(metadata.twitter?.card).toBe('summary_large_image')
   })
 
-  it('should handle sale without description', () => {
+  it('should include categories in description when provided', () => {
+    const sale: Sale = {
+      id: 'test-id',
+      owner_id: 'user-123',
+      title: 'Test Sale',
+      description: 'A great sale',
+      city: 'Test City',
+      state: 'TS',
+      date_start: '2023-12-25',
+      time_start: '10:00',
+      tags: ['furniture'],
+      status: 'published',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: '2023-12-25T00:00:00Z',
+      updated_at: '2023-12-25T00:00:00Z'
+    }
+
+    const metadata = createSaleMetadata(sale, { categories: ['furniture', 'toys', 'electronics'] })
+
+    // Description should include categories if there's room
+    expect(metadata.description).toContain('furniture')
+    expect(metadata.openGraph?.description).toContain('furniture')
+  })
+
+  it('should use fallback OG image when no sale images available', () => {
+    const sale: Sale = {
+      id: 'test-id',
+      owner_id: 'user-123',
+      title: 'Test Sale',
+      city: 'Test City',
+      state: 'TS',
+      date_start: '2023-12-25',
+      time_start: '10:00',
+      status: 'published',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: '2023-12-25T00:00:00Z',
+      updated_at: '2023-12-25T00:00:00Z'
+    }
+
+    const metadata = createSaleMetadata(sale)
+
+    // Should use default OG image fallback
+    expect(metadata.openGraph?.images?.[0]?.url).toContain('og-default.png')
+    expect(metadata.twitter?.images?.[0]).toContain('og-default.png')
+  })
+
+  it('should handle sale without description and build from location/date', () => {
     const sale: Sale = {
       id: 'test-id',
       owner_id: 'user-123',
@@ -106,7 +155,31 @@ describe('createSaleMetadata', () => {
 
     const metadata = createSaleMetadata(sale)
 
-    expect(metadata.description).toContain('123 Test St')
+    expect(metadata.description).toContain('Test City')
+    expect(metadata.description).toContain('Dec')
+  })
+
+  it('should truncate description to ~160 characters', () => {
+    const sale: Sale = {
+      id: 'test-id',
+      owner_id: 'user-123',
+      title: 'Test Sale',
+      description: 'A'.repeat(200), // Very long description
+      city: 'Test City',
+      state: 'TS',
+      date_start: '2023-12-25',
+      time_start: '10:00',
+      status: 'published',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: '2023-12-25T00:00:00Z',
+      updated_at: '2023-12-25T00:00:00Z'
+    }
+
+    const metadata = createSaleMetadata(sale)
+
+    expect(metadata.description.length).toBeLessThanOrEqual(160)
+    expect(metadata.description).toContain('...')
   })
 })
 

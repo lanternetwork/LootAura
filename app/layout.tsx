@@ -15,14 +15,43 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const fetchCache = 'force-no-store'
 
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app').replace(/\/$/, '')
+const defaultOgImage = `${siteUrl}/og-default.png`
+
+// Safely construct metadataBase URL
+let metadataBaseUrl: URL | undefined
+try {
+  metadataBaseUrl = new URL(siteUrl)
+} catch (error) {
+  // If siteUrl is invalid, don't set metadataBase
+  console.warn('[LAYOUT] Invalid siteUrl for metadataBase:', siteUrl)
+}
+
 export const metadata: Metadata = {
-  title: 'Loot Aura - Find Amazing Yard Sale Treasures',
-  description: 'Discover local yard sales, garage sales, and estate sales in your area. Never miss a great deal again!',
+  ...(metadataBaseUrl && { metadataBase: metadataBaseUrl }),
+  title: 'LootAura · Yard Sales Near You',
+  description: 'Find and post yard sales, garage sales, and local deals on an interactive map.',
   keywords: 'yard sale, garage sale, estate sale, local sales, treasure hunting',
   openGraph: {
-    title: 'Loot Aura - Find Amazing Yard Sale Treasures',
-    description: 'Discover local yard sales, garage sales, and estate sales in your area.',
+    title: 'LootAura · Yard Sales Near You',
+    description: 'Find and post yard sales, garage sales, and local deals on an interactive map.',
     type: 'website',
+    url: siteUrl,
+    siteName: 'LootAura',
+    images: [
+      {
+        url: defaultOgImage,
+        width: 1200,
+        height: 630,
+        alt: 'LootAura - Yard Sales Near You',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'LootAura · Yard Sales Near You',
+    description: 'Find and post yard sales, garage sales, and local deals on an interactive map.',
+    images: [defaultOgImage],
   },
 }
 

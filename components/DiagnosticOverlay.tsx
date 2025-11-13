@@ -21,6 +21,11 @@ interface DiagnosticOverlayProps {
 }
 
 export default function DiagnosticOverlay({ isVisible, onToggle }: DiagnosticOverlayProps) {
+  // Only render in debug mode
+  if (process.env.NEXT_PUBLIC_DEBUG !== 'true') {
+    return null
+  }
+
   const [events, setEvents] = useState<FetchEvent[]>([])
   const [suppressedCount, setSuppressedCount] = useState(0)
   const _eventIdRef = useRef(0)

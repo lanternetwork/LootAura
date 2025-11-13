@@ -69,10 +69,14 @@ async function salesHandler(request: NextRequest) {
           if (geoData.ok && geoData.lat && geoData.lng) {
             latitude = parseFloat(geoData.lat)
             longitude = parseFloat(geoData.lng)
-            console.log(`[SALES] near=1: resolved zip=${zip} to lat=${latitude}, lng=${longitude}`)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log(`[SALES] near=1: resolved zip=${zip} to lat=${latitude}, lng=${longitude}`)
+            }
           } else {
             // ZIP not found - return empty result with 200
-            console.log(`[SALES] near=1: zip=${zip} not found, returning empty result`)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log(`[SALES] near=1: zip=${zip} not found, returning empty result`)
+            }
             return NextResponse.json({
               ok: true,
               data: [],
@@ -97,7 +101,9 @@ async function salesHandler(request: NextRequest) {
         longitude = parseFloat(lng)
       } else {
         // near=1 but no location provided - return empty result with 200
-        console.log(`[SALES] near=1: no location provided, returning empty result`)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[SALES] near=1: no location provided, returning empty result`)
+        }
         return NextResponse.json({
           ok: true,
           data: [],
@@ -123,7 +129,9 @@ async function salesHandler(request: NextRequest) {
         west: longitude - lngRange
       }
       
-      console.log(`[SALES] near=1: calculated bbox from lat=${latitude}, lng=${longitude}, radius=${distanceKm}km`)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[SALES] near=1: calculated bbox from lat=${latitude}, lng=${longitude}, radius=${distanceKm}km`)
+      }
     }
     
     // Normal location parsing (for non-near queries)

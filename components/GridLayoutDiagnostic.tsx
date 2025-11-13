@@ -56,6 +56,11 @@ const GridLayoutDiagnostic: React.FC<GridLayoutDiagnosticProps> = ({
   containerRef, 
   isVisible 
 }) => {
+  // Only render in debug mode
+  if (process.env.NEXT_PUBLIC_DEBUG !== 'true' || !isVisible) {
+    return null
+  }
+
   const [layoutInfo, setLayoutInfo] = useState<LayoutInfo | null>(null)
   const [isHydrated, setIsHydrated] = useState(false)
   const [mutationCount, setMutationCount] = useState(0)

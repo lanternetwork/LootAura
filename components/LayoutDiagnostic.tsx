@@ -8,6 +8,11 @@ interface LayoutDiagnosticProps {
 }
 
 export default function LayoutDiagnostic({ containerRef, isVisible }: LayoutDiagnosticProps) {
+  // Only render in debug mode
+  if (process.env.NEXT_PUBLIC_DEBUG !== 'true' || !isVisible) {
+    return null
+  }
+
   const [layoutInfo, setLayoutInfo] = useState<any>(null)
   const [isHydrated, setIsHydrated] = useState(false)
 
@@ -16,7 +21,7 @@ export default function LayoutDiagnostic({ containerRef, isVisible }: LayoutDiag
   }, [])
 
   useEffect(() => {
-    if (!containerRef.current || !isVisible) return
+    if (!containerRef.current) return
 
     const updateLayoutInfo = () => {
       const container = containerRef.current

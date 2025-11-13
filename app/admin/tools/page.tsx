@@ -43,22 +43,26 @@ export default function AdminToolsPage() {
           {/* Debug Controls */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold mb-4">Debug Controls</h3>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <DebugToggle />
-                <button
-                  onClick={() => setShowDiagnostics(!showDiagnostics)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  {showDiagnostics ? 'Hide' : 'Show'} Diagnostics
-                </button>
+            {process.env.NEXT_PUBLIC_DEBUG === 'true' ? (
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4">
+                  <DebugToggle />
+                  <button
+                    onClick={() => setShowDiagnostics(!showDiagnostics)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    {showDiagnostics ? 'Hide' : 'Show'} Diagnostics
+                  </button>
+                </div>
+                <div className="text-sm text-gray-600">
+                  <p>• Debug Toggle: Enable/disable client-side debugging</p>
+                  <p>• Diagnostics: View fetch events and system behavior</p>
+                  <p>• Environment: NEXT_PUBLIC_DEBUG = {process.env.NEXT_PUBLIC_DEBUG || 'false'}</p>
+                </div>
               </div>
-              <div className="text-sm text-gray-600">
-                <p>• Debug Toggle: Enable/disable client-side debugging</p>
-                <p>• Diagnostics: View fetch events and system behavior</p>
-                <p>• Environment: NEXT_PUBLIC_DEBUG = {process.env.NEXT_PUBLIC_DEBUG || 'false'}</p>
-              </div>
-            </div>
+            ) : (
+              <p className="text-sm text-gray-600">Diagnostics are available in debug mode.</p>
+            )}
           </div>
 
           {/* Geolocation Diagnostics */}
@@ -101,7 +105,9 @@ export default function AdminToolsPage() {
                     // Test Louisville coordinates by opening in new tab
                     const url = '/sales?lat=38.2527&lng=-85.7585&zoom=12'
                     window.open(url, '_blank')
-                    console.log('[SMOKE_TEST] Opening Louisville test:', url)
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[SMOKE_TEST] Opening Louisville test:', url)
+                    }
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
                 >
@@ -112,7 +118,9 @@ export default function AdminToolsPage() {
                     // Test New York coordinates by opening in new tab
                     const url = '/sales?lat=40.7128&lng=-74.0060&zoom=12'
                     window.open(url, '_blank')
-                    console.log('[SMOKE_TEST] Opening New York test:', url)
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[SMOKE_TEST] Opening New York test:', url)
+                    }
                   }}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
@@ -123,7 +131,9 @@ export default function AdminToolsPage() {
                     // Test ZIP search by opening in new tab
                     const url = '/sales?zip=10001'
                     window.open(url, '_blank')
-                    console.log('[SMOKE_TEST] Opening ZIP search test:', url)
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[SMOKE_TEST] Opening ZIP search test:', url)
+                    }
                   }}
                   className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
                 >
@@ -175,16 +185,24 @@ export default function AdminToolsPage() {
                      { id: 'test-sale-5', lat: 38.2327, lng: -85.7385 }
                    ],
                    selectedId: null, // Same as main app - no selected sale by default
-                   onPinClick: (id) => {
-                     console.log('[ADMIN_DIAG] Pin clicked:', id)
-                     // Same behavior as main app - just logging for now
-                   },
-                   onClusterClick: ({ lat, lng, expandToZoom }) => {
-                     console.log('[ADMIN_DIAG] Cluster clicked:', { lat, lng, expandToZoom })
-                     // Same behavior as main app - cluster expansion handled by SimpleMap
-                   }
-                 }}
-                 onViewportChange={(vp) => console.log('[ADMIN_DIAG] viewport', vp)}
+                  onPinClick: (id) => {
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[ADMIN_DIAG] Pin clicked:', id)
+                    }
+                    // Same behavior as main app - just logging for now
+                  },
+                  onClusterClick: ({ lat, lng, expandToZoom }) => {
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[ADMIN_DIAG] Cluster clicked:', { lat, lng, expandToZoom })
+                    }
+                    // Same behavior as main app - cluster expansion handled by SimpleMap
+                  }
+                }}
+                onViewportChange={(vp) => {
+                  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                    console.log('[ADMIN_DIAG] viewport', vp)
+                  }
+                }}
                />
              </div>
            </div>
@@ -210,24 +228,7 @@ export default function AdminToolsPage() {
           {/* System Information */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold mb-4">System Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="font-medium text-gray-700">Environment:</span>
-                <p className="text-gray-900">{process.env.NODE_ENV}</p>
-              </div>
-              <div>
-                <span className="font-medium text-gray-700">Debug Mode:</span>
-                <p className="text-gray-900">{process.env.NEXT_PUBLIC_DEBUG === 'true' ? 'Enabled' : 'Disabled'}</p>
-              </div>
-              <div>
-                <span className="font-medium text-gray-700">Clustering:</span>
-                <p className="text-gray-900">{process.env.NEXT_PUBLIC_FEATURE_CLUSTERING === 'true' ? 'Enabled' : 'Disabled'}</p>
-              </div>
-              <div>
-                <span className="font-medium text-gray-700">Schema:</span>
-                <p className="text-gray-900">{process.env.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public'}</p>
-              </div>
-            </div>
+            <p className="text-sm text-gray-700">System status: OK</p>
           </div>
 
           {/* Quick Actions */}

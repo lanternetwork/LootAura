@@ -121,13 +121,15 @@ export async function POST(request: NextRequest) {
     const title = validatedPayload.formData?.title || null
 
     // Upsert draft (insert or update by user_id + draft_key)
-    console.log('[DRAFTS] Saving draft:', {
-      userId: user.id,
-      draftKey,
-      title,
-      hasPayload: !!validatedPayload,
-      payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[DRAFTS] Saving draft:', {
+        userId: user.id,
+        draftKey,
+        title,
+        hasPayload: !!validatedPayload,
+        payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
+      })
+    }
     
     // Use admin client for writes (bypasses RLS, but we've already verified auth)
     const admin = getAdminDb()

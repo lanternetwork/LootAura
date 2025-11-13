@@ -147,14 +147,18 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      console.log('[SELL_WIZARD] Auth check:', { hasUser: !!user, userId: user?.id })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SELL_WIZARD] Auth check:', { hasUser: !!user, userId: user?.id })
+      }
       setUser(user)
     }
     checkUser()
 
     // Listen for auth state changes (e.g., after login)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[SELL_WIZARD] Auth state change:', { event, hasUser: !!session?.user, userId: session?.user?.id })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SELL_WIZARD] Auth state change:', { event, hasUser: !!session?.user, userId: session?.user?.id })
+      }
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user)
       } else if (event === 'SIGNED_OUT') {
@@ -297,7 +301,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         if (serverResult.ok && serverResult.data?.payload) {
           draftToRestore = serverResult.data.payload
           source = 'server'
-          console.log('[SELL_WIZARD] Found server draft')
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Found server draft')
+          }
         }
       }
 
@@ -307,7 +313,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         if (localDraft) {
           draftToRestore = localDraft
           source = 'local'
-          console.log('[SELL_WIZARD] Found local draft')
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Found local draft')
+          }
         }
       }
 
@@ -333,7 +341,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
                 currentStep: parsed.currentStep || 0,
               }
               source = 'local'
-              console.log('[SELL_WIZARD] Found old format draft')
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[SELL_WIZARD] Found old format draft')
+              }
             }
           } catch (error) {
             console.error('[SELL_WIZARD] Error parsing old draft:', error)
@@ -407,14 +417,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   }, [initialData, user, normalizeTimeToNearest30, searchParams])
 
   const handleInputChange = (field: keyof SaleInput, value: any) => {
-    // Only log in development to reduce console noise
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SELL_WIZARD] handleInputChange called:', { field, value, currentFormData: formData })
     }
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
-      // Only log in development to reduce console noise
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[SELL_WIZARD] FormData updated:', { field, value, updated })
       }
 
@@ -534,7 +542,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       // Check auth state synchronously to ensure we have the latest value
       if (currentStep === STEPS.ITEMS) {
         const { data: { user: currentUser } } = await supabase.auth.getUser()
-        console.log('[SELL_WIZARD] Auth gate check:', { currentStep, hasUser: !!currentUser, userId: currentUser?.id })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SELL_WIZARD] Auth gate check:', { currentStep, hasUser: !!currentUser, userId: currentUser?.id })
+        }
         
         if (!currentUser) {
           // Set redirect keys
@@ -642,13 +652,14 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     const failures = results.filter(r => r.status === 'rejected')
     const successes = results.filter(r => r.status === 'fulfilled')
     
-    // Log detailed results
-    console.log('[SELL_WIZARD] Item creation results:', {
-      total: itemsToCreate.length,
-      succeeded: successes.length,
-      failed: failures.length,
-      failures: failures.map(f => f.status === 'rejected' ? f.reason : null),
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SELL_WIZARD] Item creation results:', {
+        total: itemsToCreate.length,
+        succeeded: successes.length,
+        failed: failures.length,
+        failures: failures.map(f => f.status === 'rejected' ? f.reason : null),
+      })
+    }
     
     // Check for HTTP errors in successful promises
     for (const result of successes) {
@@ -885,7 +896,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
           
           // If draft not found, fall back to direct creation
           if (result.code === 'DRAFT_NOT_FOUND') {
-            console.log('[SELL_WIZARD] Draft not found on server, creating sale directly')
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Draft not found on server, creating sale directly')
+            }
             const payload = buildSalePayload()
             await submitSalePayload(payload)
             setLoading(false)
@@ -1137,7 +1150,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         ) : (
                 <button
                   onClick={(e) => {
-                    console.log('[SELL_WIZARD] Publish button clicked (main)', { loading, currentStep, disabled: loading })
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[SELL_WIZARD] Publish button clicked (main)', { loading, currentStep, disabled: loading })
+                    }
                     e.preventDefault()
                     e.stopPropagation()
                     handleSubmit()
@@ -1712,7 +1727,9 @@ function ReviewStep({ formData, photos, items, onPublish, loading, submitError }
         )}
         <button
           onClick={(e) => {
-            console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading })
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading })
+            }
             e.preventDefault()
             e.stopPropagation()
             onPublish()

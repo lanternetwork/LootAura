@@ -296,7 +296,8 @@ async function suggestHandler(request: NextRequest) {
         finalCount: finalSuggestions.length,
         distances: hasCoords && suggestions.length > 0 ? suggestions.slice(0, 3).map(s => ({ id: s.id, distanceKm: (s as any).__distanceKm })) : undefined
       }
-      console.log('[SUGGEST]', {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SUGGEST]', {
         query: query.substring(0, 20),
         hasCoords,
         viewboxApplied,

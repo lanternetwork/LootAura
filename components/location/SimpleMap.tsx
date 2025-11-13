@@ -78,7 +78,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   }), [loaded])
 
   const onLoad = useCallback(() => {
-    console.log('[MAP] onLoad - Map initialization completed')
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MAP] onLoad - Map initialization completed')
+    }
     setLoaded(true)
     mapRef.current?.getMap()?.resize()
     
@@ -101,21 +103,25 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
           }
         }
         
-        console.log('[MAP] onLoad - Initial viewport:', viewport)
-        console.log('[MAP] onLoad - Bounds range:', {
-          latRange: viewport.bounds.north - viewport.bounds.south,
-          lngRange: viewport.bounds.east - viewport.bounds.west,
-          center: viewport.center,
-          zoom: viewport.zoom
-        })
-        console.log('[MAP] onLoad - Bounds area (square degrees):', (viewport.bounds.north - viewport.bounds.south) * (viewport.bounds.east - viewport.bounds.west))
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[MAP] onLoad - Initial viewport:', viewport)
+          console.log('[MAP] onLoad - Bounds range:', {
+            latRange: viewport.bounds.north - viewport.bounds.south,
+            lngRange: viewport.bounds.east - viewport.bounds.west,
+            center: viewport.center,
+            zoom: viewport.zoom
+          })
+          console.log('[MAP] onLoad - Bounds area (square degrees):', (viewport.bounds.north - viewport.bounds.south) * (viewport.bounds.east - viewport.bounds.west))
+        }
         onViewportChange?.(viewport)
       }
     }
   }, [onViewportChange])
 
   const onStyleData = useCallback(() => {
-    console.log('[MAP] onStyleData')
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MAP] onStyleData')
+    }
     // Only resize if map is not already loaded to avoid excessive resizing
     if (!loaded) {
       mapRef.current?.getMap()?.resize()
@@ -143,12 +149,14 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       }
     }
     
-    console.log('[MAP] onMoveEnd:', viewport)
-    console.log('[MAP] onMoveEnd - Bounds range:', {
-      latRange: viewport.bounds.north - viewport.bounds.south,
-      lngRange: viewport.bounds.east - viewport.bounds.west,
-      center: viewport.center
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MAP] onMoveEnd:', viewport)
+      console.log('[MAP] onMoveEnd - Bounds range:', {
+        latRange: viewport.bounds.north - viewport.bounds.south,
+        lngRange: viewport.bounds.east - viewport.bounds.west,
+        center: viewport.center
+      })
+    }
     onViewportChange?.(viewport)
   }, [onViewportChange])
 
@@ -159,7 +167,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const map = mapRef.current.getMap()
     if (!map) return
 
-    console.log('[CLUSTER] expand', { lat: cluster.lat, lng: cluster.lng, expandToZoom: cluster.expandToZoom })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[CLUSTER] expand', { lat: cluster.lat, lng: cluster.lng, expandToZoom: cluster.expandToZoom })
+    }
     
     // TEMPORARILY DISABLED: Zoom functionality works but is disabled for UX testing
     // Original zoom behavior (commented out):

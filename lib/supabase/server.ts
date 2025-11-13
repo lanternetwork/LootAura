@@ -5,7 +5,7 @@ import { getSchema } from './schema';
 // Log schema at server startup (once)
 let schemaLogged = false;
 function logSchemaOnce() {
-  if (!schemaLogged) {
+  if (!schemaLogged && process.env.NEXT_PUBLIC_DEBUG === 'true') {
     const schema = getSchema();
     console.log(`[Supabase] Using schema: ${schema}`);
     schemaLogged = true;

@@ -18,7 +18,7 @@ export async function GET(_request: NextRequest) {
       error = result.error
     } catch (adminErr: any) {
       // If admin client fails, try RLS client as fallback
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[DEBUG/DB] Admin client failed, trying RLS client:', adminErr.message)
       }
       try {

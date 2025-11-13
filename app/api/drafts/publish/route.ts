@@ -154,12 +154,14 @@ export async function POST(request: NextRequest) {
 
     // 2. Create items if any
     if (itemsPayload.length) {
-      console.log('[DRAFT_PUBLISH] Creating items:', {
-        saleId: saleRow.id,
-        saleStatus: salePayload.status,
-        itemsCount: itemsPayload.length,
-        items: itemsPayload.map((i: any) => ({ name: i.name, hasImage: !!i.image_url })),
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DRAFT_PUBLISH] Creating items:', {
+          saleId: saleRow.id,
+          saleStatus: salePayload.status,
+          itemsCount: itemsPayload.length,
+          items: itemsPayload.map((i: any) => ({ name: i.name, hasImage: !!i.image_url })),
+        })
+      }
       
       const { data: insertedItems, error: iErr } = await fromBase(admin, 'items')
         .insert(itemsPayload)
@@ -172,11 +174,13 @@ export async function POST(request: NextRequest) {
         return fail(500, 'ITEMS_CREATE_FAILED', iErr.message, iErr)
       }
       
-      console.log('[DRAFT_PUBLISH] Items created successfully:', {
-        saleId: saleRow.id,
-        itemsCreated: insertedItems?.length || 0,
-        itemIds: insertedItems?.map((i: any) => i.id),
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DRAFT_PUBLISH] Items created successfully:', {
+          saleId: saleRow.id,
+          itemsCreated: insertedItems?.length || 0,
+          itemIds: insertedItems?.map((i: any) => i.id),
+        })
+      }
       
       // Verify items are readable from base table (using admin client to bypass RLS for verification)
       // Note: admin client is schema-scoped to lootaura_v2, so we query the base table, not the view
@@ -184,26 +188,32 @@ export async function POST(request: NextRequest) {
         .select('id, name, sale_id, image_url')
         .eq('sale_id', saleRow.id)
       
-      console.log('[DRAFT_PUBLISH] Items verification (admin client):', {
-        saleId: saleRow.id,
-        itemsFound: verifyItems?.length || 0,
-        error: verifyErr,
-        itemIds: verifyItems?.map((i: any) => i.id),
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DRAFT_PUBLISH] Items verification (admin client):', {
+          saleId: saleRow.id,
+          itemsFound: verifyItems?.length || 0,
+          error: verifyErr,
+          itemIds: verifyItems?.map((i: any) => i.id),
+        })
+      }
     } else {
-      console.log('[DRAFT_PUBLISH] No items to create for sale:', saleRow.id)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DRAFT_PUBLISH] No items to create for sale:', saleRow.id)
+      }
     }
 
     // 3. Delete the draft after successful publication (hard delete)
     // We delete instead of marking as 'published' since the sale is now live
     // Use admin client since we've already verified ownership via RLS read above
     // This ensures the delete succeeds even if RLS has permission issues
-    console.log('[PUBLISH/POST] Attempting to delete draft:', {
-      draftId: draft.id,
-      draftKey: draft.draft_key,
-      userId: user.id,
-      saleId: saleRow.id,
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[PUBLISH/POST] Attempting to delete draft:', {
+        draftId: draft.id,
+        draftKey: draft.draft_key,
+        userId: user.id,
+        saleId: saleRow.id,
+      })
+    }
     
     // Delete the draft using admin client (bypasses RLS)
     // Use both id and draft_key for extra safety and to ensure we match the right draft
@@ -258,15 +268,18 @@ export async function POST(request: NextRequest) {
           })
         } else {
           // Draft doesn't exist, so deletion succeeded even though select returned nothing
-          console.log('[PUBLISH/POST] Draft deleted successfully (verified by read):', {
-            draftId: draft.id,
-            draftKey: draft.draft_key,
-            saleId: saleRow.id,
-          })
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[PUBLISH/POST] Draft deleted successfully (verified by read):', {
+              draftId: draft.id,
+              draftKey: draft.draft_key,
+              saleId: saleRow.id,
+            })
+          }
         }
       } else {
-        console.log('[PUBLISH/POST] Draft deleted successfully after publication:', {
-          draftId: draft.id,
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[PUBLISH/POST] Draft deleted successfully after publication:', {
+            draftId: draft.id,
           draftKey: draft.draft_key,
           saleId: saleRow.id,
           deletedCount,

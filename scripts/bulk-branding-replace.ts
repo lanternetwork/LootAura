@@ -16,7 +16,6 @@ const FILES = [
   'app/api/push/test/route.ts',
   'docs/CHANGELOG.md',
   'components/PWAInstallPrompt.tsx',
-  'plan.md',
   'ROADMAP.md',
   'LAUNCH_CHECKLIST.md',
   'DEPLOYMENT_PLAN.md',

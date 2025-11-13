@@ -4,6 +4,7 @@ import { validateSession } from '@/lib/auth/server-session'
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const userAgent = req.headers.get('user-agent') || '';
   
   // 0. Immediately bypass static PWA files and manifest (before any other checks)
   if (
@@ -26,10 +27,36 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
   
+  // 0.2. Allow social media crawlers (Facebook, Twitter, LinkedIn, etc.) to access all pages
+  // This is critical for Open Graph and Twitter Card metadata to work
+  const isSocialMediaCrawler = 
+    userAgent.includes('facebookexternalhit') ||
+    userAgent.includes('Facebot') ||
+    userAgent.includes('Twitterbot') ||
+    userAgent.includes('LinkedInBot') ||
+    userAgent.includes('WhatsApp') ||
+    userAgent.includes('Slackbot') ||
+    userAgent.includes('Applebot') ||
+    userAgent.includes('Googlebot') ||
+    userAgent.includes('Bingbot') ||
+    userAgent.includes('Slurp') ||
+    userAgent.includes('DuckDuckBot') ||
+    userAgent.includes('Baiduspider') ||
+    userAgent.includes('YandexBot') ||
+    userAgent.includes('Sogou') ||
+    userAgent.includes('Exabot') ||
+    userAgent.includes('ia_archiver');
+  
+  if (isSocialMediaCrawler) {
+    console.log(`[MIDDLEWARE] allowing social media crawler access → ${pathname} (${userAgent.substring(0, 50)})`);
+    return NextResponse.next();
+  }
+  
   // 1. Public pages that don't require authentication
   const isPublicPage = 
     pathname === '/' ||
     pathname === '/sales' ||
+    pathname.startsWith('/sales/') || // Sale detail pages are public
     pathname === '/sell/new' ||
     pathname === '/admin/tools';
   

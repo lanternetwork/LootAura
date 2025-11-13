@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { deriveCategories } from '@/lib/profile/deriveCategories'
 import { createPageMetadata } from '@/lib/metadata'
 import { IdentityCard } from '@/components/profile/IdentityCard'
+import { SocialLinksRow } from '@/components/profile/SocialLinksRow'
 import { AboutCard } from '@/components/profile/AboutCard'
 import { PreferredCategories } from '@/components/profile/PreferredCategories'
 import { SellerSignals } from '@/components/profile/SellerSignals'
@@ -74,14 +75,14 @@ async function fetchProfileData(slug: string) {
     // Treat as user_id
     prof = await supabase
       .from('profiles_v2')
-      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, social_links')
       .eq('id', slug)
       .maybeSingle()
   } else {
     // Treat as username
     prof = await supabase
       .from('profiles_v2')
-      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, social_links')
       .eq('username', slug)
       .maybeSingle()
   }
@@ -142,11 +143,23 @@ async function fetchListings(userId: string, page: number) {
   
   const q = await supabase
     .from('sales_v2')
-    .select('id, title, cover_url, address, status, owner_id', { count: 'exact' })
+    .select('id, title, cover_image_url, images, address, status, owner_id, created_at', { count: 'exact' })
     .eq('owner_id', userId)
     .eq('status', 'published')
     .order('created_at', { ascending: false })
     .range(from, to)
+  
+  if (q.error) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[PROFILE] Error fetching listings:', q.error)
+    }
+    return {
+      items: [],
+      total: 0,
+      page,
+      hasMore: false,
+    }
+  }
   
   return {
     items: q.data || [],
@@ -196,18 +209,21 @@ export default async function PublicProfilePage({ params, searchParams }: Public
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
       <Suspense fallback={<ProfileSkeleton />}>
-        <IdentityCard
-          profile={{
-            displayName: profile.display_name,
-            username: profile.username,
-            avatarUrl: profile.avatar_url ? `${profile.avatar_url}?v=${Date.now()}` : null,
-            locationCity: profile.location_city,
-            locationRegion: profile.location_region,
-            createdAt: profile.created_at,
-            verified: profile.verified,
-          }}
-          mode="public"
-        />
+        <div>
+          <IdentityCard
+            profile={{
+              displayName: profile.display_name,
+              username: profile.username,
+              avatarUrl: profile.avatar_url ? `${profile.avatar_url}?v=${Date.now()}` : null,
+              locationCity: profile.location_city,
+              locationRegion: profile.location_region,
+              createdAt: profile.created_at,
+              verified: profile.verified,
+            }}
+            mode="public"
+          />
+          <SocialLinksRow socialLinks={profile.social_links as any} />
+        </div>
       </Suspense>
       
       <Suspense fallback={<div className="card animate-pulse"><div className="card-body-lg h-32 bg-neutral-200 rounded" /></div>}>
@@ -246,22 +262,28 @@ export default async function PublicProfilePage({ params, searchParams }: Public
                 </div>
               }>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                  {listings.items.map((it: any) => (
-                    <div key={it.id} className="card">
-                      <div className="card-body">
-                        <div
-                          className="w-full h-32 rounded mb-2 bg-neutral-200"
-                          style={it.cover_url ? { backgroundImage: `url(${it.cover_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
-                          aria-label={it.title}
-                        />
-                        <div className="font-medium truncate mb-1">{it.title}</div>
-                        {it.address && <div className="text-sm text-neutral-600 truncate mb-2">{it.address}</div>}
-                        <Link href={`/sales/${it.id}`} className="link-accent text-sm">
-                          View →
-                        </Link>
+                  {listings.items.map((it: any) => {
+                    // Get cover image - prefer cover_image_url, fallback to first image in images array
+                    const coverImage = it.cover_image_url || 
+                      (Array.isArray(it.images) && it.images.length > 0 ? it.images[0] : null)
+                    
+                    return (
+                      <div key={it.id} className="card">
+                        <div className="card-body">
+                          <div
+                            className="w-full h-32 rounded mb-2 bg-neutral-200"
+                            style={coverImage ? { backgroundImage: `url(${coverImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                            aria-label={it.title}
+                          />
+                          <div className="font-medium truncate mb-1">{it.title}</div>
+                          {it.address && <div className="text-sm text-neutral-600 truncate mb-2">{it.address}</div>}
+                          <Link href={`/sales/${it.id}`} className="link-accent text-sm">
+                            View →
+                          </Link>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </Suspense>
               

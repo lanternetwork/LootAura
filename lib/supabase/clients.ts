@@ -25,6 +25,12 @@ export function getRlsDb() {
         cookieStore.set({ name, value: '', ...options, maxAge: 0 })
       },
     },
+    // Explicitly set auth persistence to ensure session is available
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+    },
   })
 
   return sb.schema('lootaura_v2')

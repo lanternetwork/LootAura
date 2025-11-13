@@ -1,10 +1,129 @@
 'use client'
 
 import type { Metrics7d } from '@/lib/data/profileAccess'
+import { useMemo } from 'react'
 
 interface AnalyticsPanelProps {
   metrics7d?: Metrics7d | null
   loading?: boolean
+}
+
+interface SimpleLineChartProps {
+  data: number[]
+  color?: string
+  height?: number
+}
+
+function SimpleLineChart({ data, color = '#3b82f6', height = 60 }: SimpleLineChartProps) {
+  // Calculate values before early return to ensure hooks are always called
+  const maxValue = useMemo(() => {
+    if (!data || data.length === 0) return 1
+    return Math.max(...data, 1)
+  }, [data])
+  
+  const minValue = useMemo(() => {
+    if (!data || data.length === 0) return 0
+    return Math.min(...data, 0)
+  }, [data])
+  
+  const range = useMemo(() => {
+    return maxValue - minValue || 1
+  }, [maxValue, minValue])
+
+  const gradientId = useMemo(() => {
+    return `gradient-${color.replace('#', '')}`
+  }, [color])
+
+  const points = useMemo(() => {
+    if (!data || data.length === 0) return ''
+    if (data.length === 1) {
+      // Single point - draw a horizontal line
+      return `0,50 100,50`
+    }
+    return data.map((value, index) => {
+      const x = (index / (data.length - 1 || 1)) * 100
+      const y = 100 - ((value - minValue) / range) * 100
+      return `${x},${y}`
+    }).join(' ')
+  }, [data, minValue, range])
+
+  // Handle empty data after hooks
+  if (!data || data.length === 0) {
+    return (
+      <div className="w-full flex items-center justify-center text-neutral-400 text-xs" style={{ height: `${height}px` }}>
+        No data
+      </div>
+    )
+  }
+
+  const pathData = `M ${points}`
+
+  return (
+    <div className="w-full" style={{ height: `${height}px` }}>
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        className="w-full h-full"
+        style={{ display: 'block' }}
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {/* Area fill */}
+        <path
+          d={`${pathData} L 100,100 L 0,100 Z`}
+          fill={`url(#${gradientId})`}
+        />
+        {/* Line */}
+        <path
+          d={pathData}
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Data points */}
+        {data.map((value, index) => {
+          const x = (index / (data.length - 1 || 1)) * 100
+          const y = 100 - ((value - minValue) / range) * 100
+          return (
+            <circle
+              key={index}
+              cx={x}
+              cy={y}
+              r="2"
+              fill={color}
+            />
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+interface MetricCardProps {
+  title: string
+  value: string | number
+  data: number[]
+  color?: string
+}
+
+function MetricCard({ title, value, data, color = '#3b82f6' }: MetricCardProps) {
+  return (
+    <div className="card">
+      <div className="card-body">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium text-neutral-600">{title}</h3>
+        </div>
+        <div className="text-2xl font-semibold text-neutral-900 mb-3">{value}</div>
+        <SimpleLineChart data={data} color={color} height={60} />
+      </div>
+    </div>
+  )
 }
 
 export default function AnalyticsPanel({ metrics7d, loading }: AnalyticsPanelProps) {
@@ -24,29 +143,48 @@ export default function AnalyticsPanel({ metrics7d, loading }: AnalyticsPanelPro
     saves7d: 0,
     ctr7d: 0,
     salesFulfilled: 0,
+    series: [],
   }
+
+  // Extract time series data for each metric
+  const viewsData = metrics.series?.map(d => d.views) || []
+  const savesData = metrics.series?.map(d => d.saves) || []
+  const ctrData = metrics.series?.map(d => {
+    const views = d.views || 0
+    const clicks = d.clicks || 0
+    return views > 0 ? (clicks / views) * 100 : 0
+  }) || []
+  const fulfilledData = metrics.series?.map(d => d.fulfilled) || []
 
   return (
     <div className="card">
       <div className="card-body-lg">
         <h2 className="card-title mb-4">Analytics (7 days)</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-semibold text-neutral-900">{metrics.views7d ?? 0}</div>
-            <div className="text-sm text-neutral-600">Views</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-semibold text-neutral-900">{metrics.saves7d ?? 0}</div>
-            <div className="text-sm text-neutral-600">Saves</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-semibold text-neutral-900">{metrics.ctr7d ? `${metrics.ctr7d.toFixed(1)}%` : '0%'}</div>
-            <div className="text-sm text-neutral-600">CTR</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-semibold text-neutral-900">{metrics.salesFulfilled ?? 0}</div>
-            <div className="text-sm text-neutral-600">Fulfilled</div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard
+            title="Views"
+            value={metrics.views7d ?? 0}
+            data={viewsData}
+            color="#3b82f6"
+          />
+          <MetricCard
+            title="Saves"
+            value={metrics.saves7d ?? 0}
+            data={savesData}
+            color="#10b981"
+          />
+          <MetricCard
+            title="CTR"
+            value={metrics.ctr7d ? `${metrics.ctr7d.toFixed(1)}%` : '0%'}
+            data={ctrData}
+            color="#f59e0b"
+          />
+          <MetricCard
+            title="Fulfilled"
+            value={metrics.salesFulfilled ?? 0}
+            data={fulfilledData}
+            color="#8b5cf6"
+          />
         </div>
       </div>
     </div>

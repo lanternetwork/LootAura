@@ -8,7 +8,8 @@ CREATE OR REPLACE FUNCTION public.update_profile(
   p_full_name text DEFAULT NULL,
   p_bio text DEFAULT NULL,
   p_location_city text DEFAULT NULL,
-  p_location_region text DEFAULT NULL
+  p_location_region text DEFAULT NULL,
+  p_social_links jsonb DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -141,6 +142,32 @@ BEGIN
       WHERE id = p_user_id;
     EXCEPTION WHEN OTHERS THEN
       RAISE WARNING 'Failed to update location_region: %', SQLERRM;
+    END;
+  END IF;
+  
+  -- Update social_links if provided (allows NULL to clear)
+  IF p_social_links IS NOT NULL OR (p_social_links IS NULL AND EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'lootaura_v2' 
+    AND table_name = 'profiles' 
+    AND column_name = 'social_links'
+  )) THEN
+    BEGIN
+      -- Ensure column exists
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' 
+        AND table_name = 'profiles' 
+        AND column_name = 'social_links'
+      ) THEN
+        ALTER TABLE lootaura_v2.profiles ADD COLUMN social_links jsonb DEFAULT '{}'::jsonb;
+      END IF;
+      
+      UPDATE lootaura_v2.profiles
+      SET social_links = COALESCE(p_social_links, '{}'::jsonb)
+      WHERE id = p_user_id;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'Failed to update social_links: %', SQLERRM;
     END;
   END IF;
   

@@ -2,14 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { ProfileSummaryCard } from '@/components/dashboard/ProfileSummaryCard'
-import DraftsPanel from '@/components/dashboard/DraftsPanel'
 import SalesPanel from '@/components/dashboard/SalesPanel'
 import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
 import type { DraftListing } from '@/lib/data/salesAccess'
 import type { ProfileData, Metrics7d } from '@/lib/data/profileAccess'
 import { Sale } from '@/lib/types'
-import { FaPlus } from 'react-icons/fa'
-import Link from 'next/link'
 
 interface DashboardClientProps {
   initialSales: Sale[]
@@ -107,34 +104,26 @@ export default function DashboardClient({
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h1 className="text-2xl font-semibold">Seller Dashboard</h1>
-        <Link href="/sell/new" className="btn-accent flex items-center gap-1 text-sm">
-          <FaPlus className="w-4 h-4" />
-          New Sale
-        </Link>
       </div>
 
       <div className="space-y-6">
-        {/* Row 1: Profile Summary + Quick Stats */}
+        {/* Row 1: Profile Summary (read-only with Edit Profile button) */}
         <ProfileSummaryCard profile={initialProfile || null} />
 
-        {/* Row 2: Drafts Panel */}
-        <DraftsPanel
-          drafts={drafts}
-          isLoading={draftsLoading}
-          error={draftsError}
-          onDelete={handleDraftDelete}
-          onPublish={handleDraftPublish}
-          onRetry={handleRetryDrafts}
-        />
-
-        {/* Row 3: Sales Panel */}
+        {/* Row 3: Sales Panel (with Live, Archived, and Drafts tabs) */}
         <SalesPanel 
-          sales={sales} 
+          sales={sales}
+          drafts={drafts}
+          isLoadingDrafts={draftsLoading}
+          draftsError={draftsError}
           onSaleDelete={(saleId) => {
             setSales((prev) => prev.filter((s) => s.id !== saleId))
           }}
+          onDraftDelete={handleDraftDelete}
+          onDraftPublish={handleDraftPublish}
+          onRetryDrafts={handleRetryDrafts}
         />
 
         {/* Row 4: Analytics */}

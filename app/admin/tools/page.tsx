@@ -19,7 +19,9 @@ import ImageStatsView from '@/components/admin/ImageStatsView'
 import ZipCodeImport from '@/components/admin/ZipCodeImport'
 import GeolocationDiagnostics from '@/components/admin/GeolocationDiagnostics'
 import DraftSalesDiagnostics from '@/components/admin/DraftSalesDiagnostics'
+import AnalyticsDiagnosticsCard from '@/components/admin/AnalyticsDiagnosticsCard'
 import OSMAttributionDiagnostics from '@/components/admin/OSMAttributionDiagnostics'
+import ItemImagesDiagnostics from '@/components/admin/ItemImagesDiagnostics'
 import { useState, useRef } from 'react'
 // MapRef is a namespace in react-map-gl v7, not a type
 
@@ -79,6 +81,12 @@ export default function AdminToolsPage() {
             <h3 className="text-lg font-semibold mb-4">Rate Limiting Status</h3>
             <RateLimitStatus />
           </div>
+
+          {/* Analytics Diagnostics */}
+          <AnalyticsDiagnosticsCard />
+
+          {/* Item Images Diagnostics */}
+          <ItemImagesDiagnostics />
 
           {/* Load Testing Controls */}
           <LoadTestControls />

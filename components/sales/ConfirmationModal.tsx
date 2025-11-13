@@ -6,20 +6,32 @@ interface ConfirmationModalProps {
   open: boolean
   onClose: () => void
   saleId: string
+  onViewSale?: () => void
 }
 
 export default function ConfirmationModal({
   open,
   onClose,
-  saleId
+  saleId,
+  onViewSale
 }: ConfirmationModalProps) {
   const router = useRouter()
 
   if (!open) return null
 
   const handleViewSale = () => {
-    router.push(`/sales/${saleId}`)
-    onClose()
+    if (onViewSale) {
+      // Use custom callback if provided - it handles navigation
+      // Don't call onClose() here to avoid navigation conflict
+      onViewSale()
+      // Close modal state without triggering onClose's navigation
+      // The parent component should handle closing the modal state
+    } else {
+      // Default behavior: navigate to sale detail page
+      router.push(`/sales/${saleId}`)
+      // Close the modal state
+      onClose()
+    }
   }
 
   const handleGoToDashboard = () => {

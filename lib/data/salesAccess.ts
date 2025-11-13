@@ -226,9 +226,10 @@ export async function getItemsForSale(
 ): Promise<SaleItem[]> {
   try {
     // Read from view (reads allowed) - select both images and image_url for compatibility
+    // Note: updated_at doesn't exist in the view, only created_at
     const { data: items, error } = await supabase
       .from('items_v2')
-      .select('id, sale_id, name, category, price, images, image_url, created_at, updated_at')
+      .select('id, sale_id, name, category, price, images, image_url, created_at')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: true })
       .limit(limit)
@@ -401,7 +402,54 @@ export async function getSaleWithItems(
 
     // Fetch owner profile, stats, and items in parallel
     // (tags already fetched above)
-    const [profileRes, statsRes, itemsRes] = await Promise.all([
+    // Try to fetch items with images column first, fallback if column doesn't exist
+    let itemsRes: any
+    try {
+      itemsRes = await supabase
+        .from('items_v2')
+        .select('id, sale_id, name, category, price, image_url, images, created_at')
+        .eq('sale_id', saleId)
+        .order('created_at', { ascending: false })
+      
+      // If error is about missing images column, retry without it
+      if (itemsRes.error && 
+          (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('images')) ||
+          itemsRes.error?.code === 'PGRST301') {
+        console.log('[SALES_ACCESS] images column not found, falling back to image_url only')
+        itemsRes = await supabase
+          .from('items_v2')
+          .select('id, sale_id, name, category, price, image_url, created_at')
+          .eq('sale_id', saleId)
+          .order('created_at', { ascending: false })
+      }
+      
+      // If error is about missing updated_at column, retry without it
+      if (itemsRes.error && 
+          (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('updated_at')) ||
+          itemsRes.error?.code === '42703') {
+        console.log('[SALES_ACCESS] updated_at column not found, retrying without it')
+        itemsRes = await supabase
+          .from('items_v2')
+          .select('id, sale_id, name, category, price, image_url, created_at')
+          .eq('sale_id', saleId)
+          .order('created_at', { ascending: false })
+      }
+    } catch (err) {
+      // If there's an exception, create a mock error response
+      // Ensure error is an object with code and message properties
+      itemsRes = { 
+        data: null, 
+        error: err instanceof Error ? {
+          code: (err as any).code || 'UNKNOWN',
+          message: err.message || 'Unknown error',
+        } : {
+          code: 'UNKNOWN',
+          message: String(err) || 'Unknown error',
+        }
+      }
+    }
+    
+    const [profileRes, statsRes] = await Promise.all([
       supabase
         .from('profiles_v2')
         .select('id, created_at, full_name')
@@ -412,11 +460,6 @@ export async function getSaleWithItems(
         .select('user_id, total_sales, last_sale_at, avg_rating, ratings_count')
         .eq('user_id', ownerId)
         .maybeSingle(),
-      supabase
-        .from('items_v2')
-        .select('id, sale_id, name, category, price, image_url, created_at, updated_at')
-        .eq('sale_id', saleId)
-        .order('created_at', { ascending: false }),
     ])
 
     // Log errors but don't fail - return with defaults
@@ -439,14 +482,17 @@ export async function getSaleWithItems(
     // Always log in production for debugging (can remove later)
     console.log('[SALES_ACCESS] Items fetch result:', {
       saleId,
+      hasError: !!itemsRes.error,
       itemsResError: itemsRes.error ? {
-        code: itemsRes.error.code,
-        message: itemsRes.error.message,
+        code: itemsRes.error?.code || 'unknown',
+        message: itemsRes.error?.message || 'unknown error',
+        errorType: itemsRes.error?.constructor?.name || typeof itemsRes.error,
       } : null,
       itemsCount: itemsRes.data?.length || 0,
-      items: itemsRes.data?.map(i => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
+      items: itemsRes.data?.map((i: any) => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
       // Debug: Check if sale status might be blocking items
       saleStatus: sale.status,
+      saleIdMatch: sale.id === saleId,
     })
     
     // Additional debug: Try to query items using admin client via items_v2 view
@@ -470,8 +516,8 @@ export async function getSaleWithItems(
             saleId,
             adminItemsCount: adminItems?.length || 0,
             adminItemsError: adminItemsRes.error ? {
-              code: adminItemsRes.error.code,
-              message: adminItemsRes.error.message,
+              code: adminItemsRes.error?.code || 'unknown',
+              message: adminItemsRes.error?.message || 'unknown error',
             } : null,
             adminItems: adminItems?.map(i => ({ id: i.id, name: i.name, category: i.category })),
             note: 'If admin finds items but regular query returns 0, there may be an RLS issue',
@@ -486,18 +532,36 @@ export async function getSaleWithItems(
     }
 
     // Map items to SaleItem type
-    // Handle both image_url (production) and images (array) formats
-    const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => ({
-      id: item.id,
-      sale_id: item.sale_id,
-      name: item.name,
-      category: item.category || undefined,
-      condition: item.condition || undefined,
-      price: item.price || undefined,
-      photo: item.image_url || (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : undefined),
-      purchased: item.is_sold || false, // is_sold may not exist in view, default to false
-      created_at: item.created_at,
-    }))
+    // Normalize images: prefer images array, fallback to image_url
+    const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => {
+      // Normalize images: prefer images array, fallback to image_url
+      const images: string[] = Array.isArray(item.images) && item.images.length > 0
+        ? item.images.filter((url: any): url is string => typeof url === 'string')
+        : (item.image_url ? [item.image_url] : [])
+      
+      // Log dev-only fallback when using image_url
+      if (process.env.NODE_ENV !== 'production' && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
+        console.log('[SALES_ACCESS] Item image fallback (image_url → images[]):', {
+          itemId: item.id,
+          itemName: item.name,
+          hadImageUrl: !!item.image_url,
+          hadImages: !!item.images,
+          imagesCount: images.length,
+        })
+      }
+      
+      return {
+        id: item.id,
+        sale_id: item.sale_id,
+        name: item.name,
+        category: item.category || undefined,
+        condition: item.condition || undefined,
+        price: item.price || undefined,
+        photo: images.length > 0 ? images[0] : undefined, // Use first image as photo
+        purchased: item.is_sold || false, // is_sold may not exist in view, default to false
+        created_at: item.created_at,
+      }
+    })
 
     return {
       sale: {

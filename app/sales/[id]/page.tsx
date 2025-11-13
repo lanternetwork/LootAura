@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
+import { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSaleWithItems } from '@/lib/data/salesAccess'
 import SaleDetailClient from './SaleDetailClient'
@@ -47,16 +48,31 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   )
 }
 
-export async function generateMetadata({ params }: SaleDetailPageProps) {
+export async function generateMetadata({ params }: SaleDetailPageProps): Promise<Metadata> {
   const supabase = createSupabaseServerClient()
   const result = await getSaleWithItems(supabase, params.id)
   
   if (!result) {
     return {
-      title: 'Sale Not Found',
-      description: 'The requested sale could not be found.'
+      title: 'Sale not found · LootAura',
+      description: 'This sale no longer exists or is not available.',
+      openGraph: {
+        title: 'Sale not found · LootAura',
+        description: 'This sale no longer exists or is not available.',
+        type: 'website',
+      },
+      twitter: {
+        card: 'summary',
+        title: 'Sale not found · LootAura',
+        description: 'This sale no longer exists or is not available.',
+      },
     }
   }
 
-  return createSaleMetadata(result.sale)
+  // Compute categories from sale tags and item categories (same logic as page component)
+  const saleCats = Array.isArray(result.sale.tags) ? result.sale.tags : []
+  const itemCats = result.items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
+  const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
+
+  return createSaleMetadata(result.sale, { categories: displayCategories })
 }

@@ -15,6 +15,11 @@ export function useAuth() {
       }
       return user
     },
+    staleTime: 5 * 60 * 1000, // Consider auth data fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (formerly cacheTime)
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
+    refetchOnMount: false, // Don't refetch on component mount if data exists
+    refetchOnReconnect: true, // Only refetch on network reconnect
   })
 }
 
@@ -175,28 +180,31 @@ export function useToggleFavorite() {
   const { data: user } = useAuth()
 
   return useMutation({
-    mutationFn: async ({ saleId, isFavorited }: { saleId: string; isFavorited: boolean }) => {
+    mutationFn: async ({ saleId, isFavorited: _isFavorited }: { saleId: string; isFavorited: boolean }) => {
       if (!user) throw new Error('Please sign in to save favorites')
 
-      // Work directly against Supabase from the browser to avoid server-session 401s
-      if (isFavorited) {
-        const { error } = await sb
-          .from('favorites_v2')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('sale_id', saleId)
+      // Use API route for consistency with SaleDetailClient
+      const response = await fetch(`/api/sales/${saleId}/favorite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
 
-        if (error) throw new Error(error.message)
-      } else {
-        const { error } = await sb
-          .from('favorites_v2')
-          // upsert to avoid 409 conflict on rapid clicks
-          .upsert({ user_id: user.id, sale_id: saleId }, { onConflict: 'user_id,sale_id', ignoreDuplicates: true })
-
-        if (error) throw new Error(error.message)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to toggle favorite' }))
+        throw new Error(errorData.error || 'Failed to toggle favorite')
       }
+
+      const result = await response.json()
+      return result
     },
     onSuccess: () => {
+      // Invalidate with user ID to match useFavorites query key
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['favorites', user.id] })
+      }
+      // Also invalidate general favorites queries
       queryClient.invalidateQueries({ queryKey: ['favorites'] })
     },
   })

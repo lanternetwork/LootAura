@@ -89,6 +89,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const hasResumedRef = useRef(false)
   const draftKeyRef = useRef<string | null>(null)
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isPublishingRef = useRef<boolean>(false) // Flag to prevent autosave during/after publish
   const lastServerSaveRef = useRef<number>(0)
   const isNavigatingRef = useRef(false)
   const searchParams = useSearchParams()
@@ -198,6 +199,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
   // Debounced autosave (local + server)
   useEffect(() => {
+    // Don't autosave if we're publishing or have already published
+    if (isPublishingRef.current) {
+      return
+    }
+    
     // Clear existing timeout
     if (autosaveTimeoutRef.current) {
       clearTimeout(autosaveTimeoutRef.current)
@@ -205,6 +211,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
     // Set new timeout for debounced save (1.5s)
     autosaveTimeoutRef.current = setTimeout(() => {
+      // Double-check we're not publishing before saving
+      if (isPublishingRef.current) {
+        return
+      }
+      
       const payload = buildDraftPayload()
       
       // Always save locally
@@ -212,7 +223,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       setSaveStatus('saved')
 
       // Save to server if authenticated (throttle to max 1x per 10s)
-      if (user && draftKeyRef.current) {
+      if (user && draftKeyRef.current && !isPublishingRef.current) {
         const now = Date.now()
         const timeSinceLastSave = now - lastServerSaveRef.current
         
@@ -220,6 +231,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
           setSaveStatus('saving')
           saveDraftServer(payload, draftKeyRef.current)
             .then((result) => {
+              // Check again before updating state
+              if (isPublishingRef.current) {
+                return
+              }
               if (result.ok) {
                 lastServerSaveRef.current = Date.now()
                 setSaveStatus('saved')
@@ -230,6 +245,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
               }
             })
             .catch((error) => {
+              if (isPublishingRef.current) {
+                return
+              }
               setSaveStatus('error')
               console.error('[SELL_WIZARD] Autosave error:', error)
             })
@@ -412,8 +430,8 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         const durationHours = updated.duration_hours || prev.duration_hours || 4
         
         if (dateStart && timeStart && durationHours) {
-          // Validate duration doesn't exceed 24 hours
-          const maxDuration = 24
+          // Validate duration doesn't exceed 8 hours
+          const maxDuration = 8
           const actualDuration = Math.min(durationHours, maxDuration)
           
           // Calculate end time
@@ -464,13 +482,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     
     if (!timeStart) nextErrors.time_start = 'Start time is required'
     
-    // Validate duration
+    // Validate duration (1-8 hours)
     const durationHours = formData.duration_hours || 4
-    if (durationHours > 24) {
-      nextErrors.duration_hours = 'Sale cannot last more than 24 hours'
-    }
-    if (durationHours <= 0) {
-      nextErrors.duration_hours = 'Duration must be greater than 0'
+    if (durationHours < 1 || durationHours > 8) {
+      nextErrors.duration_hours = 'Duration must be between 1 and 8 hours'
     }
     
     // Unsavory language checks (client-side guard; server also validates)
@@ -625,8 +640,32 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
     const results = await Promise.allSettled(itemPromises)
     const failures = results.filter(r => r.status === 'rejected')
+    const successes = results.filter(r => r.status === 'fulfilled')
+    
+    // Log detailed results
+    console.log('[SELL_WIZARD] Item creation results:', {
+      total: itemsToCreate.length,
+      succeeded: successes.length,
+      failed: failures.length,
+      failures: failures.map(f => f.status === 'rejected' ? f.reason : null),
+    })
+    
+    // Check for HTTP errors in successful promises
+    for (const result of successes) {
+      if (result.status === 'fulfilled') {
+        const response = await result.value
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error('[SELL_WIZARD] Item creation HTTP error:', {
+            status: response.status,
+            error: errorData,
+          })
+        }
+      }
+    }
+    
     if (failures.length > 0) {
-      console.warn('Some items failed to create:', failures)
+      console.error('[SELL_WIZARD] Some items failed to create:', failures)
     }
   }, [])
 
@@ -694,6 +733,19 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       clearLocalDraft()
       sessionStorage.removeItem('auth:postLoginRedirect')
       sessionStorage.removeItem('draft:returnStep')
+      
+      // Delete server-side draft if it exists
+      if (draftKeyRef.current && user) {
+        await deleteDraftServer(draftKeyRef.current).catch((error) => {
+          // Log error but don't fail the sale creation
+          console.warn('[SELL_WIZARD] Failed to delete server draft:', error)
+        })
+      }
+      
+      // Clear draft key ref - a new one will be generated when needed
+      // clearLocalDraft() already removed the key from localStorage,
+      // so getDraftKey() will generate a new one on next access
+      draftKeyRef.current = null
 
       // Show confirmation modal
       setCreatedSaleId(saleId)
@@ -805,9 +857,22 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       // Publish draft (transactional)
       setLoading(true)
       setSubmitError(null)
+      
+      // Store draft key before clearing it (we need it for the publish call)
+      const draftKeyToPublish = draftKeyRef.current
+      
+      // Clear any pending autosave and prevent future autosaves
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current)
+        autosaveTimeoutRef.current = null
+      }
+      isPublishingRef.current = true
+      // Clear draftKeyRef immediately to prevent autosave from saving
+      // (even if a pending timeout executes, it won't have a draftKey to save to)
+      draftKeyRef.current = null
 
       try {
-        const result = await publishDraftServer(draftKeyRef.current)
+        const result = await publishDraftServer(draftKeyToPublish)
         
         if (!result.ok) {
           if (result.code === 'AUTH_REQUIRED') {
@@ -843,9 +908,16 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         clearLocalDraft()
         sessionStorage.removeItem('auth:postLoginRedirect')
         sessionStorage.removeItem('draft:returnStep')
-        if (draftKeyRef.current) {
-          // Draft is already marked as published on server
-        }
+        
+        // Note: The publish endpoint should have already deleted the draft server-side
+        // We don't need to delete it again here - the publish endpoint handles deletion
+        // This prevents race conditions and ensures consistency
+        
+        // Clear the draft key ref to prevent reuse
+        draftKeyRef.current = null
+        // Reset publishing flag since publish completed successfully
+        // The draft is deleted, so autosave won't recreate it anyway
+        isPublishingRef.current = false
 
         // Show confirmation modal
         setCreatedSaleId(saleId)
@@ -853,6 +925,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       } catch (error) {
         console.error('[SELL_WIZARD] Error publishing draft:', error)
         setSubmitError(error instanceof Error ? error.message : 'Failed to publish sale')
+        // Reset publishing flag on error so autosave can work again
+        // Don't restore draftKeyRef - the draft should remain cleared even on error
+        // User can start fresh if they need to
+        isPublishingRef.current = false
       } finally {
         setLoading(false)
       }
@@ -1092,6 +1168,12 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
             setConfirmationModalOpen(false)
             router.push('/dashboard')
           }}
+          onViewSale={() => {
+            // Navigate to sale detail page
+            router.push(`/sales/${createdSaleId}`)
+            // Close the modal state
+            setConfirmationModalOpen(false)
+          }}
           saleId={createdSaleId}
         />
       )}
@@ -1177,23 +1259,23 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Duration (Hours) *
         </label>
-        <input
-          type="number"
-          min="1"
-          max="24"
-          step="0.5"
+        <select
           value={formData.duration_hours || 4}
           onChange={(e) => {
-            const raw = (e.currentTarget as HTMLInputElement).valueAsNumber
-            const hours = Number.isFinite(raw) ? raw : 4
-            const clamped = Math.max(1, Math.min(24, hours))
-            onChange('duration_hours', clamped)
+            const hours = parseInt(e.target.value, 10)
+            onChange('duration_hours', hours)
           }}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] bg-white cursor-pointer"
           required
-        />
+        >
+          {Array.from({ length: 8 }, (_, i) => i + 1).map((hours) => (
+            <option key={hours} value={hours}>
+              {hours} {hours === 1 ? 'hour' : 'hours'}
+            </option>
+          ))}
+        </select>
         <p className="mt-1 text-xs text-gray-500">
-          Sale duration (1-24 hours). End time is calculated automatically.
+          Sale duration (1-8 hours). End time is calculated automatically.
         </p>
         {errors?.duration_hours && (
           <p className="mt-1 text-sm text-red-600">{errors.duration_hours}</p>
@@ -1503,7 +1585,7 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
 function ReviewStep({ formData, photos, items, onPublish, loading, submitError }: {
   formData: Partial<SaleInput>,
   photos: string[],
-  items: Array<{ id?: string; name: string; price?: number; description?: string; category?: CategoryValue }>,
+  items: Array<{ id?: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>,
   onPublish: () => void,
   loading: boolean,
   submitError?: string | null
@@ -1564,13 +1646,39 @@ function ReviewStep({ formData, photos, items, onPublish, loading, submitError }
 
         {items.length > 0 && (
           <div>
-            <h4 className="font-medium text-gray-900">Items ({items.length})</h4>
-            <div className="mt-2 space-y-2">
+            <h4 className="font-medium text-gray-900 mb-3">Items ({items.length})</h4>
+            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {items.map((item) => (
-                <div key={item.id || `review-item-${item.name}`} className="text-sm text-gray-600">
-                  <strong>{item.name}</strong>
-                  {item.price && ` - $${item.price}`}
-                  {item.description && <div className="text-xs text-gray-500">{item.description}</div>}
+                <div
+                  key={item.id || `review-item-${item.name}`}
+                  className="bg-white border border-gray-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="w-full h-24 object-cover rounded mb-2"
+                    />
+                  ) : (
+                    <div className="w-full h-24 bg-gray-100 rounded mb-2 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="text-xs font-medium text-gray-900 truncate" title={item.name}>
+                    {item.name}
+                  </div>
+                  {item.price && (
+                    <div className="text-xs font-semibold text-[var(--accent-primary)] mt-1">
+                      ${item.price}
+                    </div>
+                  )}
+                  {item.description && (
+                    <div className="text-xs text-gray-500 mt-1 line-clamp-2" title={item.description}>
+                      {item.description}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

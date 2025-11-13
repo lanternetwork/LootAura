@@ -73,16 +73,50 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    const { data: item, error } = await fromBase(db, 'items')
-      .insert({
-        sale_id: body.sale_id,
-        name: body.title,
-        description: body.description,
-        price: body.price,
-        category: body.category,
-        condition: body.condition,
-        images: body.images || []
+    // Normalize images: prefer images array, fallback to image_url
+    const images = Array.isArray(body.images) && body.images.length > 0
+      ? body.images
+      : (body.image_url ? [body.image_url] : [])
+    
+    // Get first image URL for image_url column (fallback for compatibility)
+    // Always use body.image_url if provided, even if empty string (to allow clearing)
+    const firstImageUrl = body.image_url !== undefined 
+      ? (body.image_url || null)  // Allow empty string to be saved as null
+      : (images.length > 0 ? images[0] : null)
+    
+    // Build insert payload - try to include both images array and image_url
+    const insertPayload: any = {
+      sale_id: body.sale_id,
+      name: body.title,
+      description: body.description,
+      price: body.price,
+      category: body.category,
+      condition: body.condition,
+    }
+    
+    // Add image_url (this column definitely exists)
+    // Always set it, even if null, to ensure it's saved
+    insertPayload.image_url = firstImageUrl
+    
+    // Add images array if we have images (this column might not exist, but we'll try)
+    if (images.length > 0) {
+      insertPayload.images = images
+    }
+    
+    // Log for debugging (only in non-production)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[ITEMS_V2] Creating item with image data:', {
+        hasImageUrl: !!body.image_url,
+        imageUrl: body.image_url,
+        hasImages: Array.isArray(body.images) && body.images.length > 0,
+        images: body.images,
+        firstImageUrl,
+        insertPayloadImageUrl: insertPayload.image_url,
       })
+    }
+    
+    const { data: item, error } = await fromBase(db, 'items')
+      .insert(insertPayload)
       .select()
       .single()
     

@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { ProfileData } from '@/lib/data/profileAccess'
 
 interface ProfileSummaryCardProps {
@@ -80,11 +81,17 @@ export function ProfileSummaryCard({ profile, onEdit }: ProfileSummaryCardProps)
 
         {/* Actions */}
         <div className="flex gap-2">
+          <Link
+            href="/account/edit"
+            className="btn-accent text-sm"
+          >
+            Edit Profile
+          </Link>
           <button
             type="button"
             onClick={handleViewPublic}
             disabled={!profile.username && !profile.id}
-            className="btn-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             title={!profile.username && !profile.id ? 'Profile ID required' : 'View your public profile'}
           >
             View Public Profile

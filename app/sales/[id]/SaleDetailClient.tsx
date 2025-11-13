@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
@@ -8,10 +8,11 @@ import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
-import { useAuth, useFavorites } from '@/lib/hooks/useAuth'
+import { useAuth, useFavorites, useToggleFavorite } from '@/lib/hooks/useAuth'
 import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
 import CategoryChips from '@/components/ui/CategoryChips'
 import OSMAttribution from '@/components/location/OSMAttribution'
+import SaleShareButton from '@/components/share/SaleShareButton'
 import type { SaleWithOwnerInfo } from '@/lib/data'
 import type { SaleItem } from '@/lib/types'
 
@@ -37,8 +38,32 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   const [isFavorited, setIsFavorited] = useState(false)
   const { data: currentUser } = useAuth()
   const { data: favoriteSales = [] } = useFavorites()
+  const toggleFavorite = useToggleFavorite()
   const [showFullDescription, setShowFullDescription] = useState(false)
   const cover = getSaleCoverUrl(sale)
+  const viewTrackedRef = useRef(false)
+  const isOptimisticRef = useRef(false)
+
+  // Track view event when component mounts (only once)
+  useEffect(() => {
+    if (!viewTrackedRef.current) {
+      viewTrackedRef.current = true
+      // Track view event
+      fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sale_id: sale.id,
+          event_type: 'view',
+        }),
+      }).catch((error) => {
+        // Silently fail - analytics tracking shouldn't break the page
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[SALE_DETAIL] Failed to track view event:', error)
+        }
+      })
+    }
+  }, [sale.id])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -60,49 +85,85 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
 
 
   // Keep local favorite state in sync with favorites list
-  // (simple check each render; list is small)
-  const fromList = Array.isArray(favoriteSales) && favoriteSales.some((s: any) => s?.id === sale.id)
-  if (fromList !== isFavorited) {
-    setIsFavorited(fromList)
-  }
+  // Only sync when favorites list changes, not during optimistic updates
+  useEffect(() => {
+    if (!isOptimisticRef.current) {
+      const fromList = Array.isArray(favoriteSales) && favoriteSales.some((s: any) => s?.id === sale.id)
+      if (fromList !== isFavorited) {
+        setIsFavorited(fromList)
+      }
+    }
+  }, [favoriteSales, sale.id, isFavorited])
 
   const handleFavoriteToggle = async () => {
+    if (!currentUser) {
+      window.location.href = `/auth/signin?redirectTo=${encodeURIComponent(window.location.pathname)}`
+      return
+    }
+
+    const wasFavorited = isFavorited
+    
+    // Optimistic UI update - update immediately for instant feedback
+    isOptimisticRef.current = true
+    setIsFavorited(!isFavorited)
+    
     try {
-      if (!currentUser) {
-        window.location.href = `/auth/signin?redirectTo=${encodeURIComponent(window.location.pathname)}`
-        return
-      }
-      const response = await fetch(`/api/sales/${sale.id}/favorite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      // Use the same hook as FavoriteButton for consistency
+      const result = await toggleFavorite.mutateAsync({ 
+        saleId: sale.id, 
+        isFavorited 
       })
 
-      if (response.ok) {
-        setIsFavorited(!isFavorited)
+      // Update with actual result (in case of any discrepancy)
+      setIsFavorited(result.favorited ?? !wasFavorited)
+      
+      // Track save event if favoriting (not unfavoriting)
+      if (result.favorited && !wasFavorited) {
+        fetch('/api/analytics/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sale_id: sale.id,
+            event_type: 'save',
+          }),
+        }).catch((error) => {
+          // Silently fail - analytics tracking shouldn't break the page
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('[SALE_DETAIL] Failed to track save event:', error)
+          }
+        })
       }
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error)
+    } catch (error: any) {
+      // Rollback optimistic update on error
+      setIsFavorited(wasFavorited)
+      console.error('[SALE_DETAIL] Failed to toggle favorite:', error)
+      alert(error?.message || 'Failed to save sale. Please try again.')
+    } finally {
+      // Allow sync to resume after API call completes
+      isOptimisticRef.current = false
     }
   }
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: sale.title,
-          text: `Check out this yard sale: ${sale.title}`,
-          url: window.location.href,
-        })
-      } catch (error) {
-        console.error('Error sharing:', error)
-      }
+  // Build share URL (canonical, without UTM params)
+  const shareUrl = typeof window !== 'undefined' 
+    ? window.location.origin + `/sales/${sale.id}`
+    : `/sales/${sale.id}`
+  
+  // Build share text with location and date info
+  const shareTextParts: string[] = []
+  if (sale.city && sale.state) {
+    shareTextParts.push(`${sale.city}, ${sale.state}`)
+  }
+  if (sale.date_start) {
+    const startDate = new Date(sale.date_start)
+    if (sale.date_end && sale.date_end !== sale.date_start) {
+      const endDate = new Date(sale.date_end)
+      shareTextParts.push(`${startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`)
     } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href)
+      shareTextParts.push(startDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
     }
   }
+  const shareText = shareTextParts.length > 0 ? shareTextParts.join(' — ') : undefined
 
   const currentCenter = location || { lat: sale.lat || 38.2527, lng: sale.lng || -85.7585 }
 
@@ -154,7 +215,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                 </div>
               </div>
               
-              <div className="flex gap-2 ml-4">
+              <div className="flex gap-2 ml-4 flex-shrink-0">
                 <button
                   onClick={handleFavoriteToggle}
                   className={`inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors min-h-[44px] ${
@@ -169,15 +230,12 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                   {isFavorited ? 'Saved' : 'Save'}
                 </button>
                 
-                <button
-                  onClick={handleShare}
-                  className="inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors min-h-[44px] bg-[rgba(147,51,234,0.15)] text-[#3A2268] hover:bg-[rgba(147,51,234,0.25)]"
-                >
-                  <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                  </svg>
-                  Share
-                </button>
+                <SaleShareButton
+                  url={shareUrl}
+                  title={sale.title || 'Yard Sale'}
+                  text={shareText}
+                  saleId={sale.id}
+                />
               </div>
             </div>
             </div>

@@ -133,10 +133,9 @@ export async function POST(request: NextRequest) {
     if (sErr) return fail(500, 'SALE_CREATE_FAILED', sErr.message, sErr)
 
     // Build itemsPayload
-    // Note: We don't include the 'images' field because the database schema may not have this column
-    // Items use image_url (single string) instead of images (array) in the current schema
+    // Include image_url (single string) - the database supports this column
+    // Note: We don't include 'images' array because that column doesn't exist in the base table
     const itemsPayload = items && items.length > 0 ? items.map((item: any) => {
-      // Build payload without images field to avoid schema cache errors
       const payload: any = {
         sale_id: saleRow.id,
         name: item.name,
@@ -145,31 +144,134 @@ export async function POST(request: NextRequest) {
         category: item.category || null,
       }
       
-      // Note: images field is omitted because the database schema doesn't support it
-      // If images support is needed, a migration must be applied first
+      // Include image_url if provided
+      if (item.image_url) {
+        payload.image_url = item.image_url
+      }
       
       return payload
     }) : []
 
     // 2. Create items if any
     if (itemsPayload.length) {
-      const { error: iErr } = await fromBase(admin, 'items').insert(itemsPayload)
+      console.log('[DRAFT_PUBLISH] Creating items:', {
+        saleId: saleRow.id,
+        saleStatus: salePayload.status,
+        itemsCount: itemsPayload.length,
+        items: itemsPayload.map((i: any) => ({ name: i.name, hasImage: !!i.image_url })),
+      })
+      
+      const { data: insertedItems, error: iErr } = await fromBase(admin, 'items')
+        .insert(itemsPayload)
+        .select('id, name, sale_id, image_url')
+      
       if (iErr) {
+        console.error('[DRAFT_PUBLISH] Failed to create items:', iErr)
         // Try to clean up the sale (best effort)
         await fromBase(admin, 'sales').delete().eq('id', saleRow.id)
         return fail(500, 'ITEMS_CREATE_FAILED', iErr.message, iErr)
       }
+      
+      console.log('[DRAFT_PUBLISH] Items created successfully:', {
+        saleId: saleRow.id,
+        itemsCreated: insertedItems?.length || 0,
+        itemIds: insertedItems?.map((i: any) => i.id),
+      })
+      
+      // Verify items are readable from base table (using admin client to bypass RLS for verification)
+      // Note: admin client is schema-scoped to lootaura_v2, so we query the base table, not the view
+      const { data: verifyItems, error: verifyErr } = await fromBase(admin, 'items')
+        .select('id, name, sale_id, image_url')
+        .eq('sale_id', saleRow.id)
+      
+      console.log('[DRAFT_PUBLISH] Items verification (admin client):', {
+        saleId: saleRow.id,
+        itemsFound: verifyItems?.length || 0,
+        error: verifyErr,
+        itemIds: verifyItems?.map((i: any) => i.id),
+      })
+    } else {
+      console.log('[DRAFT_PUBLISH] No items to create for sale:', saleRow.id)
     }
 
-    // 3. Mark draft as published
-    const { error: uErr } = await fromBase(rls, 'sale_drafts')
-      .update({ status: 'published' })
+    // 3. Delete the draft after successful publication (hard delete)
+    // We delete instead of marking as 'published' since the sale is now live
+    // Use admin client since we've already verified ownership via RLS read above
+    // This ensures the delete succeeds even if RLS has permission issues
+    console.log('[PUBLISH/POST] Attempting to delete draft:', {
+      draftId: draft.id,
+      draftKey: draft.draft_key,
+      userId: user.id,
+      saleId: saleRow.id,
+    })
+    
+    // Delete the draft using admin client (bypasses RLS)
+    // Use both id and draft_key for extra safety and to ensure we match the right draft
+    const { data: deleteData, error: deleteErr } = await fromBase(admin, 'sale_drafts')
+      .delete()
       .eq('id', draft.id)
+      .eq('draft_key', draft.draft_key) // Match on draft_key as well for extra safety
+      .eq('user_id', user.id) // Extra safety check: ensure we only delete drafts owned by the user
+      .eq('status', 'active') // Only delete active drafts
+      .select('id') // Select to get deleted row count
 
-    if (uErr) {
+    if (deleteErr) {
       // Sale and items are already created, so we'll log but not fail
-      if (process.env.NODE_ENV !== 'production') console.error('[PUBLISH/POST] draft update error:', uErr)
-      Sentry.captureException(uErr, { tags: { operation: 'publishDraft', step: 'updateDraft' } })
+      // The draft will remain but the sale is published, which is acceptable
+      console.error('[PUBLISH/POST] Draft delete error:', {
+        error: deleteErr,
+        message: deleteErr.message,
+        code: deleteErr.code,
+        details: deleteErr.details,
+        hint: deleteErr.hint,
+        draftId: draft.id,
+        userId: user.id,
+      })
+      Sentry.captureException(deleteErr, { 
+        tags: { operation: 'publishDraft', step: 'deleteDraft' },
+        extra: { draftId: draft.id, userId: user.id, saleId: saleRow.id },
+      })
+    } else {
+      // Verify deletion by checking if any rows were deleted
+      const deletedCount = deleteData?.length || 0
+      if (deletedCount === 0) {
+        // Try to verify by reading the draft again - if it still exists, the delete failed
+        const { data: verifyDraft, error: verifyErr } = await fromBase(admin, 'sale_drafts')
+          .select('id, status')
+          .eq('id', draft.id)
+          .maybeSingle()
+        
+        if (verifyDraft) {
+          console.error('[PUBLISH/POST] Draft still exists after delete attempt:', {
+            draftId: draft.id,
+            draftKey: draft.draft_key,
+            userId: user.id,
+            saleId: saleRow.id,
+            currentStatus: verifyDraft.status,
+            deleteData,
+            verifyError: verifyErr,
+          })
+          Sentry.captureMessage('Draft still exists after delete attempt', {
+            level: 'error',
+            tags: { operation: 'publishDraft', step: 'deleteDraft' },
+            extra: { draftId: draft.id, userId: user.id, saleId: saleRow.id, currentStatus: verifyDraft.status },
+          })
+        } else {
+          // Draft doesn't exist, so deletion succeeded even though select returned nothing
+          console.log('[PUBLISH/POST] Draft deleted successfully (verified by read):', {
+            draftId: draft.id,
+            draftKey: draft.draft_key,
+            saleId: saleRow.id,
+          })
+        }
+      } else {
+        console.log('[PUBLISH/POST] Draft deleted successfully after publication:', {
+          draftId: draft.id,
+          draftKey: draft.draft_key,
+          saleId: saleRow.id,
+          deletedCount,
+        })
+      }
     }
 
     return ok({ data: { saleId: saleRow.id } })

@@ -4,11 +4,11 @@ import { Sale } from '@/lib/types'
 
 interface SalesListProps {
   sales: Sale[]
-  mode?: string
+  _mode?: string
   viewport?: { center: { lat: number; lng: number }; zoom: number } | null
 }
 
-export default function SalesList({ sales, mode, viewport }: SalesListProps) {
+export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
   const isEmpty = !sales?.length
 
   if (isEmpty) {

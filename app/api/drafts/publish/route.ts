@@ -280,10 +280,11 @@ export async function POST(request: NextRequest) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[PUBLISH/POST] Draft deleted successfully after publication:', {
             draftId: draft.id,
-          draftKey: draft.draft_key,
-          saleId: saleRow.id,
-          deletedCount,
-        })
+            draftKey: draft.draft_key,
+            saleId: saleRow.id,
+            deletedCount,
+          })
+        }
       }
     }
 

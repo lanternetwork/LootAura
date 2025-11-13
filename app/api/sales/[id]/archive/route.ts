@@ -21,7 +21,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     .single()
   
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[SALES/ARCHIVE] Error archiving sale:', error)
+    return NextResponse.json({ ok: false, code: 'ARCHIVE_FAILED', error: 'Failed to update sale status' }, { status: 500 })
   }
   
   return NextResponse.json({ success: true, data })

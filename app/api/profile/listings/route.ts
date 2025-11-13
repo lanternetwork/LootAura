@@ -58,7 +58,7 @@ export async function GET(req: Request) {
       }
     }
     
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: false, code: 'FETCH_ERROR', error: 'Failed to fetch listings' }, { status: 500 })
   }
   
   return NextResponse.json({

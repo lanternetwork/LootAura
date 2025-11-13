@@ -33,9 +33,9 @@ export async function GET(_request: NextRequest) {
         .limit(50)
 
     if (error) {
-      if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/GET] supabase error:', error)
+      console.error('[DRAFTS/GET] supabase error:', error)
       Sentry.captureException(error, { tags: { operation: 'getAllDrafts' } })
-      return fail(500, 'FETCH_ERROR', 'Failed to fetch drafts', { supabase: error.message, hint: error.hint, details: error.details, code: error.code })
+      return fail(500, 'FETCH_ERROR', 'Failed to fetch drafts', error)
     }
 
     return ok({ data: drafts || [] })
@@ -52,9 +52,9 @@ export async function GET(_request: NextRequest) {
       .maybeSingle()
 
     if (error) {
-      if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/GET] supabase error:', error)
+      console.error('[DRAFTS/GET] supabase error:', error)
       Sentry.captureException(error, { tags: { operation: 'getLatestDraft' } })
-      return fail(500, 'FETCH_ERROR', 'Failed to fetch draft', { supabase: error.message, hint: error.hint, details: error.details, code: error.code })
+      return fail(500, 'FETCH_ERROR', 'Failed to fetch draft', error)
     }
 
     if (!draft) {
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         hasFormData: !!(payload as any)?.formData,
         formDataKeys: (payload as any)?.formData ? Object.keys((payload as any).formData) : []
       })
-      return fail(400, 'VALIDATION_ERROR', 'Invalid draft payload', { data: validationResult.error.issues, details: validationResult.error.message })
+      return fail(400, 'VALIDATION_ERROR', 'Invalid draft payload', validationResult.error)
     }
 
     const validatedPayload = validationResult.data
@@ -178,9 +178,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (error) {
-      if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/POST] supabase error:', error)
+      console.error('[DRAFTS/POST] supabase error:', error)
       Sentry.captureException(error, { tags: { operation: 'saveDraft' } })
-      return fail(500, 'SAVE_ERROR', 'Failed to save draft', { supabase: error.message, hint: error.hint, details: error.details, code: error.code })
+      return fail(500, 'SAVE_ERROR', 'Failed to save draft', error)
     }
 
     if (!draft) {
@@ -226,9 +226,9 @@ export async function DELETE(request: NextRequest) {
       .eq('status', 'active')
 
     if (error) {
-      if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/DELETE] supabase error:', error)
+      console.error('[DRAFTS/DELETE] supabase error:', error)
       Sentry.captureException(error, { tags: { operation: 'deleteDraft' } })
-      return fail(500, 'DELETE_ERROR', 'Failed to delete draft', { supabase: error.message, hint: error.hint, details: error.details, code: error.code })
+      return fail(500, 'DELETE_ERROR', 'Failed to delete draft', error)
     }
 
     return ok({ data: {} })

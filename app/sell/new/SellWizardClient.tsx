@@ -762,8 +762,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       setCreatedSaleId(saleId)
       setConfirmationModalOpen(true)
     } catch (error) {
-      console.error('Error creating sale:', error)
-      setSubmitError(error instanceof Error ? error.message : 'Failed to create sale')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('Error creating sale:', error)
+      }
+      setSubmitError('Something went wrong while creating your sale. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -936,8 +938,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         setCreatedSaleId(saleId)
         setConfirmationModalOpen(true)
       } catch (error) {
-        console.error('[SELL_WIZARD] Error publishing draft:', error)
-        setSubmitError(error instanceof Error ? error.message : 'Failed to publish sale')
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[SELL_WIZARD] Error publishing draft:', error)
+        }
+        setSubmitError('Something went wrong while publishing your sale. Please try again.')
         // Reset publishing flag on error so autosave can work again
         // Don't restore draftKeyRef - the draft should remain cleared even on error
         // User can start fresh if they need to

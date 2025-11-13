@@ -210,12 +210,16 @@ export async function fetchOverpassAddresses(
     
             const data = await response.json()
             if (data.ok && Array.isArray(data.data)) {
-              // Include debug info if present
-              return {
+              // Include debug info if present and in development
+              const result: ApiResponse<AddressSuggestion[]> = {
                 ok: true,
                 data: data.data,
-                _debug: data._debug // Preserve debug info from server
               }
+              // Only preserve _debug in non-production environments
+              if (process.env.NODE_ENV !== 'production' && data._debug) {
+                result._debug = data._debug
+              }
+              return result
             }
             
             return {

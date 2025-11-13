@@ -55,7 +55,10 @@ export async function updateProfile(input: ProfileUpdateInput): Promise<ActionRe
       .single()
 
     if (error) {
-      return { success: false, error: error.message }
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[ACCOUNT_ACTIONS] updateProfile error:', error)
+      }
+      return { success: false, error: 'We couldn\'t save your profile changes. Please try again.' }
     }
 
     revalidatePath('/account')
@@ -74,9 +77,12 @@ export async function updateProfile(input: ProfileUpdateInput): Promise<ActionRe
       }
     }
     
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[ACCOUNT_ACTIONS] updateProfile exception:', error)
+    }
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'An error occurred' 
+      error: 'We couldn\'t save your profile changes. Please try again.'
     }
   }
 }
@@ -93,14 +99,20 @@ export async function getProfile(): Promise<ActionResult> {
       .single()
 
     if (error) {
-      return { success: false, error: error.message }
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[ACCOUNT_ACTIONS] updateProfile error:', error)
+      }
+      return { success: false, error: 'We couldn\'t save your profile changes. Please try again.' }
     }
 
     return { success: true, data }
   } catch (error) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[ACCOUNT_ACTIONS] updateProfile exception:', error)
+    }
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'An error occurred' 
+      error: 'We couldn\'t save your profile changes. Please try again.'
     }
   }
 }

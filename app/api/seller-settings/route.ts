@@ -30,7 +30,7 @@ export async function GET() {
       hint: error.hint,
       userId: user.id
     })
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: false, code: 'FETCH_ERROR', error: 'Failed to fetch settings' }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true, data: data ?? { user_id: user.id, email_opt_in: false, default_radius_km: 10 } })
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[RLS] blocked mutation', { code: error.code, message: error.message })
     }
-    return NextResponse.json({ ok: false, error: error.message }, { status })
+    return NextResponse.json({ ok: false, code: 'UPDATE_FAILED', error: 'Failed to update settings' }, { status })
   }
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

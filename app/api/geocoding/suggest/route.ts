@@ -284,7 +284,8 @@ async function suggestHandler(request: NextRequest) {
     }
     
     // Dev-only debug info (also log to console for troubleshooting)
-    if (process.env.NODE_ENV === 'development') {
+    // Only include _debug in development to prevent leaking internal details
+    if (process.env.NODE_ENV !== 'production') {
       respBody._debug = {
         viewboxApplied,
         upstreamLimit,

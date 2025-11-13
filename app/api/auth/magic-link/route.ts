@@ -64,7 +64,7 @@ async function magicLinkHandler(request: NextRequest) {
       authDebug.logMagicLink(email, 'error', { code: error.message })
       
       return NextResponse.json(
-        { code: error.message, message: 'Failed to send magic link' },
+        { ok: false, code: 'MAGIC_LINK_FAILED', error: 'Failed to send magic link. Please try again.' },
         { status: 400 }
       )
     }

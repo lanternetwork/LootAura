@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       }
       
       return NextResponse.json(
-        { code: error.message, message: 'Auth failed' },
+        { ok: false, code: 'RESEND_FAILED', error: 'Failed to resend verification email. Please try again.' },
         { status: 400 }
       )
     }

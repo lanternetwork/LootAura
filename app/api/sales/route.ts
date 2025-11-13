@@ -169,10 +169,12 @@ async function salesHandler(request: NextRequest) {
           actualBbox = validatedBbox
           
         } catch (error: any) {
-          console.log(`[SALES] Invalid bbox: ${error.message}`)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log(`[SALES] Invalid bbox: ${error.message}`)
+          }
           return NextResponse.json({ 
             ok: false, 
-            error: `Invalid bbox: ${error.message}` 
+            error: 'Invalid location parameters'
           }, { status: 400 })
         }
       } else if (lat && lng) {
@@ -765,12 +767,15 @@ async function postHandler(request: NextRequest) {
     try {
       body = await request.json()
     } catch (error) {
-      console.error('[SALES] JSON parse error:', {
-        error: error instanceof Error ? error.message : String(error)
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SALES] JSON parse error:', {
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
       return NextResponse.json({ 
-        error: 'Invalid JSON in request body',
-        code: 'INVALID_JSON'
+        ok: false,
+        code: 'INVALID_JSON',
+        error: 'Invalid request format'
       }, { status: 400 })
     }
     
@@ -947,8 +952,8 @@ async function postHandler(request: NextRequest) {
     }
     
     if (error) {
-      if (process.env.NODE_ENV !== 'production') console.error('[SALES/POST] supabase error:', error)
-      return fail(500, 'SALE_CREATE_FAILED', error.message, error)
+      console.error('[SALES/POST] supabase error:', error)
+      return fail(500, 'SALE_CREATE_FAILED', 'Failed to create sale', error)
     }
     
     if (!data) {

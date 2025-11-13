@@ -84,7 +84,10 @@ export async function createSale(input: SaleInput): Promise<ActionResult> {
       .single()
 
     if (error) {
-      return { success: false, error: error.message }
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SALES_ACTIONS] createSale error:', error)
+      }
+      return { success: false, error: 'Something went wrong while creating your sale. Please try again.' }
     }
 
     revalidatePath('/sales')
@@ -104,9 +107,12 @@ export async function createSale(input: SaleInput): Promise<ActionResult> {
       }
     }
     
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[SALES_ACTIONS] createSale exception:', error)
+    }
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'An error occurred' 
+      error: 'Something went wrong while creating your sale. Please try again.'
     }
   }
 }
@@ -141,7 +147,10 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
       .single()
 
     if (error) {
-      return { success: false, error: error.message }
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SALES_ACTIONS] createSale error:', error)
+      }
+      return { success: false, error: 'Something went wrong while creating your sale. Please try again.' }
     }
 
     revalidatePath('/sales')
@@ -162,9 +171,12 @@ export async function updateSale(id: string, input: Partial<SaleInput>): Promise
       }
     }
     
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[SALES_ACTIONS] createSale exception:', error)
+    }
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'An error occurred' 
+      error: 'Something went wrong while creating your sale. Please try again.'
     }
   }
 }
@@ -180,7 +192,10 @@ export async function deleteSale(id: string): Promise<ActionResult> {
       .eq('owner_id', user.id) // Ensure user owns the sale
 
     if (error) {
-      return { success: false, error: error.message }
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SALES_ACTIONS] createSale error:', error)
+      }
+      return { success: false, error: 'Something went wrong while creating your sale. Please try again.' }
     }
 
     revalidatePath('/sales')
@@ -188,9 +203,12 @@ export async function deleteSale(id: string): Promise<ActionResult> {
     
     return { success: true }
   } catch (error) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[SALES_ACTIONS] createSale exception:', error)
+    }
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'An error occurred' 
+      error: 'Something went wrong while creating your sale. Please try again.'
     }
   }
 }
@@ -228,7 +246,10 @@ export async function createItem(saleId: string, input: ItemInput): Promise<Acti
       .single()
 
     if (error) {
-      return { success: false, error: error.message }
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SALES_ACTIONS] createSale error:', error)
+      }
+      return { success: false, error: 'Something went wrong while creating your sale. Please try again.' }
     }
 
     revalidatePath(`/sales/${saleId}`)
@@ -248,9 +269,12 @@ export async function createItem(saleId: string, input: ItemInput): Promise<Acti
       }
     }
     
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[SALES_ACTIONS] createSale exception:', error)
+    }
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'An error occurred' 
+      error: 'Something went wrong while creating your sale. Please try again.'
     }
   }
 }
@@ -287,7 +311,10 @@ export async function deleteItem(id: string): Promise<ActionResult> {
       .eq('id', id)
 
     if (error) {
-      return { success: false, error: error.message }
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SALES_ACTIONS] createSale error:', error)
+      }
+      return { success: false, error: 'Something went wrong while creating your sale. Please try again.' }
     }
 
     revalidatePath('/sales')
@@ -295,9 +322,12 @@ export async function deleteItem(id: string): Promise<ActionResult> {
     
     return { success: true }
   } catch (error) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[SALES_ACTIONS] createSale exception:', error)
+    }
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'An error occurred' 
+      error: 'Something went wrong while creating your sale. Please try again.'
     }
   }
 }
@@ -350,9 +380,12 @@ export async function toggleFavorite(saleId: string): Promise<ActionResult> {
       return { success: true, data: { favorited: true } }
     }
   } catch (error) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[SALES_ACTIONS] createSale exception:', error)
+    }
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'An error occurred' 
+      error: 'Something went wrong while creating your sale. Please try again.'
     }
   }
 }

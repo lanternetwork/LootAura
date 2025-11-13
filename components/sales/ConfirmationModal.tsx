@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useEffect, useCallback } from 'react'
 
 interface ConfirmationModalProps {
   open: boolean
@@ -17,6 +18,31 @@ export default function ConfirmationModal({
 }: ConfirmationModalProps) {
   const router = useRouter()
 
+  const handleGoToDashboard = useCallback(() => {
+    router.push('/dashboard')
+    onClose()
+  }, [router, onClose])
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    if (!open) return
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleGoToDashboard()
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    // Lock body scroll when modal is open
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.body.style.overflow = ''
+    }
+  }, [open, handleGoToDashboard])
+
   if (!open) return null
 
   const handleViewSale = () => {
@@ -32,11 +58,6 @@ export default function ConfirmationModal({
       // Close the modal state
       onClose()
     }
-  }
-
-  const handleGoToDashboard = () => {
-    router.push('/dashboard')
-    onClose()
   }
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {

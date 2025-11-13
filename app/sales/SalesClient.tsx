@@ -880,6 +880,8 @@ export default function SalesClient({
               ? `calc(100vh - ${FILTERS_HEIGHT}px)` 
               : '100%'
           }}
+          role="region"
+          aria-label="Interactive map showing yard sales locations"
         >
           <div className="w-full h-full">
             {mapView ? (

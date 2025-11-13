@@ -1062,6 +1062,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
                     setShowToast(true)
                   }
                 }}
+                aria-label="Discard draft"
                 className="text-sm text-red-600 hover:text-red-700 mt-2 underline"
               >
                 Discard draft
@@ -1113,9 +1114,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         <button
           onClick={handlePrevious}
           disabled={currentStep === STEPS.DETAILS}
+          aria-label="Previous step"
           className="inline-flex items-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
         >
-          <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Previous
@@ -1124,24 +1126,26 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         {currentStep < WIZARD_STEPS.length - 1 ? (
           <button
             onClick={handleNext}
+            aria-label="Next step"
             className="inline-flex items-center px-6 py-3 btn-accent min-h-[44px]"
           >
             Next
-            <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         ) : (
-          <button
-            onClick={(e) => {
-              console.log('[SELL_WIZARD] Publish button clicked (main)', { loading, currentStep, disabled: loading })
-              e.preventDefault()
-              e.stopPropagation()
-              handleSubmit()
-            }}
-            disabled={loading}
-            className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
-          >
+                <button
+                  onClick={(e) => {
+                    console.log('[SELL_WIZARD] Publish button clicked (main)', { loading, currentStep, disabled: loading })
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleSubmit()
+                  }}
+                  disabled={loading}
+                  aria-label="Publish sale"
+                  className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                >
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -1714,6 +1718,7 @@ function ReviewStep({ formData, photos, items, onPublish, loading, submitError }
             onPublish()
           }}
           disabled={loading}
+          aria-label="Publish sale"
           className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
         >
           {loading ? (

@@ -1,6 +1,8 @@
+import { Metadata } from 'next'
 import SalesClient from './SalesClient'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { cookies, headers } from 'next/headers'
+import { createPageMetadata } from '@/lib/metadata'
 
 interface SalesPageProps {
   searchParams: {
@@ -18,6 +20,12 @@ interface SalesPageProps {
 }
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = createPageMetadata({
+  title: 'Find Yard Sales',
+  description: 'Browse yard sales, garage sales, and estate sales on an interactive map. Find great deals near you.',
+  path: '/sales',
+})
 
 export default async function SalesPage({ searchParams }: SalesPageProps) {
   const supabase = createSupabaseServerClient()

@@ -10,13 +10,14 @@ import { Sale } from '@/lib/types'
 import type { Metadata } from 'next'
 
 // Helper to safely extract image URL from metadata
-function getImageUrl(images: Metadata['openGraph']['images'] | Metadata['twitter']['images']): string | undefined {
+// Using any to work around Next.js Metadata type limitations
+function getImageUrl(images: any): string | undefined {
   if (!images) return undefined
   const imageArray = Array.isArray(images) ? images : [images]
   const firstImage = imageArray[0]
   if (!firstImage) return undefined
   if (typeof firstImage === 'string') return firstImage
-  if (typeof firstImage === 'object' && 'url' in firstImage) return firstImage.url
+  if (typeof firstImage === 'object' && firstImage !== null && 'url' in firstImage) return firstImage.url
   return undefined
 }
 
@@ -143,8 +144,10 @@ describe('createSaleMetadata', () => {
     const metadata = createSaleMetadata(sale)
 
     // Should use default OG image fallback
-    const ogImageUrl = getImageUrl(metadata.openGraph?.images)
-    const twitterImageUrl = getImageUrl(metadata.twitter?.images)
+    const ogImages = metadata.openGraph?.images
+    const twitterImages = metadata.twitter?.images
+    const ogImageUrl = getImageUrl(ogImages)
+    const twitterImageUrl = getImageUrl(twitterImages)
     
     expect(ogImageUrl).toBeDefined()
     expect(ogImageUrl).toContain('og-default.png')

@@ -25,11 +25,6 @@ export default function DiagnosticOverlay({ isVisible, onToggle }: DiagnosticOve
   const [suppressedCount, setSuppressedCount] = useState(0)
   const _eventIdRef = useRef(0)
 
-  // Only render in debug mode
-  if (process.env.NEXT_PUBLIC_DEBUG !== 'true') {
-    return null
-  }
-
   useEffect(() => {
     // Listen for fetch events from the global event emitter
     const handleFetchEvent = (event: FetchEvent) => {

@@ -73,8 +73,8 @@ describe('Password Reset Authentication', () => {
       const data = await response.json()
 
       expect(response.status).toBe(400)
-      expect(data.code).toBe('User not found')
-      expect(data.message).toBe('Failed to send password reset email')
+      expect(data.code).toBe('RESET_FAILED')
+      expect(data.error).toBe('Failed to send password reset email. Please try again.')
     })
 
     it('should validate email format', async () => {

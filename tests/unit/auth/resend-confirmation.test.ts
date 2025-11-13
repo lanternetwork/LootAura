@@ -83,8 +83,8 @@ describe('Resend Confirmation Email', () => {
     const data = await response.json()
 
     expect(response.status).toBe(400)
-    expect(data.code).toBe('Rate limit exceeded')
-    expect(data.message).toBe('Auth failed')
+    expect(data.code).toBe('RESEND_FAILED')
+    expect(data.error).toBe('Failed to resend verification email. Please try again.')
   })
 
   it('should reject invalid email', async () => {

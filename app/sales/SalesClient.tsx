@@ -985,7 +985,7 @@ export default function SalesClient({
                 </div>
                 </div>
 
-          <div className="flex-1 overflow-y-auto pl-4 pr-0 pb-4 pt-4" style={{ width: '100%' }}>
+          <div className="flex-1 pl-4 pr-4 pb-4 pt-4" style={{ width: '100%' }}>
             {loading && (
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (

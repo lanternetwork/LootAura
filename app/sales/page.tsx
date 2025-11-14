@@ -211,7 +211,7 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   const initialSales: any[] = []
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen bg-gray-50 overflow-hidden">
       <SalesClient 
         initialSales={initialSales}
         initialCenter={initialCenter}

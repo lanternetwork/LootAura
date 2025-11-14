@@ -448,9 +448,9 @@ export default function FiltersBar({
 
       {/* Mobile Layout */}
       <div className="md:hidden">
-        <div className="flex items-center gap-2 px-4 py-2">
-          {/* ZIP Search - Compact */}
-          <div className="flex-1">
+        <div className="flex flex-col gap-2 px-4 py-2">
+          {/* Row 1: ZIP Search - Full Width */}
+          <div className="w-full min-w-0">
             <ZipInput
               onLocationFound={onZipLocationFound}
               onError={onZipError}
@@ -463,45 +463,48 @@ export default function FiltersBar({
             )}
           </div>
 
-          {/* Date Dropdown - Compact - Show presets */}
-          <select
-            value={dateRange}
-            onChange={(e) => onDateRangeChange(e.target.value as any)}
-            disabled={isLoading}
-            className={`px-2 py-1 border rounded text-xs min-w-[100px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <option value="any">Any</option>
-            {datePresets.map((preset) => (
-              <option key={preset.id} value={preset.id}>
-                {preset.label}
-              </option>
-            ))}
-          </select>
+          {/* Row 2: Date + Radius Dropdowns Side-by-Side */}
+          <div className="flex items-center gap-2 w-full min-w-0">
+            {/* Date Dropdown - Flex-1 */}
+            <select
+              value={dateRange}
+              onChange={(e) => onDateRangeChange(e.target.value as any)}
+              disabled={isLoading}
+              className={`flex-1 min-w-0 px-3 py-2 border rounded text-sm min-h-[44px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <option value="any">Any Date</option>
+              {datePresets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
 
-          {/* Search Area - Compact */}
-          <select
-            value={distance}
-            onChange={(e) => onDistanceChange(Number(e.target.value))}
-            disabled={isLoading}
-            className={`px-2 py-1 border rounded text-xs min-w-[60px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <option value={2}>2mi</option>
-            <option value={5}>5mi</option>
-            <option value={10}>10mi</option>
-            <option value={25}>25mi</option>
-          </select>
+            {/* Search Area Dropdown - Flex-1 */}
+            <select
+              value={distance}
+              onChange={(e) => onDistanceChange(Number(e.target.value))}
+              disabled={isLoading}
+              className={`flex-1 min-w-0 px-3 py-2 border rounded text-sm min-h-[44px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <option value={2}>2mi</option>
+              <option value={5}>5mi</option>
+              <option value={10}>10mi</option>
+              <option value={25}>25mi</option>
+            </select>
 
-          {/* More Filters Button */}
-          <button
-            onClick={() => setShowMobileFilters(true)}
-            aria-label={hasActiveFilters ? 'Open filters menu (filters active)' : 'Open filters menu'}
-            className="flex items-center gap-1 px-2 py-2 border border-gray-300 bg-white hover:bg-gray-50 rounded text-sm min-h-[44px]"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full" aria-label="Active filters indicator"></span>}
-          </button>
+            {/* More Filters Button */}
+            <button
+              onClick={() => setShowMobileFilters(true)}
+              aria-label={hasActiveFilters ? 'Open filters menu (filters active)' : 'Open filters menu'}
+              className="flex items-center justify-center gap-1 px-3 py-2 border border-gray-300 bg-white hover:bg-gray-50 rounded text-sm min-h-[44px] min-w-[44px] shrink-0"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full" aria-label="Active filters indicator"></span>}
+            </button>
+          </div>
         </div>
       </div>
 

@@ -804,7 +804,8 @@ export default function SalesClient({
   const getBottomSheetHeight = useCallback((state: 'collapsed' | 'mid' | 'expanded'): string => {
     switch (state) {
       case 'collapsed':
-        return '48px'
+        // Minimum height to show drag handle (48px) + header with text clearly visible (~60px)
+        return '108px'
       case 'mid':
         return '40vh'
       case 'expanded':
@@ -1023,18 +1024,18 @@ export default function SalesClient({
             <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
           </div>
 
-          {/* Sheet Header */}
-          <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">
+          {/* Sheet Header - Always visible, even when collapsed */}
+          <div className={`flex-shrink-0 px-4 border-b border-gray-200 ${bottomSheetState === 'collapsed' ? 'py-2' : 'py-3'}`}>
+            <div className="flex items-center justify-between min-h-[44px]">
+              <h2 className="text-base font-semibold truncate flex-1 min-w-0">
                 Results near you ({visibleSales.length})
               </h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {/* Accessibility buttons for expand/collapse - text buttons for better accessibility */}
                 {bottomSheetState === 'collapsed' && (
                   <button
                     onClick={() => setBottomSheetState('mid')}
-                    className="md:hidden text-sm text-gray-600 hover:text-gray-900 underline min-h-[44px] px-2"
+                    className="md:hidden text-sm text-gray-600 hover:text-gray-900 underline min-h-[44px] px-2 whitespace-nowrap"
                     aria-label="Show more results"
                   >
                     Show more
@@ -1043,7 +1044,7 @@ export default function SalesClient({
                 {bottomSheetState !== 'collapsed' && (
                   <button
                     onClick={() => setBottomSheetState('collapsed')}
-                    className="md:hidden text-sm text-gray-600 hover:text-gray-900 underline min-h-[44px] px-2"
+                    className="md:hidden text-sm text-gray-600 hover:text-gray-900 underline min-h-[44px] px-2 whitespace-nowrap"
                     aria-label="Show less results"
                   >
                     Show less
@@ -1052,7 +1053,7 @@ export default function SalesClient({
                 {selectedPinId && (
                   <button
                     onClick={() => setSelectedPinId(null)}
-                    className="text-sm link-accent underline min-h-[44px] px-2"
+                    className="text-sm link-accent underline min-h-[44px] px-2 whitespace-nowrap"
                   >
                     Show All
                   </button>
@@ -1067,7 +1068,7 @@ export default function SalesClient({
             style={{ 
               height: bottomSheetState === 'collapsed' 
                 ? '0px' 
-                : `calc(${getBottomSheetHeight(bottomSheetState)} - 96px)`,
+                : `calc(${getBottomSheetHeight(bottomSheetState)} - 108px)`, // Account for drag handle (48px) + header (~60px)
               overflowY: bottomSheetState === 'collapsed' ? 'hidden' : 'auto'
             }}
           >

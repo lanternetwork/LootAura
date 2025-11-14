@@ -12,6 +12,7 @@ import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
+import { useHasOverflow } from '@/lib/hooks/useHasOverflow'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -802,6 +803,9 @@ export default function SalesClient({
     // Handled by context
   }, [])
 
+  // Detect overflow in sales list to conditionally show scrollbar
+  const { ref: salesListContentRef, hasOverflow: salesListHasOverflow } = useHasOverflow<HTMLDivElement>()
+
   // Bottom sheet height calculations
   const getBottomSheetHeight = useCallback((state: 'collapsed' | 'mid' | 'expanded'): string => {
     switch (state) {
@@ -986,7 +990,10 @@ export default function SalesClient({
                 </div>
                 </div>
 
-          <div className="flex-1 pl-4 pr-4 pb-4 pt-4 overflow-y-auto">
+          <div 
+            ref={salesListContentRef}
+            className={`flex-1 pl-4 pr-4 pb-4 pt-4 ${salesListHasOverflow ? 'overflow-y-auto' : 'overflow-hidden'}`}
+          >
             {loading && (
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (

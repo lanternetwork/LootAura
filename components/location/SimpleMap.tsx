@@ -53,6 +53,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [mapError, setMapError] = useState<string | null>(null)
+  const [pinsLoading, setPinsLoading] = useState(false)
   const lastBoundsKey = useRef<string>("")
   
   const token = getMapboxToken()
@@ -68,6 +70,22 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     }
   }, [token])
   
+  // Track when pins finish loading
+  useEffect(() => {
+    if (loaded) {
+      const pinCount = hybridPins?.sales.length || pins?.sales.length || sales.length
+      if (pinCount > 0) {
+        // Small delay to ensure pins are rendered
+        const timer = setTimeout(() => {
+          setPinsLoading(false)
+        }, 300)
+        return () => clearTimeout(timer)
+      } else {
+        setPinsLoading(false)
+      }
+    }
+  }, [loaded, hybridPins?.sales.length, pins?.sales.length, sales.length])
+
   // Check if clustering is enabled - FORCE DISABLED to prevent blue circles
   const isClusteringEnabled = false  // Disabled to prevent blue cluster markers
 
@@ -82,6 +100,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       console.log('[MAP] onLoad - Map initialization completed')
     }
     setLoaded(true)
+    setMapError(null) // Clear any previous errors on successful load
+    setPinsLoading(true) // Start loading pins
     mapRef.current?.getMap()?.resize()
     
     // Trigger initial viewport change to set proper bounds
@@ -294,6 +314,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onMoveEnd={handleMoveEnd}
         onError={(error: any) => {
           console.error('[SIMPLE_MAP] Map error:', error)
+          setMapError('Unable to load map. Please check your connection and try again.')
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.log('[SIMPLE_MAP] Token for debugging:', {
               hasToken: !!token,
@@ -379,12 +400,48 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         )}
       </Map>
       
+      {/* Map error message */}
+      {mapError && (
+        <div className="absolute inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md mx-4 text-center">
+            <div className="text-red-500 mb-4">
+              <svg className="w-12 h-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Map Error</h3>
+            <p className="text-gray-600 mb-4">{mapError}</p>
+            <button
+              onClick={() => {
+                setMapError(null)
+                window.location.reload()
+              }}
+              className="px-4 py-2 bg-[var(--accent-primary)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
+            >
+              Reload Map
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Loading overlay for smooth transitions */}
       {isTransitioning && (
         <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 transition-opacity duration-300">
           <div className="bg-white rounded-lg shadow-lg p-4 flex items-center space-x-3">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-[var(--accent-primary)] border-t-transparent"></div>
             <span className="text-gray-700 font-medium">{transitionMessage}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Pins loading skeleton */}
+      {pinsLoading && !loaded && (hybridPins || pins) && (
+        <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
+          <div className="bg-white bg-opacity-80 rounded-lg shadow-md p-4">
+            <div className="flex items-center space-x-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-[var(--accent-primary)] border-t-transparent"></div>
+              <span className="text-sm text-gray-700 font-medium">Loading sales locations...</span>
+            </div>
           </div>
         </div>
       )}

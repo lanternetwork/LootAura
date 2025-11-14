@@ -34,7 +34,7 @@ export default function SalesClient({
 }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { filters, updateFilters, hasActiveFilters: _hasActiveFilters } = useFilters(
+  const { filters, updateFilters, clearFilters, hasActiveFilters: _hasActiveFilters } = useFilters(
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
   )
 
@@ -92,6 +92,7 @@ export default function SalesClient({
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartY, setDragStartY] = useState(0)
   const [dragStartHeight, setDragStartHeight] = useState<string>('40vh')
+  const [showBottomSheetHint, setShowBottomSheetHint] = useState(true)
   
   // Track window width for mobile detection
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
@@ -818,6 +819,7 @@ export default function SalesClient({
   // Bottom sheet drag handlers
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     setIsDragging(true)
+    setShowBottomSheetHint(false) // Hide hint once user starts interacting
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
     setDragStartY(clientY)
     setDragStartHeight(getBottomSheetHeight(bottomSheetState))
@@ -866,6 +868,7 @@ export default function SalesClient({
     const handleMouseMove = (e: MouseEvent) => handleDragMove(e)
     const handleTouchMove = (e: TouchEvent) => {
       e.preventDefault()
+      e.stopPropagation() // Prevent map panning when dragging bottom sheet
       handleDragMove(e)
     }
     const handleMouseUp = () => handleDragEnd()
@@ -900,6 +903,7 @@ export default function SalesClient({
         onDistanceChange={(distance) => handleFiltersChange({ ...filters, distance })}
         hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
         isLoading={loading}
+        onClearFilters={clearFilters}
         zipInputTestId="zip-input"
         filtersCenterTestId="filters-center"
         filtersMoreTestId="filters-more"
@@ -1012,16 +1016,24 @@ export default function SalesClient({
           style={{
             height: getBottomSheetHeight(bottomSheetState),
             transform: `translateY(0)`,
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
         >
           {/* Drag Handle */}
           <div
-            className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none touch-none"
+            className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none touch-none relative"
             onMouseDown={handleDragStart}
             onTouchStart={handleDragStart}
             aria-label="Drag to resize"
           >
             <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
+            {/* Discoverability hint - show on first load */}
+            {showBottomSheetHint && bottomSheetState === 'collapsed' && (
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap animate-bounce">
+                Swipe up for results
+                <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
+              </div>
+            )}
           </div>
 
           {/* Sheet Header - Always visible, even when collapsed */}
@@ -1113,6 +1125,7 @@ export default function SalesClient({
         onDistanceChange={(distance) => handleFiltersChange({ ...filters, distance })}
         hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
         isLoading={loading}
+        onClearFilters={clearFilters}
       />
 
     </div>

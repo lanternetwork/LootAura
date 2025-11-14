@@ -28,8 +28,14 @@ export default function ClusterMarker({
     }
   }, [cluster, onKeyDown])
 
-  // Fixed size to match individual pins (12px)
-  const sizeClass = 'w-3 h-3 text-[8px]'
+  // Dynamic size based on cluster count for better visibility
+  const getSizeClass = () => {
+    if (cluster.count >= 100) return 'w-10 h-10 text-xs'
+    if (cluster.count >= 50) return 'w-9 h-9 text-xs'
+    if (cluster.count >= 20) return 'w-8 h-8 text-[10px]'
+    if (cluster.count >= 10) return 'w-7 h-7 text-[9px]'
+    return 'w-6 h-6 text-[8px]'
+  }
 
   return (
     <Marker
@@ -40,13 +46,13 @@ export default function ClusterMarker({
     >
       <button
         className={`
-          ${sizeClass}
+          ${getSizeClass()}
           bg-[var(--accent-primary)]
-          text-white font-semibold 
+          text-white font-bold
           rounded-full flex items-center justify-center
-          shadow-sm select-none
-          /* remove focus/hover effects to prevent size/visibility thrash */
-          cursor-pointer
+          shadow-lg border-2 border-white select-none
+          cursor-pointer hover:scale-110 transition-transform
+          focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2
         `}
         data-cluster-marker="true"
         data-cluster-id={cluster.id}
@@ -56,9 +62,9 @@ export default function ClusterMarker({
         onKeyDown={handleKeyDown}
         tabIndex={0}
         aria-label={`Cluster of ${cluster.count} sales. Press Enter to zoom in.`}
-        title={`Cluster of ${cluster.count} sales`}
+        title={`${cluster.count} sales at this location`}
       >
-        <span className="text-white font-bold">{cluster.count}</span>
+        <span className="text-white font-bold leading-none">{cluster.count}</span>
       </button>
     </Marker>
   )

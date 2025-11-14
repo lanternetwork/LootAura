@@ -383,7 +383,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
             </div>
           </div>
 
-          {/* Seller Activity Card */}
+          {/* Seller Details Card */}
           <SellerActivityCard
             ownerProfile={sale.owner_profile}
             ownerStats={sale.owner_stats}

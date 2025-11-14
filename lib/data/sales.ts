@@ -213,6 +213,8 @@ export interface SaleWithOwnerInfo extends Sale {
     id?: string
     created_at?: string | null
     full_name?: string | null
+    username?: string | null
+    avatar_url?: string | null
   } | null
   owner_stats?: {
     user_id?: string

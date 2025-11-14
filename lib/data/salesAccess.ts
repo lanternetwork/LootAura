@@ -461,7 +461,7 @@ export async function getSaleWithItems(
     const [profileRes, statsRes] = await Promise.all([
       supabase
         .from('profiles_v2')
-        .select('id, created_at, full_name')
+        .select('id, created_at, full_name, username, avatar_url')
         .eq('id', ownerId)
         .maybeSingle(),
       supabase

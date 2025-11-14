@@ -67,7 +67,7 @@ describe('getNearestSalesForSale', () => {
       { id: 'sale-1', distance_meters: 0 }, // Current sale
       { id: 'sale-2', distance_meters: 500 },
       { id: 'sale-3', distance_meters: 1000 },
-    ]
+    ];
 
     (mockSupabase.from as any).mockReturnValue({
       select: vi.fn().mockReturnValue({
@@ -104,7 +104,7 @@ describe('getNearestSalesForSale', () => {
       { id: 'sale-2', distance_meters: 500 },
       { id: 'sale-3', distance_meters: 1000 },
       { id: 'sale-4', distance_meters: 1500 },
-    ]
+    ];
 
     (mockSupabase.from as any).mockReturnValue({
       select: vi.fn().mockReturnValue({

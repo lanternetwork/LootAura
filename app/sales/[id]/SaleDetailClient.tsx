@@ -15,7 +15,7 @@ import CategoryChips from '@/components/ui/CategoryChips'
 import OSMAttribution from '@/components/location/OSMAttribution'
 import SaleShareButton from '@/components/share/SaleShareButton'
 import type { SaleWithOwnerInfo } from '@/lib/data'
-import type { SaleItem } from '@/lib/types'
+import type { SaleItem, Sale } from '@/lib/types'
 
 interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo

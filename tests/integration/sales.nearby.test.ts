@@ -25,7 +25,7 @@ describe('getNearestSalesForSale', () => {
   })
 
   it('returns empty array when sale not found', async () => {
-    ;(mockSupabase.from as any).mockReturnValue({
+    (mockSupabase.from as any).mockReturnValue({
       select: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
@@ -41,7 +41,7 @@ describe('getNearestSalesForSale', () => {
   })
 
   it('returns empty array when sale has no coordinates', async () => {
-    ;(mockSupabase.from as any).mockReturnValue({
+    (mockSupabase.from as any).mockReturnValue({
       select: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
@@ -69,7 +69,7 @@ describe('getNearestSalesForSale', () => {
       { id: 'sale-3', distance_meters: 1000 },
     ]
 
-    ;(mockSupabase.from as any).mockReturnValue({
+    (mockSupabase.from as any).mockReturnValue({
       select: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
@@ -106,7 +106,7 @@ describe('getNearestSalesForSale', () => {
       { id: 'sale-4', distance_meters: 1500 },
     ]
 
-    ;(mockSupabase.from as any).mockReturnValue({
+    (mockSupabase.from as any).mockReturnValue({
       select: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
@@ -128,7 +128,7 @@ describe('getNearestSalesForSale', () => {
   })
 
   it('returns empty array on error', async () => {
-    ;(mockSupabase.from as any).mockReturnValue({
+    (mockSupabase.from as any).mockReturnValue({
       select: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
           single: vi.fn().mockRejectedValue(new Error('Database error')),

@@ -790,8 +790,9 @@ export default function SalesClient({
   }, [])
 
   // Constants for layout calculations
+  const HEADER_HEIGHT = 64 // px - header height (h-16)
   const FILTERS_HEIGHT = 56 // px - filters bar height
-  const MAIN_CONTENT_HEIGHT = `calc(100vh - ${FILTERS_HEIGHT}px)`
+  const MAIN_CONTENT_HEIGHT = `calc(100vh - ${HEADER_HEIGHT + FILTERS_HEIGHT}px)`
 
   // Use mobile filter context
   const { isOpen: isMobileFilterSheetOpen, closeFilterSheet } = useMobileFilter()
@@ -888,7 +889,7 @@ export default function SalesClient({
   }, [isDragging, handleDragMove, handleDragEnd])
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col overflow-hidden" style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}>
 
       {/* Advanced Filters Bar */}
       <FiltersBar
@@ -920,7 +921,7 @@ export default function SalesClient({
           className="relative md:h-full md:min-h-0 bg-gray-100 flex-shrink-0" 
           style={{ 
             height: isMobile 
-              ? `calc(100vh - ${FILTERS_HEIGHT}px)` 
+              ? `calc(100vh - ${HEADER_HEIGHT + FILTERS_HEIGHT}px)` 
               : '100%'
           }}
           role="region"

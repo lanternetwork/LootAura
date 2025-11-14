@@ -963,8 +963,8 @@ export default function SalesClient({
         </div>
 
         {/* Sales List - Below map on mobile, Right panel on desktop */}
-        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto lg:w-[420px] xl:w-[480px] 2xl:w-[540px] lg:min-w-[420px] xl:min-w-[480px] 2xl:min-w-[540px]">
-          <div className="flex-shrink-0 p-4 border-b border-gray-200">
+        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto lg:w-[420px] xl:w-[480px] 2xl:w-[540px] lg:min-w-[420px] xl:min-w-[480px] 2xl:min-w-[540px]" style={{ scrollbarGutter: 'stable' }}>
+          <div className="flex-shrink-0 px-4 pt-4 pb-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
                 Sales ({visibleSales.length})
@@ -985,7 +985,7 @@ export default function SalesClient({
                 </div>
                 </div>
 
-          <div className="flex-1 overflow-y-auto p-4" style={{ width: '100%' }}>
+          <div className="flex-1 overflow-y-auto px-4 pb-4 pt-4 scrollbar-hide" style={{ width: '100%' }}>
             {loading && (
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (

@@ -1012,11 +1012,10 @@ export default function SalesClient({
       {/* Mobile Bottom Sheet - Only on mobile (<768px) */}
       {isMobile && (
         <div
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 rounded-t-2xl shadow-lg z-30 transition-transform duration-300 ease-out will-change-transform"
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 rounded-t-2xl shadow-lg z-30 transition-transform duration-300 ease-out will-change-transform safe-area-bottom"
           style={{
             height: getBottomSheetHeight(bottomSheetState),
             transform: `translateY(0)`,
-            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
         >
           {/* Drag Handle */}

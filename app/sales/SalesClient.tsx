@@ -804,7 +804,8 @@ export default function SalesClient({
   const getBottomSheetHeight = useCallback((state: 'collapsed' | 'mid' | 'expanded'): string => {
     switch (state) {
       case 'collapsed':
-        return '48px'
+        // Minimum height to show drag handle (48px) + header with text clearly visible (~60px)
+        return '108px'
       case 'mid':
         return '40vh'
       case 'expanded':
@@ -958,7 +959,7 @@ export default function SalesClient({
         </div>
 
         {/* Sales List - Below map on mobile, Right panel on desktop */}
-        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto" style={{ width: '628px', minWidth: '628px' }}>
+        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto lg:w-[420px] xl:w-[480px] 2xl:w-[540px] lg:min-w-[420px] xl:min-w-[480px] 2xl:min-w-[540px]">
           <div className="flex-shrink-0 p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
@@ -1007,44 +1008,67 @@ export default function SalesClient({
       {/* Mobile Bottom Sheet - Only on mobile (<768px) */}
       {isMobile && (
         <div
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 rounded-t-2xl shadow-lg z-30 transition-all duration-300 ease-out"
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 rounded-t-2xl shadow-lg z-30 transition-transform duration-300 ease-out will-change-transform"
           style={{
             height: getBottomSheetHeight(bottomSheetState),
+            transform: `translateY(0)`,
           }}
         >
           {/* Drag Handle */}
           <div
-            className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none"
+            className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none touch-none"
             onMouseDown={handleDragStart}
             onTouchStart={handleDragStart}
+            aria-label="Drag to resize"
           >
             <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
           </div>
 
-          {/* Sheet Header */}
-          <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">
+          {/* Sheet Header - Always visible, even when collapsed */}
+          <div className={`flex-shrink-0 px-4 border-b border-gray-200 ${bottomSheetState === 'collapsed' ? 'py-2' : 'py-3'}`}>
+            <div className="flex items-center justify-between min-h-[44px]">
+              <h2 className="text-base font-semibold truncate flex-1 min-w-0">
                 Results near you ({visibleSales.length})
               </h2>
-              {selectedPinId && (
-                <button
-                  onClick={() => setSelectedPinId(null)}
-                  className="text-sm link-accent underline"
-                >
-                  Show All
-                </button>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Accessibility buttons for expand/collapse - text buttons for better accessibility */}
+                {bottomSheetState === 'collapsed' && (
+                  <button
+                    onClick={() => setBottomSheetState('mid')}
+                    className="md:hidden text-sm text-gray-600 hover:text-gray-900 underline min-h-[44px] px-2 whitespace-nowrap"
+                    aria-label="Show more results"
+                  >
+                    Show more
+                  </button>
+                )}
+                {bottomSheetState !== 'collapsed' && (
+                  <button
+                    onClick={() => setBottomSheetState('collapsed')}
+                    className="md:hidden text-sm text-gray-600 hover:text-gray-900 underline min-h-[44px] px-2 whitespace-nowrap"
+                    aria-label="Show less results"
+                  >
+                    Show less
+                  </button>
+                )}
+                {selectedPinId && (
+                  <button
+                    onClick={() => setSelectedPinId(null)}
+                    className="text-sm link-accent underline min-h-[44px] px-2 whitespace-nowrap"
+                  >
+                    Show All
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Sheet Content */}
           <div 
-            className="overflow-y-auto"
+            className="overflow-y-auto touch-pan-y"
             style={{ 
               height: bottomSheetState === 'collapsed' 
                 ? '0px' 
-                : `calc(${getBottomSheetHeight(bottomSheetState)} - 96px)`,
+                : `calc(${getBottomSheetHeight(bottomSheetState)} - 108px)`, // Account for drag handle (48px) + header (~60px)
               overflowY: bottomSheetState === 'collapsed' ? 'hidden' : 'auto'
             }}
           >

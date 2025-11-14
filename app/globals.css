@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile touch optimizations */
+@layer utilities {
+  .touch-pan-y {
+    touch-action: pan-y;
+  }
+  .touch-none {
+    touch-action: none;
+  }
+}
+
 :root {
   --accent-primary: #4C1D95;
   --accent-secondary: #FACC15;

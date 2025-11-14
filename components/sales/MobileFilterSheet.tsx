@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { buildDatePresets } from '@/lib/shared/datePresets'
 
 // Category data
@@ -45,6 +45,37 @@ export default function MobileFilterSheet({
   const [tempDateRange, setTempDateRange] = useState(dateRange)
   const [tempCategories, setTempCategories] = useState(categories)
   const [tempDistance, setTempDistance] = useState(distance)
+  const [swipeStartY, setSwipeStartY] = useState<number | null>(null)
+  const [swipeDeltaY, setSwipeDeltaY] = useState(0)
+  const sheetRef = useRef<HTMLDivElement>(null)
+
+  // Swipe-to-dismiss gesture handling (only on drag handle area)
+  const handleDragHandleTouchStart = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation()
+    setSwipeStartY(e.touches[0].clientY)
+    setSwipeDeltaY(0)
+  }, [])
+
+  const handleDragHandleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (swipeStartY === null) return
+    e.preventDefault()
+    e.stopPropagation()
+    const currentY = e.touches[0].clientY
+    const delta = currentY - swipeStartY
+    // Only allow downward swipes (positive delta)
+    if (delta > 0) {
+      setSwipeDeltaY(delta)
+    }
+  }, [swipeStartY])
+
+  const handleDragHandleTouchEnd = useCallback(() => {
+    // If swiped down more than 100px, dismiss the sheet
+    if (swipeDeltaY > 100) {
+      onClose()
+    }
+    setSwipeStartY(null)
+    setSwipeDeltaY(0)
+  }, [swipeDeltaY, onClose])
 
   // Date presets - only show Thu/Fri/Sat/Sun/This weekend (skip Today)
   const datePresets = useMemo(() => {
@@ -98,11 +129,21 @@ export default function MobileFilterSheet({
 
       {/* Bottom Sheet */}
       <div
-        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg z-50 md:hidden max-h-[85vh] overflow-hidden flex flex-col"
+        ref={sheetRef}
+        className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg z-50 md:hidden max-h-[85vh] overflow-hidden flex flex-col will-change-transform transition-transform duration-200"
         onClick={(e) => e.stopPropagation()}
+        style={{
+          transform: swipeDeltaY > 0 ? `translateY(${swipeDeltaY}px)` : 'translateY(0)',
+        }}
       >
         {/* Drag Handle */}
-        <div className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none">
+        <div 
+          className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none touch-none"
+          aria-label="Drag handle - swipe down to close"
+          onTouchStart={handleDragHandleTouchStart}
+          onTouchMove={handleDragHandleTouchMove}
+          onTouchEnd={handleDragHandleTouchEnd}
+        >
           <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
         </div>
 
@@ -111,7 +152,7 @@ export default function MobileFilterSheet({
           <h2 className="text-lg font-semibold">Filters</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 min-w-[44px] min-h-[44px] flex items-center justify-center"
             aria-label="Close filters"
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -121,7 +162,7 @@ export default function MobileFilterSheet({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 space-y-6 touch-pan-y">
           {/* Date Range */}
           <div>
             <label className="block text-sm font-medium mb-3">Date Range</label>
@@ -152,7 +193,7 @@ export default function MobileFilterSheet({
                     onClick={() => handleCategoryToggle(category.id)}
                     disabled={isLoading}
                     className={`
-                      px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap
+                      px-4 py-2.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap min-h-[44px]
                       ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
                       ${isSelected 
                         ? 'bg-[rgba(147,51,234,0.15)] text-[#3A2268] border border-purple-200' 
@@ -190,7 +231,7 @@ export default function MobileFilterSheet({
           <button
             onClick={handleReset}
             disabled={isLoading}
-            className={`flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 px-4 py-3 border border-gray-300 rounded-lg text-sm font-medium transition-colors min-h-[44px] ${
               isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
             }`}
           >
@@ -199,7 +240,7 @@ export default function MobileFilterSheet({
           <button
             onClick={handleApply}
             disabled={isLoading}
-            className={`flex-1 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 rounded-lg text-sm font-medium transition-colors min-h-[44px] ${
               isLoading ? 'opacity-50 cursor-not-allowed btn-accent' : 'btn-accent'
             }`}
           >

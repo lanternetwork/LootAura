@@ -912,7 +912,7 @@ export default function SalesClient({
 
       {/* Main Content - Responsive Layout */}
       <div 
-        className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_628px] lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
+        className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_420px] lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] 2xl:grid-cols-[minmax(0,1fr)_540px] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
         style={{ height: MAIN_CONTENT_HEIGHT }}
       >
         {/* Map - Top on mobile, Left on desktop */}
@@ -963,7 +963,7 @@ export default function SalesClient({
         </div>
 
         {/* Sales List - Below map on mobile, Right panel on desktop */}
-        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto lg:w-[420px] xl:w-[480px] 2xl:w-[540px] lg:min-w-[420px] xl:min-w-[480px] 2xl:min-w-[540px]">
+        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full w-full overflow-hidden">
           <div className="flex-shrink-0 px-4 pt-4 pb-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
@@ -985,7 +985,7 @@ export default function SalesClient({
                 </div>
                 </div>
 
-          <div className="flex-1 pl-4 pr-4 pb-4 pt-4" style={{ width: '100%' }}>
+          <div className="flex-1 pl-4 pr-4 pb-4 pt-4 overflow-y-auto">
             {loading && (
               <div className="grid grid-cols-2 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (

@@ -28,14 +28,8 @@ export default function ClusterMarker({
     }
   }, [cluster, onKeyDown])
 
-  // Dynamic size based on cluster count for better visibility
-  const getSizeClass = () => {
-    if (cluster.count >= 100) return 'w-10 h-10 text-xs'
-    if (cluster.count >= 50) return 'w-9 h-9 text-xs'
-    if (cluster.count >= 20) return 'w-8 h-8 text-[10px]'
-    if (cluster.count >= 10) return 'w-7 h-7 text-[9px]'
-    return 'w-6 h-6 text-[8px]'
-  }
+  // Fixed size to match individual pins (12px)
+  const sizeClass = 'w-3 h-3 text-[8px]'
 
   return (
     <Marker
@@ -46,7 +40,7 @@ export default function ClusterMarker({
     >
       <button
         className={`
-          ${getSizeClass()}
+          ${sizeClass}
           bg-[var(--accent-primary)]
           text-white font-bold
           rounded-full flex items-center justify-center

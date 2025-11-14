@@ -937,7 +937,14 @@ export default function SalesClient({
                   duration: 0 // No animation for ZIP search - instant positioning
                 } : undefined}
                 hybridPins={{
-                  sales: mapSales,
+                  sales: hybridResult ? hybridResult.locations.flatMap(loc => loc.sales) : mapSales.filter(sale => {
+                    // Filter to only sales within viewport bounds to match what's being clustered
+                    if (!currentViewport || typeof sale.lat !== 'number' || typeof sale.lng !== 'number') return false
+                    return sale.lat >= currentViewport.bounds[1] && // south
+                           sale.lat <= currentViewport.bounds[3] && // north
+                           sale.lng >= currentViewport.bounds[0] && // west
+                           sale.lng <= currentViewport.bounds[2]    // east
+                  }),
                   selectedId: selectedPinId,
                   onLocationClick: (locationId) => {
                     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

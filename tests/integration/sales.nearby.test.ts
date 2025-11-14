@@ -2,10 +2,21 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { getNearestSalesForSale } from '@/lib/data/salesAccess'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// Mock getRlsDb at the top level
+const mockRlsDbRpc = vi.fn()
+const mockGetRlsDb = vi.fn(() => ({
+  rpc: mockRlsDbRpc,
+}))
+
+vi.mock('@/lib/supabase/clients', () => ({
+  getRlsDb: () => mockGetRlsDb(),
+}))
+
 describe('getNearestSalesForSale', () => {
   let mockSupabase: SupabaseClient
 
   beforeEach(() => {
+    vi.clearAllMocks()
     // Mock Supabase client
     mockSupabase = {
       from: vi.fn(),
@@ -69,15 +80,11 @@ describe('getNearestSalesForSale', () => {
       }),
     })
 
-    // Mock getRlsDb
-    vi.mock('@/lib/supabase/clients', () => ({
-      getRlsDb: vi.fn(() => ({
-        rpc: vi.fn().mockResolvedValue({
-          data: nearbySales,
-          error: null,
-        }),
-      })),
-    }))
+    // Mock getRlsDb RPC call
+    mockRlsDbRpc.mockResolvedValue({
+      data: nearbySales,
+      error: null,
+    })
 
     const result = await getNearestSalesForSale(mockSupabase, 'sale-1', 2)
     
@@ -110,15 +117,11 @@ describe('getNearestSalesForSale', () => {
       }),
     })
 
-    // Mock getRlsDb
-    vi.mock('@/lib/supabase/clients', () => ({
-      getRlsDb: vi.fn(() => ({
-        rpc: vi.fn().mockResolvedValue({
-          data: nearbySales,
-          error: null,
-        }),
-      })),
-    }))
+    // Mock getRlsDb RPC call
+    mockRlsDbRpc.mockResolvedValue({
+      data: nearbySales,
+      error: null,
+    })
 
     const result = await getNearestSalesForSale(mockSupabase, 'sale-1', 2)
     expect(result.length).toBeLessThanOrEqual(2)
@@ -137,4 +140,3 @@ describe('getNearestSalesForSale', () => {
     expect(result).toEqual([])
   })
 })
-

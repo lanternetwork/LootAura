@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
-import { formatDistance } from '@/lib/data/sales'
+import { formatDistance } from '@/lib/utils/distance'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 
 interface NearbySalesCardProps {

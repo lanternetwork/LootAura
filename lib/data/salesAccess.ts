@@ -664,19 +664,25 @@ export async function getNearestSalesForSale(
         distance_meters: maxDistanceMeters,
         limit_count: limit + 1, // Fetch one extra to account for excluding current sale
       })
-      nearbySales = rpcResult.data
-      rpcError = rpcResult.error
+      nearbySales = rpcResult?.data ?? null
+      rpcError = rpcResult?.error ?? null
     } catch (importError) {
       // If getRlsDb is not available, try with regular supabase client
       // (might work if search_path includes lootaura_v2)
-      const rpcResult = await supabase.rpc('get_sales_within_distance', {
-        user_lat: currentSale.lat,
-        user_lng: currentSale.lng,
-        distance_meters: maxDistanceMeters,
-        limit_count: limit + 1,
-      })
-      nearbySales = rpcResult.data
-      rpcError = rpcResult.error
+      try {
+        const rpcResult = await supabase.rpc('get_sales_within_distance', {
+          user_lat: currentSale.lat,
+          user_lng: currentSale.lng,
+          distance_meters: maxDistanceMeters,
+          limit_count: limit + 1,
+        })
+        nearbySales = rpcResult?.data ?? null
+        rpcError = rpcResult?.error ?? null
+      } catch (rpcCallError) {
+        // If RPC call itself throws, treat as error
+        nearbySales = null
+        rpcError = rpcCallError instanceof Error ? rpcCallError : new Error('RPC call failed')
+      }
     }
 
     if (rpcError) {
@@ -745,7 +751,8 @@ export async function getNearestSalesForSale(
 
     return filtered as Array<Sale & { distance_m: number }>
   } catch (error) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    // Only log errors in debug mode and not in test environment
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && process.env.NODE_ENV !== 'test') {
       console.error('[SALES_ACCESS] Unexpected error in getNearestSalesForSale:', error)
     }
     // Return empty array on error - don't break the page

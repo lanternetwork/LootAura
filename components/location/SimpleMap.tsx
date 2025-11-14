@@ -211,8 +211,19 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
 
   // First-click-to-center, second-click-to-select for location pins
   const centeredLocationRef = useRef<Record<string, boolean>>({})
+  const previousSelectedIdRef = useRef<string | null>(null)
+  
   const handleLocationClickWrapped = useCallback((locationId: string, lat?: number, lng?: number) => {
     const alreadyCentered = centeredLocationRef.current[locationId]
+    const isCurrentlySelected = hybridPins?.selectedId === locationId
+    
+    // If this location is already selected, always toggle (don't center again)
+    if (isCurrentlySelected) {
+      hybridPins?.onLocationClick?.(locationId)
+      return
+    }
+    
+    // First click: center the map
     if (!alreadyCentered && mapRef.current?.getMap) {
       const map = mapRef.current.getMap()
       if (map && typeof lat === 'number' && typeof lng === 'number') {
@@ -221,9 +232,29 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         return
       }
     }
-    // Second click (or if we couldn't center): bubble to parent to select location
+    
+    // Second click (or if we couldn't center): select location
     hybridPins?.onLocationClick?.(locationId)
-  }, [hybridPins])
+  }, [hybridPins?.onLocationClick, hybridPins?.selectedId])
+  
+  // Reset centered flag when location is deselected or a different location is selected
+  useEffect(() => {
+    const currentSelectedId = hybridPins?.selectedId || null
+    const previousSelectedId = previousSelectedIdRef.current
+    
+    if (!currentSelectedId) {
+      // Nothing selected: clear all centered flags
+      centeredLocationRef.current = {}
+    } else if (currentSelectedId !== previousSelectedId) {
+      // Different location selected: clear the previous location's flag
+      if (previousSelectedId) {
+        delete centeredLocationRef.current[previousSelectedId]
+      }
+      // Keep the new location's flag if it exists (so clicking it again will toggle)
+    }
+    
+    previousSelectedIdRef.current = currentSelectedId
+  }, [hybridPins?.selectedId])
 
   // Handle fitBounds
   useEffect(() => {

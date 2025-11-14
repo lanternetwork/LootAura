@@ -44,7 +44,7 @@ export default function ClusterMarker({
           bg-[var(--accent-primary)]
           text-white font-bold
           rounded-full flex items-center justify-center
-          shadow-lg border-2 border-white select-none
+          shadow-lg select-none
           cursor-pointer hover:scale-110 transition-transform
           focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2
         `}

@@ -8,12 +8,14 @@ import { useRouter } from 'next/navigation'
 export default function Favorites() {
   const router = useRouter()
   const { data: user, isLoading: authLoading } = useAuth()
+  // Only fetch favorites if user is authenticated
   const { data: favorites = [], isLoading, error } = useFavorites()
 
-  // Redirect to login if not authenticated
+  // Redirect to login immediately if not authenticated (don't wait for authLoading)
+  // Middleware should handle this, but this is a client-side safety net
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/auth/signin?redirectTo=/favorites')
+      router.replace('/auth/signin?redirectTo=/favorites')
     }
   }, [user, authLoading, router])
 

@@ -467,16 +467,16 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       nextErrors.address = 'Address is required (minimum 5 characters)'
     }
     if (!formData.city || formData.city.trim().length < 2) {
-      nextErrors.city = 'City is required (minimum 2 characters)'
+      nextErrors.city = 'City is required'
     }
     if (!formData.state || formData.state.trim().length < 2) {
-      nextErrors.state = 'State is required (minimum 2 characters)'
+      nextErrors.state = 'State is required'
     }
     if (formData.zip_code && !/^\d{5}(-\d{4})?$/.test(formData.zip_code)) {
       nextErrors.zip_code = 'ZIP code must be 5 digits or 5+4 format'
     }
     if (!formData.lat || !formData.lng) {
-      nextErrors.address = 'Please enter a complete address (street, city, state) and leave the field to get location coordinates'
+      nextErrors.address = 'Please enter a complete address (street, city, state)'
     }
     if (!formData.date_start) nextErrors.date_start = 'Start date is required'
     

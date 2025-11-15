@@ -3,8 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Sale } from '@/lib/types'
-import { getDatePresetById } from '@/lib/shared/datePresets'
 
 interface WeekendStatsData {
   activeSales: number
@@ -95,46 +93,23 @@ export function WeekendStats() {
           return
         }
         
-        // Set limit to match map behavior (200 is max)
-        params.set('limit', '200')
-
         // Use dateRange=this_weekend to match exactly what the sales page filter uses
-        // This ensures both the hero card and sales page use the same API query
         params.set('dateRange', 'this_weekend')
 
-        // Get the preset for logging/debugging only
-        const now = new Date()
-        const weekendPreset = getDatePresetById('this_weekend', now)
-        if (!weekendPreset) {
-          throw new Error('Failed to resolve weekend date preset')
+        // Use lightweight count endpoint for faster loading
+        const countUrl = `/api/sales/count?${params.toString()}`
+        console.log('[WeekendStats] Fetching weekend sales count:', countUrl)
+        const countRes = await fetch(countUrl)
+        if (!countRes.ok) {
+          throw new Error(`Failed to fetch weekend sales count: ${countRes.status}`)
         }
-
-        console.log('[WeekendStats] Using dateRange=this_weekend (same as sales page filter)')
-        console.log('[WeekendStats] Weekend preset details:', {
-          presetId: weekendPreset.id,
-          presetLabel: weekendPreset.label,
-          start: weekendPreset.start,
-          end: weekendPreset.end
-        })
-
-        // Fetch weekend sales
-        const weekendUrl = `/api/sales?${params.toString()}`
-        console.log('[WeekendStats] Fetching weekend sales:', weekendUrl)
-        const weekendRes = await fetch(weekendUrl)
-        if (!weekendRes.ok) {
-          throw new Error(`Failed to fetch weekend sales: ${weekendRes.status}`)
-        }
-        const weekendData = await weekendRes.json()
-        const weekendSales: Sale[] = weekendData.data || []
-        const weekendCount = weekendSales.length
-        console.log('[WeekendStats] Weekend sales response:', {
-          ok: weekendRes.ok,
+        const countData = await countRes.json()
+        const weekendCount = countData.count || 0
+        console.log('[WeekendStats] Weekend sales count response:', {
+          ok: countRes.ok,
           count: weekendCount,
-          totalInResponse: weekendData.count || weekendData.data?.length || 0,
-          sampleIds: weekendSales.slice(0, 3).map(s => s.id),
-          fullResponse: weekendData
+          durationMs: countData.durationMs
         })
-        console.log('[WeekendStats] Weekend count:', weekendCount, 'sales')
 
         // Calculate stats
         const activeSales = weekendCount

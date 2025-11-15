@@ -15,12 +15,7 @@ export function AuthStateRefresher() {
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    // Check if we're coming from an OAuth callback
-    // OAuth callbacks typically include a code parameter or we can check for auth state changes
-    const code = searchParams.get('code')
-    const isOAuthCallback = !!code
-
-    // Also check if we just authenticated by checking for auth state change
+    // Check if we just authenticated by checking for auth state change
     const checkAuthAndRefresh = async () => {
       const sb = createSupabaseBrowserClient()
       
@@ -35,12 +30,12 @@ export function AuthStateRefresher() {
       }
     }
 
-    // Run check on mount and if we detect OAuth callback
+    // Run check on mount to refresh auth state after OAuth redirect
     checkAuthAndRefresh()
 
     // Also listen for auth state changes from Supabase
     const sb = createSupabaseBrowserClient()
-    const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event, _session) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         // Invalidate queries when auth state changes
         queryClient.invalidateQueries({ queryKey: ['auth'] })

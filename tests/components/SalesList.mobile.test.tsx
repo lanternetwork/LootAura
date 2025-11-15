@@ -25,8 +25,8 @@ describe('SalesList mobile layout', () => {
     expect(listContainer).toHaveClass('flex')
     expect(listContainer).toHaveClass('flex-col')
     expect(listContainer).toHaveClass('md:grid')
-    expect(listContainer).toHaveClass('md:grid-cols-2')
-    expect(listContainer).toHaveClass('lg:grid-cols-3')
+    expect(listContainer).toHaveClass('md:grid-cols-1')
+    expect(listContainer).toHaveClass('lg:grid-cols-2')
   })
 
   it('renders sale cards with w-full class', () => {

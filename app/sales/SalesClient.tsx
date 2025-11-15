@@ -995,7 +995,7 @@ export default function SalesClient({
             className={`flex-1 pl-4 pr-4 pb-4 pt-4 ${salesListHasOverflow ? 'overflow-y-auto' : 'overflow-hidden'}`}
           >
             {loading && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SaleCardSkeleton key={i} />
                 ))}

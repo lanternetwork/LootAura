@@ -43,7 +43,12 @@ export async function GET(request: NextRequest) {
           return ok({ count: 0, durationMs: Date.now() - startedAt })
         }
       } catch (error) {
-        console.error('[SALES/COUNT] Failed to resolve zip code:', { zip, error })
+        const { logger } = await import('@/lib/log')
+        logger.error('Failed to resolve zip code', error instanceof Error ? error : new Error(String(error)), {
+          component: 'sales',
+          operation: 'count_zip_resolve',
+          zip
+        })
         return ok({ count: 0, durationMs: Date.now() - startedAt })
       }
     } else if (lat && lng) {
@@ -131,21 +136,30 @@ export async function GET(request: NextRequest) {
         .select('sale_id')
         .in('category', dbCategories)
       
-      if (categoryError) {
-        console.error('[SALES/COUNT] Category filter error:', categoryError)
-        return fail(500, 'CATEGORY_FILTER_ERROR', 'Failed to filter by categories')
-      }
+          if (categoryError) {
+            const { logger } = await import('@/lib/log')
+            logger.error('Category filter error in count', categoryError instanceof Error ? categoryError : new Error(String(categoryError)), {
+              component: 'sales',
+              operation: 'count_category_filter'
+            })
+            return fail(500, 'CATEGORY_FILTER_ERROR', 'Failed to filter by categories')
+          }
       
       const saleIds = [...new Set(salesWithCategories?.map(item => item.sale_id) || [])]
       
       if (saleIds.length > 0) {
         // Count sales that match location/date AND have matching category items
-        const { count, error } = await query.in('id', saleIds)
-        
-        if (error) {
-          console.error('[SALES/COUNT] Query error:', error)
-          return fail(500, 'QUERY_ERROR', 'Failed to count sales')
-        }
+            const { count, error } = await query.in('id', saleIds)
+
+            if (error) {
+              const { logger } = await import('@/lib/log')
+              logger.error('Query error in count', error instanceof Error ? error : new Error(String(error)), {
+                component: 'sales',
+                operation: 'count_query',
+                hasCategoryFilter: true
+              })
+              return fail(500, 'QUERY_ERROR', 'Failed to count sales')
+            }
         
         finalCount = count || 0
       }
@@ -153,21 +167,39 @@ export async function GET(request: NextRequest) {
       // No category filter - simple count
       const { count, error } = await query
       
-      if (error) {
-        console.error('[SALES/COUNT] Query error:', error)
-        return fail(500, 'QUERY_ERROR', 'Failed to count sales')
-      }
+       if (error) {
+         const { logger } = await import('@/lib/log')
+         logger.error('Query error in count', error instanceof Error ? error : new Error(String(error)), {
+           component: 'sales',
+           operation: 'count_query',
+           hasCategoryFilter: false
+         })
+         return fail(500, 'QUERY_ERROR', 'Failed to count sales')
+       }
       
       finalCount = count || 0
     }
     
-    return ok({
+    // Add cache headers for public count data
+    const { addCacheHeaders } = await import('@/lib/http/cache')
+    const response = ok({
       count: finalCount,
       durationMs: Date.now() - startedAt
     })
+    return addCacheHeaders(response, {
+      maxAge: 30, // 30 seconds client cache
+      sMaxAge: 60, // 1 minute CDN cache (counts change more frequently)
+      staleWhileRevalidate: 30,
+      public: true
+    })
     
   } catch (error) {
-    console.error('[SALES/COUNT] Unexpected error:', error)
+    const { logger } = await import('@/lib/log')
+    logger.error('Unexpected error in count', error instanceof Error ? error : new Error(String(error)), {
+      component: 'sales',
+      operation: 'count',
+      durationMs: Date.now() - startedAt
+    })
     return fail(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }

@@ -1,14 +1,32 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth, useProfile, useSignOut } from '@/lib/hooks/useAuth'
 
 export default function UserProfile() {
   const router = useRouter()
-  const { data: user, isLoading: authLoading } = useAuth()
+  const { data: user, isLoading: authLoading, isError: authError } = useAuth()
   const { data: profile, isLoading: profileLoading } = useProfile()
   const signOut = useSignOut()
   const [open, setOpen] = useState(false)
+  const [showLoading, setShowLoading] = useState(true)
+
+  // Timeout fallback: if loading takes more than 3 seconds, show sign in button
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (authLoading || profileLoading) {
+        setShowLoading(false)
+      }
+    }, 3000)
+
+    // Clear loading state once auth/profile loads
+    if (!authLoading && !profileLoading) {
+      setShowLoading(false)
+      clearTimeout(timer)
+    }
+
+    return () => clearTimeout(timer)
+  }, [authLoading, profileLoading])
 
   const toggle = () => setOpen(v => !v)
 
@@ -22,7 +40,8 @@ export default function UserProfile() {
     })
   }
 
-  if (authLoading || profileLoading) {
+  // Show loading only if actively loading AND not timed out AND no error
+  if ((authLoading || profileLoading) && showLoading && !authError) {
     return (
       <div className="flex items-center gap-2">
         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-500"></div>

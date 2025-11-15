@@ -351,6 +351,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Log business event: draft published
+    const { logDraftPublished } = await import('@/lib/events/businessEvents')
+    logDraftPublished(draft.id, createdSaleId ?? '', user.id, createdItemIds.length)
+    
     return ok({ data: { saleId: createdSaleId ?? undefined } })
   } catch (e: any) {
     const { logger } = await import('@/lib/log')

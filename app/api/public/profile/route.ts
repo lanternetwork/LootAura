@@ -38,7 +38,16 @@ export async function GET(req: Request) {
   if (!profile) return NextResponse.json({ error: 'not found' }, { status: 404 })
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') console.log('[PROFILE] get public profile', { username })
   const preferred = await deriveCategories(profile.id).catch(() => [])
-  return NextResponse.json({ profile, preferred })
+  
+  // Add cache headers for public profile data (profiles change infrequently)
+  const { addCacheHeaders } = await import('@/lib/http/cache')
+  const response = NextResponse.json({ profile, preferred })
+  return addCacheHeaders(response, {
+    maxAge: 60, // 1 minute client cache
+    sMaxAge: 300, // 5 minutes CDN cache (profiles change infrequently)
+    staleWhileRevalidate: 120,
+    public: true
+  })
 }
 
 

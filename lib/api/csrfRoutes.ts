@@ -62,11 +62,11 @@ export function requiresCsrf(pathname: string, method: string): boolean {
   }
 
   // Check if route requires CSRF
-  return CSRF_PROTECTED_ROUTES.some(protected => {
+  return CSRF_PROTECTED_ROUTES.some(protectedRoute => {
     // Handle dynamic routes like /api/sales/[id]/archive
-    const protectedPattern = protected.replace('[id]', '[^/]+')
+    const protectedPattern = protectedRoute.replace('[id]', '[^/]+')
     const regex = new RegExp(`^${protectedPattern}$`)
-    return regex.test(pathname) || pathname.startsWith(protected)
+    return regex.test(pathname) || pathname.startsWith(protectedRoute)
   })
 }
 

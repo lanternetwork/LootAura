@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
       const { isDebugMode } = await import('@/lib/env')
       if (isDebugMode()) {
         console.log('[DRAFT_PUBLISH] Creating items:', {
-          saleId: createdSaleId,
+          saleId: createdSaleId ?? undefined,
           saleStatus: salePayload.status,
           itemsCount: itemsPayload.length,
           items: itemsPayload.map((i: any) => ({ name: i.name, hasImage: !!i.image_url })),
@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
           operation: 'create_items',
           draftId: draft.id,
           userId: user.id,
-          saleId: createdSaleId,
+          saleId: createdSaleId ?? undefined,
         })
         
         // Cleanup: delete the sale we just created
@@ -206,13 +206,13 @@ export async function POST(request: NextRequest) {
             logger.info('Compensated: deleted sale after item creation failure', {
               component: 'drafts/publish',
               operation: 'compensation',
-              saleId: createdSaleId,
+              saleId: createdSaleId ?? undefined,
             })
           } catch (cleanupErr) {
             logger.error('Failed to cleanup sale after item creation failure', cleanupErr, {
               component: 'drafts/publish',
               operation: 'compensation_failed',
-              saleId: createdSaleId,
+              saleId: createdSaleId ?? undefined,
             })
             // Report to Sentry but don't fail the response
             Sentry.captureException(cleanupErr, {
@@ -233,7 +233,7 @@ export async function POST(request: NextRequest) {
       const { isDebugMode: isDebugModeItems } = await import('@/lib/env')
       if (isDebugModeItems()) {
         console.log('[DRAFT_PUBLISH] Items created successfully:', {
-          saleId: createdSaleId,
+          saleId: createdSaleId ?? undefined,
           itemsCreated: insertedItems?.length || 0,
           itemIds: insertedItems?.map((i: any) => i.id),
         })
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
       
       if (isDebugModeItems()) {
         console.log('[DRAFT_PUBLISH] Items verification (admin client):', {
-          saleId: createdSaleId,
+          saleId: createdSaleId ?? undefined,
           itemsFound: verifyItems?.length || 0,
           error: verifyErr,
           itemIds: verifyItems?.map((i: any) => i.id),
@@ -316,7 +316,7 @@ export async function POST(request: NextRequest) {
             draftId: draft.id,
             draftKey: draft.draft_key,
             userId: user.id,
-            saleId: createdSaleId,
+            saleId: createdSaleId ?? undefined,
             currentStatus: verifyDraft.status,
             deleteData,
             verifyError: verifyErr,
@@ -332,7 +332,7 @@ export async function POST(request: NextRequest) {
             console.log('[PUBLISH/POST] Draft deleted successfully (verified by read):', {
               draftId: draft.id,
               draftKey: draft.draft_key,
-              saleId: createdSaleId,
+              saleId: createdSaleId ?? undefined,
             })
           }
         }
@@ -341,14 +341,14 @@ export async function POST(request: NextRequest) {
           console.log('[PUBLISH/POST] Draft deleted successfully after publication:', {
             draftId: draft.id,
             draftKey: draft.draft_key,
-            saleId: createdSaleId,
+            saleId: createdSaleId ?? undefined,
             deletedCount,
           })
         }
       }
     }
 
-    return ok({ data: { saleId: createdSaleId } })
+    return ok({ data: { saleId: createdSaleId ?? undefined } })
   } catch (e: any) {
     const { logger } = await import('@/lib/log')
     const { isProduction } = await import('@/lib/env')
@@ -367,14 +367,14 @@ export async function POST(request: NextRequest) {
         logger.info('Compensated: cleaned up sale and items after publish failure', {
           component: 'drafts/publish',
           operation: 'compensation',
-          saleId: createdSaleId,
+          saleId: createdSaleId ?? undefined,
           itemIds: createdItemIds,
         })
       } catch (cleanupErr) {
         logger.error('Failed to cleanup resources after publish failure', cleanupErr, {
           component: 'drafts/publish',
           operation: 'compensation_failed',
-          saleId: createdSaleId,
+          saleId: createdSaleId ?? undefined,
           itemIds: createdItemIds,
         })
         Sentry.captureException(cleanupErr, {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SellerRatingStars } from '@/components/seller/SellerRatingStars'
 
@@ -134,6 +135,8 @@ describe('SellerRatingStars', () => {
   })
 
   it('calls API when star is clicked', async () => {
+    const user = userEvent.setup()
+    
     // Ensure user is authenticated and NOT the seller (set before render)
     mockUseAuth.mockReturnValue({
       data: { id: 'user-123' }, // Different from sellerId
@@ -158,7 +161,7 @@ describe('SellerRatingStars', () => {
       href: 'http://localhost/sales/test-sale',
     }
 
-    const { rerender } = render(
+    render(
       <TestWrapper>
         <SellerRatingStars
           sellerId="seller-456" // Different from user-123
@@ -170,19 +173,15 @@ describe('SellerRatingStars', () => {
       </TestWrapper>
     )
 
-    // Wait for component to render and useAuth to be called
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /rate 1 out of 5 stars/i })).toBeInTheDocument()
-    })
-
-    const fourthStar = screen.getByRole('button', { name: /rate 4 out of 5 stars/i })
+    // Wait for component to render
+    const fourthStar = await screen.findByRole('button', { name: /rate 4 out of 5 stars/i })
     
     // Verify button is not disabled and is interactive
     expect(fourthStar).not.toBeDisabled()
     expect(fourthStar).toHaveAttribute('tabIndex', '0')
     
-    // Click the star
-    fireEvent.click(fourthStar)
+    // Click the star using userEvent for more realistic interaction
+    await user.click(fourthStar)
 
     // Wait for fetch to be called
     await waitFor(

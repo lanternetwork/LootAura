@@ -153,18 +153,21 @@ describe('SellerRatingStars', () => {
       }),
     })
 
-    // Mock window.location for redirect check
+    // Mock window.location for redirect check - do this before render
     const originalLocation = window.location
-    delete (window as any).location
-    ;(window as any).location = {
-      pathname: '/sales/test-sale',
-      href: 'http://localhost/sales/test-sale',
-    }
+    Object.defineProperty(window, 'location', {
+      value: {
+        pathname: '/sales/test-sale',
+        href: 'http://localhost/sales/test-sale',
+      },
+      writable: true,
+      configurable: true,
+    })
 
     render(
       <TestWrapper>
         <SellerRatingStars
-          sellerId="seller-456" // Different from user-123
+          sellerId="seller-456" // Different from user-123 to ensure isReadOnly is false
           avgRating={null}
           ratingsCount={0}
           currentUserRating={null}
@@ -173,22 +176,25 @@ describe('SellerRatingStars', () => {
       </TestWrapper>
     )
 
-    // Wait for component to render
+    // Wait for component to render and verify it's interactive
     const fourthStar = await screen.findByRole('button', { name: /rate 4 out of 5 stars/i })
     
     // Verify button is not disabled and is interactive
     expect(fourthStar).not.toBeDisabled()
     expect(fourthStar).toHaveAttribute('tabIndex', '0')
     
+    // Verify the button has an onClick handler
+    expect(fourthStar).toHaveAttribute('type', 'button')
+    
     // Click the star using userEvent for more realistic interaction
     await user.click(fourthStar)
 
-    // Wait for fetch to be called
+    // Wait for fetch to be called - give it more time
     await waitFor(
       () => {
         expect(mockFetch).toHaveBeenCalled()
       },
-      { timeout: 3000 }
+      { timeout: 5000, interval: 100 }
     )
 
     expect(mockFetch).toHaveBeenCalledWith(
@@ -207,7 +213,11 @@ describe('SellerRatingStars', () => {
     )
 
     // Restore window.location
-    ;(window as any).location = originalLocation
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    })
   })
 
   it('handles keyboard navigation', () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
@@ -23,18 +23,71 @@ export function WeekendStats() {
   const [stats, setStats] = useState<WeekendStatsData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Location inference - same logic as FeaturedSalesSection
+  // Fetch stats with a given location
+  const fetchStatsForLocation = useCallback(async (loc: LocationState) => {
+    try {
+      const params = new URLSearchParams()
+      
+      if (loc.lat && loc.lng) {
+        params.set('lat', loc.lat.toString())
+        params.set('lng', loc.lng.toString())
+        params.set('radiusKm', '50')
+      } else if (loc.zip) {
+        params.set('zip', loc.zip)
+        params.set('radiusKm', '50')
+      } else {
+        return
+      }
+      
+      // Use dateRange=this_weekend to match exactly what the sales page filter uses
+      params.set('dateRange', 'this_weekend')
+
+      // Use lightweight count endpoint for faster loading
+      const countUrl = `/api/sales/count?${params.toString()}`
+      console.log('[WeekendStats] Fetching weekend sales count:', countUrl)
+      const countRes = await fetch(countUrl)
+      if (!countRes.ok) {
+        throw new Error(`Failed to fetch weekend sales count: ${countRes.status}`)
+      }
+      const countData = await countRes.json()
+      const weekendCount = countData.count || 0
+      console.log('[WeekendStats] Weekend sales count response:', {
+        ok: countRes.ok,
+        count: weekendCount,
+        durationMs: countData.durationMs
+      })
+
+      // Calculate stats
+      const activeSales = weekendCount
+
+      console.log('[WeekendStats] FINAL STATS - Active sales:', activeSales)
+      setStats({ activeSales })
+      setLoading(false)
+    } catch (error) {
+      console.error('[WeekendStats] Error fetching stats:', error)
+      setStats(null)
+      setLoading(false)
+    }
+  }, [])
+
+  // Location inference - optimized to start fetching immediately
   useEffect(() => {
-    // 1) URL first
+    // 1) URL first (fastest path)
     const zipFromUrl = searchParams.get('zip') || searchParams.get('postal')
     if (zipFromUrl) {
-      setLocation({ zip: zipFromUrl })
+      const loc = { zip: zipFromUrl }
+      setLocation(loc)
       setStatus('ready')
+      fetchStatsForLocation(loc)
       return
     }
 
-    // 2) Try IP-based geolocation first (works with VPNs and doesn't require permission)
-    // This should be the PRIMARY method since it respects VPN location
+    // 2) Start with a default US location to fetch stats immediately
+    // This ensures the count appears quickly while we resolve the actual location
+    const defaultLocation: LocationState = { lat: 39.8283, lng: -98.5795 } // US center
+    fetchStatsForLocation(defaultLocation)
+
+    // 3) Try IP-based geolocation in parallel (works with VPNs and doesn't require permission)
     const tryIPGeolocation = async () => {
       try {
         const ipRes = await fetch('/api/geolocation/ip')
@@ -50,6 +103,8 @@ export function WeekendStats() {
             }
             setLocation(loc)
             setStatus('ready')
+            // Fetch with actual location (will update the count if different)
+            fetchStatsForLocation(loc)
             return true
           }
         }
@@ -59,75 +114,16 @@ export function WeekendStats() {
       return false
     }
     
-    // Try IP geolocation first (respects VPN location)
+    // Try IP geolocation (respects VPN location)
     tryIPGeolocation().then((ipSuccess) => {
       if (ipSuccess) return
       
-      // Do NOT call browser geolocation; rely on inferred IP/location or fallback
-      console.log('[WeekendStats] Geolocation disabled by policy; using inferred or fallback location')
+      // If IP geolocation failed, keep using default location
+      setLocation(defaultLocation)
       setStatus('ready')
+      console.log('[WeekendStats] Using default location after IP geolocation failed')
     })
   }, [searchParams])
-
-  // Fetch stats when location is ready
-  useEffect(() => {
-    if (status !== 'ready' || !location) {
-      setLoading(true)
-      return
-    }
-
-    const fetchStats = async () => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        
-        if (location.lat && location.lng) {
-          params.set('lat', location.lat.toString())
-          params.set('lng', location.lng.toString())
-          params.set('radiusKm', '50')
-        } else if (location.zip) {
-          params.set('zip', location.zip)
-          params.set('radiusKm', '50')
-        } else {
-          setLoading(false)
-          return
-        }
-        
-        // Use dateRange=this_weekend to match exactly what the sales page filter uses
-        params.set('dateRange', 'this_weekend')
-
-        // Use lightweight count endpoint for faster loading
-        const countUrl = `/api/sales/count?${params.toString()}`
-        console.log('[WeekendStats] Fetching weekend sales count:', countUrl)
-        const countRes = await fetch(countUrl)
-        if (!countRes.ok) {
-          throw new Error(`Failed to fetch weekend sales count: ${countRes.status}`)
-        }
-        const countData = await countRes.json()
-        const weekendCount = countData.count || 0
-        console.log('[WeekendStats] Weekend sales count response:', {
-          ok: countRes.ok,
-          count: weekendCount,
-          durationMs: countData.durationMs
-        })
-
-        // Calculate stats
-        const activeSales = weekendCount
-
-        console.log('[WeekendStats] FINAL STATS - Active sales:', activeSales)
-        setStats({ activeSales })
-      } catch (error) {
-        console.error('[WeekendStats] Error fetching stats:', error)
-        setStats(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, location?.lat, location?.lng, location?.zip])
 
   // Show fallback values while loading or on error
   const displayStats = stats || { activeSales: 12 }

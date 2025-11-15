@@ -12,6 +12,7 @@ import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
+import { useHasOverflow } from '@/lib/hooks/useHasOverflow'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -34,7 +35,7 @@ export default function SalesClient({
 }: SalesClientProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { filters, updateFilters, hasActiveFilters: _hasActiveFilters } = useFilters(
+  const { filters, updateFilters, clearFilters, hasActiveFilters: _hasActiveFilters } = useFilters(
     initialCenter?.lat && initialCenter?.lng ? { lat: initialCenter.lat, lng: initialCenter.lng } : undefined
   )
 
@@ -92,6 +93,7 @@ export default function SalesClient({
   const [isDragging, setIsDragging] = useState(false)
   const [dragStartY, setDragStartY] = useState(0)
   const [dragStartHeight, setDragStartHeight] = useState<string>('40vh')
+  const [showBottomSheetHint, setShowBottomSheetHint] = useState(true)
   
   // Track window width for mobile detection
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024)
@@ -789,8 +791,9 @@ export default function SalesClient({
   }, [])
 
   // Constants for layout calculations
+  const HEADER_HEIGHT = 64 // px - header height (h-16)
   const FILTERS_HEIGHT = 56 // px - filters bar height
-  const MAIN_CONTENT_HEIGHT = `calc(100vh - ${FILTERS_HEIGHT}px)`
+  const MAIN_CONTENT_HEIGHT = `calc(100vh - ${HEADER_HEIGHT + FILTERS_HEIGHT}px)`
 
   // Use mobile filter context
   const { isOpen: isMobileFilterSheetOpen, closeFilterSheet } = useMobileFilter()
@@ -799,6 +802,9 @@ export default function SalesClient({
   const handleMobileFilterClick = useCallback(() => {
     // Handled by context
   }, [])
+
+  // Detect overflow in sales list to conditionally show scrollbar
+  const { ref: salesListContentRef, hasOverflow: salesListHasOverflow } = useHasOverflow<HTMLDivElement>()
 
   // Bottom sheet height calculations
   const getBottomSheetHeight = useCallback((state: 'collapsed' | 'mid' | 'expanded'): string => {
@@ -818,6 +824,7 @@ export default function SalesClient({
   // Bottom sheet drag handlers
   const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     setIsDragging(true)
+    setShowBottomSheetHint(false) // Hide hint once user starts interacting
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
     setDragStartY(clientY)
     setDragStartHeight(getBottomSheetHeight(bottomSheetState))
@@ -866,6 +873,7 @@ export default function SalesClient({
     const handleMouseMove = (e: MouseEvent) => handleDragMove(e)
     const handleTouchMove = (e: TouchEvent) => {
       e.preventDefault()
+      e.stopPropagation() // Prevent map panning when dragging bottom sheet
       handleDragMove(e)
     }
     const handleMouseUp = () => handleDragEnd()
@@ -885,7 +893,7 @@ export default function SalesClient({
   }, [isDragging, handleDragMove, handleDragEnd])
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col overflow-hidden" style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}>
 
       {/* Advanced Filters Bar */}
       <FiltersBar
@@ -900,6 +908,7 @@ export default function SalesClient({
         onDistanceChange={(distance) => handleFiltersChange({ ...filters, distance })}
         hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
         isLoading={loading}
+        onClearFilters={clearFilters}
         zipInputTestId="zip-input"
         filtersCenterTestId="filters-center"
         filtersMoreTestId="filters-more"
@@ -908,7 +917,7 @@ export default function SalesClient({
 
       {/* Main Content - Responsive Layout */}
       <div 
-        className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_628px] lg:grid-cols-[minmax(0,1fr)_628px] xl:grid-cols-[minmax(0,1fr)_628px] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
+        className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_420px] lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] 2xl:grid-cols-[minmax(0,1fr)_540px] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
         style={{ height: MAIN_CONTENT_HEIGHT }}
       >
         {/* Map - Top on mobile, Left on desktop */}
@@ -916,7 +925,7 @@ export default function SalesClient({
           className="relative md:h-full md:min-h-0 bg-gray-100 flex-shrink-0" 
           style={{ 
             height: isMobile 
-              ? `calc(100vh - ${FILTERS_HEIGHT}px)` 
+              ? `calc(100vh - ${HEADER_HEIGHT + FILTERS_HEIGHT}px)` 
               : '100%'
           }}
           role="region"
@@ -959,8 +968,8 @@ export default function SalesClient({
         </div>
 
         {/* Sales List - Below map on mobile, Right panel on desktop */}
-        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full overflow-y-auto lg:w-[420px] xl:w-[480px] 2xl:w-[540px] lg:min-w-[420px] xl:min-w-[480px] 2xl:min-w-[540px]">
-          <div className="flex-shrink-0 p-4 border-b border-gray-200">
+        <div className="hidden md:flex bg-white border-l border-gray-200 flex-col min-h-0 h-full w-full overflow-hidden">
+          <div className="flex-shrink-0 px-4 pt-4 pb-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
                 Sales ({visibleSales.length})
@@ -981,9 +990,12 @@ export default function SalesClient({
                 </div>
                 </div>
 
-          <div className="flex-1 overflow-y-auto p-4" style={{ width: '100%' }}>
+          <div 
+            ref={salesListContentRef}
+            className={`flex-1 pl-4 pr-4 pb-4 pt-4 ${salesListHasOverflow ? 'overflow-y-auto' : 'overflow-hidden'}`}
+          >
             {loading && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <SaleCardSkeleton key={i} />
                 ))}
@@ -1008,7 +1020,7 @@ export default function SalesClient({
       {/* Mobile Bottom Sheet - Only on mobile (<768px) */}
       {isMobile && (
         <div
-          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 rounded-t-2xl shadow-lg z-30 transition-transform duration-300 ease-out will-change-transform"
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 rounded-t-2xl shadow-lg z-30 transition-transform duration-300 ease-out will-change-transform safe-area-bottom"
           style={{
             height: getBottomSheetHeight(bottomSheetState),
             transform: `translateY(0)`,
@@ -1016,12 +1028,19 @@ export default function SalesClient({
         >
           {/* Drag Handle */}
           <div
-            className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none touch-none"
+            className="flex items-center justify-center h-12 cursor-grab active:cursor-grabbing border-b border-gray-200 select-none touch-none relative"
             onMouseDown={handleDragStart}
             onTouchStart={handleDragStart}
             aria-label="Drag to resize"
           >
             <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
+            {/* Discoverability hint - show on first load */}
+            {showBottomSheetHint && bottomSheetState === 'collapsed' && (
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap animate-bounce">
+                Swipe up for results
+                <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
+              </div>
+            )}
           </div>
 
           {/* Sheet Header - Always visible, even when collapsed */}
@@ -1113,6 +1132,7 @@ export default function SalesClient({
         onDistanceChange={(distance) => handleFiltersChange({ ...filters, distance })}
         hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
         isLoading={loading}
+        onClearFilters={clearFilters}
       />
 
     </div>

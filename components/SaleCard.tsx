@@ -40,7 +40,7 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
       data-card="sale"
       data-kind="sale-row"
     >
-      <div className="relative bg-gray-100 h-40 sm:h-44 md:h-[160px] overflow-hidden">
+      <div className="relative bg-gray-100 h-36 sm:h-[158px] md:h-[144px] overflow-hidden">
         {cover ? (
           <Image
             src={cover.url}

@@ -129,12 +129,52 @@ export function applyVisualClustering(
   // Add clusters (defensive: only real clusters with count > 1)
   const realClusters = clusters.filter(c => (c.count || 0) > 1)
   realClusters.forEach(cluster => {
+    // Calculate total sales count for this cluster by summing sales from all location groups in the cluster
+    let totalSalesCount = 0
+    try {
+      const leaves = (clusterIndex as any).getLeaves?.(cluster.id, Infinity) || []
+      leaves.forEach((leaf: any) => {
+        const locationId = leaf?.properties?.id
+        if (locationId) {
+          const location = locations.find(loc => loc.id === locationId)
+          if (location) {
+            totalSalesCount += location.totalSales
+          }
+        }
+      })
+    } catch {
+      // Fallback: if getLeaves fails, use cluster.count as minimum (at least that many locations)
+      // Try to get children and sum their sales
+      try {
+        const children = (clusterIndex as any).getChildren?.(cluster.id) || []
+        children.forEach((child: any) => {
+          const locationId = child?.properties?.id
+          if (locationId) {
+            const location = locations.find(loc => loc.id === locationId)
+            if (location) {
+              totalSalesCount += location.totalSales
+            }
+          } else {
+            // If it's a nested cluster, use its point_count as fallback
+            const pointCount = child?.properties?.point_count || 0
+            totalSalesCount += pointCount
+          }
+        })
+      } catch {
+        // Final fallback: use cluster.count (number of location groups)
+        totalSalesCount = cluster.count || 0
+      }
+    }
+    
+    // Use total sales count, or fallback to cluster.count if calculation failed
+    const finalCount = totalSalesCount > 0 ? totalSalesCount : cluster.count
+    
     pins.push({
       type: 'cluster',
       id: `cluster-${cluster.id}`,
       lat: cluster.lat,
       lng: cluster.lng,
-      count: cluster.count,
+      count: finalCount,
       expandToZoom: cluster.expandToZoom
     })
   })

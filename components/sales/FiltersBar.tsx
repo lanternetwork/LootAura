@@ -25,6 +25,9 @@ type FiltersBarProps = {
   // Active filters indicator
   hasActiveFilters: boolean
   
+  // Clear all filters callback
+  onClearFilters?: () => void
+  
   // Loading state for visual feedback
   isLoading?: boolean
   
@@ -179,6 +182,7 @@ export default function FiltersBar({
   onDistanceChange,
   hasActiveFilters,
   isLoading = false,
+  onClearFilters,
   zipInputTestId = "zip-input",
   filtersCenterTestId = "filters-center",
   filtersMoreTestId = "filters-more",
@@ -278,8 +282,16 @@ export default function FiltersBar({
                     disabled={isLoading}
                     aria-label={isSelected ? `Remove ${category.label} filter` : `Filter by ${category.label}`}
                     aria-pressed={isSelected}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleCategoryToggle(category.id)
+                      }
+                    }}
                     className={`
                       shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap min-h-[44px]
+                      focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2
                       ${isLoading 
                         ? 'opacity-50 cursor-not-allowed' 
                         : ''
@@ -358,8 +370,16 @@ export default function FiltersBar({
                       disabled={isLoading}
                       aria-label={isSelected ? `Remove ${preset.label} date filter` : `Filter by ${preset.label}`}
                       aria-pressed={isSelected}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          handleDateToggle(preset.id)
+                        }
+                      }}
                       className={`
                         shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
+                        focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2
                         ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
                         ${isSelected 
                           ? 'bg-blue-100 text-blue-800 border border-blue-200' 
@@ -393,6 +413,21 @@ export default function FiltersBar({
               <option value={25}>25 mi</option>
             </select>
           </div>
+
+          {/* Clear All Filters button - only show when filters are active */}
+          {hasActiveFilters && onClearFilters && (
+            <button
+              onClick={onClearFilters}
+              disabled={isLoading}
+              aria-label="Clear all filters"
+              className={`flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors min-h-[44px] ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Clear
+            </button>
+          )}
 
           {/* Overflow menu for additional categories */}
           {overflow.length > 0 && (

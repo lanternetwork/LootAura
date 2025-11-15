@@ -786,10 +786,10 @@ async function postHandler(request: NextRequest) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
     }
     if (!city || typeof city !== 'string' || city.trim().length < 2) {
-      return NextResponse.json({ error: 'City is required (minimum 2 characters)' }, { status: 400 })
+      return NextResponse.json({ error: 'City is required' }, { status: 400 })
     }
     if (!state || typeof state !== 'string' || state.trim().length < 2) {
-      return NextResponse.json({ error: 'State is required (minimum 2 characters)' }, { status: 400 })
+      return NextResponse.json({ error: 'State is required' }, { status: 400 })
     }
     if (!date_start || typeof date_start !== 'string') {
       return NextResponse.json({ error: 'Start date is required' }, { status: 400 })

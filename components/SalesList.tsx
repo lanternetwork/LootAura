@@ -29,7 +29,7 @@ export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
 
   return (
     <div 
-      className="flex flex-col gap-3 sm:gap-4 md:grid md:grid-cols-2 lg:grid-cols-3" 
+      className="flex flex-col gap-3 sm:gap-4 md:grid md:grid-cols-1 lg:grid-cols-2" 
       data-testid="sales-list" 
       style={{ width: '100%' }}
     >

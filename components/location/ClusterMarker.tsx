@@ -42,11 +42,11 @@ export default function ClusterMarker({
         className={`
           ${sizeClass}
           bg-[var(--accent-primary)]
-          text-white font-semibold 
+          text-white font-bold
           rounded-full flex items-center justify-center
-          shadow-sm select-none
-          /* remove focus/hover effects to prevent size/visibility thrash */
-          cursor-pointer
+          shadow-lg select-none
+          cursor-pointer hover:scale-110 transition-transform
+          focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2
         `}
         data-cluster-marker="true"
         data-cluster-id={cluster.id}
@@ -56,9 +56,9 @@ export default function ClusterMarker({
         onKeyDown={handleKeyDown}
         tabIndex={0}
         aria-label={`Cluster of ${cluster.count} sales. Press Enter to zoom in.`}
-        title={`Cluster of ${cluster.count} sales`}
+        title={`${cluster.count} sales at this location`}
       >
-        <span className="text-white font-bold">{cluster.count}</span>
+        <span className="text-white font-bold leading-none">{cluster.count}</span>
       </button>
     </Marker>
   )

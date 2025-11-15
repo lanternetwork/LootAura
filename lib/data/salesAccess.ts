@@ -461,7 +461,7 @@ export async function getSaleWithItems(
     const [profileRes, statsRes] = await Promise.all([
       supabase
         .from('profiles_v2')
-        .select('id, created_at, full_name')
+        .select('id, created_at, full_name, username, avatar_url')
         .eq('id', ownerId)
         .maybeSingle(),
       supabase
@@ -595,6 +595,168 @@ export async function getSaleWithItems(
       console.error('[SALES_ACCESS] Unexpected error in getSaleWithItems:', error)
     }
     return null
+  }
+}
+
+/**
+ * Fetch the nearest published sales to a given sale
+ * Uses PostGIS for accurate distance calculation
+ * @param supabase - Authenticated Supabase client
+ * @param saleId - Sale ID to find neighbors for
+ * @param limit - Maximum number of results (default: 2)
+ * @returns Array of nearby sales with distance_m field, or empty array on error
+ */
+export async function getNearestSalesForSale(
+  supabase: SupabaseClient,
+  saleId: string,
+  limit: number = 2
+): Promise<Array<Sale & { distance_m: number }>> {
+  try {
+    // First, fetch the current sale's location
+    const { data: currentSale, error: saleError } = await supabase
+      .from('sales_v2')
+      .select('id, lat, lng')
+      .eq('id', saleId)
+      .single()
+
+    if (saleError || !currentSale) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES_ACCESS] Could not fetch current sale for nearest sales:', {
+          saleId,
+          error: saleError?.message,
+        })
+      }
+      return []
+    }
+
+    // Validate that the sale has coordinates
+    if (
+      typeof currentSale.lat !== 'number' ||
+      typeof currentSale.lng !== 'number' ||
+      isNaN(currentSale.lat) ||
+      isNaN(currentSale.lng)
+    ) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES_ACCESS] Current sale has no valid coordinates:', {
+          saleId,
+          lat: currentSale.lat,
+          lng: currentSale.lng,
+        })
+      }
+      return []
+    }
+
+    // Use PostGIS RPC function to find nearest sales
+    // Search within a reasonable radius (50km) to ensure we find results
+    const maxDistanceMeters = 50 * 1000 // 50km
+
+    // Try to use the PostGIS RPC function (in lootaura_v2 schema)
+    // Use schema-qualified client to access lootaura_v2 functions
+    let nearbySales: any[] | null = null
+    let rpcError: any = null
+
+    try {
+      const { getRlsDb } = await import('@/lib/supabase/clients')
+      const rlsDb = getRlsDb() // This returns a client scoped to lootaura_v2 schema
+      const rpcResult = await rlsDb.rpc('get_sales_within_distance', {
+        user_lat: currentSale.lat,
+        user_lng: currentSale.lng,
+        distance_meters: maxDistanceMeters,
+        limit_count: limit + 1, // Fetch one extra to account for excluding current sale
+      })
+      nearbySales = rpcResult?.data ?? null
+      rpcError = rpcResult?.error ?? null
+    } catch (importError) {
+      // If getRlsDb is not available, try with regular supabase client
+      // (might work if search_path includes lootaura_v2)
+      try {
+        const rpcResult = await supabase.rpc('get_sales_within_distance', {
+          user_lat: currentSale.lat,
+          user_lng: currentSale.lng,
+          distance_meters: maxDistanceMeters,
+          limit_count: limit + 1,
+        })
+        nearbySales = rpcResult?.data ?? null
+        rpcError = rpcResult?.error ?? null
+      } catch (rpcCallError) {
+        // If RPC call itself throws, treat as error
+        nearbySales = null
+        rpcError = rpcCallError instanceof Error ? rpcCallError : new Error('RPC call failed')
+      }
+    }
+
+    if (rpcError) {
+      // If RPC fails, fallback to manual query with Haversine calculation
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES_ACCESS] PostGIS RPC failed, using fallback query:', {
+          saleId,
+          error: rpcError.message,
+        })
+      }
+
+      // Fallback: query all published sales and calculate distance client-side
+      const { data: allSales, error: queryError } = await supabase
+        .from('sales_v2')
+        .select('*')
+        .eq('status', 'published')
+        .neq('id', saleId)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .limit(100) // Reasonable limit for fallback
+
+      if (queryError || !allSales) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALES_ACCESS] Fallback query failed:', {
+            saleId,
+            error: queryError?.message,
+          })
+        }
+        return []
+      }
+
+      // Calculate distances using Haversine formula
+      const salesWithDistance = allSales
+        .map((sale: any) => {
+          const R = 6371000 // Earth's radius in meters
+          const dLat = ((sale.lat - currentSale.lat) * Math.PI) / 180
+          const dLng = ((sale.lng - currentSale.lng) * Math.PI) / 180
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos((currentSale.lat * Math.PI) / 180) *
+              Math.cos((sale.lat * Math.PI) / 180) *
+              Math.sin(dLng / 2) *
+              Math.sin(dLng / 2)
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+          const distanceM = R * c
+
+          return {
+            ...sale,
+            distance_m: Math.round(distanceM),
+          }
+        })
+        .sort((a: any, b: any) => a.distance_m - b.distance_m)
+        .slice(0, limit)
+
+      return salesWithDistance as Array<Sale & { distance_m: number }>
+    }
+
+    // Filter out the current sale and limit results
+    const filtered = (nearbySales || [])
+      .filter((sale: any) => sale.id !== saleId)
+      .slice(0, limit)
+      .map((sale: any) => ({
+        ...sale,
+        distance_m: sale.distance_meters || 0, // Normalize field name
+      }))
+
+    return filtered as Array<Sale & { distance_m: number }>
+  } catch (error) {
+    // Only log errors in debug mode and not in test environment
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && process.env.NODE_ENV !== 'test') {
+      console.error('[SALES_ACCESS] Unexpected error in getNearestSalesForSale:', error)
+    }
+    // Return empty array on error - don't break the page
+    return []
   }
 }
 

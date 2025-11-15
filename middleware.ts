@@ -176,6 +176,7 @@ export async function middleware(req: NextRequest) {
   
   // 6. Protected routes that require authentication
   const isProtectedRoute = 
+    pathname === '/favorites' ||
     pathname.startsWith('/favorites/') ||
     pathname.startsWith('/account') ||  // Remove trailing slash to match /account
     pathname.startsWith('/admin/');

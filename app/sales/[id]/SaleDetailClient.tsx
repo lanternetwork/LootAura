@@ -10,19 +10,22 @@ import SimpleMap from '@/components/location/SimpleMap'
 import { useLocationSearch } from '@/lib/location/useLocation'
 import { useAuth, useFavorites, useToggleFavorite } from '@/lib/hooks/useAuth'
 import { SellerActivityCard } from '@/components/sales/SellerActivityCard'
+import { NearbySalesCard } from '@/components/sales/NearbySalesCard'
 import CategoryChips from '@/components/ui/CategoryChips'
 import OSMAttribution from '@/components/location/OSMAttribution'
 import SaleShareButton from '@/components/share/SaleShareButton'
 import type { SaleWithOwnerInfo } from '@/lib/data'
-import type { SaleItem } from '@/lib/types'
+import type { SaleItem, Sale } from '@/lib/types'
 
 interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo
   displayCategories?: string[]
   items?: SaleItem[]
+  nearbySales?: Array<Sale & { distance_m: number }>
+  currentUserRating?: number | null
 }
 
-export default function SaleDetailClient({ sale, displayCategories = [], items = [] }: SaleDetailClientProps) {
+export default function SaleDetailClient({ sale, displayCategories = [], items = [], nearbySales = [], currentUserRating }: SaleDetailClientProps) {
   const searchParams = useSearchParams()
   
   // Get viewport params from URL to preserve on back navigation
@@ -383,10 +386,12 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
             </div>
           </div>
 
-          {/* Seller Activity Card */}
+          {/* Seller Details Card */}
           <SellerActivityCard
             ownerProfile={sale.owner_profile}
             ownerStats={sale.owner_stats}
+            currentUserRating={currentUserRating ?? null}
+            saleId={sale.id}
           />
 
           {/* Shopping Tips */}
@@ -407,7 +412,17 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
               )}
             </ul>
           </div>
+
+          {/* Nearby Sales - Desktop: in sidebar */}
+          <div className="hidden lg:block">
+            <NearbySalesCard nearbySales={nearbySales} />
+          </div>
         </div>
+      </div>
+
+      {/* Nearby Sales - Mobile: below main content */}
+      <div className="lg:hidden mt-6">
+        <NearbySalesCard nearbySales={nearbySales} />
       </div>
     </div>
   )

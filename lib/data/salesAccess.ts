@@ -256,6 +256,9 @@ export async function getItemsForSale(
       })
     }
 
+    // Import isProduction once for use in map callback
+    const { isProduction: isProd } = await import('@/lib/env')
+    
     // Map items to SaleItem type
     // Normalize images: guarantee images: string[] with fallback to image_url
     const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => {
@@ -265,8 +268,7 @@ export async function getItemsForSale(
         : (item.image_url ? [item.image_url] : [])
       
       // Log dev-only fallback when using image_url
-      const { isProduction } = await import('@/lib/env')
-      if (!isProduction() && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
+      if (!isProd() && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
         console.log('[SALES_ACCESS] Item image fallback (image_url → images[]):', {
           itemId: item.id,
           itemName: item.name,
@@ -277,8 +279,7 @@ export async function getItemsForSale(
       }
       
       // Log dev-only when item has neither images nor image_url
-      const { isProduction } = await import('@/lib/env')
-      if (!isProduction() && images.length === 0) {
+      if (!isProd() && images.length === 0) {
         console.log('[SALES_ACCESS] Item has no images:', {
           itemId: item.id,
           itemName: item.name,
@@ -568,6 +569,9 @@ export async function getSaleWithItems(
       }
     }
 
+    // Import isProduction once for use in map callback
+    const { isProduction: isProdItems } = await import('@/lib/env')
+    
     // Map items to SaleItem type
     // Normalize images: prefer images array, fallback to image_url
     const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => {
@@ -577,8 +581,7 @@ export async function getSaleWithItems(
         : (item.image_url ? [item.image_url] : [])
       
       // Log dev-only fallback when using image_url
-      const { isProduction } = await import('@/lib/env')
-      if (!isProduction() && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
+      if (!isProdItems() && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
         console.log('[SALES_ACCESS] Item image fallback (image_url → images[]):', {
           itemId: item.id,
           itemName: item.name,

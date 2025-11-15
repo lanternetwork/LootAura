@@ -81,18 +81,37 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
 
 
 async function geocodeWithNominatim(address: string): Promise<GeocodeResult | null> {
+  const { retry, isTransientError } = await import('./utils/retry')
   const email = getNominatimEmail()
   
-  const response = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&email=${email}&limit=1`,
-    {
-      headers: {
-        'User-Agent': `LootAura/1.0 (contact: ${email})`
+  const data = await retry(
+    async () => {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&email=${email}&limit=1`,
+        {
+          headers: {
+            'User-Agent': `LootAura/1.0 (contact: ${email})`
+          }
+        }
+      )
+      
+      if (!response.ok) {
+        // Don't retry on 4xx errors (client errors)
+        if (response.status >= 400 && response.status < 500) {
+          throw new Error(`Nominatim request failed: ${response.status}`)
+        }
+        // Retry on 5xx and network errors
+        throw new Error(`Nominatim request failed: ${response.status}`)
       }
+      
+      return await response.json()
+    },
+    {
+      maxAttempts: 3,
+      initialDelayMs: 500,
+      retryable: isTransientError,
     }
   )
-  
-  const data = await response.json()
   
   if (data && data.length > 0) {
     const result = data[0]

@@ -23,8 +23,9 @@ export async function uploadToCloudinary(
 ): Promise<CloudinaryUploadResult> {
   const { onProgress, signal } = options
 
-  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
+  const { ENV_PUBLIC } = await import('@/lib/env')
+  const cloudName = ENV_PUBLIC.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+  const uploadPreset = ENV_PUBLIC.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 
   if (!cloudName || !uploadPreset) {
     return {

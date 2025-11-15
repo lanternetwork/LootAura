@@ -96,7 +96,8 @@ export async function uploadImage(
       }
     }
 
-    const maxSize = parseInt(process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE || '5242880') // 5MB default
+    const { ENV_PUBLIC, ENV_SERVER } = await import('@/lib/env')
+    const maxSize = ENV_PUBLIC.NEXT_PUBLIC_MAX_UPLOAD_SIZE || ENV_SERVER.MAX_UPLOAD_SIZE_BYTES || 5242880 // 5MB default
     if (file.size > maxSize) {
       return {
         success: false,

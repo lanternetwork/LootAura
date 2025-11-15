@@ -16,11 +16,6 @@ import { logger } from '@/lib/log'
  * @returns Error response if CSRF check fails, null if check passes or not required
  */
 export async function checkCsrfIfRequired(request: NextRequest): Promise<ReturnType<typeof fail> | null> {
-  // Skip CSRF checks in test environment
-  if (process.env.NODE_ENV === 'test') {
-    return null
-  }
-
   const pathname = request.nextUrl.pathname
   const method = request.method
 
@@ -42,7 +37,8 @@ export async function checkCsrfIfRequired(request: NextRequest): Promise<ReturnT
     }
   } catch (error) {
     // If cookies() can't be called (e.g., in test environment), skip CSRF check
-    if (process.env.NODE_ENV === 'test' || error instanceof Error && error.message.includes('request scope')) {
+    // Check for the specific error message indicating we're outside a request scope
+    if (error instanceof Error && error.message.includes('request scope')) {
       return null
     }
     throw error

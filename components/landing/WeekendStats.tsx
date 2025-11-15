@@ -19,7 +19,6 @@ interface LocationState {
 export function WeekendStats() {
   const searchParams = useSearchParams()
   const [location, setLocation] = useState<LocationState | null>(null)
-  const [status, setStatus] = useState<'resolving' | 'ready' | 'error'>('resolving')
   const [stats, setStats] = useState<WeekendStatsData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -77,7 +76,6 @@ export function WeekendStats() {
     if (zipFromUrl) {
       const loc = { zip: zipFromUrl }
       setLocation(loc)
-      setStatus('ready')
       fetchStatsForLocation(loc)
       return
     }
@@ -102,7 +100,6 @@ export function WeekendStats() {
               state: ipData.state
             }
             setLocation(loc)
-            setStatus('ready')
             // Fetch with actual location (will update the count if different)
             fetchStatsForLocation(loc)
             return true
@@ -120,7 +117,6 @@ export function WeekendStats() {
       
       // If IP geolocation failed, keep using default location
       setLocation(defaultLocation)
-      setStatus('ready')
       console.log('[WeekendStats] Using default location after IP geolocation failed')
     })
   }, [searchParams])

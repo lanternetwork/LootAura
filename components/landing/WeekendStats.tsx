@@ -21,9 +21,10 @@ export function WeekendStats() {
   const [location, setLocation] = useState<LocationState | null>(null)
   const [stats, setStats] = useState<WeekendStatsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isDefaultLocation, setIsDefaultLocation] = useState(false)
 
   // Fetch stats with a given location
-  const fetchStatsForLocation = useCallback(async (loc: LocationState) => {
+  const fetchStatsForLocation = useCallback(async (loc: LocationState, isDefault = false) => {
     try {
       const params = new URLSearchParams()
       
@@ -43,7 +44,7 @@ export function WeekendStats() {
 
       // Use lightweight count endpoint for faster loading
       const countUrl = `/api/sales/count?${params.toString()}`
-      console.log('[WeekendStats] Fetching weekend sales count:', countUrl)
+      console.log('[WeekendStats] Fetching weekend sales count:', countUrl, { isDefault })
       const countRes = await fetch(countUrl)
       if (!countRes.ok) {
         throw new Error(`Failed to fetch weekend sales count: ${countRes.status}`)
@@ -53,21 +54,35 @@ export function WeekendStats() {
       console.log('[WeekendStats] Weekend sales count response:', {
         ok: countRes.ok,
         count: weekendCount,
-        durationMs: countData.durationMs
+        durationMs: countData.durationMs,
+        isDefault
       })
 
       // Calculate stats
       const activeSales = weekendCount
 
-      console.log('[WeekendStats] FINAL STATS - Active sales:', activeSales)
-      setStats({ activeSales })
-      setLoading(false)
+      // Only update stats if:
+      // 1. We don't have stats yet (first fetch), OR
+      // 2. This is NOT a default location fetch (real location resolved), OR
+      // 3. This is a default location fetch but we got a non-zero count
+      if (!stats || !isDefault || activeSales > 0) {
+        console.log('[WeekendStats] Updating stats - Active sales:', activeSales)
+        setStats({ activeSales })
+        setLoading(false)
+      } else {
+        // Default location returned 0, but we'll wait for real location
+        console.log('[WeekendStats] Default location returned 0, waiting for real location')
+        setIsDefaultLocation(true)
+      }
     } catch (error) {
       console.error('[WeekendStats] Error fetching stats:', error)
-      setStats(null)
-      setLoading(false)
+      // Only set stats to null if we don't have any stats yet
+      if (!stats) {
+        setStats(null)
+        setLoading(false)
+      }
     }
-  }, [])
+  }, [stats])
 
   // Location inference - optimized to start fetching immediately
   useEffect(() => {
@@ -76,14 +91,15 @@ export function WeekendStats() {
     if (zipFromUrl) {
       const loc = { zip: zipFromUrl }
       setLocation(loc)
-      fetchStatsForLocation(loc)
+      setIsDefaultLocation(false)
+      fetchStatsForLocation(loc, false)
       return
     }
 
     // 2) Start with a default US location to fetch stats immediately
     // This ensures the count appears quickly while we resolve the actual location
     const defaultLocation: LocationState = { lat: 39.8283, lng: -98.5795 } // US center
-    fetchStatsForLocation(defaultLocation)
+    fetchStatsForLocation(defaultLocation, true)
 
     // 3) Try IP-based geolocation in parallel (works with VPNs and doesn't require permission)
     const tryIPGeolocation = async () => {
@@ -100,8 +116,9 @@ export function WeekendStats() {
               state: ipData.state
             }
             setLocation(loc)
+            setIsDefaultLocation(false)
             // Fetch with actual location (will update the count if different)
-            fetchStatsForLocation(loc)
+            fetchStatsForLocation(loc, false)
             return true
           }
         }
@@ -121,8 +138,10 @@ export function WeekendStats() {
     })
   }, [searchParams])
 
-  // Show fallback values while loading or on error
-  const displayStats = stats || { activeSales: 12 }
+  // Show fallback values while loading, on error, or if we only have a 0 from default location
+  const displayStats = (stats && (!isDefaultLocation || stats.activeSales > 0)) 
+    ? stats 
+    : { activeSales: 12 }
   
   // Decode URL-encoded city name if present (safe decode)
   const cityName = (() => {

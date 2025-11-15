@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
             // Report to Sentry but don't fail the response
             Sentry.captureException(cleanupError, {
               tags: { operation: 'publishDraft', step: 'compensation' },
-              extra: { saleId: createdSaleId, draftId: draft.id },
+              extra: { saleId: createdSaleId ?? undefined, draftId: draft.id },
             })
           }
         }
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
         draftId: draft.id,
         draftKey: draft.draft_key,
         userId: user.id,
-        saleId: createdSaleId,
+        saleId: createdSaleId ?? undefined,
       })
     }
     
@@ -297,12 +297,12 @@ export async function POST(request: NextRequest) {
         operation: 'delete_draft',
         draftId: draft.id,
         userId: user.id,
-        saleId: createdSaleId,
+        saleId: createdSaleId ?? undefined,
         error: deleteErr.message,
       })
       Sentry.captureException(deleteErr, { 
         tags: { operation: 'publishDraft', step: 'deleteDraft' },
-        extra: { draftId: draft.id, userId: user.id, saleId: createdSaleId },
+        extra: { draftId: draft.id, userId: user.id, saleId: createdSaleId ?? undefined },
       })
     } else {
       // Verify deletion by checking if any rows were deleted
@@ -327,7 +327,7 @@ export async function POST(request: NextRequest) {
           Sentry.captureMessage('Draft still exists after delete attempt', {
             level: 'error',
             tags: { operation: 'publishDraft', step: 'deleteDraft' },
-            extra: { draftId: draft.id, userId: user.id, saleId: createdSaleId, currentStatus: verifyDraft.status },
+            extra: { draftId: draft.id, userId: user.id, saleId: createdSaleId ?? undefined, currentStatus: verifyDraft.status },
           })
         } else {
           // Draft doesn't exist, so deletion succeeded even though select returned nothing
@@ -383,7 +383,7 @@ export async function POST(request: NextRequest) {
         })
         Sentry.captureException(cleanupError, {
           tags: { operation: 'publishDraft', step: 'compensation' },
-          extra: { saleId: createdSaleId, itemIds: createdItemIds },
+          extra: { saleId: createdSaleId ?? undefined, itemIds: createdItemIds },
         })
       }
     }

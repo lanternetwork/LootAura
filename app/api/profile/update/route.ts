@@ -3,11 +3,19 @@ import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
+import { logger } from '@/lib/log'
+import { checkCsrfIfRequired } from '@/lib/api/csrfCheck'
 import * as Sentry from '@sentry/nextjs'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  // CSRF protection check
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const supabase = createSupabaseServerClient()
     
@@ -84,28 +92,36 @@ export async function POST(request: NextRequest) {
 
     // Check if updateResult is valid and has expected structure
     if (updateResult == null || typeof updateResult !== 'object') {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[PROFILE/UPDATE] Update returned undefined or invalid:', updateResult)
-      }
-      Sentry.captureException(new Error('Update returned undefined or invalid'), { tags: { operation: 'updateProfile' } })
+      const error = new Error('Update returned undefined or invalid')
+      logger.error('Profile update returned invalid result', error, {
+        component: 'profile/update',
+        operation: 'update_profile',
+        userId: user.id,
+      })
+      Sentry.captureException(error, { tags: { operation: 'updateProfile' } })
       return fail(500, 'UPDATE_FAILED', 'Failed to update profile')
     }
 
     // Now safe to check for properties
     if (!('data' in updateResult || 'error' in updateResult)) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[PROFILE/UPDATE] Update result missing data/error properties:', updateResult)
-      }
-      Sentry.captureException(new Error('Update result missing expected properties'), { tags: { operation: 'updateProfile' } })
+      const error = new Error('Update result missing expected properties')
+      logger.error('Profile update result missing properties', error, {
+        component: 'profile/update',
+        operation: 'update_profile',
+        userId: user.id,
+      })
+      Sentry.captureException(error, { tags: { operation: 'updateProfile' } })
       return fail(500, 'UPDATE_FAILED', 'Failed to update profile')
     }
 
     const { data: updatedProfile, error: updateError } = updateResult as { data: any; error: any }
 
     if (updateError) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[PROFILE/UPDATE] Update error:', updateError)
-      }
+      logger.error('Profile update error', updateError instanceof Error ? updateError : new Error(String(updateError)), {
+        component: 'profile/update',
+        operation: 'update_profile',
+        userId: user.id,
+      })
       Sentry.captureException(updateError, { tags: { operation: 'updateProfile' } })
       return fail(500, 'UPDATE_FAILED', 'Failed to update profile', {
         supabase: updateError.message,
@@ -115,11 +131,12 @@ export async function POST(request: NextRequest) {
 
     return ok({ data: { profile: updatedProfile } })
   } catch (e: any) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[PROFILE/UPDATE] Unexpected error:', e)
-    }
+    logger.error('Unexpected error in profile update', e instanceof Error ? e : new Error(String(e)), {
+      component: 'profile/update',
+      operation: 'update_profile',
+    })
     Sentry.captureException(e, { tags: { operation: 'updateProfile' } })
-    return fail(500, 'INTERNAL_ERROR', e.message)
+    return fail(500, 'INTERNAL_ERROR', 'An error occurred while updating your profile')
   }
 }
 

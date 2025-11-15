@@ -2,14 +2,27 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { upsertSellerRating } from '@/lib/data/ratingsAccess'
 import { Policies } from '@/lib/rateLimit/policies'
+import { fail, ok } from '@/lib/http/json'
+import { logger } from '@/lib/log'
+import { checkCsrfIfRequired } from '@/lib/api/csrfCheck'
 
 async function postHandler(req: NextRequest) {
+  // CSRF protection check
+  const csrfError = await checkCsrfIfRequired(req)
+  if (csrfError) {
+    return csrfError
+  }
+
   const supabase = createSupabaseServerClient()
 
   // Auth check
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    logger.warn('Unauthorized rating attempt', undefined, {
+      component: 'seller/rating',
+      operation: 'auth_check',
+    })
+    return fail(401, 'AUTH_REQUIRED', 'Authentication required')
   }
 
   // Rate limiting check (after auth so we have userId)
@@ -22,10 +35,12 @@ async function postHandler(req: NextRequest) {
     const result = await check(policy, key)
     
     if (!result.allowed) {
-      return NextResponse.json(
-        { error: 'Too many rating changes. Please try again later.' },
-        { status: 429 }
-      )
+      logger.warn('Rate limit exceeded for rating', undefined, {
+        component: 'seller/rating',
+        operation: 'rate_limit',
+        userId: user.id,
+      })
+      return fail(429, 'RATE_LIMIT_EXCEEDED', 'Too many rating changes. Please try again later.')
     }
   }
 
@@ -35,42 +50,27 @@ async function postHandler(req: NextRequest) {
 
     // Validate required fields
     if (!seller_id || typeof seller_id !== 'string') {
-      return NextResponse.json(
-        { error: 'seller_id is required and must be a string' },
-        { status: 400 }
-      )
+      return fail(400, 'INVALID_INPUT', 'seller_id is required and must be a string')
     }
 
     if (rating === undefined || rating === null) {
-      return NextResponse.json(
-        { error: 'rating is required' },
-        { status: 400 }
-      )
+      return fail(400, 'INVALID_INPUT', 'rating is required')
     }
 
     // Validate rating is integer between 1 and 5
     const ratingNum = Number(rating)
     if (!Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-      return NextResponse.json(
-        { error: 'rating must be an integer between 1 and 5' },
-        { status: 400 }
-      )
+      return fail(400, 'INVALID_INPUT', 'rating must be an integer between 1 and 5')
     }
 
     // Validate seller_id is not the same as authenticated user
     if (seller_id === user.id) {
-      return NextResponse.json(
-        { error: 'Cannot rate yourself' },
-        { status: 400 }
-      )
+      return fail(400, 'INVALID_INPUT', 'Cannot rate yourself')
     }
 
     // Validate sale_id if provided
     if (sale_id !== undefined && sale_id !== null && typeof sale_id !== 'string') {
-      return NextResponse.json(
-        { error: 'sale_id must be a string or null' },
-        { status: 400 }
-      )
+      return fail(400, 'INVALID_INPUT', 'sale_id must be a string or null')
     }
 
     // Upsert the rating
@@ -83,39 +83,39 @@ async function postHandler(req: NextRequest) {
     )
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error || 'Failed to save rating' },
-        { status: 400 }
-      )
-    }
-
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[RATING_API] Rating saved:', {
+      logger.error('Failed to save rating', new Error(result.error || 'Unknown error'), {
+        component: 'seller/rating',
+        operation: 'upsert_rating',
+        userId: user.id,
         sellerId: seller_id,
-        raterId: user.id,
-        rating: ratingNum,
-        saleId: sale_id || null,
       })
+      return fail(400, 'RATING_SAVE_FAILED', result.error || 'Failed to save rating')
     }
 
-    return NextResponse.json({
-      ok: true,
+    logger.info('Rating saved successfully', {
+      component: 'seller/rating',
+      operation: 'upsert_rating',
+      userId: user.id,
+      sellerId: seller_id,
+      rating: ratingNum,
+    })
+
+    return ok({
       rating: ratingNum,
       summary: result.summary,
     })
   } catch (error) {
     if (error instanceof SyntaxError) {
-      return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
-        { status: 400 }
-      )
+      return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
     }
 
-    console.error('[RATING_API] Unexpected error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logger.error('Unexpected error in rating API', error instanceof Error ? error : new Error(String(error)), {
+      component: 'seller/rating',
+      operation: 'handler_execution',
+      userId: user?.id,
+    })
+
+    return fail(500, 'INTERNAL_ERROR', 'An error occurred while saving your rating')
   }
 }
 

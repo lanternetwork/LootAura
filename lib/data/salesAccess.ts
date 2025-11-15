@@ -472,19 +472,30 @@ export async function getSaleWithItems(
     ])
 
     // Log errors but don't fail - return with defaults
-    if (profileRes.error && process.env.NODE_ENV !== 'production') {
-      console.error('[SALES_ACCESS] Error fetching owner profile:', profileRes.error)
+    const { logger } = await import('@/lib/log')
+    if (profileRes.error) {
+      logger.error('Error fetching owner profile', profileRes.error instanceof Error ? profileRes.error : new Error(String(profileRes.error)), {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        ownerId,
+      })
     }
-    if (statsRes.error && process.env.NODE_ENV !== 'production') {
-      console.error('[SALES_ACCESS] Error fetching owner stats:', statsRes.error)
+    if (statsRes.error) {
+      logger.error('Error fetching owner stats', statsRes.error instanceof Error ? statsRes.error : new Error(String(statsRes.error)), {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        ownerId,
+      })
     }
     if (itemsRes.error) {
-      // Always log errors (not just in dev) since this is critical
-      console.error('[SALES_ACCESS] Error fetching items:', {
+      // Always log errors since this is critical
+      logger.error('Error fetching items', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
         saleId,
-        error: itemsRes.error,
-        code: itemsRes.error?.code,
-        message: itemsRes.error?.message,
+        errorCode: itemsRes.error?.code,
       })
     }
     
@@ -591,9 +602,12 @@ export async function getSaleWithItems(
       items: mappedItems,
     }
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[SALES_ACCESS] Unexpected error in getSaleWithItems:', error)
-    }
+    const { logger } = await import('@/lib/log')
+    logger.error('Unexpected error in getSaleWithItems', error instanceof Error ? error : new Error(String(error)), {
+      component: 'salesAccess',
+      operation: 'getSaleWithItems',
+      saleId,
+    })
     return null
   }
 }

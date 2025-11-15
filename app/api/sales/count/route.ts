@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { ok, fail } from '@/lib/http/json'
 import { resolveDatePreset } from '@/lib/shared/resolveDatePreset'
@@ -124,12 +124,12 @@ export async function GET(request: NextRequest) {
     
     // Apply category filters if specified (using items subquery approach like main sales route)
     let finalCount = 0
-    if (dbCategories.size > 0) {
+    if (dbCategories.length > 0) {
       // Use subquery approach to find sales with matching category items
       const { data: salesWithCategories, error: categoryError } = await supabase
         .from('items_v2')
         .select('sale_id')
-        .in('category', Array.from(dbCategories))
+        .in('category', dbCategories)
       
       if (categoryError) {
         console.error('[SALES/COUNT] Category filter error:', categoryError)

@@ -3,11 +3,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SellerRatingStars } from '@/components/seller/SellerRatingStars'
 
 // Mock useAuth and useRouter
+const mockUseAuth = vi.fn()
 vi.mock('@/lib/hooks/useAuth', () => ({
-  useAuth: () => ({
-    data: { id: 'user-123' },
-    isLoading: false,
-  }),
+  useAuth: () => mockUseAuth(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -25,6 +23,12 @@ describe('SellerRatingStars', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockFetch.mockClear()
+    // Default mock: authenticated user
+    mockUseAuth.mockReturnValue({
+      data: { id: 'user-123' },
+      isLoading: false,
+      error: null,
+    })
   })
 
   it('renders stars with correct average rating', () => {
@@ -105,6 +109,13 @@ describe('SellerRatingStars', () => {
   })
 
   it('calls API when star is clicked', async () => {
+    // Ensure user is authenticated
+    mockUseAuth.mockReturnValue({
+      data: { id: 'user-123' },
+      isLoading: false,
+      error: null,
+    })
+
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -112,6 +123,14 @@ describe('SellerRatingStars', () => {
         rating: 4,
         summary: { avg_rating: 4.0, ratings_count: 1 },
       }),
+    })
+
+    // Mock window.location for redirect check
+    Object.defineProperty(window, 'location', {
+      value: {
+        pathname: '/sales/test-sale',
+      },
+      writable: true,
     })
 
     render(

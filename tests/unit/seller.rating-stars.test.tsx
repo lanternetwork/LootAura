@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -36,6 +36,13 @@ vi.mock('next/navigation', () => ({
 // Mock fetch
 const mockFetch = vi.fn()
 global.fetch = mockFetch
+
+// Ensure fetch is available
+beforeAll(() => {
+  if (typeof global.fetch === 'undefined') {
+    global.fetch = mockFetch
+  }
+})
 
 describe('SellerRatingStars', () => {
   beforeEach(() => {
@@ -137,6 +144,10 @@ describe('SellerRatingStars', () => {
   it('calls API when star is clicked', async () => {
     const user = userEvent.setup()
     
+    // Clear any previous mocks
+    mockFetch.mockClear()
+    mockUseAuth.mockClear()
+    
     // Ensure user is authenticated and NOT the seller (set before render)
     mockUseAuth.mockReturnValue({
       data: { id: 'user-123' }, // Different from sellerId
@@ -144,6 +155,9 @@ describe('SellerRatingStars', () => {
       error: null,
     })
 
+    // Ensure fetch is properly mocked
+    global.fetch = mockFetch
+    
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -183,18 +197,21 @@ describe('SellerRatingStars', () => {
     expect(fourthStar).not.toBeDisabled()
     expect(fourthStar).toHaveAttribute('tabIndex', '0')
     
-    // Verify the button has an onClick handler
+    // Verify the button has an onClick handler by checking it's a button
     expect(fourthStar).toHaveAttribute('type', 'button')
+    
+    // Verify fetch is available
+    expect(global.fetch).toBe(mockFetch)
     
     // Click the star using userEvent for more realistic interaction
     await user.click(fourthStar)
 
-    // Wait for fetch to be called - give it more time
+    // Wait for fetch to be called - give it more time and check more frequently
     await waitFor(
       () => {
         expect(mockFetch).toHaveBeenCalled()
       },
-      { timeout: 5000, interval: 100 }
+      { timeout: 5000, interval: 50 }
     )
 
     expect(mockFetch).toHaveBeenCalledWith(

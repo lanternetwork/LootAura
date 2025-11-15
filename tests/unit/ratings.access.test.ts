@@ -60,7 +60,7 @@ describe('ratingsAccess', () => {
     })
 
     it('handles null avg_rating', async () => {
-      const mockData = {
+      const mockData: { avg_rating: null; ratings_count: number } = {
         avg_rating: null,
         ratings_count: 0,
       }

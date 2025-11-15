@@ -547,13 +547,16 @@ async function salesHandler(request: NextRequest) {
       
       // Debug: Log sample sales and their dates
       if (salesWithDistance.length > 0 && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        logger.debug('Sample filtered sales', { component: 'sales', samples: salesWithDistance.slice(0, 3).map(s => ({
-          id: s?.id,
-          title: s?.title,
-          starts_at: s?.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
-          date_start: s?.date_start,
-          time_start: s?.time_start
-        })))
+        logger.debug('Sample filtered sales', { 
+          component: 'sales', 
+          samples: salesWithDistance.slice(0, 3).map(s => ({
+            id: s?.id,
+            title: s?.title,
+            starts_at: s?.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
+            date_start: s?.date_start,
+            time_start: s?.time_start
+          }))
+        })
       }
       
       // Debug: Log raw data before filtering

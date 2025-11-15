@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { upsertSellerRating, getSellerRatingSummary } from '@/lib/data/ratingsAccess'
-import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { upsertSellerRating } from '@/lib/data/ratingsAccess'
 import { Policies } from '@/lib/rateLimit/policies'
 
 async function postHandler(req: NextRequest) {

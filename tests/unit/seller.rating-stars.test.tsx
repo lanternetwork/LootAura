@@ -18,12 +18,13 @@ vi.mock('next/navigation', () => ({
 }))
 
 // Mock fetch
-global.fetch = vi.fn()
+const mockFetch = vi.fn()
+global.fetch = mockFetch
 
 describe('SellerRatingStars', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    ;(global.fetch as any).mockClear()
+    mockFetch.mockClear()
   })
 
   it('renders stars with correct average rating', () => {
@@ -104,7 +105,7 @@ describe('SellerRatingStars', () => {
   })
 
   it('calls API when star is clicked', async () => {
-    ;(global.fetch as any).mockResolvedValueOnce({
+    mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         ok: true,
@@ -127,7 +128,7 @@ describe('SellerRatingStars', () => {
     fireEvent.click(fourthStar)
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         '/api/seller/rating',
         expect.objectContaining({
           method: 'POST',

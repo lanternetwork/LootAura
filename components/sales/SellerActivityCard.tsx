@@ -31,7 +31,6 @@ export function SellerActivityCard({ ownerProfile, ownerStats, currentUserRating
     : 'Recently joined'
 
   const totalSales = ownerStats?.total_sales ?? 0
-  const hasRatings = (ownerStats?.ratings_count ?? 0) > 0
   const isSeller = currentUser?.id === ownerProfile?.id
 
   // Build profile link - prefer username, fallback to id

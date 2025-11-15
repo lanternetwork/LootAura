@@ -23,7 +23,7 @@ describe('ratingsAccess', () => {
         ratings_count: 10,
       }
 
-      ;(mockSupabase.from as any).mockReturnValue({
+      (mockSupabase.from as any).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
@@ -43,7 +43,7 @@ describe('ratingsAccess', () => {
     })
 
     it('returns null when seller not found', async () => {
-      ;(mockSupabase.from as any).mockReturnValue({
+      (mockSupabase.from as any).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
@@ -91,7 +91,7 @@ describe('ratingsAccess', () => {
         rating: 5,
       }
 
-      ;(mockSupabase.from as any).mockReturnValue({
+      (mockSupabase.from as any).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
@@ -114,7 +114,7 @@ describe('ratingsAccess', () => {
     })
 
     it('returns null when rating does not exist', async () => {
-      ;(mockSupabase.from as any).mockReturnValue({
+      (mockSupabase.from as any).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
@@ -140,16 +140,40 @@ describe('ratingsAccess', () => {
   describe('upsertSellerRating', () => {
     it('creates new rating successfully', async () => {
       // Mock upsert
-      ;(mockSupabase.from as any).mockReturnValue({
-        upsert: vi.fn().mockResolvedValue({
-          error: null,
+      const mockUpsert = vi.fn().mockResolvedValue({
+        error: null,
+      })
+      
+      // Mock getSellerRatingSummary query (called after upsert)
+      const mockSummaryData = {
+        avg_rating: 4.0,
+        ratings_count: 1,
+      }
+      const mockSummaryQuery = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: mockSummaryData,
+            error: null,
+          }),
         }),
       })
 
-      // Mock getSellerRatingSummary (called after upsert)
-      const mockSummary = { avg_rating: 4.0, ratings_count: 1 }
-      const ratingsAccess = await import('@/lib/data/ratingsAccess')
-      vi.spyOn(ratingsAccess, 'getSellerRatingSummary').mockResolvedValue(mockSummary)
+      ;(mockSupabase.from as any).mockImplementation((table: string) => {
+        if (table === 'seller_ratings') {
+          return {
+            upsert: mockUpsert,
+          }
+        }
+        if (table === 'owner_stats') {
+          return {
+            select: mockSummaryQuery,
+          }
+        }
+        return {
+          select: vi.fn(),
+          upsert: mockUpsert,
+        }
+      })
 
       const result = await upsertSellerRating(
         mockSupabase,
@@ -160,21 +184,48 @@ describe('ratingsAccess', () => {
       )
 
       expect(result.success).toBe(true)
-      expect(result.summary).toEqual(mockSummary)
+      expect(result.summary).toEqual({
+        avg_rating: 4.0,
+        ratings_count: 1,
+      })
     })
 
     it('updates existing rating successfully', async () => {
       // Mock upsert
-      ;(mockSupabase.from as any).mockReturnValue({
-        upsert: vi.fn().mockResolvedValue({
-          error: null,
+      const mockUpsert = vi.fn().mockResolvedValue({
+        error: null,
+      })
+      
+      // Mock getSellerRatingSummary query (called after upsert)
+      const mockSummaryData = {
+        avg_rating: 5.0,
+        ratings_count: 1,
+      }
+      const mockSummaryQuery = vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: mockSummaryData,
+            error: null,
+          }),
         }),
       })
 
-      // Mock getSellerRatingSummary
-      const mockSummary = { avg_rating: 5.0, ratings_count: 1 }
-      const ratingsAccess = await import('@/lib/data/ratingsAccess')
-      vi.spyOn(ratingsAccess, 'getSellerRatingSummary').mockResolvedValue(mockSummary)
+      ;(mockSupabase.from as any).mockImplementation((table: string) => {
+        if (table === 'seller_ratings') {
+          return {
+            upsert: mockUpsert,
+          }
+        }
+        if (table === 'owner_stats') {
+          return {
+            select: mockSummaryQuery,
+          }
+        }
+        return {
+          select: vi.fn(),
+          upsert: mockUpsert,
+        }
+      })
 
       const result = await upsertSellerRating(
         mockSupabase,
@@ -185,7 +236,10 @@ describe('ratingsAccess', () => {
       )
 
       expect(result.success).toBe(true)
-      expect(result.summary).toEqual(mockSummary)
+      expect(result.summary).toEqual({
+        avg_rating: 5.0,
+        ratings_count: 1,
+      })
     })
 
     it('rejects invalid rating values', async () => {
@@ -215,7 +269,7 @@ describe('ratingsAccess', () => {
     })
 
     it('handles database constraint violations', async () => {
-      ;(mockSupabase.from as any).mockReturnValue({
+      (mockSupabase.from as any).mockReturnValue({
         upsert: vi.fn().mockResolvedValue({
           error: {
             code: '23514',

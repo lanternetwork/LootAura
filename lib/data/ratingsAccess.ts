@@ -35,7 +35,7 @@ export async function getSellerRatingSummary(
       .maybeSingle()
 
     if (error) {
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
         console.error('[RATINGS_ACCESS] Error fetching rating summary:', error)
       }
       return null
@@ -50,7 +50,7 @@ export async function getSellerRatingSummary(
       ratings_count: data.ratings_count ?? 0,
     }
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
       console.error('[RATINGS_ACCESS] Unexpected error fetching rating summary:', error)
     }
     return null
@@ -78,7 +78,7 @@ export async function getUserRatingForSeller(
       .maybeSingle()
 
     if (error) {
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
         console.error('[RATINGS_ACCESS] Error fetching user rating:', error)
       }
       return null
@@ -86,7 +86,7 @@ export async function getUserRatingForSeller(
 
     return data?.rating ?? null
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
       console.error('[RATINGS_ACCESS] Unexpected error fetching user rating:', error)
     }
     return null
@@ -166,7 +166,7 @@ export async function upsertSellerRating(
         }
       }
 
-      if (process.env.NODE_ENV !== 'production') {
+      if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
         console.error('[RATINGS_ACCESS] Error upserting rating:', upsertError)
       }
       return {
@@ -193,7 +193,7 @@ export async function upsertSellerRating(
       summary,
     }
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
       console.error('[RATINGS_ACCESS] Unexpected error upserting rating:', error)
     }
     return {

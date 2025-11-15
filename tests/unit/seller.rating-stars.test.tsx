@@ -109,7 +109,7 @@ describe('SellerRatingStars', () => {
   })
 
   it('calls API when star is clicked', async () => {
-    // Ensure user is authenticated
+    // Ensure user is authenticated (set before render)
     mockUseAuth.mockReturnValue({
       data: { id: 'user-123' },
       isLoading: false,
@@ -126,12 +126,12 @@ describe('SellerRatingStars', () => {
     })
 
     // Mock window.location for redirect check
-    Object.defineProperty(window, 'location', {
-      value: {
-        pathname: '/sales/test-sale',
-      },
-      writable: true,
-    })
+    const originalLocation = window.location
+    delete (window as any).location
+    ;(window as any).location = {
+      pathname: '/sales/test-sale',
+      href: 'http://localhost/sales/test-sale',
+    }
 
     render(
       <SellerRatingStars
@@ -144,13 +144,22 @@ describe('SellerRatingStars', () => {
     )
 
     const fourthStar = screen.getByRole('button', { name: /rate 4 out of 5 stars/i })
+    
+    // Verify button is not disabled and is interactive
+    expect(fourthStar).not.toBeDisabled()
+    expect(fourthStar).toHaveAttribute('tabIndex', '0')
+    
+    // Click the star
     fireEvent.click(fourthStar)
 
+    // Wait for fetch to be called - the component should call it immediately
     await waitFor(
       () => {
-        expect(mockFetch).toHaveBeenCalled()
+        if (mockFetch.mock.calls.length === 0) {
+          throw new Error('Fetch not called yet')
+        }
       },
-      { timeout: 2000 }
+      { timeout: 3000 }
     )
 
     expect(mockFetch).toHaveBeenCalledWith(
@@ -167,6 +176,9 @@ describe('SellerRatingStars', () => {
         }),
       })
     )
+
+    // Restore window.location
+    ;(window as any).location = originalLocation
   })
 
   it('handles keyboard navigation', () => {

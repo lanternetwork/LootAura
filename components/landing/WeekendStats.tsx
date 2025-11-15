@@ -61,18 +61,26 @@ export function WeekendStats() {
       // Calculate stats
       const activeSales = weekendCount
 
-      // Only update stats if:
-      // 1. We don't have stats yet (first fetch), OR
-      // 2. This is NOT a default location fetch (real location resolved), OR
-      // 3. This is a default location fetch but we got a non-zero count
-      if (!stats || !isDefault || activeSales > 0) {
-        console.log('[WeekendStats] Updating stats - Active sales:', activeSales)
+      // Update stats based on location type:
+      // - Real location: always update (even if 0, that's the actual count)
+      // - Default location with > 0: update immediately
+      // - Default location with 0: don't update, wait for real location
+      if (!isDefault) {
+        // Real location resolved - always update
+        console.log('[WeekendStats] Updating stats from real location - Active sales:', activeSales)
+        setStats({ activeSales })
+        setLoading(false)
+        setIsDefaultLocation(false)
+      } else if (activeSales > 0) {
+        // Default location has sales - show immediately
+        console.log('[WeekendStats] Updating stats from default location - Active sales:', activeSales)
         setStats({ activeSales })
         setLoading(false)
       } else {
-        // Default location returned 0, but we'll wait for real location
+        // Default location returned 0 - wait for real location
         console.log('[WeekendStats] Default location returned 0, waiting for real location')
         setIsDefaultLocation(true)
+        // Keep loading true and don't update stats - show fallback
       }
     } catch (error) {
       console.error('[WeekendStats] Error fetching stats:', error)

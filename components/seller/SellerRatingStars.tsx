@@ -84,7 +84,9 @@ export function SellerRatingStars({
         router.refresh()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to save rating')
-        console.error('[RATING] Error saving rating:', err)
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('[RATING] Error saving rating:', err)
+        }
       } finally {
         setIsSubmitting(false)
       }

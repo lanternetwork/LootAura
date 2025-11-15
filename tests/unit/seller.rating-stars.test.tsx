@@ -127,22 +127,27 @@ describe('SellerRatingStars', () => {
     const fourthStar = screen.getByRole('button', { name: /rate 4 out of 5 stars/i })
     fireEvent.click(fourthStar)
 
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/seller/rating',
-        expect.objectContaining({
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            seller_id: 'seller-123',
-            rating: 4,
-            sale_id: null,
-          }),
-        })
-      )
-    })
+    await waitFor(
+      () => {
+        expect(mockFetch).toHaveBeenCalled()
+      },
+      { timeout: 2000 }
+    )
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/seller/rating',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          seller_id: 'seller-123',
+          rating: 4,
+          sale_id: null,
+        }),
+      })
+    )
   })
 
   it('handles keyboard navigation', () => {

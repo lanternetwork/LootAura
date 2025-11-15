@@ -18,12 +18,12 @@ describe('ratingsAccess', () => {
 
   describe('getSellerRatingSummary', () => {
     it('returns rating summary from owner_stats', async () => {
-      const mockData = {
+      const mockData: { avg_rating: number; ratings_count: number } = {
         avg_rating: 4.5,
         ratings_count: 10,
       }
 
-      (mockSupabase.from as any).mockReturnValue({
+      ;(mockSupabase.from as any).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
@@ -87,11 +87,11 @@ describe('ratingsAccess', () => {
 
   describe('getUserRatingForSeller', () => {
     it('returns user rating when exists', async () => {
-      const mockData = {
+      const mockData: { rating: number } = {
         rating: 5,
       }
 
-      (mockSupabase.from as any).mockReturnValue({
+      ;(mockSupabase.from as any).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({

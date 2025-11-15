@@ -1,6 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SellerRatingStars } from '@/components/seller/SellerRatingStars'
+
+const createTestQueryClient = () => new QueryClient({
+  defaultOptions: {
+    queries: { retry: false },
+    mutations: { retry: false },
+  },
+})
+
+const TestWrapper = ({ children }: { children: React.ReactNode }) => {
+  const queryClient = createTestQueryClient()
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  )
+}
 
 // Mock useAuth and useRouter
 const mockUseAuth = vi.fn()
@@ -33,13 +50,15 @@ describe('SellerRatingStars', () => {
 
   it('renders stars with correct average rating', () => {
     render(
-      <SellerRatingStars
-        sellerId="seller-123"
-        avgRating={4.5}
-        ratingsCount={10}
-        currentUserRating={null}
-        isSeller={false}
-      />
+      <TestWrapper>
+        <SellerRatingStars
+          sellerId="seller-123"
+          avgRating={4.5}
+          ratingsCount={10}
+          currentUserRating={null}
+          isSeller={false}
+        />
+      </TestWrapper>
     )
 
     // Should show 4.5 stars (4 filled, 1 empty)
@@ -64,13 +83,15 @@ describe('SellerRatingStars', () => {
 
   it('displays "No ratings yet" when ratings count is 0', () => {
     render(
-      <SellerRatingStars
-        sellerId="seller-123"
-        avgRating={null}
-        ratingsCount={0}
-        currentUserRating={null}
-        isSeller={false}
-      />
+      <TestWrapper>
+        <SellerRatingStars
+          sellerId="seller-123"
+          avgRating={null}
+          ratingsCount={0}
+          currentUserRating={null}
+          isSeller={false}
+        />
+      </TestWrapper>
     )
 
     expect(screen.getByText('No ratings yet')).toBeInTheDocument()
@@ -78,13 +99,15 @@ describe('SellerRatingStars', () => {
 
   it('shows user rating when provided', () => {
     render(
-      <SellerRatingStars
-        sellerId="seller-123"
-        avgRating={4.5}
-        ratingsCount={10}
-        currentUserRating={5}
-        isSeller={false}
-      />
+      <TestWrapper>
+        <SellerRatingStars
+          sellerId="seller-123"
+          avgRating={4.5}
+          ratingsCount={10}
+          currentUserRating={5}
+          isSeller={false}
+        />
+      </TestWrapper>
     )
 
     expect(screen.getByText('Your rating: 5 stars')).toBeInTheDocument()
@@ -92,13 +115,15 @@ describe('SellerRatingStars', () => {
 
   it('makes stars read-only when user is the seller', () => {
     render(
-      <SellerRatingStars
-        sellerId="seller-123"
-        avgRating={4.5}
-        ratingsCount={10}
-        currentUserRating={null}
-        isSeller={true}
-      />
+      <TestWrapper>
+        <SellerRatingStars
+          sellerId="seller-123"
+          avgRating={4.5}
+          ratingsCount={10}
+          currentUserRating={null}
+          isSeller={true}
+        />
+      </TestWrapper>
     )
 
     const stars = screen.getAllByRole('button', { name: /rate \d out of 5 stars/i })
@@ -134,13 +159,15 @@ describe('SellerRatingStars', () => {
     }
 
     render(
-      <SellerRatingStars
-        sellerId="seller-123"
-        avgRating={null}
-        ratingsCount={0}
-        currentUserRating={null}
-        isSeller={false}
-      />
+      <TestWrapper>
+        <SellerRatingStars
+          sellerId="seller-123"
+          avgRating={null}
+          ratingsCount={0}
+          currentUserRating={null}
+          isSeller={false}
+        />
+      </TestWrapper>
     )
 
     const fourthStar = screen.getByRole('button', { name: /rate 4 out of 5 stars/i })
@@ -183,13 +210,15 @@ describe('SellerRatingStars', () => {
 
   it('handles keyboard navigation', () => {
     render(
-      <SellerRatingStars
-        sellerId="seller-123"
-        avgRating={null}
-        ratingsCount={0}
-        currentUserRating={null}
-        isSeller={false}
-      />
+      <TestWrapper>
+        <SellerRatingStars
+          sellerId="seller-123"
+          avgRating={null}
+          ratingsCount={0}
+          currentUserRating={null}
+          isSeller={false}
+        />
+      </TestWrapper>
     )
 
     const firstStar = screen.getByRole('button', { name: /rate 1 out of 5 stars/i })

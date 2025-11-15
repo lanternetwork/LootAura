@@ -22,9 +22,10 @@ interface SaleDetailClientProps {
   displayCategories?: string[]
   items?: SaleItem[]
   nearbySales?: Array<Sale & { distance_m: number }>
+  currentUserRating?: number | null
 }
 
-export default function SaleDetailClient({ sale, displayCategories = [], items = [], nearbySales = [] }: SaleDetailClientProps) {
+export default function SaleDetailClient({ sale, displayCategories = [], items = [], nearbySales = [], currentUserRating }: SaleDetailClientProps) {
   const searchParams = useSearchParams()
   
   // Get viewport params from URL to preserve on back navigation
@@ -389,6 +390,8 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
           <SellerActivityCard
             ownerProfile={sale.owner_profile}
             ownerStats={sale.owner_stats}
+            currentUserRating={currentUserRating ?? null}
+            saleId={sale.id}
           />
 
           {/* Shopping Tips */}

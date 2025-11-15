@@ -3,11 +3,13 @@ import { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { deriveCategories } from '@/lib/profile/deriveCategories'
 import { createPageMetadata } from '@/lib/metadata'
+import { getUserRatingForSeller } from '@/lib/data/ratingsAccess'
 import { IdentityCard } from '@/components/profile/IdentityCard'
 import { SocialLinksRow } from '@/components/profile/SocialLinksRow'
 import { AboutCard } from '@/components/profile/AboutCard'
 import { PreferredCategories } from '@/components/profile/PreferredCategories'
 import { SellerSignals } from '@/components/profile/SellerSignals'
+import { SellerRatingStars } from '@/components/seller/SellerRatingStars'
 import Link from 'next/link'
 import { Suspense } from 'react'
 
@@ -119,19 +121,27 @@ async function fetchProfileData(slug: string) {
       .eq('user_id', profile.id)
       .maybeSingle(),
   ])
-  
+
   const ownerStats = ownerStatsResult.error || !ownerStatsResult.data
     ? { avg_rating: null, ratings_count: null, total_sales: null }
     : ownerStatsResult.data
+
+  // Fetch current user's rating for this seller (if authenticated)
+  let currentUserRating: number | null = null
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user && user.id !== profile.id) {
+    currentUserRating = await getUserRatingForSeller(supabase, profile.id, user.id).catch(() => null)
+  }
   
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[PROFILE] public page fetch end', { slug, hasProfile: !!profile, categoriesCount: preferred.length })
   }
-  
+
   return {
     profile,
     preferred,
     ownerStats,
+    currentUserRating,
   }
 }
 
@@ -203,7 +213,7 @@ export default async function PublicProfilePage({ params, searchParams }: Public
   const data = await fetchProfileData(slug)
   if (!data) return notFound()
   
-  const { profile, preferred, ownerStats } = data
+  const { profile, preferred, ownerStats, currentUserRating } = data
   const listings = await fetchListings(profile.id, page)
   
   return (
@@ -246,6 +256,23 @@ export default async function PublicProfilePage({ params, searchParams }: Public
         salesFulfilled={ownerStats.total_sales}
         memberSince={profile.created_at}
       />
+
+      {/* Seller Rating Component */}
+      {profile.id && (
+        <div className="card">
+          <div className="card-body-lg">
+            <h2 className="card-title mb-4">Rate This Seller</h2>
+            <SellerRatingStars
+              sellerId={profile.id}
+              saleId={null}
+              currentUserRating={currentUserRating ?? null}
+              avgRating={ownerStats.avg_rating}
+              ratingsCount={ownerStats.ratings_count ?? 0}
+              isSeller={false} // Will be determined client-side by the component
+            />
+          </div>
+        </div>
+      )}
       
       <div className="card">
         <div className="card-body-lg">

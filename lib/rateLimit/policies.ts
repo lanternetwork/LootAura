@@ -27,6 +27,8 @@ export const Policies = {
   SALES_VIEW_HOURLY: { name: 'SALES_VIEW_HOURLY', limit: 800, windowSec: 3600, scope: 'ip' as const },
   MUTATE_MINUTE:     { name: 'MUTATE_MINUTE',     limit: 3,  windowSec: 60, scope: 'user' as const },
   MUTATE_DAILY:      { name: 'MUTATE_DAILY',      limit: 100, windowSec: 86400, scope: 'user' as const },
+  RATING_MINUTE:     { name: 'RATING_MINUTE',     limit: 10, windowSec: 60, scope: 'user' as const },
+  RATING_HOURLY:      { name: 'RATING_HOURLY',    limit: 50, windowSec: 3600, scope: 'user' as const },
   ADMIN_TOOLS:       { name: 'ADMIN_TOOLS',       limit: 3,  windowSec: 30, scope: 'ip' as const },
   ADMIN_HOURLY:      { name: 'ADMIN_HOURLY',      limit: 60, windowSec: 3600, scope: 'ip' as const },
 } as const

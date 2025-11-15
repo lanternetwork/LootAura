@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getSaleWithItems, getNearestSalesForSale } from '@/lib/data/salesAccess'
+import { getUserRatingForSeller } from '@/lib/data/ratingsAccess'
 import SaleDetailClient from './SaleDetailClient'
 import { createSaleMetadata, createSaleEventStructuredData, createBreadcrumbStructuredData } from '@/lib/metadata'
 
@@ -30,6 +31,15 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   // Fetch nearby sales (non-blocking - if it fails, we just don't show the card)
   const nearbySales = await getNearestSalesForSale(supabase, params.id, 2).catch(() => [])
 
+  // Fetch current user's rating for this seller (if authenticated)
+  let currentUserRating: number | null = null
+  if (sale.owner_id) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user && user.id !== sale.owner_id) {
+      currentUserRating = await getUserRatingForSeller(supabase, sale.owner_id, user.id).catch(() => null)
+    }
+  }
+
   const _metadata = createSaleMetadata(sale)
   
   // Create structured data for SEO
@@ -51,7 +61,13 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbStructuredData) }}
       />
       <Suspense fallback={<div className="p-4">Loading...</div>}>
-        <SaleDetailClient sale={sale} displayCategories={displayCategories} items={items} nearbySales={nearbySales} />
+        <SaleDetailClient 
+          sale={sale} 
+          displayCategories={displayCategories} 
+          items={items} 
+          nearbySales={nearbySales}
+          currentUserRating={currentUserRating}
+        />
       </Suspense>
     </div>
   )

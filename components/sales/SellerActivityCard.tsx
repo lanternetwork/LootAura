@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { SellerRatingStars } from '@/components/seller/SellerRatingStars'
+import { useAuth } from '@/lib/hooks/useAuth'
 
 type SellerActivityCardProps = {
   ownerProfile?: { 
@@ -17,9 +19,12 @@ type SellerActivityCardProps = {
     ratings_count?: number | null
     last_sale_at?: string | null
   } | null
+  currentUserRating?: number | null
+  saleId?: string | null
 }
 
-export function SellerActivityCard({ ownerProfile, ownerStats }: SellerActivityCardProps) {
+export function SellerActivityCard({ ownerProfile, ownerStats, currentUserRating, saleId }: SellerActivityCardProps) {
+  const { data: currentUser } = useAuth()
   const createdAt = ownerProfile?.created_at ? new Date(ownerProfile.created_at) : null
   const memberSince = createdAt
     ? createdAt.toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
@@ -27,6 +32,7 @@ export function SellerActivityCard({ ownerProfile, ownerStats }: SellerActivityC
 
   const totalSales = ownerStats?.total_sales ?? 0
   const hasRatings = (ownerStats?.ratings_count ?? 0) > 0
+  const isSeller = currentUser?.id === ownerProfile?.id
 
   // Build profile link - prefer username, fallback to id
   const profileSlug = ownerProfile?.username || ownerProfile?.id || ''
@@ -89,14 +95,20 @@ export function SellerActivityCard({ ownerProfile, ownerStats }: SellerActivityC
         <span className="text-[#5B4A83]">Sales posted</span>
         <span className="font-medium text-[#3A2268]">{totalSales}</span>
       </div>
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-[#5B4A83]">Rating</span>
-        {hasRatings ? (
-          <span className="font-medium text-[#3A2268]">⭐ {ownerStats?.avg_rating?.toFixed?.(1)}</span>
-        ) : (
-          <span className="text-xs text-[#8D7DB2]">Reviews coming soon</span>
-        )}
-      </div>
+      {/* Rating Section */}
+      {ownerProfile?.id && (
+        <div className="space-y-2 pt-2 border-t border-gray-200">
+          <div className="text-sm font-semibold text-[#3A2268]">Seller Rating</div>
+          <SellerRatingStars
+            sellerId={ownerProfile.id}
+            saleId={saleId || null}
+            currentUserRating={currentUserRating ?? null}
+            avgRating={ownerStats?.avg_rating ?? null}
+            ratingsCount={ownerStats?.ratings_count ?? 0}
+            isSeller={isSeller}
+          />
+        </div>
+      )}
     </div>
   )
 }

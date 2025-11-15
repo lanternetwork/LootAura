@@ -134,9 +134,9 @@ describe('SellerRatingStars', () => {
   })
 
   it('calls API when star is clicked', async () => {
-    // Ensure user is authenticated (set before render)
+    // Ensure user is authenticated and NOT the seller (set before render)
     mockUseAuth.mockReturnValue({
-      data: { id: 'user-123' },
+      data: { id: 'user-123' }, // Different from sellerId
       isLoading: false,
       error: null,
     })
@@ -158,10 +158,10 @@ describe('SellerRatingStars', () => {
       href: 'http://localhost/sales/test-sale',
     }
 
-    render(
+    const { rerender } = render(
       <TestWrapper>
         <SellerRatingStars
-          sellerId="seller-123"
+          sellerId="seller-456" // Different from user-123
           avgRating={null}
           ratingsCount={0}
           currentUserRating={null}
@@ -169,6 +169,11 @@ describe('SellerRatingStars', () => {
         />
       </TestWrapper>
     )
+
+    // Wait for component to render and useAuth to be called
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /rate 1 out of 5 stars/i })).toBeInTheDocument()
+    })
 
     const fourthStar = screen.getByRole('button', { name: /rate 4 out of 5 stars/i })
     
@@ -179,12 +184,10 @@ describe('SellerRatingStars', () => {
     // Click the star
     fireEvent.click(fourthStar)
 
-    // Wait for fetch to be called - the component should call it immediately
+    // Wait for fetch to be called
     await waitFor(
       () => {
-        if (mockFetch.mock.calls.length === 0) {
-          throw new Error('Fetch not called yet')
-        }
+        expect(mockFetch).toHaveBeenCalled()
       },
       { timeout: 3000 }
     )
@@ -197,7 +200,7 @@ describe('SellerRatingStars', () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          seller_id: 'seller-123',
+          seller_id: 'seller-456',
           rating: 4,
           sale_id: null,
         }),

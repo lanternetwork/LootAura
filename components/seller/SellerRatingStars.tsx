@@ -45,7 +45,8 @@ export function SellerRatingStars({
 
       // If not authenticated, redirect to sign in
       if (!isAuthenticated) {
-        router.push(`/auth/signin?redirectTo=${encodeURIComponent(window.location.pathname)}`)
+        const pathname = typeof window !== 'undefined' && window.location ? window.location.pathname : '/'
+        router.push(`/auth/signin?redirectTo=${encodeURIComponent(pathname)}`)
         return
       }
 

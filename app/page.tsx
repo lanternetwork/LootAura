@@ -18,7 +18,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AuthStateRefresher />
+      <Suspense fallback={null}>
+        <AuthStateRefresher />
+      </Suspense>
       <Hero />
       <CoreFlowsSection />
       <Suspense fallback={<div className="py-12 bg-gray-50" />}>

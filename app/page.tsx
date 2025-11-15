@@ -1,6 +1,5 @@
 import { Suspense } from 'react'
 import { Metadata } from 'next'
-import { Header } from '@/app/Header'
 import { Hero } from '@/components/landing/Hero'
 import { CoreFlowsSection } from '@/components/landing/CoreFlowsSection'
 import { FeaturedSalesSection } from '@/components/landing/FeaturedSalesSection'
@@ -20,7 +19,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       <AuthStateRefresher />
-      <Header />
       <Hero />
       <CoreFlowsSection />
       <Suspense fallback={<div className="py-12 bg-gray-50" />}>

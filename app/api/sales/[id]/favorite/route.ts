@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Auth check
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
-    logger.warn('Unauthorized favorite attempt', undefined, {
+    logger.warn('Unauthorized favorite attempt', {
       component: 'sales/favorite',
       operation: 'auth_check',
     })

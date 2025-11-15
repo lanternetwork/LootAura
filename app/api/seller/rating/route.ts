@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import { type NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { upsertSellerRating } from '@/lib/data/ratingsAccess'
 import { Policies } from '@/lib/rateLimit/policies'
@@ -18,7 +18,7 @@ async function postHandler(req: NextRequest) {
   // Auth check
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
-    logger.warn('Unauthorized rating attempt', undefined, {
+    logger.warn('Unauthorized rating attempt', {
       component: 'seller/rating',
       operation: 'auth_check',
     })
@@ -35,7 +35,7 @@ async function postHandler(req: NextRequest) {
     const result = await check(policy, key)
     
     if (!result.allowed) {
-      logger.warn('Rate limit exceeded for rating', undefined, {
+      logger.warn('Rate limit exceeded for rating', {
         component: 'seller/rating',
         operation: 'rate_limit',
         userId: user.id,

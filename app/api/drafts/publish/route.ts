@@ -142,13 +142,14 @@ export async function POST(request: NextRequest) {
 
     if (sErr) {
       const { logger } = await import('@/lib/log')
-      logger.error('Failed to create sale during draft publish', sErr, {
+      const saleError = sErr instanceof Error ? sErr : new Error(String(sErr))
+      logger.error('Failed to create sale during draft publish', saleError, {
         component: 'drafts/publish',
         operation: 'create_sale',
         draftId: draft.id,
         userId: user.id,
       })
-      return fail(500, 'SALE_CREATE_FAILED', sErr.message, sErr)
+      return fail(500, 'SALE_CREATE_FAILED', saleError.message, saleError)
     }
 
     createdSaleId = saleRow.id
@@ -191,7 +192,8 @@ export async function POST(request: NextRequest) {
       
       if (iErr) {
         const { logger } = await import('@/lib/log')
-        logger.error('Failed to create items during draft publish', iErr, {
+        const itemsError = iErr instanceof Error ? iErr : new Error(String(iErr))
+        logger.error('Failed to create items during draft publish', itemsError, {
           component: 'drafts/publish',
           operation: 'create_items',
           draftId: draft.id,
@@ -209,20 +211,21 @@ export async function POST(request: NextRequest) {
               saleId: createdSaleId ?? undefined,
             })
           } catch (cleanupErr) {
-            logger.error('Failed to cleanup sale after item creation failure', cleanupErr, {
+            const cleanupError = cleanupErr instanceof Error ? cleanupErr : new Error(String(cleanupErr))
+            logger.error('Failed to cleanup sale after item creation failure', cleanupError, {
               component: 'drafts/publish',
               operation: 'compensation_failed',
               saleId: createdSaleId ?? undefined,
             })
             // Report to Sentry but don't fail the response
-            Sentry.captureException(cleanupErr, {
+            Sentry.captureException(cleanupError, {
               tags: { operation: 'publishDraft', step: 'compensation' },
               extra: { saleId: createdSaleId, draftId: draft.id },
             })
           }
         }
         
-        return fail(500, 'ITEMS_CREATE_FAILED', iErr.message, iErr)
+        return fail(500, 'ITEMS_CREATE_FAILED', itemsError.message, itemsError)
       }
       
       // Track created item IDs for potential cleanup
@@ -371,20 +374,22 @@ export async function POST(request: NextRequest) {
           itemIds: createdItemIds,
         })
       } catch (cleanupErr) {
-        logger.error('Failed to cleanup resources after publish failure', cleanupErr, {
+        const cleanupError = cleanupErr instanceof Error ? cleanupErr : new Error(String(cleanupErr))
+        logger.error('Failed to cleanup resources after publish failure', cleanupError, {
           component: 'drafts/publish',
           operation: 'compensation_failed',
           saleId: createdSaleId ?? undefined,
           itemIds: createdItemIds,
         })
-        Sentry.captureException(cleanupErr, {
+        Sentry.captureException(cleanupError, {
           tags: { operation: 'publishDraft', step: 'compensation' },
           extra: { saleId: createdSaleId, itemIds: createdItemIds },
         })
       }
     }
     
-    logger.error('Draft publish failed with exception', e, {
+    const error = e instanceof Error ? e : new Error(String(e))
+    logger.error('Draft publish failed with exception', error, {
       component: 'drafts/publish',
       operation: 'publish_draft',
       draftId: draft?.id,
@@ -394,8 +399,8 @@ export async function POST(request: NextRequest) {
     if (!isProduction()) {
       console.error('[PUBLISH/POST] thrown:', e)
     }
-    Sentry.captureException(e, { tags: { operation: 'publishDraft' } })
-    return fail(500, 'PUBLISH_FAILED', e.message)
+    Sentry.captureException(error, { tags: { operation: 'publishDraft' } })
+    return fail(500, 'PUBLISH_FAILED', error.message)
   }
 }
 

@@ -24,7 +24,7 @@ const MockSaleCard = ({ saleId }: { saleId: string }) => {
 
 const MockSalesList = ({ sales }: { sales: string[] }) => {
   return (
-    <div data-panel="list" className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div data-panel="list" className="w-full grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-6">
       {sales.map(saleId => (
         <MockSaleCard key={saleId} saleId={saleId} />
       ))}
@@ -82,8 +82,8 @@ describe('list.dom', () => {
     expect(listPanel).toHaveClass('w-full')
     expect(listPanel).toHaveClass('grid')
     expect(listPanel).toHaveClass('grid-cols-1')
-    expect(listPanel).toHaveClass('sm:grid-cols-2')
-    expect(listPanel).toHaveClass('lg:grid-cols-3')
+    expect(listPanel).toHaveClass('md:grid-cols-1')
+    expect(listPanel).toHaveClass('lg:grid-cols-2')
     expect(listPanel).toHaveClass('gap-6')
   })
   

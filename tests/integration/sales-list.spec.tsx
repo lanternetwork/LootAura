@@ -70,12 +70,12 @@ describe('SalesList Integration', () => {
     // Check container exists with responsive layout classes
     const gridContainer = screen.getByTestId('sales-list')
     expect(gridContainer).toBeInTheDocument()
-    // Mobile: flex flex-col, Desktop: md:grid
+    // Mobile: flex flex-col, Tablet: md:grid md:grid-cols-1, Desktop: lg:grid-cols-2
     expect(gridContainer).toHaveClass('flex')
     expect(gridContainer).toHaveClass('flex-col')
     expect(gridContainer).toHaveClass('md:grid')
-    expect(gridContainer).toHaveClass('md:grid-cols-2')
-    expect(gridContainer).toHaveClass('lg:grid-cols-3')
+    expect(gridContainer).toHaveClass('md:grid-cols-1')
+    expect(gridContainer).toHaveClass('lg:grid-cols-2')
   })
 
   it('should handle empty sales list', () => {

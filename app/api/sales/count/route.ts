@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
           return ok({ count: 0, durationMs: Date.now() - startedAt })
         }
       } catch (error) {
-        console.error(`[SALES/COUNT] Failed to resolve zip=${zip}:`, error)
+        console.error('[SALES/COUNT] Failed to resolve zip code:', { zip, error })
         return ok({ count: 0, durationMs: Date.now() - startedAt })
       }
     } else if (lat && lng) {

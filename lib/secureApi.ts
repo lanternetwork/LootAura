@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireCsrfToken } from '@/lib/csrf'
 import { sanitizeText, sanitizeHtml, sanitizeEmail, sanitizeUrl, sanitizeTags } from '@/lib/sanitize'
+import { sanitizeErrorMessage } from '@/lib/errors/sanitize'
+import { fail } from '@/lib/http/json'
+import { logger } from '@/lib/log'
+import * as Sentry from '@sentry/nextjs'
 
 export interface SecureApiOptions {
   requireAuth?: boolean
@@ -25,6 +29,11 @@ export function createSecureApiHandler(
 
       // CSRF protection
       if (options.requireCsrf && !requireCsrfToken(req)) {
+        logger.warn('CSRF token validation failed', {
+          component: 'secureApi',
+          operation: 'csrf_check',
+          path: req.nextUrl.pathname,
+        })
         return NextResponse.json(
           { error: 'Invalid CSRF token' },
           { status: 403 }
@@ -40,11 +49,29 @@ export function createSecureApiHandler(
       // Call the actual handler
       return await handler(req, context)
     } catch (error) {
-      console.error('API Error:', error)
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
+      // Log error with context
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      logger.error('API handler error', error instanceof Error ? error : new Error(errorMessage), {
+        component: 'secureApi',
+        operation: 'handler_execution',
+        path: req.nextUrl.pathname,
+        method: req.method,
+      })
+
+      // Send to Sentry in production
+      if (process.env.NODE_ENV === 'production') {
+        Sentry.captureException(error, {
+          tags: {
+            component: 'secureApi',
+            path: req.nextUrl.pathname,
+            method: req.method,
+          },
+        })
+      }
+
+      // Return sanitized error response
+      const safeMessage = sanitizeErrorMessage(error, 'Internal server error')
+      return fail(500, 'INTERNAL_ERROR', safeMessage)
     }
   }
 }

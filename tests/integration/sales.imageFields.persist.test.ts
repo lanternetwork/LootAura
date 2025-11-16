@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import * as ImageValidate from '@/lib/images/validateImageUrl'
+import { generateCsrfToken } from '@/lib/csrf'
 
 // Ensure Cloudinary validator recognizes the test cloud name
 ;(process.env as any).NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME = 'test'
@@ -66,6 +67,21 @@ beforeAll(async () => {
 	POST = route.POST
 })
 
+// Helper function to create a request with CSRF token
+function createRequestWithCsrf(url: string, body: any): NextRequest {
+	const csrfToken = generateCsrfToken()
+	const request = new NextRequest(url, {
+		method: 'POST',
+		body: JSON.stringify(body),
+		headers: {
+			'Content-Type': 'application/json',
+			'x-csrf-token': csrfToken,
+			'cookie': `csrf-token=${csrfToken}`
+		}
+	})
+	return request
+}
+
 describe('Sales API - Image Support', () => {
 	beforeEach(() => {
 		// Match working test pattern exactly - use clearAllMocks() like v2 test
@@ -106,21 +122,18 @@ describe('Sales API - Image Support', () => {
 	it('should accept and persist cover_image_url', async () => {
 	// No-op: insert/select/single chain in shared mock will reflect payload
 
-		const request = new NextRequest('http://localhost:3000/api/sales', {
-			method: 'POST',
-			body: JSON.stringify({
-				title: 'Test Sale',
-				description: 'Test Description',
-				address: '123 Test St',
-				city: 'Test City',
-				state: 'TS',
-				zip_code: '12345',
-				lat: 38.2527,
-				lng: -85.7585,
-				date_start: '2024-01-01',
-				time_start: '09:00',
-				cover_image_url: 'https://res.cloudinary.com/test/image/upload/v123/cover.jpg'
-			})
+		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
+			title: 'Test Sale',
+			description: 'Test Description',
+			address: '123 Test St',
+			city: 'Test City',
+			state: 'TS',
+			zip_code: '12345',
+			lat: 38.2527,
+			lng: -85.7585,
+			date_start: '2024-01-01',
+			time_start: '09:00',
+			cover_image_url: 'https://res.cloudinary.com/test/image/upload/v123/cover.jpg'
 		})
 
 		const response = await POST(request)
@@ -137,21 +150,18 @@ describe('Sales API - Image Support', () => {
 	it('should accept and validate images array', async () => {
 	// No-op: shared mock returns inserted row id
 
-		const request = new NextRequest('http://localhost:3000/api/sales', {
-			method: 'POST',
-			body: JSON.stringify({
-				title: 'Test Sale',
-				description: 'Test Description',
-				address: '123 Test St',
-				city: 'Test City',
-				state: 'TS',
-				zip_code: '12345',
-				lat: 38.2527,
-				lng: -85.7585,
-				date_start: '2024-01-01',
-				time_start: '09:00',
-				images: ['https://res.cloudinary.com/test/image/upload/v123/img1.jpg']
-			})
+		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
+			title: 'Test Sale',
+			description: 'Test Description',
+			address: '123 Test St',
+			city: 'Test City',
+			state: 'TS',
+			zip_code: '12345',
+			lat: 38.2527,
+			lng: -85.7585,
+			date_start: '2024-01-01',
+			time_start: '09:00',
+			images: ['https://res.cloudinary.com/test/image/upload/v123/img1.jpg']
 		})
 
 		const response = await POST(request)
@@ -167,21 +177,18 @@ describe('Sales API - Image Support', () => {
 		// Set mock to return false for invalid URLs in this test
 		mockIsAllowedImageUrl.mockReturnValue(false)
 		
-		const request = new NextRequest('http://localhost:3000/api/sales', {
-			method: 'POST',
-			body: JSON.stringify({
-				title: 'Test Sale',
-				description: 'Test Description',
-				address: '123 Test St',
-				city: 'Test City',
-				state: 'TS',
-				zip_code: '12345',
-				lat: 38.2527,
-				lng: -85.7585,
-				date_start: '2024-01-01',
-				time_start: '09:00',
-				cover_image_url: 'https://malicious-site.com/image.jpg'
-			})
+		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
+			title: 'Test Sale',
+			description: 'Test Description',
+			address: '123 Test St',
+			city: 'Test City',
+			state: 'TS',
+			zip_code: '12345',
+			lat: 38.2527,
+			lng: -85.7585,
+			date_start: '2024-01-01',
+			time_start: '09:00',
+			cover_image_url: 'https://malicious-site.com/image.jpg'
 		})
 
 		const response = await POST(request)
@@ -197,24 +204,21 @@ describe('Sales API - Image Support', () => {
 			return url.includes('res.cloudinary.com/test')
 		})
 		
-		const request = new NextRequest('http://localhost:3000/api/sales', {
-			method: 'POST',
-			body: JSON.stringify({
-				title: 'Test Sale',
-				description: 'Test Description',
-				address: '123 Test St',
-				city: 'Test City',
-				state: 'TS',
-				zip_code: '12345',
-				lat: 38.2527,
-				lng: -85.7585,
-				date_start: '2024-01-01',
-				time_start: '09:00',
-				images: [
-					'https://res.cloudinary.com/test/image/upload/v123/img1.jpg',
-					'https://malicious-site.com/image.jpg'
-				]
-			})
+		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
+			title: 'Test Sale',
+			description: 'Test Description',
+			address: '123 Test St',
+			city: 'Test City',
+			state: 'TS',
+			zip_code: '12345',
+			lat: 38.2527,
+			lng: -85.7585,
+			date_start: '2024-01-01',
+			time_start: '09:00',
+			images: [
+				'https://res.cloudinary.com/test/image/upload/v123/img1.jpg',
+				'https://malicious-site.com/image.jpg'
+			]
 		})
 
 		const response = await POST(request)
@@ -227,21 +231,18 @@ describe('Sales API - Image Support', () => {
 	it('should handle empty images array', async () => {
 	// No-op: shared mock returns inserted row id
 
-		const request = new NextRequest('http://localhost:3000/api/sales', {
-			method: 'POST',
-			body: JSON.stringify({
-				title: 'Test Sale',
-				description: 'Test Description',
-				address: '123 Test St',
-				city: 'Test City',
-				state: 'TS',
-				zip_code: '12345',
-				lat: 38.2527,
-				lng: -85.7585,
-				date_start: '2024-01-01',
-				time_start: '09:00',
-				images: []
-			})
+		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
+			title: 'Test Sale',
+			description: 'Test Description',
+			address: '123 Test St',
+			city: 'Test City',
+			state: 'TS',
+			zip_code: '12345',
+			lat: 38.2527,
+			lng: -85.7585,
+			date_start: '2024-01-01',
+			time_start: '09:00',
+			images: []
 		})
 
 		const response = await POST(request)
@@ -257,20 +258,17 @@ describe('Sales API - Image Support', () => {
 	it('should default images to empty array when not provided', async () => {
 		// No-op: shared supabase mock will return inserted row with id
 
-		const request = new NextRequest('http://localhost:3000/api/sales', {
-			method: 'POST',
-			body: JSON.stringify({
-				title: 'Test Sale',
-				description: 'Test Description',
-				address: '123 Test St',
-				city: 'Test City',
-				state: 'TS',
-				zip_code: '12345',
-				lat: 38.2527,
-				lng: -85.7585,
-				date_start: '2024-01-01',
-				time_start: '09:00'
-			})
+		const request = createRequestWithCsrf('http://localhost:3000/api/sales', {
+			title: 'Test Sale',
+			description: 'Test Description',
+			address: '123 Test St',
+			city: 'Test City',
+			state: 'TS',
+			zip_code: '12345',
+			lat: 38.2527,
+			lng: -85.7585,
+			date_start: '2024-01-01',
+			time_start: '09:00'
 		})
 
 		const response = await POST(request)

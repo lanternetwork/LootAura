@@ -1,10 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Sale } from '@/lib/types'
-import { getDatePresetById } from '@/lib/shared/datePresets'
 
 interface WeekendStatsData {
   activeSales: number
@@ -21,22 +19,97 @@ interface LocationState {
 export function WeekendStats() {
   const searchParams = useSearchParams()
   const [location, setLocation] = useState<LocationState | null>(null)
-  const [status, setStatus] = useState<'resolving' | 'ready' | 'error'>('resolving')
   const [stats, setStats] = useState<WeekendStatsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isDefaultLocation, setIsDefaultLocation] = useState(false)
 
-  // Location inference - same logic as FeaturedSalesSection
+  // Fetch stats with a given location
+  const fetchStatsForLocation = useCallback(async (loc: LocationState, isDefault = false) => {
+    try {
+      const params = new URLSearchParams()
+      
+      if (loc.lat && loc.lng) {
+        params.set('lat', loc.lat.toString())
+        params.set('lng', loc.lng.toString())
+        params.set('radiusKm', '50')
+      } else if (loc.zip) {
+        params.set('zip', loc.zip)
+        params.set('radiusKm', '50')
+      } else {
+        return
+      }
+      
+      // Use dateRange=this_weekend to match exactly what the sales page filter uses
+      params.set('dateRange', 'this_weekend')
+
+      // Use lightweight count endpoint for faster loading
+      const countUrl = `/api/sales/count?${params.toString()}`
+      console.log('[WeekendStats] Fetching weekend sales count:', countUrl, { isDefault })
+      const countRes = await fetch(countUrl)
+      if (!countRes.ok) {
+        throw new Error(`Failed to fetch weekend sales count: ${countRes.status}`)
+      }
+      const countData = await countRes.json()
+      const weekendCount = countData.count || 0
+      console.log('[WeekendStats] Weekend sales count response:', {
+        ok: countRes.ok,
+        count: weekendCount,
+        durationMs: countData.durationMs,
+        isDefault
+      })
+
+      // Calculate stats
+      const activeSales = weekendCount
+
+      // Update stats based on location type:
+      // - Real location: always update (even if 0, that's the actual count)
+      // - Default location with > 0: update immediately
+      // - Default location with 0: don't update, wait for real location
+      if (!isDefault) {
+        // Real location resolved - always update
+        console.log('[WeekendStats] Updating stats from real location - Active sales:', activeSales)
+        setStats({ activeSales })
+        setLoading(false)
+        setIsDefaultLocation(false)
+      } else if (activeSales > 0) {
+        // Default location has sales - show immediately
+        console.log('[WeekendStats] Updating stats from default location - Active sales:', activeSales)
+        setStats({ activeSales })
+        setLoading(false)
+      } else {
+        // Default location returned 0 - wait for real location
+        console.log('[WeekendStats] Default location returned 0, waiting for real location')
+        setIsDefaultLocation(true)
+        // Keep loading true and don't update stats - show fallback
+      }
+    } catch (error) {
+      console.error('[WeekendStats] Error fetching stats:', error)
+      // Only set stats to null if we don't have any stats yet
+      if (!stats) {
+        setStats(null)
+        setLoading(false)
+      }
+    }
+  }, [stats])
+
+  // Location inference - optimized to start fetching immediately
   useEffect(() => {
-    // 1) URL first
+    // 1) URL first (fastest path)
     const zipFromUrl = searchParams.get('zip') || searchParams.get('postal')
     if (zipFromUrl) {
-      setLocation({ zip: zipFromUrl })
-      setStatus('ready')
+      const loc = { zip: zipFromUrl }
+      setLocation(loc)
+      setIsDefaultLocation(false)
+      fetchStatsForLocation(loc, false)
       return
     }
 
-    // 2) Try IP-based geolocation first (works with VPNs and doesn't require permission)
-    // This should be the PRIMARY method since it respects VPN location
+    // 2) Start with a default US location to fetch stats immediately
+    // This ensures the count appears quickly while we resolve the actual location
+    const defaultLocation: LocationState = { lat: 39.8283, lng: -98.5795 } // US center
+    fetchStatsForLocation(defaultLocation, true)
+
+    // 3) Try IP-based geolocation in parallel (works with VPNs and doesn't require permission)
     const tryIPGeolocation = async () => {
       try {
         const ipRes = await fetch('/api/geolocation/ip')
@@ -51,7 +124,9 @@ export function WeekendStats() {
               state: ipData.state
             }
             setLocation(loc)
-            setStatus('ready')
+            setIsDefaultLocation(false)
+            // Fetch with actual location (will update the count if different)
+            fetchStatsForLocation(loc, false)
             return true
           }
         }
@@ -61,101 +136,20 @@ export function WeekendStats() {
       return false
     }
     
-    // Try IP geolocation first (respects VPN location)
+    // Try IP geolocation (respects VPN location)
     tryIPGeolocation().then((ipSuccess) => {
       if (ipSuccess) return
       
-      // Do NOT call browser geolocation; rely on inferred IP/location or fallback
-      console.log('[WeekendStats] Geolocation disabled by policy; using inferred or fallback location')
-      setStatus('ready')
+      // If IP geolocation failed, keep using default location
+      setLocation(defaultLocation)
+      console.log('[WeekendStats] Using default location after IP geolocation failed')
     })
   }, [searchParams])
 
-  // Fetch stats when location is ready
-  useEffect(() => {
-    if (status !== 'ready' || !location) {
-      setLoading(true)
-      return
-    }
-
-    const fetchStats = async () => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        
-        if (location.lat && location.lng) {
-          params.set('lat', location.lat.toString())
-          params.set('lng', location.lng.toString())
-          params.set('radiusKm', '50')
-        } else if (location.zip) {
-          params.set('zip', location.zip)
-          params.set('radiusKm', '50')
-        } else {
-          setLoading(false)
-          return
-        }
-        
-        // Set limit to match map behavior (200 is max)
-        params.set('limit', '200')
-
-        // Use dateRange=this_weekend to match exactly what the sales page filter uses
-        // This ensures both the hero card and sales page use the same API query
-        params.set('dateRange', 'this_weekend')
-
-        // Get the preset for logging/debugging only
-        const now = new Date()
-        const weekendPreset = getDatePresetById('this_weekend', now)
-        if (!weekendPreset) {
-          throw new Error('Failed to resolve weekend date preset')
-        }
-
-        console.log('[WeekendStats] Using dateRange=this_weekend (same as sales page filter)')
-        console.log('[WeekendStats] Weekend preset details:', {
-          presetId: weekendPreset.id,
-          presetLabel: weekendPreset.label,
-          start: weekendPreset.start,
-          end: weekendPreset.end
-        })
-
-        // Fetch weekend sales
-        const weekendUrl = `/api/sales?${params.toString()}`
-        console.log('[WeekendStats] Fetching weekend sales:', weekendUrl)
-        const weekendRes = await fetch(weekendUrl)
-        if (!weekendRes.ok) {
-          throw new Error(`Failed to fetch weekend sales: ${weekendRes.status}`)
-        }
-        const weekendData = await weekendRes.json()
-        const weekendSales: Sale[] = weekendData.data || []
-        const weekendCount = weekendSales.length
-        console.log('[WeekendStats] Weekend sales response:', {
-          ok: weekendRes.ok,
-          count: weekendCount,
-          totalInResponse: weekendData.count || weekendData.data?.length || 0,
-          sampleIds: weekendSales.slice(0, 3).map(s => s.id),
-          fullResponse: weekendData
-        })
-        console.log('[WeekendStats] Weekend count:', weekendCount, 'sales')
-
-        // Calculate stats
-        const activeSales = weekendCount
-
-        console.log('[WeekendStats] FINAL STATS - Active sales:', activeSales)
-        setStats({ activeSales })
-      } catch (error) {
-        console.error('[WeekendStats] Error fetching stats:', error)
-        setStats(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, location?.lat, location?.lng, location?.zip])
-
-  // Show fallback values while loading or on error
-  const displayStats = stats || { activeSales: 12 }
+  // Show fallback values while loading, on error, or if we only have a 0 from default location
+  const displayStats = (stats && (!isDefaultLocation || stats.activeSales > 0)) 
+    ? stats 
+    : { activeSales: 12 }
   
   // Decode URL-encoded city name if present (safe decode)
   const cityName = (() => {

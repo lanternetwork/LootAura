@@ -11,41 +11,6 @@ export interface GeocodeResult {
   zip?: string
 }
 
-// In-memory cache with TTL and size limits
-interface CacheEntry {
-  result: GeocodeResult
-  expiresAt: number
-}
-
-const geocodeCache = new Map<string, CacheEntry>()
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
-const MAX_CACHE_SIZE = 100
-
-function evictCacheIfNeeded(): void {
-  if (geocodeCache.size >= MAX_CACHE_SIZE) {
-    // Remove oldest entry (first in map)
-    const firstKey = geocodeCache.keys().next().value
-    if (firstKey) {
-      geocodeCache.delete(firstKey)
-    }
-  }
-}
-
-function getCachedResult(key: string): GeocodeResult | null {
-  const entry = geocodeCache.get(key)
-  if (!entry) {
-    return null
-  }
-  
-  // Check expiration
-  if (Date.now() > entry.expiresAt) {
-    geocodeCache.delete(key)
-    return null
-  }
-  
-  return entry.result
-}
-
 export async function geocodeAddress(address: string): Promise<GeocodeResult | null> {
   if (typeof window !== 'undefined') {
     // Lazy import to avoid SSR touching window
@@ -54,20 +19,20 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
   
   const cacheKey = address.toLowerCase()
   
-  // Check cache first
-  const cached = getCachedResult(cacheKey)
+  // Check Redis-backed cache first
+  const { getGeocodeCache, setGeocodeCache } = await import('./geocode/redisCache')
+  const cached = await getGeocodeCache(cacheKey)
   if (cached) {
-    return cached
+    return cached as GeocodeResult
   }
 
   try {
     // Use Nominatim for geocoding
     const result = await geocodeWithNominatim(address)
     if (result) {
-      evictCacheIfNeeded()
-      geocodeCache.set(cacheKey, {
-        result,
-        expiresAt: Date.now() + CACHE_TTL_MS
+      // Store in Redis-backed cache (24 hour TTL)
+      await setGeocodeCache(cacheKey, result, 86400).catch(() => {
+        // Ignore cache write errors - geocoding succeeded
       })
       return result
     }
@@ -81,18 +46,37 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
 
 
 async function geocodeWithNominatim(address: string): Promise<GeocodeResult | null> {
+  const { retry, isTransientError } = await import('./utils/retry')
   const email = getNominatimEmail()
   
-  const response = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&email=${email}&limit=1`,
-    {
-      headers: {
-        'User-Agent': `LootAura/1.0 (contact: ${email})`
+  const data = await retry(
+    async () => {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&email=${email}&limit=1`,
+        {
+          headers: {
+            'User-Agent': `LootAura/1.0 (contact: ${email})`
+          }
+        }
+      )
+      
+      if (!response.ok) {
+        // Don't retry on 4xx errors (client errors)
+        if (response.status >= 400 && response.status < 500) {
+          throw new Error(`Nominatim request failed: ${response.status}`)
+        }
+        // Retry on 5xx and network errors
+        throw new Error(`Nominatim request failed: ${response.status}`)
       }
+      
+      return await response.json()
+    },
+    {
+      maxAttempts: 3,
+      initialDelayMs: 500,
+      retryable: isTransientError,
     }
   )
-  
-  const data = await response.json()
   
   if (data && data.length > 0) {
     const result = data[0]
@@ -109,8 +93,9 @@ async function geocodeWithNominatim(address: string): Promise<GeocodeResult | nu
   return null
 }
 
-export function clearGeocodeCache() {
-  geocodeCache.clear()
+export async function clearGeocodeCache() {
+  const { clearGeocodeCache: clearRedisCache } = await import('./geocode/redisCache')
+  await clearRedisCache()
 }
 
 // Suggest addresses using Nominatim (for autocomplete)

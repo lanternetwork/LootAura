@@ -1,13 +1,26 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { checkCsrfIfRequired } from '@/lib/api/csrfCheck'
+import { fail, ok } from '@/lib/http/json'
+import { logger } from '@/lib/log'
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> | { id: string } }) {
+  // CSRF protection check
+  const csrfError = await checkCsrfIfRequired(req)
+  if (csrfError) {
+    return csrfError
+  }
+
   const supabase = createSupabaseServerClient()
 
   // Auth check
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    logger.warn('Unauthorized favorite attempt', {
+      component: 'sales/favorite',
+      operation: 'auth_check',
+    })
+    return fail(401, 'AUTH_REQUIRED', 'Authentication required')
   }
 
   // Handle params as Promise (Next.js 15+) or object (Next.js 13/14)
@@ -28,8 +41,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     .maybeSingle()
 
   if (checkError) {
-    console.error('[FAVORITE_API] Error checking existing favorite:', checkError)
-    return NextResponse.json({ error: checkError.message }, { status: 400 })
+    logger.error('Error checking existing favorite', checkError instanceof Error ? checkError : new Error(String(checkError)), {
+      component: 'sales/favorite',
+      operation: 'check_favorite',
+      userId: user.id,
+      saleId,
+    })
+    return fail(400, 'FAVORITE_CHECK_FAILED', 'Failed to check favorite status')
   }
 
   if (existing) {
@@ -41,15 +59,23 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       .eq('sale_id', saleId)
 
     if (deleteError) {
-      console.error('[FAVORITE_API] Error deleting favorite:', deleteError)
-      return NextResponse.json({ error: deleteError.message }, { status: 400 })
+      logger.error('Error deleting favorite', deleteError instanceof Error ? deleteError : new Error(String(deleteError)), {
+        component: 'sales/favorite',
+        operation: 'delete_favorite',
+        userId: user.id,
+        saleId,
+      })
+      return fail(400, 'FAVORITE_DELETE_FAILED', 'Failed to remove favorite')
     }
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[FAVORITE_API] Deleted favorite:', { userId: user.id, saleId })
-    }
+    logger.info('Favorite removed', {
+      component: 'sales/favorite',
+      operation: 'delete_favorite',
+      userId: user.id,
+      saleId,
+    })
 
-    return NextResponse.json({ ok: true, favorited: false })
+    return ok({ favorited: false })
   }
 
   // Insert with upsert to avoid duplicate conflicts if called twice rapidly
@@ -58,15 +84,23 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     .upsert({ user_id: user.id, sale_id: saleId }, { onConflict: 'user_id,sale_id', ignoreDuplicates: true })
 
   if (upsertError) {
-    console.error('[FAVORITE_API] Error upserting favorite:', upsertError)
-    return NextResponse.json({ error: upsertError.message }, { status: 400 })
+    logger.error('Error upserting favorite', upsertError instanceof Error ? upsertError : new Error(String(upsertError)), {
+      component: 'sales/favorite',
+      operation: 'add_favorite',
+      userId: user.id,
+      saleId,
+    })
+    return fail(400, 'FAVORITE_ADD_FAILED', 'Failed to add favorite')
   }
 
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    console.log('[FAVORITE_API] Added favorite:', { userId: user.id, saleId })
-  }
+  logger.info('Favorite added', {
+    component: 'sales/favorite',
+    operation: 'add_favorite',
+    userId: user.id,
+    saleId,
+  })
 
-  return NextResponse.json({ ok: true, favorited: true })
+  return ok({ favorited: true })
 }
 
 

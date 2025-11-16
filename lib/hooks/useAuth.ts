@@ -9,17 +9,28 @@ export function useAuth() {
   return useQuery({
     queryKey: ['auth'],
     queryFn: async () => {
-      const { data: { user }, error } = await sb.auth.getUser()
-      if (error) {
-        throw new Error(error.message)
+      try {
+        const { data: { user }, error } = await sb.auth.getUser()
+        if (error) {
+          // Don't throw on auth errors - just return null (user is not authenticated)
+          // This prevents the query from being in a permanent error state
+          return null
+        }
+        return user
+      } catch (error) {
+        // Network errors or other issues - return null instead of throwing
+        // This allows the UI to show "Sign In" button instead of being stuck loading
+        console.warn('[useAuth] Error fetching user:', error)
+        return null
       }
-      return user
     },
     staleTime: 5 * 60 * 1000, // Consider auth data fresh for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (formerly cacheTime)
     refetchOnWindowFocus: false, // Don't refetch when window regains focus
     refetchOnMount: false, // Don't refetch on component mount if data exists
     refetchOnReconnect: true, // Only refetch on network reconnect
+    retry: 1, // Only retry once on failure
+    retryDelay: 1000, // Wait 1 second before retry
   })
 }
 

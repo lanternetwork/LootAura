@@ -1221,14 +1221,19 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
         </label>
         <input
           type="text"
+          id="sale-title"
           value={formData.title || ''}
           onChange={(e) => onChange('title', e.target.value)}
           placeholder="e.g., Huge Yard Sale with Antiques"
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] ${
+            errors?.title ? 'border-red-500' : 'border-gray-300'
+          }`}
           required
+          aria-invalid={!!errors?.title}
+          aria-describedby={errors?.title ? 'title-error' : undefined}
         />
         {errors?.title && (
-          <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+          <p id="title-error" className="mt-1 text-sm text-red-600" role="alert">{errors.title}</p>
         )}
       </div>
 
@@ -1256,11 +1261,15 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
             value={formData.date_start || ''}
             onChange={(e) => onChange('date_start', e.target.value)}
             onClick={(e) => e.currentTarget.showPicker?.()}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] cursor-pointer"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] cursor-pointer ${
+              errors?.date_start ? 'border-red-500' : 'border-gray-300'
+            }`}
             required
+            aria-invalid={!!errors?.date_start}
+            aria-describedby={errors?.date_start ? 'date_start-error' : undefined}
           />
         {errors?.date_start && (
-          <p className="mt-1 text-sm text-red-600">{errors.date_start}</p>
+          <p id="date_start-error" className="mt-1 text-sm text-red-600" role="alert">{errors.date_start}</p>
         )}
         </div>
         <div>
@@ -1344,17 +1353,22 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
           </label>
           <input
             type="text"
+            id="sale-city"
             value={formData.city || ''}
             onChange={(e) => onChange('city', e.target.value)}
             placeholder="City"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] ${
+              errors?.city ? 'border-red-500' : 'border-gray-300'
+            }`}
             required
             minLength={2}
             pattern="[A-Za-z\s]+"
             title="City name (letters only)"
+            aria-invalid={!!errors?.city}
+            aria-describedby={errors?.city ? 'city-error' : undefined}
           />
         {errors?.city && (
-          <p className="mt-1 text-sm text-red-600">{errors.city}</p>
+          <p id="city-error" className="mt-1 text-sm text-red-600" role="alert">{errors.city}</p>
         )}
         </div>
         <div>
@@ -1363,18 +1377,23 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
           </label>
           <input
             type="text"
+            id="sale-state"
             value={formData.state || ''}
             onChange={(e) => onChange('state', e.target.value.toUpperCase().slice(0, 2))}
             placeholder="State (e.g., KY)"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              errors?.state ? 'border-red-500' : 'border-gray-300'
+            }`}
             required
             minLength={2}
             maxLength={2}
             pattern="[A-Z]{2}"
             title="Two-letter state code (e.g., KY, CA)"
+            aria-invalid={!!errors?.state}
+            aria-describedby={errors?.state ? 'state-error' : undefined}
           />
         {errors?.state && (
-          <p className="mt-1 text-sm text-red-600">{errors.state}</p>
+          <p id="state-error" className="mt-1 text-sm text-red-600" role="alert">{errors.state}</p>
         )}
         </div>
         <div>
@@ -1383,18 +1402,23 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
           </label>
           <input
             type="text"
+            id="sale-zip"
             value={formData.zip_code || ''}
             onChange={(e) => {
               const value = e.target.value.replace(/\D/g, '').slice(0, 5)
               onChange('zip_code', value)
             }}
             placeholder="ZIP Code (5 digits)"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              errors?.zip_code ? 'border-red-500' : 'border-gray-300'
+            }`}
             pattern="\d{5}"
             title="5-digit ZIP code"
+            aria-invalid={!!errors?.zip_code}
+            aria-describedby={errors?.zip_code ? 'zip_code-error' : undefined}
           />
         {errors?.zip_code && (
-          <p className="mt-1 text-sm text-red-600">{errors.zip_code}</p>
+          <p id="zip_code-error" className="mt-1 text-sm text-red-600" role="alert">{errors.zip_code}</p>
         )}
         </div>
       </div>

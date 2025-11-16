@@ -5,11 +5,14 @@ import WebVitals from '@/components/WebVitals'
 import { ConditionalHeader } from '@/components/landing/ConditionalHeader'
 import { PWAComponents } from './PWAComponents'
 import DebugToggle from '@/components/debug/DebugToggle'
+import { ErrorBoundary } from '@/components/system/ErrorBoundary'
+import SkipToContent from '@/components/a11y/SkipToContent'
 import { createHomepageStructuredData, createOrganizationStructuredData } from '@/lib/metadata'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 // Disable Mapbox telemetry at app startup
 import '@/lib/maps/telemetry'
+import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -64,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
+        <SkipToContent />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(createHomepageStructuredData()) }}
@@ -73,23 +77,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(createOrganizationStructuredData()) }}
         />
         <Providers>
-          <ConditionalHeader />
-          <WebVitals />
-          {children}
-          <PWAComponents />
-          <DebugToggle />
-          <ToastContainer
-            position="bottom-right"
-            autoClose={3000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="light"
-          />
+          <ErrorBoundary>
+            <CsrfTokenInitializer />
+            <ConditionalHeader />
+            <WebVitals />
+            <main id="main-content" tabIndex={-1}>
+              {children}
+            </main>
+            <PWAComponents />
+            <DebugToggle />
+            <ToastContainer
+              position="bottom-right"
+              autoClose={3000}
+              hideProgressBar={false}
+              newestOnTop={false}
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="light"
+            />
+          </ErrorBoundary>
         </Providers>
       </body>
     </html>

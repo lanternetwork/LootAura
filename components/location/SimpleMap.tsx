@@ -30,6 +30,7 @@ interface SimpleMapProps {
   attributionPosition?: 'top-right' | 'bottom-right' | 'top-left' | 'bottom-left' // Position of OSM attribution overlay
   showOSMAttribution?: boolean // Show OSM attribution overlay
   attributionControl?: boolean // Show Mapbox attribution control (default: true)
+  bottomSheetHeight?: number // Height of bottom sheet in pixels (for mobile) - used for map resizing and pin centering offset
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -48,7 +49,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   interactive = true,
   attributionPosition = 'bottom-right',
   showOSMAttribution = true,
-  attributionControl = true
+  attributionControl = true,
+  bottomSheetHeight = 0
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -191,6 +193,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       console.log('[CLUSTER] expand', { lat: cluster.lat, lng: cluster.lng, expandToZoom: cluster.expandToZoom })
     }
     
+    // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
+    const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
+    
     // TEMPORARILY DISABLED: Zoom functionality works but is disabled for UX testing
     // Original zoom behavior (commented out):
     // map.flyTo({
@@ -202,12 +207,13 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     // TEMPORARY: Just center the map on the cluster without zooming
     map.flyTo({
       center: [cluster.lng, cluster.lat],
-      duration: 400
+      duration: 400,
+      offset: offsetY !== 0 ? [0, offsetY] : undefined
     })
     
     // Call the onClusterClick callback if provided
     pins?.onClusterClick?.(cluster)
-  }, [pins])
+  }, [pins, bottomSheetHeight])
 
   // First-click-to-center, second-click-to-select for location pins
   const centeredLocationRef = useRef<Record<string, boolean>>({})
@@ -227,7 +233,13 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     if (!alreadyCentered && mapRef.current?.getMap) {
       const map = mapRef.current.getMap()
       if (map && typeof lat === 'number' && typeof lng === 'number') {
-        map.flyTo({ center: [lng, lat], duration: 400 })
+        // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
+        const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
+        map.flyTo({ 
+          center: [lng, lat], 
+          duration: 400,
+          offset: offsetY !== 0 ? [0, offsetY] : undefined
+        })
         centeredLocationRef.current[locationId] = true
         return
       }
@@ -235,7 +247,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     
     // Second click (or if we couldn't center): select location
     hybridPins?.onLocationClick?.(locationId)
-  }, [hybridPins?.onLocationClick, hybridPins?.selectedId])
+  }, [hybridPins?.onLocationClick, hybridPins?.selectedId, bottomSheetHeight])
   
   // Reset centered flag when location is deselected or a different location is selected
   useEffect(() => {
@@ -299,6 +311,23 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       })
     }
   }, [center.lat, center.lng, zoom, loaded, fitBounds])
+
+  // Resize map when bottomSheetHeight changes (for mobile bottom sheet)
+  // This ensures the map recalculates its viewport when the container height changes
+  useEffect(() => {
+    if (!loaded || !mapRef.current) return
+    
+    // Use requestAnimationFrame to ensure resize happens after layout
+    requestAnimationFrame(() => {
+      const map = mapRef.current?.getMap()
+      if (map) {
+        map.resize()
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[MAP] Resized due to bottomSheetHeight change:', bottomSheetHeight)
+        }
+      }
+    })
+  }, [bottomSheetHeight, loaded])
 
   // ResizeObserver
   useEffect(() => {

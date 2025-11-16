@@ -12,6 +12,7 @@ LootAura requires environment variables for:
 - **Cloudinary**: Image hosting and optimization
 - **Rate Limiting**: Upstash Redis for production scaling
 - **Monitoring**: Sentry for error tracking
+- **Analytics**: Microsoft Clarity for session recordings and heatmaps
 - **Push Notifications**: VAPID keys for browser push
 - **Feature Flags**: Client-side feature toggles
 
@@ -38,6 +39,7 @@ These variables are exposed to the browser and safe for client-side code.
 | `NEXT_PUBLIC_FLAG_SAVED_PRESETS` | ⚠️ Optional | Enable saved presets | Vercel dashboard → Environment Variables | Default: `true` |
 | `NEXT_PUBLIC_FLAG_SHARE_LINKS` | ⚠️ Optional | Enable share links | Vercel dashboard → Environment Variables | Default: `true` |
 | `NEXT_PUBLIC_GOOGLE_ENABLED` | ⚠️ Optional | Enable Google OAuth | Vercel dashboard → Environment Variables | Default: `true` |
+| `NEXT_PUBLIC_CLARITY_ID` | ⚠️ Optional | Microsoft Clarity project ID | Vercel dashboard → Environment Variables | Get from Clarity dashboard → Settings → Project ID |
 
 ### 🔴 Server-Only Variables (Never Client-Exposed)
 

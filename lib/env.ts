@@ -46,6 +46,18 @@ const publicSchema = z.object({
     (val) => val ? parseInt(String(val), 10) : undefined,
     z.number().int().positive().optional()
   ),
+  NEXT_PUBLIC_CLARITY_ID: z.preprocess(
+    (val) => {
+      // In production, require Clarity ID; in dev, allow optional
+      if (process.env.NODE_ENV === 'production' && (!val || typeof val !== 'string' || val.trim() === '')) {
+        // Don't throw - just return undefined so it's optional even in production
+        // This allows gradual rollout
+        return undefined
+      }
+      return val && typeof val === 'string' && val.trim() !== '' ? val.trim() : undefined
+    },
+    z.string().min(1).optional()
+  ),
 })
 
 const serverSchema = z.object({
@@ -85,6 +97,7 @@ export const ENV_PUBLIC = publicSchema.parse({
   NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
   NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
   NEXT_PUBLIC_MAX_UPLOAD_SIZE: process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE,
+  NEXT_PUBLIC_CLARITY_ID: process.env.NEXT_PUBLIC_CLARITY_ID,
 })
 
 // Validate server environment variables (only in server context, lazy to avoid build-time validation)

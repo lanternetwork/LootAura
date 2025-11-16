@@ -16,6 +16,7 @@ import OSMAttribution from '@/components/location/OSMAttribution'
 import SaleShareButton from '@/components/share/SaleShareButton'
 import type { SaleWithOwnerInfo } from '@/lib/data'
 import type { SaleItem, Sale } from '@/lib/types'
+import { trackSaleViewed, trackFavoriteToggled } from '@/lib/analytics/clarityEvents'
 
 interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo
@@ -51,7 +52,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   useEffect(() => {
     if (!viewTrackedRef.current) {
       viewTrackedRef.current = true
-      // Track view event
+      // Track view event (internal analytics)
       fetch('/api/analytics/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,6 +66,8 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
           console.warn('[SALE_DETAIL] Failed to track view event:', error)
         }
       })
+      // Track Clarity event
+      trackSaleViewed(sale.id)
     }
   }, [sale.id])
 
@@ -136,6 +139,8 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
           }
         })
       }
+      // Track Clarity event for favorite toggle
+      trackFavoriteToggled(sale.id, result.favorited ?? !wasFavorited)
     } catch (error: any) {
       // Rollback optimistic update on error
       setIsFavorited(wasFavorited)

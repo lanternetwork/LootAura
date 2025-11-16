@@ -28,7 +28,45 @@ export function getCsrfToken(): string | null {
 
 export function validateCsrfToken(request: Request): boolean {
   const tokenFromHeader = request.headers.get(CSRF_HEADER)
-  const tokenFromCookie = getCsrfToken()
+  
+  // Read cookie from request header (works in API routes)
+  const cookieHeader = request.headers.get('cookie')
+  let tokenFromCookie: string | null = null
+  
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(';').map(c => c.trim())
+    for (const cookie of cookies) {
+      const equalIndex = cookie.indexOf('=')
+      if (equalIndex === -1) continue
+      const name = cookie.substring(0, equalIndex).trim()
+      const value = cookie.substring(equalIndex + 1).trim()
+      if (name === CSRF_TOKEN_COOKIE) {
+        tokenFromCookie = decodeURIComponent(value)
+        break
+      }
+    }
+  }
+  
+  // Fallback: try cookies() if available (for server components)
+  if (!tokenFromCookie) {
+    try {
+      tokenFromCookie = getCsrfToken()
+    } catch {
+      // cookies() not available in this context, that's okay
+    }
+  }
+
+  // Debug logging in development
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true' || process.env.NODE_ENV !== 'production') {
+    if (!tokenFromHeader || !tokenFromCookie) {
+      console.warn('[CSRF] Validation failed:', {
+        hasHeader: !!tokenFromHeader,
+        hasCookie: !!tokenFromCookie,
+        cookieHeader: cookieHeader ? cookieHeader.substring(0, 100) : null,
+        cookieNames: cookieHeader ? cookieHeader.split(';').map(c => c.trim().split('=')[0]) : []
+      })
+    }
+  }
 
   if (!tokenFromHeader || !tokenFromCookie) {
     return false

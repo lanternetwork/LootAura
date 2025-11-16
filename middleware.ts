@@ -111,14 +111,26 @@ export async function middleware(req: NextRequest) {
       csrfToken = existingToken
     }
   } catch (error) {
-    // CSRF token initialization is best-effort, don't block requests
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.warn('[MIDDLEWARE] Failed to initialize CSRF token:', error)
+    // CSRF token initialization is best-effort, but generate a token if we can
+    // This ensures we always have a token to set, even if reading fails
+    try {
+      const { generateCsrfToken } = await import('@/lib/csrf')
+      csrfToken = generateCsrfToken()
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('[MIDDLEWARE] Failed to read CSRF token, generated new one:', error)
+      }
+    } catch (genError) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('[MIDDLEWARE] Failed to generate CSRF token:', genError)
+      }
     }
   }
   
   // Helper function to create response with CSRF token
   const createResponseWithCsrf = (response: NextResponse): NextResponse => {
+    // Note: csrfToken should already be set above, but if not, we'll handle it
+    // We can't use await here since this is a synchronous function
+    
     if (csrfToken && response.cookies) {
       // Detect if request is over HTTPS (for Vercel preview deployments)
       // Vercel previews are HTTPS but NODE_ENV might not be 'production'
@@ -144,10 +156,21 @@ export async function middleware(req: NextRequest) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[MIDDLEWARE] CSRF token cookie set on response:', {
           hasToken: !!csrfToken,
+          tokenLength: csrfToken?.length,
           isHttps,
           protocol,
           forwardedProto,
-          url: req.url.substring(0, 50)
+          url: req.url.substring(0, 50),
+          pathname: req.nextUrl.pathname
+        })
+      }
+    } else {
+      // Log when cookie is NOT being set to help debug
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('[MIDDLEWARE] CSRF token cookie NOT set:', {
+          hasToken: !!csrfToken,
+          hasCookies: !!response.cookies,
+          pathname: req.nextUrl.pathname
         })
       }
     }

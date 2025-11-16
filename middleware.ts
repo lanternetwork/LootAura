@@ -121,9 +121,15 @@ export async function middleware(req: NextRequest) {
   // Helper function to create response with CSRF token
   const createResponseWithCsrf = (response: NextResponse): NextResponse => {
     if (csrfToken) {
+      // Detect if request is over HTTPS (for Vercel preview deployments)
+      // Vercel previews are HTTPS but NODE_ENV might not be 'production'
+      const isHttps = req.nextUrl.protocol === 'https:' || 
+                     req.headers.get('x-forwarded-proto') === 'https' ||
+                     process.env.NODE_ENV === 'production'
+      
       response.cookies.set('csrf-token', csrfToken, {
         httpOnly: false, // Must be readable by client to send in header
-        secure: process.env.NODE_ENV === 'production',
+        secure: isHttps, // Set secure flag based on actual HTTPS connection
         sameSite: 'lax',
         maxAge: 60 * 60 * 24, // 24 hours
         path: '/'

@@ -970,7 +970,6 @@ export default function SalesClient({
         isLoading={loading}
         onClearFilters={clearFilters}
       />
-
-    </div>
+    </>
   )
 }

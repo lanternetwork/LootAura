@@ -10,8 +10,10 @@ export function generateCsrfToken(): string {
 
 export function setCsrfToken(token: string): void {
   const cookieStore = cookies()
+  // CSRF token must be readable by client-side JavaScript to send in x-csrf-token header
+  // Security is maintained by validating that header token matches cookie token
   cookieStore.set(CSRF_TOKEN_COOKIE, token, {
-    httpOnly: true,
+    httpOnly: false, // Must be readable by client to send in header
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 60 * 60 * 24, // 24 hours

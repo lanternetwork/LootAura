@@ -203,6 +203,21 @@ export async function middleware(req: NextRequest) {
   
   const cookieStore = cookies()
   
+  // Initialize CSRF token if not present (for all requests, authenticated or not)
+  try {
+    const { generateCsrfToken, getCsrfToken, setCsrfToken } = await import('@/lib/csrf')
+    const existingToken = getCsrfToken()
+    if (!existingToken) {
+      const newToken = generateCsrfToken()
+      setCsrfToken(newToken)
+    }
+  } catch (error) {
+    // CSRF token initialization is best-effort, don't block requests
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.warn('[MIDDLEWARE] Failed to initialize CSRF token:', error)
+    }
+  }
+  
   // Validate session with Supabase (skip the fast check for Google OAuth compatibility)
   // Google OAuth sessions may use different cookie names than the fast check expects
   const session = await validateSession(cookieStore)

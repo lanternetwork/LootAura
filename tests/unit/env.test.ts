@@ -2,31 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 describe('Environment Validation', () => {
   const originalEnv = process.env
-  let unhandledRejectionHandler: ((reason: unknown) => void) | null = null
 
   beforeEach(() => {
     vi.resetModules()
     process.env = { ...originalEnv }
     // Ensure required server env is present for tests that import lib/env
     process.env.SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || 'test-service-role-1234567890'
-    
-    // Add global unhandled rejection handler to catch module evaluation errors
-    unhandledRejectionHandler = (reason: unknown) => {
-      // Ignore ZodErrors from env validation during tests
-      if (reason && typeof reason === 'object' && 'issues' in reason) {
-        // This is a ZodError from env validation - we'll handle it in the test
-        return
-      }
-    }
-    process.on('unhandledRejection', unhandledRejectionHandler)
   })
 
   afterEach(() => {
-    // Remove unhandled rejection handler
-    if (unhandledRejectionHandler) {
-      process.removeListener('unhandledRejection', unhandledRejectionHandler)
-      unhandledRejectionHandler = null
-    }
     process.env = originalEnv
     vi.resetModules()
   })

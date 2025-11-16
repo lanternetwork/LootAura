@@ -47,7 +47,7 @@ describe('Job Queue', () => {
           attempts: 0,
           maxAttempts: 3,
         }),
-        expect.any(Number)
+        expect.any(Number) // TTL in seconds
       )
       expect(mockPush).toHaveBeenCalledWith(jobId)
     })
@@ -59,12 +59,18 @@ describe('Job Queue', () => {
       mockSet.mockRejectedValue(new Error('REDIS_NOT_CONFIGURED'))
       mockPush.mockRejectedValue(new Error('REDIS_NOT_CONFIGURED'))
 
+      // Mock console.warn to avoid test output noise
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
       // Should not throw, but return a job ID
       const jobId = await enqueueJob('image:postprocess', {
         imageUrl: 'https://example.com/image.jpg',
       })
 
       expect(jobId).toBeTruthy()
+      expect(consoleWarnSpy).toHaveBeenCalled()
+      
+      consoleWarnSpy.mockRestore()
     })
   })
 

@@ -116,7 +116,7 @@ export async function processJob(job: BaseJob): Promise<{ success: boolean; erro
  */
 async function processImagePostprocessJob(payload: ImagePostprocessJobPayload): Promise<{ success: boolean; error?: string }> {
   try {
-    const { imageUrl, saleId, ownerId } = payload
+    const { imageUrl, saleId } = payload
 
     if (!imageUrl) {
       return { success: false, error: 'Missing imageUrl in payload' }

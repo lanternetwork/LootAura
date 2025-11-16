@@ -284,7 +284,8 @@ process.on('unhandledRejection', (reason: unknown) => {
   // These are expected when testing error conditions in env.test.ts
   if (reason && typeof reason === 'object' && 'issues' in reason) {
     // Check if this is from env.test.ts by checking the stack trace
-    const stack = (reason as Error).stack || ''
+    // Safely access stack property - ZodError may have a stack property
+    const stack = (reason instanceof Error ? reason.stack : (reason as any).stack) || ''
     if (stack.includes('env.test.ts') || stack.includes('lib/env.ts')) {
       // This is an expected error from env validation tests - ignore it
       return

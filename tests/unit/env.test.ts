@@ -37,39 +37,37 @@ describe('Environment Validation', () => {
   })
 
   it('should throw error for missing required public variables', async () => {
-    // Clear required variables
-    delete process.env.NEXT_PUBLIC_SUPABASE_URL
-    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    
-    // Reset modules to ensure fresh import
-    vi.resetModules()
+    await vi.isolateModules(async () => {
+      // Clear required variables
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    await expect(async () => {
-      await import('@/lib/env')
-    }).rejects.toThrow()
-    
-    // Restore env vars after test to prevent unhandled rejections in other tests
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-    vi.resetModules()
+      await expect(async () => {
+        await import('@/lib/env')
+      }).rejects.toThrow()
+    })
   })
 
   it('should throw error for invalid URL format', async () => {
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'not-a-url'
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    await vi.isolateModules(async () => {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'not-a-url'
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
 
-    await expect(async () => {
-      await import('@/lib/env')
-    }).rejects.toThrow()
+      await expect(async () => {
+        await import('@/lib/env')
+      }).rejects.toThrow()
+    })
   })
 
   it('should throw error for short API keys', async () => {
-    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'short'
+    await vi.isolateModules(async () => {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'short'
 
-    await expect(async () => {
-      await import('@/lib/env')
-    }).rejects.toThrow('NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 10 characters')
+      await expect(async () => {
+        await import('@/lib/env')
+      }).rejects.toThrow('NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 10 characters')
+    })
   })
 
   it('should handle optional environment variables', async () => {

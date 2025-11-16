@@ -266,6 +266,7 @@ export async function POST(request: NextRequest) {
     // Enqueue image post-processing jobs for sale images (non-blocking, non-critical)
     try {
       const { enqueueJob, JOB_TYPES } = await import('@/lib/jobs')
+      const { logger } = await import('@/lib/log')
       const imagesToProcess: string[] = []
       
       if (salePayload.cover_image_url) {
@@ -283,7 +284,6 @@ export async function POST(request: NextRequest) {
           ownerId: user.id,
         }).catch((err) => {
           // Log but don't fail - job enqueueing is non-critical
-          const { logger } = await import('@/lib/log')
           logger.warn('Failed to enqueue image post-processing job (non-critical)', {
             component: 'drafts/publish',
             operation: 'enqueue_image_job',

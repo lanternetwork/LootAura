@@ -49,7 +49,9 @@ describe('Job Queue', () => {
         attempts: 0,
         maxAttempts: 3,
       })
-      expect(typeof setCall[2]).toBe('number') // TTL in seconds
+      // TTL is a default parameter, so it's not explicitly passed
+      // Only 2 arguments are passed: jobId and job data
+      expect(setCall.length).toBe(2)
       expect(mockPush).toHaveBeenCalledWith(jobId)
     })
 

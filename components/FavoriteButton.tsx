@@ -3,6 +3,7 @@ import { useFavorites, useToggleFavorite, useAuth } from '@/lib/hooks/useAuth'
 import { useState } from 'react'
 import { AiFillHeart, AiOutlineHeart } from 'react-icons/ai'
 import { useRouter } from 'next/navigation'
+import { trackFavoriteToggled } from '@/lib/analytics/clarityEvents'
 
 export default function FavoriteButton({ 
   saleId, 
@@ -31,6 +32,8 @@ export default function FavoriteButton({
     toggleFavorite
       .mutateAsync({ saleId, isFavorited })
       .then(() => {
+        // Track Clarity event for favorite toggle
+        trackFavoriteToggled(saleId, !isFavorited)
         // fall back to cache after success
         setOptimistic(null)
       })

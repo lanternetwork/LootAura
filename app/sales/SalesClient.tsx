@@ -14,6 +14,7 @@ import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
 import { useHasOverflow } from '@/lib/hooks/useHasOverflow'
+import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -616,6 +617,16 @@ export default function SalesClient({
     
     // For other filter changes, trigger single fetch with current bounds
     updateFilters(newFilters) // Keep URL update for filter state
+    
+    // Track Clarity event for filter update
+    trackFiltersUpdated({
+      zip: newFilters.city,
+      dateRange: newFilters.dateRange,
+      distanceMiles: newFilters.distance,
+      categoriesCount: newFilters.categories?.length,
+      hasFavoritesFilter: false, // TODO: Add if favorites filter is implemented
+    })
+    
     if (mapView?.bounds) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[FILTERS] Triggering single fetch with new filters:', newFilters)
@@ -886,6 +897,8 @@ export default function SalesClient({
                         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
                           console.log('[SALES] Location clicked:', locationId)
                         }
+                        // Track Clarity event for pin click
+                        trackPinClicked(locationId)
                         setSelectedPinId(selectedPinId === locationId ? null : locationId)
                       },
                       onClusterClick: ({ lat, lng, expandToZoom }) => {

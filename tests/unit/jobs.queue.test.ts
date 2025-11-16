@@ -39,16 +39,17 @@ describe('Job Queue', () => {
 
       expect(jobId).toBeTruthy()
       expect(typeof jobId).toBe('string')
-      expect(mockSet).toHaveBeenCalledWith(
-        jobId,
-        expect.objectContaining({
-          type: 'image:postprocess',
-          payload: { imageUrl: 'https://example.com/image.jpg' },
-          attempts: 0,
-          maxAttempts: 3,
-        }),
-        expect.any(Number) // TTL in seconds
-      )
+      // Verify setJobData was called with correct job data
+      expect(mockSet).toHaveBeenCalled()
+      const setCall = vi.mocked(mockSet).mock.calls[0]
+      expect(setCall[0]).toBe(jobId)
+      expect(setCall[1]).toMatchObject({
+        type: 'image:postprocess',
+        payload: { imageUrl: 'https://example.com/image.jpg' },
+        attempts: 0,
+        maxAttempts: 3,
+      })
+      expect(typeof setCall[2]).toBe('number') // TTL in seconds
       expect(mockPush).toHaveBeenCalledWith(jobId)
     })
 

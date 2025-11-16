@@ -33,7 +33,6 @@ const bboxSchema = z.object({
 
 async function salesHandler(request: NextRequest) {
   const startedAt = Date.now()
-  const { timeOperation } = await import('@/lib/utils/performance')
   const { logger } = await import('@/lib/log')
   
   try {

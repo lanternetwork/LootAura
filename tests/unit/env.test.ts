@@ -40,10 +40,18 @@ describe('Environment Validation', () => {
     // Clear required variables
     delete process.env.NEXT_PUBLIC_SUPABASE_URL
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    // Reset modules to ensure fresh import
+    vi.resetModules()
 
     await expect(async () => {
       await import('@/lib/env')
     }).rejects.toThrow()
+    
+    // Restore env vars after test to prevent unhandled rejections in other tests
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    vi.resetModules()
   })
 
   it('should throw error for invalid URL format', async () => {

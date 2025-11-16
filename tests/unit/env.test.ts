@@ -44,16 +44,20 @@ describe('Environment Validation', () => {
     // Reset modules to ensure fresh import
     vi.resetModules()
 
+    let caughtError: unknown = null
     try {
-      await expect(async () => {
-        await import('@/lib/env')
-      }).rejects.toThrow()
-    } finally {
-      // Always restore env vars after test to prevent unhandled rejections
-      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-      vi.resetModules()
+      await import('@/lib/env')
+    } catch (error) {
+      caughtError = error
     }
+    
+    // Restore env vars immediately to prevent unhandled rejections
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    vi.resetModules()
+    
+    // Verify that an error was thrown
+    expect(caughtError).toBeTruthy()
   })
 
   it('should throw error for invalid URL format', async () => {
@@ -63,16 +67,20 @@ describe('Environment Validation', () => {
     // Reset modules to ensure fresh import
     vi.resetModules()
 
+    let caughtError: unknown = null
     try {
-      await expect(async () => {
-        await import('@/lib/env')
-      }).rejects.toThrow()
-    } finally {
-      // Always restore env vars after test to prevent unhandled rejections
-      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-      vi.resetModules()
+      await import('@/lib/env')
+    } catch (error) {
+      caughtError = error
     }
+    
+    // Restore env vars immediately to prevent unhandled rejections
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    vi.resetModules()
+    
+    // Verify that an error was thrown
+    expect(caughtError).toBeTruthy()
   })
 
   it('should throw error for short API keys', async () => {
@@ -82,15 +90,22 @@ describe('Environment Validation', () => {
     // Reset modules to ensure fresh import
     vi.resetModules()
 
+    let caughtError: unknown = null
     try {
-      await expect(async () => {
-        await import('@/lib/env')
-      }).rejects.toThrow('NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 10 characters')
-    } finally {
-      // Always restore env vars after test to prevent unhandled rejections
-      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
-      vi.resetModules()
+      await import('@/lib/env')
+    } catch (error) {
+      caughtError = error
+    }
+    
+    // Restore env vars immediately to prevent unhandled rejections
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    vi.resetModules()
+    
+    // Verify that an error was thrown with the expected message
+    expect(caughtError).toBeTruthy()
+    if (caughtError instanceof Error) {
+      expect(caughtError.message).toContain('NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 10 characters')
     }
   })
 

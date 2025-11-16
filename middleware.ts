@@ -204,18 +204,41 @@ export async function middleware(req: NextRequest) {
   const cookieStore = cookies()
   
   // Initialize CSRF token if not present (for all requests, authenticated or not)
+  // This must happen before any response is created to ensure the cookie is set
+  let csrfToken: string | null = null
   try {
     const { generateCsrfToken, getCsrfToken, setCsrfToken } = await import('@/lib/csrf')
     const existingToken = getCsrfToken()
     if (!existingToken) {
-      const newToken = generateCsrfToken()
-      setCsrfToken(newToken)
+      csrfToken = generateCsrfToken()
+      setCsrfToken(csrfToken)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MIDDLEWARE] CSRF token initialized:', { tokenLength: csrfToken.length })
+      }
+    } else {
+      csrfToken = existingToken
     }
   } catch (error) {
     // CSRF token initialization is best-effort, don't block requests
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.warn('[MIDDLEWARE] Failed to initialize CSRF token:', error)
     }
+  }
+  
+  // Get the response object early so we can ensure cookies are set
+  const response = NextResponse.next()
+  
+  // Explicitly set CSRF token cookie in response to ensure it's sent to the client
+  // This ensures the cookie is available for client-side JavaScript to read
+  // Fixed: Cookie must be set on response object, not just via cookies().set()
+  if (csrfToken) {
+    response.cookies.set('csrf-token', csrfToken, {
+      httpOnly: false, // Must be readable by client to send in header
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24, // 24 hours
+      path: '/'
+    })
   }
   
   // Validate session with Supabase (skip the fast check for Google OAuth compatibility)
@@ -228,7 +251,18 @@ export async function middleware(req: NextRequest) {
     
     // For API routes, return 401
     if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      const apiResponse = NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      // Ensure CSRF token is set in API error responses too
+      if (csrfToken) {
+        apiResponse.cookies.set('csrf-token', csrfToken, {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24,
+          path: '/'
+        })
+      }
+      return apiResponse
     }
     
     // For pages, redirect to signin
@@ -237,7 +271,17 @@ export async function middleware(req: NextRequest) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[MIDDLEWARE] Already on signin page, allowing access to prevent loop')
       }
-      return NextResponse.next()
+      // Ensure CSRF token is set even when allowing access
+      if (csrfToken) {
+        response.cookies.set('csrf-token', csrfToken, {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24,
+          path: '/'
+        })
+      }
+      return response
     }
     
     const loginUrl = new URL('/auth/signin', req.url)
@@ -245,7 +289,18 @@ export async function middleware(req: NextRequest) {
     const redirectTo = req.nextUrl.pathname.startsWith('/') ? req.nextUrl.pathname : '/'
     // Encode redirectTo to handle query parameters properly
     loginUrl.searchParams.set('redirectTo', encodeURIComponent(redirectTo + req.nextUrl.search))
-    return NextResponse.redirect(loginUrl)
+    const redirectResponse = NextResponse.redirect(loginUrl)
+    // Ensure CSRF token is set in redirect responses too
+    if (csrfToken) {
+      redirectResponse.cookies.set('csrf-token', csrfToken, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24,
+        path: '/'
+      })
+    }
+    return redirectResponse
   }
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -296,7 +351,7 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  return NextResponse.next()
+  return response
 }
 
 export const config = {

@@ -30,6 +30,10 @@ export function getCsrfToken(): string | null {
 export function getCsrfHeaders(): Record<string, string> {
   const token = getCsrfToken()
   if (!token) {
+    // Log warning in development to help debug CSRF issues
+    if (process.env.NODE_ENV !== 'production' || process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.warn('[CSRF] No CSRF token found in cookies. Available cookies:', document.cookie.split(';').map(c => c.trim().split('=')[0]))
+    }
     return {}
   }
   return {

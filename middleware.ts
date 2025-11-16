@@ -100,11 +100,10 @@ export async function middleware(req: NextRequest) {
   const cookieStore = cookies()
   let csrfToken: string | null = null
   try {
-    const { generateCsrfToken, getCsrfToken, setCsrfToken } = await import('@/lib/csrf')
+    const { generateCsrfToken, getCsrfToken } = await import('@/lib/csrf')
     const existingToken = getCsrfToken()
     if (!existingToken) {
       csrfToken = generateCsrfToken()
-      setCsrfToken(csrfToken)
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[MIDDLEWARE] CSRF token initialized:', { tokenLength: csrfToken.length })
       }
@@ -123,17 +122,34 @@ export async function middleware(req: NextRequest) {
     if (csrfToken && response.cookies) {
       // Detect if request is over HTTPS (for Vercel preview deployments)
       // Vercel previews are HTTPS but NODE_ENV might not be 'production'
-      const isHttps = req.nextUrl.protocol === 'https:' || 
-                     req.headers.get('x-forwarded-proto') === 'https' ||
+      // Check multiple sources to reliably detect HTTPS
+      const protocol = req.nextUrl.protocol
+      const forwardedProto = req.headers.get('x-forwarded-proto')
+      const isHttps = protocol === 'https:' || 
+                     forwardedProto === 'https' ||
+                     req.url.startsWith('https://') ||
                      process.env.NODE_ENV === 'production'
       
+      // Always set the cookie on every response to ensure it's available
+      // This refreshes the cookie expiration and ensures it's sent to the client
       response.cookies.set('csrf-token', csrfToken, {
         httpOnly: false, // Must be readable by client to send in header
         secure: isHttps, // Set secure flag based on actual HTTPS connection
         sameSite: 'lax',
         maxAge: 60 * 60 * 24, // 24 hours
         path: '/'
+        // Don't set domain - let it default to current domain
       })
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MIDDLEWARE] CSRF token cookie set on response:', {
+          hasToken: !!csrfToken,
+          isHttps,
+          protocol,
+          forwardedProto,
+          url: req.url.substring(0, 50)
+        })
+      }
     }
     return response
   }

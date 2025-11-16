@@ -12,6 +12,7 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 // Disable Mapbox telemetry at app startup
 import '@/lib/maps/telemetry'
+import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <Providers>
           <ErrorBoundary>
+            <CsrfTokenInitializer />
             <ConditionalHeader />
             <WebVitals />
             <main id="main-content" tabIndex={-1}>

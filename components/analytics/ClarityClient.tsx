@@ -28,7 +28,8 @@ export default function ClarityClient() {
 
     // Inject Clarity script using the official Microsoft Clarity snippet
     // This uses the self-invoking function pattern from Clarity docs
-    (function (c: any, l: any, a: any, r: any, i: any, t: any, y: any) {
+    // Note: t and y are optional parameters (undefined initially, assigned in function body)
+    (function (c: any, l: any, a: any, r: any, i: any, t?: any, y?: any) {
       c[a] = c[a] || function () {
         (c[a].q = c[a].q || []).push(arguments)
       }

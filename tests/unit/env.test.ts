@@ -37,37 +37,61 @@ describe('Environment Validation', () => {
   })
 
   it('should throw error for missing required public variables', async () => {
-    await vi.isolateModules(async () => {
-      // Clear required variables
-      delete process.env.NEXT_PUBLIC_SUPABASE_URL
-      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    // Clear required variables
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    
+    // Reset modules to ensure fresh import
+    vi.resetModules()
 
+    try {
       await expect(async () => {
         await import('@/lib/env')
       }).rejects.toThrow()
-    })
+    } finally {
+      // Always restore env vars after test to prevent unhandled rejections
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+      vi.resetModules()
+    }
   })
 
   it('should throw error for invalid URL format', async () => {
-    await vi.isolateModules(async () => {
-      process.env.NEXT_PUBLIC_SUPABASE_URL = 'not-a-url'
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'not-a-url'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+    
+    // Reset modules to ensure fresh import
+    vi.resetModules()
 
+    try {
       await expect(async () => {
         await import('@/lib/env')
       }).rejects.toThrow()
-    })
+    } finally {
+      // Always restore env vars after test to prevent unhandled rejections
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+      vi.resetModules()
+    }
   })
 
   it('should throw error for short API keys', async () => {
-    await vi.isolateModules(async () => {
-      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'short'
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'short'
+    
+    // Reset modules to ensure fresh import
+    vi.resetModules()
 
+    try {
       await expect(async () => {
         await import('@/lib/env')
       }).rejects.toThrow('NEXT_PUBLIC_SUPABASE_ANON_KEY must be at least 10 characters')
-    })
+    } finally {
+      // Always restore env vars after test to prevent unhandled rejections
+      process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
+      vi.resetModules()
+    }
   })
 
   it('should handle optional environment variables', async () => {

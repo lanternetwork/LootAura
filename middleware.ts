@@ -165,8 +165,9 @@ export async function middleware(req: NextRequest) {
         })
       }
     } else {
-      // Log when cookie is NOT being set to help debug
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      // Log when cookie is NOT being set to help debug (skip in test environment)
+      const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST !== undefined
+      if (!isTestEnv && process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.warn('[MIDDLEWARE] CSRF token cookie NOT set:', {
           hasToken: !!csrfToken,
           hasCookies: !!response.cookies,

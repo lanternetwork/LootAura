@@ -28,16 +28,15 @@ export default function ClarityClient() {
 
     // Inject Clarity script using the official Microsoft Clarity snippet
     // This uses the self-invoking function pattern from Clarity docs
-    (function (c: any, l: any, a: any, r: any, i: any) {
-      c[a] =
-        c[a] ||
-        function () {
-          (c[a].q = c[a].q || []).push(arguments)
-        }
-      const t = l.createElement(r)
+    // Note: t and y are optional parameters (undefined initially, assigned in function body)
+    (function (c: any, l: any, a: any, r: any, i: any, t?: any, y?: any) {
+      c[a] = c[a] || function () {
+        (c[a].q = c[a].q || []).push(arguments)
+      }
+      t = l.createElement(r)
       t.async = 1
       t.src = 'https://www.clarity.ms/tag/' + i
-      const y = l.getElementsByTagName(r)[0]
+      y = l.getElementsByTagName(r)[0]
       y.parentNode.insertBefore(t, y)
     })(window, document, 'clarity', 'script', clarityId)
 

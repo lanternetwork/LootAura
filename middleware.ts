@@ -95,6 +95,43 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
   
+  // Initialize CSRF token early for ALL requests (before any early returns)
+  // This ensures the cookie is available for client-side JavaScript on all pages
+  const cookieStore = cookies()
+  let csrfToken: string | null = null
+  try {
+    const { generateCsrfToken, getCsrfToken, setCsrfToken } = await import('@/lib/csrf')
+    const existingToken = getCsrfToken()
+    if (!existingToken) {
+      csrfToken = generateCsrfToken()
+      setCsrfToken(csrfToken)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MIDDLEWARE] CSRF token initialized:', { tokenLength: csrfToken.length })
+      }
+    } else {
+      csrfToken = existingToken
+    }
+  } catch (error) {
+    // CSRF token initialization is best-effort, don't block requests
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.warn('[MIDDLEWARE] Failed to initialize CSRF token:', error)
+    }
+  }
+  
+  // Helper function to create response with CSRF token
+  const createResponseWithCsrf = (response: NextResponse): NextResponse => {
+    if (csrfToken) {
+      response.cookies.set('csrf-token', csrfToken, {
+        httpOnly: false, // Must be readable by client to send in header
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24, // 24 hours
+        path: '/'
+      })
+    }
+    return response
+  }
+  
   // 1. Public pages that don't require authentication
   const isPublicPage = 
     pathname === '/' ||
@@ -107,7 +144,8 @@ export async function middleware(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     }
-    return NextResponse.next();
+    const response = NextResponse.next()
+    return createResponseWithCsrf(response)
   }
   
   // 2. Public static assets and PWA files
@@ -132,7 +170,8 @@ export async function middleware(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     }
-    return NextResponse.next();
+    const response = NextResponse.next()
+    return createResponseWithCsrf(response)
   }
   
   // 3. Public API endpoints (GET only for sales, all methods for others)
@@ -147,7 +186,8 @@ export async function middleware(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     }
-    return NextResponse.next();
+    const response = NextResponse.next()
+    return createResponseWithCsrf(response)
   }
   
   // 4. Bypass requests with manifest content type or .json extension
@@ -157,7 +197,8 @@ export async function middleware(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     }
-    return NextResponse.next();
+    const response = NextResponse.next()
+    return createResponseWithCsrf(response)
   }
   
   // 5. Bypass auth pages to prevent redirect loops
@@ -171,7 +212,8 @@ export async function middleware(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     }
-    return NextResponse.next();
+    const response = NextResponse.next()
+    return createResponseWithCsrf(response)
   }
   
   // 6. Protected routes that require authentication
@@ -193,36 +235,13 @@ export async function middleware(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     }
-    return NextResponse.next();
+    const response = NextResponse.next()
+    return createResponseWithCsrf(response)
   }
   
   // Only run auth checks for protected routes or write APIs
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log(`[MIDDLEWARE] checking authentication for → ${pathname}`);
-  }
-  
-  const cookieStore = cookies()
-  
-  // Initialize CSRF token if not present (for all requests, authenticated or not)
-  // This must happen before any response is created to ensure the cookie is set
-  let csrfToken: string | null = null
-  try {
-    const { generateCsrfToken, getCsrfToken, setCsrfToken } = await import('@/lib/csrf')
-    const existingToken = getCsrfToken()
-    if (!existingToken) {
-      csrfToken = generateCsrfToken()
-      setCsrfToken(csrfToken)
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[MIDDLEWARE] CSRF token initialized:', { tokenLength: csrfToken.length })
-      }
-    } else {
-      csrfToken = existingToken
-    }
-  } catch (error) {
-    // CSRF token initialization is best-effort, don't block requests
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.warn('[MIDDLEWARE] Failed to initialize CSRF token:', error)
-    }
   }
   
   // Get the response object early so we can ensure cookies are set
@@ -231,15 +250,7 @@ export async function middleware(req: NextRequest) {
   // Explicitly set CSRF token cookie in response to ensure it's sent to the client
   // This ensures the cookie is available for client-side JavaScript to read
   // Fixed: Cookie must be set on response object, not just via cookies().set()
-  if (csrfToken) {
-    response.cookies.set('csrf-token', csrfToken, {
-      httpOnly: false, // Must be readable by client to send in header
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24, // 24 hours
-      path: '/'
-    })
-  }
+  const responseWithCsrf = createResponseWithCsrf(response)
   
   // Validate session with Supabase (skip the fast check for Google OAuth compatibility)
   // Google OAuth sessions may use different cookie names than the fast check expects
@@ -252,17 +263,7 @@ export async function middleware(req: NextRequest) {
     // For API routes, return 401
     if (pathname.startsWith('/api/')) {
       const apiResponse = NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      // Ensure CSRF token is set in API error responses too
-      if (csrfToken) {
-        apiResponse.cookies.set('csrf-token', csrfToken, {
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24,
-          path: '/'
-        })
-      }
-      return apiResponse
+      return createResponseWithCsrf(apiResponse)
     }
     
     // For pages, redirect to signin
@@ -271,17 +272,7 @@ export async function middleware(req: NextRequest) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[MIDDLEWARE] Already on signin page, allowing access to prevent loop')
       }
-      // Ensure CSRF token is set even when allowing access
-      if (csrfToken) {
-        response.cookies.set('csrf-token', csrfToken, {
-          httpOnly: false,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24,
-          path: '/'
-        })
-      }
-      return response
+      return responseWithCsrf
     }
     
     const loginUrl = new URL('/auth/signin', req.url)
@@ -290,17 +281,7 @@ export async function middleware(req: NextRequest) {
     // Encode redirectTo to handle query parameters properly
     loginUrl.searchParams.set('redirectTo', encodeURIComponent(redirectTo + req.nextUrl.search))
     const redirectResponse = NextResponse.redirect(loginUrl)
-    // Ensure CSRF token is set in redirect responses too
-    if (csrfToken) {
-      redirectResponse.cookies.set('csrf-token', csrfToken, {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24,
-        path: '/'
-      })
-    }
-    return redirectResponse
+    return createResponseWithCsrf(redirectResponse)
   }
 
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -351,7 +332,7 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  return response
+  return responseWithCsrf
 }
 
 export const config = {

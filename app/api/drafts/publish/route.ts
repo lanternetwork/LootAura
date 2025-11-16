@@ -263,6 +263,47 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Enqueue image post-processing jobs for sale images (non-blocking, non-critical)
+    try {
+      const { enqueueJob, JOB_TYPES } = await import('@/lib/jobs')
+      const imagesToProcess: string[] = []
+      
+      if (salePayload.cover_image_url) {
+        imagesToProcess.push(salePayload.cover_image_url)
+      }
+      if (salePayload.images && Array.isArray(salePayload.images)) {
+        imagesToProcess.push(...salePayload.images)
+      }
+      
+      // Enqueue jobs for each image (fire-and-forget)
+      for (const imageUrl of imagesToProcess) {
+        enqueueJob(JOB_TYPES.IMAGE_POSTPROCESS, {
+          imageUrl,
+          saleId: createdSaleId,
+          ownerId: user.id,
+        }).catch((err) => {
+          // Log but don't fail - job enqueueing is non-critical
+          const { logger } = await import('@/lib/log')
+          logger.warn('Failed to enqueue image post-processing job (non-critical)', {
+            component: 'drafts/publish',
+            operation: 'enqueue_image_job',
+            imageUrl,
+            saleId: createdSaleId ?? undefined,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
+      }
+    } catch (jobErr) {
+      // Ignore job enqueueing errors - this is non-critical
+      const { logger } = await import('@/lib/log')
+      logger.warn('Failed to enqueue image post-processing jobs (non-critical)', {
+        component: 'drafts/publish',
+        operation: 'enqueue_image_jobs',
+        saleId: createdSaleId ?? undefined,
+        error: jobErr instanceof Error ? jobErr.message : String(jobErr),
+      })
+    }
+
     // 3. Delete the draft after successful publication (hard delete)
     // We delete instead of marking as 'published' since the sale is now live
     // Use admin client since we've already verified ownership via RLS read above

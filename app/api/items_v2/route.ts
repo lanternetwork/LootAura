@@ -132,6 +132,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create item' }, { status: 500 })
     }
     
+    // Enqueue image post-processing job for item image (non-blocking, non-critical)
+    if (firstImageUrl) {
+      try {
+        const { enqueueJob, JOB_TYPES } = await import('@/lib/jobs')
+        enqueueJob(JOB_TYPES.IMAGE_POSTPROCESS, {
+          imageUrl: firstImageUrl,
+          saleId: body.sale_id,
+          ownerId: user.id,
+        }).catch((err) => {
+          // Log but don't fail - job enqueueing is non-critical
+          console.warn('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical):', err)
+        })
+      } catch (jobErr) {
+        // Ignore job enqueueing errors - this is non-critical
+        console.warn('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical):', jobErr)
+      }
+    }
+    
     return NextResponse.json({ item }, { status: 201 })
   } catch (error) {
     console.error('Unexpected error:', error)

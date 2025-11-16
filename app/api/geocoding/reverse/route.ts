@@ -43,39 +43,74 @@ async function reverseHandler(request: NextRequest) {
       }, { status: 400 })
     }
     
-    // Fetch from Nominatim
-    const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${lat}&lon=${lng}&email=${email}`
+    // Fetch from Nominatim with retry logic
+    const { retry, isTransientError } = await import('@/lib/utils/retry')
+    const { getNominatimEmail } = await import('@/lib/env')
+    const email = getNominatimEmail()
     
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': `LootAura/1.0 (${email})`
-      }
-    })
-    
-    if (!response.ok) {
-      // Handle 429 (rate limit) with retry-after header if present
-      if (response.status === 429) {
-        const retryAfter = response.headers.get('Retry-After') || '60'
+    let data: any
+    try {
+      data = await retry(
+        async () => {
+          const url = `https://nominatim.openstreetmap.org/reverse?format=json&addressdetails=1&lat=${lat}&lon=${lng}&email=${email}`
+          
+          const response = await fetch(url, {
+            headers: {
+              'User-Agent': `LootAura/1.0 (${email})`
+            }
+          })
+          
+          if (!response.ok) {
+            // Handle 429 (rate limit) - don't retry, throw special error
+            if (response.status === 429) {
+              const retryAfter = response.headers.get('Retry-After') || '60'
+              const rateLimitError: any = new Error('Rate limit exceeded')
+              rateLimitError.isRateLimit = true
+              rateLimitError.retryAfter = parseInt(retryAfter, 10)
+              throw rateLimitError
+            }
+            
+            // Don't retry on 4xx errors (client errors)
+            if (response.status >= 400 && response.status < 500) {
+              throw new Error(`Nominatim request failed: ${response.status}`)
+            }
+            
+            // Retry on 5xx and network errors
+            throw new Error(`Nominatim request failed: ${response.status}`)
+          }
+          
+          return await response.json()
+        },
+        {
+          maxAttempts: 3,
+          initialDelayMs: 500,
+          retryable: (error) => {
+            // Don't retry rate limit errors
+            if (error && typeof error === 'object' && 'isRateLimit' in error) {
+              return false
+            }
+            return isTransientError(error)
+          },
+        }
+      )
+    } catch (error: any) {
+      // Handle rate limit error
+      if (error?.isRateLimit) {
         return NextResponse.json({
           ok: false,
           error: 'Rate limit exceeded',
-          retryAfter: parseInt(retryAfter, 10)
+          retryAfter: error.retryAfter || 60
         }, { 
           status: 429,
           headers: {
-            'Retry-After': retryAfter
+            'Retry-After': String(error.retryAfter || 60)
           }
         })
       }
       
-      return NextResponse.json({
-        ok: false,
-        error: `Nominatim request failed: ${response.status}`
-      }, { status: response.status })
+      // Re-throw other errors
+      throw error
     }
-    
-    const data = await response.json()
     
     if (!data || !data.lat || !data.lon) {
       return NextResponse.json({

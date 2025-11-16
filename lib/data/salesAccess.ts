@@ -73,7 +73,8 @@ export async function getUserSales(
         error.message?.includes('does not exist')
 
       if (isPermissionError) {
-        if (process.env.NODE_ENV !== 'production') {
+        const { isProduction } = await import('@/lib/env')
+        if (!isProduction()) {
           console.warn('[SALES_ACCESS] View query failed, falling back to base table:', {
             error: error.code,
             message: error.message,
@@ -99,7 +100,8 @@ export async function getUserSales(
       throw error
     }
 
-    if (process.env.NODE_ENV !== 'production') {
+    const { isProduction } = await import('@/lib/env')
+    if (!isProduction()) {
       console.warn('[SALES_ACCESS] View query failed, falling back to base table:', {
         error: error?.code,
         message: error?.message,
@@ -126,7 +128,8 @@ export async function getUserSales(
     }
 
     // Log fallback usage for observability (dev only)
-    if (process.env.NODE_ENV !== 'production') {
+    const { isProduction } = await import('@/lib/env')
+    if (!isProduction()) {
       console.warn('[SALES_ACCESS] Using base-table fallback. View may need attention.', {
         userId,
         count: sales?.length || 0,
@@ -173,7 +176,8 @@ export async function getUserDrafts(
       .range(offset, offset + limit - 1)
 
     if (error) {
-      if (process.env.NODE_ENV !== 'production') {
+      const { isProduction } = await import('@/lib/env')
+    if (!isProduction()) {
         console.error('[SALES_ACCESS] Error fetching drafts:', {
           code: error.code,
           message: error.message,
@@ -201,7 +205,8 @@ export async function getUserDrafts(
       data: mappedDrafts,
     }
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
+    const { isProduction } = await import('@/lib/env')
+    if (!isProduction()) {
       console.error('[SALES_ACCESS] Unexpected error fetching drafts:', error)
     }
     return {
@@ -235,13 +240,15 @@ export async function getItemsForSale(
       .limit(limit)
 
     if (error) {
-      if (process.env.NODE_ENV !== 'production') {
+      const { isProduction } = await import('@/lib/env')
+    if (!isProduction()) {
         console.error('[SALES_ACCESS] Error fetching items for sale:', error)
       }
       return []
     }
     
-    if (process.env.NODE_ENV !== 'production') {
+    const { isProduction } = await import('@/lib/env')
+    if (!isProduction()) {
       console.log('[SALES_ACCESS] getItemsForSale result:', {
         saleId,
         itemsCount: items?.length || 0,
@@ -249,6 +256,9 @@ export async function getItemsForSale(
       })
     }
 
+    // Import isProduction once for use in map callback
+    const { isProduction: isProd } = await import('@/lib/env')
+    
     // Map items to SaleItem type
     // Normalize images: guarantee images: string[] with fallback to image_url
     const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => {
@@ -258,7 +268,7 @@ export async function getItemsForSale(
         : (item.image_url ? [item.image_url] : [])
       
       // Log dev-only fallback when using image_url
-      if (process.env.NODE_ENV !== 'production' && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
+      if (!isProd() && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
         console.log('[SALES_ACCESS] Item image fallback (image_url → images[]):', {
           itemId: item.id,
           itemName: item.name,
@@ -269,7 +279,7 @@ export async function getItemsForSale(
       }
       
       // Log dev-only when item has neither images nor image_url
-      if (process.env.NODE_ENV !== 'production' && images.length === 0) {
+      if (!isProd() && images.length === 0) {
         console.log('[SALES_ACCESS] Item has no images:', {
           itemId: item.id,
           itemName: item.name,
@@ -293,7 +303,8 @@ export async function getItemsForSale(
 
     return mappedItems
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
+    const { isProduction } = await import('@/lib/env')
+    if (!isProduction()) {
       console.error('[SALES_ACCESS] Unexpected error in getItemsForSale:', error)
     }
     return []
@@ -324,7 +335,8 @@ export async function getSaleWithItems(
       if (saleError?.code === 'PGRST116') {
         return null // No rows returned
       }
-      if (process.env.NODE_ENV !== 'production') {
+      const { isProduction } = await import('@/lib/env')
+    if (!isProduction()) {
         console.error('[SALES_ACCESS] Error fetching sale:', saleError)
       }
       return null
@@ -385,7 +397,8 @@ export async function getSaleWithItems(
     }
 
     if (!sale.owner_id) {
-      if (process.env.NODE_ENV !== 'production') {
+      const { isProduction } = await import('@/lib/env')
+    if (!isProduction()) {
         console.error('[SALES_ACCESS] Sale found but missing owner_id')
       }
       return {
@@ -472,19 +485,30 @@ export async function getSaleWithItems(
     ])
 
     // Log errors but don't fail - return with defaults
-    if (profileRes.error && process.env.NODE_ENV !== 'production') {
-      console.error('[SALES_ACCESS] Error fetching owner profile:', profileRes.error)
+    const { logger } = await import('@/lib/log')
+    if (profileRes.error) {
+      logger.error('Error fetching owner profile', profileRes.error instanceof Error ? profileRes.error : new Error(String(profileRes.error)), {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        ownerId,
+      })
     }
-    if (statsRes.error && process.env.NODE_ENV !== 'production') {
-      console.error('[SALES_ACCESS] Error fetching owner stats:', statsRes.error)
+    if (statsRes.error) {
+      logger.error('Error fetching owner stats', statsRes.error instanceof Error ? statsRes.error : new Error(String(statsRes.error)), {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        ownerId,
+      })
     }
     if (itemsRes.error) {
-      // Always log errors (not just in dev) since this is critical
-      console.error('[SALES_ACCESS] Error fetching items:', {
+      // Always log errors since this is critical
+      logger.error('Error fetching items', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
         saleId,
-        error: itemsRes.error,
-        code: itemsRes.error?.code,
-        message: itemsRes.error?.message,
+        errorCode: itemsRes.error?.code,
       })
     }
     
@@ -545,6 +569,9 @@ export async function getSaleWithItems(
       }
     }
 
+    // Import isProduction once for use in map callback
+    const { isProduction: isProdItems } = await import('@/lib/env')
+    
     // Map items to SaleItem type
     // Normalize images: prefer images array, fallback to image_url
     const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => {
@@ -554,7 +581,7 @@ export async function getSaleWithItems(
         : (item.image_url ? [item.image_url] : [])
       
       // Log dev-only fallback when using image_url
-      if (process.env.NODE_ENV !== 'production' && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
+      if (!isProdItems() && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
         console.log('[SALES_ACCESS] Item image fallback (image_url → images[]):', {
           itemId: item.id,
           itemName: item.name,
@@ -591,9 +618,12 @@ export async function getSaleWithItems(
       items: mappedItems,
     }
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[SALES_ACCESS] Unexpected error in getSaleWithItems:', error)
-    }
+    const { logger } = await import('@/lib/log')
+    logger.error('Unexpected error in getSaleWithItems', error instanceof Error ? error : new Error(String(error)), {
+      component: 'salesAccess',
+      operation: 'getSaleWithItems',
+      saleId,
+    })
     return null
   }
 }

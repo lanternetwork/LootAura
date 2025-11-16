@@ -11,13 +11,21 @@ export const dynamic = 'force-dynamic'
 
 // POST: Publish draft (transactional: create sale + items, mark draft as published)
 export async function POST(request: NextRequest) {
+  // Track created resources for cleanup on failure (scoped to function)
+  let createdSaleId: string | null = null
+  let createdItemIds: string[] = []
+  let draft: any = null
+  let user: any = null
+
   try {
     const supabase = createSupabaseServerClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
 
-    if (authError || !user) {
+    if (authError || !authUser) {
       return fail(401, 'AUTH_REQUIRED', 'Authentication required')
     }
+
+    user = authUser
 
     let body: any
     try {
@@ -34,14 +42,16 @@ export async function POST(request: NextRequest) {
 
     // Read draft with RLS
     const rls = getRlsDb()
-    const { data: draft, error: dErr } = await fromBase(rls, 'sale_drafts')
+    const { data: draftData, error: dErr } = await fromBase(rls, 'sale_drafts')
       .select('*')
       .eq('draft_key', draftKey)
       .eq('status', 'active')
       .maybeSingle()
 
     if (dErr) return fail(500, 'DRAFT_LOOKUP_FAILED', dErr.message, dErr)
-    if (!draft) return fail(404, 'DRAFT_NOT_FOUND', 'Draft not found')
+    if (!draftData) return fail(404, 'DRAFT_NOT_FOUND', 'Draft not found')
+    
+    draft = draftData
 
     // Validate payload
     const validationResult = SaleDraftPayloadSchema.safeParse(draft.payload)
@@ -96,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     // Use a transaction-like approach: create sale, then items, then update draft
     // Note: Supabase doesn't support true transactions across multiple operations,
-    // so we'll do them sequentially and handle errors
+    // so we'll do them sequentially and handle errors with compensation logic
 
     // Write sale/items with admin (or RLS if policies allow)
     const admin = getAdminDb()
@@ -130,14 +140,26 @@ export async function POST(request: NextRequest) {
       .select('id')
       .single()
 
-    if (sErr) return fail(500, 'SALE_CREATE_FAILED', sErr.message, sErr)
+    if (sErr) {
+      const { logger } = await import('@/lib/log')
+      const saleError = sErr instanceof Error ? sErr : new Error(String(sErr))
+      logger.error('Failed to create sale during draft publish', saleError, {
+        component: 'drafts/publish',
+        operation: 'create_sale',
+        draftId: draft.id,
+        userId: user.id,
+      })
+      return fail(500, 'SALE_CREATE_FAILED', saleError.message, saleError)
+    }
+
+    createdSaleId = saleRow.id
 
     // Build itemsPayload
     // Include image_url (single string) - the database supports this column
     // Note: We don't include 'images' array because that column doesn't exist in the base table
     const itemsPayload = items && items.length > 0 ? items.map((item: any) => {
       const payload: any = {
-        sale_id: saleRow.id,
+        sale_id: createdSaleId,
         name: item.name,
         description: item.description || null,
         price: item.price || null,
@@ -154,9 +176,10 @@ export async function POST(request: NextRequest) {
 
     // 2. Create items if any
     if (itemsPayload.length) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { isDebugMode } = await import('@/lib/env')
+      if (isDebugMode()) {
         console.log('[DRAFT_PUBLISH] Creating items:', {
-          saleId: saleRow.id,
+          saleId: createdSaleId ?? undefined,
           saleStatus: salePayload.status,
           itemsCount: itemsPayload.length,
           items: itemsPayload.map((i: any) => ({ name: i.name, hasImage: !!i.image_url })),
@@ -168,15 +191,52 @@ export async function POST(request: NextRequest) {
         .select('id, name, sale_id, image_url')
       
       if (iErr) {
-        console.error('[DRAFT_PUBLISH] Failed to create items:', iErr)
-        // Try to clean up the sale (best effort)
-        await fromBase(admin, 'sales').delete().eq('id', saleRow.id)
-        return fail(500, 'ITEMS_CREATE_FAILED', iErr.message, iErr)
+        const { logger } = await import('@/lib/log')
+        const itemsError = iErr instanceof Error ? iErr : new Error(String(iErr))
+        logger.error('Failed to create items during draft publish', itemsError, {
+          component: 'drafts/publish',
+          operation: 'create_items',
+          draftId: draft.id,
+          userId: user.id,
+          saleId: createdSaleId ?? undefined,
+        })
+        
+        // Cleanup: delete the sale we just created
+        if (createdSaleId) {
+          try {
+            await fromBase(admin, 'sales').delete().eq('id', createdSaleId)
+            logger.info('Compensated: deleted sale after item creation failure', {
+              component: 'drafts/publish',
+              operation: 'compensation',
+              saleId: createdSaleId ?? undefined,
+            })
+          } catch (cleanupErr) {
+            const cleanupError = cleanupErr instanceof Error ? cleanupErr : new Error(String(cleanupErr))
+            logger.error('Failed to cleanup sale after item creation failure', cleanupError, {
+              component: 'drafts/publish',
+              operation: 'compensation_failed',
+              saleId: createdSaleId ?? undefined,
+            })
+            // Report to Sentry but don't fail the response
+            Sentry.captureException(cleanupError, {
+              tags: { operation: 'publishDraft', step: 'compensation' },
+              extra: { saleId: createdSaleId ?? undefined, draftId: draft.id },
+            })
+          }
+        }
+        
+        return fail(500, 'ITEMS_CREATE_FAILED', itemsError.message, itemsError)
       }
       
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      // Track created item IDs for potential cleanup
+      if (insertedItems) {
+        createdItemIds = insertedItems.map((item: any) => item.id)
+      }
+      
+      const { isDebugMode: isDebugModeItems } = await import('@/lib/env')
+      if (isDebugModeItems()) {
         console.log('[DRAFT_PUBLISH] Items created successfully:', {
-          saleId: saleRow.id,
+          saleId: createdSaleId ?? undefined,
           itemsCreated: insertedItems?.length || 0,
           itemIds: insertedItems?.map((i: any) => i.id),
         })
@@ -186,32 +246,75 @@ export async function POST(request: NextRequest) {
       // Note: admin client is schema-scoped to lootaura_v2, so we query the base table, not the view
       const { data: verifyItems, error: verifyErr } = await fromBase(admin, 'items')
         .select('id, name, sale_id, image_url')
-        .eq('sale_id', saleRow.id)
+        .eq('sale_id', createdSaleId)
       
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (isDebugModeItems()) {
         console.log('[DRAFT_PUBLISH] Items verification (admin client):', {
-          saleId: saleRow.id,
+          saleId: createdSaleId ?? undefined,
           itemsFound: verifyItems?.length || 0,
           error: verifyErr,
           itemIds: verifyItems?.map((i: any) => i.id),
         })
       }
     } else {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[DRAFT_PUBLISH] No items to create for sale:', saleRow.id)
+      const { isDebugMode: isDebugModeNoItems } = await import('@/lib/env')
+      if (isDebugModeNoItems()) {
+        console.log('[DRAFT_PUBLISH] No items to create for sale:', createdSaleId)
       }
+    }
+
+    // Enqueue image post-processing jobs for sale images (non-blocking, non-critical)
+    try {
+      const { enqueueJob, JOB_TYPES } = await import('@/lib/jobs')
+      const { logger } = await import('@/lib/log')
+      const imagesToProcess: string[] = []
+      
+      if (salePayload.cover_image_url) {
+        imagesToProcess.push(salePayload.cover_image_url)
+      }
+      if (salePayload.images && Array.isArray(salePayload.images)) {
+        imagesToProcess.push(...salePayload.images)
+      }
+      
+      // Enqueue jobs for each image (fire-and-forget)
+      for (const imageUrl of imagesToProcess) {
+        enqueueJob(JOB_TYPES.IMAGE_POSTPROCESS, {
+          imageUrl,
+          saleId: createdSaleId,
+          ownerId: user.id,
+        }).catch((err) => {
+          // Log but don't fail - job enqueueing is non-critical
+          logger.warn('Failed to enqueue image post-processing job (non-critical)', {
+            component: 'drafts/publish',
+            operation: 'enqueue_image_job',
+            imageUrl,
+            saleId: createdSaleId ?? undefined,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
+      }
+    } catch (jobErr) {
+      // Ignore job enqueueing errors - this is non-critical
+      const { logger } = await import('@/lib/log')
+      logger.warn('Failed to enqueue image post-processing jobs (non-critical)', {
+        component: 'drafts/publish',
+        operation: 'enqueue_image_jobs',
+        saleId: createdSaleId ?? undefined,
+        error: jobErr instanceof Error ? jobErr.message : String(jobErr),
+      })
     }
 
     // 3. Delete the draft after successful publication (hard delete)
     // We delete instead of marking as 'published' since the sale is now live
     // Use admin client since we've already verified ownership via RLS read above
     // This ensures the delete succeeds even if RLS has permission issues
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    const { isDebugMode: isDebugModeDelete } = await import('@/lib/env')
+    if (isDebugModeDelete()) {
       console.log('[PUBLISH/POST] Attempting to delete draft:', {
         draftId: draft.id,
         draftKey: draft.draft_key,
         userId: user.id,
-        saleId: saleRow.id,
+        saleId: createdSaleId ?? undefined,
       })
     }
     
@@ -228,18 +331,19 @@ export async function POST(request: NextRequest) {
     if (deleteErr) {
       // Sale and items are already created, so we'll log but not fail
       // The draft will remain but the sale is published, which is acceptable
-      console.error('[PUBLISH/POST] Draft delete error:', {
-        error: deleteErr,
-        message: deleteErr.message,
-        code: deleteErr.code,
-        details: deleteErr.details,
-        hint: deleteErr.hint,
+      // This is a non-critical failure - the sale is live, draft cleanup can happen later
+      const { logger } = await import('@/lib/log')
+      logger.warn('Failed to delete draft after successful publish (non-critical)', {
+        component: 'drafts/publish',
+        operation: 'delete_draft',
         draftId: draft.id,
         userId: user.id,
+        saleId: createdSaleId ?? undefined,
+        error: deleteErr.message,
       })
       Sentry.captureException(deleteErr, { 
         tags: { operation: 'publishDraft', step: 'deleteDraft' },
-        extra: { draftId: draft.id, userId: user.id, saleId: saleRow.id },
+        extra: { draftId: draft.id, userId: user.id, saleId: createdSaleId ?? undefined },
       })
     } else {
       // Verify deletion by checking if any rows were deleted
@@ -256,7 +360,7 @@ export async function POST(request: NextRequest) {
             draftId: draft.id,
             draftKey: draft.draft_key,
             userId: user.id,
-            saleId: saleRow.id,
+            saleId: createdSaleId ?? undefined,
             currentStatus: verifyDraft.status,
             deleteData,
             verifyError: verifyErr,
@@ -264,35 +368,84 @@ export async function POST(request: NextRequest) {
           Sentry.captureMessage('Draft still exists after delete attempt', {
             level: 'error',
             tags: { operation: 'publishDraft', step: 'deleteDraft' },
-            extra: { draftId: draft.id, userId: user.id, saleId: saleRow.id, currentStatus: verifyDraft.status },
+            extra: { draftId: draft.id, userId: user.id, saleId: createdSaleId ?? undefined, currentStatus: verifyDraft.status },
           })
         } else {
           // Draft doesn't exist, so deletion succeeded even though select returned nothing
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          if (isDebugModeDelete()) {
             console.log('[PUBLISH/POST] Draft deleted successfully (verified by read):', {
               draftId: draft.id,
               draftKey: draft.draft_key,
-              saleId: saleRow.id,
+              saleId: createdSaleId ?? undefined,
             })
           }
         }
       } else {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (isDebugModeDelete()) {
           console.log('[PUBLISH/POST] Draft deleted successfully after publication:', {
             draftId: draft.id,
             draftKey: draft.draft_key,
-            saleId: saleRow.id,
+            saleId: createdSaleId ?? undefined,
             deletedCount,
           })
         }
       }
     }
 
-    return ok({ data: { saleId: saleRow.id } })
+    // Log business event: draft published
+    const { logDraftPublished } = await import('@/lib/events/businessEvents')
+    logDraftPublished(draft.id, createdSaleId ?? '', user.id, createdItemIds.length)
+    
+    return ok({ data: { saleId: createdSaleId ?? undefined } })
   } catch (e: any) {
-    if (process.env.NODE_ENV !== 'production') console.error('[PUBLISH/POST] thrown:', e)
-    Sentry.captureException(e, { tags: { operation: 'publishDraft' } })
-    return fail(500, 'PUBLISH_FAILED', e.message)
+    const { logger } = await import('@/lib/log')
+    const { isProduction } = await import('@/lib/env')
+    
+    // If we have created resources, attempt cleanup
+    if (createdSaleId) {
+      try {
+        const admin = getAdminDb()
+        // Delete items first (foreign key constraint)
+        if (createdItemIds.length > 0) {
+          await fromBase(admin, 'items').delete().in('id', createdItemIds)
+        }
+        // Then delete the sale
+        await fromBase(admin, 'sales').delete().eq('id', createdSaleId)
+        
+        logger.info('Compensated: cleaned up sale and items after publish failure', {
+          component: 'drafts/publish',
+          operation: 'compensation',
+          saleId: createdSaleId ?? undefined,
+          itemIds: createdItemIds,
+        })
+      } catch (cleanupErr) {
+        const cleanupError = cleanupErr instanceof Error ? cleanupErr : new Error(String(cleanupErr))
+        logger.error('Failed to cleanup resources after publish failure', cleanupError, {
+          component: 'drafts/publish',
+          operation: 'compensation_failed',
+          saleId: createdSaleId ?? undefined,
+          itemIds: createdItemIds,
+        })
+        Sentry.captureException(cleanupError, {
+          tags: { operation: 'publishDraft', step: 'compensation' },
+          extra: { saleId: createdSaleId ?? undefined, itemIds: createdItemIds },
+        })
+      }
+    }
+    
+    const error = e instanceof Error ? e : new Error(String(e))
+    logger.error('Draft publish failed with exception', error, {
+      component: 'drafts/publish',
+      operation: 'publish_draft',
+      draftId: draft?.id,
+      userId: user?.id,
+    })
+    
+    if (!isProduction()) {
+      console.error('[PUBLISH/POST] thrown:', e)
+    }
+    Sentry.captureException(error, { tags: { operation: 'publishDraft' } })
+    return fail(500, 'PUBLISH_FAILED', error.message)
   }
 }
 

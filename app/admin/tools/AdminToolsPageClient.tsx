@@ -22,6 +22,7 @@ import DraftSalesDiagnostics from '@/components/admin/DraftSalesDiagnostics'
 import AnalyticsDiagnosticsCard from '@/components/admin/AnalyticsDiagnosticsCard'
 import OSMAttributionDiagnostics from '@/components/admin/OSMAttributionDiagnostics'
 import ItemImagesDiagnostics from '@/components/admin/ItemImagesDiagnostics'
+import JobControls from '@/components/admin/JobControls'
 import { useState, useRef } from 'react'
 
 export default function AdminToolsPageClient() {
@@ -84,6 +85,9 @@ export default function AdminToolsPageClient() {
             <h3 className="text-lg font-semibold mb-4">Rate Limiting Status</h3>
             <RateLimitStatus />
           </div>
+
+          {/* Background Jobs */}
+          <JobControls />
 
           {/* Analytics Diagnostics */}
           <AnalyticsDiagnosticsCard />

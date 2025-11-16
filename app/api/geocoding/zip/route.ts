@@ -54,29 +54,46 @@ function normalizeZip(rawZip: string): string | null {
 }
 
 async function lookupNominatim(zip: string): Promise<any> {
-  // Rate limiting: ensure at least 1 second between calls
-  const now = Date.now()
-  const timeSinceLastCall = now - lastNominatimCall
-  if (timeSinceLastCall < NOMINATIM_DELAY) {
-    await delay(NOMINATIM_DELAY - timeSinceLastCall)
-  }
-  lastNominatimCall = Date.now()
+  const { retry, isTransientError } = await import('@/lib/utils/retry')
+  const { getNominatimEmail } = await import('@/lib/env')
+  
+  return await retry(
+    async () => {
+      // Rate limiting: ensure at least 1 second between calls
+      const now = Date.now()
+      const timeSinceLastCall = now - lastNominatimCall
+      if (timeSinceLastCall < NOMINATIM_DELAY) {
+        await delay(NOMINATIM_DELAY - timeSinceLastCall)
+      }
+      lastNominatimCall = Date.now()
 
-  const email = process.env.NOMINATIM_APP_EMAIL || 'admin@lootaura.com'
-  const url = `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=US&format=json&limit=1&email=${email}`
-  
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': `LootAura/1.0 (${email})`
+      const email = getNominatimEmail()
+      const url = `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=US&format=json&limit=1&email=${email}`
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': `LootAura/1.0 (${email})`
+        }
+      })
+      
+      if (!response.ok) {
+        // Don't retry on 4xx errors (client errors)
+        if (response.status >= 400 && response.status < 500) {
+          throw new Error(`Nominatim request failed: ${response.status}`)
+        }
+        // Retry on 5xx and network errors
+        throw new Error(`Nominatim request failed: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      return data
+    },
+    {
+      maxAttempts: 3,
+      initialDelayMs: 500,
+      retryable: isTransientError,
     }
-  })
-  
-  if (!response.ok) {
-    throw new Error(`Nominatim request failed: ${response.status}`)
-  }
-  
-  const data = await response.json()
-  return data
+  )
 }
 
 // Helper function to safely escape strings for logging

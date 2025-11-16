@@ -79,6 +79,13 @@ export async function GET(_request: NextRequest) {
 
 // POST: Save or update draft
 export async function POST(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const { createSupabaseWriteClient } = await import('@/lib/supabase/server')
     const supabase = createSupabaseWriteClient()

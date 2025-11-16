@@ -13,12 +13,26 @@ interface WindowCount {
 // In-memory store for dev/test
 const memoryStore = new Map<string, WindowCount>()
 
+// Maximum size for in-memory store (to prevent unbounded growth)
+const MAX_MEMORY_STORE_SIZE = 10000
+
 // Clean up expired entries every 5 minutes
 setInterval(() => {
   const currentTime = Math.floor(Date.now() / 1000)
   for (const [key, entry] of memoryStore.entries()) {
     if (currentTime > entry.resetAt) {
       memoryStore.delete(key)
+    }
+  }
+  
+  // If still over max size after cleanup, evict oldest entries (FIFO)
+  if (memoryStore.size > MAX_MEMORY_STORE_SIZE) {
+    const entriesToRemove = memoryStore.size - MAX_MEMORY_STORE_SIZE
+    let removed = 0
+    for (const key of memoryStore.keys()) {
+      if (removed >= entriesToRemove) break
+      memoryStore.delete(key)
+      removed++
     }
   }
 }, 5 * 60 * 1000)
@@ -28,8 +42,9 @@ export function now(): number {
 }
 
 async function incrAndGetRedis(windowKey: string, windowSec: number): Promise<WindowCount> {
-  const redisUrl = process.env.UPSTASH_REDIS_REST_URL
-  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
+  const { ENV_SERVER } = await import('@/lib/env')
+  const redisUrl = ENV_SERVER.UPSTASH_REDIS_REST_URL
+  const redisToken = ENV_SERVER.UPSTASH_REDIS_REST_TOKEN
   
   if (!redisUrl || !redisToken) {
     // Return a special error that can be caught for fallback
@@ -100,7 +115,8 @@ async function incrAndGetMemory(windowKey: string, windowSec: number): Promise<W
 
 export async function incrAndGet(windowKey: string, windowSec: number): Promise<WindowCount> {
   // Try Redis first if credentials are available
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  const { ENV_SERVER } = await import('@/lib/env')
+  if (ENV_SERVER.UPSTASH_REDIS_REST_URL && ENV_SERVER.UPSTASH_REDIS_REST_TOKEN) {
     try {
       return await incrAndGetRedis(windowKey, windowSec)
     } catch (error) {

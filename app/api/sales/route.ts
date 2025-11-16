@@ -33,6 +33,7 @@ const bboxSchema = z.object({
 
 async function salesHandler(request: NextRequest) {
   const startedAt = Date.now()
+  const { logger } = await import('@/lib/log')
   
   try {
     const supabase = createSupabaseServerClient()
@@ -292,7 +293,7 @@ async function salesHandler(request: NextRequest) {
     
     // 3. Use direct query to sales_v2 view (RPC functions have permission issues)
     try {
-      console.log(`[SALES] Querying sales_v2 view directly...`)
+      logger.debug('Querying sales_v2 view', { component: 'sales', operation: 'get_sales' })
       
       // First, let's check the total count of sales in the database
       const { count: totalCount, error: _countError } = await supabase
@@ -301,7 +302,7 @@ async function salesHandler(request: NextRequest) {
         .eq('status', 'published')
       
       totalSalesCount = totalCount || 0
-      console.log(`[SALES] Total published sales in database:`, totalSalesCount)
+      logger.debug('Total published sales count', { component: 'sales', totalCount: totalSalesCount })
       
       // Use actual bbox if provided, otherwise calculate from distance
       let minLat, maxLat, minLng, maxLng
@@ -316,9 +317,12 @@ async function salesHandler(request: NextRequest) {
         minLng = actualBbox.west - lngBuffer
         maxLng = actualBbox.east + lngBuffer
         
-        console.log(`[SALES] Using expanded viewport bbox: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
-        console.log(`[SALES] Original bbox: lat=${actualBbox.south} to ${actualBbox.north}, lng=${actualBbox.west} to ${actualBbox.east}`)
-        console.log(`[SALES] Expansion: latBuffer=${latBuffer}, lngBuffer=${lngBuffer}`)
+        logger.debug('Using expanded viewport bbox', { 
+          component: 'sales', 
+          minLat, maxLat, minLng, maxLng,
+          originalBbox: actualBbox,
+          latBuffer, lngBuffer
+        })
       } else {
         // Calculate bounding box for approximate distance filtering
         const latRange = distanceKm / 111.0 // 1 degree ≈ 111km
@@ -329,7 +333,7 @@ async function salesHandler(request: NextRequest) {
         minLng = longitude - lngRange
         maxLng = longitude + lngRange
         
-        console.log(`[SALES] Calculated bbox: lat=${minLat} to ${maxLat}, lng=${minLng} to ${maxLng}`)
+        logger.debug('Calculated bbox from distance', { component: 'sales', minLat, maxLat, minLng, maxLng, distanceKm })
       }
       
       let query = supabase
@@ -344,20 +348,20 @@ async function salesHandler(request: NextRequest) {
       
       // Add category filters by joining with items table
       if (categories.length > 0) {
-        console.log('[SALES] Applying category filter:', categories)
+        logger.debug('Applying category filter', { component: 'sales', categories, dbCategories })
         
         // Debug: Check if items_v2 table has category column
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[FILTER DEBUG] Checking items_v2 table structure...')
+          logger.debug('Checking items_v2 table structure', { component: 'sales' })
           const { data: tableInfo, error: tableError } = await supabase
             .from('items_v2')
             .select('*')
             .limit(1)
           
           if (tableError) {
-            console.error('[FILTER DEBUG] Error checking items_v2 table:', tableError)
+            logger.error('Error checking items_v2 table', tableError instanceof Error ? tableError : new Error(String(tableError)), { component: 'sales' })
           } else {
-            console.log('[FILTER DEBUG] items_v2 sample row:', tableInfo?.[0])
+            logger.debug('items_v2 sample row', { component: 'sales', sampleRow: tableInfo?.[0] })
           }
         }
         
@@ -368,7 +372,11 @@ async function salesHandler(request: NextRequest) {
           .in('category', dbCategories)
         
         if (categoryError) {
-          console.error('[SALES] Category filter error:', categoryError)
+          logger.error('Category filter error', categoryError instanceof Error ? categoryError : new Error(String(categoryError)), {
+            component: 'sales',
+            operation: 'category_filter',
+            categories: dbCategories
+          })
           return NextResponse.json({
             ok: false,
             error: 'Category filter failed',
@@ -378,13 +386,11 @@ async function salesHandler(request: NextRequest) {
         }
         
         const saleIds = salesWithCategories?.map(item => item.sale_id) || []
-        console.log('[SALES] Found sales with matching categories:', saleIds.length)
-        
-        // Debug server-side category filtering results
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[FILTER DEBUG] Server found saleIds:', saleIds.length, 'for categories:', dbCategories)
-          console.log('[FILTER DEBUG] sqlParamsPreview =', dbCategories)
-        }
+        logger.debug('Found sales with matching categories', { 
+          component: 'sales', 
+          count: saleIds.length,
+          categories: dbCategories
+        })
         
         if (saleIds.length > 0) {
           query = query.in('id', saleIds)
@@ -412,10 +418,10 @@ async function salesHandler(request: NextRequest) {
         .order('id', { ascending: true })
         .range(0, fetchWindow - 1)
       
-      console.log(`[SALES] Direct query response:`, { 
+      logger.debug('Direct query response', { 
+        component: 'sales',
         dataCount: salesData?.length || 0, 
         error: salesError,
-        sampleData: salesData?.slice(0, 2),
         bboxUsed: actualBbox ? 'viewport' : 'distance-based',
         fetchWindow,
         limit,
@@ -429,7 +435,10 @@ async function salesHandler(request: NextRequest) {
       })
       
       if (salesError) {
-        console.error('Sales query error:', salesError)
+        logger.error('Sales query error', salesError instanceof Error ? salesError : new Error(String(salesError)), {
+          component: 'sales',
+          operation: 'query_sales'
+        })
         return NextResponse.json({
           ok: false,
           error: 'Database query failed',
@@ -444,7 +453,7 @@ async function salesHandler(request: NextRequest) {
       const toUtcDateOnly = (d: string) => new Date(d.length === 10 ? `${d}T00:00:00Z` : d)
       const windowStart = startDateParam ? toUtcDateOnly(startDateParam) : null
       const windowEnd = endDateParam ? new Date((toUtcDateOnly(endDateParam)).getTime() + 86399999) : null
-      console.log('[SALES] Date filtering:', { startDateParam, endDateParam, windowStart, windowEnd })
+      logger.debug('Date filtering', { component: 'sales', startDateParam, endDateParam, windowStart, windowEnd })
       // If coordinates are null or missing, skip those rows
       const salesWithDistance = (salesData || [])
         .map((sale: Sale) => {
@@ -468,8 +477,9 @@ async function salesHandler(request: NextRequest) {
           const startOk = !windowEnd || s <= windowEnd
           const endOk = !windowStart || e >= windowStart
           const passes = startOk && endOk
-          if (windowStart && windowEnd) {
-            console.log('[SALES] Date filter check:', { 
+          if (windowStart && windowEnd && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            logger.debug('Date filter check', { 
+              component: 'sales',
               saleId: sale.id, 
               saleStart: s?.toISOString(), 
               saleEnd: e?.toISOString(),
@@ -525,22 +535,27 @@ async function salesHandler(request: NextRequest) {
                 })
                 .slice(offset, offset + limit)
       
-      console.log(`[SALES] Filtered ${salesWithDistance.length} sales within ${distanceKm}km`, { 
+      logger.debug('Filtered sales by distance', { 
+        component: 'sales',
+        count: salesWithDistance.length,
+        distanceKm,
         windowStart, 
         windowEnd,
-        bboxUsed: actualBbox ? 'viewport' : 'distance-based',
-        finalCount: salesWithDistance.length
+        bboxUsed: actualBbox ? 'viewport' : 'distance-based'
       })
       
       // Debug: Log sample sales and their dates
-      if (salesWithDistance.length > 0) {
-        console.log('[SALES] Sample filtered sales:', salesWithDistance.slice(0, 3).map(s => ({
-          id: s?.id,
-          title: s?.title,
-          starts_at: s?.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
-          date_start: s?.date_start,
-          time_start: s?.time_start
-        })))
+      if (salesWithDistance.length > 0 && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        logger.debug('Sample filtered sales', { 
+          component: 'sales', 
+          samples: salesWithDistance.slice(0, 3).map(s => ({
+            id: s?.id,
+            title: s?.title,
+            starts_at: s?.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
+            date_start: s?.date_start,
+            time_start: s?.time_start
+          }))
+        })
       }
       
       // Debug: Log raw data before filtering
@@ -683,10 +698,13 @@ async function salesHandler(request: NextRequest) {
         }))
       }
         
-      console.log(`[SALES] Direct query success: ${results.length} results`)
+      logger.debug('Direct query success', { component: 'sales', resultCount: results.length })
       
     } catch (queryError: any) {
-      console.log(`[SALES] Direct query failed: ${queryError.message}`)
+      logger.error('Direct query failed', queryError instanceof Error ? queryError : new Error(String(queryError)), {
+        component: 'sales',
+        operation: 'direct_query'
+      })
       return NextResponse.json({ 
         ok: false, 
         error: 'Database query failed' 
@@ -708,18 +726,31 @@ async function salesHandler(request: NextRequest) {
       response.degraded = true
     }
     
-    console.log(`[SALES] Final result: ${results.length} sales, degraded=${degraded}, duration=${Date.now() - startedAt}ms`)
+    logger.info('Sales query completed', {
+      component: 'sales',
+      operation: 'get_sales',
+      count: results.length,
+      degraded,
+      durationMs: Date.now() - startedAt
+    })
     
-    return NextResponse.json(response, {
-      headers: {
-        'Cache-Control': 'public, max-age=60, s-maxage=300', // 1 min client, 5 min CDN
-        'CDN-Cache-Control': 'public, max-age=300',
-        'Vary': 'Accept-Encoding'
-      }
+    // Add optimized cache headers for public sales data
+    const { addCacheHeaders } = await import('@/lib/http/cache')
+    const cachedResponse = NextResponse.json(response)
+    return addCacheHeaders(cachedResponse, {
+      maxAge: 30, // 30 seconds client cache
+      sMaxAge: 120, // 2 minutes CDN cache
+      staleWhileRevalidate: 60, // Serve stale for 60s while revalidating
+      public: true
     })
     
   } catch (error: any) {
-    console.log(`[SALES][ERROR] Unexpected error: ${error?.message || error}`)
+    const { logger } = await import('@/lib/log')
+    logger.error('Sales query failed', error instanceof Error ? error : new Error(String(error)), {
+      component: 'sales',
+      operation: 'get_sales',
+      durationMs: Date.now() - startedAt
+    })
     return NextResponse.json({ 
       ok: false, 
       error: 'Internal server error' 
@@ -728,6 +759,13 @@ async function salesHandler(request: NextRequest) {
 }
 
 async function postHandler(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const supabase = createSupabaseServerClient()
 
@@ -961,14 +999,25 @@ async function postHandler(request: NextRequest) {
     }
     
     // Handle items if provided
+    let itemCount = 0
     if (body.items?.length) {
       const withSale = body.items.map((it: any) => ({ ...it, sale_id: data.id }))
       const { error: iErr } = await fromBase(admin, 'items').insert(withSale)
       if (iErr) {
-        if (process.env.NODE_ENV !== 'production') console.error('[SALES/POST] items error:', iErr)
+        const { logger } = await import('@/lib/log')
+        logger.error('Failed to create items', iErr instanceof Error ? iErr : new Error(String(iErr)), {
+          component: 'sales',
+          operation: 'create_items',
+          saleId: data.id
+        })
         return fail(500, 'ITEMS_CREATE_FAILED', iErr.message, iErr)
       }
+      itemCount = body.items.length
     }
+    
+    // Log business event: sale created
+    const { logSaleCreated } = await import('@/lib/events/businessEvents')
+    logSaleCreated(data.id, user.id, itemCount)
     
     return ok({ saleId: data.id })
   } catch (e: any) {

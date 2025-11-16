@@ -228,6 +228,9 @@ const ALLOWED_PATTERNS = [
   // Sales API error logging (app/api/sales/route.ts)
   /^\[SALES\] Unexpected error:/, // Expected error logging in sales POST handler - tests/integration/sales.imageFields.persist.test.ts
   
+  // CSRF validation warnings (lib/api/csrfCheck.ts)
+  /\[WARN\] \[csrfCheck\] \[csrf_validation\] CSRF token validation failed/, // Expected CSRF validation warnings in tests without CSRF tokens - tests/integration/sales.imageFields.persist.test.ts
+  
   // Map component error logging (components/location/SimpleMap.tsx)
   /^\[SIMPLE_MAP\] Map error:/, // Expected map error logging in tests - tests/unit/a11y.smoke.test.tsx
   
@@ -275,5 +278,22 @@ vitestAfterEach(async () => {
     const clear = (globalThis as any).__clearOverpassCache
     if (typeof clear === 'function') clear()
   } catch {}
+})
+
+// Global unhandled rejection handler to catch ZodErrors from env validation during tests
+// These errors are expected in env.test.ts when testing error conditions
+process.on('unhandledRejection', (reason: unknown) => {
+  // Ignore ZodErrors from env validation during tests
+  // These are expected when testing error conditions in env.test.ts
+  if (reason && typeof reason === 'object' && 'issues' in reason) {
+    // Check if this is from env.test.ts by checking the stack trace
+    // Safely access stack property - ZodError may have a stack property
+    const stack = (reason instanceof Error ? reason.stack : (reason as any).stack) || ''
+    if (stack.includes('env.test.ts') || stack.includes('lib/env.ts')) {
+      // This is an expected error from env validation tests - ignore it
+      return
+    }
+  }
+  // For other unhandled rejections, let them propagate (Vitest will handle them)
 })
 

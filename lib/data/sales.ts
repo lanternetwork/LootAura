@@ -279,10 +279,20 @@ export async function getSaleById(id: string): Promise<SaleWithOwnerInfo | null>
 
     // Log errors but don't fail - return with defaults
     if (profileRes.error) {
-      console.error('[SALES] Error fetching owner profile:', profileRes.error)
+      const { logger } = await import('@/lib/log')
+      logger.error('Error fetching owner profile', profileRes.error instanceof Error ? profileRes.error : new Error(String(profileRes.error)), {
+        component: 'sales',
+        operation: 'getSaleById',
+        ownerId,
+      })
     }
     if (statsRes.error) {
-      console.error('[SALES] Error fetching owner stats:', statsRes.error)
+      const { logger } = await import('@/lib/log')
+      logger.error('Error fetching owner stats', statsRes.error instanceof Error ? statsRes.error : new Error(String(statsRes.error)), {
+        component: 'sales',
+        operation: 'getSaleById',
+        ownerId,
+      })
     }
 
     return {
@@ -296,7 +306,11 @@ export async function getSaleById(id: string): Promise<SaleWithOwnerInfo | null>
       },
     } as SaleWithOwnerInfo
   } catch (error) {
-    console.error('[SALES] Error in getSaleById:', error)
+    const { logger } = await import('@/lib/log')
+    logger.error('Error in getSaleById', error instanceof Error ? error : new Error(String(error)), {
+      component: 'sales',
+      operation: 'getSaleById',
+    })
     throw error
   }
 }

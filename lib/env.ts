@@ -36,6 +36,16 @@ const publicSchema = z.object({
   ),
   NEXT_PUBLIC_SUPABASE_SCHEMA: z.string().optional(),
   NEXT_PUBLIC_GOOGLE_ENABLED: z.string().optional(),
+  NEXT_PUBLIC_DEBUG: z.preprocess(
+    (val) => val === 'true' || val === '1',
+    z.boolean().optional()
+  ),
+  NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: z.string().optional(),
+  NEXT_PUBLIC_MAX_UPLOAD_SIZE: z.preprocess(
+    (val) => val ? parseInt(String(val), 10) : undefined,
+    z.number().int().positive().optional()
+  ),
 })
 
 const serverSchema = z.object({
@@ -46,6 +56,10 @@ const serverSchema = z.object({
     z.string().url().optional()
   ),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(10).optional(),
+  MAX_UPLOAD_SIZE_BYTES: z.preprocess(
+    (val) => val ? parseInt(String(val), 10) : undefined,
+    z.number().int().positive().optional()
+  ),
   NOMINATIM_APP_EMAIL: z.preprocess(
     (val) => {
       // In production, require email; in dev, allow optional with default
@@ -67,6 +81,10 @@ export const ENV_PUBLIC = publicSchema.parse({
   NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
   NEXT_PUBLIC_SUPABASE_SCHEMA: process.env.NEXT_PUBLIC_SUPABASE_SCHEMA,
   NEXT_PUBLIC_GOOGLE_ENABLED: process.env.NEXT_PUBLIC_GOOGLE_ENABLED,
+  NEXT_PUBLIC_DEBUG: process.env.NEXT_PUBLIC_DEBUG,
+  NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
+  NEXT_PUBLIC_MAX_UPLOAD_SIZE: process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE,
 })
 
 // Validate server environment variables (only in server context, lazy to avoid build-time validation)
@@ -80,6 +98,7 @@ function getEnvServer() {
       VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
       UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
       UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+      MAX_UPLOAD_SIZE_BYTES: process.env.MAX_UPLOAD_SIZE_BYTES,
       NOMINATIM_APP_EMAIL: process.env.NOMINATIM_APP_EMAIL,
     })
   }
@@ -100,4 +119,14 @@ export type ServerEnv = z.infer<typeof serverSchema>
 // Getter for Nominatim email (single source of truth)
 export function getNominatimEmail(): string {
   return getEnvServer().NOMINATIM_APP_EMAIL
+}
+
+// Helper to check if we're in production
+export function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production'
+}
+
+// Helper to check if debug mode is enabled
+export function isDebugMode(): boolean {
+  return ENV_PUBLIC.NEXT_PUBLIC_DEBUG === true
 }

@@ -3,15 +3,12 @@ import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createRateLimitMiddleware, RATE_LIMITS } from '@/lib/rateLimiter'
 
-// Validation schema
+// Validation schema (size validation happens at runtime)
 const uploadRequestSchema = z.object({
   mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp'], {
     errorMap: () => ({ message: 'Only JPEG, PNG, and WebP images are allowed' })
   }),
-  sizeBytes: z.number().int().positive().max(
-    parseInt(process.env.MAX_UPLOAD_SIZE_BYTES || '5242880'), // 5MB default
-    { message: 'File size exceeds maximum allowed' }
-  ),
+  sizeBytes: z.number().int().positive(),
   ext: z.string().optional(),
   entity: z.enum(['sale', 'profile']),
   entityId: z.string().uuid().optional()
@@ -33,13 +30,24 @@ export async function POST(request: NextRequest) {
     // Validate input
     const body = await request.json()
     const { mimeType, sizeBytes, ext, entity, entityId: _entityId } = uploadRequestSchema.parse(body)
+    
+    // Validate file size against configured limit
+    const { ENV_SERVER } = await import('@/lib/env')
+    const maxSizeBytes = ENV_SERVER.MAX_UPLOAD_SIZE_BYTES || 5242880 // 5MB default
+    if (sizeBytes > maxSizeBytes) {
+      return NextResponse.json(
+        { error: `File size exceeds maximum allowed (${Math.round(maxSizeBytes / 1024 / 1024)}MB)` },
+        { status: 400 }
+      )
+    }
 
     // Check authentication
     const supabase = createSupabaseServerClient()
     
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { isDebugMode } = await import('@/lib/env')
+      if (isDebugMode()) {
         console.log('[UPLOAD] Auth failed', { event: 'upload-signer', status: 'fail', code: authError?.message })
       }
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
@@ -59,7 +67,8 @@ export async function POST(request: NextRequest) {
       })
 
     if (signedUrlError) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { isDebugMode } = await import('@/lib/env')
+      if (isDebugMode()) {
         console.log('[UPLOAD] Signed URL creation failed', { event: 'upload-signer', status: 'fail', code: signedUrlError.message })
       }
       return NextResponse.json(
@@ -80,7 +89,8 @@ export async function POST(request: NextRequest) {
       objectKey // Include for potential cleanup
     }
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    const { isDebugMode } = await import('@/lib/env')
+    if (isDebugMode()) {
       console.log('[UPLOAD] Signed URL created', { 
         event: 'upload-signer', 
         status: 'ok',
@@ -94,7 +104,8 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     if (error instanceof z.ZodError) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { isDebugMode } = await import('@/lib/env')
+      if (isDebugMode()) {
         console.log('[UPLOAD] Validation failed', { event: 'upload-signer', status: 'fail', errors: error.errors.length })
       }
       return NextResponse.json(
@@ -103,7 +114,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    const { isDebugMode } = await import('@/lib/env')
+    if (isDebugMode()) {
       console.log('[UPLOAD] Unexpected error', { event: 'upload-signer', status: 'fail' })
     }
     console.error('[UPLOAD] Unexpected error:', error)

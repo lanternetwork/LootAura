@@ -43,6 +43,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const supabase = createSupabaseServerClient()
     const body = await request.json()
@@ -125,6 +132,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create item' }, { status: 500 })
     }
     
+    // Enqueue image post-processing job for item image (non-blocking, non-critical)
+    if (firstImageUrl) {
+      try {
+        const { enqueueJob, JOB_TYPES } = await import('@/lib/jobs')
+        enqueueJob(JOB_TYPES.IMAGE_POSTPROCESS, {
+          imageUrl: firstImageUrl,
+          saleId: body.sale_id,
+          ownerId: user.id,
+        }).catch((err) => {
+          // Log but don't fail - job enqueueing is non-critical
+          console.warn('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical):', err)
+        })
+      } catch (jobErr) {
+        // Ignore job enqueueing errors - this is non-critical
+        console.warn('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical):', jobErr)
+      }
+    }
+    
     return NextResponse.json({ item }, { status: 201 })
   } catch (error) {
     console.error('Unexpected error:', error)
@@ -133,6 +158,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const supabase = createSupabaseServerClient()
     const { pathname } = new URL(request.url)
@@ -174,6 +206,13 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const supabase = createSupabaseServerClient()
     const { pathname } = new URL(request.url)

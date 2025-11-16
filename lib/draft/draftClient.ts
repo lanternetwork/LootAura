@@ -4,6 +4,7 @@
  */
 
 import { SaleDraftPayload } from '@/lib/validation/saleDraft'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 type ApiResponse<T = any> = {
   ok: boolean
@@ -25,6 +26,7 @@ export async function saveDraftServer(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
       },
       body: JSON.stringify({ payload, draftKey }),
     })
@@ -124,6 +126,7 @@ export async function publishDraftServer(draftKey: string): Promise<ApiResponse<
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
       },
       body: JSON.stringify({ draftKey }),
     })

@@ -1176,7 +1176,7 @@ export default function AddressAutocomplete({
           onBlur={handleBlur}
           onFocus={handleFocus}
           placeholder={placeholder}
-          className={className}
+          className={`${className} ${error ? 'border-red-500' : ''}`}
           required={required}
           minLength={5}
           disabled={isGeocoding}
@@ -1186,11 +1186,13 @@ export default function AddressAutocomplete({
           aria-expanded={isOpen}
           aria-controls="address-suggestions"
           aria-activedescendant={selectedIndex >= 0 ? `suggestion-${selectedIndex}` : undefined}
+          aria-invalid={!!error}
+          aria-describedby={error ? 'address-error' : undefined}
           role="combobox"
         />
         
         {error && (
-          <p className="mt-1 text-sm text-red-600">{error}</p>
+          <p id="address-error" className="mt-1 text-sm text-red-600" role="alert">{error}</p>
         )}
         
         {(() => {

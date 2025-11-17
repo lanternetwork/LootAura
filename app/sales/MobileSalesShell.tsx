@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import SimpleMap from '@/components/location/SimpleMap'
-import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
+import MobilePinCallout from '@/components/sales/MobilePinCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
@@ -72,16 +72,22 @@ export default function MobileSalesShell({
   // Mobile-only state
   const [mode, setMode] = useState<MobileMode>('map')
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
+  const mapRef = useRef<any>(null)
   
-  // Find selected sale from selectedPinId
+  // Find selected sale and pin coordinates from selectedPinId
   // selectedPinId can be either a sale ID (when location grouping is disabled) 
   // or a location ID like "location-0" (when location grouping is enabled)
-  const selectedSale = useMemo(() => {
-    if (!selectedPinId) return null
+  const { selectedSale, pinCoordinates } = useMemo(() => {
+    if (!selectedPinId) return { selectedSale: null, pinCoordinates: { lat: null, lng: null } }
     
     // First, try direct sale ID match (for when location grouping is disabled)
     const directMatch = mapSales.find(sale => sale.id === selectedPinId)
-    if (directMatch) return directMatch
+    if (directMatch && typeof directMatch.lat === 'number' && typeof directMatch.lng === 'number') {
+      return {
+        selectedSale: directMatch,
+        pinCoordinates: { lat: directMatch.lat, lng: directMatch.lng }
+      }
+    }
     
     // If it's a location ID (starts with "location-"), find the location group
     if (selectedPinId.startsWith('location-')) {
@@ -91,12 +97,14 @@ export default function MobileSalesShell({
       })
       const location = locationGroups.find(loc => loc.id === selectedPinId)
       if (location && location.sales.length > 0) {
-        // Return the first sale from this location group
-        return location.sales[0]
+        return {
+          selectedSale: location.sales[0],
+          pinCoordinates: { lat: location.lat, lng: location.lng }
+        }
       }
     }
     
-    return null
+    return { selectedSale: null, pinCoordinates: { lat: null, lng: null } }
   }, [selectedPinId, mapSales])
   
   // Handle mode toggle
@@ -123,6 +131,7 @@ export default function MobileSalesShell({
         <div className="relative flex-1 min-h-0 bg-gray-100">
           {/* Full-screen map */}
           <SimpleMap
+            ref={mapRef}
             center={mapView.center}
             zoom={pendingBounds ? undefined : mapView.zoom}
             fitBounds={pendingBounds}
@@ -173,10 +182,13 @@ export default function MobileSalesShell({
             </button>
           </div>
           
-          {/* Callout Card - Shows when a sale is selected */}
-          {selectedSale && (
-            <MobileSaleCallout
+          {/* Pin Callout - Shows when a sale is selected, positioned above the pin */}
+          {selectedSale && pinCoordinates.lat !== null && pinCoordinates.lng !== null && (
+            <MobilePinCallout
               sale={selectedSale}
+              pinLat={pinCoordinates.lat}
+              pinLng={pinCoordinates.lng}
+              mapRef={mapRef}
               onDismiss={() => onLocationClick(selectedPinId || '')}
               viewport={mapViewport}
             />

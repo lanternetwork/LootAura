@@ -166,23 +166,29 @@ export default function SalesClient({
       zoom: mapView.zoom
     }
     
-    // Only update if viewport changed significantly
-    // Threshold: 1% change in bounds or 0.5 zoom levels
+    // Always update on first load (when previousViewportRef is null)
+    // This ensures pins appear on initial page load
     const prev = previousViewportRef.current
-    if (prev) {
-      const latRange = newViewport.bounds[3] - newViewport.bounds[1]
-      const lngRange = newViewport.bounds[2] - newViewport.bounds[0]
-      const prevLatRange = prev.bounds[3] - prev.bounds[1]
-      const prevLngRange = prev.bounds[2] - prev.bounds[0]
-      
-      const latChange = Math.abs(latRange - prevLatRange) / Math.max(latRange, prevLatRange, 0.001)
-      const lngChange = Math.abs(lngRange - prevLngRange) / Math.max(lngRange, prevLngRange, 0.001)
-      const zoomChange = Math.abs(newViewport.zoom - prev.zoom)
-      
-      // If change is small, return previous viewport to avoid unnecessary recalculations
-      if (latChange < 0.01 && lngChange < 0.01 && zoomChange < 0.5) {
-        return prev
-      }
+    if (!prev) {
+      previousViewportRef.current = newViewport
+      return newViewport
+    }
+    
+    // After initial load, only update if viewport changed significantly
+    // Threshold: 2% change in bounds or 0.3 zoom levels (less aggressive to allow initial updates)
+    const latRange = newViewport.bounds[3] - newViewport.bounds[1]
+    const lngRange = newViewport.bounds[2] - newViewport.bounds[0]
+    const prevLatRange = prev.bounds[3] - prev.bounds[1]
+    const prevLngRange = prev.bounds[2] - prev.bounds[0]
+    
+    const latChange = Math.abs(latRange - prevLatRange) / Math.max(latRange, prevLatRange, 0.001)
+    const lngChange = Math.abs(lngRange - prevLngRange) / Math.max(lngRange, prevLngRange, 0.001)
+    const zoomChange = Math.abs(newViewport.zoom - prev.zoom)
+    
+    // If change is small, return previous viewport to avoid unnecessary recalculations
+    // But be less aggressive to allow initial map load updates
+    if (latChange < 0.02 && lngChange < 0.02 && zoomChange < 0.3) {
+      return prev
     }
     
     previousViewportRef.current = newViewport

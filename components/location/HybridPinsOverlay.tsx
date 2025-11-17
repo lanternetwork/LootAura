@@ -30,16 +30,8 @@ export default function HybridPinsOverlay({
   hybridResult: providedHybridResult
 }: HybridPinsOverlayProps) {
   
-  // Use provided hybridResult if available, otherwise calculate it
-  // This avoids duplicate clustering when hybridResult is already calculated upstream
-  // Use a more explicit check to ensure React detects changes properly
-  const hybridResult = useMemo((): HybridPinsResult => {
-    // Explicitly check for null/undefined to ensure React detects changes
-    if (providedHybridResult !== null && providedHybridResult !== undefined) {
-      return providedHybridResult
-    }
-    
-    // Fallback: calculate if not provided (for backwards compatibility)
+  // Calculate fallback result (only when not provided) - must be called unconditionally
+  const fallbackResult = useMemo(() => {
     return createHybridPins(sales, viewport, {
       coordinatePrecision: 6,
       clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
@@ -48,7 +40,14 @@ export default function HybridPinsOverlay({
       enableLocationGrouping: true,
       enableVisualClustering: true
     })
-  }, [providedHybridResult, sales, viewport])
+  }, [sales, viewport])
+  
+  // Use provided hybridResult if available, otherwise use fallback
+  // This avoids duplicate clustering when hybridResult is already calculated upstream
+  // Direct assignment ensures React detects changes immediately when providedHybridResult changes
+  const hybridResult: HybridPinsResult = providedHybridResult !== null && providedHybridResult !== undefined
+    ? providedHybridResult
+    : fallbackResult
 
   // Early return if no sales - avoid unnecessary rendering
   if (sales.length === 0) {

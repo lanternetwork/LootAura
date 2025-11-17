@@ -346,7 +346,49 @@ export default function SalesClient({
             bbox: bbox
           })
         }
-        setMapSales(filtered)
+        
+        // Merge new sales with existing ones to prevent pins from disappearing when panning
+        // Keep sales that are within a buffer around the current viewport
+        setMapSales((prevSales) => {
+          // Create a map of existing sales by ID for quick lookup
+          const existingSalesMap = new Map(prevSales.map(sale => [sale.id, sale]))
+          
+          // Add/update sales from the new fetch
+          filtered.forEach(sale => {
+            existingSalesMap.set(sale.id, sale)
+          })
+          
+          // Expand bounds by 20% to create a buffer zone
+          const bufferFactor = 0.2
+          const latRange = bbox.north - bbox.south
+          const lngRange = bbox.east - bbox.west
+          const bufferedBounds = {
+            west: bbox.west - (lngRange * bufferFactor),
+            south: bbox.south - (latRange * bufferFactor),
+            east: bbox.east + (lngRange * bufferFactor),
+            north: bbox.north + (latRange * bufferFactor)
+          }
+          
+          // Keep only sales within the buffered bounds to prevent memory bloat
+          const mergedSales = Array.from(existingSalesMap.values()).filter(sale => {
+            if (typeof sale.lat !== 'number' || typeof sale.lng !== 'number') return false
+            return sale.lat >= bufferedBounds.south &&
+                   sale.lat <= bufferedBounds.north &&
+                   sale.lng >= bufferedBounds.west &&
+                   sale.lng <= bufferedBounds.east
+          })
+          
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[FETCH] Merged sales:', {
+              previous: prevSales.length,
+              new: filtered.length,
+              merged: mergedSales.length,
+              removed: prevSales.length + filtered.length - mergedSales.length
+            })
+          }
+          
+          return mergedSales
+        })
         setMapMarkers(filtered
           .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
           .map(sale => ({

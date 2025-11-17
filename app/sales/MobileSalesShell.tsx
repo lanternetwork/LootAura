@@ -121,6 +121,7 @@ export default function MobileSalesShell({
             showOSMAttribution={true}
             attributionControl={false}
             interactive={true}
+            skipCenteringOnClick={true}
           />
           
           {/* Floating Action Buttons */}

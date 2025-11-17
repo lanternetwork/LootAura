@@ -207,11 +207,15 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     // })
     
     // TEMPORARY: Just center the map on the cluster without zooming
-    map.flyTo({
+    const flyToOptions: any = {
       center: [cluster.lng, cluster.lat],
-      duration: 400,
-      offset: offsetY !== 0 ? { x: 0, y: offsetY } : undefined
-    })
+      duration: 400
+    }
+    // Only include offset if we have a non-zero offset value
+    if (offsetY !== 0) {
+      flyToOptions.offset = { x: 0, y: offsetY }
+    }
+    map.flyTo(flyToOptions)
     
     // Call the onClusterClick callback if provided
     pins?.onClusterClick?.(cluster)
@@ -243,11 +247,15 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       if (map && typeof lat === 'number' && typeof lng === 'number') {
         // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
         const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
-        map.flyTo({ 
-          center: [lng, lat], 
-          duration: 400,
-          offset: offsetY !== 0 ? { x: 0, y: offsetY } : undefined
-        })
+        const flyToOptions: any = {
+          center: [lng, lat],
+          duration: 400
+        }
+        // Only include offset if we have a non-zero offset value
+        if (offsetY !== 0) {
+          flyToOptions.offset = { x: 0, y: offsetY }
+        }
+        map.flyTo(flyToOptions)
         centeredLocationRef.current[locationId] = true
         return
       }

@@ -109,9 +109,12 @@ export function applyVisualClustering(
     lng: location.lng
   }))
   
-  // Build cluster index
+  // Build cluster index with radius calculated for current zoom level
+  // clusterRadius is in screen pixels, we need to convert it to pixels at maxZoom
+  // This ensures visual touch-based clustering (pins that visually touch will cluster)
   const clusterIndex = buildClusterIndex(pinPoints, {
-    radius: opts.clusterRadius,
+    radius: opts.clusterRadius, // This is in screen pixels
+    currentZoom: viewport.zoom, // Pass current zoom so radius can be converted
     maxZoom: opts.maxZoom,
     minPoints: opts.minClusterSize
   })

@@ -10,7 +10,7 @@ export type { PinPoint, ClusterFeature }
 export type ClusterPoint = PinPoint
 
 const DEFAULT_OPTIONS: ClusterOptions = {
-  radius: 0.3, // Ultra-conservative clustering radius (0.3px)
+  radius: 0.3, // Default radius in screen pixels (only used if currentZoom not provided)
   maxZoom: 20,
   minPoints: 2
 }
@@ -18,16 +18,49 @@ const DEFAULT_OPTIONS: ClusterOptions = {
 export type SuperclusterIndex = Supercluster<PinPoint, { point_count: number }>
 
 /**
+ * Convert screen pixel radius to Supercluster radius (pixels at maxZoom)
+ * Supercluster's radius is in pixels at the maximum zoom level, not screen pixels.
+ * To get visual touch-based clustering, we need to convert screen pixels to the
+ * equivalent radius at maxZoom based on the current zoom level.
+ * 
+ * Formula: radius_at_maxZoom = radius_screen * 2^(maxZoom - currentZoom)
+ * 
+ * @param screenPixelRadius - Radius in screen pixels at current zoom
+ * @param currentZoom - Current zoom level
+ * @param maxZoom - Maximum zoom level used by Supercluster
+ * @returns Radius in pixels at maxZoom
+ */
+export function calculateClusterRadius(
+  screenPixelRadius: number,
+  currentZoom: number,
+  maxZoom: number
+): number {
+  // Convert screen pixels at current zoom to pixels at maxZoom
+  // At zoom z, 1 screen pixel = 256 * 2^z pixels in tile coordinates
+  // At maxZoom, 1 screen pixel at zoom z = 2^(z - maxZoom) pixels at maxZoom
+  // So radius_at_maxZoom = radius_screen * 2^(maxZoom - currentZoom)
+  const zoomDiff = maxZoom - currentZoom
+  return screenPixelRadius * Math.pow(2, zoomDiff)
+}
+
+/**
  * Build a Supercluster index from sales data
  */
 export function buildClusterIndex(
   sales: PinPoint[], 
-  options: Partial<ClusterOptions> = {}
+  options: Partial<ClusterOptions & { currentZoom?: number }> = {}
 ): SuperclusterIndex {
   const opts = { ...DEFAULT_OPTIONS, ...options }
   
+  // If currentZoom is provided and radius is in screen pixels, convert it
+  let radius = opts.radius
+  if (options.currentZoom !== undefined && options.currentZoom >= 0) {
+    // Assume radius is in screen pixels, convert to pixels at maxZoom
+    radius = calculateClusterRadius(opts.radius, options.currentZoom, opts.maxZoom)
+  }
+  
   const cluster = new Supercluster<PinPoint, { point_count: number }>({
-    radius: opts.radius,
+    radius: radius,
     maxZoom: opts.maxZoom,
     minPoints: opts.minPoints
   })
@@ -47,7 +80,10 @@ export function buildClusterIndex(
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[PINS] index built', { 
       points: sales.length, 
-      radius: opts.radius, 
+      screenPixelRadius: opts.radius,
+      calculatedRadius: radius,
+      currentZoom: options.currentZoom,
+      maxZoom: opts.maxZoom,
       minPoints: opts.minPoints 
     })
   }

@@ -21,10 +21,6 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport }: MobileS
   const router = useRouter()
   const [swipeStartY, setSwipeStartY] = useState<number | null>(null)
   const [swipeDeltaY, setSwipeDeltaY] = useState(0)
-
-  if (!sale) return null
-
-  const cover = getSaleCoverUrl(sale)
   
   // Swipe-to-dismiss gesture handling
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -50,6 +46,10 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport }: MobileS
     setSwipeStartY(null)
     setSwipeDeltaY(0)
   }, [swipeDeltaY, onDismiss])
+
+  if (!sale) return null
+
+  const cover = getSaleCoverUrl(sale)
   
   // Build detail page URL with viewport params to restore view on back
   const detailUrl = viewport 

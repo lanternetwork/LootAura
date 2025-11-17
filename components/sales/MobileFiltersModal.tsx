@@ -145,11 +145,12 @@ export default function MobileFiltersModal({
           {/* ZIP Search */}
           <div>
             <label className="block text-sm font-medium mb-2">Location</label>
+            {zipError && (
+              <div className="mb-2 text-sm text-red-600">{zipError}</div>
+            )}
             <ZipInput
               onLocationFound={onZipLocationFound}
               onError={onZipError}
-              error={zipError}
-              testId="mobile-filters-zip-input"
             />
           </div>
 
@@ -256,4 +257,5 @@ export default function MobileFiltersModal({
     </>
   )
 }
+
 

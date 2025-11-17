@@ -86,18 +86,6 @@ export default function MobileSalesShell({
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
   
-  // Handle pin selection - clear selection when tapping map background
-  const handleMapClick = useCallback(() => {
-    if (selectedPinId) {
-      onLocationClick(selectedPinId) // Toggle off
-    }
-  }, [selectedPinId, onLocationClick])
-  
-  // Handle sale selection from list
-  const handleSaleClick = useCallback((sale: Sale) => {
-    router.push(`/sales/${sale.id}`)
-  }, [router])
-  
   // Map viewport for callout
   const mapViewport = useMemo(() => {
     if (!mapView) return null

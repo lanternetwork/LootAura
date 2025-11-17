@@ -59,8 +59,13 @@ export function buildGoogleMapsUrlFromSale(sale: {
   const addressParts: string[] = []
   if (sale.address) addressParts.push(sale.address)
   if (sale.city && sale.state) {
-    addressParts.push(`${sale.city}, ${sale.state}`)
-    if (sale.zip_code) addressParts.push(sale.zip_code)
+    // Format as "City, State ZIP" (no comma before ZIP)
+    const cityState = `${sale.city}, ${sale.state}`
+    if (sale.zip_code) {
+      addressParts.push(`${cityState} ${sale.zip_code}`)
+    } else {
+      addressParts.push(cityState)
+    }
   } else if (sale.city) {
     addressParts.push(sale.city)
   }

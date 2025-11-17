@@ -31,6 +31,7 @@ interface SimpleMapProps {
   showOSMAttribution?: boolean // Show OSM attribution overlay
   attributionControl?: boolean // Show Mapbox attribution control (default: true)
   bottomSheetHeight?: number // Height of bottom sheet in pixels (for mobile) - used for map resizing and pin centering offset
+  skipCenteringOnClick?: boolean // Skip centering behavior and immediately select on first click (for mobile)
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -50,7 +51,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   attributionPosition = 'bottom-right',
   showOSMAttribution = true,
   attributionControl = true,
-  bottomSheetHeight = 0
+  bottomSheetHeight = 0,
+  skipCenteringOnClick = false
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -229,6 +231,12 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       return
     }
     
+    // If skipCenteringOnClick is true (mobile), immediately select without centering
+    if (skipCenteringOnClick) {
+      hybridPins?.onLocationClick?.(locationId)
+      return
+    }
+    
     // First click: center the map
     if (!alreadyCentered && mapRef.current?.getMap) {
       const map = mapRef.current.getMap()
@@ -247,7 +255,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     
     // Second click (or if we couldn't center): select location
     hybridPins?.onLocationClick?.(locationId)
-  }, [hybridPins?.onLocationClick, hybridPins?.selectedId, bottomSheetHeight])
+  }, [hybridPins?.onLocationClick, hybridPins?.selectedId, bottomSheetHeight, skipCenteringOnClick])
   
   // Reset centered flag when location is deselected or a different location is selected
   useEffect(() => {

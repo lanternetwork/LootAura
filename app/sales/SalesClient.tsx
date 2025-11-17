@@ -821,36 +821,29 @@ export default function SalesClient({
       }
     }
     
-    // Filter sales to only those within the current viewport bounds (same as map pins)
-    if (!currentViewport) {
+    // Get all sales from visible locations (already filtered with buffered bounds in hybridResult)
+    // This ensures the list matches what's visible on the map without duplicate filtering
+    if (!hybridResult || hybridResult.locations.length === 0) {
       return []
     }
     
-    const viewportFilteredSales = mapSales.filter(sale => {
-      if (typeof sale.lat !== 'number' || typeof sale.lng !== 'number') return false
-      
-      return sale.lat >= currentViewport.bounds[1] && // south
-             sale.lat <= currentViewport.bounds[3] && // north
-             sale.lng >= currentViewport.bounds[0] && // west
-             sale.lng <= currentViewport.bounds[2]    // east
-    })
-    
-    const deduplicated = deduplicateSales(viewportFilteredSales)
+    // Flatten all sales from all visible locations
+    const allVisibleSales = hybridResult.locations.flatMap(loc => loc.sales)
+    const deduplicated = deduplicateSales(allVisibleSales)
     
     // Only log when debug is enabled
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SALES] Visible sales count:', { 
-        mapSales: mapSales.length, 
-        viewportFiltered: viewportFilteredSales.length,
+        mapSales: mapSales.length,
+        locationsCount: hybridResult.locations.length,
         visibleSales: deduplicated.length,
         selectedPinId,
-        hybridType: hybridResult?.type,
-        locationsCount: hybridResult?.locations.length || 0
+        hybridType: hybridResult.type
       })
     }
     
     return deduplicated
-  }, [mapSales, currentViewport, deduplicateSales, selectedPinId, hybridResult])
+  }, [hybridResult, selectedPinId, deduplicateSales, mapSales.length])
 
   // Memoized map center
   const mapCenter = useMemo(() => {

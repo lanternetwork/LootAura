@@ -120,11 +120,25 @@ export default function SalesClient({
   }, [])
   
   useEffect(() => {
+    let resizeTimeout: NodeJS.Timeout | null = null
+    
     const handleResize = () => {
-      setWindowWidth(window.innerWidth)
+      // Debounce resize events to prevent rapid re-renders
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+      }
+      resizeTimeout = setTimeout(() => {
+        setWindowWidth(window.innerWidth)
+      }, 150) // 150ms debounce delay
     }
+    
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    return () => {
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+      }
+      window.removeEventListener('resize', handleResize)
+    }
   }, [])
   
   const isMobile = windowWidth < 768
@@ -815,7 +829,7 @@ export default function SalesClient({
   return (
     <>
       {/* Mobile Layout - Only on small screens (<768px) */}
-      {isMobile ? (
+      <div className={isMobile ? 'block md:hidden' : 'hidden'}>
         <MobileSalesShell
           mapView={mapView}
           pendingBounds={pendingBounds}
@@ -844,9 +858,10 @@ export default function SalesClient({
           zipError={zipError}
           hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
         />
-      ) : (
-        /* Desktop Layout - md and above */
-        <div className="flex flex-col overflow-hidden" style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}>
+      </div>
+      
+      {/* Desktop Layout - md and above */}
+      <div className={isMobile ? 'hidden' : 'flex flex-col overflow-hidden'} style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}>
           {/* Advanced Filters Bar */}
           <FiltersBar
             onZipLocationFound={handleZipLocationFound}

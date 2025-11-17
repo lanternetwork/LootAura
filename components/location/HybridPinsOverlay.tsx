@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { Sale } from '@/lib/types'
 import { HybridPinsResult, HybridPin, LocationGroup } from '@/lib/pins/types'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
@@ -59,6 +59,17 @@ export default function HybridPinsOverlay({
     
     return result
   }, [providedHybridResult, fallbackResult])
+
+  // Debug: Track when component renders and when hybridResult changes
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[HYBRID_PINS] Component rendered:', {
+        salesCount: sales.length,
+        hybridResultPinsCount: hybridResult?.pins?.length || 0,
+        hasProvidedResult: providedHybridResult !== null && providedHybridResult !== undefined
+      })
+    }
+  }, [sales.length, hybridResult?.pins?.length, providedHybridResult])
 
   // Early return if no sales - avoid unnecessary rendering
   if (sales.length === 0) {

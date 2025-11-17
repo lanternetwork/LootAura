@@ -22,7 +22,7 @@ interface AddressLinkProps {
 }
 
 /**
- * Renders an address as a clickable link to Google Maps.
+ * Renders an address as a clickable link to maps (opens in user's default maps app).
  * Falls back to plain text if no valid location data is available.
  * 
  * Prefers lat/lng coordinates when available for precision.
@@ -61,7 +61,7 @@ export default function AddressLink({
     fullAddress = state
   }
 
-  // Build Google Maps URL
+  // Build maps URL
   const mapsUrl = buildGoogleMapsUrl({
     lat: typeof lat === 'number' ? lat : undefined,
     lng: typeof lng === 'number' ? lng : undefined,
@@ -72,8 +72,8 @@ export default function AddressLink({
   if (mapsUrl) {
     const displayText = children || fullAddress || 'View on map'
     const ariaLabel = fullAddress 
-      ? `Open in Google Maps: ${fullAddress}`
-      : 'Open in Google Maps'
+      ? `Open in maps: ${fullAddress}`
+      : 'Open in maps'
 
     return (
       <a

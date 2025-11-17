@@ -157,7 +157,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     
     const map = mapRef.current.getMap()
     if (!map) return
-
+    
     const center = map.getCenter()
     const zoom = map.getZoom()
     const bounds = map.getBounds()
@@ -171,6 +171,12 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         east: bounds.getEast(),
         north: bounds.getNorth()
       }
+    }
+    
+    // Clear programmatic move flag when move ends (whether from programmatic or user interaction)
+    // This allows the next programmatic move to work correctly
+    if (isProgrammaticMoveRef.current) {
+      isProgrammaticMoveRef.current = false
     }
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -310,6 +316,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     }
   }, [fitBounds, fitBoundsOptions, loaded])
 
+  // Track if we're programmatically moving the map to prevent feedback loops
+  const isProgrammaticMoveRef = useRef(false)
+  const lastProgrammaticCenterRef = useRef<{ lat: number; lng: number; zoom: number } | null>(null)
+
   // Handle center/zoom changes
   // Skip center/zoom updates when fitBounds is active to prevent zoom flash
   useEffect(() => {
@@ -318,6 +328,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const map = mapRef.current.getMap()
     if (!map) return
 
+    // Skip if we're currently in a programmatic move (prevents feedback loop)
+    if (isProgrammaticMoveRef.current) {
+      return
+    }
+
     const currentCenter = map.getCenter()
     const currentZoom = map.getZoom()
     
@@ -325,13 +340,29 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const lngDiff = Math.abs(currentCenter.lng - center.lng)
     const zoomDiff = Math.abs(currentZoom - zoom)
     
-    if (latDiff > 1e-5 || lngDiff > 1e-5 || zoomDiff > 0.01) {
-      console.log('[MAP] easeTo:', { center, zoom })
+    // Only easeTo if there's a significant difference AND it's not from a recent programmatic move
+    const isRecentProgrammaticMove = lastProgrammaticCenterRef.current && 
+      Math.abs(lastProgrammaticCenterRef.current.lat - center.lat) < 1e-4 &&
+      Math.abs(lastProgrammaticCenterRef.current.lng - center.lng) < 1e-4 &&
+      Math.abs(lastProgrammaticCenterRef.current.zoom - zoom) < 0.1
+    
+    if ((latDiff > 1e-5 || lngDiff > 1e-5 || zoomDiff > 0.01) && !isRecentProgrammaticMove) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MAP] easeTo:', { center, zoom })
+      }
+      isProgrammaticMoveRef.current = true
+      lastProgrammaticCenterRef.current = { lat: center.lat, lng: center.lng, zoom }
+      
       map.easeTo({
         center: [center.lng, center.lat],
         zoom,
         duration: 400
       })
+      
+      // Reset flag after animation completes
+      setTimeout(() => {
+        isProgrammaticMoveRef.current = false
+      }, 450) // Slightly longer than duration to ensure it completes
     }
   }, [center.lat, center.lng, zoom, loaded, fitBounds])
 

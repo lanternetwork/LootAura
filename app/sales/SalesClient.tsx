@@ -387,16 +387,18 @@ export default function SalesClient({
             })
           }
           
+          // Update markers from merged sales
+          setMapMarkers(mergedSales
+            .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
+            .map(sale => ({
+              id: sale.id,
+              title: sale.title,
+              lat: sale.lat!,
+              lng: sale.lng!
+            })))
+          
           return mergedSales
         })
-        setMapMarkers(filtered
-          .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
-          .map(sale => ({
-            id: sale.id,
-            title: sale.title,
-            lat: sale.lat!,
-            lng: sale.lng!
-          })))
       } else {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[FETCH] No data in response:', data)

@@ -44,19 +44,23 @@ export function WeekendStats() {
 
       // Use lightweight count endpoint for faster loading
       const countUrl = `/api/sales/count?${params.toString()}`
-      console.log('[WeekendStats] Fetching weekend sales count:', countUrl, { isDefault })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[WeekendStats] Fetching weekend sales count:', countUrl, { isDefault })
+      }
       const countRes = await fetch(countUrl)
       if (!countRes.ok) {
         throw new Error(`Failed to fetch weekend sales count: ${countRes.status}`)
       }
       const countData = await countRes.json()
       const weekendCount = countData.count || 0
-      console.log('[WeekendStats] Weekend sales count response:', {
-        ok: countRes.ok,
-        count: weekendCount,
-        durationMs: countData.durationMs,
-        isDefault
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[WeekendStats] Weekend sales count response:', {
+          ok: countRes.ok,
+          count: weekendCount,
+          durationMs: countData.durationMs,
+          isDefault
+        })
+      }
 
       // Calculate stats
       const activeSales = weekendCount
@@ -67,18 +71,24 @@ export function WeekendStats() {
       // - Default location with 0: don't update, wait for real location
       if (!isDefault) {
         // Real location resolved - always update
-        console.log('[WeekendStats] Updating stats from real location - Active sales:', activeSales)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[WeekendStats] Updating stats from real location - Active sales:', activeSales)
+        }
         setStats({ activeSales })
         setLoading(false)
         setIsDefaultLocation(false)
       } else if (activeSales > 0) {
         // Default location has sales - show immediately
-        console.log('[WeekendStats] Updating stats from default location - Active sales:', activeSales)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[WeekendStats] Updating stats from default location - Active sales:', activeSales)
+        }
         setStats({ activeSales })
         setLoading(false)
       } else {
         // Default location returned 0 - wait for real location
-        console.log('[WeekendStats] Default location returned 0, waiting for real location')
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[WeekendStats] Default location returned 0, waiting for real location')
+        }
         setIsDefaultLocation(true)
         // Keep loading true and don't update stats - show fallback
       }
@@ -116,10 +126,12 @@ export function WeekendStats() {
         if (ipRes.ok) {
           const ipData = await ipRes.json()
           if (ipData.lat && ipData.lng) {
-            console.log('[WeekendStats] Using IP geolocation:', ipData)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[WeekendStats] Using IP geolocation:', ipData)
+            }
             const loc = { 
               lat: ipData.lat, 
-              lng: ipData.lng,
+              lng: ipData.lng, 
               city: ipData.city,
               state: ipData.state
             }

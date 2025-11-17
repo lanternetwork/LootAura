@@ -43,7 +43,9 @@ export function FeaturedSalesSection() {
         if (ipRes.ok) {
           const ipData = await ipRes.json()
           if (ipData.lat && ipData.lng) {
-            console.log('[FeaturedSales] Using IP geolocation:', ipData)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[FeaturedSales] Using IP geolocation:', ipData)
+            }
             const loc = { 
               lat: ipData.lat, 
               lng: ipData.lng,
@@ -75,7 +77,9 @@ export function FeaturedSalesSection() {
             const parsed = JSON.parse(saved)
             // Only use saved data if it's a ZIP code (not exact coordinates)
             if (parsed && parsed.zip) {
-              console.log('[FeaturedSales] Using localStorage ZIP:', parsed.zip)
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[FeaturedSales] Using localStorage ZIP:', parsed.zip)
+              }
               setLocation({ zip: parsed.zip })
               setStatus('ready')
               return
@@ -89,7 +93,9 @@ export function FeaturedSalesSection() {
       }
       
       // Final fallback city (Louisville)
-      console.log('[FeaturedSales] Using fallback Louisville')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FeaturedSales] Using fallback Louisville')
+      }
       const fallback = { zip: '40204' }
       setLocation(fallback)
       setStatus('ready')
@@ -137,36 +143,48 @@ export function FeaturedSalesSection() {
           return
         }
 
-        console.log('[FeaturedSales] Fetching sales from:', url)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FeaturedSales] Fetching sales from:', url)
+        }
         const res = await fetch(url)
         if (!res.ok) {
-          console.error('[FeaturedSales] Failed to fetch sales:', res.status, res.statusText)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.error('[FeaturedSales] Failed to fetch sales:', res.status, res.statusText)
+          }
           setSales([])
           setLoading(false)
           return
         }
         
         const data = await res.json()
-        console.log('[FeaturedSales] API response:', { 
-          ok: data.ok, 
-          hasSales: !!data.sales, 
-          hasData: !!data.data,
-          salesCount: data.sales?.length || 0,
-          dataCount: data.data?.length || 0,
-          count: data.count || 0
-        })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[FeaturedSales] API response:', { 
+            ok: data.ok, 
+            hasSales: !!data.sales, 
+            hasData: !!data.data,
+            salesCount: data.sales?.length || 0,
+            dataCount: data.data?.length || 0,
+            count: data.count || 0
+          })
+        }
         
         // Handle different response formats
         let allSales: Sale[] = []
         if (data.sales && Array.isArray(data.sales)) {
           allSales = data.sales
-          console.log('[FeaturedSales] Using data.sales:', allSales.length)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[FeaturedSales] Using data.sales:', allSales.length)
+          }
         } else if (data.data && Array.isArray(data.data)) {
           allSales = data.data
-          console.log('[FeaturedSales] Using data.data:', allSales.length)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[FeaturedSales] Using data.data:', allSales.length)
+          }
         } else if (Array.isArray(data)) {
           allSales = data
-          console.log('[FeaturedSales] Using direct array:', allSales.length)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[FeaturedSales] Using direct array:', allSales.length)
+          }
         } else {
           console.warn('[FeaturedSales] No sales found in response:', data)
         }
@@ -197,7 +215,9 @@ export function FeaturedSalesSection() {
         }
         
         if (finalSales.length > 0) {
-          console.log('[FeaturedSales] Displaying', finalSales.length, 'sales (real:', realSales.length, 'demo:', isTestSalesEnabled() ? getDemoSales().length : 0, ')')
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[FeaturedSales] Displaying', finalSales.length, 'sales (real:', realSales.length, 'demo:', isTestSalesEnabled() ? getDemoSales().length : 0, ')')
+          }
           setSales(finalSales)
         } else {
           console.warn('[FeaturedSales] No sales available, showing empty state')

@@ -41,7 +41,9 @@ export function MapPreviewSection() {
         if (ipRes.ok) {
           const ipData = await ipRes.json()
           if (ipData.lat && ipData.lng) {
-            console.log('[MapPreview] Using IP geolocation:', ipData)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[MapPreview] Using IP geolocation:', ipData)
+            }
             const loc = { 
               lat: ipData.lat, 
               lng: ipData.lng,
@@ -71,7 +73,9 @@ export function MapPreviewSection() {
           try {
             const parsed = JSON.parse(saved)
             if (parsed && parsed.zip) {
-              console.log('[MapPreview] Using localStorage ZIP:', parsed.zip)
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[MapPreview] Using localStorage ZIP:', parsed.zip)
+              }
               setLocation({ zip: parsed.zip })
               return
             }
@@ -84,7 +88,9 @@ export function MapPreviewSection() {
       }
       
       // Final fallback city
-      console.log('[MapPreview] Using fallback Louisville')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MapPreview] Using fallback Louisville')
+      }
       const fallback = { zip: '40204' }
       setLocation(fallback)
     })

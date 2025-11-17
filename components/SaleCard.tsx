@@ -16,7 +16,7 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
   const cover = getSaleCoverUrl(sale)
   
   // Debug: log cover image resolution
-  if (!cover) {
+  if (!cover && process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[SALE_CARD] No cover image found for sale:', {
       id: sale.id,
       title: sale.title,

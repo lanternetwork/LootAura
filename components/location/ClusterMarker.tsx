@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { Marker } from 'react-map-gl'
 import { ClusterFeature } from '@/lib/pins/types'
 
@@ -15,6 +15,8 @@ export default function ClusterMarker({
   onClick, 
   onKeyDown 
 }: ClusterMarkerProps) {
+  const [isHovered, setIsHovered] = useState(false)
+
   const handleClick = useCallback((event: React.MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()
@@ -27,6 +29,16 @@ export default function ClusterMarker({
       onKeyDown?.(cluster, event)
     }
   }, [cluster, onKeyDown])
+
+  const handleMouseEnter = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsHovered(true)
+  }, [])
+
+  const handleMouseLeave = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsHovered(false)
+  }, [])
 
   // Fixed size to match individual pins (12px)
   const sizeClass = 'w-3 h-3 text-[8px]'
@@ -51,14 +63,16 @@ export default function ClusterMarker({
         data-cluster-marker="true"
         data-cluster-id={cluster.id}
         onClick={handleClick}
-        onMouseEnter={(e) => { e.stopPropagation() }}
-        onMouseLeave={(e) => { e.stopPropagation() }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         onKeyDown={handleKeyDown}
         tabIndex={0}
         aria-label={`Cluster of ${cluster.count} sales. Press Enter to zoom in.`}
         title={`${cluster.count} sales at this location`}
       >
-        <span className="text-white font-bold leading-none">{cluster.count}</span>
+        <span className="text-white font-bold leading-none">
+          {isHovered ? '+' : cluster.count}
+        </span>
       </button>
     </Marker>
   )

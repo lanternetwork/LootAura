@@ -198,17 +198,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
     const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
     
-    // TEMPORARILY DISABLED: Zoom functionality works but is disabled for UX testing
-    // Original zoom behavior (commented out):
-    // map.flyTo({
-    //   center: [cluster.lng, cluster.lat],
-    //   zoom: cluster.expandToZoom,
-    //   duration: 400
-    // })
-    
-    // TEMPORARY: Just center the map on the cluster without zooming
+    // Zoom to cluster expansion zoom level to break the cluster apart
     map.flyTo({
       center: [cluster.lng, cluster.lat],
+      zoom: cluster.expandToZoom || 16,
       duration: 400,
       offset: offsetY !== 0 ? [0, offsetY] : undefined
     })

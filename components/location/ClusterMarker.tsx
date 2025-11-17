@@ -50,23 +50,27 @@ export default function ClusterMarker({
       anchor="center"
       data-testid="cluster"
     >
-      <button
+      <div
         className={`
           ${sizeClass}
-          bg-[var(--accent-primary)]
           text-white font-bold
           rounded-full flex items-center justify-center
           shadow-lg select-none
           cursor-pointer
-          focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
         `}
-        style={{ backgroundColor: 'var(--accent-primary)' }}
+        style={{ 
+          backgroundColor: 'var(--accent-primary)',
+          border: 'none',
+          padding: 0,
+          margin: 0
+        }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         data-cluster-marker="true"
         data-cluster-id={cluster.id}
         onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
         onKeyDown={handleKeyDown}
+        role="button"
         tabIndex={0}
         aria-label={`Cluster of ${cluster.count} sales. Press Enter to zoom in.`}
         title={`${cluster.count} sales at this location`}
@@ -74,7 +78,7 @@ export default function ClusterMarker({
         <span className="text-white font-bold leading-none">
           {isHovered ? '+' : cluster.count}
         </span>
-      </button>
+      </div>
     </Marker>
   )
 }

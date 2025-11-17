@@ -210,7 +210,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     map.flyTo({
       center: [cluster.lng, cluster.lat],
       duration: 400,
-      offset: offsetY !== 0 ? [0, offsetY] : undefined
+      offset: offsetY !== 0 ? { x: 0, y: offsetY } : undefined
     })
     
     // Call the onClusterClick callback if provided
@@ -246,7 +246,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         map.flyTo({ 
           center: [lng, lat], 
           duration: 400,
-          offset: offsetY !== 0 ? [0, offsetY] : undefined
+          offset: offsetY !== 0 ? { x: 0, y: offsetY } : undefined
         })
         centeredLocationRef.current[locationId] = true
         return

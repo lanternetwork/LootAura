@@ -109,12 +109,9 @@ export function applyVisualClustering(
     lng: location.lng
   }))
   
-  // Build cluster index with radius calculated for current zoom level
-  // clusterRadius is in screen pixels, we need to convert it to pixels at maxZoom
-  // This ensures visual touch-based clustering (pins that visually touch will cluster)
+  // Build cluster index
   const clusterIndex = buildClusterIndex(pinPoints, {
-    radius: opts.clusterRadius, // This is in screen pixels
-    currentZoom: viewport.zoom, // Pass current zoom so radius can be converted
+    radius: opts.clusterRadius,
     maxZoom: opts.maxZoom,
     minPoints: opts.minClusterSize
   })
@@ -183,29 +180,11 @@ export function applyVisualClustering(
   })
   
   // Add individual locations that aren't clustered at current zoom
-  // Use the SAME cluster index that generated the clusters to check membership
-  // (rebuilding the index would generate different cluster IDs)
-  const clusteredIds = getClusterMemberIds(clusterIndex, realClusters.map(c => c.id))
-  
-  // Debug: Log clustering details to identify missing members
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true' && realClusters.length > 0) {
-    const clusterDetails = realClusters.map(c => {
-      const members = getClusterMemberIds(clusterIndex, [c.id])
-      return {
-        clusterId: c.id,
-        count: c.count,
-        memberIds: Array.from(members),
-        memberCount: members.size
-      }
-    })
-    console.log('[CLUSTERING] Cluster membership check:', {
-      totalLocations: locations.length,
-      totalClusteredIds: clusteredIds.size,
-      clusters: clusterDetails,
-      unclusteredLocations: locations.filter(loc => !clusteredIds.has(loc.id)).map(loc => loc.id)
-    })
-  }
-  
+  const indexForMembership = buildClusterIndex(
+    locations.map(l => ({ id: l.id, lat: l.lat, lng: l.lng })),
+    { radius: opts.clusterRadius, maxZoom: opts.maxZoom, minPoints: opts.minClusterSize }
+  )
+  const clusteredIds = getClusterMemberIds(indexForMembership, realClusters.map(c => c.id))
   let colocatedClusterCount = 0
   locations.forEach(location => {
     if (clusteredIds.has(location.id)) {

@@ -981,7 +981,6 @@ export default function SalesClient({
             </div>
           </div>
         </div>
-      )}
 
       {/* Mobile Filter Sheet */}
       <MobileFilterSheet

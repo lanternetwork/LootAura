@@ -8,6 +8,7 @@ import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
+import { groupSalesByLocation } from '@/lib/pins/hybridClustering'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -73,9 +74,29 @@ export default function MobileSalesShell({
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
   
   // Find selected sale from selectedPinId
+  // selectedPinId can be either a sale ID (when location grouping is disabled) 
+  // or a location ID like "location-0" (when location grouping is enabled)
   const selectedSale = useMemo(() => {
     if (!selectedPinId) return null
-    return mapSales.find(sale => sale.id === selectedPinId) || null
+    
+    // First, try direct sale ID match (for when location grouping is disabled)
+    const directMatch = mapSales.find(sale => sale.id === selectedPinId)
+    if (directMatch) return directMatch
+    
+    // If it's a location ID (starts with "location-"), find the location group
+    if (selectedPinId.startsWith('location-')) {
+      const locationGroups = groupSalesByLocation(mapSales, {
+        coordinatePrecision: 6,
+        enableLocationGrouping: true
+      })
+      const location = locationGroups.find(loc => loc.id === selectedPinId)
+      if (location && location.sales.length > 0) {
+        // Return the first sale from this location group
+        return location.sales[0]
+      }
+    }
+    
+    return null
   }, [selectedPinId, mapSales])
   
   // Handle mode toggle

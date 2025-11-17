@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useEffect } from 'react'
+import { useMemo } from 'react'
 import { Sale } from '@/lib/types'
 import { HybridPinsResult, HybridPin, LocationGroup } from '@/lib/pins/types'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
@@ -43,33 +43,11 @@ export default function HybridPinsOverlay({
   }, [sales, viewport])
   
   // Use provided hybridResult if available, otherwise use fallback
-  // Wrap in useMemo to ensure React detects changes when providedHybridResult changes from null to a value
-  const hybridResult = useMemo(() => {
-    const hasProvided = providedHybridResult !== null && providedHybridResult !== undefined
-    const result = hasProvided ? providedHybridResult : fallbackResult
-    
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[HYBRID_PINS] Calculating result:', {
-        hasProvided,
-        providedPinsCount: providedHybridResult?.pins?.length || 0,
-        fallbackPinsCount: fallbackResult.pins.length,
-        resultPinsCount: result.pins.length
-      })
-    }
-    
-    return result
-  }, [providedHybridResult, fallbackResult])
-
-  // Debug: Track when component renders and when hybridResult changes
-  useEffect(() => {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[HYBRID_PINS] Component rendered:', {
-        salesCount: sales.length,
-        hybridResultPinsCount: hybridResult?.pins?.length || 0,
-        hasProvidedResult: providedHybridResult !== null && providedHybridResult !== undefined
-      })
-    }
-  }, [sales.length, hybridResult?.pins?.length, providedHybridResult])
+  // This avoids duplicate clustering when hybridResult is already calculated upstream
+  // Direct assignment ensures React detects changes immediately when providedHybridResult changes
+  const hybridResult: HybridPinsResult = providedHybridResult !== null && providedHybridResult !== undefined
+    ? providedHybridResult
+    : fallbackResult
 
   // Early return if no sales - avoid unnecessary rendering
   if (sales.length === 0) {

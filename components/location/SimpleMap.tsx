@@ -409,7 +409,6 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         {/* Custom pin rendering - no Mapbox Markers */}
         {hybridPins ? (
           <HybridPinsOverlay
-            key={`${hybridPins.hybridResult ? `result-${hybridPins.hybridResult.pins.length}` : 'no-result'}-${hybridPins.sales.length}`}
             sales={hybridPins.sales}
             selectedId={hybridPins.selectedId}
             onLocationClick={hybridPins.onLocationClick}

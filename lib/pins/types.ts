@@ -62,4 +62,5 @@ export interface HybridPinsProps {
   onLocationClick?: (locationId: string) => void
   onClusterClick?: (cluster: ClusterFeature) => void
   viewport: { bounds: [number, number, number, number]; zoom: number }
+  hybridResult?: HybridPinsResult | null // Optional pre-calculated result to avoid duplicate clustering
 }

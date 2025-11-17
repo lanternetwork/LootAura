@@ -223,7 +223,8 @@ export default function MobileSalesShell({
               selectedId: selectedPinId,
               onLocationClick: onLocationClick,
               onClusterClick: onClusterClick,
-              viewport: currentViewport
+              viewport: currentViewport,
+              hybridResult: hybridResult // Pass pre-calculated result to avoid duplicate clustering
             }}
             onViewportChange={handleViewportChangeWithDismiss}
             attributionPosition="top-right"

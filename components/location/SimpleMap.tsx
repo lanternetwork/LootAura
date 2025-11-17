@@ -416,6 +416,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
             onClusterClick={handleClusterClick}
             mapRef={{ current: { getMap: () => mapRef.current?.getMap?.() } }}
             viewport={hybridPins.viewport}
+            hybridResult={hybridPins.hybridResult}
           />
         ) : pins ? (
           <>

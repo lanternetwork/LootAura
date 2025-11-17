@@ -15,6 +15,8 @@ interface HybridPinsOverlayProps {
   onClusterClick?: (cluster: any) => void
   mapRef: React.RefObject<any>
   viewport: { bounds: [number, number, number, number]; zoom: number }
+  // Optional pre-calculated hybridResult to avoid duplicate clustering
+  hybridResult?: HybridPinsResult | null
 }
 
 export default function HybridPinsOverlay({
@@ -24,12 +26,18 @@ export default function HybridPinsOverlay({
   onLocationClickWithCoords,
   onClusterClick,
   mapRef: _mapRef,
-  viewport
+  viewport,
+  hybridResult: providedHybridResult
 }: HybridPinsOverlayProps) {
   
-  // Create hybrid pins using the two-stage process - touch-only clustering
-  // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
+  // Use provided hybridResult if available, otherwise calculate it
+  // This avoids duplicate clustering when hybridResult is already calculated upstream
   const hybridResult = useMemo((): HybridPinsResult => {
+    if (providedHybridResult) {
+      return providedHybridResult
+    }
+    
+    // Fallback: calculate if not provided (for backwards compatibility)
     return createHybridPins(sales, viewport, {
       coordinatePrecision: 6,
       clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
@@ -38,7 +46,7 @@ export default function HybridPinsOverlay({
       enableLocationGrouping: true,
       enableVisualClustering: true
     })
-  }, [sales, viewport])
+  }, [providedHybridResult, sales, viewport])
 
   // Early return if no sales - avoid unnecessary rendering
   if (sales.length === 0) {

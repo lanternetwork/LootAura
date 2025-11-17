@@ -150,10 +150,13 @@ export default function SalesClient({
   }, [])
 
   // Hybrid system: Get current viewport for clustering
+  // Use ref to track previous viewport and only update if change is significant
+  const previousViewportRef = useRef<{ bounds: [number, number, number, number]; zoom: number } | null>(null)
+  
   const currentViewport = useMemo(() => {
     if (!mapView || !mapView.bounds) return null
     
-        return {
+    const newViewport = {
       bounds: [
         mapView.bounds.west,
         mapView.bounds.south,
@@ -162,9 +165,32 @@ export default function SalesClient({
       ] as [number, number, number, number],
       zoom: mapView.zoom
     }
+    
+    // Only update if viewport changed significantly
+    // Threshold: 1% change in bounds or 0.5 zoom levels
+    const prev = previousViewportRef.current
+    if (prev) {
+      const latRange = newViewport.bounds[3] - newViewport.bounds[1]
+      const lngRange = newViewport.bounds[2] - newViewport.bounds[0]
+      const prevLatRange = prev.bounds[3] - prev.bounds[1]
+      const prevLngRange = prev.bounds[2] - prev.bounds[0]
+      
+      const latChange = Math.abs(latRange - prevLatRange) / Math.max(latRange, prevLatRange, 0.001)
+      const lngChange = Math.abs(lngRange - prevLngRange) / Math.max(lngRange, prevLngRange, 0.001)
+      const zoomChange = Math.abs(newViewport.zoom - prev.zoom)
+      
+      // If change is small, return previous viewport to avoid unnecessary recalculations
+      if (latChange < 0.01 && lngChange < 0.01 && zoomChange < 0.5) {
+        return prev
+      }
+    }
+    
+    previousViewportRef.current = newViewport
+    return newViewport
   }, [mapView?.bounds, mapView?.zoom])
 
   // Hybrid system: Create location groups and apply clustering
+  // Removed 'loading' from dependencies - it doesn't affect clustering calculation
   const hybridResult = useMemo(() => {
     // Early return for empty sales - no need to run clustering
     if (!currentViewport || mapSales.length === 0) {
@@ -226,7 +252,7 @@ export default function SalesClient({
     }
     
     return result
-  }, [mapSales, currentViewport, loading])
+  }, [mapSales, currentViewport])
 
   // Request cancellation for preventing race conditions
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -752,10 +778,27 @@ export default function SalesClient({
     }
   }, [searchParams, hasRestoredZip, urlLat, urlLng, initialCenter, handleZipLocationFound, handleZipError])
 
-  // Memoized visible sales - filtered by current viewport bounds to match map pins
+  // Memoized visible sales - derived from hybridResult.locations to avoid duplicate filtering
   // Note: selectedPinId is only used for the callout card, not for filtering the sales list
   const visibleSales = useMemo(() => {
-    // Filter sales to only those within the current viewport bounds (same as map pins)
+    // Use hybridResult.locations if available (already filtered by viewport)
+    // This avoids duplicate filtering work
+    if (hybridResult && hybridResult.locations.length > 0) {
+      const salesFromLocations = hybridResult.locations.flatMap(loc => loc.sales)
+      const deduplicated = deduplicateSales(salesFromLocations)
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SALES] Visible sales from hybridResult:', { 
+          locationsCount: hybridResult.locations.length,
+          visibleSales: deduplicated.length,
+          hybridType: hybridResult.type
+        })
+      }
+      
+      return deduplicated
+    }
+    
+    // Fallback: filter sales if hybridResult not available yet
     if (!currentViewport) {
       return []
     }
@@ -773,18 +816,15 @@ export default function SalesClient({
     
     // Only log when debug is enabled
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SALES] Visible sales count:', { 
+      console.log('[SALES] Visible sales count (fallback):', { 
         mapSales: mapSales.length, 
         viewportFiltered: viewportFilteredSales.length,
-        visibleSales: deduplicated.length,
-        selectedPinId,
-        hybridType: hybridResult?.type,
-        locationsCount: hybridResult?.locations.length || 0
+        visibleSales: deduplicated.length
       })
     }
     
     return deduplicated
-  }, [mapSales, currentViewport, deduplicateSales, selectedPinId, hybridResult])
+  }, [hybridResult, mapSales, currentViewport, deduplicateSales])
 
   // Memoized map center
   const mapCenter = useMemo(() => {
@@ -1033,7 +1073,8 @@ export default function SalesClient({
                           console.log('[CLUSTER] expand', { lat, lng, expandToZoom })
                         }
                       },
-                      viewport: currentViewport!
+                      viewport: currentViewport!,
+                      hybridResult: hybridResult // Pass pre-calculated result to avoid duplicate clustering
                     }}
                     onViewportChange={handleDesktopViewportChange}
                     attributionPosition="top-right"

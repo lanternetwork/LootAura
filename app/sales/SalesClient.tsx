@@ -843,6 +843,7 @@ export default function SalesClient({
           onZipError={handleZipError}
           zipError={zipError}
           hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
+          hybridResult={hybridResult}
         />
       ) : (
         /* Desktop Layout - md and above */

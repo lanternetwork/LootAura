@@ -8,6 +8,7 @@ import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
+import { HybridPinsResult } from '@/lib/pins/types'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -40,6 +41,9 @@ interface MobileSalesShellProps {
   onZipError: (error: string) => void
   zipError: string | null
   hasActiveFilters: boolean
+  
+  // Hybrid result for location-based pin selection
+  hybridResult?: HybridPinsResult | null
 }
 
 /**
@@ -66,17 +70,32 @@ export default function MobileSalesShell({
   onZipLocationFound,
   onZipError,
   zipError,
-  hasActiveFilters
+  hasActiveFilters,
+  hybridResult
 }: MobileSalesShellProps) {
   // Mobile-only state
   const [mode, setMode] = useState<MobileMode>('map')
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
   
   // Find selected sale from selectedPinId
+  // selectedPinId can be either a sale ID or a location ID
   const selectedSale = useMemo(() => {
     if (!selectedPinId) return null
-    return mapSales.find(sale => sale.id === selectedPinId) || null
-  }, [selectedPinId, mapSales])
+    
+    // First, try to find by sale ID (for single-sale locations)
+    const saleById = mapSales.find(sale => sale.id === selectedPinId)
+    if (saleById) return saleById
+    
+    // If not found, it might be a location ID - find the location and get first sale
+    if (hybridResult?.locations) {
+      const location = hybridResult.locations.find(loc => loc.id === selectedPinId)
+      if (location && location.sales.length > 0) {
+        return location.sales[0]
+      }
+    }
+    
+    return null
+  }, [selectedPinId, mapSales, hybridResult])
   
   // Handle mode toggle
   const handleToggleMode = useCallback(() => {

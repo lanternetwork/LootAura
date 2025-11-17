@@ -75,7 +75,7 @@ export default function ClusterMarker({
         aria-label={`Cluster of ${cluster.count} sales. Press Enter to zoom in.`}
         title={`${cluster.count} sales at this location`}
       >
-        <span className="text-white font-bold leading-none">
+        <span className={`text-white font-bold leading-none ${isHovered ? 'text-[10.4px]' : ''}`}>
           {isHovered ? '+' : cluster.count}
         </span>
       </div>

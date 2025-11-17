@@ -9,9 +9,11 @@ import SalesList from '@/components/SalesList'
 import FiltersBar from '@/components/sales/FiltersBar'
 import MobileFilterSheet from '@/components/sales/MobileFilterSheet'
 import MobileSalesShell from './MobileSalesShell'
+import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
+import { HybridPinsResult } from '@/lib/pins/types'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
 import { useHasOverflow } from '@/lib/hooks/useHasOverflow'
 import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
@@ -811,6 +813,100 @@ export default function SalesClient({
   // Detect overflow in sales list to conditionally show scrollbar
   const { ref: salesListContentRef, hasOverflow: salesListHasOverflow } = useHasOverflow<HTMLDivElement>()
 
+  // Desktop callout card state
+  const desktopMapRef = useRef<any>(null)
+  const [desktopPinPosition, setDesktopPinPosition] = useState<{ x: number; y: number } | null>(null)
+
+  // Calculate selected sale for desktop callout
+  const selectedSale = useMemo(() => {
+    if (!selectedPinId) return null
+    const saleById = mapSales.find(sale => sale.id === selectedPinId)
+    if (saleById) return saleById
+    if (hybridResult?.locations) {
+      const location = hybridResult.locations.find(loc => loc.id === selectedPinId)
+      if (location && location.sales.length > 0) {
+        return location.sales[0]
+      }
+    }
+    return null
+  }, [selectedPinId, mapSales, hybridResult])
+
+  // Calculate selected pin coordinates for desktop callout
+  const selectedPinCoords = useMemo(() => {
+    if (!selectedPinId || !hybridResult) return null
+    const location = hybridResult.locations.find(loc => loc.id === selectedPinId)
+    if (location) {
+      return { lat: location.lat, lng: location.lng }
+    }
+    const sale = mapSales.find(sale => sale.id === selectedPinId)
+    if (sale && typeof sale.lat === 'number' && typeof sale.lng === 'number') {
+      return { lat: sale.lat, lng: sale.lng }
+    }
+    return null
+  }, [selectedPinId, hybridResult, mapSales])
+
+  // Convert selected pin coordinates to screen position for desktop callout
+  useEffect(() => {
+    if (!selectedPinCoords || !desktopMapRef.current || !mapView) {
+      setDesktopPinPosition(null)
+      return
+    }
+    const map = desktopMapRef.current.getMap?.()
+    if (!map || typeof map.project !== 'function') {
+      setDesktopPinPosition(null)
+      return
+    }
+    try {
+      const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
+      setDesktopPinPosition({ x: point.x, y: point.y })
+    } catch (error) {
+      setDesktopPinPosition(null)
+    }
+  }, [selectedPinCoords, mapView])
+
+  // Update pin position when map moves or zooms (desktop)
+  useEffect(() => {
+    if (!selectedPinCoords || !desktopMapRef.current || !mapView) {
+      return
+    }
+    const map = desktopMapRef.current.getMap?.()
+    if (!map) return
+
+    const updatePosition = () => {
+      try {
+        const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
+        setDesktopPinPosition({ x: point.x, y: point.y })
+      } catch (error) {
+        setDesktopPinPosition(null)
+      }
+    }
+
+    map.on('move', updatePosition)
+    map.on('zoom', updatePosition)
+
+    return () => {
+      map.off('move', updatePosition)
+      map.off('zoom', updatePosition)
+    }
+  }, [selectedPinCoords, mapView])
+
+  // Handle map click to dismiss callout (desktop)
+  const handleDesktopMapClick = useCallback((e: React.MouseEvent) => {
+    // Only dismiss if clicking directly on the map container, not on child elements
+    if (e.target === e.currentTarget && selectedPinId) {
+      setSelectedPinId(null)
+    }
+  }, [selectedPinId])
+
+  // Handle viewport change (desktop) - handleViewportChange already dismisses callout
+  const handleDesktopViewportChange = useCallback((args: { 
+    center: { lat: number; lng: number }; 
+    zoom: number; 
+    bounds: { west: number; south: number; east: number; north: number } 
+  }) => {
+    handleViewportChange(args)
+  }, [handleViewportChange])
+
 
   return (
     <>
@@ -879,10 +975,12 @@ export default function SalesClient({
               style={{ height: '100%' }}
               role="region"
               aria-label="Interactive map showing yard sales locations"
+              onClick={handleDesktopMapClick}
             >
               <div className="w-full h-full">
                 {mapView ? (
                   <SimpleMap
+                    ref={desktopMapRef}
                     center={mapCenter}
                     zoom={pendingBounds ? undefined : mapZoom}
                     fitBounds={pendingBounds}
@@ -908,13 +1006,23 @@ export default function SalesClient({
                       },
                       viewport: currentViewport!
                     }}
-                    onViewportChange={handleViewportChange}
+                    onViewportChange={handleDesktopViewportChange}
                     attributionPosition="top-right"
                     showOSMAttribution={true}
                     attributionControl={false}
                   />
                 ) : null}
               </div>
+              
+              {/* Desktop callout card */}
+              {selectedSale && desktopPinPosition && (
+                <MobileSaleCallout
+                  sale={selectedSale}
+                  onDismiss={() => setSelectedPinId(null)}
+                  viewport={mapView ? { center: mapView.center, zoom: mapView.zoom } : null}
+                  pinPosition={desktopPinPosition}
+                />
+              )}
             </div>
 
             {/* Sales List - Right panel on desktop */}

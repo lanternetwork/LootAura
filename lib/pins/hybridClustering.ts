@@ -180,11 +180,9 @@ export function applyVisualClustering(
   })
   
   // Add individual locations that aren't clustered at current zoom
-  const indexForMembership = buildClusterIndex(
-    locations.map(l => ({ id: l.id, lat: l.lat, lng: l.lng })),
-    { radius: opts.clusterRadius, maxZoom: opts.maxZoom, minPoints: opts.minClusterSize }
-  )
-  const clusteredIds = getClusterMemberIds(indexForMembership, realClusters.map(c => c.id))
+  // Use the SAME cluster index that generated the clusters to check membership
+  // (rebuilding the index would generate different cluster IDs)
+  const clusteredIds = getClusterMemberIds(clusterIndex, realClusters.map(c => c.id))
   let colocatedClusterCount = 0
   locations.forEach(location => {
     if (clusteredIds.has(location.id)) {

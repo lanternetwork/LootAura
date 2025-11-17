@@ -169,6 +169,25 @@ export default function MobileSalesShell({
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
   
+  // Close callout when map is clicked or moved
+  const handleMapClick = useCallback(() => {
+    if (selectedPinId) {
+      onLocationClick(selectedPinId)
+    }
+  }, [selectedPinId, onLocationClick])
+  
+  const handleViewportChangeWithDismiss = useCallback((args: { 
+    center: { lat: number; lng: number }; 
+    zoom: number; 
+    bounds: { west: number; south: number; east: number; north: number } 
+  }) => {
+    // Close callout if visible when map moves
+    if (selectedPinId) {
+      onLocationClick(selectedPinId)
+    }
+    onViewportChange(args)
+  }, [selectedPinId, onLocationClick, onViewportChange])
+  
   // Map viewport for callout
   const mapViewport = useMemo(() => {
     if (!mapView) return null
@@ -185,7 +204,10 @@ export default function MobileSalesShell({
     >
       {/* Map Mode */}
       {mode === 'map' && mapView && currentViewport && (
-        <div className="relative flex-1 min-h-0 bg-gray-100">
+        <div 
+          className="relative flex-1 min-h-0 bg-gray-100"
+          onClick={handleMapClick}
+        >
           {/* Full-screen map */}
           <SimpleMap
             ref={mapRef}
@@ -203,7 +225,7 @@ export default function MobileSalesShell({
               onClusterClick: onClusterClick,
               viewport: currentViewport
             }}
-            onViewportChange={onViewportChange}
+            onViewportChange={handleViewportChangeWithDismiss}
             attributionPosition="top-right"
             showOSMAttribution={true}
             attributionControl={false}
@@ -215,7 +237,10 @@ export default function MobileSalesShell({
           <div className="absolute inset-0 pointer-events-none z-10">
             {/* Filters FAB - Top Left */}
             <button
-              onClick={() => setIsFiltersModalOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsFiltersModalOpen(true)
+              }}
               className="absolute top-4 left-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
               aria-label="Open filters"
             >
@@ -229,7 +254,10 @@ export default function MobileSalesShell({
             
             {/* Mode Toggle FAB - Bottom Right */}
             <button
-              onClick={handleToggleMode}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleToggleMode()
+              }}
               className="absolute bottom-20 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
               aria-label="Switch to list view"
             >

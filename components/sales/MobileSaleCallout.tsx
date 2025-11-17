@@ -121,10 +121,23 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
       }}
     >
       <div 
-        className={`bg-white ${pinPosition ? 'rounded-2xl' : 'rounded-t-2xl'} shadow-lg ${pinPosition ? 'border' : 'border-t'} border-gray-200 ${pinPosition ? '' : 'max-w-full mx-auto mb-4'} will-change-transform transition-transform duration-200`}
+        className={`bg-white ${pinPosition ? 'rounded-2xl' : 'rounded-t-2xl'} shadow-lg ${pinPosition ? 'border' : 'border-t'} border-gray-200 ${pinPosition ? '' : 'max-w-full mx-auto mb-4'} will-change-transform transition-transform duration-200 relative`}
         onClick={(e) => e.stopPropagation()}
         style={cardStyle}
       >
+        {/* Callout pointer/arrow pointing to pin */}
+        {pinPosition && (
+          <div 
+            className="absolute left-1/2 -bottom-2 transform -translate-x-1/2 w-0 h-0"
+            style={{
+              borderLeft: '8px solid transparent',
+              borderRight: '8px solid transparent',
+              borderTop: '8px solid white',
+              filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))'
+            }}
+          />
+        )}
+        
         {/* Swipe indicator / Drag handle - only show when at bottom */}
         {!pinPosition && (
           <div 

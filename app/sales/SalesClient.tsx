@@ -364,8 +364,8 @@ export default function SalesClient({
         }
         
         // Merge new sales with existing ones to prevent pins from disappearing when panning
-        // Use the CURRENT viewport bounds (from ref) instead of the fetch bbox to avoid removing
-        // sales that are still visible after the map moved during the fetch
+        // Don't filter during merge - let the viewport filtering in hybridResult handle visibility
+        // This prevents sales from being removed when zooming in/out
         setMapSales((prevSales) => {
           // Create a map of existing sales by ID for quick lookup
           const existingSalesMap = new Map(prevSales.map(sale => [sale.id, sale]))
@@ -375,41 +375,29 @@ export default function SalesClient({
             existingSalesMap.set(sale.id, sale)
           })
           
-          // Use current viewport bounds if available, otherwise fall back to fetch bbox
-          const boundsToUse = currentBoundsRef.current || bbox
+          // Keep ALL merged sales - don't filter by bounds here
+          // The viewport filtering in hybridResult will handle what's visible
+          // This prevents sales from disappearing when zooming in/out
+          const mergedSales = Array.from(existingSalesMap.values())
           
-          // Expand bounds by 100% to create a large buffer zone (prevents aggressive removal)
-          // This ensures sales stay visible even if the map moves during fetch
-          const bufferFactor = 1.0
-          const latRange = boundsToUse.north - boundsToUse.south
-          const lngRange = boundsToUse.east - boundsToUse.west
-          const bufferedBounds = {
-            west: boundsToUse.west - (lngRange * bufferFactor),
-            south: boundsToUse.south - (latRange * bufferFactor),
-            east: boundsToUse.east + (lngRange * bufferFactor),
-            north: boundsToUse.north + (latRange * bufferFactor)
-          }
-          
-          // Keep only sales within the buffered bounds to prevent memory bloat
-          const mergedSales = Array.from(existingSalesMap.values()).filter(sale => {
-            if (typeof sale.lat !== 'number' || typeof sale.lng !== 'number') return false
-            return sale.lat >= bufferedBounds.south &&
-                   sale.lat <= bufferedBounds.north &&
-                   sale.lng >= bufferedBounds.west &&
-                   sale.lng <= bufferedBounds.east
-          })
+          // Limit total sales to prevent memory bloat (keep most recent 500)
+          const MAX_SALES = 500
+          const limitedSales = mergedSales.length > MAX_SALES 
+            ? mergedSales.slice(-MAX_SALES)
+            : mergedSales
           
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.log('[FETCH] Merged sales:', {
               previous: prevSales.length,
               new: filtered.length,
               merged: mergedSales.length,
-              removed: prevSales.length + filtered.length - mergedSales.length
+              limited: limitedSales.length,
+              removed: mergedSales.length - limitedSales.length
             })
           }
           
-          // Update markers from merged sales
-          setMapMarkers(mergedSales
+          // Update markers from limited sales
+          setMapMarkers(limitedSales
             .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
             .map(sale => ({
               id: sale.id,
@@ -417,8 +405,8 @@ export default function SalesClient({
               lat: sale.lat!,
               lng: sale.lng!
             })))
-          
-          return mergedSales
+
+          return limitedSales
         })
       } else {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

@@ -242,28 +242,35 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     }
     
     // First click: center the map
-    if (!alreadyCentered && mapRef.current?.getMap) {
+    if (!alreadyCentered && loaded && mapRef.current?.getMap) {
       const map = mapRef.current.getMap()
       if (map && typeof lat === 'number' && typeof lng === 'number') {
-        // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
-        const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
-        const flyToOptions: any = {
-          center: [lng, lat],
-          duration: 400
+        try {
+          // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
+          const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
+          const flyToOptions: any = {
+            center: [lng, lat],
+            duration: 400
+          }
+          // Only include offset if we have a non-zero offset value
+          if (offsetY !== 0) {
+            flyToOptions.offset = { x: 0, y: offsetY }
+          }
+          map.flyTo(flyToOptions)
+          centeredLocationRef.current[locationId] = true
+          return
+        } catch (error) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.error('[MAP] flyTo error:', error)
+          }
+          // Fall through to select location if flyTo fails
         }
-        // Only include offset if we have a non-zero offset value
-        if (offsetY !== 0) {
-          flyToOptions.offset = { x: 0, y: offsetY }
-        }
-        map.flyTo(flyToOptions)
-        centeredLocationRef.current[locationId] = true
-        return
       }
     }
     
     // Second click (or if we couldn't center): select location
     hybridPins?.onLocationClick?.(locationId)
-  }, [hybridPins?.onLocationClick, hybridPins?.selectedId, bottomSheetHeight, skipCenteringOnClick])
+  }, [hybridPins?.onLocationClick, hybridPins?.selectedId, bottomSheetHeight, skipCenteringOnClick, loaded])
   
   // Reset centered flag when location is deselected or a different location is selected
   useEffect(() => {

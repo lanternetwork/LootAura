@@ -753,21 +753,8 @@ export default function SalesClient({
   }, [searchParams, hasRestoredZip, urlLat, urlLng, initialCenter, handleZipLocationFound, handleZipError])
 
   // Memoized visible sales - filtered by current viewport bounds to match map pins
+  // Note: selectedPinId is only used for the callout card, not for filtering the sales list
   const visibleSales = useMemo(() => {
-    // If a location is selected, show only sales from that location
-    if (selectedPinId && hybridResult) {
-      const selectedLocation = hybridResult.locations.find((loc: any) => loc.id === selectedPinId)
-      if (selectedLocation) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES] Showing sales for selected location:', { 
-            locationId: selectedPinId,
-            salesCount: selectedLocation.sales.length 
-          })
-        }
-        return selectedLocation.sales
-      }
-    }
-    
     // Filter sales to only those within the current viewport bounds (same as map pins)
     if (!currentViewport) {
       return []
@@ -1083,20 +1070,7 @@ export default function SalesClient({
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">
                     Sales ({visibleSales.length})
-                    {selectedPinId && (
-                      <span className="text-sm text-blue-600 ml-2">
-                        (Location selected)
-                      </span>
-                    )}
                   </h2>
-                  {selectedPinId && (
-                    <button
-                      onClick={() => setSelectedPinId(null)}
-                      className="text-sm text-blue-600 hover:text-blue-800 underline"
-                    >
-                      Show All Sales
-                    </button>
-                  )}
                 </div>
               </div>
 

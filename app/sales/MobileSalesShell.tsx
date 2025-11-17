@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import SimpleMap from '@/components/location/SimpleMap'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
@@ -76,6 +76,8 @@ export default function MobileSalesShell({
   // Mobile-only state
   const [mode, setMode] = useState<MobileMode>('map')
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
+  const mapRef = useRef<any>(null)
+  const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   
   // Find selected sale from selectedPinId
   // selectedPinId can be either a sale ID or a location ID
@@ -96,6 +98,71 @@ export default function MobileSalesShell({
     
     return null
   }, [selectedPinId, mapSales, hybridResult])
+  
+  // Get pin coordinates for selected location
+  const selectedPinCoords = useMemo(() => {
+    if (!selectedPinId || !hybridResult) return null
+    
+    // Find location by ID
+    const location = hybridResult.locations.find(loc => loc.id === selectedPinId)
+    if (location) {
+      return { lat: location.lat, lng: location.lng }
+    }
+    
+    // If not found, try to find sale by ID
+    const sale = mapSales.find(sale => sale.id === selectedPinId)
+    if (sale && typeof sale.lat === 'number' && typeof sale.lng === 'number') {
+      return { lat: sale.lat, lng: sale.lng }
+    }
+    
+    return null
+  }, [selectedPinId, hybridResult, mapSales])
+  
+  // Convert pin coordinates to screen position
+  useEffect(() => {
+    if (!selectedPinCoords || !mapRef.current) {
+      setPinPosition(null)
+      return
+    }
+    
+    const map = mapRef.current.getMap?.()
+    if (!map || typeof map.project !== 'function') {
+      setPinPosition(null)
+      return
+    }
+    
+    try {
+      const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
+      setPinPosition({ x: point.x, y: point.y })
+    } catch (error) {
+      setPinPosition(null)
+    }
+  }, [selectedPinCoords, mapView, currentViewport])
+  
+  // Update position on map move/zoom
+  useEffect(() => {
+    if (!selectedPinCoords || !mapRef.current) return
+    
+    const map = mapRef.current.getMap?.()
+    if (!map) return
+    
+    const updatePosition = () => {
+      try {
+        const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
+        setPinPosition({ x: point.x, y: point.y })
+      } catch (error) {
+        // Ignore errors during map transitions
+      }
+    }
+    
+    map.on('move', updatePosition)
+    map.on('zoom', updatePosition)
+    
+    return () => {
+      map.off('move', updatePosition)
+      map.off('zoom', updatePosition)
+    }
+  }, [selectedPinCoords])
   
   // Handle mode toggle
   const handleToggleMode = useCallback(() => {
@@ -121,6 +188,7 @@ export default function MobileSalesShell({
         <div className="relative flex-1 min-h-0 bg-gray-100">
           {/* Full-screen map */}
           <SimpleMap
+            ref={mapRef}
             center={mapView.center}
             zoom={pendingBounds ? undefined : mapView.zoom}
             fitBounds={pendingBounds}
@@ -172,11 +240,12 @@ export default function MobileSalesShell({
           </div>
           
           {/* Callout Card - Shows when a sale is selected */}
-          {selectedSale && (
+          {selectedSale && pinPosition && (
             <MobileSaleCallout
               sale={selectedSale}
               onDismiss={() => onLocationClick(selectedPinId || '')}
               viewport={mapViewport}
+              pinPosition={pinPosition}
             />
           )}
         </div>

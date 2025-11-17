@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { toast } from 'react-toastify'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
+import AddressLink from '@/components/common/AddressLink'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import { FaEdit, FaTrash } from 'react-icons/fa'
@@ -105,8 +106,30 @@ export default function DashboardSaleCard({ sale, onDelete }: DashboardSaleCardP
           </div>
           {sale.description && <p className="text-xs text-neutral-600 line-clamp-1">{sale.description}</p>}
           <div className="text-sm text-neutral-700">
-            {sale.address && <div>{sale.address}</div>}
-            {sale.city && sale.state && <div>{sale.city}, {sale.state}</div>}
+            {sale.address && (
+              <div>
+                <AddressLink
+                  lat={sale.lat}
+                  lng={sale.lng}
+                  address={sale.address}
+                  city={sale.city}
+                  state={sale.state}
+                  zipCode={sale.zip_code}
+                />
+              </div>
+            )}
+            {sale.city && sale.state && (
+              <div>
+                <AddressLink
+                  lat={sale.lat}
+                  lng={sale.lng}
+                  city={sale.city}
+                  state={sale.state}
+                  zipCode={sale.zip_code}
+                  address={sale.address}
+                />
+              </div>
+            )}
           </div>
           {sale.date_start && (
             <div className="text-xs text-neutral-600">

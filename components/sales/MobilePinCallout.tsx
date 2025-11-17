@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
+import AddressLink from '@/components/common/AddressLink'
 
 interface MobilePinCalloutProps {
   sale: Sale | null
@@ -212,8 +213,14 @@ export default function MobilePinCallout({
             </div>
             {sale.address && (
               <p className="text-xs text-gray-600 line-clamp-1 mb-1">
-                {sale.address}
-                {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
+                <AddressLink
+                  lat={pinLat}
+                  lng={pinLng}
+                  address={sale.address}
+                  city={sale.city}
+                  state={sale.state}
+                  zipCode={sale.zip_code}
+                />
               </p>
             )}
             {sale.date_start && (

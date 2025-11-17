@@ -14,6 +14,7 @@ import { NearbySalesCard } from '@/components/sales/NearbySalesCard'
 import CategoryChips from '@/components/ui/CategoryChips'
 import OSMAttribution from '@/components/location/OSMAttribution'
 import SaleShareButton from '@/components/share/SaleShareButton'
+import AddressLink from '@/components/common/AddressLink'
 import type { SaleWithOwnerInfo } from '@/lib/data'
 import type { SaleItem, Sale } from '@/lib/types'
 import { trackSaleViewed, trackFavoriteToggled } from '@/lib/analytics/clarityEvents'
@@ -380,8 +381,18 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
               />
             </div>
             <div className="mt-4 text-sm text-gray-600">
-              <p>{sale.address}</p>
-              <p>{sale.city}, {sale.state} {sale.zip_code}</p>
+              {(sale.address || (sale.city && sale.state)) && (
+                <p>
+                  <AddressLink
+                    lat={sale.lat}
+                    lng={sale.lng}
+                    address={sale.address}
+                    city={sale.city}
+                    state={sale.state}
+                    zipCode={sale.zip_code}
+                  />
+                </p>
+              )}
               {/* OSM Attribution - show when address exists (addresses are geocoded via Nominatim/OSM) */}
               {sale.address && (
                 <div className="mt-2">

@@ -73,32 +73,18 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
           {sale?.id && <FavoriteButton saleId={sale.id} initial={false} />}
         </div>
         {sale?.description && <p className="text-xs text-neutral-600 line-clamp-1">{sale.description}</p>}
-        <div className="text-sm text-neutral-700">
-          {sale?.address && (
-            <div>
-              <AddressLink
-                lat={sale.lat}
-                lng={sale.lng}
-                address={sale.address}
-                city={sale.city}
-                state={sale.state}
-                zipCode={sale.zip_code}
-              />
-            </div>
-          )}
-          {sale?.city && sale?.state && (
-            <div>
-              <AddressLink
-                lat={sale.lat}
-                lng={sale.lng}
-                city={sale.city}
-                state={sale.state}
-                zipCode={sale.zip_code}
-                address={sale.address}
-              />
-            </div>
-          )}
-        </div>
+        {(sale?.address || (sale?.city && sale?.state)) && (
+          <div className="text-sm text-neutral-700">
+            <AddressLink
+              lat={sale.lat}
+              lng={sale.lng}
+              address={sale.address}
+              city={sale.city}
+              state={sale.state}
+              zipCode={sale.zip_code}
+            />
+          </div>
+        )}
         {sale?.date_start && (
           <div className="text-xs text-neutral-600">
             {new Date(`${sale.date_start}T${sale.time_start}`).toLocaleString()}

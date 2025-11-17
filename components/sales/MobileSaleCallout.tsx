@@ -49,6 +49,19 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
     setSwipeDeltaY(0)
   }, [swipeDeltaY, onDismiss])
 
+  // Calculate card offset to position pointer at pin
+  // Hooks must be called before any early returns
+  const [cardOffset, setCardOffset] = useState(140)
+  
+  useEffect(() => {
+    if (pinPosition && cardRef.current) {
+      const cardHeight = cardRef.current.offsetHeight
+      // Pointer is 8px tall, position card so pointer tip aligns with pin
+      // Card bottom should be at pin.y - 8px, so offset = cardHeight + 8px
+      setCardOffset(cardHeight + 8)
+    }
+  }, [pinPosition, sale])
+
   if (!sale) return null
 
   const cover = getSaleCoverUrl(sale)
@@ -95,18 +108,6 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
         zIndex: 50
       }
-
-  // Calculate card offset to position pointer at pin
-  const [cardOffset, setCardOffset] = useState(140)
-  
-  useEffect(() => {
-    if (pinPosition && cardRef.current) {
-      const cardHeight = cardRef.current.offsetHeight
-      // Pointer is 8px tall, position card so pointer tip aligns with pin
-      // Card bottom should be at pin.y - 8px, so offset = cardHeight + 8px
-      setCardOffset(cardHeight + 8)
-    }
-  }, [pinPosition, sale])
   
   const cardStyle = pinPosition
     ? {

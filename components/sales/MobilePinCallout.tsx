@@ -131,7 +131,7 @@ export default function MobilePinCallout({
   }
 
   // Calculate callout position (above the pin)
-  const CALLOUT_WIDTH = 280 // Approximate width in pixels
+  const CALLOUT_WIDTH = 240 // Approximate width in pixels
   const CALLOUT_HEIGHT = 120 // Approximate height in pixels
   const PIN_OFFSET = 24 // Distance from pin to callout
   const TAIL_HEIGHT = 8 // Height of the tail/pointer

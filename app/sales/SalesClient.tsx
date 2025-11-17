@@ -384,8 +384,24 @@ export default function SalesClient({
     }
     
     // If a single location is selected and the user moves the map, exit location view
-    if (selectedPinId) {
-      setSelectedPinId(null)
+    // BUT: Don't clear if this is a programmatic centering (we want to keep the callout visible)
+    // We detect programmatic centering by checking if the center matches a selected pin's location
+    if (selectedPinId && hybridResult) {
+      const selectedLocation = hybridResult.locations.find((loc: any) => loc.id === selectedPinId)
+      if (selectedLocation) {
+        // Check if the new center is close to the selected pin (within ~0.001 degrees, ~100m)
+        const latDiff = Math.abs(center.lat - selectedLocation.lat)
+        const lngDiff = Math.abs(center.lng - selectedLocation.lng)
+        const isCenteringToPin = latDiff < 0.001 && lngDiff < 0.001
+        
+        // Only clear if this is NOT a centering action (user manually moved map)
+        if (!isCenteringToPin) {
+          setSelectedPinId(null)
+        }
+      } else {
+        // No matching location found, clear selection
+        setSelectedPinId(null)
+      }
     }
 
     // Update map view state
@@ -440,7 +456,7 @@ export default function SalesClient({
       initialLoadRef.current = false // Mark initial load as complete
       fetchMapSales(bounds)
     }, 300)
-  }, [fetchMapSales, selectedPinId])
+  }, [fetchMapSales, selectedPinId, hybridResult])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {

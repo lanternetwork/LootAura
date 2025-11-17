@@ -237,7 +237,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       return
     }
     
-    // First click: center the map
+    // First click: center the map AND show callout immediately
     if (!alreadyCentered && mapRef.current?.getMap) {
       const map = mapRef.current.getMap()
       if (map && typeof lat === 'number' && typeof lng === 'number') {
@@ -249,6 +249,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
           offset: offsetY !== 0 ? [0, offsetY] : undefined
         })
         centeredLocationRef.current[locationId] = true
+        // Show callout immediately on first click (even while centering)
+        hybridPins?.onLocationClick?.(locationId)
         return
       }
     }

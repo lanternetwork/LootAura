@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Sale } from '@/lib/types'
 import { HybridPinsResult, HybridPin, LocationGroup } from '@/lib/pins/types'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
@@ -27,10 +27,40 @@ export default function HybridPinsOverlay({
   viewport
 }: HybridPinsOverlayProps) {
   
+  // Stabilize viewport to prevent unnecessary recalculations
+  // Only recalculate if bounds or zoom actually change (not just object reference)
+  const prevViewportRef = useRef<{ bounds: [number, number, number, number]; zoom: number } | null>(null)
+  const stableViewport = useMemo(() => {
+    if (!prevViewportRef.current) {
+      prevViewportRef.current = viewport
+      return viewport
+    }
+    
+    const prev = prevViewportRef.current
+    const boundsChanged = 
+      prev.bounds[0] !== viewport.bounds[0] ||
+      prev.bounds[1] !== viewport.bounds[1] ||
+      prev.bounds[2] !== viewport.bounds[2] ||
+      prev.bounds[3] !== viewport.bounds[3]
+    const zoomChanged = Math.abs(prev.zoom - viewport.zoom) > 0.01
+    
+    if (boundsChanged || zoomChanged) {
+      prevViewportRef.current = viewport
+      return viewport
+    }
+    
+    return prevViewportRef.current
+  }, [viewport])
+  
   // Create hybrid pins using the two-stage process - touch-only clustering
   // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
+  // Use stable viewport and memoize based on sales array length and IDs to prevent excessive recalculations
+  const salesKey = useMemo(() => {
+    return sales.map(s => s.id).sort().join(',')
+  }, [sales])
+  
   const hybridResult = useMemo((): HybridPinsResult => {
-    return createHybridPins(sales, viewport, {
+    return createHybridPins(sales, stableViewport, {
       coordinatePrecision: 6,
       clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
       minClusterSize: 2,
@@ -38,7 +68,7 @@ export default function HybridPinsOverlay({
       enableLocationGrouping: true,
       enableVisualClustering: true
     })
-  }, [sales, viewport])
+  }, [sales, salesKey, stableViewport])
 
   // Early return if no sales - avoid unnecessary rendering
   if (sales.length === 0) {

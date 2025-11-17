@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Sale } from '@/lib/types'
@@ -11,16 +11,18 @@ interface MobileSaleCalloutProps {
   sale: Sale | null
   onDismiss: () => void
   viewport?: { center: { lat: number; lng: number }; zoom: number } | null
+  pinPosition?: { x: number; y: number } | null
 }
 
 /**
  * Small callout card that appears at the bottom of the map when a sale pin is selected on mobile.
  * This replaces the large bottom tray for a more minimal, map-focused experience.
  */
-export default function MobileSaleCallout({ sale, onDismiss, viewport }: MobileSaleCalloutProps) {
+export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPosition }: MobileSaleCalloutProps) {
   const router = useRouter()
   const [swipeStartY, setSwipeStartY] = useState<number | null>(null)
   const [swipeDeltaY, setSwipeDeltaY] = useState(0)
+  const cardRef = useRef<HTMLDivElement>(null)
   
   // Swipe-to-dismiss gesture handling
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -46,6 +48,19 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport }: MobileS
     setSwipeStartY(null)
     setSwipeDeltaY(0)
   }, [swipeDeltaY, onDismiss])
+
+  // Calculate card offset to position pointer at pin
+  // Hooks must be called before any early returns
+  const [cardOffset, setCardOffset] = useState(140)
+  
+  useEffect(() => {
+    if (pinPosition && cardRef.current) {
+      const cardHeight = cardRef.current.offsetHeight
+      // Pointer is 8px tall, position card so pointer tip aligns with pin
+      // Card bottom should be at pin.y - 8px, so offset = cardHeight + 8px
+      setCardOffset(cardHeight + 8)
+    }
+  }, [pinPosition, sale])
 
   if (!sale) return null
 
@@ -74,10 +89,45 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport }: MobileS
     }
   }
 
+  // Calculate position relative to pin
+  const containerStyle = pinPosition
+    ? {
+        position: 'absolute' as const,
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+        pointerEvents: 'none' as const,
+        zIndex: 50
+      }
+    : {
+        position: 'fixed' as const,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        zIndex: 50
+      }
+  
+  const cardStyle = pinPosition
+    ? {
+        position: 'absolute' as const,
+        left: `${pinPosition.x}px`,
+        top: `${pinPosition.y}px`,
+        // Position card so pointer tip (8px below card bottom) points to pin
+        transform: `translate(-50%, ${swipeDeltaY > 0 ? swipeDeltaY - cardOffset : -cardOffset}px)`,
+        maxWidth: 'calc(100vw - 2rem)',
+        width: '220px',
+        pointerEvents: 'auto' as const
+      }
+    : {
+        transform: swipeDeltaY > 0 ? `translateY(${swipeDeltaY}px)` : 'translateY(0)',
+      }
+
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 z-50 px-4"
-      style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+      className={pinPosition ? "absolute inset-0 z-50" : "fixed bottom-0 left-0 right-0 z-50 px-4"}
+      style={containerStyle}
       onClick={(e) => {
         // Allow clicks on the card itself to work, but clicking outside dismisses
         if (e.target === e.currentTarget) {
@@ -86,25 +136,39 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport }: MobileS
       }}
     >
       <div 
-        className="bg-white rounded-t-2xl shadow-lg border-t border-gray-200 max-w-full mx-auto mb-4 will-change-transform transition-transform duration-200"
+        ref={cardRef}
+        className={`bg-white ${pinPosition ? 'rounded-2xl' : 'rounded-t-2xl'} shadow-lg ${pinPosition ? 'border' : 'border-t'} border-gray-200 ${pinPosition ? '' : 'max-w-full mx-auto mb-4'} will-change-transform transition-transform duration-200 relative`}
         onClick={(e) => e.stopPropagation()}
-        style={{
-          transform: swipeDeltaY > 0 ? `translateY(${swipeDeltaY}px)` : 'translateY(0)',
-        }}
+        style={cardStyle}
       >
-        {/* Swipe indicator / Drag handle */}
-        <div 
-          className="flex justify-center pt-2 pb-1 cursor-grab active:cursor-grabbing select-none touch-none"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          aria-label="Swipe down to dismiss"
-        >
-          <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
-        </div>
+        {/* Callout pointer/arrow pointing to pin */}
+        {pinPosition && (
+          <div 
+            className="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-full w-0 h-0"
+            style={{
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
+              borderTop: '8px solid white',
+              filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))'
+            }}
+          />
+        )}
+        
+        {/* Swipe indicator / Drag handle - only show when at bottom */}
+        {!pinPosition && (
+          <div 
+            className="flex justify-center pt-2 pb-1 cursor-grab active:cursor-grabbing select-none touch-none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            aria-label="Swipe down to dismiss"
+          >
+            <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
+          </div>
+        )}
 
         {/* Card content */}
-        <div className="flex gap-3 p-4">
+        <div className={`flex gap-3 ${pinPosition ? 'p-3' : 'p-4'}`}>
           {/* Thumbnail */}
           <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
             {cover ? (

@@ -54,8 +54,12 @@ export function groupSalesByLocation(
       const key = `${sale.lat.toFixed(opts.coordinatePrecision)},${sale.lng.toFixed(opts.coordinatePrecision)}`
       
       if (!groups.has(key)) {
+        // Use the coordinate key as the ID to ensure stable IDs across recalculations
+        // This prevents location IDs from changing when clustering recalculates
+        // Replace comma with underscore to make it safe for use in HTML/CSS
+        const stableId = `location-${key.replace(',', '_')}`
         groups.set(key, {
-          id: `location-${groups.size}`,
+          id: stableId,
           lat: sale.lat,
           lng: sale.lng,
           sales: [],

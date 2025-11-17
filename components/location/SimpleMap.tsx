@@ -237,18 +237,25 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       return
     }
     
-    // First click: center the map
+    // First click: center the map AND show callout immediately
     if (!alreadyCentered && mapRef.current?.getMap) {
       const map = mapRef.current.getMap()
       if (map && typeof lat === 'number' && typeof lng === 'number') {
         // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
-        const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
-        map.flyTo({ 
-          center: [lng, lat], 
-          duration: 400,
-          offset: offsetY !== 0 ? [0, offsetY] : undefined
-        })
+        const flyToOptions: any = {
+          center: [lng, lat],
+          duration: 400
+        }
+        
+        // Only add offset if bottomSheetHeight is set (mobile)
+        if (bottomSheetHeight > 0) {
+          flyToOptions.offset = [0, -bottomSheetHeight / 2]
+        }
+        
+        map.flyTo(flyToOptions)
         centeredLocationRef.current[locationId] = true
+        // Show callout immediately on first click (even while centering)
+        hybridPins?.onLocationClick?.(locationId)
         return
       }
     }

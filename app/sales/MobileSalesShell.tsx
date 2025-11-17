@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import SimpleMap from '@/components/location/SimpleMap'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
@@ -8,6 +8,7 @@ import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
+import { HybridPinsResult } from '@/lib/pins/types'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -40,6 +41,9 @@ interface MobileSalesShellProps {
   onZipError: (error: string) => void
   zipError: string | null
   hasActiveFilters: boolean
+  
+  // Hybrid result for location-based pin selection
+  hybridResult?: HybridPinsResult | null
 }
 
 /**
@@ -66,22 +70,123 @@ export default function MobileSalesShell({
   onZipLocationFound,
   onZipError,
   zipError,
-  hasActiveFilters
+  hasActiveFilters,
+  hybridResult
 }: MobileSalesShellProps) {
   // Mobile-only state
   const [mode, setMode] = useState<MobileMode>('map')
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
+  const mapRef = useRef<any>(null)
+  const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   
   // Find selected sale from selectedPinId
+  // selectedPinId can be either a sale ID or a location ID
   const selectedSale = useMemo(() => {
     if (!selectedPinId) return null
-    return mapSales.find(sale => sale.id === selectedPinId) || null
-  }, [selectedPinId, mapSales])
+    
+    // First, try to find by sale ID (for single-sale locations)
+    const saleById = mapSales.find(sale => sale.id === selectedPinId)
+    if (saleById) return saleById
+    
+    // If not found, it might be a location ID - find the location and get first sale
+    if (hybridResult?.locations) {
+      const location = hybridResult.locations.find(loc => loc.id === selectedPinId)
+      if (location && location.sales.length > 0) {
+        return location.sales[0]
+      }
+    }
+    
+    return null
+  }, [selectedPinId, mapSales, hybridResult])
+  
+  // Get pin coordinates for selected location
+  const selectedPinCoords = useMemo(() => {
+    if (!selectedPinId || !hybridResult) return null
+    
+    // Find location by ID
+    const location = hybridResult.locations.find(loc => loc.id === selectedPinId)
+    if (location) {
+      return { lat: location.lat, lng: location.lng }
+    }
+    
+    // If not found, try to find sale by ID
+    const sale = mapSales.find(sale => sale.id === selectedPinId)
+    if (sale && typeof sale.lat === 'number' && typeof sale.lng === 'number') {
+      return { lat: sale.lat, lng: sale.lng }
+    }
+    
+    return null
+  }, [selectedPinId, hybridResult, mapSales])
+  
+  // Convert pin coordinates to screen position
+  useEffect(() => {
+    if (!selectedPinCoords || !mapRef.current) {
+      setPinPosition(null)
+      return
+    }
+    
+    const map = mapRef.current.getMap?.()
+    if (!map || typeof map.project !== 'function') {
+      setPinPosition(null)
+      return
+    }
+    
+    try {
+      const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
+      setPinPosition({ x: point.x, y: point.y })
+    } catch (error) {
+      setPinPosition(null)
+    }
+  }, [selectedPinCoords, mapView, currentViewport])
+  
+  // Update position on map move/zoom
+  useEffect(() => {
+    if (!selectedPinCoords || !mapRef.current) return
+    
+    const map = mapRef.current.getMap?.()
+    if (!map) return
+    
+    const updatePosition = () => {
+      try {
+        const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
+        setPinPosition({ x: point.x, y: point.y })
+      } catch (error) {
+        // Ignore errors during map transitions
+      }
+    }
+    
+    map.on('move', updatePosition)
+    map.on('zoom', updatePosition)
+    
+    return () => {
+      map.off('move', updatePosition)
+      map.off('zoom', updatePosition)
+    }
+  }, [selectedPinCoords])
   
   // Handle mode toggle
   const handleToggleMode = useCallback(() => {
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
+  
+  // Close callout when map is clicked or moved
+  const handleMapClick = useCallback(() => {
+    if (selectedPinId) {
+      onLocationClick(selectedPinId)
+    }
+  }, [selectedPinId, onLocationClick])
+  
+  const handleViewportChangeWithDismiss = useCallback((args: { 
+    center: { lat: number; lng: number }; 
+    zoom: number; 
+    bounds: { west: number; south: number; east: number; north: number } 
+  }) => {
+    // Close callout if visible when map moves
+    if (selectedPinId) {
+      onLocationClick(selectedPinId)
+    }
+    onViewportChange(args)
+  }, [selectedPinId, onLocationClick, onViewportChange])
   
   // Map viewport for callout
   const mapViewport = useMemo(() => {
@@ -99,9 +204,13 @@ export default function MobileSalesShell({
     >
       {/* Map Mode */}
       {mode === 'map' && mapView && currentViewport && (
-        <div className="relative flex-1 min-h-0 bg-gray-100">
+        <div 
+          className="relative flex-1 min-h-0 bg-gray-100"
+          onClick={handleMapClick}
+        >
           {/* Full-screen map */}
           <SimpleMap
+            ref={mapRef}
             center={mapView.center}
             zoom={pendingBounds ? undefined : mapView.zoom}
             fitBounds={pendingBounds}
@@ -116,7 +225,7 @@ export default function MobileSalesShell({
               onClusterClick: onClusterClick,
               viewport: currentViewport
             }}
-            onViewportChange={onViewportChange}
+            onViewportChange={handleViewportChangeWithDismiss}
             attributionPosition="top-right"
             showOSMAttribution={true}
             attributionControl={false}
@@ -128,7 +237,10 @@ export default function MobileSalesShell({
           <div className="absolute inset-0 pointer-events-none z-10">
             {/* Filters FAB - Top Left */}
             <button
-              onClick={() => setIsFiltersModalOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsFiltersModalOpen(true)
+              }}
               className="absolute top-4 left-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
               aria-label="Open filters"
             >
@@ -142,7 +254,10 @@ export default function MobileSalesShell({
             
             {/* Mode Toggle FAB - Bottom Right */}
             <button
-              onClick={handleToggleMode}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleToggleMode()
+              }}
               className="absolute bottom-20 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
               aria-label="Switch to list view"
             >
@@ -153,11 +268,12 @@ export default function MobileSalesShell({
           </div>
           
           {/* Callout Card - Shows when a sale is selected */}
-          {selectedSale && (
+          {selectedSale && pinPosition && (
             <MobileSaleCallout
               sale={selectedSale}
               onDismiss={() => onLocationClick(selectedPinId || '')}
               viewport={mapViewport}
+              pinPosition={pinPosition}
             />
           )}
         </div>

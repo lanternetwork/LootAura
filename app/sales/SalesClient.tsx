@@ -9,6 +9,7 @@ import SalesList from '@/components/SalesList'
 import FiltersBar from '@/components/sales/FiltersBar'
 import MobileFilterSheet from '@/components/sales/MobileFilterSheet'
 import MobileSalesShell from './MobileSalesShell'
+import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
@@ -383,8 +384,24 @@ export default function SalesClient({
     }
     
     // If a single location is selected and the user moves the map, exit location view
-    if (selectedPinId) {
-      setSelectedPinId(null)
+    // BUT: Don't clear if this is a programmatic centering (we want to keep the callout visible)
+    // We detect programmatic centering by checking if the center matches a selected pin's location
+    if (selectedPinId && hybridResult) {
+      const selectedLocation = hybridResult.locations.find((loc: any) => loc.id === selectedPinId)
+      if (selectedLocation) {
+        // Check if the new center is close to the selected pin (within ~0.001 degrees, ~100m)
+        const latDiff = Math.abs(center.lat - selectedLocation.lat)
+        const lngDiff = Math.abs(center.lng - selectedLocation.lng)
+        const isCenteringToPin = latDiff < 0.001 && lngDiff < 0.001
+        
+        // Only clear if this is NOT a centering action (user manually moved map)
+        if (!isCenteringToPin) {
+          setSelectedPinId(null)
+        }
+      } else {
+        // No matching location found, clear selection
+        setSelectedPinId(null)
+      }
     }
 
     // Update map view state
@@ -439,7 +456,7 @@ export default function SalesClient({
       initialLoadRef.current = false // Mark initial load as complete
       fetchMapSales(bounds)
     }, 300)
-  }, [fetchMapSales, selectedPinId])
+  }, [fetchMapSales, selectedPinId, hybridResult])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {
@@ -736,21 +753,8 @@ export default function SalesClient({
   }, [searchParams, hasRestoredZip, urlLat, urlLng, initialCenter, handleZipLocationFound, handleZipError])
 
   // Memoized visible sales - filtered by current viewport bounds to match map pins
+  // Note: selectedPinId is only used for the callout card, not for filtering the sales list
   const visibleSales = useMemo(() => {
-    // If a location is selected, show only sales from that location
-    if (selectedPinId && hybridResult) {
-      const selectedLocation = hybridResult.locations.find((loc: any) => loc.id === selectedPinId)
-      if (selectedLocation) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES] Showing sales for selected location:', { 
-            locationId: selectedPinId,
-            salesCount: selectedLocation.sales.length 
-          })
-        }
-        return selectedLocation.sales
-      }
-    }
-    
     // Filter sales to only those within the current viewport bounds (same as map pins)
     if (!currentViewport) {
       return []
@@ -811,6 +815,127 @@ export default function SalesClient({
   // Detect overflow in sales list to conditionally show scrollbar
   const { ref: salesListContentRef, hasOverflow: salesListHasOverflow } = useHasOverflow<HTMLDivElement>()
 
+  // Desktop callout card state
+  const desktopMapRef = useRef<any>(null)
+  const [desktopPinPosition, setDesktopPinPosition] = useState<{ x: number; y: number } | null>(null)
+
+  // Calculate selected sale for desktop callout
+  const selectedSale = useMemo(() => {
+    if (!selectedPinId) return null
+    const saleById = mapSales.find(sale => sale.id === selectedPinId)
+    if (saleById) return saleById
+    if (hybridResult?.locations) {
+      const location = hybridResult.locations.find(loc => loc.id === selectedPinId)
+      if (location && location.sales.length > 0) {
+        return location.sales[0]
+      }
+    }
+    return null
+  }, [selectedPinId, mapSales, hybridResult])
+
+  // Calculate selected pin coordinates for desktop callout
+  const selectedPinCoords = useMemo(() => {
+    if (!selectedPinId || !hybridResult) return null
+    const location = hybridResult.locations.find(loc => loc.id === selectedPinId)
+    if (location) {
+      return { lat: location.lat, lng: location.lng }
+    }
+    const sale = mapSales.find(sale => sale.id === selectedPinId)
+    if (sale && typeof sale.lat === 'number' && typeof sale.lng === 'number') {
+      return { lat: sale.lat, lng: sale.lng }
+    }
+    return null
+  }, [selectedPinId, hybridResult, mapSales])
+
+  // Convert selected pin coordinates to screen position for desktop callout
+  useEffect(() => {
+    if (!selectedPinCoords || !desktopMapRef.current) {
+      setDesktopPinPosition(null)
+      return
+    }
+    
+    // Wait a bit for map to be ready, then calculate position
+    const calculatePosition = () => {
+      const map = desktopMapRef.current?.getMap?.()
+      if (!map || typeof map.project !== 'function') {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[DESKTOP_CALLOUT] Map not ready:', { hasRef: !!desktopMapRef.current, hasGetMap: !!desktopMapRef.current?.getMap, hasProject: typeof map?.project === 'function' })
+        }
+        return false
+      }
+      
+      try {
+        const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[DESKTOP_CALLOUT] Calculated pin position:', { x: point.x, y: point.y, coords: selectedPinCoords })
+        }
+        setDesktopPinPosition({ x: point.x, y: point.y })
+        return true
+      } catch (error) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[DESKTOP_CALLOUT] Error calculating position:', error)
+        }
+        return false
+      }
+    }
+    
+    // Try immediately
+    if (calculatePosition()) {
+      return
+    }
+    
+    // If map not ready, try again after a short delay
+    const timeoutId = setTimeout(() => {
+      calculatePosition()
+    }, 100)
+    
+    return () => clearTimeout(timeoutId)
+  }, [selectedPinCoords, mapView, currentViewport])
+
+  // Update pin position when map moves or zooms (desktop)
+  useEffect(() => {
+    if (!selectedPinCoords || !desktopMapRef.current) {
+      return
+    }
+    
+    const map = desktopMapRef.current.getMap?.()
+    if (!map) return
+
+    const updatePosition = () => {
+      try {
+        const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
+        setDesktopPinPosition({ x: point.x, y: point.y })
+      } catch (error) {
+        // Ignore errors during map transitions
+      }
+    }
+
+    map.on('move', updatePosition)
+    map.on('zoom', updatePosition)
+
+    return () => {
+      map.off('move', updatePosition)
+      map.off('zoom', updatePosition)
+    }
+  }, [selectedPinCoords])
+
+  // Handle map click to dismiss callout (desktop)
+  const handleDesktopMapClick = useCallback((e: React.MouseEvent) => {
+    // Only dismiss if clicking directly on the map container, not on child elements
+    if (e.target === e.currentTarget && selectedPinId) {
+      setSelectedPinId(null)
+    }
+  }, [selectedPinId])
+
+  // Handle viewport change (desktop) - handleViewportChange already dismisses callout
+  const handleDesktopViewportChange = useCallback((args: { 
+    center: { lat: number; lng: number }; 
+    zoom: number; 
+    bounds: { west: number; south: number; east: number; north: number } 
+  }) => {
+    handleViewportChange(args)
+  }, [handleViewportChange])
+
 
   return (
     <>
@@ -843,6 +968,7 @@ export default function SalesClient({
           onZipError={handleZipError}
           zipError={zipError}
           hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
+          hybridResult={hybridResult}
         />
       ) : (
         /* Desktop Layout - md and above */
@@ -878,10 +1004,12 @@ export default function SalesClient({
               style={{ height: '100%' }}
               role="region"
               aria-label="Interactive map showing yard sales locations"
+              onClick={handleDesktopMapClick}
             >
               <div className="w-full h-full">
                 {mapView ? (
                   <SimpleMap
+                    ref={desktopMapRef}
                     center={mapCenter}
                     zoom={pendingBounds ? undefined : mapZoom}
                     fitBounds={pendingBounds}
@@ -907,13 +1035,33 @@ export default function SalesClient({
                       },
                       viewport: currentViewport!
                     }}
-                    onViewportChange={handleViewportChange}
+                    onViewportChange={handleDesktopViewportChange}
                     attributionPosition="top-right"
                     showOSMAttribution={true}
                     attributionControl={false}
                   />
                 ) : null}
               </div>
+              
+              {/* Desktop callout card */}
+              {selectedSale && desktopPinPosition && (
+                <MobileSaleCallout
+                  sale={selectedSale}
+                  onDismiss={() => {
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[DESKTOP_CALLOUT] Dismissing callout')
+                    }
+                    setSelectedPinId(null)
+                  }}
+                  viewport={mapView ? { center: mapView.center, zoom: mapView.zoom } : null}
+                  pinPosition={desktopPinPosition}
+                />
+              )}
+              {process.env.NEXT_PUBLIC_DEBUG === 'true' && selectedPinId && (
+                <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 z-50 rounded">
+                  Debug: selectedPinId={selectedPinId}, selectedSale={selectedSale ? 'yes' : 'no'}, pinPosition={desktopPinPosition ? `x:${desktopPinPosition.x},y:${desktopPinPosition.y}` : 'null'}
+                </div>
+              )}
             </div>
 
             {/* Sales List - Right panel on desktop */}
@@ -922,20 +1070,7 @@ export default function SalesClient({
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">
                     Sales ({visibleSales.length})
-                    {selectedPinId && (
-                      <span className="text-sm text-blue-600 ml-2">
-                        (Location selected)
-                      </span>
-                    )}
                   </h2>
-                  {selectedPinId && (
-                    <button
-                      onClick={() => setSelectedPinId(null)}
-                      className="text-sm text-blue-600 hover:text-blue-800 underline"
-                    >
-                      Show All Sales
-                    </button>
-                  )}
                 </div>
               </div>
 

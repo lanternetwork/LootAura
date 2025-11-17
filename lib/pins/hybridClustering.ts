@@ -183,6 +183,26 @@ export function applyVisualClustering(
   // Use the SAME cluster index that generated the clusters to check membership
   // (rebuilding the index would generate different cluster IDs)
   const clusteredIds = getClusterMemberIds(clusterIndex, realClusters.map(c => c.id))
+  
+  // Debug: Log clustering details to identify missing members
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true' && realClusters.length > 0) {
+    const clusterDetails = realClusters.map(c => {
+      const members = getClusterMemberIds(clusterIndex, [c.id])
+      return {
+        clusterId: c.id,
+        count: c.count,
+        memberIds: Array.from(members),
+        memberCount: members.size
+      }
+    })
+    console.log('[CLUSTERING] Cluster membership check:', {
+      totalLocations: locations.length,
+      totalClusteredIds: clusteredIds.size,
+      clusters: clusterDetails,
+      unclusteredLocations: locations.filter(loc => !clusteredIds.has(loc.id)).map(loc => loc.id)
+    })
+  }
+  
   let colocatedClusterCount = 0
   locations.forEach(location => {
     if (clusteredIds.has(location.id)) {

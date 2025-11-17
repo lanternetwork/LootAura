@@ -8,7 +8,7 @@ import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import SalesList from '@/components/SalesList'
 import FiltersBar from '@/components/sales/FiltersBar'
 import MobileFilterSheet from '@/components/sales/MobileFilterSheet'
-import MobileSalesLayout from './MobileSalesLayout'
+import MobileSalesShell from './MobileSalesShell'
 import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
@@ -816,7 +816,7 @@ export default function SalesClient({
     <>
       {/* Mobile Layout - Only on small screens (<768px) */}
       {isMobile ? (
-        <MobileSalesLayout
+        <MobileSalesShell
           mapView={mapView}
           pendingBounds={pendingBounds}
           mapSales={mapSales}
@@ -836,7 +836,6 @@ export default function SalesClient({
           currentViewport={currentViewport}
           visibleSales={visibleSales}
           loading={loading}
-          onClearSelection={() => setSelectedPinId(null)}
           filters={filters}
           onFiltersChange={handleFiltersChange}
           onClearFilters={clearFilters}

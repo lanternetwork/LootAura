@@ -75,37 +75,68 @@ export function getClustersForViewport(
 
 /**
  * Get the set of leaf point ids that belong to the provided clusters
+ * Recursively traverses nested clusters to find all leaf points
  */
 export function getClusterMemberIds(
   index: SuperclusterIndex,
   clusterIds: number[]
 ): Set<string> {
   const memberIds = new Set<string>()
-  clusterIds.forEach((clusterId) => {
+  
+  // Recursively collect all leaf point IDs from clusters
+  const collectLeaves = (clusterId: number) => {
     try {
+      // Try to get leaves directly
       const leaves = (index as any).getLeaves?.(clusterId, Infinity) || []
       leaves.forEach((leaf: any) => {
-        const id = leaf?.properties?.id
-        if (id) memberIds.add(String(id))
+        // Check if this is a nested cluster or a leaf point
+        const pointCount = leaf?.properties?.point_count
+        if (pointCount && pointCount > 0) {
+          // This is a nested cluster, recurse into it
+          if (typeof leaf.id === 'number') {
+            collectLeaves(leaf.id)
+          }
+        } else {
+          // This is a leaf point
+          const id = leaf?.properties?.id
+          if (id) {
+            memberIds.add(String(id))
+          }
+        }
       })
     } catch {
-      // Fallback: traverse children when getLeaves is not available
-      const stack = [(clusterId as unknown) as number]
-      while (stack.length) {
-        const cid = stack.pop()!
-        const children = (index as any).getChildren?.(cid) || []
+      // Fallback: traverse children when getLeaves is not available or fails
+      try {
+        const children = (index as any).getChildren?.(clusterId) || []
         children.forEach((child: any) => {
-          const pc = child?.properties?.point_count
-          if (pc && pc > 0) {
-            if (typeof child.id === 'number') stack.push(child.id)
+          const pointCount = child?.properties?.point_count
+          if (pointCount && pointCount > 0) {
+            // This is a nested cluster, recurse into it
+            if (typeof child.id === 'number') {
+              collectLeaves(child.id)
+            }
           } else {
+            // This is a leaf point
             const id = child?.properties?.id
-            if (id) memberIds.add(String(id))
+            if (id) {
+              memberIds.add(String(id))
+            }
           }
         })
+      } catch {
+        // If both methods fail, skip this cluster
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[CLUSTERING] Failed to get members for cluster:', clusterId)
+        }
       }
     }
+  }
+  
+  // Process all provided cluster IDs
+  clusterIds.forEach((clusterId) => {
+    collectLeaves(clusterId)
   })
+  
   return memberIds
 }
 

@@ -57,9 +57,10 @@ export default function ClusterMarker({
           text-white font-bold
           rounded-full flex items-center justify-center
           shadow-lg select-none
-          cursor-pointer hover:scale-110 transition-transform
-          focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2
+          cursor-pointer
+          focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]
         `}
+        style={{ backgroundColor: 'var(--accent-primary)' }}
         data-cluster-marker="true"
         data-cluster-id={cluster.id}
         onClick={handleClick}

@@ -1,12 +1,10 @@
 'use client'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import UserProfile from '@/components/UserProfile'
 import { useEffect, useRef, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 export function Header() {
-  const pathname = usePathname()
   const [hasUser, setHasUser] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)

@@ -45,9 +45,19 @@ export default function HybridPinsOverlay({
   // Use provided hybridResult if available, otherwise use fallback
   // Wrap in useMemo to ensure React detects changes when providedHybridResult changes from null to a value
   const hybridResult = useMemo(() => {
-    return providedHybridResult !== null && providedHybridResult !== undefined
-      ? providedHybridResult
-      : fallbackResult
+    const hasProvided = providedHybridResult !== null && providedHybridResult !== undefined
+    const result = hasProvided ? providedHybridResult : fallbackResult
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[HYBRID_PINS] Calculating result:', {
+        hasProvided,
+        providedPinsCount: providedHybridResult?.pins?.length || 0,
+        fallbackPinsCount: fallbackResult.pins.length,
+        resultPinsCount: result.pins.length
+      })
+    }
+    
+    return result
   }, [providedHybridResult, fallbackResult])
 
   // Early return if no sales - avoid unnecessary rendering

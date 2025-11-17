@@ -260,6 +260,9 @@ export default function SalesClient({
   // Track API calls for debugging single fetch path
   const apiCallCounterRef = useRef(0)
 
+  // Track current viewport bounds in a ref for use during merge (avoids stale closure)
+  const currentBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)
+
   // Fetch sales based on map viewport bbox
   const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }, customFilters?: any) => {
     // Cancel any in-flight request
@@ -361,7 +364,8 @@ export default function SalesClient({
         }
         
         // Merge new sales with existing ones to prevent pins from disappearing when panning
-        // Keep sales that are within a buffer around the current viewport
+        // Use the CURRENT viewport bounds (from ref) instead of the fetch bbox to avoid removing
+        // sales that are still visible after the map moved during the fetch
         setMapSales((prevSales) => {
           // Create a map of existing sales by ID for quick lookup
           const existingSalesMap = new Map(prevSales.map(sale => [sale.id, sale]))
@@ -371,15 +375,19 @@ export default function SalesClient({
             existingSalesMap.set(sale.id, sale)
           })
           
-          // Expand bounds by 20% to create a buffer zone
-          const bufferFactor = 0.2
-          const latRange = bbox.north - bbox.south
-          const lngRange = bbox.east - bbox.west
+          // Use current viewport bounds if available, otherwise fall back to fetch bbox
+          const boundsToUse = currentBoundsRef.current || bbox
+          
+          // Expand bounds by 100% to create a large buffer zone (prevents aggressive removal)
+          // This ensures sales stay visible even if the map moves during fetch
+          const bufferFactor = 1.0
+          const latRange = boundsToUse.north - boundsToUse.south
+          const lngRange = boundsToUse.east - boundsToUse.west
           const bufferedBounds = {
-            west: bbox.west - (lngRange * bufferFactor),
-            south: bbox.south - (latRange * bufferFactor),
-            east: bbox.east + (lngRange * bufferFactor),
-            north: bbox.north + (latRange * bufferFactor)
+            west: boundsToUse.west - (lngRange * bufferFactor),
+            south: boundsToUse.south - (latRange * bufferFactor),
+            east: boundsToUse.east + (lngRange * bufferFactor),
+            north: boundsToUse.north + (latRange * bufferFactor)
           }
           
           // Keep only sales within the buffered bounds to prevent memory bloat
@@ -457,6 +465,9 @@ export default function SalesClient({
     if (selectedPinId) {
       setSelectedPinId(null)
     }
+
+    // Update current bounds ref for use during merge (avoids stale closure issues)
+    currentBoundsRef.current = bounds
 
     // Update map view state
     setMapView(prev => {

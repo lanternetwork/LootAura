@@ -101,6 +101,6 @@ export default function HybridPinsOverlay({
           )
         }
       })}
-    </div>
+    </>
   )
 }

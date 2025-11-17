@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Sale } from '@/lib/types'
@@ -22,6 +22,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
   const router = useRouter()
   const [swipeStartY, setSwipeStartY] = useState<number | null>(null)
   const [swipeDeltaY, setSwipeDeltaY] = useState(0)
+  const cardRef = useRef<HTMLDivElement>(null)
   
   // Swipe-to-dismiss gesture handling
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -95,14 +96,27 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         zIndex: 50
       }
 
+  // Calculate card offset to position pointer at pin
+  const [cardOffset, setCardOffset] = useState(140)
+  
+  useEffect(() => {
+    if (pinPosition && cardRef.current) {
+      const cardHeight = cardRef.current.offsetHeight
+      // Pointer is 8px tall, position card so pointer tip aligns with pin
+      // Card bottom should be at pin.y - 8px, so offset = cardHeight + 8px
+      setCardOffset(cardHeight + 8)
+    }
+  }, [pinPosition, sale])
+  
   const cardStyle = pinPosition
     ? {
         position: 'absolute' as const,
         left: `${pinPosition.x}px`,
         top: `${pinPosition.y}px`,
-        transform: `translate(-50%, ${swipeDeltaY > 0 ? swipeDeltaY - 100 : -100}px)`,
+        // Position card so pointer tip (8px below card bottom) points to pin
+        transform: `translate(-50%, ${swipeDeltaY > 0 ? swipeDeltaY - cardOffset : -cardOffset}px)`,
         maxWidth: 'calc(100vw - 2rem)',
-        width: '280px',
+        width: '220px',
         pointerEvents: 'auto' as const
       }
     : {
@@ -121,6 +135,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
       }}
     >
       <div 
+        ref={cardRef}
         className={`bg-white ${pinPosition ? 'rounded-2xl' : 'rounded-t-2xl'} shadow-lg ${pinPosition ? 'border' : 'border-t'} border-gray-200 ${pinPosition ? '' : 'max-w-full mx-auto mb-4'} will-change-transform transition-transform duration-200 relative`}
         onClick={(e) => e.stopPropagation()}
         style={cardStyle}
@@ -128,10 +143,10 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         {/* Callout pointer/arrow pointing to pin */}
         {pinPosition && (
           <div 
-            className="absolute left-1/2 -bottom-2 transform -translate-x-1/2 w-0 h-0"
+            className="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-full w-0 h-0"
             style={{
-              borderLeft: '8px solid transparent',
-              borderRight: '8px solid transparent',
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
               borderTop: '8px solid white',
               filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))'
             }}

@@ -32,8 +32,10 @@ export default function HybridPinsOverlay({
   
   // Use provided hybridResult if available, otherwise calculate it
   // This avoids duplicate clustering when hybridResult is already calculated upstream
+  // Use a more explicit check to ensure React detects changes properly
   const hybridResult = useMemo((): HybridPinsResult => {
-    if (providedHybridResult) {
+    // Explicitly check for null/undefined to ensure React detects changes
+    if (providedHybridResult !== null && providedHybridResult !== undefined) {
       return providedHybridResult
     }
     
@@ -63,6 +65,11 @@ export default function HybridPinsOverlay({
     })
   }
 
+  // Ensure pins render by checking if hybridResult has pins
+  if (!hybridResult || hybridResult.pins.length === 0) {
+    return null
+  }
+  
   return (
     <>
       {hybridResult.pins.map((pin: HybridPin) => {
@@ -95,6 +102,6 @@ export default function HybridPinsOverlay({
           )
         }
       })}
-    </>
+    </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Sale } from '@/lib/types'
@@ -31,6 +31,7 @@ export default function MobilePinCallout({
   const router = useRouter()
   const calloutRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
+  const [containerDimensions, setContainerDimensions] = useState<{ width: number; height: number } | null>(null)
 
   // Update callout position when map moves or pin coordinates change
   useEffect(() => {
@@ -78,6 +79,30 @@ export default function MobilePinCallout({
     return () => clearTimeout(timeoutId)
   }, [sale, pinLat, pinLng, mapRef])
 
+  // Get container dimensions for bounds checking
+  useEffect(() => {
+    const map = mapRef.current?.getMap?.()
+    if (!map) return
+
+    const updateDimensions = () => {
+      const container = map.getContainer()
+      if (container) {
+        setContainerDimensions({
+          width: container.offsetWidth,
+          height: container.offsetHeight
+        })
+      }
+    }
+
+    updateDimensions()
+    const mapInstance = map
+    mapInstance.on('resize', updateDimensions)
+
+    return () => {
+      mapInstance.off('resize', updateDimensions)
+    }
+  }, [mapRef])
+
   if (!sale || !position) return null
 
   const cover = getSaleCoverUrl(sale)
@@ -110,32 +135,6 @@ export default function MobilePinCallout({
   const CALLOUT_HEIGHT = 120 // Approximate height in pixels
   const PIN_OFFSET = 24 // Distance from pin to callout
   const TAIL_HEIGHT = 8 // Height of the tail/pointer
-
-  // Get container dimensions for bounds checking
-  const [containerDimensions, setContainerDimensions] = useState<{ width: number; height: number } | null>(null)
-  
-  useEffect(() => {
-    const map = mapRef.current?.getMap?.()
-    if (!map) return
-
-    const updateDimensions = () => {
-      const container = map.getContainer()
-      if (container) {
-        setContainerDimensions({
-          width: container.offsetWidth,
-          height: container.offsetHeight
-        })
-      }
-    }
-
-    updateDimensions()
-    const mapInstance = map
-    mapInstance.on('resize', updateDimensions)
-
-    return () => {
-      mapInstance.off('resize', updateDimensions)
-    }
-  }, [mapRef])
 
   // Position callout above the pin, centered horizontally
   const left = position.x - CALLOUT_WIDTH / 2

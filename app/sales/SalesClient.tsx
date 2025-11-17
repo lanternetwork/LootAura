@@ -846,28 +846,55 @@ export default function SalesClient({
 
   // Convert selected pin coordinates to screen position for desktop callout
   useEffect(() => {
-    if (!selectedPinCoords || !desktopMapRef.current || !mapView) {
+    if (!selectedPinCoords || !desktopMapRef.current) {
       setDesktopPinPosition(null)
       return
     }
-    const map = desktopMapRef.current.getMap?.()
-    if (!map || typeof map.project !== 'function') {
-      setDesktopPinPosition(null)
+    
+    // Wait a bit for map to be ready, then calculate position
+    const calculatePosition = () => {
+      const map = desktopMapRef.current?.getMap?.()
+      if (!map || typeof map.project !== 'function') {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[DESKTOP_CALLOUT] Map not ready:', { hasRef: !!desktopMapRef.current, hasGetMap: !!desktopMapRef.current?.getMap, hasProject: typeof map?.project === 'function' })
+        }
+        return false
+      }
+      
+      try {
+        const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[DESKTOP_CALLOUT] Calculated pin position:', { x: point.x, y: point.y, coords: selectedPinCoords })
+        }
+        setDesktopPinPosition({ x: point.x, y: point.y })
+        return true
+      } catch (error) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[DESKTOP_CALLOUT] Error calculating position:', error)
+        }
+        return false
+      }
+    }
+    
+    // Try immediately
+    if (calculatePosition()) {
       return
     }
-    try {
-      const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
-      setDesktopPinPosition({ x: point.x, y: point.y })
-    } catch (error) {
-      setDesktopPinPosition(null)
-    }
-  }, [selectedPinCoords, mapView])
+    
+    // If map not ready, try again after a short delay
+    const timeoutId = setTimeout(() => {
+      calculatePosition()
+    }, 100)
+    
+    return () => clearTimeout(timeoutId)
+  }, [selectedPinCoords, mapView, currentViewport])
 
   // Update pin position when map moves or zooms (desktop)
   useEffect(() => {
-    if (!selectedPinCoords || !desktopMapRef.current || !mapView) {
+    if (!selectedPinCoords || !desktopMapRef.current) {
       return
     }
+    
     const map = desktopMapRef.current.getMap?.()
     if (!map) return
 
@@ -876,7 +903,7 @@ export default function SalesClient({
         const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
         setDesktopPinPosition({ x: point.x, y: point.y })
       } catch (error) {
-        setDesktopPinPosition(null)
+        // Ignore errors during map transitions
       }
     }
 
@@ -887,7 +914,7 @@ export default function SalesClient({
       map.off('move', updatePosition)
       map.off('zoom', updatePosition)
     }
-  }, [selectedPinCoords, mapView])
+  }, [selectedPinCoords])
 
   // Handle map click to dismiss callout (desktop)
   const handleDesktopMapClick = useCallback((e: React.MouseEvent) => {
@@ -1017,10 +1044,20 @@ export default function SalesClient({
               {selectedSale && desktopPinPosition && (
                 <MobileSaleCallout
                   sale={selectedSale}
-                  onDismiss={() => setSelectedPinId(null)}
+                  onDismiss={() => {
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.log('[DESKTOP_CALLOUT] Dismissing callout')
+                    }
+                    setSelectedPinId(null)
+                  }}
                   viewport={mapView ? { center: mapView.center, zoom: mapView.zoom } : null}
                   pinPosition={desktopPinPosition}
                 />
+              )}
+              {process.env.NEXT_PUBLIC_DEBUG === 'true' && selectedPinId && (
+                <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 z-50 rounded">
+                  Debug: selectedPinId={selectedPinId}, selectedSale={selectedSale ? 'yes' : 'no'}, pinPosition={desktopPinPosition ? `x:${desktopPinPosition.x},y:${desktopPinPosition.y}` : 'null'}
+                </div>
               )}
             </div>
 

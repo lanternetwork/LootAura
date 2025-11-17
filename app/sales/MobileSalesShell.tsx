@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
 import SimpleMap from '@/components/location/SimpleMap'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
@@ -69,8 +68,6 @@ export default function MobileSalesShell({
   zipError,
   hasActiveFilters
 }: MobileSalesShellProps) {
-  const router = useRouter()
-  
   // Mobile-only state
   const [mode, setMode] = useState<MobileMode>('map')
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)

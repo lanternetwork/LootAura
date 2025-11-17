@@ -186,7 +186,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
 
   // Handle cluster click
   const handleClusterClick = useCallback((cluster: any) => {
-    if (!mapRef.current) return
+    if (!loaded || !mapRef.current) return
     
     const map = mapRef.current.getMap()
     if (!map) return
@@ -195,31 +195,31 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       console.log('[CLUSTER] expand', { lat: cluster.lat, lng: cluster.lng, expandToZoom: cluster.expandToZoom })
     }
     
-    // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
-    const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
-    
-    // TEMPORARILY DISABLED: Zoom functionality works but is disabled for UX testing
-    // Original zoom behavior (commented out):
-    // map.flyTo({
-    //   center: [cluster.lng, cluster.lat],
-    //   zoom: cluster.expandToZoom,
-    //   duration: 400
-    // })
-    
-    // TEMPORARY: Just center the map on the cluster without zooming
-    const flyToOptions: any = {
-      center: [cluster.lng, cluster.lat],
-      duration: 400
+    try {
+      // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
+      const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
+      
+      // Zoom in on the cluster until it breaks apart
+      const flyToOptions: any = {
+        center: [cluster.lng, cluster.lat],
+        zoom: cluster.expandToZoom || 16,
+        duration: 400
+      }
+      // Only include offset if we have a non-zero offset value
+      if (offsetY !== 0) {
+        flyToOptions.offset = { x: 0, y: offsetY }
+      }
+      map.flyTo(flyToOptions)
+    } catch (error) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[MAP] Cluster flyTo error:', error)
+      }
     }
-    // Only include offset if we have a non-zero offset value
-    if (offsetY !== 0) {
-      flyToOptions.offset = { x: 0, y: offsetY }
-    }
-    map.flyTo(flyToOptions)
     
     // Call the onClusterClick callback if provided
     pins?.onClusterClick?.(cluster)
-  }, [pins, bottomSheetHeight])
+    hybridPins?.onClusterClick?.(cluster)
+  }, [pins, hybridPins, bottomSheetHeight, loaded])
 
   // First-click-to-center, second-click-to-select for location pins
   const centeredLocationRef = useRef<Record<string, boolean>>({})

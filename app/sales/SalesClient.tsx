@@ -193,14 +193,27 @@ export default function SalesClient({
     
     // Allow clustering regardless of small dataset size to prevent initial pin gaps
     
-    // Filter sales to only those within the current viewport bounds
+    // Use buffered bounds to show pins slightly outside viewport (prevents disappearing at edges)
+    // This matches the buffer used when merging sales in fetchMapSales
+    const bufferFactor = 0.2
+    const latRange = currentViewport.bounds[3] - currentViewport.bounds[1]
+    const lngRange = currentViewport.bounds[2] - currentViewport.bounds[0]
+    const bufferedBounds = {
+      west: currentViewport.bounds[0] - (lngRange * bufferFactor),
+      south: currentViewport.bounds[1] - (latRange * bufferFactor),
+      east: currentViewport.bounds[2] + (lngRange * bufferFactor),
+      north: currentViewport.bounds[3] + (latRange * bufferFactor)
+    }
+    
+    // Filter sales to those within the buffered viewport bounds
+    // This prevents pins from disappearing when they're just outside the exact viewport
     const visibleSales = mapSales.filter(sale => {
       if (typeof sale.lat !== 'number' || typeof sale.lng !== 'number') return false
       
-      return sale.lat >= currentViewport.bounds[1] && // south
-             sale.lat <= currentViewport.bounds[3] && // north
-             sale.lng >= currentViewport.bounds[0] && // west
-             sale.lng <= currentViewport.bounds[2]    // east
+      return sale.lat >= bufferedBounds.south &&
+             sale.lat <= bufferedBounds.north &&
+             sale.lng >= bufferedBounds.west &&
+             sale.lng <= bufferedBounds.east
     })
     
     // Skip clustering if no visible sales

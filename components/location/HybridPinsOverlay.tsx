@@ -43,11 +43,12 @@ export default function HybridPinsOverlay({
   }, [sales, viewport])
   
   // Use provided hybridResult if available, otherwise use fallback
-  // This avoids duplicate clustering when hybridResult is already calculated upstream
-  // Direct assignment ensures React detects changes immediately when providedHybridResult changes
-  const hybridResult: HybridPinsResult = providedHybridResult !== null && providedHybridResult !== undefined
-    ? providedHybridResult
-    : fallbackResult
+  // Wrap in useMemo to ensure React detects changes when providedHybridResult changes from null to a value
+  const hybridResult = useMemo(() => {
+    return providedHybridResult !== null && providedHybridResult !== undefined
+      ? providedHybridResult
+      : fallbackResult
+  }, [providedHybridResult, fallbackResult])
 
   // Early return if no sales - avoid unnecessary rendering
   if (sales.length === 0) {

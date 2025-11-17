@@ -2,29 +2,65 @@ import { describe, it, expect } from 'vitest'
 import { buildGoogleMapsUrl, buildGoogleMapsUrlFromSale } from '@/lib/location/googleMaps'
 
 describe('buildGoogleMapsUrl', () => {
-  it('should build URL with lat/lng when both are provided', () => {
-    const url = buildGoogleMapsUrl({ lat: 38.2527, lng: -85.7585 })
-    expect(url).toBe('https://maps.apple.com/?ll=38.2527,-85.7585')
-  })
-
-  it('should prefer lat/lng over address when both are provided', () => {
-    const url = buildGoogleMapsUrl({
-      lat: 38.2527,
-      lng: -85.7585,
-      address: '123 Main St, Louisville, KY'
+  describe('desktop (isMobile=false or undefined)', () => {
+    it('should build Google Maps URL with lat/lng when both are provided', () => {
+      const url = buildGoogleMapsUrl({ lat: 38.2527, lng: -85.7585, isMobile: false })
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=38.2527,-85.7585')
     })
-    expect(url).toBe('https://maps.apple.com/?ll=38.2527,-85.7585')
+
+    it('should default to desktop (Google Maps) when isMobile is not provided', () => {
+      const url = buildGoogleMapsUrl({ lat: 38.2527, lng: -85.7585 })
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=38.2527,-85.7585')
+    })
+
+    it('should prefer lat/lng over address when both are provided', () => {
+      const url = buildGoogleMapsUrl({
+        lat: 38.2527,
+        lng: -85.7585,
+        address: '123 Main St, Louisville, KY',
+        isMobile: false
+      })
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=38.2527,-85.7585')
+    })
+
+    it('should use address when lat/lng are not available', () => {
+      const url = buildGoogleMapsUrl({ address: '123 Main St, Louisville, KY 40202', isMobile: false })
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=123%20Main%20St%2C%20Louisville%2C%20KY%2040202')
+    })
+
+    it('should URL-encode address properly', () => {
+      const url = buildGoogleMapsUrl({ address: '123 Main St & Broadway, Louisville, KY', isMobile: false })
+      expect(url).toContain('123%20Main%20St%20%26%20Broadway')
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=123%20Main%20St%20%26%20Broadway%2C%20Louisville%2C%20KY')
+    })
   })
 
-  it('should use address when lat/lng are not available', () => {
-    const url = buildGoogleMapsUrl({ address: '123 Main St, Louisville, KY 40202' })
-    expect(url).toBe('https://maps.apple.com/?q=123%20Main%20St%2C%20Louisville%2C%20KY%2040202')
-  })
+  describe('mobile (isMobile=true)', () => {
+    it('should build Apple Maps URL with lat/lng when both are provided', () => {
+      const url = buildGoogleMapsUrl({ lat: 38.2527, lng: -85.7585, isMobile: true })
+      expect(url).toBe('https://maps.apple.com/?ll=38.2527,-85.7585')
+    })
 
-  it('should URL-encode address properly', () => {
-    const url = buildGoogleMapsUrl({ address: '123 Main St & Broadway, Louisville, KY' })
-    expect(url).toContain('123%20Main%20St%20%26%20Broadway')
-    expect(url).toBe('https://maps.apple.com/?q=123%20Main%20St%20%26%20Broadway%2C%20Louisville%2C%20KY')
+    it('should prefer lat/lng over address when both are provided', () => {
+      const url = buildGoogleMapsUrl({
+        lat: 38.2527,
+        lng: -85.7585,
+        address: '123 Main St, Louisville, KY',
+        isMobile: true
+      })
+      expect(url).toBe('https://maps.apple.com/?ll=38.2527,-85.7585')
+    })
+
+    it('should use address when lat/lng are not available', () => {
+      const url = buildGoogleMapsUrl({ address: '123 Main St, Louisville, KY 40202', isMobile: true })
+      expect(url).toBe('https://maps.apple.com/?q=123%20Main%20St%2C%20Louisville%2C%20KY%2040202')
+    })
+
+    it('should URL-encode address properly', () => {
+      const url = buildGoogleMapsUrl({ address: '123 Main St & Broadway, Louisville, KY', isMobile: true })
+      expect(url).toContain('123%20Main%20St%20%26%20Broadway')
+      expect(url).toBe('https://maps.apple.com/?q=123%20Main%20St%20%26%20Broadway%2C%20Louisville%2C%20KY')
+    })
   })
 
   it('should return empty string when only lat is provided', () => {
@@ -62,44 +98,124 @@ describe('buildGoogleMapsUrl', () => {
 })
 
 describe('buildGoogleMapsUrlFromSale', () => {
-  it('should prefer lat/lng from sale object', () => {
-    const sale = {
-      lat: 38.2527,
-      lng: -85.7585,
-      address: '123 Main St',
-      city: 'Louisville',
-      state: 'KY'
-    }
-    const url = buildGoogleMapsUrlFromSale(sale)
-    expect(url).toBe('https://maps.apple.com/?ll=38.2527,-85.7585')
+  describe('desktop (isMobile=false or undefined)', () => {
+    it('should prefer lat/lng from sale object', () => {
+      const sale = {
+        lat: 38.2527,
+        lng: -85.7585,
+        address: '123 Main St',
+        city: 'Louisville',
+        state: 'KY'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale, false)
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=38.2527,-85.7585')
+    })
+
+    it('should default to desktop when isMobile is not provided', () => {
+      const sale = {
+        lat: 38.2527,
+        lng: -85.7585,
+        address: '123 Main St',
+        city: 'Louisville',
+        state: 'KY'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale)
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=38.2527,-85.7585')
+    })
+
+    it('should build address from components when lat/lng are missing', () => {
+      const sale = {
+        address: '123 Main St',
+        city: 'Louisville',
+        state: 'KY',
+        zip_code: '40202'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale, false)
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=123%20Main%20St%2C%20Louisville%2C%20KY%2040202')
+    })
+
+    it('should handle sale with only city and state', () => {
+      const sale = {
+        city: 'Louisville',
+        state: 'KY'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale, false)
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=Louisville%2C%20KY')
+    })
+
+    it('should handle sale with only address', () => {
+      const sale = {
+        address: '123 Main St'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale, false)
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=123%20Main%20St')
+    })
+
+    it('should ignore null lat/lng and use address', () => {
+      const sale = {
+        lat: null,
+        lng: null,
+        address: '123 Main St',
+        city: 'Louisville',
+        state: 'KY'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale, false)
+      expect(url).toBe('https://www.google.com/maps/search/?api=1&query=123%20Main%20St%2C%20Louisville%2C%20KY')
+    })
   })
 
-  it('should build address from components when lat/lng are missing', () => {
-    const sale = {
-      address: '123 Main St',
-      city: 'Louisville',
-      state: 'KY',
-      zip_code: '40202'
-    }
-    const url = buildGoogleMapsUrlFromSale(sale)
-    expect(url).toBe('https://maps.apple.com/?q=123%20Main%20St%2C%20Louisville%2C%20KY%2040202')
-  })
+  describe('mobile (isMobile=true)', () => {
+    it('should prefer lat/lng from sale object', () => {
+      const sale = {
+        lat: 38.2527,
+        lng: -85.7585,
+        address: '123 Main St',
+        city: 'Louisville',
+        state: 'KY'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale, true)
+      expect(url).toBe('https://maps.apple.com/?ll=38.2527,-85.7585')
+    })
 
-  it('should handle sale with only city and state', () => {
-    const sale = {
-      city: 'Louisville',
-      state: 'KY'
-    }
-    const url = buildGoogleMapsUrlFromSale(sale)
-    expect(url).toBe('https://maps.apple.com/?q=Louisville%2C%20KY')
-  })
+    it('should build address from components when lat/lng are missing', () => {
+      const sale = {
+        address: '123 Main St',
+        city: 'Louisville',
+        state: 'KY',
+        zip_code: '40202'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale, true)
+      expect(url).toBe('https://maps.apple.com/?q=123%20Main%20St%2C%20Louisville%2C%20KY%2040202')
+    })
 
-  it('should handle sale with only address', () => {
-    const sale = {
-      address: '123 Main St'
-    }
-    const url = buildGoogleMapsUrlFromSale(sale)
-    expect(url).toBe('https://maps.apple.com/?q=123%20Main%20St')
+    it('should handle sale with only city and state', () => {
+      const sale = {
+        city: 'Louisville',
+        state: 'KY'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale, true)
+      expect(url).toBe('https://maps.apple.com/?q=Louisville%2C%20KY')
+    })
+
+    it('should handle sale with only address', () => {
+      const sale = {
+        address: '123 Main St'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale, true)
+      expect(url).toBe('https://maps.apple.com/?q=123%20Main%20St')
+    })
+
+    it('should ignore null lat/lng and use address', () => {
+      const sale = {
+        lat: null,
+        lng: null,
+        address: '123 Main St',
+        city: 'Louisville',
+        state: 'KY'
+      }
+      const url = buildGoogleMapsUrlFromSale(sale, true)
+      expect(url).toBe('https://maps.apple.com/?q=123%20Main%20St%2C%20Louisville%2C%20KY')
+    })
   })
 
   it('should return empty string when sale has no location data', () => {
@@ -118,18 +234,6 @@ describe('buildGoogleMapsUrlFromSale', () => {
     }
     const url = buildGoogleMapsUrlFromSale(sale)
     expect(url).toBe('')
-  })
-
-  it('should ignore null lat/lng and use address', () => {
-    const sale = {
-      lat: null,
-      lng: null,
-      address: '123 Main St',
-      city: 'Louisville',
-      state: 'KY'
-    }
-    const url = buildGoogleMapsUrlFromSale(sale)
-    expect(url).toBe('https://maps.apple.com/?q=123%20Main%20St%2C%20Louisville%2C%20KY')
   })
 })
 

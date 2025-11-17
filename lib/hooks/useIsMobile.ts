@@ -5,16 +5,25 @@ import { useState, useEffect } from 'react'
 /**
  * Hook to detect if the current viewport is mobile (< 768px)
  * Uses window.innerWidth and updates on resize
+ * 
+ * Defaults to false on SSR/first render for safe hydration
  */
 export function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false
-    return window.innerWidth < 768
-  })
+  // Default to false on SSR/first render
+  const [isMobile, setIsMobile] = useState<boolean>(false)
 
   useEffect(() => {
-    const handleResize = () => {
+    // Check on mount and update
+    const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)
+    }
+
+    // Initial check
+    checkMobile()
+
+    // Update on resize
+    const handleResize = () => {
+      checkMobile()
     }
 
     window.addEventListener('resize', handleResize)

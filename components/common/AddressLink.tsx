@@ -1,6 +1,7 @@
 'use client'
 
 import { buildGoogleMapsUrl } from '@/lib/location/googleMaps'
+import { useIsMobile } from '@/lib/hooks/useIsMobile'
 
 interface AddressLinkProps {
   /** Street address */
@@ -38,6 +39,9 @@ export default function AddressLink({
   children,
   className = ''
 }: AddressLinkProps) {
+  // Detect if we're on mobile
+  const isMobile = useIsMobile()
+
   // Build full address string for display/aria-label
   // If address is provided, use it as primary; otherwise build from components
   let fullAddress = ''
@@ -61,11 +65,12 @@ export default function AddressLink({
     fullAddress = state
   }
 
-  // Build maps URL
+  // Build maps URL (mobile vs desktop)
   const mapsUrl = buildGoogleMapsUrl({
     lat: typeof lat === 'number' ? lat : undefined,
     lng: typeof lng === 'number' ? lng : undefined,
-    address: fullAddress || undefined
+    address: fullAddress || undefined,
+    isMobile
   })
 
   // If we have a valid URL, render as link

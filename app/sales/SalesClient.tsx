@@ -767,8 +767,8 @@ export default function SalesClient({
     
     const deduplicated = deduplicateSales(viewportFilteredSales)
     
-    // Only log when there are sales or when debug is enabled
-    if (deduplicated.length > 0 || process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    // Only log when debug is enabled
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SALES] Visible sales count:', { 
         mapSales: mapSales.length, 
         viewportFiltered: viewportFilteredSales.length,

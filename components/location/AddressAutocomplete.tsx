@@ -122,7 +122,9 @@ export default function AddressAutocomplete({
         .then(res => res.ok ? res.json() : null)
         .then(ipData => {
           if (ipData?.lat && ipData?.lng) {
-            console.log('[AddressAutocomplete] Using IP geolocation:', { lat: ipData.lat, lng: ipData.lng, source: ipData.source })
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[AddressAutocomplete] Using IP geolocation:', { lat: ipData.lat, lng: ipData.lng, source: ipData.source })
+            }
             setUserLat(ipData.lat)
             setUserLng(ipData.lng)
           }
@@ -163,10 +165,14 @@ export default function AddressAutocomplete({
     // Minimum length: 1 for numeric-only, 2 for general text
     const minLength = isNumericOnly ? 1 : 2
     
-    console.log(`[AddressAutocomplete] Query processing: "${trimmedQuery}" (length: ${trimmedQuery.length}, minLength: ${minLength}, isNumericOnly: ${isNumericOnly}, isDigitsStreet: ${isDigitsStreet}, hasCoords: ${hasCoords}, hasGoogleToken: ${!!googleSessionToken}, digitsStreetMatch: ${!!digitsStreetMatch?.groups})`)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log(`[AddressAutocomplete] Query processing: "${trimmedQuery}" (length: ${trimmedQuery.length}, minLength: ${minLength}, isNumericOnly: ${isNumericOnly}, isDigitsStreet: ${isDigitsStreet}, hasCoords: ${hasCoords}, hasGoogleToken: ${!!googleSessionToken}, digitsStreetMatch: ${!!digitsStreetMatch?.groups})`)
+    }
     
     if (!trimmedQuery || trimmedQuery.length < minLength) {
-      console.log(`[AddressAutocomplete] Query too short: "${trimmedQuery}" (length: ${trimmedQuery.length} < ${minLength})`)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log(`[AddressAutocomplete] Query too short: "${trimmedQuery}" (length: ${trimmedQuery.length} < ${minLength})`)
+      }
       setSuggestions([])
       setIsOpen(false)
       setShowFallbackMessage(false)

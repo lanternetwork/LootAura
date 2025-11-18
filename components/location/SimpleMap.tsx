@@ -535,11 +535,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       
       {/* Debug overlay */}
       {process.env.NEXT_PUBLIC_DEBUG === "true" && (
-        <div className="absolute top-2 left-2 z-50 bg-black bg-opacity-75 text-white text-xs p-2 rounded pointer-events-none">
+        <div className="absolute top-2 right-2 z-40 bg-black bg-opacity-75 text-white text-xs p-2 rounded pointer-events-none">
           <div>Container: {containerRef.current?.offsetWidth}×{containerRef.current?.offsetHeight}</div>
           <div>Loaded: {loaded ? 'Yes' : 'No'}</div>
-          <div>Clustering: {isClusteringEnabled ? 'Enabled' : 'Disabled'}</div>
-          <div>Pins: {pins ? pins.sales.length : sales.length}</div>
+          <div>Clustering: {hybridPins ? 'Enabled (Hybrid)' : isClusteringEnabled ? 'Enabled' : 'Disabled'}</div>
+          <div>Pins: {hybridPins ? hybridPins.sales.length : pins ? pins.sales.length : sales.length}</div>
         </div>
       )}
       

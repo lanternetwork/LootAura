@@ -51,7 +51,9 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
 
   // Initialize filters from URL params
   useEffect(() => {
-    console.log('[FILTERS] init from URL params:', Object.fromEntries(searchParams.entries()))
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[FILTERS] init from URL params:', Object.fromEntries(searchParams.entries()))
+    }
     const lat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : undefined
     const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : undefined
     const distance = searchParams.get('dist') ? parseInt(searchParams.get('dist')!) : 25
@@ -79,12 +81,16 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
 
   const updateFilters = useCallback((newFilters: Partial<FilterState>, skipUrlUpdate = false) => {
     const updatedFilters = { ...filters, ...newFilters }
-    console.log('[FILTERS] updateFilters called with:', newFilters, '=> next:', updatedFilters)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[FILTERS] updateFilters called with:', newFilters, '=> next:', updatedFilters)
+    }
     setFilters(updatedFilters)
     
     // Skip URL updates for auto-refetch scenarios to prevent scroll-to-top
     if (skipUrlUpdate) {
-      console.log('[FILTERS] Skipping URL update for auto-refetch')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTERS] Skipping URL update for auto-refetch')
+      }
       return
     }
     
@@ -139,7 +145,9 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     
     // Update URL without navigation or scroll using History API
     const newUrl = `${window.location.pathname}?${params.toString()}`
-    console.log('[FILTERS] history.replaceState (no scroll):', newUrl)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[FILTERS] history.replaceState (no scroll):', newUrl)
+    }
     try {
       window.history.replaceState(null, '', newUrl)
     } catch {

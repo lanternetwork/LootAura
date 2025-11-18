@@ -152,6 +152,41 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     }
   }, [loaded])
 
+  // Throttle move events to update viewport during movement (not just on end)
+  const moveThrottleRef = useRef<NodeJS.Timeout | null>(null)
+  const lastMoveTimeRef = useRef<number>(0)
+  
+  const handleMove = useCallback(() => {
+    if (!mapRef.current) return
+    
+    const map = mapRef.current.getMap()
+    if (!map) return
+
+    const now = Date.now()
+    // Throttle to max once per 150ms during movement
+    if (now - lastMoveTimeRef.current < 150) {
+      return
+    }
+    lastMoveTimeRef.current = now
+
+    const center = map.getCenter()
+    const zoom = map.getZoom()
+    const bounds = map.getBounds()
+    
+    const viewport = {
+      center: { lat: center.lat, lng: center.lng },
+      zoom,
+      bounds: {
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth()
+      }
+    }
+    
+    onViewportChange?.(viewport)
+  }, [onViewportChange])
+
   const handleMoveEnd = useCallback(() => {
     if (!mapRef.current) return
     
@@ -398,6 +433,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         style={{ position: "absolute", inset: 0 }}
         onLoad={onLoad}
         onStyleData={onStyleData}
+        onMove={handleMove}
         onMoveEnd={handleMoveEnd}
         onError={(error: any) => {
           console.error('[SIMPLE_MAP] Map error:', error)

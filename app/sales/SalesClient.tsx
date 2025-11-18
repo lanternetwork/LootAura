@@ -435,7 +435,8 @@ export default function SalesClient({
       clearTimeout(debounceTimerRef.current)
     }
     
-    // Debounce fetch by 300ms to prevent rapid successive calls during zoom
+    // Reduce debounce to 150ms for more responsive updates during map movement
+    // This allows real-time updates while still preventing excessive API calls
     debounceTimerRef.current = setTimeout(() => {
       // Skip second API call during initial load (map settling)
       if (initialLoadRef.current && lastBoundsRef.current) {
@@ -455,7 +456,7 @@ export default function SalesClient({
       lastBoundsRef.current = bounds
       initialLoadRef.current = false // Mark initial load as complete
       fetchMapSales(bounds)
-    }, 300)
+    }, 150)
   }, [fetchMapSales, selectedPinId, hybridResult])
 
   // Handle ZIP search with bbox support
@@ -1095,7 +1096,9 @@ export default function SalesClient({
                 )}
 
                 {!loading && visibleSales.length > 0 && (
-                  <SalesList sales={visibleSales} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
+                  <div className="transition-opacity duration-200 ease-in-out">
+                    <SalesList sales={visibleSales} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
+                  </div>
                 )}
               </div>
             </div>

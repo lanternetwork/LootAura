@@ -4,6 +4,7 @@ import SalePlaceholder from './placeholders/SalePlaceholder'
 import FavoriteButton from './FavoriteButton'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
+import AddressLink from '@/components/common/AddressLink'
 
 interface SaleCardProps {
   sale: Sale
@@ -73,8 +74,28 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
         </div>
         {sale?.description && <p className="text-xs text-neutral-600 line-clamp-1">{sale.description}</p>}
         <div className="text-sm text-neutral-700">
-          {sale?.address && <div>{sale.address}</div>}
-          {sale?.city && sale?.state && <div>{sale.city}, {sale.state}</div>}
+          {sale?.address && (
+            <div>
+              <AddressLink
+                lat={sale.lat ?? undefined}
+                lng={sale.lng ?? undefined}
+                address={sale.address}
+              >
+                {sale.address}
+              </AddressLink>
+            </div>
+          )}
+          {sale?.city && sale?.state && (
+            <div>
+              <AddressLink
+                lat={sale.lat ?? undefined}
+                lng={sale.lng ?? undefined}
+                address={`${sale.city}, ${sale.state}`}
+              >
+                {sale.city}, {sale.state}
+              </AddressLink>
+            </div>
+          )}
         </div>
         {sale?.date_start && (
           <div className="text-xs text-neutral-600">

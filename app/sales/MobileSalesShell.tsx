@@ -337,7 +337,7 @@ export default function MobileSalesShell({
             )}
             
             {!loading && visibleSales.length > 0 && (
-              <div className="p-4 transition-opacity duration-200 ease-in-out">
+              <div className="p-4">
                 <SalesList 
                   sales={visibleSales} 
                   _mode="grid" 

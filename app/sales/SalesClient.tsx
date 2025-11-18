@@ -65,6 +65,20 @@ export default function SalesClient({
   const zipNeedsResolution = urlZip && !urlLat && !urlLng && 
     (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== urlZip.trim())
   
+  // Distance to zoom level mapping (miles to zoom level)
+  // Zoom levels approximate: 8=~100mi, 9=~50mi, 10=~25mi, 11=~12mi, 12=~6mi, 13=~3mi, 14=~1.5mi, 15=~0.75mi
+  const distanceToZoom = (distance: number): number => {
+    if (distance <= 1) return 15  // Very close - high zoom
+    if (distance <= 2) return 14  // Close - high zoom
+    if (distance <= 5) return 13  // Medium-close - medium-high zoom
+    if (distance <= 10) return 12 // Medium - medium zoom
+    if (distance <= 15) return 11 // Medium-far - medium-low zoom
+    if (distance <= 25) return 10 // Far - low zoom
+    if (distance <= 50) return 9  // Very far - very low zoom
+    if (distance <= 75) return 8  // Extremely far - extremely low zoom
+    return 8 // Default for 100+ miles
+  }
+
   // Map view state - single source of truth
   // If ZIP needs resolution, wait before initializing map view to avoid showing wrong location
   // Otherwise, use effectiveCenter which should have been resolved server-side
@@ -73,16 +87,28 @@ export default function SalesClient({
       // ZIP needs client-side resolution - don't show map yet
       return null
     }
+    
+    // Calculate initial zoom from default distance filter (25 miles = zoom 10)
+    // Or use URL zoom if provided, or fallback to 10
+    const defaultDistance = 25 // matches DEFAULT_FILTERS.distance in useFilters
+    const calculatedZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(defaultDistance)
+    
+    // Calculate bounds based on zoom level (approximate)
+    // For zoom 10 (25 miles), use approximately 0.45 degree range (roughly 25 miles at mid-latitudes)
+    const zoomLevel = calculatedZoom
+    const latRange = zoomLevel === 10 ? 0.45 : zoomLevel === 12 ? 0.11 : zoomLevel === 11 ? 0.22 : 1.0
+    const lngRange = latRange * (effectiveCenter?.lat ? Math.cos(effectiveCenter.lat * Math.PI / 180) : 1)
+    
     // ZIP already resolved server-side or no ZIP - show map with correct location
     return {
       center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
       bounds: { 
-        west: (effectiveCenter?.lng || -98.5795) - 1.0, 
-        south: (effectiveCenter?.lat || 39.8283) - 1.0, 
-        east: (effectiveCenter?.lng || -98.5795) + 1.0, 
-        north: (effectiveCenter?.lat || 39.8283) + 1.0 
+        west: (effectiveCenter?.lng || -98.5795) - lngRange / 2, 
+        south: (effectiveCenter?.lat || 39.8283) - latRange / 2, 
+        east: (effectiveCenter?.lng || -98.5795) + lngRange / 2, 
+        north: (effectiveCenter?.lat || 39.8283) + latRange / 2
       },
-      zoom: urlZoom ? parseFloat(urlZoom) : 12
+      zoom: calculatedZoom
     }
   })
 
@@ -673,20 +699,6 @@ export default function SalesClient({
   const handleZipError = useCallback((error: string) => {
     setZipError(error)
   }, [])
-
-  // Distance to zoom level mapping (miles to zoom level)
-  // Zoom levels approximate: 8=~100mi, 9=~50mi, 10=~25mi, 11=~12mi, 12=~6mi, 13=~3mi, 14=~1.5mi, 15=~0.75mi
-  const distanceToZoom = (distance: number): number => {
-    if (distance <= 1) return 15  // Very close - high zoom
-    if (distance <= 2) return 14  // Close - high zoom
-    if (distance <= 5) return 13  // Medium-close - medium-high zoom
-    if (distance <= 10) return 12 // Medium - medium zoom
-    if (distance <= 15) return 11 // Medium-far - medium-low zoom
-    if (distance <= 25) return 10 // Far - low zoom
-    if (distance <= 50) return 9  // Very far - very low zoom
-    if (distance <= 75) return 8  // Extremely far - extremely low zoom
-    return 8 // Default for 100+ miles
-  }
 
   // Inverse function: zoom level to distance (miles)
   // This ensures the distance dropdown matches the actual zoom level on first load

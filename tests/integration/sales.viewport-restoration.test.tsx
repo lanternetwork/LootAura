@@ -40,8 +40,8 @@ const distanceToZoom = (distance: number): number => {
   return 8
 }
 
-const DEFAULT_DISTANCE = 25 // matches DEFAULT_FILTERS.distance in useFilters
-const DEFAULT_ZOOM = distanceToZoom(DEFAULT_DISTANCE) // 10
+const DEFAULT_DISTANCE = 10 // matches DEFAULT_FILTERS.distance in useFilters
+const DEFAULT_ZOOM = distanceToZoom(DEFAULT_DISTANCE) // 12
 
 describe('SalesClient Viewport Restoration', () => {
   beforeEach(() => {
@@ -100,7 +100,7 @@ describe('SalesClient Viewport Restoration', () => {
       const searchParams = useSearchParams()
       const urlZoom = searchParams.get('zoom')
 
-      // Default zoom is now 10 (matching 25-mile distance filter)
+      // Default zoom is now 12 (matching 10-mile distance filter)
       const zoom = urlZoom ? parseFloat(urlZoom) : DEFAULT_ZOOM
 
       expect(zoom).toBe(DEFAULT_ZOOM)
@@ -160,7 +160,7 @@ describe('SalesClient Viewport Restoration', () => {
         ? { lat: parseFloat(urlLat), lng: parseFloat(urlLng) }
         : null
 
-      // Default zoom is now 10 (matching 25-mile distance filter)
+      // Default zoom is now 12 (matching 10-mile distance filter)
       const zoom = urlZoom ? parseFloat(urlZoom) : DEFAULT_ZOOM
 
       // Should still use lat/lng but default zoom
@@ -224,7 +224,7 @@ describe('SalesClient Viewport Restoration', () => {
         : defaultCenter
 
       // Simulate mapView state initialization
-      // Default zoom is now 10 (matching 25-mile distance filter)
+      // Default zoom is now 12 (matching 10-mile distance filter)
       const mapView = {
         center: effectiveCenter,
         bounds: {
@@ -260,7 +260,7 @@ describe('SalesClient Viewport Restoration', () => {
       const parsedZoom = urlZoom ? parseFloat(urlZoom) : NaN
       const zoom = isNaN(parsedZoom) ? DEFAULT_ZOOM : parsedZoom
 
-      // Should fall back to default when zoom is invalid (now 10, matching 25-mile distance)
+      // Should fall back to default when zoom is invalid (now 12, matching 10-mile distance)
       expect(zoom).toBe(DEFAULT_ZOOM)
     })
 

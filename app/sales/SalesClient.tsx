@@ -88,15 +88,15 @@ export default function SalesClient({
       return null
     }
     
-    // Calculate initial zoom from default distance filter (25 miles = zoom 10)
-    // Or use URL zoom if provided, or fallback to 10
-    const defaultDistance = 25 // matches DEFAULT_FILTERS.distance in useFilters
+    // Calculate initial zoom from default distance filter (10 miles = zoom 12)
+    // Or use URL zoom if provided, or fallback to 12
+    const defaultDistance = 10 // matches DEFAULT_FILTERS.distance in useFilters
     const calculatedZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(defaultDistance)
     
     // Calculate bounds based on zoom level (approximate)
-    // For zoom 10 (25 miles), use approximately 0.45 degree range (roughly 25 miles at mid-latitudes)
+    // For zoom 12 (10 miles), use approximately 0.11 degree range (roughly 10 miles at mid-latitudes)
     const zoomLevel = calculatedZoom
-    const latRange = zoomLevel === 10 ? 0.45 : zoomLevel === 12 ? 0.11 : zoomLevel === 11 ? 0.22 : 1.0
+    const latRange = zoomLevel === 12 ? 0.11 : zoomLevel === 10 ? 0.45 : zoomLevel === 11 ? 0.22 : 1.0
     const lngRange = latRange * (effectiveCenter?.lat ? Math.cos(effectiveCenter.lat * Math.PI / 180) : 1)
     
     // ZIP already resolved server-side or no ZIP - show map with correct location

@@ -32,6 +32,7 @@ interface SimpleMapProps {
   attributionControl?: boolean // Show Mapbox attribution control (default: true)
   bottomSheetHeight?: number // Height of bottom sheet in pixels (for mobile) - used for map resizing and pin centering offset
   skipCenteringOnClick?: boolean // Skip centering behavior and immediately select on first click (for mobile)
+  onMapClick?: () => void // Callback when map is clicked (not on pins/markers)
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -52,7 +53,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   showOSMAttribution = true,
   attributionControl = true,
   bottomSheetHeight = 0,
-  skipCenteringOnClick = false
+  skipCenteringOnClick = false,
+  onMapClick
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -399,6 +401,16 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMoveEnd={handleMoveEnd}
+        onClick={(e) => {
+          // Only trigger onMapClick if clicking directly on the map canvas (not on markers/pins)
+          // Markers and pins have data attributes that we can check for
+          const target = e.originalEvent.target as HTMLElement
+          const isClickOnMarker = target.closest('[data-cluster-marker="true"], [data-location-marker="true"], [data-pin-marker="true"], [data-testid="cluster"], [data-testid="location-marker"]')
+          
+          if (!isClickOnMarker && onMapClick) {
+            onMapClick()
+          }
+        }}
         onError={(error: any) => {
           console.error('[SIMPLE_MAP] Map error:', error)
           setMapError('Unable to load map. Please check your connection and try again.')

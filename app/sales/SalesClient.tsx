@@ -333,15 +333,30 @@ export default function SalesClient({
             bbox: bbox
           })
         }
-        setMapSales(filtered)
-        setMapMarkers(filtered
-          .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
-          .map(sale => ({
-            id: sale.id,
-            title: sale.title,
-            lat: sale.lat!,
-            lng: sale.lng!
-          })))
+        // Merge with existing sales instead of replacing (for preloading)
+        setMapSales(prev => {
+          const merged = [...prev, ...filtered]
+          // Deduplicate by sale ID
+          const unique = merged.filter((sale, index, self) => 
+            index === self.findIndex(s => s.id === sale.id)
+          )
+          return unique
+        })
+        setMapMarkers(prev => {
+          const newMarkers = filtered
+            .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
+            .map(sale => ({
+              id: sale.id,
+              title: sale.title,
+              lat: sale.lat!,
+              lng: sale.lng!
+            }))
+          const merged = [...prev, ...newMarkers]
+          // Deduplicate by ID
+          return merged.filter((marker, index, self) => 
+            index === self.findIndex(m => m.id === marker.id)
+          )
+        })
       } else {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[FETCH] No data in response:', data)
@@ -362,6 +377,35 @@ export default function SalesClient({
       setLoading(false)
     }
   }, [filters.dateRange, filters.categories, deduplicateSales])
+
+  // Preloaded bounds - track the area we've already loaded sales for
+  const preloadedBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)
+  
+  // Helper function to calculate bbox for a radius in miles
+  const calculateRadiusBbox = useCallback((center: { lat: number; lng: number }, radiusMiles: number) => {
+    const radiusKm = radiusMiles * 1.60934 // Convert miles to km
+    const latRange = radiusKm / 111.0
+    const lngRange = radiusKm / (111.0 * Math.cos(center.lat * Math.PI / 180))
+    return {
+      west: center.lng - lngRange,
+      south: center.lat - latRange,
+      east: center.lng + lngRange,
+      north: center.lat + latRange
+    }
+  }, [])
+  
+  // Check if a bbox is within the preloaded bounds
+  const isWithinPreloadedBounds = useCallback((bbox: { west: number; south: number; east: number; north: number }) => {
+    if (!preloadedBoundsRef.current) return false
+    const preloaded = preloadedBoundsRef.current
+    // Check if the viewport bbox is completely within the preloaded bounds
+    return (
+      bbox.west >= preloaded.west &&
+      bbox.south >= preloaded.south &&
+      bbox.east <= preloaded.east &&
+      bbox.north <= preloaded.north
+    )
+  }, [])
 
   // Debounce timer for viewport changes
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -1036,6 +1080,11 @@ export default function SalesClient({
                       viewport: currentViewport!
                     }}
                     onViewportChange={handleDesktopViewportChange}
+                    onMapClick={() => {
+                      if (selectedPinId) {
+                        setSelectedPinId(null)
+                      }
+                    }}
                     attributionPosition="top-right"
                     showOSMAttribution={true}
                     attributionControl={false}

@@ -99,7 +99,6 @@ vi.mock('@/components/location/PinMarker', () => ({
 
 describe('SimpleMap Clusters Integration', () => {
   beforeEach(() => {
-    cleanup()
     vi.clearAllMocks()
   })
 
@@ -141,7 +140,6 @@ describe('SimpleMap Clusters Integration', () => {
       expect(screen.getAllByTestId('map')[0]).toBeInTheDocument()
 
       unmount()
-      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -160,7 +158,6 @@ describe('SimpleMap Clusters Integration', () => {
       }, { timeout: 10000 })
 
       unmount()
-      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -179,7 +176,6 @@ describe('SimpleMap Clusters Integration', () => {
       expect(screen.getAllByTestId('map')[0]).toBeInTheDocument()
 
       unmount()
-      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -204,7 +200,6 @@ describe('SimpleMap Clusters Integration', () => {
       expect(onPinClick).toHaveBeenCalledWith(testSales[0].id)
 
       unmount()
-      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_FEATURE_CLUSTERING = originalEnv
@@ -225,7 +220,6 @@ describe('SimpleMap Clusters Integration', () => {
       expect(onViewportChange).toBeDefined()
 
       unmount()
-      cleanup()
     })
   })
 
@@ -266,7 +260,6 @@ describe('SimpleMap Clusters Integration', () => {
       expect(markers.length).toBeGreaterThan(0)
 
       unmount()
-      cleanup()
     })
   })
 
@@ -282,7 +275,6 @@ describe('SimpleMap Clusters Integration', () => {
       expect(debugOverlay).toBeInTheDocument()
 
       unmount()
-      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_DEBUG = originalEnv
@@ -299,7 +291,6 @@ describe('SimpleMap Clusters Integration', () => {
       expect(debugOverlay).not.toBeInTheDocument()
 
       unmount()
-      cleanup()
 
       // Restore environment variable
       process.env.NEXT_PUBLIC_DEBUG = originalEnv

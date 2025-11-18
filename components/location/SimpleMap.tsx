@@ -74,11 +74,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     }
     
     // Check token format (should start with pk. for public tokens)
-    if (!token.startsWith('pk.') && !token.startsWith('sk.')) {
-      console.warn('[SIMPLE_MAP] Token format may be invalid. Expected pk.eyJ... or sk.eyJ...')
-    }
-    
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      if (!token.startsWith('pk.') && !token.startsWith('sk.')) {
+        console.warn('[SIMPLE_MAP] Token format may be invalid. Expected pk.eyJ... or sk.eyJ...')
+      }
       console.log('[SIMPLE_MAP] Token status:', {
         hasToken: !!token,
         tokenLength: token?.length || 0,

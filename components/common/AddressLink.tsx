@@ -13,7 +13,7 @@ interface AddressLinkProps {
 /**
  * Hybrid address linking component:
  * - Desktop: opens Google Maps
- * - Mobile: opens Apple Maps (universal link)
+ * - Mobile: opens Apple Maps navigation (universal link with daddr=)
  * 
  * Pure presentational component - no map state interaction
  */
@@ -38,8 +38,8 @@ export default function AddressLink({
 
   // Build aria-label for accessibility
   const ariaLabel = address 
-    ? `Open in Maps: ${address}`
-    : 'Open in Maps'
+    ? `Start navigation to: ${address}`
+    : 'Start navigation'
 
   const displayText = children ?? address ?? ''
 

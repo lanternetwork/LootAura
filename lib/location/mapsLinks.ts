@@ -27,7 +27,8 @@ export function buildGoogleMapsUrl(options: {
 }
 
 /**
- * Build an Apple Maps URL (universal link) for mobile
+ * Build an Apple Maps navigation URL (universal link) for mobile
+ * Uses daddr= parameter to open directly into turn-by-turn navigation
  */
 export function buildAppleMapsUrl(options: {
   lat?: number
@@ -38,12 +39,12 @@ export function buildAppleMapsUrl(options: {
 
   // Prefer coordinates if available
   if (typeof lat === 'number' && typeof lng === 'number') {
-    return `https://maps.apple.com/?ll=${lat},${lng}`
+    return `https://maps.apple.com/?daddr=${lat},${lng}`
   }
 
   // Fall back to address
   if (address) {
-    return `https://maps.apple.com/?q=${encodeURIComponent(address)}`
+    return `https://maps.apple.com/?daddr=${encodeURIComponent(address)}`
   }
 
   return ''

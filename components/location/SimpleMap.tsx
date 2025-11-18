@@ -153,7 +153,6 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   }, [loaded])
 
   // Throttle move events to update viewport during movement (not just on end)
-  const moveThrottleRef = useRef<NodeJS.Timeout | null>(null)
   const lastMoveTimeRef = useRef<number>(0)
   
   const handleMove = useCallback(() => {

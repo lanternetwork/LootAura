@@ -212,12 +212,18 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
     
     // Zoom to cluster expansion zoom level to break the cluster apart
-    map.flyTo({
+    const flyToOptions: any = {
       center: [cluster.lng, cluster.lat],
       zoom: finalZoom,
-      duration: 400,
-      offset: offsetY !== 0 ? [0, offsetY] : undefined
-    })
+      duration: 400
+    }
+    
+    // Only include offset if it's non-zero (for mobile bottom sheet)
+    if (offsetY !== 0) {
+      flyToOptions.offset = [0, offsetY]
+    }
+    
+    map.flyTo(flyToOptions)
     
     // Call the onClusterClick callback if provided
     pins?.onClusterClick?.(cluster)

@@ -65,13 +65,25 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   
   const token = getMapboxToken()
   
-  // Debug token status
+  // Validate token before map loads
   useEffect(() => {
+    if (!token || token.length === 0) {
+      console.error('[SIMPLE_MAP] No Mapbox token found. Please set NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN environment variable.')
+      setMapError('Map configuration error: Missing access token. Please contact support.')
+      return
+    }
+    
+    // Check token format (should start with pk. for public tokens)
+    if (!token.startsWith('pk.') && !token.startsWith('sk.')) {
+      console.warn('[SIMPLE_MAP] Token format may be invalid. Expected pk.eyJ... or sk.eyJ...')
+    }
+    
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SIMPLE_MAP] Token status:', {
         hasToken: !!token,
         tokenLength: token?.length || 0,
-        tokenPrefix: token?.substring(0, 10) + '...' || 'none'
+        tokenPrefix: token?.substring(0, 15) + '...' || 'none',
+        tokenFormat: token.startsWith('pk.') ? 'public' : token.startsWith('sk.') ? 'secret' : 'unknown'
       })
     }
   }, [token])
@@ -425,13 +437,38 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onClick={handleMapClick}
         onError={(error: any) => {
           console.error('[SIMPLE_MAP] Map error:', error)
-          setMapError('Unable to load map. Please check your connection and try again.')
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SIMPLE_MAP] Token for debugging:', {
-              hasToken: !!token,
-              tokenLength: token?.length || 0
-            })
+          
+          // Extract more details from the error
+          const errorMessage = error?.message || error?.error?.message || String(error) || ''
+          const errorType = error?.type || error?.error?.type || 'unknown'
+          
+          // Check if it's a token-related error
+          const isTokenError = !token || token.length === 0 || 
+                               errorMessage?.toLowerCase().includes('token') ||
+                               errorMessage?.toLowerCase().includes('unauthorized') ||
+                               errorMessage?.toLowerCase().includes('401') ||
+                               errorType === 'StyleLoadError'
+          
+          // Provide more specific error message
+          let userMessage = 'Unable to load map. Please check your connection and try again.'
+          if (isTokenError) {
+            userMessage = 'Map configuration error. Please contact support if this persists.'
+          } else if (errorMessage?.includes('network') || errorMessage?.includes('connection') || errorMessage?.includes('ERR_CONNECTION')) {
+            userMessage = 'Network error. Please check your internet connection and try again.'
           }
+          
+          setMapError(userMessage)
+          
+          // Always log detailed error info in console for debugging
+          console.error('[SIMPLE_MAP] Detailed error info:', {
+            error,
+            errorMessage,
+            errorType,
+            hasToken: !!token,
+            tokenLength: token?.length || 0,
+            tokenPrefix: token?.substring(0, 15) + '...' || 'none',
+            isTokenError
+          })
         }}
         dragPan={interactive}
         dragRotate={interactive}

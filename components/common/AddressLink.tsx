@@ -50,7 +50,7 @@ export default function AddressLink({
         href={googleUrl || '#'}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${className} hidden md:inline`}
+        className={`${className} hidden md:inline hover:underline cursor-pointer`}
         aria-label={ariaLabel}
       >
         {displayText}
@@ -61,7 +61,7 @@ export default function AddressLink({
         href={appleUrl || '#'}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${className} inline md:hidden`}
+        className={`${className} inline md:hidden hover:underline cursor-pointer`}
         aria-label={ariaLabel}
       >
         {displayText}

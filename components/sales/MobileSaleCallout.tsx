@@ -17,6 +17,11 @@ interface MobileSaleCalloutProps {
 /**
  * Small callout card that appears at the bottom of the map when a sale pin is selected on mobile.
  * This replaces the large bottom tray for a more minimal, map-focused experience.
+ * 
+ * Features:
+ * - Compact design with image, title, address, and action button
+ * - Swipe-to-dismiss gesture support
+ * - Positioned relative to pin location when available
  */
 export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPosition }: MobileSaleCalloutProps) {
   const router = useRouter()

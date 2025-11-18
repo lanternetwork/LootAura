@@ -382,7 +382,8 @@ export default function SalesClient({
   const preloadedBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)
   
   // Helper function to calculate bbox for a radius in miles
-  const calculateRadiusBbox = useCallback((center: { lat: number; lng: number }, radiusMiles: number) => {
+  // TODO: Use this when implementing preloading feature
+  const _calculateRadiusBbox = useCallback((center: { lat: number; lng: number }, radiusMiles: number) => {
     const radiusKm = radiusMiles * 1.60934 // Convert miles to km
     const latRange = radiusKm / 111.0
     const lngRange = radiusKm / (111.0 * Math.cos(center.lat * Math.PI / 180))
@@ -395,7 +396,8 @@ export default function SalesClient({
   }, [])
   
   // Check if a bbox is within the preloaded bounds
-  const isWithinPreloadedBounds = useCallback((bbox: { west: number; south: number; east: number; north: number }) => {
+  // TODO: Use this when implementing preloading feature
+  const _isWithinPreloadedBounds = useCallback((bbox: { west: number; south: number; east: number; north: number }) => {
     if (!preloadedBoundsRef.current) return false
     const preloaded = preloadedBoundsRef.current
     // Check if the viewport bbox is completely within the preloaded bounds

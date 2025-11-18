@@ -168,15 +168,45 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         )}
 
         {/* Card content */}
-        <div className={`flex flex-col ${pinPosition ? 'p-3' : 'p-4'}`}>
-          {/* Title and info section - full width at top */}
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <div className="flex-1 min-w-0">
-              <h3 className="text-base font-semibold line-clamp-2 mb-1">
-                {sale.title || `Sale ${sale.id}`}
-              </h3>
+        <div className={`flex flex-col ${pinPosition ? 'p-0' : 'p-0'} overflow-hidden`}>
+          {/* Image at top - full width */}
+          <div className="relative w-full h-32 bg-gray-100">
+            {cover ? (
+              <Image
+                src={cover.url}
+                alt={cover.alt}
+                fill
+                sizes="(max-width: 400px) 100vw, 400px"
+                className="object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <SalePlaceholder className="w-full h-full opacity-60" />
+              </div>
+            )}
+            {/* Close button overlay on image */}
+            <button
+              onClick={onDismiss}
+              className="absolute top-2 right-2 bg-white/90 hover:bg-white text-gray-600 rounded-full min-w-[32px] min-h-[32px] flex items-center justify-center shadow-sm transition-colors"
+              aria-label="Close"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Content section */}
+          <div className={`flex flex-col ${pinPosition ? 'p-3' : 'p-4'}`}>
+            {/* Title */}
+            <h3 className="text-base font-semibold line-clamp-2 mb-2">
+              {sale.title || `Sale ${sale.id}`}
+            </h3>
+
+            {/* Address and date */}
+            <div className="space-y-1 mb-3">
               {sale.address && (
-                <p className="text-xs text-gray-600 line-clamp-1 mb-1">
+                <p className="text-xs text-gray-600 line-clamp-1">
                   {sale.address}
                   {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
                 </p>
@@ -187,41 +217,11 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                 </p>
               )}
             </div>
-            {/* Close button */}
-            <button
-              onClick={onDismiss}
-              className="flex-shrink-0 text-gray-400 hover:text-gray-600 min-w-[32px] min-h-[32px] flex items-center justify-center"
-              aria-label="Close"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
 
-          {/* Image and button section - aligned at bottom */}
-          <div className="flex gap-3 items-end">
-            {/* Thumbnail */}
-            <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-              {cover ? (
-                <Image
-                  src={cover.url}
-                  alt={cover.alt}
-                  fill
-                  sizes="80px"
-                  className="object-cover"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <SalePlaceholder className="w-full h-full opacity-60" />
-                </div>
-              )}
-            </div>
-
-            {/* Action button - aligned with image bottom */}
+            {/* Action button - full width, normal height */}
             <button
               onClick={handleViewSale}
-              className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2 rounded-lg transition-colors text-sm h-20"
+              className="w-full bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-3 rounded-lg transition-colors text-sm"
             >
               View Sale
             </button>

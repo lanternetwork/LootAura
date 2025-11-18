@@ -27,6 +27,22 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/sales',
 }))
 
+// Helper function to match SalesClient's distanceToZoom logic
+const distanceToZoom = (distance: number): number => {
+  if (distance <= 1) return 15
+  if (distance <= 2) return 14
+  if (distance <= 5) return 13
+  if (distance <= 10) return 12
+  if (distance <= 15) return 11
+  if (distance <= 25) return 10
+  if (distance <= 50) return 9
+  if (distance <= 75) return 8
+  return 8
+}
+
+const DEFAULT_DISTANCE = 25 // matches DEFAULT_FILTERS.distance in useFilters
+const DEFAULT_ZOOM = distanceToZoom(DEFAULT_DISTANCE) // 10
+
 describe('SalesClient Viewport Restoration', () => {
   beforeEach(() => {
     mockSearchParams.clear()
@@ -84,9 +100,10 @@ describe('SalesClient Viewport Restoration', () => {
       const searchParams = useSearchParams()
       const urlZoom = searchParams.get('zoom')
 
-      const zoom = urlZoom ? parseFloat(urlZoom) : 12
+      // Default zoom is now 10 (matching 25-mile distance filter)
+      const zoom = urlZoom ? parseFloat(urlZoom) : DEFAULT_ZOOM
 
-      expect(zoom).toBe(12)
+      expect(zoom).toBe(DEFAULT_ZOOM)
     })
   })
 
@@ -143,14 +160,15 @@ describe('SalesClient Viewport Restoration', () => {
         ? { lat: parseFloat(urlLat), lng: parseFloat(urlLng) }
         : null
 
-      const zoom = urlZoom ? parseFloat(urlZoom) : 12
+      // Default zoom is now 10 (matching 25-mile distance filter)
+      const zoom = urlZoom ? parseFloat(urlZoom) : DEFAULT_ZOOM
 
       // Should still use lat/lng but default zoom
       expect(effectiveCenter).toEqual({
         lat: 38.2527,
         lng: -85.7585
       })
-      expect(zoom).toBe(12)
+      expect(zoom).toBe(DEFAULT_ZOOM)
     })
   })
 
@@ -206,6 +224,7 @@ describe('SalesClient Viewport Restoration', () => {
         : defaultCenter
 
       // Simulate mapView state initialization
+      // Default zoom is now 10 (matching 25-mile distance filter)
       const mapView = {
         center: effectiveCenter,
         bounds: {
@@ -214,11 +233,11 @@ describe('SalesClient Viewport Restoration', () => {
           east: effectiveCenter.lng + 1.0,
           north: effectiveCenter.lat + 1.0
         },
-        zoom: urlZoom ? parseFloat(urlZoom) : 12
+        zoom: urlZoom ? parseFloat(urlZoom) : DEFAULT_ZOOM
       }
 
       expect(mapView.center).toEqual(defaultCenter)
-      expect(mapView.zoom).toBe(12)
+      expect(mapView.zoom).toBe(DEFAULT_ZOOM)
     })
   })
 
@@ -239,10 +258,10 @@ describe('SalesClient Viewport Restoration', () => {
 
       // Handle invalid zoom values - parseFloat returns NaN for invalid input
       const parsedZoom = urlZoom ? parseFloat(urlZoom) : NaN
-      const zoom = isNaN(parsedZoom) ? 12 : parsedZoom
+      const zoom = isNaN(parsedZoom) ? DEFAULT_ZOOM : parsedZoom
 
-      // Should fall back to default when zoom is invalid
-      expect(zoom).toBe(12)
+      // Should fall back to default when zoom is invalid (now 10, matching 25-mile distance)
+      expect(zoom).toBe(DEFAULT_ZOOM)
     })
 
     it('should handle zero zoom level', () => {

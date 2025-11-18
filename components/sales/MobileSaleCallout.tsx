@@ -168,9 +168,9 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         )}
 
         {/* Card content */}
-        <div className={`flex flex-col ${pinPosition ? 'p-0' : 'p-0'} overflow-hidden`}>
+        <div className={`flex flex-col ${pinPosition ? 'p-0' : 'p-0'} overflow-hidden ${pinPosition ? 'rounded-2xl' : 'rounded-t-2xl'}`}>
           {/* Image at top - full width, half size */}
-          <div className="relative w-full h-16 bg-gray-100">
+          <div className={`relative w-full h-16 bg-gray-100 ${pinPosition ? 'rounded-t-2xl' : 'rounded-t-2xl'} overflow-hidden`}>
             {cover ? (
               <Image
                 src={cover.url}

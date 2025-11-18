@@ -168,59 +168,60 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         )}
 
         {/* Card content */}
-        <div className={`flex gap-3 ${pinPosition ? 'p-3' : 'p-4'}`}>
-          {/* Thumbnail */}
-          <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-            {cover ? (
-              <Image
-                src={cover.url}
-                alt={cover.alt}
-                fill
-                sizes="80px"
-                className="object-cover"
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <SalePlaceholder className="w-full h-full opacity-60" />
-              </div>
-            )}
+        <div className={`flex flex-col ${pinPosition ? 'p-3' : 'p-4'}`}>
+          {/* Title and info section - full width at top */}
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-base font-semibold line-clamp-2 mb-1">
+                {sale.title || `Sale ${sale.id}`}
+              </h3>
+              {sale.address && (
+                <p className="text-xs text-gray-600 line-clamp-1 mb-1">
+                  {sale.address}
+                  {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
+                </p>
+              )}
+              {sale.date_start && (
+                <p className="text-xs text-gray-500">
+                  {formatDate(sale.date_start, sale.time_start)}
+                </p>
+              )}
+            </div>
+            {/* Close button */}
+            <button
+              onClick={onDismiss}
+              className="flex-shrink-0 text-gray-400 hover:text-gray-600 min-w-[32px] min-h-[32px] flex items-center justify-center"
+              aria-label="Close"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
-          {/* Sale info */}
-          <div className="flex-1 min-w-0 flex flex-col justify-between">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold line-clamp-1 mb-1">
-                  {sale.title || `Sale ${sale.id}`}
-                </h3>
-              </div>
-              {/* Close button */}
-              <button
-                onClick={onDismiss}
-                className="flex-shrink-0 text-gray-400 hover:text-gray-600 min-w-[32px] min-h-[32px] flex items-center justify-center"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+          {/* Image and button section - aligned at bottom */}
+          <div className="flex gap-3 items-end">
+            {/* Thumbnail */}
+            <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+              {cover ? (
+                <Image
+                  src={cover.url}
+                  alt={cover.alt}
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <SalePlaceholder className="w-full h-full opacity-60" />
+                </div>
+              )}
             </div>
-            {sale.address && (
-              <p className="text-xs text-gray-600 line-clamp-1 mb-1">
-                {sale.address}
-                {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
-              </p>
-            )}
-            {sale.date_start && (
-              <p className="text-xs text-gray-500 mb-2">
-                {formatDate(sale.date_start, sale.time_start)}
-              </p>
-            )}
-            
-            {/* Action button */}
+
+            {/* Action button - aligned with image bottom */}
             <button
               onClick={handleViewSale}
-              className="mt-2 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2 rounded-lg transition-colors text-sm w-full"
+              className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2 rounded-lg transition-colors text-sm h-20"
             >
               View Sale
             </button>

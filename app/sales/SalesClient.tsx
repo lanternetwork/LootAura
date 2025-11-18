@@ -16,6 +16,14 @@ import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
 import { useHasOverflow } from '@/lib/hooks/useHasOverflow'
 import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
+import { 
+  expandBounds, 
+  isViewportInsideBounds, 
+  filterSalesForViewport,
+  type Bounds,
+  MAP_BUFFER_FACTOR,
+  MAP_BUFFER_SAFETY_FACTOR
+} from '@/lib/map/bounds'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -57,6 +65,20 @@ export default function SalesClient({
   const zipNeedsResolution = urlZip && !urlLat && !urlLng && 
     (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== urlZip.trim())
   
+  // Distance to zoom level mapping (miles to zoom level)
+  // Zoom levels approximate: 8=~100mi, 9=~50mi, 10=~25mi, 11=~12mi, 12=~6mi, 13=~3mi, 14=~1.5mi, 15=~0.75mi
+  const distanceToZoom = (distance: number): number => {
+    if (distance <= 1) return 15  // Very close - high zoom
+    if (distance <= 2) return 14  // Close - high zoom
+    if (distance <= 5) return 13  // Medium-close - medium-high zoom
+    if (distance <= 10) return 12 // Medium - medium zoom
+    if (distance <= 15) return 11 // Medium-far - medium-low zoom
+    if (distance <= 25) return 10 // Far - low zoom
+    if (distance <= 50) return 9  // Very far - very low zoom
+    if (distance <= 75) return 8  // Extremely far - extremely low zoom
+    return 8 // Default for 100+ miles
+  }
+
   // Map view state - single source of truth
   // If ZIP needs resolution, wait before initializing map view to avoid showing wrong location
   // Otherwise, use effectiveCenter which should have been resolved server-side
@@ -65,22 +87,38 @@ export default function SalesClient({
       // ZIP needs client-side resolution - don't show map yet
       return null
     }
+    
+    // Calculate initial zoom from default distance filter (10 miles = zoom 12)
+    // Or use URL zoom if provided, or fallback to 12
+    const defaultDistance = 10 // matches DEFAULT_FILTERS.distance in useFilters
+    const calculatedZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(defaultDistance)
+    
+    // Calculate bounds based on zoom level (approximate)
+    // For zoom 12 (10 miles), use approximately 0.11 degree range (roughly 10 miles at mid-latitudes)
+    const zoomLevel = calculatedZoom
+    const latRange = zoomLevel === 12 ? 0.11 : zoomLevel === 10 ? 0.45 : zoomLevel === 11 ? 0.22 : 1.0
+    const lngRange = latRange * (effectiveCenter?.lat ? Math.cos(effectiveCenter.lat * Math.PI / 180) : 1)
+    
     // ZIP already resolved server-side or no ZIP - show map with correct location
     return {
       center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
       bounds: { 
-        west: (effectiveCenter?.lng || -98.5795) - 1.0, 
-        south: (effectiveCenter?.lat || 39.8283) - 1.0, 
-        east: (effectiveCenter?.lng || -98.5795) + 1.0, 
-        north: (effectiveCenter?.lat || 39.8283) + 1.0 
+        west: (effectiveCenter?.lng || -98.5795) - lngRange / 2, 
+        south: (effectiveCenter?.lat || 39.8283) - latRange / 2, 
+        east: (effectiveCenter?.lng || -98.5795) + lngRange / 2, 
+        north: (effectiveCenter?.lat || 39.8283) + latRange / 2
       },
-      zoom: urlZoom ? parseFloat(urlZoom) : 12
+      zoom: calculatedZoom
     }
   })
 
   // Sales data state - map is source of truth
-  const [mapSales, setMapSales] = useState<Sale[]>(initialSales)
+  // fetchedSales: All sales for the buffered area (larger than viewport)
+  // visibleSales: Subset of fetchedSales that intersect current viewport (computed via useMemo)
+  const [fetchedSales, setFetchedSales] = useState<Sale[]>(initialSales)
+  const [bufferedBounds, setBufferedBounds] = useState<Bounds | null>(null)
   const [loading, setLoading] = useState(false)
+  const [isFetching, setIsFetching] = useState(false) // Track if a fetch is in progress
   
   // Track deleted sale IDs to filter them out immediately
   const deletedSaleIdsRef = useRef<Set<string>>(new Set())
@@ -101,8 +139,8 @@ export default function SalesClient({
       if (detail?.type === 'delete' && detail?.id) {
         // Mark sale as deleted
         deletedSaleIdsRef.current.add(detail.id)
-        // Remove from mapSales immediately
-        setMapSales((prev) => prev.filter((s) => s.id !== detail.id))
+        // Remove from fetchedSales immediately
+        setFetchedSales((prev) => prev.filter((s) => s.id !== detail.id))
       } else if (detail?.type === 'create' && detail?.id) {
         // Remove from deleted set if it was recreated
         deletedSaleIdsRef.current.delete(detail.id)
@@ -119,6 +157,24 @@ export default function SalesClient({
   const filterDeletedSales = useCallback((sales: Sale[]) => {
     return sales.filter((sale) => !deletedSaleIdsRef.current.has(sale.id))
   }, [])
+  
+  // Initialize bufferedBounds if we have initial sales and map view
+  // This prevents unnecessary refetch on first viewport change
+  useEffect(() => {
+    if (initialSales.length > 0 && mapView?.bounds && !bufferedBounds) {
+      // Estimate that initial sales were fetched for a buffered area around initial viewport
+      const initialBufferedBounds = expandBounds({
+        west: mapView.bounds.west,
+        south: mapView.bounds.south,
+        east: mapView.bounds.east,
+        north: mapView.bounds.north
+      }, MAP_BUFFER_FACTOR)
+      setBufferedBounds(initialBufferedBounds)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[BUFFER] Initialized bufferedBounds from initial sales:', initialBufferedBounds)
+      }
+    }
+  }, [initialSales.length, mapView?.bounds, bufferedBounds])
   
   useEffect(() => {
     const handleResize = () => {
@@ -164,10 +220,30 @@ export default function SalesClient({
     }
   }, [mapView?.bounds, mapView?.zoom])
 
+  // Compute viewport bounds object for buffer utilities
+  const viewportBounds = useMemo((): Bounds | null => {
+    if (!mapView?.bounds) return null
+    return {
+      west: mapView.bounds.west,
+      south: mapView.bounds.south,
+      east: mapView.bounds.east,
+      north: mapView.bounds.north
+    }
+  }, [mapView?.bounds])
+
+  // Derive visibleSales from fetchedSales filtered by current viewport
+  // This is the key to smooth panning - we filter locally without refetching
+  const visibleSales = useMemo(() => {
+    if (!viewportBounds || fetchedSales.length === 0) {
+      return []
+    }
+    return filterSalesForViewport(fetchedSales, viewportBounds)
+  }, [fetchedSales, viewportBounds])
+
   // Hybrid system: Create location groups and apply clustering
   const hybridResult = useMemo(() => {
     // Early return for empty sales - no need to run clustering
-    if (!currentViewport || mapSales.length === 0) {
+    if (!currentViewport || visibleSales.length === 0) {
       return {
         type: 'individual' as const,
         pins: [],
@@ -176,32 +252,12 @@ export default function SalesClient({
       }
     }
     
-    // Do not hide pins during fetch; always render using last-known mapSales
+    // Do not hide pins during fetch; always render using last-known fetchedSales
     
     // Allow clustering regardless of small dataset size to prevent initial pin gaps
     
-    // Filter sales to only those within the current viewport bounds
-    const visibleSales = mapSales.filter(sale => {
-      if (typeof sale.lat !== 'number' || typeof sale.lng !== 'number') return false
-      
-      return sale.lat >= currentViewport.bounds[1] && // south
-             sale.lat <= currentViewport.bounds[3] && // north
-             sale.lng >= currentViewport.bounds[0] && // west
-             sale.lng <= currentViewport.bounds[2]    // east
-    })
-    
-    // Skip clustering if no visible sales
-    if (visibleSales.length === 0) {
-      return {
-        type: 'individual' as const,
-        pins: [],
-        locations: [],
-        clusters: []
-      }
-    }
-    
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', mapSales.length, 'total')
+      console.log('[HYBRID] Clustering', visibleSales.length, 'visible sales out of', fetchedSales.length, 'total fetched')
     }
     
     // Only run clustering on visible sales - touch-only clustering
@@ -221,12 +277,12 @@ export default function SalesClient({
         pinsCount: result.pins.length,
         locationsCount: result.locations.length,
         visibleSalesCount: visibleSales.length,
-        totalSalesCount: mapSales.length
+        totalFetchedCount: fetchedSales.length
       })
     }
     
     return result
-  }, [mapSales, currentViewport, loading])
+  }, [visibleSales, currentViewport, fetchedSales.length])
 
   // Request cancellation for preventing race conditions
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -234,8 +290,9 @@ export default function SalesClient({
   // Track API calls for debugging single fetch path
   const apiCallCounterRef = useRef(0)
 
-  // Fetch sales based on map viewport bbox
-  const fetchMapSales = useCallback(async (bbox: { west: number; south: number; east: number; north: number }, customFilters?: any) => {
+  // Fetch sales based on buffered bounds (not tight viewport)
+  // This function now receives bufferedBounds, which are larger than the viewport
+  const fetchMapSales = useCallback(async (bufferedBbox: Bounds, customFilters?: any) => {
     // Cancel any in-flight request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -249,26 +306,31 @@ export default function SalesClient({
     const callId = apiCallCounterRef.current
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[FETCH] fetchMapSales called with bbox:', bbox)
-      console.log('[FETCH] API Call #' + callId + ' - Single fetch path verification')
-      console.log('[FETCH] Bbox range:', {
-        latRange: bbox.north - bbox.south,
-        lngRange: bbox.east - bbox.west,
+      console.log('[FETCH] fetchMapSales called with buffered bbox:', bufferedBbox)
+      console.log('[FETCH] API Call #' + callId + ' - Buffered fetch')
+      console.log('[FETCH] Buffered bbox range:', {
+        latRange: bufferedBbox.north - bufferedBbox.south,
+        lngRange: bufferedBbox.east - bufferedBbox.west,
         center: {
-          lat: (bbox.north + bbox.south) / 2,
-          lng: (bbox.east + bbox.west) / 2
+          lat: (bufferedBbox.north + bufferedBbox.south) / 2,
+          lng: (bufferedBbox.east + bufferedBbox.west) / 2
         }
       })
     }
     
-    setLoading(true)
+    // Set fetching state but keep old data visible
+    setIsFetching(true)
+    // Only set loading=true on initial load (when fetchedSales is empty)
+    if (fetchedSales.length === 0) {
+      setLoading(true)
+    }
 
     try {
       const params = new URLSearchParams()
-      params.set('north', bbox.north.toString())
-      params.set('south', bbox.south.toString())
-      params.set('east', bbox.east.toString())
-      params.set('west', bbox.west.toString())
+      params.set('north', bufferedBbox.north.toString())
+      params.set('south', bufferedBbox.south.toString())
+      params.set('east', bufferedBbox.east.toString())
+      params.set('west', bufferedBbox.west.toString())
       
       const activeFilters = customFilters || filters
       
@@ -280,16 +342,16 @@ export default function SalesClient({
       }
       // Distance parameter removed - map zoom controls visible area
       
-      // Request more sales to show all pins in viewport
+      // Request more sales to show all pins in buffered area
       params.set('limit', '200')
       
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[FETCH] API URL:', `/api/sales?${params.toString()}`)
-        console.log('[FETCH] Viewport fetch with bbox:', bbox)
-        console.log('[FETCH] Bbox area (degrees):', {
-          latRange: bbox.north - bbox.south,
-          lngRange: bbox.east - bbox.west,
-          area: (bbox.north - bbox.south) * (bbox.east - bbox.west)
+        console.log('[FETCH] Buffered fetch with bbox:', bufferedBbox)
+        console.log('[FETCH] Buffered bbox area (degrees):', {
+          latRange: bufferedBbox.north - bufferedBbox.south,
+          lngRange: bufferedBbox.east - bufferedBbox.west,
+          area: (bufferedBbox.north - bufferedBbox.south) * (bufferedBbox.east - bufferedBbox.west)
         })
       }
 
@@ -318,7 +380,7 @@ export default function SalesClient({
             distanceKm: data.distanceKm,
             degraded: data.degraded,
             totalCount: data.totalCount,
-            bbox: bbox
+            bufferedBbox: bufferedBbox
           })
         }
         
@@ -330,18 +392,17 @@ export default function SalesClient({
             raw: data.data.length, 
             deduplicated: deduplicated.length,
             filtered: filtered.length,
-            bbox: bbox
+            bufferedBbox: bufferedBbox
           })
         }
-        // Merge with existing sales instead of replacing (for preloading)
-        setMapSales(prev => {
-          const merged = [...prev, ...filtered]
-          // Deduplicate by sale ID
-          const unique = merged.filter((sale, index, self) => 
-            index === self.findIndex(s => s.id === sale.id)
-          )
-          return unique
-        })
+        
+        // Replace fetchedSales with new data for this buffered area
+        // This replaces the old buffered data, not merging (we want clean buffer boundaries)
+        setFetchedSales(filtered)
+        
+        // Update bufferedBounds to track what area we fetched
+        setBufferedBounds(bufferedBbox)
+        
         setMapMarkers(prev => {
           const newMarkers = filtered
             .filter(sale => typeof sale.lat === 'number' && typeof sale.lng === 'number')
@@ -361,8 +422,11 @@ export default function SalesClient({
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[FETCH] No data in response:', data)
         }
-        setMapSales([])
-        setMapMarkers([])
+        // Only clear if this was the initial load, otherwise keep old data
+        if (fetchedSales.length === 0) {
+          setFetchedSales([])
+          setMapMarkers([])
+        }
       }
     } catch (error) {
       // Don't log errors for aborted requests
@@ -373,10 +437,15 @@ export default function SalesClient({
         return
       }
       console.error('[FETCH] Map sales error:', error)
+      // On error, only clear if no data exists, otherwise keep old data visible
+      if (fetchedSales.length === 0) {
+        setFetchedSales([])
+      }
     } finally {
       setLoading(false)
+      setIsFetching(false)
     }
-  }, [filters.dateRange, filters.categories, deduplicateSales])
+  }, [filters.dateRange, filters.categories, deduplicateSales, filterDeletedSales, fetchedSales.length])
 
   // Preloaded bounds - track the area we've already loaded sales for
   const preloadedBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)
@@ -415,17 +484,26 @@ export default function SalesClient({
   const initialLoadRef = useRef(true) // Track if this is the initial load
 
   // Handle viewport changes from SimpleMap
+  // Core buffer logic: only fetch when viewport exits buffered area
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
+    const viewportBounds: Bounds = {
+      west: bounds.west,
+      south: bounds.south,
+      east: bounds.east,
+      north: bounds.north
+    }
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SALES] handleViewportChange called with:', {
         center,
         zoom,
-        bounds,
+        bounds: viewportBounds,
         boundsRange: {
           latRange: bounds.north - bounds.south,
           lngRange: bounds.east - bounds.west
-        }
+        },
+        bufferedBounds,
+        isInsideBuffer: bufferedBounds ? isViewportInsideBounds(viewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR) : false
       })
     }
     
@@ -476,33 +554,43 @@ export default function SalesClient({
       }
     })
 
+    // Buffer-based fetch logic: only fetch when viewport exits buffered area
     // Clear existing timer
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current)
     }
     
-    // Debounce fetch by 200ms to balance responsiveness and prevent excessive API calls
+    // Debounce buffer check by 200ms to balance responsiveness
     debounceTimerRef.current = setTimeout(() => {
-      // Skip second API call during initial load (map settling)
-      if (initialLoadRef.current && lastBoundsRef.current) {
+      // Check if we need to fetch based on buffer
+      const needsFetch = !bufferedBounds || !isViewportInsideBounds(viewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR)
+      
+      if (needsFetch) {
+        // Compute new buffered bounds around current viewport
+        const newBufferedBounds = expandBounds(viewportBounds, MAP_BUFFER_FACTOR)
+        
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES] Skipping second API call during initial load (map settling)')
+          console.log('[SALES] Viewport outside buffer - fetching new buffered area:', {
+            viewportBounds,
+            oldBufferedBounds: bufferedBounds,
+            newBufferedBounds
+          })
         }
-        initialLoadRef.current = false // Mark initial load as complete
-        return
+        
+        // Fetch with buffered bounds (larger than viewport)
+        fetchMapSales(newBufferedBounds)
+      } else {
+        // Viewport is inside buffer - no fetch needed
+        // visibleSales will be automatically computed from fetchedSales via useMemo
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SALES] Viewport inside buffer - using cached data, no fetch')
+        }
       }
       
-      // Always allow fetch on pan/zoom; debounce above prevents spam.
-      
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES] Debounced fetchMapSales called with bounds:', bounds)
-        console.log('[SALES] Entry point: VIEWPORT_CHANGE - Single fetch verification')
-      }
       lastBoundsRef.current = bounds
       initialLoadRef.current = false // Mark initial load as complete
-      fetchMapSales(bounds)
     }, 200)
-  }, [fetchMapSales, selectedPinId, hybridResult])
+  }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {
@@ -612,20 +700,6 @@ export default function SalesClient({
     setZipError(error)
   }, [])
 
-  // Distance to zoom level mapping (miles to zoom level)
-  // Zoom levels approximate: 8=~100mi, 9=~50mi, 10=~25mi, 11=~12mi, 12=~6mi, 13=~3mi, 14=~1.5mi, 15=~0.75mi
-  const distanceToZoom = (distance: number): number => {
-    if (distance <= 1) return 15  // Very close - high zoom
-    if (distance <= 2) return 14  // Close - high zoom
-    if (distance <= 5) return 13  // Medium-close - medium-high zoom
-    if (distance <= 10) return 12 // Medium - medium zoom
-    if (distance <= 15) return 11 // Medium-far - medium-low zoom
-    if (distance <= 25) return 10 // Far - low zoom
-    if (distance <= 50) return 9  // Very far - very low zoom
-    if (distance <= 75) return 8  // Extremely far - extremely low zoom
-    return 8 // Default for 100+ miles
-  }
-
   // Inverse function: zoom level to distance (miles)
   // This ensures the distance dropdown matches the actual zoom level on first load
   const zoomToDistance = (zoom: number): number => {
@@ -678,7 +752,8 @@ export default function SalesClient({
       return
     }
     
-    // For other filter changes, trigger single fetch with current bounds
+    // For other filter changes (date, categories), treat as new dataset
+    // Reset buffer and fetch new buffered area with new filters
     updateFilters(newFilters) // Keep URL update for filter state
     
     // Track Clarity event for filter update
@@ -691,12 +766,26 @@ export default function SalesClient({
     })
     
     if (mapView?.bounds) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[FILTERS] Triggering single fetch with new filters:', newFilters)
-        console.log('[FILTERS] Entry point: FILTER_CHANGE - Single fetch verification')
+      // Compute buffered bounds from current viewport
+      const viewportBounds: Bounds = {
+        west: mapView.bounds.west,
+        south: mapView.bounds.south,
+        east: mapView.bounds.east,
+        north: mapView.bounds.north
       }
-      setLoading(true) // Show loading state immediately
-      fetchMapSales(mapView.bounds, newFilters)
+      const newBufferedBounds = expandBounds(viewportBounds, MAP_BUFFER_FACTOR)
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[FILTERS] Filter change - fetching new buffered area with filters:', {
+          newFilters,
+          viewportBounds,
+          newBufferedBounds
+        })
+      }
+      
+      // Fetch with buffered bounds and new filters
+      // Old data stays visible during fetch (no clearing)
+      fetchMapSales(newBufferedBounds, newFilters)
     }
   }
 
@@ -798,39 +887,26 @@ export default function SalesClient({
     }
   }, [searchParams, hasRestoredZip, urlLat, urlLng, initialCenter, handleZipLocationFound, handleZipError])
 
-  // Memoized visible sales - filtered by current viewport bounds to match map pins
-  // Note: selectedPinId is only used for the callout card, not for filtering the sales list
-  const visibleSales = useMemo(() => {
-    // Filter sales to only those within the current viewport bounds (same as map pins)
-    if (!currentViewport) {
-      return []
-    }
-    
-    const viewportFilteredSales = mapSales.filter(sale => {
-      if (typeof sale.lat !== 'number' || typeof sale.lng !== 'number') return false
-      
-      return sale.lat >= currentViewport.bounds[1] && // south
-             sale.lat <= currentViewport.bounds[3] && // north
-             sale.lng >= currentViewport.bounds[0] && // west
-             sale.lng <= currentViewport.bounds[2]    // east
-    })
-    
-    const deduplicated = deduplicateSales(viewportFilteredSales)
-    
-    // Only log when debug is enabled
+  // visibleSales is already computed above from fetchedSales filtered by viewport
+  // This is the sales list that matches what's visible on the map
+  // Deduplicate for the list display
+  const visibleSalesDeduplicated = useMemo(() => {
+    return deduplicateSales(visibleSales)
+  }, [visibleSales, deduplicateSales])
+  
+  // Log visible sales count for debugging
+  useEffect(() => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SALES] Visible sales count:', { 
-        mapSales: mapSales.length, 
-        viewportFiltered: viewportFilteredSales.length,
-        visibleSales: deduplicated.length,
+        fetchedSales: fetchedSales.length, 
+        visibleSales: visibleSales.length,
+        visibleSalesDeduplicated: visibleSalesDeduplicated.length,
         selectedPinId,
         hybridType: hybridResult?.type,
         locationsCount: hybridResult?.locations.length || 0
       })
     }
-    
-    return deduplicated
-  }, [mapSales, currentViewport, deduplicateSales, selectedPinId, hybridResult])
+  }, [fetchedSales.length, visibleSales.length, visibleSalesDeduplicated.length, selectedPinId, hybridResult])
 
   // Memoized map center
   const mapCenter = useMemo(() => {
@@ -866,9 +942,10 @@ export default function SalesClient({
   const [desktopPinPosition, setDesktopPinPosition] = useState<{ x: number; y: number } | null>(null)
 
   // Calculate selected sale for desktop callout
+  // Search in fetchedSales (not just visibleSales) in case selected pin is outside current viewport
   const selectedSale = useMemo(() => {
     if (!selectedPinId) return null
-    const saleById = mapSales.find(sale => sale.id === selectedPinId)
+    const saleById = fetchedSales.find(sale => sale.id === selectedPinId)
     if (saleById) return saleById
     if (hybridResult?.locations) {
       const location = hybridResult.locations.find(loc => loc.id === selectedPinId)
@@ -877,7 +954,7 @@ export default function SalesClient({
       }
     }
     return null
-  }, [selectedPinId, mapSales, hybridResult])
+  }, [selectedPinId, fetchedSales, hybridResult])
 
   // Calculate selected pin coordinates for desktop callout
   const selectedPinCoords = useMemo(() => {
@@ -886,12 +963,12 @@ export default function SalesClient({
     if (location) {
       return { lat: location.lat, lng: location.lng }
     }
-    const sale = mapSales.find(sale => sale.id === selectedPinId)
+    const sale = fetchedSales.find(sale => sale.id === selectedPinId)
     if (sale && typeof sale.lat === 'number' && typeof sale.lng === 'number') {
       return { lat: sale.lat, lng: sale.lng }
     }
     return null
-  }, [selectedPinId, hybridResult, mapSales])
+  }, [selectedPinId, hybridResult, fetchedSales])
 
   // Convert selected pin coordinates to screen position for desktop callout
   useEffect(() => {
@@ -990,7 +1067,7 @@ export default function SalesClient({
         <MobileSalesShell
           mapView={mapView}
           pendingBounds={pendingBounds}
-          mapSales={mapSales}
+          mapSales={visibleSales}
           selectedPinId={selectedPinId}
           onViewportChange={handleViewportChange}
           onLocationClick={(locationId) => {
@@ -1007,6 +1084,7 @@ export default function SalesClient({
           currentViewport={currentViewport}
           visibleSales={visibleSales}
           loading={loading}
+          isFetching={isFetching}
           filters={filters}
           onFiltersChange={handleFiltersChange}
           onClearFilters={clearFilters}
@@ -1064,7 +1142,7 @@ export default function SalesClient({
                       duration: 0
                     } : undefined}
                     hybridPins={{
-                      sales: mapSales,
+                      sales: visibleSales,
                       selectedId: selectedPinId,
                       onLocationClick: (locationId) => {
                         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -1120,8 +1198,14 @@ export default function SalesClient({
               <div className="flex-shrink-0 px-4 pt-4 pb-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">
-                    Sales ({visibleSales.length})
+                    Sales ({visibleSalesDeduplicated.length})
                   </h2>
+                  {isFetching && !loading && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-gray-600"></div>
+                      <span>Updating...</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1137,7 +1221,7 @@ export default function SalesClient({
                   </div>
                 )}
                   
-                {!loading && visibleSales.length === 0 && (
+                {!loading && visibleSalesDeduplicated.length === 0 && (
                   <div className="text-center py-8">
                     <div className="text-gray-500">
                       No sales found in this area
@@ -1145,8 +1229,8 @@ export default function SalesClient({
                   </div>
                 )}
 
-                {!loading && visibleSales.length > 0 && (
-                  <SalesList sales={visibleSales} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
+                {!loading && visibleSalesDeduplicated.length > 0 && (
+                  <SalesList sales={visibleSalesDeduplicated} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
                 )}
               </div>
             </div>

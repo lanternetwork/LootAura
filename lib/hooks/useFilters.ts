@@ -33,7 +33,7 @@ export interface UseFiltersReturn {
 }
 
 const DEFAULT_FILTERS: FilterState = {
-  distance: 25,
+  distance: 10,
   dateRange: 'any',
   categories: []
 }
@@ -56,7 +56,7 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     }
     const lat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : undefined
     const lng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : undefined
-    const distance = searchParams.get('dist') ? parseInt(searchParams.get('dist')!) : 25
+    const distance = searchParams.get('dist') ? parseInt(searchParams.get('dist')!) : 10
     const dateParam = searchParams.get('date') as 'today' | 'weekend' | 'next_weekend' | 'any' | 'range' | null
     const dateRange = !dateParam || dateParam === 'range' ? 'any' : dateParam
     
@@ -107,7 +107,7 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
     }
     
     // Update distance
-    if (updatedFilters.distance !== 25) {
+    if (updatedFilters.distance !== 10) {
       params.set('dist', updatedFilters.distance.toString())
     } else {
       params.delete('dist')
@@ -162,7 +162,7 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
 
   const hasActiveFilters = useCallback(() => {
     return (
-      filters.distance !== 25 ||
+      filters.distance !== 10 ||
       filters.dateRange !== 'any' ||
       filters.categories.length > 0 ||
       !!filters.city
@@ -177,7 +177,7 @@ export function useFilters(initialLocation?: { lat: number; lng: number }): UseF
       params.set('lng', filters.lng.toString())
     }
     
-    if (filters.distance !== 25) {
+    if (filters.distance !== 10) {
       params.set('dist', filters.distance.toString())
     }
     

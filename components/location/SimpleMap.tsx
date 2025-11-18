@@ -231,6 +231,27 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     pins?.onClusterClick?.(cluster)
   }, [pins, bottomSheetHeight])
 
+  // Handle map click (not on markers/pins)
+  const handleMapClick = useCallback((e: any) => {
+    // Only trigger onMapClick if clicking directly on the map canvas (not on markers/pins)
+    // Markers and pins have data attributes that we can check for
+    // Check if originalEvent exists (may be undefined in test environments)
+    if (!e?.originalEvent || !e.originalEvent?.target) {
+      // If we can't determine the target, call onMapClick as fallback
+      if (onMapClick) {
+        onMapClick()
+      }
+      return
+    }
+    
+    const target = e.originalEvent.target as HTMLElement
+    const isClickOnMarker = target.closest('[data-cluster-marker="true"], [data-location-marker="true"], [data-pin-marker="true"], [data-testid="cluster"], [data-testid="location-marker"]')
+    
+    if (!isClickOnMarker && onMapClick) {
+      onMapClick()
+    }
+  }, [onMapClick])
+
   // First-click-to-center, second-click-to-select for location pins
   const centeredLocationRef = useRef<Record<string, boolean>>({})
   const previousSelectedIdRef = useRef<string | null>(null)
@@ -401,16 +422,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMoveEnd={handleMoveEnd}
-        onClick={(e) => {
-          // Only trigger onMapClick if clicking directly on the map canvas (not on markers/pins)
-          // Markers and pins have data attributes that we can check for
-          const target = e.originalEvent.target as HTMLElement
-          const isClickOnMarker = target.closest('[data-cluster-marker="true"], [data-location-marker="true"], [data-pin-marker="true"], [data-testid="cluster"], [data-testid="location-marker"]')
-          
-          if (!isClickOnMarker && onMapClick) {
-            onMapClick()
-          }
-        }}
+        onClick={handleMapClick}
         onError={(error: any) => {
           console.error('[SIMPLE_MAP] Map error:', error)
           setMapError('Unable to load map. Please check your connection and try again.')

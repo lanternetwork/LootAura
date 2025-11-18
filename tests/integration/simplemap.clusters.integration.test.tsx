@@ -9,17 +9,35 @@ import { PinPoint } from '@/lib/pins/types'
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
-  default: ({ children, onLoad, onMoveEnd, onClick, ...props }: any) => (
-    <div 
-      data-testid="map" 
-      data-center-lat={props.initialViewState?.latitude}
-      data-center-lng={props.initialViewState?.longitude}
-      data-zoom={props.initialViewState?.zoom}
-      onClick={onClick}
-    >
-      {children}
-    </div>
-  ),
+  default: ({ children, onLoad, onMoveEnd, onClick, ...props }: any) => {
+    const handleClick = (e: any) => {
+      // Provide a mock event structure that matches react-map-gl's MapLayerMouseEvent
+      // Ensure originalEvent and target are always present
+      const mockEvent = {
+        ...e,
+        originalEvent: e.originalEvent || {
+          target: e.target || e.currentTarget || document.createElement('div')
+        }
+      }
+      // Ensure originalEvent.target exists
+      if (!mockEvent.originalEvent.target) {
+        mockEvent.originalEvent.target = e.target || e.currentTarget || document.createElement('div')
+      }
+      onClick?.(mockEvent)
+    }
+    
+    return (
+      <div 
+        data-testid="map" 
+        data-center-lat={props.initialViewState?.latitude}
+        data-center-lng={props.initialViewState?.longitude}
+        data-zoom={props.initialViewState?.zoom}
+        onClick={handleClick}
+      >
+        {children}
+      </div>
+    )
+  },
   Marker: ({ children, ...props }: any) => (
     <div data-testid="marker" {...props}>
       {children}

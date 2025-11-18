@@ -32,6 +32,7 @@ interface SimpleMapProps {
   attributionControl?: boolean // Show Mapbox attribution control (default: true)
   bottomSheetHeight?: number // Height of bottom sheet in pixels (for mobile) - used for map resizing and pin centering offset
   skipCenteringOnClick?: boolean // Skip centering behavior and immediately select on first click (for mobile)
+  onMapClick?: () => void // Callback when map is clicked (not on pins/markers)
 }
 
 const SimpleMap = forwardRef<any, SimpleMapProps>(({ 
@@ -52,7 +53,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   showOSMAttribution = true,
   attributionControl = true,
   bottomSheetHeight = 0,
-  skipCenteringOnClick = false
+  skipCenteringOnClick = false,
+  onMapClick
 }, ref) => {
   const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -191,31 +193,64 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const map = mapRef.current.getMap()
     if (!map) return
 
+    const currentZoom = map.getZoom()
+    const targetZoom = cluster.expandToZoom || 16
+    
+    // Ensure we zoom in at least one level to break the cluster apart
+    // Use the higher of: expandToZoom or currentZoom + 1
+    const finalZoom = Math.max(targetZoom, currentZoom + 1)
+
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[CLUSTER] expand', { lat: cluster.lat, lng: cluster.lng, expandToZoom: cluster.expandToZoom })
+      console.log('[CLUSTER] expand', { 
+        lat: cluster.lat, 
+        lng: cluster.lng, 
+        expandToZoom: cluster.expandToZoom,
+        currentZoom,
+        finalZoom
+      })
     }
     
     // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
     const offsetY = bottomSheetHeight > 0 ? -bottomSheetHeight / 2 : 0
     
-    // TEMPORARILY DISABLED: Zoom functionality works but is disabled for UX testing
-    // Original zoom behavior (commented out):
-    // map.flyTo({
-    //   center: [cluster.lng, cluster.lat],
-    //   zoom: cluster.expandToZoom,
-    //   duration: 400
-    // })
-    
-    // TEMPORARY: Just center the map on the cluster without zooming
-    map.flyTo({
+    // Zoom to cluster expansion zoom level to break the cluster apart
+    const flyToOptions: any = {
       center: [cluster.lng, cluster.lat],
-      duration: 400,
-      offset: offsetY !== 0 ? [0, offsetY] : undefined
-    })
+      zoom: finalZoom,
+      duration: 400
+    }
+    
+    // Only include offset if it's non-zero (for mobile bottom sheet)
+    if (offsetY !== 0) {
+      flyToOptions.offset = [0, offsetY]
+    }
+    
+    map.flyTo(flyToOptions)
     
     // Call the onClusterClick callback if provided
     pins?.onClusterClick?.(cluster)
   }, [pins, bottomSheetHeight])
+
+  // Handle map click (not on markers/pins)
+  const handleMapClick = useCallback((e: any) => {
+    // Only trigger onMapClick if clicking directly on the map canvas (not on markers/pins)
+    // Markers and pins have data attributes that we can check for
+    // Check if originalEvent exists (may be undefined in test environments)
+    if (!e?.originalEvent || !e.originalEvent?.target) {
+      // If we can't determine the target, call onMapClick as fallback
+      if (onMapClick) {
+        onMapClick()
+      }
+      return
+    }
+    
+    const target = e.originalEvent.target as HTMLElement
+    const isClickOnMarker = target.closest('[data-cluster-marker="true"], [data-location-marker="true"], [data-pin-marker="true"], [data-testid="cluster"], [data-testid="location-marker"]')
+    
+    if (!isClickOnMarker && onMapClick) {
+      onMapClick()
+    }
+  }, [onMapClick])
 
   // First-click-to-center, second-click-to-select for location pins
   const centeredLocationRef = useRef<Record<string, boolean>>({})
@@ -387,6 +422,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMoveEnd={handleMoveEnd}
+        onClick={handleMapClick}
         onError={(error: any) => {
           console.error('[SIMPLE_MAP] Map error:', error)
           setMapError('Unable to load map. Please check your connection and try again.')
@@ -523,11 +559,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       
       {/* Debug overlay */}
       {process.env.NEXT_PUBLIC_DEBUG === "true" && (
-        <div className="absolute top-2 left-2 z-50 bg-black bg-opacity-75 text-white text-xs p-2 rounded pointer-events-none">
+        <div className="absolute top-2 right-2 z-40 bg-black bg-opacity-75 text-white text-xs p-2 rounded pointer-events-none">
           <div>Container: {containerRef.current?.offsetWidth}×{containerRef.current?.offsetHeight}</div>
           <div>Loaded: {loaded ? 'Yes' : 'No'}</div>
-          <div>Clustering: {isClusteringEnabled ? 'Enabled' : 'Disabled'}</div>
-          <div>Pins: {pins ? pins.sales.length : sales.length}</div>
+          <div>Clustering: {hybridPins ? 'Enabled (Hybrid)' : isClusteringEnabled ? 'Enabled' : 'Disabled'}</div>
+          <div>Pins: {hybridPins ? hybridPins.sales.length : pins ? pins.sales.length : sales.length}</div>
         </div>
       )}
       

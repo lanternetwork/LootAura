@@ -226,6 +226,11 @@ export default function MobileSalesShell({
               viewport: currentViewport
             }}
             onViewportChange={handleViewportChangeWithDismiss}
+            onMapClick={() => {
+              if (selectedPinId) {
+                onLocationClick(selectedPinId)
+              }
+            }}
             attributionPosition="top-right"
             showOSMAttribution={true}
             attributionControl={false}

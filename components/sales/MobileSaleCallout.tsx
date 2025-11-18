@@ -168,15 +168,15 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         )}
 
         {/* Card content */}
-        <div className={`flex gap-3 ${pinPosition ? 'p-3' : 'p-4'}`}>
-          {/* Thumbnail */}
-          <div className="relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+        <div className={`flex flex-col ${pinPosition ? 'p-0' : 'p-0'} overflow-hidden ${pinPosition ? 'rounded-2xl' : 'rounded-t-2xl'}`}>
+          {/* Image at top - full width, half size */}
+          <div className={`relative w-full h-16 bg-gray-100 ${pinPosition ? 'rounded-t-2xl' : 'rounded-t-2xl'} overflow-hidden`}>
             {cover ? (
               <Image
                 src={cover.url}
                 alt={cover.alt}
                 fill
-                sizes="80px"
+                sizes="(max-width: 400px) 100vw, 400px"
                 className="object-cover"
               />
             ) : (
@@ -184,43 +184,44 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                 <SalePlaceholder className="w-full h-full opacity-60" />
               </div>
             )}
+            {/* Close button overlay on image */}
+            <button
+              onClick={onDismiss}
+              className="absolute top-1.5 right-1.5 bg-white/90 hover:bg-white text-gray-600 rounded-full min-w-[28px] min-h-[28px] flex items-center justify-center shadow-sm transition-colors"
+              aria-label="Close"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
-          {/* Sale info */}
-          <div className="flex-1 min-w-0 flex flex-col justify-between">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold line-clamp-1 mb-1">
-                  {sale.title || `Sale ${sale.id}`}
-                </h3>
-              </div>
-              {/* Close button */}
-              <button
-                onClick={onDismiss}
-                className="flex-shrink-0 text-gray-400 hover:text-gray-600 min-w-[32px] min-h-[32px] flex items-center justify-center"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+          {/* Content section */}
+          <div className={`flex flex-col ${pinPosition ? 'p-2' : 'p-3'}`}>
+            {/* Title */}
+            <h3 className="text-base font-semibold line-clamp-2 mb-1">
+              {sale.title || `Sale ${sale.id}`}
+            </h3>
+
+            {/* Address and date */}
+            <div className="space-y-0.5 mb-2">
+              {sale.address && (
+                <p className="text-xs text-gray-600 line-clamp-1">
+                  {sale.address}
+                  {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
+                </p>
+              )}
+              {sale.date_start && (
+                <p className="text-xs text-gray-500">
+                  {formatDate(sale.date_start, sale.time_start)}
+                </p>
+              )}
             </div>
-            {sale.address && (
-              <p className="text-xs text-gray-600 line-clamp-1 mb-1">
-                {sale.address}
-                {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
-              </p>
-            )}
-            {sale.date_start && (
-              <p className="text-xs text-gray-500 mb-2">
-                {formatDate(sale.date_start, sale.time_start)}
-              </p>
-            )}
-            
-            {/* Action button */}
+
+            {/* Action button - full width, normal height */}
             <button
               onClick={handleViewSale}
-              className="mt-2 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2 rounded-lg transition-colors text-sm w-full"
+              className="w-full bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
             >
               View Sale
             </button>

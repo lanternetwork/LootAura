@@ -35,13 +35,14 @@ export default async function ShortlinkPage({ params }: PageProps) {
       .eq('id', id)
       .single()
 
-    if (error || !data) {
+    if (error) {
       console.error('Failed to retrieve shared state:', error)
       notFound()
     }
 
-    if (!data.state_json) {
-      console.error('Shared state missing state_json field')
+    // Check if data exists and has state_json field
+    if (!data || !data.state_json) {
+      console.error('Shared state missing or missing state_json field')
       notFound()
     }
 

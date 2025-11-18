@@ -28,6 +28,7 @@ interface MobileSalesShellProps {
   // Sales list props
   visibleSales: Sale[]
   loading: boolean
+  isFetching?: boolean // Track if a buffer update is in progress
   
   // Filter props
   filters: {
@@ -64,6 +65,7 @@ export default function MobileSalesShell({
   currentViewport,
   visibleSales,
   loading,
+  isFetching = false,
   filters,
   onFiltersChange,
   onClearFilters,
@@ -292,6 +294,12 @@ export default function MobileSalesShell({
             <h2 className="text-lg font-semibold">
               Sales ({visibleSales.length})
             </h2>
+            {isFetching && !loading && (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-300 border-t-gray-600"></div>
+                <span>Updating...</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsFiltersModalOpen(true)}

@@ -191,8 +191,21 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const map = mapRef.current.getMap()
     if (!map) return
 
+    const currentZoom = map.getZoom()
+    const targetZoom = cluster.expandToZoom || 16
+    
+    // Ensure we zoom in at least one level to break the cluster apart
+    // Use the higher of: expandToZoom or currentZoom + 1
+    const finalZoom = Math.max(targetZoom, currentZoom + 1)
+
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[CLUSTER] expand', { lat: cluster.lat, lng: cluster.lng, expandToZoom: cluster.expandToZoom })
+      console.log('[CLUSTER] expand', { 
+        lat: cluster.lat, 
+        lng: cluster.lng, 
+        expandToZoom: cluster.expandToZoom,
+        currentZoom,
+        finalZoom
+      })
     }
     
     // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
@@ -201,7 +214,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     // Zoom to cluster expansion zoom level to break the cluster apart
     map.flyTo({
       center: [cluster.lng, cluster.lat],
-      zoom: cluster.expandToZoom || 16,
+      zoom: finalZoom,
       duration: 400,
       offset: offsetY !== 0 ? [0, offsetY] : undefined
     })

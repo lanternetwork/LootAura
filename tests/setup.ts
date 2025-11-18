@@ -233,6 +233,7 @@ const ALLOWED_PATTERNS = [
   
   // Map component error logging (components/location/SimpleMap.tsx)
   /^\[SIMPLE_MAP\] Map error:/, // Expected map error logging in tests - tests/unit/a11y.smoke.test.tsx
+  /^\[SIMPLE_MAP\] Token format may be invalid/, // Expected token format warning when debug mode is enabled - tests/integration/simplemap.clusters.integration.test.tsx
   
   // React act() warnings (React 18 concurrent rendering in tests)
   /^Error: Should not already be working/, // React act() warnings during component cleanup - tests/unit/a11y.smoke.test.tsx

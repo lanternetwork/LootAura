@@ -97,25 +97,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
   }
 
   // Calculate position relative to pin
-  const containerStyle = pinPosition
-    ? {
-        position: 'absolute' as const,
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-        pointerEvents: 'none' as const,
-        zIndex: 50
-      }
-    : {
-        position: 'fixed' as const,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-        zIndex: 50
-      }
-  
+  // When pinPosition is set, position card directly without full-screen overlay to avoid blocking map
   const cardStyle = pinPosition
     ? {
         position: 'absolute' as const,
@@ -125,16 +107,137 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         transform: `translate(-50%, ${swipeDeltaY > 0 ? swipeDeltaY - cardOffset : -cardOffset}px)`,
         maxWidth: 'calc(100vw - 2rem)',
         width: '220px',
-        pointerEvents: 'auto' as const
+        pointerEvents: 'auto' as const,
+        zIndex: 50
       }
     : {
         transform: swipeDeltaY > 0 ? `translateY(${swipeDeltaY}px)` : 'translateY(0)',
       }
 
+  // When positioned relative to pin, render card directly without overlay container
+  // This prevents the overlay from blocking map interactions
+  if (pinPosition) {
+    return (
+      <div 
+        ref={cardRef}
+        className={`bg-white rounded-2xl shadow-lg border border-gray-200 will-change-transform transition-transform duration-200 relative`}
+        onClick={(e) => e.stopPropagation()}
+        style={cardStyle}
+      >
+        {/* Callout pointer/arrow pointing to pin */}
+        <div 
+          className="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-full w-0 h-0"
+          style={{
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: '8px solid white',
+            filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))'
+          }}
+        />
+        
+        {/* Card content */}
+        <div className="flex flex-col p-0 overflow-hidden rounded-2xl">
+          {/* Image at top - full width, half size */}
+          <div className="relative w-full h-16 bg-gray-100 rounded-t-2xl overflow-hidden">
+            {cover ? (
+              <Image
+                src={cover.url}
+                alt={cover.alt}
+                fill
+                sizes="(max-width: 400px) 100vw, 400px"
+                className="object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <SalePlaceholder className="w-full h-full opacity-60" />
+              </div>
+            )}
+            {/* Close button overlay on image */}
+            <button
+              onClick={onDismiss}
+              className="absolute top-1.5 right-1.5 bg-white/90 hover:bg-white text-gray-600 rounded-full min-w-[28px] min-h-[28px] flex items-center justify-center shadow-sm transition-colors"
+              aria-label="Close"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Content section */}
+          <div className="flex flex-col p-2">
+            {/* Title */}
+            <h3 className="text-base font-semibold line-clamp-2 mb-1">
+              {sale.title || `Sale ${sale.id}`}
+            </h3>
+
+            {/* Address and date */}
+            <div className="space-y-0.5 mb-2">
+              {sale.address && (
+                <p className="text-xs text-gray-600 line-clamp-1">
+                  <AddressLink
+                    lat={sale.lat ?? undefined}
+                    lng={sale.lng ?? undefined}
+                    address={sale.address && sale.city && sale.state ? `${sale.address}, ${sale.city}, ${sale.state}` : sale.address}
+                  >
+                    {sale.address}
+                    {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
+                  </AddressLink>
+                </p>
+              )}
+              {sale.date_start && (
+                <p className="text-xs text-gray-500">
+                  {formatDate(sale.date_start, sale.time_start)}
+                </p>
+              )}
+            </div>
+
+            {/* Action buttons - side by side */}
+            <div className="flex gap-2">
+              {/* Navigation button */}
+              <a
+                href={buildAppleMapsUrl({
+                  lat: sale.lat ?? undefined,
+                  lng: sale.lng ?? undefined,
+                  address: sale.address && sale.city && sale.state ? `${sale.address}, ${sale.city}, ${sale.state}` : sale.address ?? undefined
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px]"
+                aria-label="Start navigation"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </a>
+              
+              {/* View Sale button - reduced width */}
+              <button
+                onClick={handleViewSale}
+                className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
+              >
+                View Sale
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // When at bottom (no pinPosition), use the original overlay approach
   return (
     <div 
-      className={pinPosition ? "absolute inset-0 z-50" : "fixed bottom-0 left-0 right-0 z-50 px-4"}
-      style={containerStyle}
+      className="fixed bottom-0 left-0 right-0 z-50 px-4"
+      style={{
+        position: 'fixed' as const,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        zIndex: 50
+      }}
       onClick={(e) => {
         // Allow clicks on the card itself to work, but clicking outside dismisses
         if (e.target === e.currentTarget) {

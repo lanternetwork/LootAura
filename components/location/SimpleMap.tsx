@@ -410,8 +410,12 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
 
   // Handle center/zoom changes
   // Skip center/zoom updates when fitBounds is active to prevent zoom flash
+  // Also skip when we're programmatically centering to a pin (to avoid conflicts)
   useEffect(() => {
     if (!loaded || !mapRef.current || fitBounds) return
+    
+    // Don't easeTo if we're currently centering to a pin (programmatic centering)
+    if (isCenteringToPinRef.current) return
     
     const map = mapRef.current.getMap()
     if (!map) return

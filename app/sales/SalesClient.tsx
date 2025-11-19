@@ -482,6 +482,8 @@ export default function SalesClient({
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
   const lastBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)
   const initialLoadRef = useRef(true) // Track if this is the initial load
+  // Track when we're programmatically centering to a pin to prevent clearing selection
+  const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
 
   // Handle live viewport updates during map drag (onMove) - updates rendering only, no fetch
   const handleViewportMove = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
@@ -538,17 +540,21 @@ export default function SalesClient({
     
     // If a single location is selected and the user moves the map, exit location view
     // BUT: Don't clear if this is a programmatic centering (we want to keep the callout visible)
-    // We detect programmatic centering by checking if the center matches a selected pin's location
-    if (selectedPinId && hybridResult) {
+    // Check if we're currently centering to this pin
+    const isCenteringToThisPin = isCenteringToPinRef.current && 
+      isCenteringToPinRef.current.locationId === selectedPinId
+    
+    if (selectedPinId && hybridResult && !isCenteringToThisPin) {
       const selectedLocation = hybridResult.locations.find((loc: any) => loc.id === selectedPinId)
       if (selectedLocation) {
-        // Check if the new center is close to the selected pin (within ~0.001 degrees, ~100m)
+        // Check if the new center is close to the selected pin (within ~0.01 degrees, ~1km)
+        // Use larger threshold to account for offsets and animation intermediate positions
         const latDiff = Math.abs(center.lat - selectedLocation.lat)
         const lngDiff = Math.abs(center.lng - selectedLocation.lng)
-        const isCenteringToPin = latDiff < 0.001 && lngDiff < 0.001
+        const isNearSelectedPin = latDiff < 0.01 && lngDiff < 0.01
         
-        // Only clear if this is NOT a centering action (user manually moved map)
-        if (!isCenteringToPin) {
+        // Only clear if this is NOT near the selected pin (user manually moved map away)
+        if (!isNearSelectedPin) {
           setSelectedPinId(null)
         }
       } else {
@@ -1079,6 +1085,16 @@ export default function SalesClient({
     }
   }, [selectedPinId])
 
+  // Handle centering start - track that we're programmatically centering to a pin
+  const handleCenteringStart = useCallback((locationId: string, lat: number, lng: number) => {
+    isCenteringToPinRef.current = { locationId, lat, lng }
+  }, [])
+
+  // Handle centering end - clear the centering flag
+  const handleCenteringEnd = useCallback(() => {
+    isCenteringToPinRef.current = null
+  }, [])
+
   // Handle viewport change (desktop) - handleViewportChange already dismisses callout
   const handleDesktopViewportChange = useCallback((args: { 
     center: { lat: number; lng: number }; 
@@ -1100,6 +1116,8 @@ export default function SalesClient({
           selectedPinId={selectedPinId}
           onViewportMove={handleViewportMove}
           onViewportChange={handleViewportChange}
+          onCenteringStart={handleCenteringStart}
+          onCenteringEnd={handleCenteringEnd}
           onLocationClick={(locationId) => {
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
               console.log('[SALES] Location clicked:', locationId)
@@ -1191,6 +1209,8 @@ export default function SalesClient({
                     }}
                     onViewportMove={handleViewportMove}
                     onViewportChange={handleDesktopViewportChange}
+                    onCenteringStart={handleCenteringStart}
+                    onCenteringEnd={handleCenteringEnd}
                     onMapClick={() => {
                       if (selectedPinId) {
                         setSelectedPinId(null)

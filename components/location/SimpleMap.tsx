@@ -29,6 +29,8 @@ interface SimpleMapProps {
     zoom: number; 
     bounds: { west: number; south: number; east: number; north: number } 
   }) => void
+  onCenteringStart?: (locationId: string, lat: number, lng: number) => void
+  onCenteringEnd?: () => void
   isTransitioning?: boolean
   transitionMessage?: string
   interactive?: boolean // Disable all map interactions when false
@@ -52,6 +54,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   hybridPins,
   onViewportChange,
   onViewportMove,
+  onCenteringStart,
+  onCenteringEnd,
   isTransitioning = false,
   transitionMessage = "Loading...",
   interactive = true,
@@ -305,6 +309,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   // First-click-to-center, second-click-to-select for location pins
   const centeredLocationRef = useRef<Record<string, boolean>>({})
   const previousSelectedIdRef = useRef<string | null>(null)
+  // Track when we're programmatically centering to prevent clearing selection during animation
+  const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
   
   const handleLocationClickWrapped = useCallback((locationId: string, lat?: number, lng?: number) => {
     const alreadyCentered = centeredLocationRef.current[locationId]
@@ -326,6 +332,12 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     if (!alreadyCentered && mapRef.current?.getMap) {
       const map = mapRef.current.getMap()
       if (map && typeof lat === 'number' && typeof lng === 'number') {
+        // Mark that we're centering to this pin
+        isCenteringToPinRef.current = { locationId, lat, lng }
+        
+        // Notify parent that centering has started
+        onCenteringStart?.(locationId, lat, lng)
+        
         // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
         const flyToOptions: any = {
           center: [lng, lat],
@@ -339,6 +351,15 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         
         map.flyTo(flyToOptions)
         centeredLocationRef.current[locationId] = true
+        
+        // Clear the centering flag after animation completes
+        setTimeout(() => {
+          if (isCenteringToPinRef.current?.locationId === locationId) {
+            isCenteringToPinRef.current = null
+            onCenteringEnd?.()
+          }
+        }, 500) // Slightly longer than flyTo duration (400ms)
+        
         // Show callout immediately on first click (even while centering)
         hybridPins?.onLocationClick?.(locationId)
         return
@@ -347,7 +368,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     
     // Second click (or if we couldn't center): select location
     hybridPins?.onLocationClick?.(locationId)
-  }, [hybridPins?.onLocationClick, hybridPins?.selectedId, bottomSheetHeight, skipCenteringOnClick])
+  }, [hybridPins?.onLocationClick, hybridPins?.selectedId, bottomSheetHeight, skipCenteringOnClick, onCenteringStart, onCenteringEnd])
   
   // Reset centered flag when location is deselected or a different location is selected
   useEffect(() => {

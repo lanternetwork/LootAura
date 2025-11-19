@@ -233,6 +233,12 @@ export default function MobileSalesShell({
             }}
             onViewportMove={onViewportMove}
             onViewportChange={handleViewportChangeWithDismiss}
+            onDragStart={() => {
+              // Close callout immediately when user starts dragging
+              if (selectedPinId) {
+                onLocationClick(selectedPinId)
+              }
+            }}
             onCenteringStart={onCenteringStart}
             onCenteringEnd={onCenteringEnd}
             onMapClick={() => {

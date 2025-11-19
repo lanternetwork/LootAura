@@ -133,10 +133,10 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
           }}
         />
         
-        {/* Card content - only interactive elements should capture events */}
+        {/* Card content - disable all pointer events to allow map dragging */}
         <div className="flex flex-col p-0 overflow-hidden rounded-2xl pointer-events-none">
           {/* Image at top - full width, half size */}
-          <div className="relative w-full h-16 bg-gray-100 rounded-t-2xl overflow-hidden">
+          <div className="relative w-full h-16 bg-gray-100 rounded-t-2xl overflow-hidden pointer-events-none">
             {cover ? (
               <Image
                 src={cover.url}
@@ -162,8 +162,8 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
             </button>
           </div>
 
-          {/* Content section */}
-          <div className="flex flex-col p-2 pointer-events-auto">
+          {/* Content section - only buttons/links should capture events */}
+          <div className="flex flex-col p-2 pointer-events-none">
             {/* Title */}
             <h3 className="text-base font-semibold line-clamp-2 mb-1">
               {sale.title || `Sale ${sale.id}`}
@@ -191,7 +191,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
             </div>
 
             {/* Action buttons - side by side */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 pointer-events-auto">
               {/* Navigation button */}
               <a
                 href={buildAppleMapsUrl({
@@ -201,7 +201,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                 })}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px] pointer-events-auto"
+                className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px]"
                 aria-label="Start navigation"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -213,7 +213,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
               {/* View Sale button - reduced width */}
               <button
                 onClick={handleViewSale}
-                className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm pointer-events-auto"
+                className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
               >
                 View Sale
               </button>

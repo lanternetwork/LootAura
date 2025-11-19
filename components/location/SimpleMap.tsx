@@ -29,6 +29,7 @@ interface SimpleMapProps {
     zoom: number; 
     bounds: { west: number; south: number; east: number; north: number } 
   }) => void
+  onDragStart?: () => void // Called when user starts dragging the map
   onCenteringStart?: (locationId: string, lat: number, lng: number) => void
   onCenteringEnd?: () => void
   isTransitioning?: boolean
@@ -54,6 +55,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   hybridPins,
   onViewportChange,
   onViewportMove,
+  onDragStart,
   onCenteringStart,
   onCenteringEnd,
   isTransitioning = false,
@@ -174,6 +176,11 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       mapRef.current?.getMap()?.resize()
     }
   }, [loaded])
+
+  // Handle drag start - close callout immediately when user starts dragging
+  const handleDragStart = useCallback(() => {
+    onDragStart?.()
+  }, [onDragStart])
 
   // Handle map move (continuous during drag) - update viewport for live rendering
   const handleMove = useCallback(() => {
@@ -519,6 +526,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMove={handleMove}
+        onMoveStart={handleDragStart}
         onMoveEnd={handleMoveEnd}
         onClick={handleMapClick}
         onError={(error: any) => {

@@ -7,7 +7,7 @@ import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import AddressLink from '@/components/common/AddressLink'
-import { buildAppleMapsUrl } from '@/lib/location/mapsLinks'
+import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
 
 interface MobileSaleCalloutProps {
   sale: Sale | null
@@ -25,11 +25,40 @@ interface MobileSaleCalloutProps {
  * - Swipe-to-dismiss gesture support
  * - Positioned relative to pin location when available
  */
+type Platform = 'ios' | 'android' | 'desktop'
+
+/**
+ * Detect platform from user agent
+ * SSR-safe - returns 'desktop' during SSR, detects on client
+ */
+function detectPlatform(): Platform {
+  if (typeof window === 'undefined') {
+    return 'desktop'
+  }
+
+  const userAgent = navigator.userAgent || ''
+
+  // Check for iPhone or iPod (exclude iPad - treat as desktop)
+  if (/iPhone|iPod/.test(userAgent)) {
+    return 'ios'
+  }
+
+  // Check for Android mobile devices (must have both Android and Mobile)
+  if (/Android/.test(userAgent) && /Mobile/.test(userAgent)) {
+    return 'android'
+  }
+
+  // Default to desktop
+  return 'desktop'
+}
+
 export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPosition }: MobileSaleCalloutProps) {
   const router = useRouter()
   const [swipeStartY, setSwipeStartY] = useState<number | null>(null)
   const [swipeDeltaY, setSwipeDeltaY] = useState(0)
   const cardRef = useRef<HTMLDivElement>(null)
+  const [platform, setPlatform] = useState<Platform>('desktop')
+  const [isClient, setIsClient] = useState(false)
   
   // Swipe-to-dismiss gesture handling
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -56,6 +85,12 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
     setSwipeDeltaY(0)
   }, [swipeDeltaY, onDismiss])
 
+  // Detect platform on client side only
+  useEffect(() => {
+    setIsClient(true)
+    setPlatform(detectPlatform())
+  }, [])
+
   // Calculate card offset to position pointer at pin
   // Hooks must be called before any early returns
   const [cardOffset, setCardOffset] = useState(140)
@@ -68,6 +103,24 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
       setCardOffset(cardHeight + 8)
     }
   }, [pinPosition, sale])
+
+  // Build navigation URL based on platform
+  const getNavigationUrl = useCallback(() => {
+    if (!sale) return ''
+    
+    const address = sale.address && sale.city && sale.state 
+      ? `${sale.address}, ${sale.city}, ${sale.state}` 
+      : sale.address ?? undefined
+
+    if (!isClient || platform === 'desktop') {
+      return buildDesktopGoogleMapsUrl({ lat: sale.lat ?? undefined, lng: sale.lng ?? undefined, address })
+    } else if (platform === 'ios') {
+      return buildIosNavUrl({ lat: sale.lat ?? undefined, lng: sale.lng ?? undefined, address })
+    } else if (platform === 'android') {
+      return buildAndroidNavUrl({ lat: sale.lat ?? undefined, lng: sale.lng ?? undefined, address })
+    }
+    return buildDesktopGoogleMapsUrl({ lat: sale.lat ?? undefined, lng: sale.lng ?? undefined, address })
+  }, [sale, platform, isClient])
 
   if (!sale) return null
 
@@ -194,11 +247,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
             <div className="flex gap-2 pointer-events-auto">
               {/* Navigation button */}
               <a
-                href={buildAppleMapsUrl({
-                  lat: sale.lat ?? undefined,
-                  lng: sale.lng ?? undefined,
-                  address: sale.address && sale.city && sale.state ? `${sale.address}, ${sale.city}, ${sale.state}` : sale.address ?? undefined
-                })}
+                href={getNavigationUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px]"
@@ -336,11 +385,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
             <div className="flex gap-2">
               {/* Navigation button */}
               <a
-                href={buildAppleMapsUrl({
-                  lat: sale.lat ?? undefined,
-                  lng: sale.lng ?? undefined,
-                  address: sale.address && sale.city && sale.state ? `${sale.address}, ${sale.city}, ${sale.state}` : sale.address ?? undefined
-                })}
+                href={getNavigationUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px]"

@@ -55,7 +55,7 @@ const CATEGORY_DATA = [
 ]
 
 // Chip overflow hook
-function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement | null, measureEl: HTMLElement | null, selectedCategories: string[] = []) {
+function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement | null, measureEl: HTMLElement | null) {
   const [visible, setVisible] = useState<typeof CATEGORY_DATA>([])
   const [overflow, setOverflow] = useState<typeof CATEGORY_DATA>([])
   const [_widthCache, _setWidthCache] = useState<Record<string, number>>({})
@@ -90,22 +90,12 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
     })
     _setWidthCache(newWidthCache)
 
-    // Sort chips: selected first, then unselected (maintain original order within each group)
-    const sortedChips = [...allChips].sort((a, b) => {
-      const aSelected = selectedCategories.includes(a.id)
-      const bSelected = selectedCategories.includes(b.id)
-      if (aSelected && !bSelected) return -1
-      if (!aSelected && bSelected) return 1
-      return 0 // Maintain original order within selected/unselected groups
-    })
-
     // Greedily accumulate chips until sum exceeds available
-    // Selected chips are prioritized (already sorted first)
     let used = 0
     const nextVisible: typeof CATEGORY_DATA = []
     const nextOverflow: typeof CATEGORY_DATA = []
 
-    sortedChips.forEach((chip) => {
+    allChips.forEach((chip) => {
       const width = newWidthCache[chip.id] ?? 0
       const widthWithGap = nextVisible.length === 0 ? width : width + gap
       
@@ -147,7 +137,7 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
     if (process.env.NEXT_PUBLIC_DEBUG === 'true' && !isSameResult) {
       console.log(`[OVERFLOW] centerWidth=${centerWidth} visible=${nextVisible.length} overflow=${nextOverflow.length} sum=${used} available=${available}`)
     }
-  }, [allChips, centerEl, measureEl, hysteresis, selectedCategories])
+  }, [allChips, centerEl, measureEl, hysteresis])
 
   useEffect(() => {
     if (!centerEl) return
@@ -208,8 +198,8 @@ export default function FiltersBar({
   const measureRef = useRef<HTMLUListElement>(null)
   const rightRef = useRef<HTMLDivElement>(null)
 
-  // Chip overflow management - prioritize selected chips
-  const { visible, overflow } = useChipOverflow(CATEGORY_DATA, centerRef.current, measureRef.current, categories)
+  // Chip overflow management
+  const { visible, overflow } = useChipOverflow(CATEGORY_DATA, centerRef.current, measureRef.current)
 
   const handleCategoryToggle = (categoryId: string) => {
     if (categories.includes(categoryId)) {

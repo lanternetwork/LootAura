@@ -55,7 +55,7 @@ const CATEGORY_DATA = [
 ]
 
 // Chip overflow hook
-function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement | null, measureEl: HTMLElement | null) {
+function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement | null, measureEl: HTMLElement | null, selectedCategories: string[] = []) {
   const [visible, setVisible] = useState<typeof CATEGORY_DATA>([])
   const [overflow, setOverflow] = useState<typeof CATEGORY_DATA>([])
   const [_widthCache, _setWidthCache] = useState<Record<string, number>>({})
@@ -90,12 +90,22 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
     })
     _setWidthCache(newWidthCache)
 
+    // Sort chips: selected first, then unselected (maintain original order within each group)
+    const sortedChips = [...allChips].sort((a, b) => {
+      const aSelected = selectedCategories.includes(a.id)
+      const bSelected = selectedCategories.includes(b.id)
+      if (aSelected && !bSelected) return -1
+      if (!aSelected && bSelected) return 1
+      return 0 // Maintain original order within selected/unselected groups
+    })
+
     // Greedily accumulate chips until sum exceeds available
+    // Selected chips are prioritized (already sorted first)
     let used = 0
     const nextVisible: typeof CATEGORY_DATA = []
     const nextOverflow: typeof CATEGORY_DATA = []
 
-    allChips.forEach((chip) => {
+    sortedChips.forEach((chip) => {
       const width = newWidthCache[chip.id] ?? 0
       const widthWithGap = nextVisible.length === 0 ? width : width + gap
       
@@ -137,7 +147,7 @@ function useChipOverflow(allChips: typeof CATEGORY_DATA, centerEl: HTMLElement |
     if (process.env.NEXT_PUBLIC_DEBUG === 'true' && !isSameResult) {
       console.log(`[OVERFLOW] centerWidth=${centerWidth} visible=${nextVisible.length} overflow=${nextOverflow.length} sum=${used} available=${available}`)
     }
-  }, [allChips, centerEl, measureEl, hysteresis])
+  }, [allChips, centerEl, measureEl, hysteresis, selectedCategories])
 
   useEffect(() => {
     if (!centerEl) return
@@ -198,8 +208,8 @@ export default function FiltersBar({
   const measureRef = useRef<HTMLUListElement>(null)
   const rightRef = useRef<HTMLDivElement>(null)
 
-  // Chip overflow management
-  const { visible, overflow } = useChipOverflow(CATEGORY_DATA, centerRef.current, measureRef.current)
+  // Chip overflow management - prioritize selected chips
+  const { visible, overflow } = useChipOverflow(CATEGORY_DATA, centerRef.current, measureRef.current, categories)
 
   const handleCategoryToggle = (categoryId: string) => {
     if (categories.includes(categoryId)) {
@@ -442,8 +452,10 @@ export default function FiltersBar({
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                 </svg>
-                More ({overflow.length})
-                {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                <span className="flex items-center gap-1">
+                  More ({overflow.length})
+                  <span className={`w-2 h-2 rounded-full ${hasActiveFilters ? 'bg-blue-500' : 'bg-transparent'}`}></span>
+                </span>
               </button>
 
               {/* Overflow menu popover */}

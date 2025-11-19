@@ -114,7 +114,8 @@ export default function HybridPinsOverlay({
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       const currentIds = new Set(sales.map(s => s.id))
-      const lastIds = new Set(JSON.parse(lastSalesIdsRef.current || '[]'))
+      const lastIdsArray = JSON.parse(lastSalesIdsRef.current || '[]') as string[]
+      const lastIds = new Set(lastIdsArray)
       const addedIds = [...currentIds].filter(id => !lastIds.has(id))
       const removedIds = [...lastIds].filter(id => !currentIds.has(id))
       console.log('[HYBRID_PINS] Sales IDs changed:', {

@@ -21,6 +21,7 @@ interface MobileSalesShellProps {
   mapSales: Sale[]
   selectedPinId: string | null
   onViewportChange: (args: { center: { lat: number; lng: number }; zoom: number; bounds: { west: number; south: number; east: number; north: number } }) => void
+  onViewportMove?: (args: { center: { lat: number; lng: number }; zoom: number; bounds: { west: number; south: number; east: number; north: number } }) => void
   onLocationClick: (locationId: string) => void
   onClusterClick: (args: { lat: number; lng: number; expandToZoom: number }) => void
   currentViewport: { bounds: [number, number, number, number]; zoom: number } | null
@@ -60,6 +61,7 @@ export default function MobileSalesShell({
   mapSales,
   selectedPinId,
   onViewportChange,
+  onViewportMove,
   onLocationClick,
   onClusterClick,
   currentViewport,
@@ -227,6 +229,7 @@ export default function MobileSalesShell({
               onClusterClick: onClusterClick,
               viewport: currentViewport
             }}
+            onViewportMove={onViewportMove}
             onViewportChange={handleViewportChangeWithDismiss}
             onMapClick={() => {
               if (selectedPinId) {

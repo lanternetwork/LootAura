@@ -24,6 +24,11 @@ interface SimpleMapProps {
     zoom: number; 
     bounds: { west: number; south: number; east: number; north: number } 
   }) => void
+  onViewportMove?: (args: { 
+    center: { lat: number; lng: number }; 
+    zoom: number; 
+    bounds: { west: number; south: number; east: number; north: number } 
+  }) => void
   isTransitioning?: boolean
   transitionMessage?: string
   interactive?: boolean // Disable all map interactions when false
@@ -46,6 +51,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   pins,
   hybridPins,
   onViewportChange,
+  onViewportMove,
   isTransitioning = false,
   transitionMessage = "Loading...",
   interactive = true,
@@ -165,6 +171,38 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     }
   }, [loaded])
 
+  // Handle map move (continuous during drag) - update viewport for live rendering
+  const handleMove = useCallback(() => {
+    if (!mapRef.current) return
+    
+    const map = mapRef.current.getMap()
+    if (!map) return
+
+    const center = map.getCenter()
+    const zoom = map.getZoom()
+    const bounds = map.getBounds()
+    
+    const viewport = {
+      center: { lat: center.lat, lng: center.lng },
+      zoom,
+      bounds: {
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth()
+      }
+    }
+    
+    // Call onViewportMove for live updates (no fetch logic here)
+    // Falls back to onViewportChange if onViewportMove not provided
+    if (onViewportMove) {
+      onViewportMove(viewport)
+    } else {
+      onViewportChange?.(viewport)
+    }
+  }, [onViewportChange, onViewportMove])
+
+  // Handle map move end - trigger fetch decision logic
   const handleMoveEnd = useCallback(() => {
     if (!mapRef.current) return
     
@@ -194,6 +232,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         center: viewport.center
       })
     }
+    // Also call onViewportChange on moveend for final state update
     onViewportChange?.(viewport)
   }, [onViewportChange])
 
@@ -432,6 +471,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         style={{ position: "absolute", inset: 0 }}
         onLoad={onLoad}
         onStyleData={onStyleData}
+        onMove={handleMove}
         onMoveEnd={handleMoveEnd}
         onClick={handleMapClick}
         onError={(error: any) => {

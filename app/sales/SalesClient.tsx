@@ -483,7 +483,36 @@ export default function SalesClient({
   const lastBoundsRef = useRef<{ west: number; south: number; east: number; north: number } | null>(null)
   const initialLoadRef = useRef(true) // Track if this is the initial load
 
-  // Handle viewport changes from SimpleMap
+  // Handle live viewport updates during map drag (onMove) - updates rendering only, no fetch
+  const handleViewportMove = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
+    // Update map view state immediately for live rendering
+    // This triggers viewportBounds and visibleSales recomputation via useMemo
+    setMapView(prev => {
+      if (!prev) {
+        const radiusKm = 16.09 // 10 miles
+        const latRange = radiusKm / 111.0
+        const lngRange = radiusKm / (111.0 * Math.cos(center.lat * Math.PI / 180))
+        return {
+          center,
+          bounds: {
+            west: center.lng - lngRange,
+            south: center.lat - latRange,
+            east: center.lng + lngRange,
+            north: center.lat + latRange
+          },
+          zoom
+        }
+      }
+      return {
+        ...prev,
+        center,
+        zoom,
+        bounds
+      }
+    })
+  }, [])
+
+  // Handle viewport changes from SimpleMap (onMoveEnd) - includes fetch decision logic
   // Core buffer logic: only fetch when viewport exits buffered area
   const handleViewportChange = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
     const viewportBounds: Bounds = {
@@ -1069,6 +1098,7 @@ export default function SalesClient({
           pendingBounds={pendingBounds}
           mapSales={visibleSales}
           selectedPinId={selectedPinId}
+          onViewportMove={handleViewportMove}
           onViewportChange={handleViewportChange}
           onLocationClick={(locationId) => {
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -1159,6 +1189,7 @@ export default function SalesClient({
                       },
                       viewport: currentViewport!
                     }}
+                    onViewportMove={handleViewportMove}
                     onViewportChange={handleDesktopViewportChange}
                     onMapClick={() => {
                       if (selectedPinId) {

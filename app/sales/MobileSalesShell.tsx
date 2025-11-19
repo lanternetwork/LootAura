@@ -218,7 +218,8 @@ export default function MobileSalesShell({
             // Only if clicking on the map container itself, not on pins/callout
             if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.mapboxgl-canvas-container')) {
               if (selectedPinId) {
-                onLocationClick(selectedPinId)
+                setPinPosition(null) // Clear pin position immediately
+                onLocationClick(selectedPinId) // Toggle off selection
               }
             }
           }}
@@ -227,7 +228,8 @@ export default function MobileSalesShell({
             // Only if touching the map container itself, not on pins/callout
             if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.mapboxgl-canvas-container')) {
               if (selectedPinId) {
-                onLocationClick(selectedPinId)
+                setPinPosition(null) // Clear pin position immediately
+                onLocationClick(selectedPinId) // Toggle off selection
               }
             }
           }}

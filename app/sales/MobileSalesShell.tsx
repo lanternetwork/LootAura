@@ -189,12 +189,10 @@ export default function MobileSalesShell({
     zoom: number; 
     bounds: { west: number; south: number; east: number; north: number } 
   }) => {
-    // Close callout if visible when map moves
-    if (selectedPinId) {
-      onLocationClick(selectedPinId)
-    }
+    // Don't close callout on moveEnd - let user drag map freely
+    // Callout will close when user taps outside or explicitly dismisses
     onViewportChange(args)
-  }, [selectedPinId, onLocationClick, onViewportChange])
+  }, [onViewportChange])
   
   // Map viewport for callout
   const mapViewport = useMemo(() => {

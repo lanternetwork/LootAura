@@ -311,6 +311,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   const previousSelectedIdRef = useRef<string | null>(null)
   // Track when we're programmatically centering to prevent clearing selection during animation
   const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
+  // Track ongoing animation to cancel it if a new one starts (prevents label flashing)
+  const ongoingAnimationRef = useRef<{ cancel: () => void } | null>(null)
   
   const handleLocationClickWrapped = useCallback((locationId: string, lat?: number, lng?: number) => {
     const alreadyCentered = centeredLocationRef.current[locationId]
@@ -332,6 +334,16 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     if (!alreadyCentered && mapRef.current?.getMap) {
       const map = mapRef.current.getMap()
       if (map && typeof lat === 'number' && typeof lng === 'number') {
+        // Cancel any ongoing animation to prevent label flashing
+        if (ongoingAnimationRef.current) {
+          try {
+            ongoingAnimationRef.current.cancel()
+          } catch (e) {
+            // Ignore errors if cancel fails
+          }
+          ongoingAnimationRef.current = null
+        }
+        
         // Mark that we're centering to this pin
         isCenteringToPinRef.current = { locationId, lat, lng }
         
@@ -341,7 +353,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
         const flyToOptions: any = {
           center: [lng, lat],
-          duration: 400
+          duration: 300 // Reduced from 400ms for faster transitions and less label flashing
         }
         
         // Only add offset if bottomSheetHeight is set (mobile)
@@ -349,16 +361,22 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
           flyToOptions.offset = [0, -bottomSheetHeight / 2]
         }
         
-        map.flyTo(flyToOptions)
+        // Store the animation so we can cancel it if needed
+        const animation = map.flyTo(flyToOptions)
+        if (animation && typeof animation.cancel === 'function') {
+          ongoingAnimationRef.current = animation
+        }
+        
         centeredLocationRef.current[locationId] = true
         
-        // Clear the centering flag after animation completes
+        // Clear the centering flag and animation ref after animation completes
         setTimeout(() => {
           if (isCenteringToPinRef.current?.locationId === locationId) {
             isCenteringToPinRef.current = null
             onCenteringEnd?.()
           }
-        }, 500) // Slightly longer than flyTo duration (400ms)
+          ongoingAnimationRef.current = null
+        }, 400) // Slightly longer than flyTo duration (300ms)
         
         // Show callout immediately on first click (even while centering)
         hybridPins?.onLocationClick?.(locationId)
@@ -494,6 +512,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         style={{ position: "absolute", inset: 0 }}
+        preserveDrawingBuffer={true}
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMove={handleMove}

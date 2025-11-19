@@ -213,6 +213,24 @@ export default function MobileSalesShell({
         <div 
           className="relative flex-1 min-h-0 bg-gray-100"
           onClick={handleMapClick}
+          onMouseDown={(e) => {
+            // Close callout when user starts interacting with map
+            // Only if clicking on the map container itself, not on pins/callout
+            if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.mapboxgl-canvas-container')) {
+              if (selectedPinId) {
+                onLocationClick(selectedPinId)
+              }
+            }
+          }}
+          onTouchStart={(e) => {
+            // Close callout when user starts touching map
+            // Only if touching the map container itself, not on pins/callout
+            if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.mapboxgl-canvas-container')) {
+              if (selectedPinId) {
+                onLocationClick(selectedPinId)
+              }
+            }
+          }}
         >
           {/* Full-screen map */}
           <SimpleMap

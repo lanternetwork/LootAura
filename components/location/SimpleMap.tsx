@@ -178,9 +178,24 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   }, [loaded])
 
   // Handle drag start - close callout immediately when user starts dragging
-  const handleDragStart = useCallback(() => {
-    onDragStart?.()
-  }, [onDragStart])
+  // Use native map events to detect drag start more reliably
+  useEffect(() => {
+    if (!mapRef.current || !onDragStart) return
+    
+    const map = mapRef.current.getMap()
+    if (!map) return
+    
+    // Listen for drag start on the map
+    const handleDragStart = () => {
+      onDragStart()
+    }
+    
+    map.on('dragstart', handleDragStart)
+    
+    return () => {
+      map.off('dragstart', handleDragStart)
+    }
+  }, [onDragStart, loaded])
 
   // Handle map move (continuous during drag) - update viewport for live rendering
   const handleMove = useCallback(() => {
@@ -526,7 +541,6 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         onLoad={onLoad}
         onStyleData={onStyleData}
         onMove={handleMove}
-        onMoveStart={handleDragStart}
         onMoveEnd={handleMoveEnd}
         onClick={handleMapClick}
         onError={(error: any) => {

@@ -86,6 +86,7 @@ export default function MobileSalesShell({
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
   const mapRef = useRef<any>(null)
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
+  const isDraggingRef = useRef<boolean>(false)
   
   // Find selected sale from selectedPinId
   // selectedPinId can be either a sale ID or a location ID
@@ -148,6 +149,7 @@ export default function MobileSalesShell({
   }, [selectedPinCoords, mapView, currentViewport])
   
   // Update position on map move/zoom
+  // Skip updates during dragging to prevent flashing
   useEffect(() => {
     if (!selectedPinCoords || !mapRef.current) return
     
@@ -155,6 +157,9 @@ export default function MobileSalesShell({
     if (!map) return
     
     const updatePosition = () => {
+      // Don't update position during dragging
+      if (isDraggingRef.current) return
+      
       try {
         const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
         setPinPosition({ x: point.x, y: point.y })
@@ -255,7 +260,8 @@ export default function MobileSalesShell({
             onViewportChange={handleViewportChangeWithDismiss}
             onDragStart={() => {
               // Close callout immediately when user starts dragging
-              // Clear both selectedPinId and pinPosition to prevent flashing
+              // Set dragging flag and clear pinPosition to prevent flashing
+              isDraggingRef.current = true
               if (selectedPinId) {
                 setPinPosition(null) // Clear pin position immediately
                 onLocationClick(selectedPinId) // Toggle off selection

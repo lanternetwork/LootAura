@@ -253,8 +253,10 @@ export default function MobileSalesShell({
             onViewportChange={handleViewportChangeWithDismiss}
             onDragStart={() => {
               // Close callout immediately when user starts dragging
+              // Clear both selectedPinId and pinPosition to prevent flashing
               if (selectedPinId) {
-                onLocationClick(selectedPinId)
+                setPinPosition(null) // Clear pin position immediately
+                onLocationClick(selectedPinId) // Toggle off selection
               }
             }}
             onCenteringStart={onCenteringStart}

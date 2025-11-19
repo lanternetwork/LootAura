@@ -120,8 +120,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
     return (
       <div 
         ref={cardRef}
-        className={`bg-white rounded-2xl shadow-lg border border-gray-200 will-change-transform transition-transform duration-200 relative`}
-        onClick={(e) => e.stopPropagation()}
+        className={`bg-white rounded-2xl shadow-lg border border-gray-200 will-change-transform transition-transform duration-200 relative pointer-events-none`}
         style={cardStyle}
       >
         {/* Callout pointer/arrow pointing to pin */}
@@ -135,8 +134,8 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
           }}
         />
         
-        {/* Card content */}
-        <div className="flex flex-col p-0 overflow-hidden rounded-2xl">
+        {/* Card content - enable pointer events only on this container */}
+        <div className="flex flex-col p-0 overflow-hidden rounded-2xl pointer-events-auto">
           {/* Image at top - full width, half size */}
           <div className="relative w-full h-16 bg-gray-100 rounded-t-2xl overflow-hidden">
             {cover ? (

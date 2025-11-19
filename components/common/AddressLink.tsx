@@ -16,6 +16,11 @@ type Platform = 'ios' | 'android' | 'desktop'
 /**
  * Detect platform from user agent
  * SSR-safe - returns 'desktop' during SSR, detects on client
+ * 
+ * Conservative detection to avoid false positives:
+ * - iOS: Only iPhone/iPod (excludes iPad which can be desktop-like)
+ * - Android: Must have Android AND Mobile in user agent
+ * - Desktop: Everything else (default, safest option)
  */
 function detectPlatform(): Platform {
   if (typeof window === 'undefined') {
@@ -24,17 +29,20 @@ function detectPlatform(): Platform {
 
   const userAgent = navigator.userAgent || ''
 
-  // Check for iOS devices
-  if (/iPhone|iPad|iPod/.test(userAgent)) {
+  // Check for iPhone or iPod (exclude iPad - treat as desktop)
+  // This is more conservative and avoids false positives
+  if (/iPhone|iPod/.test(userAgent)) {
     return 'ios'
   }
 
-  // Check for Android
-  if (/Android/.test(userAgent)) {
+  // Check for Android mobile devices (must have both Android and Mobile)
+  // Desktop Chrome on Android tablets doesn't have "Mobile" in user agent
+  if (/Android/.test(userAgent) && /Mobile/.test(userAgent)) {
     return 'android'
   }
 
-  // Default to desktop
+  // Default to desktop (including iPad, desktop browsers, tablets, etc.)
+  // This is the safest default - desktop always gets Google Maps
   return 'desktop'
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { Sale } from '@/lib/types'
 import { HybridPinsResult, HybridPin, LocationGroup } from '@/lib/pins/types'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
@@ -27,10 +27,43 @@ export default function HybridPinsOverlay({
   viewport
 }: HybridPinsOverlayProps) {
   
+  // Debounce viewport updates to prevent cluster flashing during map movement
+  // Only update clustering viewport when map movement has stopped or zoom changed significantly
+  const [stableViewport, setStableViewport] = useState(viewport)
+  const viewportTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastZoomRef = useRef<number>(viewport.zoom)
+  
+  useEffect(() => {
+    // Clear any pending timeout
+    if (viewportTimeoutRef.current) {
+      clearTimeout(viewportTimeoutRef.current)
+    }
+    
+    // If zoom changed significantly (more than 0.5 levels), update immediately
+    const zoomDiff = Math.abs(viewport.zoom - lastZoomRef.current)
+    if (zoomDiff > 0.5) {
+      setStableViewport(viewport)
+      lastZoomRef.current = viewport.zoom
+      return
+    }
+    
+    // Otherwise, debounce viewport updates (wait 150ms after last movement)
+    viewportTimeoutRef.current = setTimeout(() => {
+      setStableViewport(viewport)
+    }, 150)
+    
+    return () => {
+      if (viewportTimeoutRef.current) {
+        clearTimeout(viewportTimeoutRef.current)
+      }
+    }
+  }, [viewport])
+  
   // Create hybrid pins using the two-stage process - touch-only clustering
   // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
+  // Use stableViewport instead of viewport to prevent constant recalculation during dragging
   const hybridResult = useMemo((): HybridPinsResult => {
-    return createHybridPins(sales, viewport, {
+    return createHybridPins(sales, stableViewport, {
       coordinatePrecision: 6,
       clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
       minClusterSize: 2,
@@ -38,7 +71,7 @@ export default function HybridPinsOverlay({
       enableLocationGrouping: true,
       enableVisualClustering: true
     })
-  }, [sales, viewport])
+  }, [sales, stableViewport])
 
   // Early return if no sales - avoid unnecessary rendering
   if (sales.length === 0) {

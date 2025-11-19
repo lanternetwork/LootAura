@@ -220,26 +220,6 @@ export default function MobileSalesShell({
         <div 
           className="relative flex-1 min-h-0 bg-gray-100"
           onClick={handleMapClick}
-          onMouseDown={(e) => {
-            // Close callout when user starts interacting with map
-            // Only if clicking on the map container itself, not on pins/callout
-            if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.mapboxgl-canvas-container')) {
-              if (selectedPinId) {
-                setPinPosition(null) // Clear pin position immediately
-                onLocationClick(selectedPinId) // Toggle off selection
-              }
-            }
-          }}
-          onTouchStart={(e) => {
-            // Close callout when user starts touching map
-            // Only if touching the map container itself, not on pins/callout
-            if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.mapboxgl-canvas-container')) {
-              if (selectedPinId) {
-                setPinPosition(null) // Clear pin position immediately
-                onLocationClick(selectedPinId) // Toggle off selection
-              }
-            }
-          }}
         >
           {/* Full-screen map */}
           <SimpleMap
@@ -261,13 +241,8 @@ export default function MobileSalesShell({
             onViewportMove={onViewportMove}
             onViewportChange={handleViewportChangeWithDismiss}
             onDragStart={() => {
-              // Close callout immediately when user starts dragging
-              // Set dragging flag and clear pinPosition to prevent flashing
+              // Set dragging flag to prevent pinPosition updates during drag
               isDraggingRef.current = true
-              if (selectedPinId) {
-                setPinPosition(null) // Clear pin position immediately
-                onLocationClick(selectedPinId) // Toggle off selection
-              }
             }}
             onCenteringStart={onCenteringStart}
             onCenteringEnd={onCenteringEnd}

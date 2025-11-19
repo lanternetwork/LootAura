@@ -308,12 +308,7 @@ export default function FiltersBar({
                         {category.label}
                       </div>
                     ) : (
-                      <>
-                        {category.label}
-                        {isSelected && (
-                          <span className="ml-1 text-[var(--accent-primary)]">×</span>
-                        )}
-                      </>
+                      category.label
                     )}
                   </button>
                 </li>
@@ -388,9 +383,6 @@ export default function FiltersBar({
                       `}
                     >
                       {preset.label}
-                      {isSelected && (
-                        <span className="ml-1 text-blue-600">×</span>
-                      )}
                     </button>
                   </li>
                 )
@@ -469,9 +461,6 @@ export default function FiltersBar({
                           `}
                         >
                           {category.label}
-                          {isSelected && (
-                            <span className="ml-1 text-blue-600">×</span>
-                          )}
                         </button>
                       )
                     })}
@@ -603,9 +592,6 @@ export default function FiltersBar({
                           `}
                         >
                           {category.label}
-                          {isSelected && (
-                            <span className="ml-1 text-blue-600">×</span>
-                          )}
                         </button>
                       )
                     })}

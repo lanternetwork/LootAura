@@ -334,7 +334,14 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     if (!alreadyCentered && mapRef.current?.getMap) {
       const map = mapRef.current.getMap()
       if (map && typeof lat === 'number' && typeof lng === 'number') {
-        // Cancel any ongoing animation to prevent label flashing
+        // Stop any ongoing animations immediately to prevent label flashing
+        try {
+          map.stop()
+        } catch (e) {
+          // Ignore errors if stop fails
+        }
+        
+        // Cancel any tracked animation
         if (ongoingAnimationRef.current) {
           try {
             ongoingAnimationRef.current.cancel()
@@ -350,33 +357,70 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         // Notify parent that centering has started
         onCenteringStart?.(locationId, lat, lng)
         
-        // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
-        const flyToOptions: any = {
-          center: [lng, lat],
-          duration: 300 // Reduced from 400ms for faster transitions and less label flashing
-        }
+        // Get current map center to calculate distance
+        const currentCenter = map.getCenter()
+        const currentLat = currentCenter.lat
+        const currentLng = currentCenter.lng
         
-        // Only add offset if bottomSheetHeight is set (mobile)
-        if (bottomSheetHeight > 0) {
-          flyToOptions.offset = [0, -bottomSheetHeight / 2]
-        }
+        // Calculate distance in degrees (rough approximation)
+        const latDiff = Math.abs(lat - currentLat)
+        const lngDiff = Math.abs(lng - currentLng)
+        const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff)
         
-        // Store the animation so we can cancel it if needed
-        const animation = map.flyTo(flyToOptions)
-        if (animation && typeof animation.cancel === 'function') {
-          ongoingAnimationRef.current = animation
+        // For very short distances (< 0.01 degrees, ~1km), use jumpTo to avoid label fading
+        // For longer distances, use flyTo with minimal duration
+        const isShortDistance = distance < 0.01
+        
+        if (isShortDistance) {
+          // Use jumpTo for short distances - instant, no animation, no label fade
+          const jumpOptions: any = {
+            center: [lng, lat]
+          }
+          
+          // Only add offset if bottomSheetHeight is set (mobile)
+          if (bottomSheetHeight > 0) {
+            // For jumpTo, we need to manually adjust the center to account for offset
+            // Calculate the offset in lat/lng degrees
+            const mapBounds = map.getBounds()
+            const mapHeight = mapBounds.getNorth() - mapBounds.getSouth()
+            const offsetLat = (bottomSheetHeight / 2) * (mapHeight / map.getContainer().offsetHeight)
+            jumpOptions.center = [lng, lat + offsetLat]
+          }
+          
+          map.jumpTo(jumpOptions)
+          
+          // Clear flags immediately since there's no animation
+          isCenteringToPinRef.current = null
+          onCenteringEnd?.()
+        } else {
+          // Use flyTo for longer distances with minimal duration
+          const flyToOptions: any = {
+            center: [lng, lat],
+            duration: 200 // Very short duration to minimize label fade time
+          }
+          
+          // Only add offset if bottomSheetHeight is set (mobile)
+          if (bottomSheetHeight > 0) {
+            flyToOptions.offset = [0, -bottomSheetHeight / 2]
+          }
+          
+          // Store the animation so we can cancel it if needed
+          const animation = map.flyTo(flyToOptions)
+          if (animation && typeof animation.cancel === 'function') {
+            ongoingAnimationRef.current = animation
+          }
+          
+          // Clear the centering flag and animation ref after animation completes
+          setTimeout(() => {
+            if (isCenteringToPinRef.current?.locationId === locationId) {
+              isCenteringToPinRef.current = null
+              onCenteringEnd?.()
+            }
+            ongoingAnimationRef.current = null
+          }, 250) // Slightly longer than flyTo duration (200ms)
         }
         
         centeredLocationRef.current[locationId] = true
-        
-        // Clear the centering flag and animation ref after animation completes
-        setTimeout(() => {
-          if (isCenteringToPinRef.current?.locationId === locationId) {
-            isCenteringToPinRef.current = null
-            onCenteringEnd?.()
-          }
-          ongoingAnimationRef.current = null
-        }, 400) // Slightly longer than flyTo duration (300ms)
         
         // Show callout immediately on first click (even while centering)
         hybridPins?.onLocationClick?.(locationId)

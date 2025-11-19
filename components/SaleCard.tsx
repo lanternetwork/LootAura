@@ -74,26 +74,38 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
         </div>
         {sale?.description && <p className="text-xs text-neutral-600 line-clamp-1">{sale.description}</p>}
         <div className="text-sm text-neutral-700">
-          {sale?.address && (
-            <div>
-              <AddressLink
-                lat={sale.lat ?? undefined}
-                lng={sale.lng ?? undefined}
-                address={sale.address}
-              >
-                {sale.address}
-              </AddressLink>
-            </div>
-          )}
-          {sale?.city && sale?.state && (
-            <div>
-              <AddressLink
-                lat={sale.lat ?? undefined}
-                lng={sale.lng ?? undefined}
-                address={`${sale.city}, ${sale.state}`}
-              >
-                {sale.city}, {sale.state}
-              </AddressLink>
+          {(sale?.address || (sale?.city && sale?.state)) && (
+            <div className="group">
+              {sale?.address && (
+                <div className="group-hover:underline">
+                  <AddressLink
+                    lat={sale.lat ?? undefined}
+                    lng={sale.lng ?? undefined}
+                    address={sale.address && sale.city && sale.state 
+                      ? `${sale.address}, ${sale.city}, ${sale.state}`
+                      : sale.address
+                    }
+                    className="no-underline"
+                  >
+                    {sale.address}
+                  </AddressLink>
+                </div>
+              )}
+              {sale?.city && sale?.state && (
+                <div className="group-hover:underline">
+                  <AddressLink
+                    lat={sale.lat ?? undefined}
+                    lng={sale.lng ?? undefined}
+                    address={sale.address && sale.city && sale.state 
+                      ? `${sale.address}, ${sale.city}, ${sale.state}`
+                      : `${sale.city}, ${sale.state}`
+                    }
+                    className="no-underline"
+                  >
+                    {sale.city}, {sale.state}
+                  </AddressLink>
+                </div>
+              )}
             </div>
           )}
         </div>

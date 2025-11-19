@@ -86,6 +86,7 @@ export default function MobileSalesShell({
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
   const mapRef = useRef<any>(null)
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
+  const isDraggingRef = useRef<boolean>(false)
   
   // Find selected sale from selectedPinId
   // selectedPinId can be either a sale ID or a location ID
@@ -148,6 +149,7 @@ export default function MobileSalesShell({
   }, [selectedPinCoords, mapView, currentViewport])
   
   // Update position on map move/zoom
+  // Skip updates during dragging to prevent flashing
   useEffect(() => {
     if (!selectedPinCoords || !mapRef.current) return
     
@@ -155,6 +157,9 @@ export default function MobileSalesShell({
     if (!map) return
     
     const updatePosition = () => {
+      // Don't update position during dragging
+      if (isDraggingRef.current) return
+      
       try {
         const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
         setPinPosition({ x: point.x, y: point.y })
@@ -189,12 +194,12 @@ export default function MobileSalesShell({
     zoom: number; 
     bounds: { west: number; south: number; east: number; north: number } 
   }) => {
-    // Close callout if visible when map moves
-    if (selectedPinId) {
-      onLocationClick(selectedPinId)
-    }
+    // Clear dragging flag on moveEnd
+    isDraggingRef.current = false
+    // Don't close callout on moveEnd - let user drag map freely
+    // Callout will close when user taps outside or explicitly dismisses
     onViewportChange(args)
-  }, [selectedPinId, onLocationClick, onViewportChange])
+  }, [onViewportChange])
   
   // Map viewport for callout
   const mapViewport = useMemo(() => {
@@ -235,6 +240,10 @@ export default function MobileSalesShell({
             }}
             onViewportMove={onViewportMove}
             onViewportChange={handleViewportChangeWithDismiss}
+            onDragStart={() => {
+              // Set dragging flag to prevent pinPosition updates during drag
+              isDraggingRef.current = true
+            }}
             onCenteringStart={onCenteringStart}
             onCenteringEnd={onCenteringEnd}
             onMapClick={() => {

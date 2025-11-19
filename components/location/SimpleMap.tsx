@@ -29,6 +29,7 @@ interface SimpleMapProps {
     zoom: number; 
     bounds: { west: number; south: number; east: number; north: number } 
   }) => void
+  onDragStart?: () => void // Called when user starts dragging the map
   onCenteringStart?: (locationId: string, lat: number, lng: number) => void
   onCenteringEnd?: () => void
   isTransitioning?: boolean
@@ -54,6 +55,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   hybridPins,
   onViewportChange,
   onViewportMove,
+  onDragStart,
   onCenteringStart,
   onCenteringEnd,
   isTransitioning = false,
@@ -174,6 +176,36 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
       mapRef.current?.getMap()?.resize()
     }
   }, [loaded])
+
+  // Handle drag start - close callout immediately when user starts dragging
+  // Use native map events to detect drag start more reliably
+  useEffect(() => {
+    if (!mapRef.current || !loaded) return
+    
+    const map = mapRef.current.getMap()
+    if (!map) return
+    
+    // Listen for drag start on the map
+    const handleDragStart = () => {
+      isUserDraggingRef.current = true
+      onDragStart?.()
+    }
+    
+    const handleDragEnd = () => {
+      // Small delay to ensure all drag-related state updates complete
+      setTimeout(() => {
+        isUserDraggingRef.current = false
+      }, 100)
+    }
+    
+    map.on('dragstart', handleDragStart)
+    map.on('dragend', handleDragEnd)
+    
+    return () => {
+      map.off('dragstart', handleDragStart)
+      map.off('dragend', handleDragEnd)
+    }
+  }, [onDragStart, loaded])
 
   // Handle map move (continuous during drag) - update viewport for live rendering
   const handleMove = useCallback(() => {
@@ -313,6 +345,8 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
   // Track ongoing animation to cancel it if a new one starts (prevents label flashing)
   const ongoingAnimationRef = useRef<{ cancel: () => void } | null>(null)
+  // Track when user is actively dragging/interacting with the map
+  const isUserDraggingRef = useRef<boolean>(false)
   
   const handleLocationClickWrapped = useCallback((locationId: string, lat?: number, lng?: number) => {
     const alreadyCentered = centeredLocationRef.current[locationId]
@@ -432,11 +466,15 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   // Handle center/zoom changes
   // Skip center/zoom updates when fitBounds is active to prevent zoom flash
   // Also skip when we're programmatically centering to a pin (to avoid conflicts)
+  // Also skip when user is actively dragging/interacting with the map
   useEffect(() => {
     if (!loaded || !mapRef.current || fitBounds) return
     
     // Don't easeTo if we're currently centering to a pin (programmatic centering)
     if (isCenteringToPinRef.current) return
+    
+    // Don't easeTo if user is actively dragging the map
+    if (isUserDraggingRef.current) return
     
     const map = mapRef.current.getMap()
     if (!map) return
@@ -449,7 +487,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     const zoomDiff = Math.abs(currentZoom - zoom)
     
     if (latDiff > 1e-5 || lngDiff > 1e-5 || zoomDiff > 0.01) {
-      console.log('[MAP] easeTo:', { center, zoom })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MAP] easeTo:', { center, zoom })
+      }
       map.easeTo({
         center: [center.lng, center.lat],
         zoom,

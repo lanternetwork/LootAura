@@ -291,7 +291,7 @@ export default function FiltersBar({
                     }}
                     className={`
                       shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap min-h-[44px]
-                      focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2
+                      focus:outline-none
                       ${isLoading 
                         ? 'opacity-50 cursor-not-allowed' 
                         : ''
@@ -379,7 +379,7 @@ export default function FiltersBar({
                       }}
                       className={`
                         shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap
-                        focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:ring-offset-2
+                        focus:outline-none
                         ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
                         ${isSelected 
                           ? 'bg-blue-100 text-blue-800 border border-blue-200' 

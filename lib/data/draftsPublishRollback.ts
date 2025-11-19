@@ -7,8 +7,7 @@
  * Server-only - no client-side imports.
  */
 
-import { SupabaseClient } from '@supabase/supabase-js'
-import { fromBase } from '@/lib/supabase/clients'
+import { fromBase, getAdminDb } from '@/lib/supabase/clients'
 import { logger } from '@/lib/log'
 import * as Sentry from '@sentry/nextjs'
 
@@ -18,12 +17,12 @@ import * as Sentry from '@sentry/nextjs'
  * This is a compensation operation used when draft publishing fails partway through.
  * It attempts to clean up any partially created resources.
  * 
- * @param adminClient - Admin Supabase client (schema-scoped to lootaura_v2)
+ * @param adminClient - Admin Supabase client (schema-scoped PostgrestClient from getAdminDb)
  * @param saleId - The sale ID to delete along with its items
  * @returns true if cleanup succeeded, false otherwise (errors are logged, not thrown)
  */
 export async function deleteSaleAndItemsForRollback(
-  adminClient: SupabaseClient,
+  adminClient: ReturnType<typeof getAdminDb>,
   saleId: string
 ): Promise<boolean> {
   if (!saleId) {

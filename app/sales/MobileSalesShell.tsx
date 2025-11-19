@@ -194,6 +194,8 @@ export default function MobileSalesShell({
     zoom: number; 
     bounds: { west: number; south: number; east: number; north: number } 
   }) => {
+    // Clear dragging flag on moveEnd
+    isDraggingRef.current = false
     // Don't close callout on moveEnd - let user drag map freely
     // Callout will close when user taps outside or explicitly dismisses
     onViewportChange(args)

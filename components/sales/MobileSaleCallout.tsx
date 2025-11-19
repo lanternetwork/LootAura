@@ -6,6 +6,8 @@ import Image from 'next/image'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
+import AddressLink from '@/components/common/AddressLink'
+import { buildAppleMapsUrl } from '@/lib/location/mapsLinks'
 
 interface MobileSaleCalloutProps {
   sale: Sale | null
@@ -212,8 +214,14 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
             <div className="space-y-0.5 mb-2">
               {sale.address && (
                 <p className="text-xs text-gray-600 line-clamp-1">
-                  {sale.address}
-                  {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
+                  <AddressLink
+                    lat={sale.lat ?? undefined}
+                    lng={sale.lng ?? undefined}
+                    address={sale.address && sale.city && sale.state ? `${sale.address}, ${sale.city}, ${sale.state}` : sale.address}
+                  >
+                    {sale.address}
+                    {sale.city && sale.state && `, ${sale.city}, ${sale.state}`}
+                  </AddressLink>
                 </p>
               )}
               {sale.date_start && (
@@ -223,13 +231,34 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
               )}
             </div>
 
-            {/* Action button - full width, normal height */}
-            <button
-              onClick={handleViewSale}
-              className="w-full bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
-            >
-              View Sale
-            </button>
+            {/* Action buttons - side by side */}
+            <div className="flex gap-2">
+              {/* Navigation button */}
+              <a
+                href={buildAppleMapsUrl({
+                  lat: sale.lat ?? undefined,
+                  lng: sale.lng ?? undefined,
+                  address: sale.address && sale.city && sale.state ? `${sale.address}, ${sale.city}, ${sale.state}` : sale.address ?? undefined
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px]"
+                aria-label="Start navigation"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </a>
+              
+              {/* View Sale button - reduced width */}
+              <button
+                onClick={handleViewSale}
+                className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
+              >
+                View Sale
+              </button>
+            </div>
           </div>
         </div>
       </div>

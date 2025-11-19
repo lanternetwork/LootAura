@@ -14,6 +14,7 @@ import { NearbySalesCard } from '@/components/sales/NearbySalesCard'
 import CategoryChips from '@/components/ui/CategoryChips'
 import OSMAttribution from '@/components/location/OSMAttribution'
 import SaleShareButton from '@/components/share/SaleShareButton'
+import AddressLink from '@/components/common/AddressLink'
 import type { SaleWithOwnerInfo } from '@/lib/data'
 import type { SaleItem, Sale } from '@/lib/types'
 import { trackSaleViewed, trackFavoriteToggled } from '@/lib/analytics/clarityEvents'
@@ -219,7 +220,13 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  {sale.address && `${sale.address}, `}{sale.city}, {sale.state}
+                  <AddressLink
+                    lat={sale.lat ?? undefined}
+                    lng={sale.lng ?? undefined}
+                    address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
+                  >
+                    {sale.address && `${sale.address}, `}{sale.city}, {sale.state}
+                  </AddressLink>
                 </div>
               </div>
               
@@ -380,8 +387,26 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
               />
             </div>
             <div className="mt-4 text-sm text-gray-600">
-              <p>{sale.address}</p>
-              <p>{sale.city}, {sale.state} {sale.zip_code}</p>
+              {sale.address && (
+                <p>
+                  <AddressLink
+                    lat={sale.lat ?? undefined}
+                    lng={sale.lng ?? undefined}
+                    address={sale.address}
+                  >
+                    {sale.address}
+                  </AddressLink>
+                </p>
+              )}
+              <p>
+                <AddressLink
+                  lat={sale.lat ?? undefined}
+                  lng={sale.lng ?? undefined}
+                  address={`${sale.city}, ${sale.state} ${sale.zip_code || ''}`.trim()}
+                >
+                  {sale.city}, {sale.state} {sale.zip_code}
+                </AddressLink>
+              </p>
               {/* OSM Attribution - show when address exists (addresses are geocoded via Nominatim/OSM) */}
               {sale.address && (
                 <div className="mt-2">

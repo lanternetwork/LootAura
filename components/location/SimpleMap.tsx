@@ -24,6 +24,13 @@ interface SimpleMapProps {
     zoom: number; 
     bounds: { west: number; south: number; east: number; north: number } 
   }) => void
+  onViewportMove?: (args: { 
+    center: { lat: number; lng: number }; 
+    zoom: number; 
+    bounds: { west: number; south: number; east: number; north: number } 
+  }) => void
+  onCenteringStart?: (locationId: string, lat: number, lng: number) => void
+  onCenteringEnd?: () => void
   isTransitioning?: boolean
   transitionMessage?: string
   interactive?: boolean // Disable all map interactions when false
@@ -46,6 +53,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   pins,
   hybridPins,
   onViewportChange,
+  onViewportMove,
+  onCenteringStart,
+  onCenteringEnd,
   isTransitioning = false,
   transitionMessage = "Loading...",
   interactive = true,
@@ -165,6 +175,38 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     }
   }, [loaded])
 
+  // Handle map move (continuous during drag) - update viewport for live rendering
+  const handleMove = useCallback(() => {
+    if (!mapRef.current) return
+    
+    const map = mapRef.current.getMap()
+    if (!map) return
+
+    const center = map.getCenter()
+    const zoom = map.getZoom()
+    const bounds = map.getBounds()
+    
+    const viewport = {
+      center: { lat: center.lat, lng: center.lng },
+      zoom,
+      bounds: {
+        west: bounds.getWest(),
+        south: bounds.getSouth(),
+        east: bounds.getEast(),
+        north: bounds.getNorth()
+      }
+    }
+    
+    // Call onViewportMove for live updates (no fetch logic here)
+    // Falls back to onViewportChange if onViewportMove not provided
+    if (onViewportMove) {
+      onViewportMove(viewport)
+    } else {
+      onViewportChange?.(viewport)
+    }
+  }, [onViewportChange, onViewportMove])
+
+  // Handle map move end - trigger fetch decision logic
   const handleMoveEnd = useCallback(() => {
     if (!mapRef.current) return
     
@@ -194,6 +236,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         center: viewport.center
       })
     }
+    // Also call onViewportChange on moveend for final state update
     onViewportChange?.(viewport)
   }, [onViewportChange])
 
@@ -266,6 +309,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   // First-click-to-center, second-click-to-select for location pins
   const centeredLocationRef = useRef<Record<string, boolean>>({})
   const previousSelectedIdRef = useRef<string | null>(null)
+  // Track when we're programmatically centering to prevent clearing selection during animation
+  const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
+  // Track ongoing animation to cancel it if a new one starts (prevents label flashing)
+  const ongoingAnimationRef = useRef<{ cancel: () => void } | null>(null)
   
   const handleLocationClickWrapped = useCallback((locationId: string, lat?: number, lng?: number) => {
     const alreadyCentered = centeredLocationRef.current[locationId]
@@ -287,19 +334,53 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     if (!alreadyCentered && mapRef.current?.getMap) {
       const map = mapRef.current.getMap()
       if (map && typeof lat === 'number' && typeof lng === 'number') {
-        // Calculate vertical offset for pin centering (move pin up by half of bottom sheet height)
-        const flyToOptions: any = {
-          center: [lng, lat],
-          duration: 400
+        // Stop any ongoing animations immediately to prevent label flashing
+        try {
+          map.stop()
+        } catch (e) {
+          // Ignore errors if stop fails
+        }
+        
+        // Cancel any tracked animation
+        if (ongoingAnimationRef.current) {
+          try {
+            ongoingAnimationRef.current.cancel()
+          } catch (e) {
+            // Ignore errors if cancel fails
+          }
+          ongoingAnimationRef.current = null
+        }
+        
+        // Mark that we're centering to this pin
+        isCenteringToPinRef.current = { locationId, lat, lng }
+        
+        // Notify parent that centering has started
+        onCenteringStart?.(locationId, lat, lng)
+        
+        // Always use jumpTo for pin clicks to prevent label fading
+        // jumpTo is instant with no animation, so labels don't fade
+        const jumpOptions: any = {
+          center: [lng, lat]
         }
         
         // Only add offset if bottomSheetHeight is set (mobile)
         if (bottomSheetHeight > 0) {
-          flyToOptions.offset = [0, -bottomSheetHeight / 2]
+          // For jumpTo, we need to manually adjust the center to account for offset
+          // Calculate the offset in lat/lng degrees
+          const mapBounds = map.getBounds()
+          const mapHeight = mapBounds.getNorth() - mapBounds.getSouth()
+          const offsetLat = (bottomSheetHeight / 2) * (mapHeight / map.getContainer().offsetHeight)
+          jumpOptions.center = [lng, lat + offsetLat]
         }
         
-        map.flyTo(flyToOptions)
+        map.jumpTo(jumpOptions)
+        
+        // Clear flags immediately since there's no animation
+        isCenteringToPinRef.current = null
+        onCenteringEnd?.()
+        
         centeredLocationRef.current[locationId] = true
+        
         // Show callout immediately on first click (even while centering)
         hybridPins?.onLocationClick?.(locationId)
         return
@@ -308,7 +389,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     
     // Second click (or if we couldn't center): select location
     hybridPins?.onLocationClick?.(locationId)
-  }, [hybridPins?.onLocationClick, hybridPins?.selectedId, bottomSheetHeight, skipCenteringOnClick])
+  }, [hybridPins?.onLocationClick, hybridPins?.selectedId, bottomSheetHeight, skipCenteringOnClick, onCenteringStart, onCenteringEnd])
   
   // Reset centered flag when location is deselected or a different location is selected
   useEffect(() => {
@@ -350,8 +431,12 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
 
   // Handle center/zoom changes
   // Skip center/zoom updates when fitBounds is active to prevent zoom flash
+  // Also skip when we're programmatically centering to a pin (to avoid conflicts)
   useEffect(() => {
     if (!loaded || !mapRef.current || fitBounds) return
+    
+    // Don't easeTo if we're currently centering to a pin (programmatic centering)
+    if (isCenteringToPinRef.current) return
     
     const map = mapRef.current.getMap()
     if (!map) return
@@ -430,8 +515,10 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
         }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
         style={{ position: "absolute", inset: 0 }}
+        preserveDrawingBuffer={true}
         onLoad={onLoad}
         onStyleData={onStyleData}
+        onMove={handleMove}
         onMoveEnd={handleMoveEnd}
         onClick={handleMapClick}
         onError={(error: any) => {

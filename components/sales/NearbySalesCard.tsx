@@ -6,6 +6,7 @@ import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import { formatDistance } from '@/lib/utils/distance'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
+import AddressLink from '@/components/common/AddressLink'
 
 interface NearbySalesCardProps {
   nearbySales: Array<Sale & { distance_m: number }>
@@ -113,7 +114,13 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
                     </div>
                     {locationText && (
                       <div className="text-xs text-gray-500 truncate">
-                        {locationText}
+                        <AddressLink
+                          lat={nearbySale.lat ?? undefined}
+                          lng={nearbySale.lng ?? undefined}
+                          address={locationText}
+                        >
+                          {locationText}
+                        </AddressLink>
                       </div>
                     )}
                   </div>

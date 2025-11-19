@@ -1,6 +1,7 @@
 'use client'
 
-import { buildGoogleMapsUrl, buildAppleMapsUrl } from '@/lib/location/mapsLinks'
+import { useState, useEffect } from 'react'
+import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
 
 interface AddressLinkProps {
   address?: string
@@ -10,10 +11,38 @@ interface AddressLinkProps {
   className?: string
 }
 
+type Platform = 'ios' | 'android' | 'desktop'
+
 /**
- * Hybrid address linking component:
- * - Desktop: opens Google Maps
- * - Mobile: opens Apple Maps navigation (universal link with daddr=)
+ * Detect platform from user agent
+ * SSR-safe - returns 'desktop' during SSR, detects on client
+ */
+function detectPlatform(): Platform {
+  if (typeof window === 'undefined') {
+    return 'desktop'
+  }
+
+  const userAgent = navigator.userAgent || ''
+
+  // Check for iOS devices
+  if (/iPhone|iPad|iPod/.test(userAgent)) {
+    return 'ios'
+  }
+
+  // Check for Android
+  if (/Android/.test(userAgent)) {
+    return 'android'
+  }
+
+  // Default to desktop
+  return 'desktop'
+}
+
+/**
+ * Hybrid address linking component with platform detection:
+ * - Desktop: opens Google Maps website
+ * - iOS Mobile: opens native Apple Maps app (maps://)
+ * - Android Mobile: opens Google Maps app with directions
  * 
  * Pure presentational component - no map state interaction
  */
@@ -24,11 +53,26 @@ export default function AddressLink({
   children,
   className = ''
 }: AddressLinkProps) {
-  const googleUrl = buildGoogleMapsUrl({ lat, lng, address })
-  const appleUrl = buildAppleMapsUrl({ lat, lng, address })
+  const [platform, setPlatform] = useState<Platform>('desktop')
 
-  // If no URLs can be built, render plain text
-  if (!googleUrl && !appleUrl) {
+  // Detect platform on client side only
+  useEffect(() => {
+    setPlatform(detectPlatform())
+  }, [])
+
+  // Build URL based on platform
+  let href = ''
+  if (platform === 'ios') {
+    href = buildIosNavUrl({ lat, lng, address })
+  } else if (platform === 'android') {
+    href = buildAndroidNavUrl({ lat, lng, address })
+  } else {
+    // desktop or unknown -> fall back to Google Maps web
+    href = buildDesktopGoogleMapsUrl({ lat, lng, address })
+  }
+
+  // If no URL can be built, render plain text
+  if (!href) {
     return (
       <span className={className}>
         {children ?? address ?? ''}
@@ -43,30 +87,17 @@ export default function AddressLink({
 
   const displayText = children ?? address ?? ''
 
+  // Render a single link with platform-appropriate URL
   return (
-    <>
-      {/* Desktop: Google Maps link (hidden on mobile) */}
-      <a
-        href={googleUrl || '#'}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`${className || 'hover:underline'} hidden md:inline cursor-pointer`}
-        aria-label={ariaLabel}
-      >
-        {displayText}
-      </a>
-      
-      {/* Mobile: Apple Maps link (hidden on desktop) */}
-      <a
-        href={appleUrl || '#'}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`${className || 'hover:underline'} inline md:hidden cursor-pointer`}
-        aria-label={ariaLabel}
-      >
-        {displayText}
-      </a>
-    </>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`${className || 'hover:underline'} cursor-pointer`}
+      aria-label={ariaLabel}
+    >
+      {displayText}
+    </a>
   )
 }
 

@@ -8,6 +8,7 @@ import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import { FaEdit, FaTrash } from 'react-icons/fa'
+import AddressLink from '@/components/common/AddressLink'
 
 interface DashboardSaleCardProps {
   sale: Sale
@@ -105,8 +106,34 @@ export default function DashboardSaleCard({ sale, onDelete }: DashboardSaleCardP
           </div>
           {sale.description && <p className="text-xs text-neutral-600 line-clamp-1">{sale.description}</p>}
           <div className="text-sm text-neutral-700">
-            {sale.address && <div>{sale.address}</div>}
-            {sale.city && sale.state && <div>{sale.city}, {sale.state}</div>}
+            {sale.address && (
+              <div>
+                <AddressLink
+                  lat={sale.lat ?? undefined}
+                  lng={sale.lng ?? undefined}
+                  address={sale.address && sale.city && sale.state 
+                    ? `${sale.address}, ${sale.city}, ${sale.state}`
+                    : sale.address
+                  }
+                >
+                  {sale.address}
+                </AddressLink>
+              </div>
+            )}
+            {sale.city && sale.state && (
+              <div>
+                <AddressLink
+                  lat={sale.lat ?? undefined}
+                  lng={sale.lng ?? undefined}
+                  address={sale.address && sale.city && sale.state 
+                    ? `${sale.address}, ${sale.city}, ${sale.state}`
+                    : `${sale.city}, ${sale.state}`
+                  }
+                >
+                  {sale.city}, {sale.state}
+                </AddressLink>
+              </div>
+            )}
           </div>
           {sale.date_start && (
             <div className="text-xs text-neutral-600">

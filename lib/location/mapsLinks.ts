@@ -14,14 +14,14 @@ export function buildDesktopGoogleMapsUrl(options: {
 }): string {
   const { lat, lng, address } = options
 
-  // Prefer coordinates if available
-  if (typeof lat === 'number' && typeof lng === 'number') {
-    return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
-  }
-
-  // Fall back to address
+  // Prefer address if available
   if (address) {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+  }
+
+  // Fall back to coordinates
+  if (typeof lat === 'number' && typeof lng === 'number') {
+    return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
   }
 
   return ''
@@ -38,14 +38,14 @@ export function buildIosNavUrl(options: {
 }): string {
   const { lat, lng, address } = options
 
-  // Prefer coordinates if available
-  if (typeof lat === 'number' && typeof lng === 'number') {
-    return `maps://?daddr=${lat},${lng}`
-  }
-
-  // Fall back to address
+  // Prefer address if available
   if (address) {
     return `maps://?daddr=${encodeURIComponent(address)}`
+  }
+
+  // Fall back to coordinates
+  if (typeof lat === 'number' && typeof lng === 'number') {
+    return `maps://?daddr=${lat},${lng}`
   }
 
   return ''
@@ -62,14 +62,14 @@ export function buildAndroidNavUrl(options: {
 }): string {
   const { lat, lng, address } = options
 
-  // Prefer coordinates if available
-  if (typeof lat === 'number' && typeof lng === 'number') {
-    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
-  }
-
-  // Fall back to address
+  // Prefer address if available
   if (address) {
     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`
+  }
+
+  // Fall back to coordinates
+  if (typeof lat === 'number' && typeof lng === 'number') {
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
   }
 
   return ''

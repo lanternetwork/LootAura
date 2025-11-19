@@ -338,7 +338,7 @@ function FiltersContent({
           {CATEGORY_OPTIONS.map((category) => (
             <label
               key={category.value}
-              className={`flex items-start p-2 rounded-lg border cursor-pointer transition-colors min-h-[44px] w-full overflow-hidden ${
+              className={`flex items-start p-2 rounded-lg border cursor-pointer transition-colors min-h-[44px] w-full overflow-hidden focus:outline-none ${
                 filters.categories.includes(category.value)
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'

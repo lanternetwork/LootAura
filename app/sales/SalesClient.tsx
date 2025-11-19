@@ -486,31 +486,11 @@ export default function SalesClient({
   const isCenteringToPinRef = useRef<{ locationId: string; lat: number; lng: number } | null>(null)
 
   // Handle live viewport updates during map drag (onMove) - updates rendering only, no fetch
+  // NOTE: Do NOT clear selection here - it blocks map dragging. Clear only on moveEnd.
   const handleViewportMove = useCallback(({ center, zoom, bounds }: { center: { lat: number; lng: number }, zoom: number, bounds: { west: number; south: number; east: number; north: number } }) => {
-    // Don't clear selection during programmatic centering
-    // Check if we're currently centering to a pin
-    const isCenteringToThisPin = isCenteringToPinRef.current && 
-      isCenteringToPinRef.current.locationId === selectedPinId
-    
-    // If we're centering to this pin, don't clear selection even if center moves
-    // (the center will move during the animation, but we want to keep the callout open)
-    if (!isCenteringToThisPin && selectedPinId && hybridResult) {
-      const selectedLocation = hybridResult.locations.find((loc: any) => loc.id === selectedPinId)
-      if (selectedLocation) {
-        // Check if the new center is far from the selected pin (user manually moved map away)
-        const latDiff = Math.abs(center.lat - selectedLocation.lat)
-        const lngDiff = Math.abs(center.lng - selectedLocation.lng)
-        const isFarFromSelectedPin = latDiff > 0.01 || lngDiff > 0.01
-        
-        // Only clear if user manually moved map far away from the pin
-        if (isFarFromSelectedPin) {
-          setSelectedPinId(null)
-        }
-      }
-    }
-    
     // Update map view state immediately for live rendering
     // This triggers viewportBounds and visibleSales recomputation via useMemo
+    // Do NOT clear selection here - it causes blocking during drag
     setMapView(prev => {
       if (!prev) {
         const radiusKm = 16.09 // 10 miles
@@ -534,7 +514,7 @@ export default function SalesClient({
         bounds
       }
     })
-  }, [selectedPinId, hybridResult])
+  }, [])
 
   // Handle viewport changes from SimpleMap (onMoveEnd) - includes fetch decision logic
   // Core buffer logic: only fetch when viewport exits buffered area

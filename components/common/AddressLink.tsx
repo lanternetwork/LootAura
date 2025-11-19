@@ -17,10 +17,10 @@ type Platform = 'ios' | 'android' | 'desktop'
  * Detect platform from user agent
  * SSR-safe - returns 'desktop' during SSR, detects on client
  * 
- * Conservative detection to avoid false positives:
+ * Very conservative detection - explicitly check for desktop OS first:
+ * - Desktop: Mac, Windows, Linux, or any non-mobile device
  * - iOS: Only iPhone/iPod (excludes iPad which can be desktop-like)
  * - Android: Must have Android AND Mobile in user agent
- * - Desktop: Everything else (default, safest option)
  */
 function detectPlatform(): Platform {
   if (typeof window === 'undefined') {
@@ -29,19 +29,24 @@ function detectPlatform(): Platform {
 
   const userAgent = navigator.userAgent || ''
 
+  // Explicitly check for desktop operating systems first
+  // This ensures desktop always gets Google Maps
+  const isDesktopOS = /Macintosh|Windows|Linux|X11/.test(userAgent)
+  
   // Check for iPhone or iPod (exclude iPad - treat as desktop)
-  // This is more conservative and avoids false positives
-  if (/iPhone|iPod/.test(userAgent)) {
+  // Only match if it's NOT a desktop OS (extra safety check)
+  if (!isDesktopOS && /iPhone|iPod/.test(userAgent)) {
     return 'ios'
   }
 
   // Check for Android mobile devices (must have both Android and Mobile)
   // Desktop Chrome on Android tablets doesn't have "Mobile" in user agent
-  if (/Android/.test(userAgent) && /Mobile/.test(userAgent)) {
+  // Also exclude if it's a desktop OS
+  if (!isDesktopOS && /Android/.test(userAgent) && /Mobile/.test(userAgent)) {
     return 'android'
   }
 
-  // Default to desktop (including iPad, desktop browsers, tablets, etc.)
+  // Default to desktop (including all desktop OS, iPad, tablets, etc.)
   // This is the safest default - desktop always gets Google Maps
   return 'desktop'
 }
@@ -62,20 +67,27 @@ export default function AddressLink({
   className = ''
 }: AddressLinkProps) {
   const [platform, setPlatform] = useState<Platform>('desktop')
+  const [isClient, setIsClient] = useState(false)
 
   // Detect platform on client side only
   useEffect(() => {
+    setIsClient(true)
     setPlatform(detectPlatform())
   }, [])
 
   // Build URL based on platform
+  // Always default to desktop during SSR and initial render
+  // This ensures desktop gets Google Maps even before platform detection runs
   let href = ''
-  if (platform === 'ios') {
+  if (!isClient || platform === 'desktop') {
+    // During SSR or if platform is desktop -> use Google Maps
+    href = buildDesktopGoogleMapsUrl({ lat, lng, address })
+  } else if (platform === 'ios') {
     href = buildIosNavUrl({ lat, lng, address })
   } else if (platform === 'android') {
     href = buildAndroidNavUrl({ lat, lng, address })
   } else {
-    // desktop or unknown -> fall back to Google Maps web
+    // Fallback to desktop (Google Maps)
     href = buildDesktopGoogleMapsUrl({ lat, lng, address })
   }
 

@@ -37,6 +37,13 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(req as any)
+  if (csrfError) {
+    return csrfError
+  }
+
   const supabase = createSupabaseServerClient()
   const {
     data: { user },

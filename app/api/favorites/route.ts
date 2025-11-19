@@ -55,6 +55,13 @@ export async function GET(_request: NextRequest) {
  * POST /api/favorites - Add a favorite
  */
 export async function POST(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const body = await request.json()
     const { sale_id } = body
@@ -114,6 +121,13 @@ export async function POST(request: NextRequest) {
  * DELETE /api/favorites - Remove a favorite
  */
 export async function DELETE(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const sale_id = searchParams.get('sale_id')

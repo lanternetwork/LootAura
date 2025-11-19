@@ -11,6 +11,13 @@ export const dynamic = 'force-dynamic'
 
 // POST: Publish draft (transactional: create sale + items, mark draft as published)
 export async function POST(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   // Track created resources for cleanup on failure (scoped to function)
   let createdSaleId: string | null = null
   let createdItemIds: string[] = []

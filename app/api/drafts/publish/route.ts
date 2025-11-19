@@ -6,6 +6,7 @@ import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
 import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
+import { deleteSaleAndItemsForRollback } from '@/lib/data/draftsPublishRollback'
 
 export const dynamic = 'force-dynamic'
 
@@ -208,34 +209,15 @@ export async function POST(request: NextRequest) {
           saleId: createdSaleId ?? undefined,
         })
         
-        // Cleanup: delete the sale we just created
+        // Cleanup: rollback the sale and any partially created items
         if (createdSaleId) {
-          try {
-            await fromBase(admin, 'sales').delete().eq('id', createdSaleId)
-            logger.info('Compensated: deleted sale after item creation failure', {
-              component: 'drafts/publish',
-              operation: 'compensation',
-              saleId: createdSaleId ?? undefined,
-            })
-          } catch (cleanupErr) {
-            const cleanupError = cleanupErr instanceof Error ? cleanupErr : new Error(String(cleanupErr))
-            logger.error('Failed to cleanup sale after item creation failure', cleanupError, {
-              component: 'drafts/publish',
-              operation: 'compensation_failed',
-              saleId: createdSaleId ?? undefined,
-            })
-            // Report to Sentry but don't fail the response
-            Sentry.captureException(cleanupError, {
-              tags: { operation: 'publishDraft', step: 'compensation' },
-              extra: { saleId: createdSaleId ?? undefined, draftId: draft.id },
-            })
-          }
+          await deleteSaleAndItemsForRollback(admin, createdSaleId)
         }
         
         return fail(500, 'ITEMS_CREATE_FAILED', itemsError.message, itemsError)
       }
       
-      // Track created item IDs for potential cleanup
+      // Track created item IDs for business event logging
       if (insertedItems) {
         createdItemIds = insertedItems.map((item: any) => item.id)
       }
@@ -408,36 +390,11 @@ export async function POST(request: NextRequest) {
     const { logger } = await import('@/lib/log')
     const { isProduction } = await import('@/lib/env')
     
-    // If we have created resources, attempt cleanup
+    // If we have created resources, attempt cleanup using rollback helper
+    // This handles deletion of both items (by sale_id) and the sale itself
     if (createdSaleId) {
-      try {
-        const admin = getAdminDb()
-        // Delete items first (foreign key constraint)
-        if (createdItemIds.length > 0) {
-          await fromBase(admin, 'items').delete().in('id', createdItemIds)
-        }
-        // Then delete the sale
-        await fromBase(admin, 'sales').delete().eq('id', createdSaleId)
-        
-        logger.info('Compensated: cleaned up sale and items after publish failure', {
-          component: 'drafts/publish',
-          operation: 'compensation',
-          saleId: createdSaleId ?? undefined,
-          itemIds: createdItemIds,
-        })
-      } catch (cleanupErr) {
-        const cleanupError = cleanupErr instanceof Error ? cleanupErr : new Error(String(cleanupErr))
-        logger.error('Failed to cleanup resources after publish failure', cleanupError, {
-          component: 'drafts/publish',
-          operation: 'compensation_failed',
-          saleId: createdSaleId ?? undefined,
-          itemIds: createdItemIds,
-        })
-        Sentry.captureException(cleanupError, {
-          tags: { operation: 'publishDraft', step: 'compensation' },
-          extra: { saleId: createdSaleId ?? undefined, itemIds: createdItemIds },
-        })
-      }
+      const admin = getAdminDb()
+      await deleteSaleAndItemsForRollback(admin, createdSaleId)
     }
     
     const error = e instanceof Error ? e : new Error(String(e))
@@ -446,6 +403,7 @@ export async function POST(request: NextRequest) {
       operation: 'publish_draft',
       draftId: draft?.id,
       userId: user?.id,
+      saleId: createdSaleId ?? undefined,
     })
     
     if (!isProduction()) {

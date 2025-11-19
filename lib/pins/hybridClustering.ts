@@ -134,12 +134,15 @@ export function applyVisualClustering(
   const realClusters = clusters.filter(c => (c.count || 0) > 1)
   realClusters.forEach(cluster => {
     // Calculate total sales count for this cluster by summing sales from all location groups in the cluster
+    // Also collect location IDs to generate a stable cluster ID
     let totalSalesCount = 0
+    const locationIds: string[] = []
     try {
       const leaves = (clusterIndex as any).getLeaves?.(cluster.id, Infinity) || []
       leaves.forEach((leaf: any) => {
         const locationId = leaf?.properties?.id
         if (locationId) {
+          locationIds.push(String(locationId))
           const location = locations.find(loc => loc.id === locationId)
           if (location) {
             totalSalesCount += location.totalSales
@@ -154,6 +157,7 @@ export function applyVisualClustering(
         children.forEach((child: any) => {
           const locationId = child?.properties?.id
           if (locationId) {
+            locationIds.push(String(locationId))
             const location = locations.find(loc => loc.id === locationId)
             if (location) {
               totalSalesCount += location.totalSales
@@ -173,9 +177,17 @@ export function applyVisualClustering(
     // Use total sales count, or fallback to cluster.count if calculation failed
     const finalCount = totalSalesCount > 0 ? totalSalesCount : cluster.count
     
+    // Generate stable cluster ID based on location IDs and coordinates
+    // This ensures the same physical cluster always has the same ID, even if Supercluster returns different numeric IDs
+    const stableLocationIds = locationIds.sort().join(',')
+    const coordKey = `${cluster.lat.toFixed(6)},${cluster.lng.toFixed(6)}`
+    const stableClusterId = stableLocationIds 
+      ? `cluster-${coordKey}-${stableLocationIds.slice(0, 50)}` // Use first 50 chars of location IDs for hash-like ID
+      : `cluster-${coordKey}-${cluster.id}` // Fallback to numeric ID if no location IDs
+    
     pins.push({
       type: 'cluster',
-      id: `cluster-${cluster.id}`,
+      id: stableClusterId,
       lat: cluster.lat,
       lng: cluster.lng,
       count: finalCount,

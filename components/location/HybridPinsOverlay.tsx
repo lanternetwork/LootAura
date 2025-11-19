@@ -34,6 +34,12 @@ export default function HybridPinsOverlay({
   const lastZoomRef = useRef<number>(viewport.zoom)
   const lastBoundsRef = useRef<[number, number, number, number]>(viewport.bounds)
   
+  // Stabilize sales array to prevent cluster flashing when visibleSales changes during map movement
+  // Only update when the set of sales IDs has meaningfully changed
+  const [stableSales, setStableSales] = useState(sales)
+  const salesTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastSalesIdsRef = useRef<string>(JSON.stringify(sales.map(s => s.id).sort()))
+  
   useEffect(() => {
     // Compare actual values, not object reference
     const zoomDiff = Math.abs(viewport.zoom - lastZoomRef.current)
@@ -93,11 +99,59 @@ export default function HybridPinsOverlay({
     }
   }, [viewport, stableViewport])
   
+  // Stabilize sales array to prevent cluster flashing when visibleSales changes during map movement
+  // Debounce all sales updates to prevent constant recalculation during dragging
+  useEffect(() => {
+    const currentSalesIds = JSON.stringify(sales.map(s => s.id).sort())
+    
+    // If the set of sales IDs hasn't changed, don't update
+    if (currentSalesIds === lastSalesIdsRef.current) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[HYBRID_PINS] Sales IDs unchanged, skipping update')
+      }
+      return
+    }
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const currentIds = new Set(sales.map(s => s.id))
+      const lastIds = new Set(JSON.parse(lastSalesIdsRef.current || '[]'))
+      const addedIds = [...currentIds].filter(id => !lastIds.has(id))
+      const removedIds = [...lastIds].filter(id => !currentIds.has(id))
+      console.log('[HYBRID_PINS] Sales IDs changed:', {
+        added: addedIds.length,
+        removed: removedIds.length,
+        currentCount: sales.length,
+        lastCount: lastIds.size
+      })
+    }
+    
+    // Clear any pending timeout
+    if (salesTimeoutRef.current) {
+      clearTimeout(salesTimeoutRef.current)
+    }
+    
+    // Debounce sales updates (wait 400ms after last change) to prevent cluster flashing during map movement
+    // This is longer than viewport debounce (300ms) to ensure clusters stabilize
+    salesTimeoutRef.current = setTimeout(() => {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[HYBRID_PINS] Applying debounced sales update')
+      }
+      setStableSales(sales)
+      lastSalesIdsRef.current = currentSalesIds
+    }, 400)
+    
+    return () => {
+      if (salesTimeoutRef.current) {
+        clearTimeout(salesTimeoutRef.current)
+      }
+    }
+  }, [sales])
+  
   // Create hybrid pins using the two-stage process - touch-only clustering
   // Pins are 12px diameter (6px radius), so cluster only when centers are within 12px (pins exactly touch)
-  // Use stableViewport instead of viewport to prevent constant recalculation during dragging
+  // Use stableViewport and stableSales instead of viewport and sales to prevent constant recalculation during dragging
   const hybridResult = useMemo((): HybridPinsResult => {
-    return createHybridPins(sales, stableViewport, {
+    return createHybridPins(stableSales, stableViewport, {
       coordinatePrecision: 6,
       clusterRadius: 6.5, // px: touch-only - cluster only when pins actually touch (12px apart = edge-to-edge)
       minClusterSize: 2,
@@ -105,10 +159,10 @@ export default function HybridPinsOverlay({
       enableLocationGrouping: true,
       enableVisualClustering: true
     })
-  }, [sales, stableViewport])
+  }, [stableSales, stableViewport])
 
   // Early return if no sales - avoid unnecessary rendering
-  if (sales.length === 0) {
+  if (stableSales.length === 0) {
     return null
   }
 
@@ -126,11 +180,18 @@ export default function HybridPinsOverlay({
     <>
       {hybridResult.pins.map((pin: HybridPin) => {
         if (pin.type === 'cluster') {
+          // Generate a numeric hash from the stable cluster ID for ClusterFeature compatibility
+          // The stable ID ensures React keys are consistent, preventing unmount/remount flashing
+          const numericId = pin.id.split('').reduce((acc, char) => {
+            const hash = ((acc << 5) - acc) + char.charCodeAt(0)
+            return hash & hash // Convert to 32-bit integer
+          }, 0)
+          
           return (
             <ClusterMarker
-              key={pin.id}
+              key={pin.id} // Use stable string ID as React key to prevent flashing
               cluster={{
-                id: parseInt(pin.id.replace('cluster-', '')),
+                id: numericId, // Numeric ID for ClusterFeature type compatibility
                 count: pin.count || 0,
                 lat: pin.lat,
                 lng: pin.lng,

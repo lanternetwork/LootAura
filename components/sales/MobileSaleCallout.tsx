@@ -7,6 +7,7 @@ import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import AddressLink from '@/components/common/AddressLink'
+import { buildAppleMapsUrl } from '@/lib/location/mapsLinks'
 
 interface MobileSaleCalloutProps {
   sale: Sale | null
@@ -230,13 +231,33 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
               )}
             </div>
 
-            {/* Action button - full width, normal height */}
-            <button
-              onClick={handleViewSale}
-              className="w-full bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
-            >
-              View Sale
-            </button>
+            {/* Action buttons - side by side */}
+            <div className="flex gap-2">
+              {/* Navigation button */}
+              <a
+                href={buildAppleMapsUrl({
+                  lat: sale.lat ?? undefined,
+                  lng: sale.lng ?? undefined,
+                  address: sale.address && sale.city && sale.state ? `${sale.address}, ${sale.city}, ${sale.state}` : sale.address ?? undefined
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px]"
+                aria-label="Start navigation"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </a>
+              
+              {/* View Sale button - reduced width */}
+              <button
+                onClick={handleViewSale}
+                className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
+              >
+                View Sale
+              </button>
+            </div>
           </div>
         </div>
       </div>

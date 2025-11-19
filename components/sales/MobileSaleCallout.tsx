@@ -107,7 +107,6 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
         transform: `translate(-50%, ${swipeDeltaY > 0 ? swipeDeltaY - cardOffset : -cardOffset}px)`,
         maxWidth: 'calc(100vw - 2rem)',
         width: '220px',
-        pointerEvents: 'auto' as const,
         zIndex: 50
       }
     : {
@@ -134,8 +133,8 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
           }}
         />
         
-        {/* Card content - enable pointer events only on this container */}
-        <div className="flex flex-col p-0 overflow-hidden rounded-2xl pointer-events-auto">
+        {/* Card content - only interactive elements should capture events */}
+        <div className="flex flex-col p-0 overflow-hidden rounded-2xl pointer-events-none">
           {/* Image at top - full width, half size */}
           <div className="relative w-full h-16 bg-gray-100 rounded-t-2xl overflow-hidden">
             {cover ? (
@@ -154,7 +153,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
             {/* Close button overlay on image */}
             <button
               onClick={onDismiss}
-              className="absolute top-1.5 right-1.5 bg-white/90 hover:bg-white text-gray-600 rounded-full min-w-[28px] min-h-[28px] flex items-center justify-center shadow-sm transition-colors"
+              className="absolute top-1.5 right-1.5 bg-white/90 hover:bg-white text-gray-600 rounded-full min-w-[28px] min-h-[28px] flex items-center justify-center shadow-sm transition-colors pointer-events-auto"
               aria-label="Close"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +163,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
           </div>
 
           {/* Content section */}
-          <div className="flex flex-col p-2">
+          <div className="flex flex-col p-2 pointer-events-auto">
             {/* Title */}
             <h3 className="text-base font-semibold line-clamp-2 mb-1">
               {sale.title || `Sale ${sale.id}`}
@@ -202,7 +201,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                 })}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px]"
+                className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px] pointer-events-auto"
                 aria-label="Start navigation"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -214,7 +213,7 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
               {/* View Sale button - reduced width */}
               <button
                 onClick={handleViewSale}
-                className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm"
+                className="flex-1 bg-[#F4B63A] hover:bg-[#dca32f] text-[#3A2268] font-medium px-4 py-2.5 rounded-lg transition-colors text-sm pointer-events-auto"
               >
                 View Sale
               </button>

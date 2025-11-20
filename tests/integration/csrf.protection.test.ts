@@ -117,8 +117,7 @@ function createRequestWithCsrf(
     method,
     body: body ? JSON.stringify(body) : undefined,
     headers,
-    duplex: 'half',
-  })
+  } as any)
 }
 
 describe('CSRF Protection', () => {
@@ -182,8 +181,7 @@ describe('CSRF Protection', () => {
           'x-csrf-token': token1,
           'cookie': `csrf-token=${token2}`,
         },
-        duplex: 'half',
-      })
+      } as any)
 
       const response = await POST(request)
       const data = await response.json()

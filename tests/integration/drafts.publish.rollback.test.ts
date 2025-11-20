@@ -15,6 +15,52 @@ vi.mock('@/lib/data/draftsPublishRollback', () => ({
   deleteSaleAndItemsForRollback: mockDeleteSaleAndItemsForRollback,
 }))
 
+// Helper to create a chainable mock query builder
+function createChainableQueryBuilder() {
+  const chain = {
+    select: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    upsert: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    neq: vi.fn().mockReturnThis(),
+    gt: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockReturnThis(),
+    lt: vi.fn().mockReturnThis(),
+    lte: vi.fn().mockReturnThis(),
+    like: vi.fn().mockReturnThis(),
+    ilike: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
+    in: vi.fn().mockReturnThis(),
+    contains: vi.fn().mockReturnThis(),
+    containedBy: vi.fn().mockReturnThis(),
+    rangeGt: vi.fn().mockReturnThis(),
+    rangeGte: vi.fn().mockReturnThis(),
+    rangeLt: vi.fn().mockReturnThis(),
+    rangeLte: vi.fn().mockReturnThis(),
+    rangeAdjacent: vi.fn().mockReturnThis(),
+    overlaps: vi.fn().mockReturnThis(),
+    textSearch: vi.fn().mockReturnThis(),
+    match: vi.fn().mockReturnThis(),
+    not: vi.fn().mockReturnThis(),
+    or: vi.fn().mockReturnThis(),
+    filter: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    range: vi.fn().mockReturnThis(),
+    abortSignal: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue({ data: null, error: null }),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    csv: vi.fn().mockResolvedValue(''),
+    geojson: vi.fn().mockResolvedValue({}),
+    explain: vi.fn().mockResolvedValue({}),
+    rollback: vi.fn().mockReturnThis(),
+    returns: vi.fn().mockReturnThis(),
+  }
+  return chain
+}
+
 // Mock Supabase clients
 const mockRlsDb = {
   from: vi.fn(),
@@ -42,7 +88,16 @@ vi.mock('@/lib/supabase/clients', () => ({
     if (table.includes('.')) {
       throw new Error(`Do not qualify table names: received "${table}"`)
     }
-    return db.from(table)
+    const result = db.from(table)
+    // Ensure the result is chainable (has all query builder methods)
+    if (result && typeof result === 'object') {
+      // If it already has chainable methods, return as-is
+      if (result.eq && typeof result.eq === 'function') {
+        return result
+      }
+    }
+    // Fallback: return a chainable mock if db.from doesn't return proper chain
+    return createChainableQueryBuilder()
   },
 }))
 
@@ -103,8 +158,7 @@ function createRequestWithCsrf(url: string, body: any): NextRequest {
       'x-csrf-token': csrfToken,
       'cookie': `csrf-token=${csrfToken}`,
     },
-    duplex: 'half',
-  })
+  } as any)
 }
 
 // Helper to create a mock draft payload
@@ -160,10 +214,9 @@ describe('Draft Publish Rollback', () => {
       const draftPayload = createMockDraftPayload()
       const validatedPayload = SaleDraftPayloadSchema.parse(draftPayload)
 
-      // Mock draft lookup
-      const mockDraftSelect = vi.fn().mockReturnThis()
-      const mockDraftEq = vi.fn().mockReturnThis()
-      const mockDraftMaybeSingle = vi.fn().mockResolvedValue({
+      // Mock draft lookup - needs to support .select().eq().eq().maybeSingle() chain
+      const draftChain = createChainableQueryBuilder()
+      draftChain.maybeSingle.mockResolvedValue({
         data: {
           id: draftId,
           draft_key: draftKey,
@@ -174,101 +227,56 @@ describe('Draft Publish Rollback', () => {
         error: null,
       })
 
-      mockRlsDb.from.mockReturnValue({
-        select: mockDraftSelect,
-        eq: mockDraftEq,
-        maybeSingle: mockDraftMaybeSingle,
-      })
-      mockDraftSelect.mockReturnValue({
-        eq: mockDraftEq,
-      })
-      mockDraftEq.mockReturnValue({
-        maybeSingle: mockDraftMaybeSingle,
-      })
+      mockRlsDb.from.mockReturnValue(draftChain)
 
       // Mock sale creation
-      const mockSaleInsert = vi.fn().mockReturnThis()
-      const mockSaleSelect = vi.fn().mockReturnThis()
-      const mockSaleSingle = vi.fn().mockResolvedValue({
+      const saleInsertChain = createChainableQueryBuilder()
+      saleInsertChain.single.mockResolvedValue({
         data: { id: saleId },
         error: null,
       })
 
-      mockAdminDb.from.mockImplementation((table: string) => {
-        if (table === 'sales') {
-          return {
-            insert: mockSaleInsert,
-          }
-        }
-        if (table === 'items') {
-          return {
-            insert: vi.fn().mockReturnThis(),
-            select: vi.fn().mockReturnThis(),
-          }
-        }
-        if (table === 'sale_drafts') {
-          return {
-            delete: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            select: vi.fn().mockResolvedValue({
-              data: [{ id: draftId }],
-              error: null,
-            }),
-          }
-        }
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-        }
+      // Mock draft deletion - needs to support .delete().eq().eq().eq().eq().select() chain
+      const draftDeleteChain = createChainableQueryBuilder()
+      draftDeleteChain.select.mockResolvedValue({
+        data: [{ id: draftId }],
+        error: null,
+        count: 1,
       })
 
-      mockSaleInsert.mockReturnValue({
-        select: mockSaleSelect,
-      })
-      mockSaleSelect.mockReturnValue({
-        single: mockSaleSingle,
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'sales') {
+          return saleInsertChain
+        }
+        if (table === 'items') {
+          return createChainableQueryBuilder()
+        }
+        if (table === 'sale_drafts') {
+          return draftDeleteChain
+        }
+        return createChainableQueryBuilder()
       })
 
       // Mock items creation
-      const mockItemsInsert = vi.fn().mockReturnThis()
-      const mockItemsSelect = vi.fn().mockReturnThis()
-      const mockItemsSelectResult = vi.fn().mockResolvedValue({
+      const itemsInsertChain = createChainableQueryBuilder()
+      itemsInsertChain.select.mockResolvedValue({
         data: [{ id: 'item-1', name: 'Test Item', sale_id: saleId }],
         error: null,
       })
 
+      // Update mock to return proper chains
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sales') {
-          return {
-            insert: mockSaleInsert,
-          }
+          return saleInsertChain
         }
         if (table === 'items') {
-          return {
-            insert: mockItemsInsert,
-            select: mockItemsSelect,
-          }
+          return itemsInsertChain
         }
         if (table === 'sale_drafts') {
-          return {
-            delete: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            select: vi.fn().mockResolvedValue({
-              data: [{ id: draftId }],
-              error: null,
-            }),
-          }
+          return draftDeleteChain
         }
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-        }
+        return createChainableQueryBuilder()
       })
-
-      mockItemsInsert.mockReturnValue({
-        select: mockItemsSelect,
-      })
-      mockItemsSelect.mockReturnValue(mockItemsSelectResult)
 
       const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {
         draftKey,
@@ -291,10 +299,9 @@ describe('Draft Publish Rollback', () => {
       const draftPayload = createMockDraftPayload()
       const validatedPayload = SaleDraftPayloadSchema.parse(draftPayload)
 
-      // Mock draft lookup
-      const mockDraftSelect = vi.fn().mockReturnThis()
-      const mockDraftEq = vi.fn().mockReturnThis()
-      const mockDraftMaybeSingle = vi.fn().mockResolvedValue({
+      // Mock draft lookup - needs to support .select().eq().eq().maybeSingle() chain
+      const draftChain = createChainableQueryBuilder()
+      draftChain.maybeSingle.mockResolvedValue({
         data: {
           id: draftId,
           draft_key: draftKey,
@@ -305,30 +312,18 @@ describe('Draft Publish Rollback', () => {
         error: null,
       })
 
-      mockRlsDb.from.mockReturnValue({
-        select: mockDraftSelect,
-        eq: mockDraftEq,
-        maybeSingle: mockDraftMaybeSingle,
-      })
-      mockDraftSelect.mockReturnValue({
-        eq: mockDraftEq,
-      })
-      mockDraftEq.mockReturnValue({
-        maybeSingle: mockDraftMaybeSingle,
-      })
+      mockRlsDb.from.mockReturnValue(draftChain)
 
       // Mock sale creation (succeeds)
-      const mockSaleInsert = vi.fn().mockReturnThis()
-      const mockSaleSelect = vi.fn().mockReturnThis()
-      const mockSaleSingle = vi.fn().mockResolvedValue({
+      const saleInsertChain = createChainableQueryBuilder()
+      saleInsertChain.single.mockResolvedValue({
         data: { id: saleId },
         error: null,
       })
 
       // Mock items creation (fails)
-      const mockItemsInsert = vi.fn().mockReturnThis()
-      const mockItemsSelect = vi.fn().mockReturnThis()
-      const mockItemsSelectResult = vi.fn().mockResolvedValue({
+      const itemsInsertChain = createChainableQueryBuilder()
+      itemsInsertChain.select.mockResolvedValue({
         data: null,
         error: {
           code: '23503',
@@ -338,33 +333,13 @@ describe('Draft Publish Rollback', () => {
 
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sales') {
-          return {
-            insert: mockSaleInsert,
-          }
+          return saleInsertChain
         }
         if (table === 'items') {
-          return {
-            insert: mockItemsInsert,
-            select: mockItemsSelect,
-          }
+          return itemsInsertChain
         }
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-        }
+        return createChainableQueryBuilder()
       })
-
-      mockSaleInsert.mockReturnValue({
-        select: mockSaleSelect,
-      })
-      mockSaleSelect.mockReturnValue({
-        single: mockSaleSingle,
-      })
-
-      mockItemsInsert.mockReturnValue({
-        select: mockItemsSelect,
-      })
-      mockItemsSelect.mockReturnValue(mockItemsSelectResult)
 
       const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {
         draftKey,
@@ -391,10 +366,9 @@ describe('Draft Publish Rollback', () => {
       const draftPayload = createMockDraftPayload()
       const validatedPayload = SaleDraftPayloadSchema.parse(draftPayload)
 
-      // Mock draft lookup
-      const mockDraftSelect = vi.fn().mockReturnThis()
-      const mockDraftEq = vi.fn().mockReturnThis()
-      const mockDraftMaybeSingle = vi.fn().mockResolvedValue({
+      // Mock draft lookup - needs to support .select().eq().eq().maybeSingle() chain
+      const draftChain = createChainableQueryBuilder()
+      draftChain.maybeSingle.mockResolvedValue({
         data: {
           id: draftId,
           draft_key: draftKey,
@@ -405,83 +379,39 @@ describe('Draft Publish Rollback', () => {
         error: null,
       })
 
-      mockRlsDb.from.mockReturnValue({
-        select: mockDraftSelect,
-        eq: mockDraftEq,
-        maybeSingle: mockDraftMaybeSingle,
-      })
-      mockDraftSelect.mockReturnValue({
-        eq: mockDraftEq,
-      })
-      mockDraftEq.mockReturnValue({
-        maybeSingle: mockDraftMaybeSingle,
-      })
+      mockRlsDb.from.mockReturnValue(draftChain)
 
       // Mock sale creation (succeeds)
-      const mockSaleInsert = vi.fn().mockReturnThis()
-      const mockSaleSelect = vi.fn().mockReturnThis()
-      const mockSaleSingle = vi.fn().mockResolvedValue({
+      const saleInsertChain = createChainableQueryBuilder()
+      saleInsertChain.single.mockResolvedValue({
         data: { id: saleId },
         error: null,
       })
 
       // Mock items creation (succeeds)
-      const mockItemsInsert = vi.fn().mockReturnThis()
-      const mockItemsSelect = vi.fn().mockReturnThis()
-      const mockItemsSelectResult = vi.fn().mockResolvedValue({
+      const itemsInsertChain = createChainableQueryBuilder()
+      itemsInsertChain.select.mockResolvedValue({
         data: [{ id: 'item-1', name: 'Test Item', sale_id: saleId }],
         error: null,
       })
 
       // Mock draft deletion (fails with unexpected error)
-      const mockDraftDelete = vi.fn().mockReturnThis()
-      const mockDraftDeleteEq = vi.fn().mockReturnThis()
-      const mockDraftDeleteSelect = vi.fn().mockImplementation(() => {
+      const draftDeleteChain = createChainableQueryBuilder()
+      draftDeleteChain.select.mockImplementation(() => {
         throw new Error('Unexpected database error during draft deletion')
       })
 
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sales') {
-          return {
-            insert: mockSaleInsert,
-          }
+          return saleInsertChain
         }
         if (table === 'items') {
-          return {
-            insert: mockItemsInsert,
-            select: mockItemsSelect,
-          }
+          return itemsInsertChain
         }
         if (table === 'sale_drafts') {
-          return {
-            delete: mockDraftDelete,
-            eq: mockDraftDeleteEq,
-            select: mockDraftDeleteSelect,
-          }
+          return draftDeleteChain
         }
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-        }
-      })
-
-      mockSaleInsert.mockReturnValue({
-        select: mockSaleSelect,
-      })
-      mockSaleSelect.mockReturnValue({
-        single: mockSaleSingle,
-      })
-
-      mockItemsInsert.mockReturnValue({
-        select: mockItemsSelect,
-      })
-      mockItemsSelect.mockReturnValue(mockItemsSelectResult)
-
-      mockDraftDelete.mockReturnValue({
-        eq: mockDraftDeleteEq,
-      })
-      mockDraftDeleteEq.mockReturnValue({
-        select: mockDraftDeleteSelect,
+        return createChainableQueryBuilder()
       })
 
       const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {
@@ -510,10 +440,9 @@ describe('Draft Publish Rollback', () => {
       // Mock rollback to fail
       mockDeleteSaleAndItemsForRollback.mockResolvedValue(false)
 
-      // Mock draft lookup
-      const mockDraftSelect = vi.fn().mockReturnThis()
-      const mockDraftEq = vi.fn().mockReturnThis()
-      const mockDraftMaybeSingle = vi.fn().mockResolvedValue({
+      // Mock draft lookup - needs to support .select().eq().eq().maybeSingle() chain
+      const draftChain = createChainableQueryBuilder()
+      draftChain.maybeSingle.mockResolvedValue({
         data: {
           id: draftId,
           draft_key: draftKey,
@@ -524,30 +453,18 @@ describe('Draft Publish Rollback', () => {
         error: null,
       })
 
-      mockRlsDb.from.mockReturnValue({
-        select: mockDraftSelect,
-        eq: mockDraftEq,
-        maybeSingle: mockDraftMaybeSingle,
-      })
-      mockDraftSelect.mockReturnValue({
-        eq: mockDraftEq,
-      })
-      mockDraftEq.mockReturnValue({
-        maybeSingle: mockDraftMaybeSingle,
-      })
+      mockRlsDb.from.mockReturnValue(draftChain)
 
       // Mock sale creation (succeeds)
-      const mockSaleInsert = vi.fn().mockReturnThis()
-      const mockSaleSelect = vi.fn().mockReturnThis()
-      const mockSaleSingle = vi.fn().mockResolvedValue({
+      const saleInsertChain = createChainableQueryBuilder()
+      saleInsertChain.single.mockResolvedValue({
         data: { id: saleId },
         error: null,
       })
 
       // Mock items creation (fails)
-      const mockItemsInsert = vi.fn().mockReturnThis()
-      const mockItemsSelect = vi.fn().mockReturnThis()
-      const mockItemsSelectResult = vi.fn().mockResolvedValue({
+      const itemsInsertChain = createChainableQueryBuilder()
+      itemsInsertChain.select.mockResolvedValue({
         data: null,
         error: {
           code: '23503',
@@ -557,33 +474,13 @@ describe('Draft Publish Rollback', () => {
 
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sales') {
-          return {
-            insert: mockSaleInsert,
-          }
+          return saleInsertChain
         }
         if (table === 'items') {
-          return {
-            insert: mockItemsInsert,
-            select: mockItemsSelect,
-          }
+          return itemsInsertChain
         }
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-        }
+        return createChainableQueryBuilder()
       })
-
-      mockSaleInsert.mockReturnValue({
-        select: mockSaleSelect,
-      })
-      mockSaleSelect.mockReturnValue({
-        single: mockSaleSingle,
-      })
-
-      mockItemsInsert.mockReturnValue({
-        select: mockItemsSelect,
-      })
-      mockItemsSelect.mockReturnValue(mockItemsSelectResult)
 
       const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {
         draftKey,

@@ -121,8 +121,7 @@ function createRequestWithCsrf(url: string, body: any, options: { authenticated?
     method: 'POST',
     body: JSON.stringify(body),
     headers,
-    duplex: 'half',
-  })
+  } as any)
 }
 
 describe('POST /api/seller/rating', () => {
@@ -340,8 +339,7 @@ describe('POST /api/seller/rating', () => {
         'x-csrf-token': token1,
         'cookie': `csrf-token=${token2}`,
       },
-      duplex: 'half',
-    })
+    } as any)
 
     const response = await POST(request)
     const data = await response.json()
@@ -451,8 +449,7 @@ describe('POST /api/seller/rating', () => {
         'x-csrf-token': csrfToken,
         'cookie': `csrf-token=${csrfToken}`,
       },
-      duplex: 'half',
-    })
+    } as any)
 
     const response = await POST(request)
     const data = await response.json()

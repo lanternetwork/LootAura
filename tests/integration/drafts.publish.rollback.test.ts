@@ -11,6 +11,8 @@ import { NextRequest } from 'next/server'
 import { generateCsrfToken } from '@/lib/csrf'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
+import { server } from '@/tests/setup/msw.server'
+import { http, passthrough } from 'msw'
 
 // Mock auth only - we need a test user for authentication
 const mockSupabaseClient = {
@@ -204,6 +206,13 @@ describe('Draft publish rollback', () => {
       data: { user: { id: userId } },
       error: null,
     })
+    
+    // Allow Supabase REST API requests to pass through to real database
+    // This test uses the real Supabase client, not mocks
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://test.supabase.co'
+    server.use(
+      http.all(`${supabaseUrl}/rest/v1/*`, passthrough)
+    )
   })
 
   describe('Rollback on failure', () => {

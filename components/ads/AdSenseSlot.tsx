@@ -53,9 +53,8 @@ export default function AdSenseSlot({
         if (typeof window !== 'undefined' && window.adsbygoogle) {
           window.adsbygoogle.push({})
           
-          if (process.env.NODE_ENV !== 'production') {
-            console.log('[AdSense] Pushed ad for slot:', slot)
-          }
+          // Always log to help with debugging
+          console.log('[AdSense] Pushed ad for slot:', slot)
           return true
         }
         return false

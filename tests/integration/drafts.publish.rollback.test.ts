@@ -17,47 +17,22 @@ vi.mock('@/lib/data/draftsPublishRollback', () => ({
 
 // Helper to create a chainable mock query builder
 function createChainableQueryBuilder() {
-  const chain: any = {
-    select: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    update: vi.fn().mockReturnThis(),
-    delete: vi.fn().mockReturnThis(),
-    upsert: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    neq: vi.fn().mockReturnThis(),
-    gt: vi.fn().mockReturnThis(),
-    gte: vi.fn().mockReturnThis(),
-    lt: vi.fn().mockReturnThis(),
-    lte: vi.fn().mockReturnThis(),
-    like: vi.fn().mockReturnThis(),
-    ilike: vi.fn().mockReturnThis(),
-    is: vi.fn().mockReturnThis(),
-    in: vi.fn().mockReturnThis(),
-    contains: vi.fn().mockReturnThis(),
-    containedBy: vi.fn().mockReturnThis(),
-    rangeGt: vi.fn().mockReturnThis(),
-    rangeGte: vi.fn().mockReturnThis(),
-    rangeLt: vi.fn().mockReturnThis(),
-    rangeLte: vi.fn().mockReturnThis(),
-    rangeAdjacent: vi.fn().mockReturnThis(),
-    overlaps: vi.fn().mockReturnThis(),
-    textSearch: vi.fn().mockReturnThis(),
-    match: vi.fn().mockReturnThis(),
-    not: vi.fn().mockReturnThis(),
-    or: vi.fn().mockReturnThis(),
-    filter: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    range: vi.fn().mockReturnThis(),
-    abortSignal: vi.fn().mockReturnThis(),
-    rollback: vi.fn().mockReturnThis(),
-    returns: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data: null, error: null }),
-    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    csv: vi.fn().mockResolvedValue(''),
-    geojson: vi.fn().mockResolvedValue({}),
-    explain: vi.fn().mockResolvedValue({}),
-  }
+  const chain: any = {}
+  
+  // Create chainable methods that return the chain object
+  const chainableMethods = ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'is', 'in', 'contains', 'containedBy', 'rangeGt', 'rangeGte', 'rangeLt', 'rangeLte', 'rangeAdjacent', 'overlaps', 'textSearch', 'match', 'not', 'or', 'filter', 'order', 'limit', 'range', 'abortSignal', 'rollback', 'returns']
+  chainableMethods.forEach(method => {
+    chain[method] = vi.fn(function(this: any) {
+      return this
+    }.bind(chain))
+  })
+  
+  // Terminal methods that return promises
+  chain.single = vi.fn().mockResolvedValue({ data: null, error: null })
+  chain.maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null })
+  chain.csv = vi.fn().mockResolvedValue('')
+  chain.geojson = vi.fn().mockResolvedValue({})
+  chain.explain = vi.fn().mockResolvedValue({})
   
   return chain
 }

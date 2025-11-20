@@ -92,9 +92,21 @@ export default function AdSenseSlot({
           // Check ad status after a delay to see if AdSense processed it
           setTimeout(() => {
             const status = (adElement as HTMLElement)?.getAttribute('data-adsbygoogle-status')
+            const innerHTML = (adElement as HTMLElement)?.innerHTML || ''
+            const hasIframe = innerHTML.includes('<iframe')
+            const hasAdContent = innerHTML.length > 0
+            
             console.log('[AdSense] Ad status after push for slot:', slot, {
               status: status || 'not set',
-              hasAdContent: (adElement as HTMLElement)?.innerHTML.length > 0,
+              hasAdContent,
+              hasIframe,
+              innerHTMLLength: innerHTML.length,
+              innerHTMLPreview: innerHTML.substring(0, 200),
+              elementVisible: (adElement as HTMLElement)?.offsetParent !== null,
+              elementDimensions: {
+                width: (adElement as HTMLElement)?.offsetWidth,
+                height: (adElement as HTMLElement)?.offsetHeight,
+              },
             })
           }, 2000)
           

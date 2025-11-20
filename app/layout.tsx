@@ -1,6 +1,5 @@
 import "./globals.css"
 import { Metadata } from 'next'
-import Script from 'next/script'
 import { Providers } from './providers'
 import WebVitals from '@/components/WebVitals'
 import { ConditionalHeader } from '@/components/landing/ConditionalHeader'

@@ -42,34 +42,56 @@ export function MobileListInlineAd() {
 }
 
 /**
+ * List Inline Ad
+ * Displays inline in sales list, between sale cards
+ * Visible on all screen sizes (mobile + desktop)
+ */
+export function ListInlineAd() {
+  return (
+    <div className="my-3">
+      <AdSenseSlot
+        slot="2129152111"
+        format="auto"
+        fullWidthResponsive={true}
+        style={{ minHeight: '100px' }}
+        className="w-full"
+      />
+    </div>
+  )
+}
+
+/**
  * Desktop Footer Ad
  * Displays in footer on desktop screens
  * Desktop only (hidden on mobile/tablet)
  */
 export function DesktopFooterAd() {
-  const [adsEnabled, setAdsEnabled] = useState(false)
+  // Disabled for now - using inline ads in sales list instead
+  return null
 
-  useEffect(() => {
-    // Check environment variable on client side
-    const enabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
-    setAdsEnabled(enabled)
-  }, [])
+  // const [adsEnabled, setAdsEnabled] = useState(false)
 
-  // Don't render anything if ads are disabled
-  if (!adsEnabled) {
-    return null
-  }
+  // useEffect(() => {
+  //   // Check environment variable on client side
+  //   const enabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
+  //   setAdsEnabled(enabled)
+  // }, [])
 
-  return (
-    <div className="hidden lg:block mt-6">
-      <AdSenseSlot
-        slot="2367280679"
-        format="auto"
-        fullWidthResponsive={true}
-        style={{ minHeight: '120px' }}
-        className="w-full"
-      />
-    </div>
-  )
+  // // Don't render anything if ads are disabled
+  // if (!adsEnabled) {
+  //   return null
+  // }
+
+  // return (
+  //   <div className="hidden lg:block mt-6">
+  //     <AdSenseSlot
+  //       slot="2367280679"
+  //       format="auto"
+  //       fullWidthResponsive={true}
+  //       style={{ minHeight: '120px' }}
+  //       className="w-full"
+  //     />
+  //   </div>
+  // )
 }
 

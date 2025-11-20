@@ -1,7 +1,7 @@
 import SaleCard from './SaleCard'
 import EmptyState from './EmptyState'
 import { Sale } from '@/lib/types'
-import { MobileListInlineAd } from '@/components/ads/AdSlots'
+import { MobileListInlineAd, ListInlineAd } from '@/components/ads/AdSlots'
 
 interface SalesListProps {
   sales: Sale[]
@@ -37,8 +37,16 @@ export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
       {sales.map((sale, index) => (
         <div key={sale.id}>
           <SaleCard sale={sale} viewport={viewport} />
-          {/* Show mobile inline ad after 3rd item (index 2) and optionally after 9th item (index 8) */}
-          {(index === 2 || (index === 8 && sales.length > 9)) && <MobileListInlineAd />}
+          {/* Show inline ad after 3rd item (index 2) and optionally after 9th item (index 8) */}
+          {/* Mobile: use MobileListInlineAd, Desktop: use ListInlineAd */}
+          {(index === 2 || (index === 8 && sales.length > 9)) && (
+            <>
+              <MobileListInlineAd />
+              <div className="hidden md:block">
+                <ListInlineAd />
+              </div>
+            </>
+          )}
         </div>
       ))}
     </div>

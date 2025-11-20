@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import AdSenseSlot from './AdSenseSlot'
 
 /**
@@ -46,6 +47,19 @@ export function MobileListInlineAd() {
  * Desktop only (hidden on mobile/tablet)
  */
 export function DesktopFooterAd() {
+  const [adsEnabled, setAdsEnabled] = useState(false)
+
+  useEffect(() => {
+    // Check environment variable on client side
+    const enabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
+    setAdsEnabled(enabled)
+  }, [])
+
+  // Don't render anything if ads are disabled
+  if (!adsEnabled) {
+    return null
+  }
+
   return (
     <div className="hidden lg:block mt-6">
       <AdSenseSlot

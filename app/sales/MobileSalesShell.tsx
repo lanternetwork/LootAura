@@ -232,13 +232,13 @@ export default function MobileSalesShell({
               padding: 20, 
               duration: 0
             } : undefined}
-            hybridPins={{
+            hybridPins={currentViewport ? {
               sales: mapSales,
               selectedId: selectedPinId,
               onLocationClick: onLocationClick,
               onClusterClick: onClusterClick,
-              viewport: currentViewport || undefined
-            }}
+              viewport: currentViewport
+            } : undefined}
             onViewportMove={onViewportMove}
             onViewportChange={handleViewportChangeWithDismiss}
             onDragStart={() => {

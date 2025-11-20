@@ -237,6 +237,9 @@ const ALLOWED_PATTERNS = [
   
   // React act() warnings (React 18 concurrent rendering in tests)
   /^Error: Should not already be working/, // React act() warnings during component cleanup - tests/unit/a11y.smoke.test.tsx
+  
+  // Draft publish error logging (app/api/drafts/publish/route.ts)
+  /^\[PUBLISH\/POST\] thrown:/, // Expected error logging in draft publish rollback tests - tests/integration/drafts.publish.rollback.test.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {

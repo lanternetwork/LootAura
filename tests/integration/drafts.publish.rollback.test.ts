@@ -260,11 +260,14 @@ describe('Draft Publish Rollback', () => {
       })
       
       const draftVerificationChain = createChainableQueryBuilder()
-      // The createChainableQueryBuilder() already sets up .select() and .eq() to return the chain
-      // But we need to ensure they're explicitly set to return this specific chain object
-      // Override with explicit return value to ensure chaining works
-      draftVerificationChain.select.mockReturnValue(draftVerificationChain)
-      draftVerificationChain.eq.mockReturnValue(draftVerificationChain)
+      // Explicitly ensure .select() and .eq() return the chain object for chaining
+      // Use mockImplementation to ensure it always returns the chain, regardless of arguments
+      draftVerificationChain.select.mockImplementation(function(this: any) {
+        return this
+      }.bind(draftVerificationChain))
+      draftVerificationChain.eq.mockImplementation(function(this: any) {
+        return this
+      }.bind(draftVerificationChain))
       draftVerificationChain.maybeSingle.mockResolvedValue({
         data: null, // Draft deleted successfully
         error: null,
@@ -420,11 +423,14 @@ describe('Draft Publish Rollback', () => {
       })
       
       const draftVerificationChain = createChainableQueryBuilder()
-      // The createChainableQueryBuilder() already sets up .select() and .eq() to return the chain
-      // But we need to ensure they're explicitly set to return this specific chain object
-      // Override with explicit return value to ensure chaining works
-      draftVerificationChain.select.mockReturnValue(draftVerificationChain)
-      draftVerificationChain.eq.mockReturnValue(draftVerificationChain)
+      // Explicitly ensure .select() and .eq() return the chain object for chaining
+      // Use mockImplementation to ensure it always returns the chain, regardless of arguments
+      draftVerificationChain.select.mockImplementation(function(this: any) {
+        return this
+      }.bind(draftVerificationChain))
+      draftVerificationChain.eq.mockImplementation(function(this: any) {
+        return this
+      }.bind(draftVerificationChain))
       // The error happens when trying to verify - throw in maybeSingle
       draftVerificationChain.maybeSingle.mockImplementation(() => {
         throw new Error('Unexpected database error during draft deletion')

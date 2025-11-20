@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import AdSenseSlot from './AdSenseSlot'
 
 /**
@@ -66,32 +67,35 @@ export function ListInlineAd() {
  * Desktop only (hidden on mobile/tablet)
  */
 export function DesktopFooterAd() {
-  // Disabled for now - using inline ads in sales list instead
-  return null
+  const [adsEnabled, setAdsEnabled] = useState(false)
+  const pathname = usePathname()
 
-  // const [adsEnabled, setAdsEnabled] = useState(false)
+  useEffect(() => {
+    // Check environment variable on client side
+    const enabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
+    setAdsEnabled(enabled)
+  }, [])
 
-  // useEffect(() => {
-  //   // Check environment variable on client side
-  //   const enabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
-  //   setAdsEnabled(enabled)
-  // }, [])
+  // Don't render anything if ads are disabled
+  if (!adsEnabled) {
+    return null
+  }
 
-  // // Don't render anything if ads are disabled
-  // if (!adsEnabled) {
-  //   return null
-  // }
+  // Disable footer ad on /sales page (using inline ads in sales list instead)
+  if (pathname === '/sales') {
+    return null
+  }
 
-  // return (
-  //   <div className="hidden lg:block mt-6">
-  //     <AdSenseSlot
-  //       slot="2367280679"
-  //       format="auto"
-  //       fullWidthResponsive={true}
-  //       style={{ minHeight: '120px' }}
-  //       className="w-full"
-  //     />
-  //   </div>
-  // )
+  return (
+    <div className="hidden lg:block mt-6">
+      <AdSenseSlot
+        slot="2367280679"
+        format="auto"
+        fullWidthResponsive={true}
+        style={{ minHeight: '120px' }}
+        className="w-full"
+      />
+    </div>
+  )
 }
 

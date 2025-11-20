@@ -240,9 +240,11 @@ export default function AdSenseSlot({
         })
         
         // Only hide placeholder if ad is definitely filled AND visible
-        // In non-production, we might want to keep placeholder visible for design purposes
-        const isProduction = process.env.NODE_ENV === 'production'
-        const shouldHidePlaceholder = status === 'done' && hasIframe && hasAdContent && isVisible && isProduction
+        // Keep placeholder visible in preview/staging environments for design purposes
+        // Check VERCEL_ENV (available client-side) or fall back to NODE_ENV
+        const vercelEnv = (process.env as any).NEXT_PUBLIC_VERCEL_ENV || process.env.VERCEL_ENV
+        const isProductionEnv = vercelEnv === 'production' || (vercelEnv === undefined && process.env.NODE_ENV === 'production')
+        const shouldHidePlaceholder = status === 'done' && hasIframe && hasAdContent && isVisible && isProductionEnv
         
         if (shouldHidePlaceholder) {
           console.log('[AdSense] Hiding placeholder - ad is filled and visible for slot:', slot)

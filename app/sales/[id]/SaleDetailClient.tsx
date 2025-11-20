@@ -444,14 +444,21 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
             </ul>
           </div>
 
-          {/* Sale Detail Banner Ad */}
-          <SaleDetailBannerAd />
+          {/* Sale Detail Banner Ad - Desktop: in sidebar */}
+          <div className="hidden lg:block">
+            <SaleDetailBannerAd />
+          </div>
 
           {/* Nearby Sales - Desktop: in sidebar */}
           <div className="hidden lg:block">
             <NearbySalesCard nearbySales={nearbySales} />
           </div>
         </div>
+      </div>
+
+      {/* Sale Detail Banner Ad - Mobile: below main content */}
+      <div className="lg:hidden mt-6">
+        <SaleDetailBannerAd />
       </div>
 
       {/* Nearby Sales - Mobile: below main content */}

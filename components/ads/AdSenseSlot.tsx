@@ -206,7 +206,11 @@ export default function AdSenseSlot({
 
   // Check if ad has been filled after a delay
   useEffect(() => {
-    if (!isClient || !adsEnabled) return
+    if (!isClient || !adsEnabled) {
+      // If ads are disabled, don't show placeholder
+      setShowPlaceholder(false)
+      return
+    }
 
     const checkAdStatus = () => {
       const adElement = document.querySelector(`ins[data-ad-slot="${slot}"]`) as HTMLElement
@@ -217,7 +221,13 @@ export default function AdSenseSlot({
         // Hide placeholder if ad is filled
         if (status === 'done' && hasIframe) {
           setShowPlaceholder(false)
+        } else {
+          // Keep showing placeholder if ad isn't filled yet
+          setShowPlaceholder(true)
         }
+      } else {
+        // Element not found yet, keep showing placeholder
+        setShowPlaceholder(true)
       }
     }
 
@@ -253,7 +263,7 @@ export default function AdSenseSlot({
     <div className={`${className} relative`} style={{ minHeight: '100px', ...style }}>
       <ins
         className="adsbygoogle"
-        style={{ display: 'block', ...style }}
+        style={{ display: 'block', minHeight: '100px', ...style }}
         data-ad-client="ca-pub-8685093412475036"
         data-ad-slot={slot}
         data-ad-format={format}
@@ -264,12 +274,12 @@ export default function AdSenseSlot({
       {/* Placeholder ad - shows when ad isn't filled yet */}
       {showPlaceholder && (
         <div
-          className="absolute inset-0 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded"
+          className="absolute inset-0 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded pointer-events-none z-10"
           style={{ minHeight: '100px', ...style }}
         >
           <div className="text-center text-gray-400">
             <div className="text-sm font-medium">Ad Placeholder</div>
-            <div className="text-xs mt-1">{slot}</div>
+            <div className="text-xs mt-1">Slot: {slot}</div>
           </div>
         </div>
       )}

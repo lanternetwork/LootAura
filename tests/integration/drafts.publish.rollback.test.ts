@@ -236,25 +236,31 @@ describe('Draft Publish Rollback', () => {
         error: null,
       })
 
-      // Mock draft deletion - needs to support .delete().eq().eq().eq().eq().select() chain
+      // Mock draft deletion - needs to support:
+      // 1. .delete().eq().eq().eq().eq().select() - for deletion (returns count)
+      // 2. .select().eq().maybeSingle() - for verification (returns null if deleted)
       const draftDeleteChain = createChainableQueryBuilder()
-      draftDeleteChain.select.mockResolvedValue({
-        data: [{ id: draftId }],
+      const draftVerificationChain = createChainableQueryBuilder()
+      draftVerificationChain.maybeSingle.mockResolvedValue({
+        data: null, // Draft deleted successfully
         error: null,
-        count: 1,
       })
-
-      mockAdminDb.from.mockImplementation((table: string) => {
-        if (table === 'sales') {
-          return saleInsertChain
+      
+      // When select is called after delete chain, return count
+      // When select is called first (verification), return chain for .eq().maybeSingle()
+      let selectCallCount = 0
+      draftDeleteChain.select.mockImplementation((...args: any[]) => {
+        selectCallCount++
+        // First call is for delete verification (after .delete().eq()...)
+        if (selectCallCount === 1) {
+          return Promise.resolve({
+            data: [{ id: draftId }],
+            error: null,
+            count: 1,
+          })
         }
-        if (table === 'items') {
-          return createChainableQueryBuilder()
-        }
-        if (table === 'sale_drafts') {
-          return draftDeleteChain
-        }
-        return createChainableQueryBuilder()
+        // Second call is for verification query (.select().eq().maybeSingle())
+        return draftVerificationChain
       })
 
       // Mock items creation
@@ -264,7 +270,6 @@ describe('Draft Publish Rollback', () => {
         error: null,
       })
 
-      // Update mock to return proper chains
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sales') {
           return saleInsertChain

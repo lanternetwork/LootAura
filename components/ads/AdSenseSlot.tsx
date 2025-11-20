@@ -51,18 +51,27 @@ export default function AdSenseSlot({
     const initAd = () => {
       try {
         if (typeof window !== 'undefined' && window.adsbygoogle) {
+          // Verify the ad slot element exists in the DOM before pushing
+          const adElement = document.querySelector(`ins[data-ad-slot="${slot}"]`)
+          if (!adElement) {
+            console.warn('[AdSense] Ad slot element not found in DOM for slot:', slot)
+            return false
+          }
+          
           window.adsbygoogle.push({})
           
           // Always log to help with debugging
-          console.log('[AdSense] Pushed ad for slot:', slot)
+          console.log('[AdSense] Pushed ad for slot:', slot, {
+            elementFound: !!adElement,
+            elementId: adElement?.id || 'none',
+            clientId: (adElement as HTMLElement)?.getAttribute('data-ad-client'),
+          })
           return true
         }
         return false
       } catch (error) {
-        // Silently ignore errors to avoid crashing the page
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('[AdSense] Failed to push ad:', error)
-        }
+        // Always log errors to help debug
+        console.warn('[AdSense] Failed to push ad:', error, { slot })
         return false
       }
     }

@@ -216,10 +216,11 @@ export default function MobileSalesShell({
       style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
     >
       {/* Map Mode */}
-      {mode === 'map' && mapView && currentViewport && (
+      {mode === 'map' && mapView && (
         <div 
           className="relative flex-1 min-h-0 bg-gray-100"
           onClick={handleMapClick}
+          key="map-container"
         >
           {/* Full-screen map */}
           <SimpleMap
@@ -236,7 +237,7 @@ export default function MobileSalesShell({
               selectedId: selectedPinId,
               onLocationClick: onLocationClick,
               onClusterClick: onClusterClick,
-              viewport: currentViewport
+              viewport: currentViewport || undefined
             }}
             onViewportMove={onViewportMove}
             onViewportChange={handleViewportChangeWithDismiss}

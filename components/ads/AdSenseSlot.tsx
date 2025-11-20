@@ -241,10 +241,10 @@ export default function AdSenseSlot({
         
         // Only hide placeholder if ad is definitely filled AND visible
         // Keep placeholder visible in preview/staging environments for design purposes
-        // Check VERCEL_ENV (available client-side) or fall back to NODE_ENV
-        const vercelEnv = (process.env as any).NEXT_PUBLIC_VERCEL_ENV || process.env.VERCEL_ENV
-        const isProductionEnv = vercelEnv === 'production' || (vercelEnv === undefined && process.env.NODE_ENV === 'production')
-        const shouldHidePlaceholder = status === 'done' && hasIframe && hasAdContent && isVisible && isProductionEnv
+        // Check hostname to detect production (lootaura.com) vs preview/staging
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+        const isProductionDomain = hostname === 'lootaura.com' || hostname === 'www.lootaura.com'
+        const shouldHidePlaceholder = status === 'done' && hasIframe && hasAdContent && isVisible && isProductionDomain
         
         if (shouldHidePlaceholder) {
           console.log('[AdSense] Hiding placeholder - ad is filled and visible for slot:', slot)

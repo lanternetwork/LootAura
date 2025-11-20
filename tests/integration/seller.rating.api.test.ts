@@ -41,9 +41,48 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient,
 }))
 
+// Mock CSRF validation to actually enforce in tests
+vi.mock('@/lib/csrf', async () => {
+  const actual = await vi.importActual('@/lib/csrf')
+  return {
+    ...actual,
+    requireCsrfToken: (request: Request) => {
+      // Actually validate CSRF in tests (don't bypass)
+      const tokenFromHeader = request.headers.get('x-csrf-token')
+      const cookieHeader = request.headers.get('cookie')
+      let tokenFromCookie: string | null = null
+      
+      if (cookieHeader) {
+        const cookies = cookieHeader.split(';').map(c => c.trim())
+        for (const cookie of cookies) {
+          const equalIndex = cookie.indexOf('=')
+          if (equalIndex === -1) continue
+          const name = cookie.substring(0, equalIndex).trim()
+          const value = cookie.substring(equalIndex + 1).trim()
+          if (name === 'csrf-token') {
+            tokenFromCookie = decodeURIComponent(value)
+            break
+          }
+        }
+      }
+      
+      if (!tokenFromHeader || !tokenFromCookie) {
+        return false
+      }
+      
+      return tokenFromHeader === tokenFromCookie
+    },
+  }
+})
+
 // Mock rate limiting - allow all requests by default
 vi.mock('@/lib/rateLimit/limiter', () => ({
-  check: vi.fn().mockResolvedValue({ allowed: true, remaining: 10 }),
+  check: vi.fn().mockResolvedValue({ 
+    allowed: true, 
+    remaining: 10,
+    softLimited: false,
+    resetAt: Date.now() + 60000,
+  }),
 }))
 
 vi.mock('@/lib/rateLimit/keys', () => ({
@@ -82,6 +121,7 @@ function createRequestWithCsrf(url: string, body: any, options: { authenticated?
     method: 'POST',
     body: JSON.stringify(body),
     headers,
+    duplex: 'half',
   })
 }
 
@@ -130,11 +170,11 @@ describe('POST /api/seller/rating', () => {
 
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
-    expect(data.data.rating).toBe(5)
-    expect(data.data.summary).toBeDefined()
-    expect(data.data.summary.avg_rating).toBeGreaterThanOrEqual(1)
-    expect(data.data.summary.avg_rating).toBeLessThanOrEqual(5)
-    expect(data.data.summary.ratings_count).toBeGreaterThanOrEqual(1)
+    expect(data.rating).toBe(5)
+    expect(data.summary).toBeDefined()
+    expect(data.summary.avg_rating).toBeGreaterThanOrEqual(1)
+    expect(data.summary.avg_rating).toBeLessThanOrEqual(5)
+    expect(data.summary.ratings_count).toBeGreaterThanOrEqual(1)
     
     // Verify upsert was called with correct parameters
     expect(mockUpsert).toHaveBeenCalledWith(
@@ -180,9 +220,9 @@ describe('POST /api/seller/rating', () => {
     const data2 = await response2.json()
 
     expect(response2.status).toBe(200)
-    expect(data2.data.rating).toBe(4)
-    expect(data2.data.summary.avg_rating).toBe(4.0)
-    expect(data2.data.summary.ratings_count).toBe(1) // Count unchanged
+    expect(data2.rating).toBe(4)
+    expect(data2.summary.avg_rating).toBe(4.0)
+    expect(data2.summary.ratings_count).toBe(1) // Count unchanged
     
     // Verify upsert was called twice (create then update)
     expect(mockUpsert).toHaveBeenCalledTimes(2)
@@ -284,22 +324,26 @@ describe('POST /api/seller/rating', () => {
   })
 
   it('enforces CSRF - rejects request with invalid CSRF token', async () => {
-    const request = createRequestWithCsrf('http://localhost/api/seller/rating', {
-      seller_id: sellerId,
-      rating: 5,
-      sale_id: null,
-    }, { csrfToken: 'invalid-token' })
-
-    // Set cookie to different token to simulate mismatch
-    const headers = new Headers(request.headers)
-    headers.set('cookie', 'csrf-token=different-token')
-    const invalidRequest = new NextRequest(request.url, {
+    const token1 = generateCsrfToken()
+    const token2 = generateCsrfToken()
+    
+    // Header has token1, cookie has token2 (mismatch)
+    const request = new NextRequest('http://localhost/api/seller/rating', {
       method: 'POST',
-      body: request.body,
-      headers,
+      body: JSON.stringify({
+        seller_id: sellerId,
+        rating: 5,
+        sale_id: null,
+      }),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': token1,
+        'cookie': `csrf-token=${token2}`,
+      },
+      duplex: 'half',
     })
 
-    const response = await POST(invalidRequest)
+    const response = await POST(request)
     const data = await response.json()
 
     expect(response.status).toBe(403)
@@ -314,8 +358,17 @@ describe('POST /api/seller/rating', () => {
     const { check } = await import('@/lib/rateLimit/limiter')
     
     // Mock rate limit exceeded
-    vi.mocked(check).mockResolvedValueOnce({ allowed: true, remaining: 10 })
-      .mockResolvedValueOnce({ allowed: false, remaining: 0 })
+    vi.mocked(check).mockResolvedValueOnce({ 
+      allowed: true, 
+      remaining: 10,
+      softLimited: false,
+      resetAt: Date.now() + 60000,
+    }).mockResolvedValueOnce({ 
+      allowed: false, 
+      remaining: 0,
+      softLimited: false,
+      resetAt: Date.now() + 60000,
+    })
 
     const request = createRequestWithCsrf('http://localhost/api/seller/rating', {
       seller_id: sellerId,
@@ -389,14 +442,16 @@ describe('POST /api/seller/rating', () => {
   })
 
   it('handles invalid JSON gracefully', async () => {
+    const csrfToken = generateCsrfToken()
     const request = new NextRequest('http://localhost/api/seller/rating', {
       method: 'POST',
       body: 'invalid json',
       headers: {
         'Content-Type': 'application/json',
-        'x-csrf-token': generateCsrfToken(),
-        'cookie': `csrf-token=${generateCsrfToken()}`,
+        'x-csrf-token': csrfToken,
+        'cookie': `csrf-token=${csrfToken}`,
       },
+      duplex: 'half',
     })
 
     const response = await POST(request)

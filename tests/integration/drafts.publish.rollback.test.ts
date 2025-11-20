@@ -103,6 +103,7 @@ function createRequestWithCsrf(url: string, body: any): NextRequest {
       'x-csrf-token': csrfToken,
       'cookie': `csrf-token=${csrfToken}`,
     },
+    duplex: 'half',
   })
 }
 
@@ -127,6 +128,7 @@ function createMockDraftPayload() {
     photos: [],
     items: [
       {
+        id: 'item-1',
         name: 'Test Item',
         price: 10,
         description: 'Test item description',

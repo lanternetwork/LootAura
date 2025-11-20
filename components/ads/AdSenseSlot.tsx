@@ -214,28 +214,37 @@ export default function AdSenseSlot({
 
     // Always show placeholder initially when ads are enabled
     setShowPlaceholder(true)
+    console.log('[AdSense] Placeholder initialized for slot:', slot, { showPlaceholder: true })
 
     const checkAdStatus = () => {
       const adElement = document.querySelector(`ins[data-ad-slot="${slot}"]`) as HTMLElement
       if (adElement) {
         const status = adElement.getAttribute('data-adsbygoogle-status')
-        const hasIframe = adElement.innerHTML.includes('<iframe')
+        const innerHTML = adElement.innerHTML || ''
+        const hasIframe = innerHTML.includes('<iframe')
+        const hasAdContent = innerHTML.length > 100 // AdSense ads typically have substantial content
         
         console.log('[AdSense] Checking placeholder status for slot:', slot, {
           status,
           hasIframe,
-          shouldShowPlaceholder: !(status === 'done' && hasIframe),
+          hasAdContent,
+          innerHTMLLength: innerHTML.length,
+          shouldShowPlaceholder: !(status === 'done' && hasIframe && hasAdContent),
+          currentShowPlaceholder: showPlaceholder,
         })
         
-        // Hide placeholder if ad is filled
-        if (status === 'done' && hasIframe) {
+        // Only hide placeholder if ad is definitely filled (status done AND has iframe AND has content)
+        if (status === 'done' && hasIframe && hasAdContent) {
+          console.log('[AdSense] Hiding placeholder - ad is filled for slot:', slot)
           setShowPlaceholder(false)
         } else {
           // Keep showing placeholder if ad isn't filled yet
+          console.log('[AdSense] Keeping placeholder visible - ad not filled yet for slot:', slot)
           setShowPlaceholder(true)
         }
       } else {
         // Element not found yet, keep showing placeholder
+        console.log('[AdSense] Ad element not found, keeping placeholder visible for slot:', slot)
         setShowPlaceholder(true)
       }
     }
@@ -245,13 +254,15 @@ export default function AdSenseSlot({
     const timer1 = setTimeout(checkAdStatus, 1000)
     const timer2 = setTimeout(checkAdStatus, 3000)
     const timer3 = setTimeout(checkAdStatus, 5000)
+    const timer4 = setTimeout(checkAdStatus, 10000) // Check again after 10 seconds
 
     return () => {
       clearTimeout(timer1)
       clearTimeout(timer2)
       clearTimeout(timer3)
+      clearTimeout(timer4)
     }
-  }, [isClient, adsEnabled, slot])
+  }, [isClient, adsEnabled, slot, showPlaceholder])
 
   if (!adsEnabled) {
     return null
@@ -267,6 +278,8 @@ export default function AdSenseSlot({
       />
     )
   }
+
+  console.log('[AdSense] Rendering ad slot:', slot, { showPlaceholder, adsEnabled, isClient })
 
   return (
     <div className={`${className} relative`} style={{ minHeight: '100px', ...style }}>
@@ -284,7 +297,8 @@ export default function AdSenseSlot({
       {showPlaceholder && (
         <div
           className="absolute inset-0 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded pointer-events-none z-10"
-          style={{ minHeight: '100px', ...style }}
+          style={{ minHeight: '100px', width: '100%', ...style }}
+          data-testid={`ad-placeholder-${slot}`}
         >
           <div className="text-center text-gray-400">
             <div className="text-sm font-medium">Ad Placeholder</div>

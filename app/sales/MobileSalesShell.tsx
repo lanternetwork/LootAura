@@ -218,9 +218,10 @@ export default function MobileSalesShell({
       {/* Map Mode */}
       {mode === 'map' && mapView && (
         <div 
-          className="relative flex-1 min-h-0 bg-gray-100"
+          className="relative flex-1 min-h-0 bg-gray-100 w-full h-full"
           onClick={handleMapClick}
           key="map-container"
+          style={{ display: 'flex', flexDirection: 'column' }}
         >
           {/* Full-screen map */}
           <SimpleMap

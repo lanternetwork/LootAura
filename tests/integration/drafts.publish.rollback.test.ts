@@ -199,6 +199,14 @@ async function cleanupSale(saleId: string) {
 
 describe('Draft publish rollback', () => {
   const userId = 'test-user-id'
+  
+  // Check if we have valid Supabase credentials (not just test defaults)
+  const hasValidSupabaseCredentials = 
+    process.env.NEXT_PUBLIC_SUPABASE_URL && 
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://test.supabase.co' &&
+    process.env.SUPABASE_SERVICE_ROLE && 
+    process.env.SUPABASE_SERVICE_ROLE !== 'test-service-role-min-10-chars' &&
+    process.env.SUPABASE_SERVICE_ROLE.length > 20 // Real service role keys are longer
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -216,7 +224,7 @@ describe('Draft publish rollback', () => {
   })
 
   describe('Rollback on failure', () => {
-    it('prevents orphaned sales when publish fails after sale creation', async () => {
+    it.skipIf(!hasValidSupabaseCredentials)('prevents orphaned sales when publish fails after sale creation', async () => {
       // This test verifies that if sale creation succeeds but a subsequent step fails,
       // the sale is rolled back and no orphaned data remains
       

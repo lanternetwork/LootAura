@@ -21,6 +21,13 @@ type EventType = typeof ALLOWED_EVENT_TYPES[number]
  * }
  */
 export async function POST(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const supabase = createSupabaseServerClient()
     const { data: { user } } = await supabase.auth.getUser()

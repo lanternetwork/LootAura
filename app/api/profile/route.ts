@@ -143,7 +143,14 @@ export async function GET(_req: NextRequest) {
   return NextResponse.json({ ok: true, data })
 }
 
-export async function PUT(req: Request) {
+export async function PUT(req: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(req)
+  if (csrfError) {
+    return csrfError
+  }
+
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
@@ -331,6 +338,13 @@ export async function PUT(req: Request) {
 
 // Legacy handlers removed to avoid duplicate exports and name collisions
 export async function POST(_request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(_request)
+  if (csrfError) {
+    return csrfError
+  }
+
   const supabase = createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })

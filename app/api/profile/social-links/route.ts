@@ -8,6 +8,13 @@ import * as Sentry from '@sentry/nextjs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const supabase = createSupabaseServerClient()
     

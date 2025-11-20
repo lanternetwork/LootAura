@@ -9,12 +9,13 @@
  */
 export const CSRF_PROTECTED_ROUTES = [
   '/api/sales', // POST
+  '/api/profile', // PUT/POST
   '/api/profile/update', // POST
   '/api/profile/avatar', // POST
   '/api/profile/social-links', // POST
   '/api/seller/rating', // POST
   '/api/seller-settings', // POST/PUT
-  '/api/drafts', // POST
+  '/api/drafts', // POST/DELETE
   '/api/drafts/publish', // POST
   '/api/sales/[id]/archive', // POST
   '/api/sales/[id]/delete', // DELETE
@@ -24,7 +25,9 @@ export const CSRF_PROTECTED_ROUTES = [
   '/api/items', // POST/PUT/DELETE
   '/api/items_v2', // POST/PUT/DELETE
   '/api/sales_v2', // POST/PUT/DELETE
-  '/api/preferences', // POST/PUT
+  '/api/v2/sales', // POST
+  '/api/v2/profiles', // POST
+  '/api/preferences', // PUT
   '/api/analytics/track', // POST (user-initiated)
 ] as const
 

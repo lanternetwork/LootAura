@@ -1,9 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
 import { getCloudinaryConfig } from '@/lib/cloudinary'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })

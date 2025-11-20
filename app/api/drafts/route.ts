@@ -209,6 +209,13 @@ export async function POST(request: NextRequest) {
 
 // DELETE: Delete/archive draft
 export async function DELETE(request: NextRequest) {
+  // CSRF protection check
+  const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const csrfError = await checkCsrfIfRequired(request)
+  if (csrfError) {
+    return csrfError
+  }
+
   try {
     const supabase = createSupabaseServerClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()

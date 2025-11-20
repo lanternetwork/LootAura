@@ -88,7 +88,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
         value: "default-src 'self'; " +
                    // Allow runtime scripts from self; keep eval for Next dev/runtime; allow Vercel Live script in previews; allow Microsoft Clarity; allow Google AdSense
-                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://www.clarity.ms https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net; " +
+                   "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://widget.cloudinary.com https://upload-widget.cloudinary.com https://vercel.live https://www.clarity.ms https://scripts.clarity.ms https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://ep2.adtrafficquality.google; " +
                    // Allow Mapbox CSS
                    "style-src 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Some browsers use style-src-elem separately

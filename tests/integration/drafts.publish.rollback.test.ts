@@ -97,6 +97,7 @@ vi.mock('@sentry/nextjs', () => ({
   default: {
     captureException: vi.fn(),
   },
+  captureException: vi.fn(),
 }))
 
 // Mock job enqueueing (non-critical)

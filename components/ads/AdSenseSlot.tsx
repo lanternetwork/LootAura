@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ADSENSE_ENABLED } from '@/lib/env'
 
 interface AdSenseSlotProps {
   slot: string
@@ -27,28 +26,56 @@ export default function AdSenseSlot({
   id,
 }: AdSenseSlotProps) {
   const [isClient, setIsClient] = useState(false)
+  const [adsEnabled, setAdsEnabled] = useState(false)
 
   useEffect(() => {
     setIsClient(true)
-  }, [])
+    // Check environment variable on client side
+    const enabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
+    setAdsEnabled(enabled)
+    
+    // Debug logging in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[AdSense] Environment check:', {
+        envValue: process.env.NEXT_PUBLIC_ENABLE_ADSENSE,
+        enabled,
+        slot,
+      })
+    }
+  }, [slot])
 
   useEffect(() => {
-    if (!isClient || !ADSENSE_ENABLED) return
+    if (!isClient || !adsEnabled) return
 
-    try {
-      if (typeof window !== 'undefined' && window.adsbygoogle) {
-        window.adsbygoogle = window.adsbygoogle || []
-        window.adsbygoogle.push({})
-      }
-    } catch (error) {
-      // Silently ignore errors to avoid crashing the page
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[AdSense] Failed to push ad:', error)
+    // Wait for AdSense script to load
+    const initAd = () => {
+      try {
+        if (typeof window !== 'undefined') {
+          window.adsbygoogle = window.adsbygoogle || []
+          window.adsbygoogle.push({})
+        }
+      } catch (error) {
+        // Silently ignore errors to avoid crashing the page
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[AdSense] Failed to push ad:', error)
+        }
       }
     }
-  }, [isClient])
 
-  if (!ADSENSE_ENABLED) {
+    // If adsbygoogle is already available, push immediately
+    if (typeof window !== 'undefined' && window.adsbygoogle) {
+      initAd()
+    } else {
+      // Otherwise, wait a bit for the script to load
+      const timer = setTimeout(() => {
+        initAd()
+      }, 100)
+
+      return () => clearTimeout(timer)
+    }
+  }, [isClient, adsEnabled])
+
+  if (!adsEnabled) {
     return null
   }
 

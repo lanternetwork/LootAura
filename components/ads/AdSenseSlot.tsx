@@ -27,6 +27,7 @@ export default function AdSenseSlot({
 }: AdSenseSlotProps) {
   const [isClient, setIsClient] = useState(false)
   const [adsEnabled, setAdsEnabled] = useState(false)
+  const [showPlaceholder, setShowPlaceholder] = useState(true)
   const hasPushedRef = useRef(false) // Track if we've already pushed this ad
 
   useEffect(() => {
@@ -217,8 +218,6 @@ export default function AdSenseSlot({
       />
     )
   }
-
-  const [showPlaceholder, setShowPlaceholder] = useState(true)
 
   // Check if ad has been filled after a delay
   useEffect(() => {

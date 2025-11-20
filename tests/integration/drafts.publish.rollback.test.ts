@@ -254,7 +254,6 @@ describe('Draft publish rollback', () => {
 
         // Verify no orphaned sale exists for this user
         // Check that no recent sales exist that would have been created by this failed publish
-        const admin = getAdminDb()
         const { data: recentSales } = await fromBase(admin, 'sales')
           .select('id, created_at, title')
           .eq('owner_id', userId)

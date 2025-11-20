@@ -261,12 +261,10 @@ describe('Draft Publish Rollback', () => {
       
       const draftVerificationChain = createChainableQueryBuilder()
       // Explicitly ensure .select() returns the chain object for chaining
-      // Reset and set up the mock to ensure it returns the chain
-      draftVerificationChain.select.mockReset()
-      draftVerificationChain.select.mockReturnValue(draftVerificationChain)
+      // Use mockImplementation to ensure it always returns the chain, overriding any default behavior
+      draftVerificationChain.select.mockImplementation(() => draftVerificationChain)
       // Also ensure .eq() returns the chain for further chaining
-      draftVerificationChain.eq.mockReset()
-      draftVerificationChain.eq.mockReturnValue(draftVerificationChain)
+      draftVerificationChain.eq.mockImplementation(() => draftVerificationChain)
       draftVerificationChain.maybeSingle.mockResolvedValue({
         data: null, // Draft deleted successfully
         error: null,
@@ -423,12 +421,10 @@ describe('Draft Publish Rollback', () => {
       
       const draftVerificationChain = createChainableQueryBuilder()
       // Explicitly ensure .select() returns the chain object for chaining
-      // Reset and set up the mock to ensure it returns the chain
-      draftVerificationChain.select.mockReset()
-      draftVerificationChain.select.mockReturnValue(draftVerificationChain)
+      // Use mockImplementation to ensure it always returns the chain, overriding any default behavior
+      draftVerificationChain.select.mockImplementation(() => draftVerificationChain)
       // Also ensure .eq() returns the chain for further chaining
-      draftVerificationChain.eq.mockReset()
-      draftVerificationChain.eq.mockReturnValue(draftVerificationChain)
+      draftVerificationChain.eq.mockImplementation(() => draftVerificationChain)
       // The error happens when trying to verify - throw in maybeSingle
       draftVerificationChain.maybeSingle.mockImplementation(() => {
         throw new Error('Unexpected database error during draft deletion')

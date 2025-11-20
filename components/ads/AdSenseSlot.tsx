@@ -218,8 +218,40 @@ export default function AdSenseSlot({
     )
   }
 
+  const [showPlaceholder, setShowPlaceholder] = useState(true)
+
+  // Check if ad has been filled after a delay
+  useEffect(() => {
+    if (!isClient || !adsEnabled) return
+
+    const checkAdStatus = () => {
+      const adElement = document.querySelector(`ins[data-ad-slot="${slot}"]`) as HTMLElement
+      if (adElement) {
+        const status = adElement.getAttribute('data-adsbygoogle-status')
+        const hasIframe = adElement.innerHTML.includes('<iframe')
+        
+        // Hide placeholder if ad is filled
+        if (status === 'done' && hasIframe) {
+          setShowPlaceholder(false)
+        }
+      }
+    }
+
+    // Check immediately and after delays
+    checkAdStatus()
+    const timer1 = setTimeout(checkAdStatus, 1000)
+    const timer2 = setTimeout(checkAdStatus, 3000)
+    const timer3 = setTimeout(checkAdStatus, 5000)
+
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
+    }
+  }, [isClient, adsEnabled, slot])
+
   return (
-    <div className={className} style={{ minHeight: '100px', ...style }}>
+    <div className={`${className} relative`} style={{ minHeight: '100px', ...style }}>
       <ins
         className="adsbygoogle"
         style={{ display: 'block', ...style }}
@@ -230,6 +262,18 @@ export default function AdSenseSlot({
         {...(id && { id })}
         suppressHydrationWarning
       />
+      {/* Placeholder ad - shows when ad isn't filled yet */}
+      {showPlaceholder && (
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded"
+          style={{ minHeight: '100px', ...style }}
+        >
+          <div className="text-center text-gray-400">
+            <div className="text-sm font-medium">Ad Placeholder</div>
+            <div className="text-xs mt-1">{slot}</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

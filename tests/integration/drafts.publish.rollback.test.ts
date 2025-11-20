@@ -260,10 +260,11 @@ describe('Draft Publish Rollback', () => {
       })
       
       const draftVerificationChain = createChainableQueryBuilder()
-      // The default behavior from createChainableQueryBuilder() already sets up .select() to return the chain
-      // But we need to ensure it's explicitly set to return the chain object (not a promise)
-      // Use mockReturnValue to ensure it returns the chain for chaining
-      draftVerificationChain.select.mockReturnValue(draftVerificationChain)
+      // Explicitly ensure .select() returns the chain object for chaining
+      // We need to use mockImplementation to ensure it always returns the chain, even if mockReturnValue was cleared
+      draftVerificationChain.select.mockImplementation(() => draftVerificationChain)
+      // Also ensure .eq() returns the chain for further chaining
+      draftVerificationChain.eq.mockImplementation(() => draftVerificationChain)
       draftVerificationChain.maybeSingle.mockResolvedValue({
         data: null, // Draft deleted successfully
         error: null,
@@ -419,10 +420,11 @@ describe('Draft Publish Rollback', () => {
       })
       
       const draftVerificationChain = createChainableQueryBuilder()
-      // The default behavior from createChainableQueryBuilder() already sets up .select() to return the chain
-      // But we need to ensure it's explicitly set to return the chain object (not a promise)
-      // Use mockReturnValue to ensure it returns the chain for chaining
-      draftVerificationChain.select.mockReturnValue(draftVerificationChain)
+      // Explicitly ensure .select() returns the chain object for chaining
+      // We need to use mockImplementation to ensure it always returns the chain, even if mockReturnValue was cleared
+      draftVerificationChain.select.mockImplementation(() => draftVerificationChain)
+      // Also ensure .eq() returns the chain for further chaining
+      draftVerificationChain.eq.mockImplementation(() => draftVerificationChain)
       // The error happens when trying to verify - throw in maybeSingle
       draftVerificationChain.maybeSingle.mockImplementation(() => {
         throw new Error('Unexpected database error during draft deletion')

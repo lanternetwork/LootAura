@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 interface AdSenseSlotProps {
   slot: string
@@ -27,6 +27,7 @@ export default function AdSenseSlot({
 }: AdSenseSlotProps) {
   const [isClient, setIsClient] = useState(false)
   const [adsEnabled, setAdsEnabled] = useState(false)
+  const hasPushedRef = useRef(false) // Track if we've already pushed this ad
 
   useEffect(() => {
     setIsClient(true)
@@ -49,6 +50,11 @@ export default function AdSenseSlot({
 
     // Wait for AdSense script to load
     const initAd = () => {
+      // Prevent duplicate pushes (AdSense doesn't allow pushing the same slot twice)
+      if (hasPushedRef.current) {
+        return false
+      }
+      
       try {
         if (typeof window !== 'undefined' && window.adsbygoogle) {
           // Verify the ad slot element exists in the DOM before pushing
@@ -58,7 +64,15 @@ export default function AdSenseSlot({
             return false
           }
           
+          // Check if this element already has an ad (AdSense may have auto-initialized it)
+          if ((adElement as HTMLElement).hasAttribute('data-adsbygoogle-status')) {
+            console.log('[AdSense] Ad slot already initialized by AdSense for slot:', slot)
+            hasPushedRef.current = true
+            return true
+          }
+          
           window.adsbygoogle.push({})
+          hasPushedRef.current = true // Mark as pushed
           
           // Always log to help with debugging
           console.log('[AdSense] Pushed ad for slot:', slot, {
@@ -70,7 +84,15 @@ export default function AdSenseSlot({
         }
         return false
       } catch (error) {
-        // Always log errors to help debug
+        // Check if error is because ad was already pushed
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        if (errorMessage.includes('already have ads')) {
+          console.log('[AdSense] Ad slot already has ads (likely auto-initialized) for slot:', slot)
+          hasPushedRef.current = true
+          return true
+        }
+        
+        // Always log other errors to help debug
         console.warn('[AdSense] Failed to push ad:', error, { slot })
         return false
       }

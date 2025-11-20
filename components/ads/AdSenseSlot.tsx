@@ -74,10 +74,14 @@ export default function AdSenseSlot({
       const scriptElement = document.querySelector('script[src*="adsbygoogle.js"]') as HTMLScriptElement
       
       // Check if script loaded successfully (not blocked)
+      // Note: readyState is a runtime property that exists in browsers but not in TypeScript DOM types
+      const scriptReadyState = scriptElement && 'readyState' in scriptElement 
+        ? (scriptElement as any).readyState 
+        : null
       const scriptLoaded = scriptElement && (
         window.adsbygoogle !== undefined || 
-        scriptElement.readyState === 'complete' || 
-        scriptElement.readyState === 'loaded'
+        scriptReadyState === 'complete' || 
+        scriptReadyState === 'loaded'
       )
       
       if (scriptLoaded && window.adsbygoogle) {

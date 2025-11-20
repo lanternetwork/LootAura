@@ -204,21 +204,6 @@ export default function AdSenseSlot({
     }
   }, [isClient, adsEnabled, slot])
 
-  if (!adsEnabled) {
-    return null
-  }
-
-  if (!isClient) {
-    // Return a placeholder to avoid hydration issues
-    return (
-      <div
-        className={className}
-        style={{ minHeight: '100px', ...style }}
-        suppressHydrationWarning
-      />
-    )
-  }
-
   // Check if ad has been filled after a delay
   useEffect(() => {
     if (!isClient || !adsEnabled) return
@@ -248,6 +233,21 @@ export default function AdSenseSlot({
       clearTimeout(timer3)
     }
   }, [isClient, adsEnabled, slot])
+
+  if (!adsEnabled) {
+    return null
+  }
+
+  if (!isClient) {
+    // Return a placeholder to avoid hydration issues
+    return (
+      <div
+        className={className}
+        style={{ minHeight: '100px', ...style }}
+        suppressHydrationWarning
+      />
+    )
+  }
 
   return (
     <div className={`${className} relative`} style={{ minHeight: '100px', ...style }}>

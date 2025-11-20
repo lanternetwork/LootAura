@@ -99,8 +99,8 @@ const nextConfig = {
                    "img-src 'self' data: https: https://res.cloudinary.com; font-src 'self' data:; " +
                    // Network connections - allow Clarity API calls and AdSense
                    "connect-src 'self' https: https://api.cloudinary.com https://vercel.live https://www.clarity.ms https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://tpc.googlesyndication.com; " +
-                   // Misc - allow AdSense frames
-                   "frame-src https://widget.cloudinary.com https://upload-widget.cloudinary.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com; object-src 'none'; base-uri 'self'; form-action 'self';",
+                   // Misc - allow AdSense frames (including quality monitoring and Google domains)
+                   "frame-src https://widget.cloudinary.com https://upload-widget.cloudinary.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://ep2.adtrafficquality.google https://www.google.com; object-src 'none'; base-uri 'self'; form-action 'self';",
           },
         ],
       },

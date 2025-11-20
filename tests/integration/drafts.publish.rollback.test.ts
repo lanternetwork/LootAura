@@ -10,7 +10,12 @@ import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import { generateCsrfToken } from '@/lib/csrf'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
-import { deleteSaleAndItemsForRollback } from '@/lib/data/draftsPublishRollback'
+
+// Mock rollback helper to track calls - must be defined before vi.mock
+const mockDeleteSaleAndItemsForRollback = vi.fn()
+vi.mock('@/lib/data/draftsPublishRollback', () => ({
+  deleteSaleAndItemsForRollback: (...args: any[]) => mockDeleteSaleAndItemsForRollback(...args),
+}))
 
 // Mock auth only - we need a test user for authentication
 const mockSupabaseClient = {
@@ -83,12 +88,6 @@ vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: () => mockRlsDb,
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => db.from(table),
-}))
-
-// Mock rollback helper to track calls
-const mockDeleteSaleAndItemsForRollback = vi.fn(deleteSaleAndItemsForRollback)
-vi.mock('@/lib/data/draftsPublishRollback', () => ({
-  deleteSaleAndItemsForRollback: mockDeleteSaleAndItemsForRollback,
 }))
 
 // Mock image validation - allow all URLs in tests

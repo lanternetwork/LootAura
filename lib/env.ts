@@ -58,6 +58,10 @@ const publicSchema = z.object({
     },
     z.string().min(1).optional()
   ),
+  NEXT_PUBLIC_ENABLE_ADSENSE: z.preprocess(
+    (val) => val === 'true' || val === '1',
+    z.boolean().optional()
+  ),
 })
 
 const serverSchema = z.object({
@@ -98,6 +102,7 @@ export const ENV_PUBLIC = publicSchema.parse({
   NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
   NEXT_PUBLIC_MAX_UPLOAD_SIZE: process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE,
   NEXT_PUBLIC_CLARITY_ID: process.env.NEXT_PUBLIC_CLARITY_ID,
+  NEXT_PUBLIC_ENABLE_ADSENSE: process.env.NEXT_PUBLIC_ENABLE_ADSENSE,
 })
 
 // Validate server environment variables (only in server context, lazy to avoid build-time validation)
@@ -143,3 +148,6 @@ export function isProduction(): boolean {
 export function isDebugMode(): boolean {
   return ENV_PUBLIC.NEXT_PUBLIC_DEBUG === true
 }
+
+// Helper to check if AdSense is enabled
+export const ADSENSE_ENABLED = ENV_PUBLIC.NEXT_PUBLIC_ENABLE_ADSENSE === true

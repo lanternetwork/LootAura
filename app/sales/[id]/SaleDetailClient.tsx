@@ -18,6 +18,7 @@ import AddressLink from '@/components/common/AddressLink'
 import type { SaleWithOwnerInfo } from '@/lib/data'
 import type { SaleItem, Sale } from '@/lib/types'
 import { trackSaleViewed, trackFavoriteToggled } from '@/lib/analytics/clarityEvents'
+import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
 
 interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo
@@ -442,6 +443,9 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
               )}
             </ul>
           </div>
+
+          {/* Sale Detail Banner Ad */}
+          <SaleDetailBannerAd />
 
           {/* Nearby Sales - Desktop: in sidebar */}
           <div className="hidden lg:block">

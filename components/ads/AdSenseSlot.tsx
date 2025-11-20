@@ -252,7 +252,7 @@ export default function AdSenseSlot({
         } else {
           // Keep showing placeholder if ad isn't filled yet, not visible, or in non-production
           console.log('[AdSense] Keeping placeholder visible for slot:', slot, {
-            reason: !isProduction ? 'non-production mode' : !isVisible ? 'ad not visible' : 'ad not filled',
+            reason: !isProductionDomain ? 'non-production domain' : !isVisible ? 'ad not visible' : 'ad not filled',
           })
           setShowPlaceholder(true)
         }

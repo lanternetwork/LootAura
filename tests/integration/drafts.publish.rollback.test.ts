@@ -29,58 +29,46 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 // Mock Supabase clients for database operations
-const mockDraftSelect = vi.fn()
-const mockDraftEq = vi.fn()
-const mockDraftMaybeSingle = vi.fn()
-const mockDraftUpdate = vi.fn()
-const mockDraftDelete = vi.fn()
+// Create chainable mock objects that return themselves for chaining
+const createChainableMock = () => {
+  const chain: any = {}
+  chain.eq = vi.fn().mockReturnValue(chain)
+  chain.select = vi.fn().mockReturnValue(chain)
+  chain.insert = vi.fn().mockReturnValue(chain)
+  chain.update = vi.fn().mockReturnValue(chain)
+  chain.delete = vi.fn().mockReturnValue(chain)
+  chain.single = vi.fn()
+  chain.maybeSingle = vi.fn()
+  chain.limit = vi.fn().mockReturnValue(chain)
+  chain.order = vi.fn().mockReturnValue(chain)
+  return chain
+}
 
-const mockSaleInsert = vi.fn()
-const mockSaleSelect = vi.fn()
-const mockSaleEq = vi.fn()
-const mockSaleSingle = vi.fn()
-
-const mockItemInsert = vi.fn()
-const mockItemSelect = vi.fn()
-const mockItemEq = vi.fn()
-const mockItemLimit = vi.fn()
+const mockDraftChain = createChainableMock()
+const mockSaleChain = createChainableMock()
+const mockItemChain = createChainableMock()
 
 const mockRlsDb = {
   from: vi.fn((table: string) => {
     if (table === 'sale_drafts') {
-      return {
-        select: mockDraftSelect,
-        update: mockDraftUpdate,
-        delete: mockDraftDelete,
-      }
+      return mockDraftChain
     }
-    return { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() }
+    return createChainableMock()
   }),
 }
 
 const mockAdminDb = {
   from: vi.fn((table: string) => {
     if (table === 'sales') {
-      return {
-        insert: mockSaleInsert,
-        select: mockSaleSelect,
-        delete: vi.fn(),
-      }
+      return mockSaleChain
     }
     if (table === 'items') {
-      return {
-        insert: mockItemInsert,
-        select: mockItemSelect,
-        delete: vi.fn(),
-      }
+      return mockItemChain
     }
     if (table === 'sale_drafts') {
-      return {
-        update: mockDraftUpdate,
-        delete: mockDraftDelete,
-      }
+      return mockDraftChain
     }
-    return { select: vi.fn(), eq: vi.fn(), delete: vi.fn() }
+    return createChainableMock()
   }),
 }
 
@@ -196,38 +184,29 @@ describe('Draft publish rollback', () => {
       error: null,
     })
     
-    // Setup draft lookup chain
-    mockDraftSelect.mockReturnValue({
-      eq: mockDraftEq,
-    })
-    mockDraftEq.mockReturnValue({
-      maybeSingle: mockDraftMaybeSingle,
-    })
+    // Reset all chain mocks to return themselves for chaining
+    mockDraftChain.eq.mockReturnValue(mockDraftChain)
+    mockDraftChain.select.mockReturnValue(mockDraftChain)
+    mockDraftChain.insert.mockReturnValue(mockDraftChain)
+    mockDraftChain.update.mockReturnValue(mockDraftChain)
+    mockDraftChain.delete.mockReturnValue(mockDraftChain)
     
-    // Setup sale creation chain
-    mockSaleInsert.mockReturnValue({
-      select: mockSaleSelect,
-    })
-    mockSaleSelect.mockReturnValue({
-      single: mockSaleSingle,
-    })
+    mockSaleChain.eq.mockReturnValue(mockSaleChain)
+    mockSaleChain.select.mockReturnValue(mockSaleChain)
+    mockSaleChain.insert.mockReturnValue(mockSaleChain)
+    mockSaleChain.delete.mockReturnValue(mockSaleChain)
     
-    // Setup item creation chain
-    mockItemInsert.mockReturnValue({
-      select: mockItemSelect,
-    })
-    mockItemSelect.mockReturnValue({
-      eq: mockItemEq,
-    })
-    mockItemEq.mockReturnValue({
-      limit: mockItemLimit,
-    })
+    mockItemChain.eq.mockReturnValue(mockItemChain)
+    mockItemChain.select.mockReturnValue(mockItemChain)
+    mockItemChain.insert.mockReturnValue(mockItemChain)
+    mockItemChain.delete.mockReturnValue(mockItemChain)
+    mockItemChain.limit.mockReturnValue(mockItemChain)
   })
 
   describe('Rollback on failure', () => {
     it('calls rollback when items creation fails after sale creation', async () => {
       // Mock successful draft lookup
-      mockDraftMaybeSingle.mockResolvedValue({
+      mockDraftChain.maybeSingle.mockResolvedValue({
         data: {
           id: draftId,
           draft_key: 'test-draft-key',
@@ -239,21 +218,22 @@ describe('Draft publish rollback', () => {
       })
       
       // Mock successful sale creation
-      mockSaleSingle.mockResolvedValue({
+      mockSaleChain.single.mockResolvedValue({
         data: { id: saleId, owner_id: userId },
         error: null,
       })
       
       // Mock items creation failure
-      mockItemLimit.mockResolvedValue({
+      // The route calls: fromBase(admin, 'items').insert(itemsData).select('id')
+      // So insert() returns a chain, then select() is called, which should fail
+      mockItemChain.insert.mockReturnValue(mockItemChain)
+      mockItemChain.select.mockResolvedValue({
         data: null,
         error: { message: 'Items creation failed', code: 'CONSTRAINT_VIOLATION' },
       })
       
       // Mock draft deletion (non-critical, can fail)
-      mockDraftDelete.mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      })
+      mockDraftChain.delete.mockResolvedValue({ error: null })
 
       // Call the publish endpoint
       const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {
@@ -278,7 +258,7 @@ describe('Draft publish rollback', () => {
 
     it('calls rollback on unexpected errors during publish', async () => {
       // Mock successful draft lookup
-      mockDraftMaybeSingle.mockResolvedValue({
+      mockDraftChain.maybeSingle.mockResolvedValue({
         data: {
           id: draftId,
           draft_key: 'test-draft-key-2',
@@ -290,13 +270,15 @@ describe('Draft publish rollback', () => {
       })
       
       // Mock successful sale creation
-      mockSaleSingle.mockResolvedValue({
+      mockSaleChain.single.mockResolvedValue({
         data: { id: saleId, owner_id: userId },
         error: null,
       })
       
       // Mock unexpected error during items creation (throw instead of error response)
-      mockItemLimit.mockRejectedValue(new Error('Unexpected database error'))
+      // The route calls: fromBase(admin, 'items').insert(itemsData).select('id')
+      mockItemChain.insert.mockReturnValue(mockItemChain)
+      mockItemChain.select.mockRejectedValue(new Error('Unexpected database error'))
 
       // Call the publish endpoint
       const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {

@@ -261,7 +261,8 @@ describe('Draft Publish Rollback', () => {
       
       const draftVerificationChain = createChainableQueryBuilder()
       // Ensure .select() returns the chain object (for .select().eq().maybeSingle() chain)
-      draftVerificationChain.select.mockReturnValue(draftVerificationChain)
+      // Use mockImplementation to ensure it always returns the chain, regardless of arguments
+      draftVerificationChain.select.mockImplementation(() => draftVerificationChain)
       draftVerificationChain.maybeSingle.mockResolvedValue({
         data: null, // Draft deleted successfully
         error: null,
@@ -418,7 +419,8 @@ describe('Draft Publish Rollback', () => {
       
       const draftVerificationChain = createChainableQueryBuilder()
       // Ensure .select() returns the chain object (for .select().eq().maybeSingle() chain)
-      draftVerificationChain.select.mockReturnValue(draftVerificationChain)
+      // Use mockImplementation to ensure it always returns the chain, regardless of arguments
+      draftVerificationChain.select.mockImplementation(() => draftVerificationChain)
       // The error happens when trying to verify - throw in maybeSingle
       draftVerificationChain.maybeSingle.mockImplementation(() => {
         throw new Error('Unexpected database error during draft deletion')

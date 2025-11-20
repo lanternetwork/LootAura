@@ -212,11 +212,20 @@ export default function AdSenseSlot({
       return
     }
 
+    // Always show placeholder initially when ads are enabled
+    setShowPlaceholder(true)
+
     const checkAdStatus = () => {
       const adElement = document.querySelector(`ins[data-ad-slot="${slot}"]`) as HTMLElement
       if (adElement) {
         const status = adElement.getAttribute('data-adsbygoogle-status')
         const hasIframe = adElement.innerHTML.includes('<iframe')
+        
+        console.log('[AdSense] Checking placeholder status for slot:', slot, {
+          status,
+          hasIframe,
+          shouldShowPlaceholder: !(status === 'done' && hasIframe),
+        })
         
         // Hide placeholder if ad is filled
         if (status === 'done' && hasIframe) {

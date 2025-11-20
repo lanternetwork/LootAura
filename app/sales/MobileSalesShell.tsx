@@ -210,6 +210,20 @@ export default function MobileSalesShell({
     }
   }, [mapView])
   
+  // Force map resize when switching back to map mode
+  useEffect(() => {
+    if (mode === 'map' && mapRef.current) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        const map = mapRef.current?.getMap?.()
+        if (map) {
+          map.resize()
+        }
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [mode])
+  
   return (
     <div 
       className="flex flex-col overflow-hidden md:hidden" 

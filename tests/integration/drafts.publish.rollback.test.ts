@@ -239,28 +239,19 @@ describe('Draft Publish Rollback', () => {
       // Mock draft deletion - needs to support:
       // 1. .delete().eq().eq().eq().eq().select() - for deletion (returns count)
       // 2. .select().eq().maybeSingle() - for verification (returns null if deleted)
+      // Since fromBase is called twice for sale_drafts, we need to return different chains
+      let saleDraftsCallCount = 0
       const draftDeleteChain = createChainableQueryBuilder()
+      draftDeleteChain.select.mockResolvedValue({
+        data: [{ id: draftId }],
+        error: null,
+        count: 1,
+      })
+      
       const draftVerificationChain = createChainableQueryBuilder()
       draftVerificationChain.maybeSingle.mockResolvedValue({
         data: null, // Draft deleted successfully
         error: null,
-      })
-      
-      // When select is called after delete chain, return count
-      // When select is called first (verification), return chain for .eq().maybeSingle()
-      let selectCallCount = 0
-      draftDeleteChain.select.mockImplementation((...args: any[]) => {
-        selectCallCount++
-        // First call is for delete verification (after .delete().eq()...)
-        if (selectCallCount === 1) {
-          return Promise.resolve({
-            data: [{ id: draftId }],
-            error: null,
-            count: 1,
-          })
-        }
-        // Second call is for verification query (.select().eq().maybeSingle())
-        return draftVerificationChain
       })
 
       // Mock items creation
@@ -278,7 +269,9 @@ describe('Draft Publish Rollback', () => {
           return itemsInsertChain
         }
         if (table === 'sale_drafts') {
-          return draftDeleteChain
+          saleDraftsCallCount++
+          // First call is for deletion, second is for verification
+          return saleDraftsCallCount === 1 ? draftDeleteChain : draftVerificationChain
         }
         return createChainableQueryBuilder()
       })
@@ -402,29 +395,18 @@ describe('Draft Publish Rollback', () => {
 
       // Mock draft deletion (fails with unexpected error)
       // The error happens during the verification step, so we need to handle both chains
+      let saleDraftsCallCount = 0
       const draftDeleteChain = createChainableQueryBuilder()
-      const draftVerificationChain = createChainableQueryBuilder()
-      draftVerificationChain.maybeSingle.mockResolvedValue({
-        data: null,
+      draftDeleteChain.select.mockResolvedValue({
+        data: [{ id: draftId }],
         error: null,
+        count: 1,
       })
       
-      let selectCallCount = 0
-      draftDeleteChain.select.mockImplementation((...args: any[]) => {
-        selectCallCount++
-        // First call is for delete (after .delete().eq()...)
-        if (selectCallCount === 1) {
-          return Promise.resolve({
-            data: [{ id: draftId }],
-            error: null,
-            count: 1,
-          })
-        }
-        // Second call is for verification - throw error here
-        if (selectCallCount === 2) {
-          throw new Error('Unexpected database error during draft deletion')
-        }
-        return draftVerificationChain
+      const draftVerificationChain = createChainableQueryBuilder()
+      // The error happens when trying to verify - throw in maybeSingle
+      draftVerificationChain.maybeSingle.mockImplementation(() => {
+        throw new Error('Unexpected database error during draft deletion')
       })
 
       mockAdminDb.from.mockImplementation((table: string) => {
@@ -435,7 +417,9 @@ describe('Draft Publish Rollback', () => {
           return itemsInsertChain
         }
         if (table === 'sale_drafts') {
-          return draftDeleteChain
+          saleDraftsCallCount++
+          // First call is for deletion, second is for verification
+          return saleDraftsCallCount === 1 ? draftDeleteChain : draftVerificationChain
         }
         return createChainableQueryBuilder()
       })

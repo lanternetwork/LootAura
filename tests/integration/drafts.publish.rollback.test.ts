@@ -23,6 +23,15 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient,
 }))
 
+// Mock cookies for getRlsDb() calls in test helpers
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(() => ({
+    get: vi.fn(),
+    set: vi.fn(),
+    getAll: vi.fn(),
+  })),
+}))
+
 // Mock image validation - allow all URLs in tests
 vi.mock('@/lib/images/validateImageUrl', () => ({
   isAllowedImageUrl: vi.fn().mockReturnValue(true),
@@ -115,9 +124,10 @@ function createDraftPayload() {
 }
 
 // Helper to create a draft in the database
+// Use admin client for test data creation (doesn't require cookies/request context)
 async function createDraftInDb(userId: string, draftKey: string, payload: any) {
-  const rls = getRlsDb()
-  const { data, error } = await fromBase(rls, 'sale_drafts')
+  const admin = getAdminDb()
+  const { data, error } = await fromBase(admin, 'sale_drafts')
     .insert({
       draft_key: draftKey,
       user_id: userId,
@@ -165,9 +175,10 @@ async function itemsExistForSale(saleId: string): Promise<boolean> {
 }
 
 // Helper to clean up test data
+// Use admin client for cleanup (doesn't require cookies/request context)
 async function cleanupDraft(draftKey: string) {
-  const rls = getRlsDb()
-  await fromBase(rls, 'sale_drafts')
+  const admin = getAdminDb()
+  await fromBase(admin, 'sale_drafts')
     .delete()
     .eq('draft_key', draftKey)
 }
@@ -223,8 +234,9 @@ describe('Draft publish rollback', () => {
         }
 
         // Update draft with invalid item data
-        const rls = getRlsDb()
-        await fromBase(rls, 'sale_drafts')
+        // Use admin client for test data manipulation (doesn't require cookies/request context)
+        const admin = getAdminDb()
+        await fromBase(admin, 'sale_drafts')
           .update({ payload: payloadWithInvalidItem })
           .eq('id', draft.id)
 

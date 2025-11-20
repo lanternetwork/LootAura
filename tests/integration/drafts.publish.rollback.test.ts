@@ -9,10 +9,8 @@
 import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import { generateCsrfToken } from '@/lib/csrf'
-import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
-import { server } from '@/tests/setup/msw.server'
-import { http, passthrough } from 'msw'
+import { deleteSaleAndItemsForRollback } from '@/lib/data/draftsPublishRollback'
 
 // Mock auth only - we need a test user for authentication
 const mockSupabaseClient = {
@@ -25,13 +23,72 @@ vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient,
 }))
 
-// Mock cookies for getRlsDb() calls in test helpers
-vi.mock('next/headers', () => ({
-  cookies: vi.fn(() => ({
-    get: vi.fn(),
-    set: vi.fn(),
-    getAll: vi.fn(),
-  })),
+// Mock Supabase clients for database operations
+const mockDraftSelect = vi.fn()
+const mockDraftEq = vi.fn()
+const mockDraftMaybeSingle = vi.fn()
+const mockDraftUpdate = vi.fn()
+const mockDraftDelete = vi.fn()
+
+const mockSaleInsert = vi.fn()
+const mockSaleSelect = vi.fn()
+const mockSaleEq = vi.fn()
+const mockSaleSingle = vi.fn()
+
+const mockItemInsert = vi.fn()
+const mockItemSelect = vi.fn()
+const mockItemEq = vi.fn()
+const mockItemLimit = vi.fn()
+
+const mockRlsDb = {
+  from: vi.fn((table: string) => {
+    if (table === 'sale_drafts') {
+      return {
+        select: mockDraftSelect,
+        update: mockDraftUpdate,
+        delete: mockDraftDelete,
+      }
+    }
+    return { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn() }
+  }),
+}
+
+const mockAdminDb = {
+  from: vi.fn((table: string) => {
+    if (table === 'sales') {
+      return {
+        insert: mockSaleInsert,
+        select: mockSaleSelect,
+        delete: vi.fn(),
+      }
+    }
+    if (table === 'items') {
+      return {
+        insert: mockItemInsert,
+        select: mockItemSelect,
+        delete: vi.fn(),
+      }
+    }
+    if (table === 'sale_drafts') {
+      return {
+        update: mockDraftUpdate,
+        delete: mockDraftDelete,
+      }
+    }
+    return { select: vi.fn(), eq: vi.fn(), delete: vi.fn() }
+  }),
+}
+
+vi.mock('@/lib/supabase/clients', () => ({
+  getRlsDb: () => mockRlsDb,
+  getAdminDb: () => mockAdminDb,
+  fromBase: (db: any, table: string) => db.from(table),
+}))
+
+// Mock rollback helper to track calls
+const mockDeleteSaleAndItemsForRollback = vi.fn(deleteSaleAndItemsForRollback)
+vi.mock('@/lib/data/draftsPublishRollback', () => ({
+  deleteSaleAndItemsForRollback: mockDeleteSaleAndItemsForRollback,
 }))
 
 // Mock image validation - allow all URLs in tests
@@ -125,177 +182,142 @@ function createDraftPayload() {
   }
 }
 
-// Helper to create a draft in the database
-// Use admin client for test data creation (doesn't require cookies/request context)
-async function createDraftInDb(userId: string, draftKey: string, payload: any) {
-  const admin = getAdminDb()
-  const { data, error } = await fromBase(admin, 'sale_drafts')
-    .insert({
-      draft_key: draftKey,
-      user_id: userId,
-      status: 'active',
-      payload: payload,
-    })
-    .select('id, draft_key')
-    .single()
-
-  if (error) {
-    throw new Error(`Failed to create draft: ${error.message}`)
-  }
-
-  return data
-}
-
-// Helper to check if a sale exists
-async function saleExists(saleId: string): Promise<boolean> {
-  const admin = getAdminDb()
-  const { data, error } = await fromBase(admin, 'sales')
-    .select('id')
-    .eq('id', saleId)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(`Failed to check sale: ${error.message}`)
-  }
-
-  return data !== null
-}
-
-// Helper to check if items exist for a sale
-async function itemsExistForSale(saleId: string): Promise<boolean> {
-  const admin = getAdminDb()
-  const { data, error } = await fromBase(admin, 'items')
-    .select('id')
-    .eq('sale_id', saleId)
-    .limit(1)
-
-  if (error) {
-    throw new Error(`Failed to check items: ${error.message}`)
-  }
-
-  return data !== null && data.length > 0
-}
-
-// Helper to clean up test data
-// Use admin client for cleanup (doesn't require cookies/request context)
-async function cleanupDraft(draftKey: string) {
-  const admin = getAdminDb()
-  await fromBase(admin, 'sale_drafts')
-    .delete()
-    .eq('draft_key', draftKey)
-}
-
-async function cleanupSale(saleId: string) {
-  const admin = getAdminDb()
-  // Delete items first (foreign key constraint)
-  await fromBase(admin, 'items')
-    .delete()
-    .eq('sale_id', saleId)
-  // Then delete sale
-  await fromBase(admin, 'sales')
-    .delete()
-    .eq('id', saleId)
-}
 
 describe('Draft publish rollback', () => {
   const userId = 'test-user-id'
-  
-  // Check if we have valid Supabase credentials (not just test defaults)
-  const hasValidSupabaseCredentials = 
-    process.env.NEXT_PUBLIC_SUPABASE_URL && 
-    process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://test.supabase.co' &&
-    process.env.SUPABASE_SERVICE_ROLE && 
-    process.env.SUPABASE_SERVICE_ROLE !== 'test-service-role-min-10-chars' &&
-    process.env.SUPABASE_SERVICE_ROLE.length > 20 // Real service role keys are longer
+  const draftId = 'test-draft-id'
+  const saleId = 'test-sale-id'
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockDeleteSaleAndItemsForRollback.mockClear()
+    
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: { id: userId } },
       error: null,
     })
     
-    // Allow Supabase REST API requests to pass through to real database
-    // This test uses the real Supabase client, not mocks
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://test.supabase.co'
-    server.use(
-      http.all(`${supabaseUrl}/rest/v1/*`, passthrough)
-    )
+    // Setup draft lookup chain
+    mockDraftSelect.mockReturnValue({
+      eq: mockDraftEq,
+    })
+    mockDraftEq.mockReturnValue({
+      maybeSingle: mockDraftMaybeSingle,
+    })
+    
+    // Setup sale creation chain
+    mockSaleInsert.mockReturnValue({
+      select: mockSaleSelect,
+    })
+    mockSaleSelect.mockReturnValue({
+      single: mockSaleSingle,
+    })
+    
+    // Setup item creation chain
+    mockItemInsert.mockReturnValue({
+      select: mockItemSelect,
+    })
+    mockItemSelect.mockReturnValue({
+      eq: mockItemEq,
+    })
+    mockItemEq.mockReturnValue({
+      limit: mockItemLimit,
+    })
   })
 
   describe('Rollback on failure', () => {
-    it.skipIf(!hasValidSupabaseCredentials)('prevents orphaned sales when publish fails after sale creation', async () => {
-      // This test verifies that if sale creation succeeds but a subsequent step fails,
-      // the sale is rolled back and no orphaned data remains
+    it('calls rollback when items creation fails after sale creation', async () => {
+      // Mock successful draft lookup
+      mockDraftMaybeSingle.mockResolvedValue({
+        data: {
+          id: draftId,
+          draft_key: 'test-draft-key',
+          user_id: userId,
+          status: 'active',
+          payload: createDraftPayload(),
+        },
+        error: null,
+      })
       
-      // Create a draft with valid data
-      const draftKey = `test-draft-rollback-${Date.now()}`
-      const draftPayload = createDraftPayload()
-      const validatedPayload = SaleDraftPayloadSchema.parse(draftPayload)
+      // Mock successful sale creation
+      mockSaleSingle.mockResolvedValue({
+        data: { id: saleId, owner_id: userId },
+        error: null,
+      })
+      
+      // Mock items creation failure
+      mockItemLimit.mockResolvedValue({
+        data: null,
+        error: { message: 'Items creation failed', code: 'CONSTRAINT_VIOLATION' },
+      })
+      
+      // Mock draft deletion (non-critical, can fail)
+      mockDraftDelete.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      })
 
-      try {
-        // Create the draft in the database
-        const draft = await createDraftInDb(userId, draftKey, validatedPayload)
+      // Call the publish endpoint
+      const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {
+        draftKey: 'test-draft-key',
+      })
 
-        // To trigger a failure after sale creation, we'll use an item with an extremely long name
-        // that might exceed database column limits, causing items creation to fail
-        // This simulates a real database constraint violation
-        const payloadWithInvalidItem = {
-          ...validatedPayload,
-          items: [
-            {
-              ...validatedPayload.items[0],
-              name: 'A'.repeat(10000), // Extremely long name that might exceed column limit
-            },
-          ],
-        }
+      const response = await POST(request)
+      const data = await response.json()
 
-        // Update draft with invalid item data
-        // Use admin client for test data manipulation (doesn't require cookies/request context)
-        const admin = getAdminDb()
-        await fromBase(admin, 'sale_drafts')
-          .update({ payload: payloadWithInvalidItem })
-          .eq('id', draft.id)
+      // Publish should fail
+      expect(response.status).toBeGreaterThanOrEqual(400)
+      expect(data.ok).toBe(false)
+      expect(data.code).toBe('ITEMS_CREATE_FAILED')
 
-        // Call the publish endpoint
-        const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {
-          draftKey,
-        })
+      // Verify rollback was called with the created sale ID
+      expect(mockDeleteSaleAndItemsForRollback).toHaveBeenCalledTimes(1)
+      expect(mockDeleteSaleAndItemsForRollback).toHaveBeenCalledWith(
+        mockAdminDb,
+        saleId
+      )
+    })
 
-        const response = await POST(request)
-        const data = await response.json()
+    it('calls rollback on unexpected errors during publish', async () => {
+      // Mock successful draft lookup
+      mockDraftMaybeSingle.mockResolvedValue({
+        data: {
+          id: draftId,
+          draft_key: 'test-draft-key-2',
+          user_id: userId,
+          status: 'active',
+          payload: createDraftPayload(),
+        },
+        error: null,
+      })
+      
+      // Mock successful sale creation
+      mockSaleSingle.mockResolvedValue({
+        data: { id: saleId, owner_id: userId },
+        error: null,
+      })
+      
+      // Mock unexpected error during items creation (throw instead of error response)
+      mockItemLimit.mockRejectedValue(new Error('Unexpected database error'))
 
-        // Publish should fail (either validation or database constraint)
-        expect(response.status).toBeGreaterThanOrEqual(400)
-        expect(data.ok).toBe(false)
+      // Call the publish endpoint
+      const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {
+        draftKey: 'test-draft-key-2',
+      })
 
-        // Verify no orphaned sale exists for this user
-        // Check that no recent sales exist that would have been created by this failed publish
-        const { data: recentSales } = await fromBase(admin, 'sales')
-          .select('id, created_at, title')
-          .eq('owner_id', userId)
-          .eq('title', validatedPayload.formData.title) // Match our test sale title
-          .order('created_at', { ascending: false })
-          .limit(5)
+      const response = await POST(request)
+      const data = await response.json()
 
-        // If any sales with our test title exist, they should have been rolled back
-        // Verify that no sale exists with orphaned items (items should have been cleaned up)
-        if (recentSales && recentSales.length > 0) {
-          for (const sale of recentSales) {
-            const hasItems = await itemsExistForSale(sale.id)
-            // If a sale exists from this failed publish, it should have been rolled back
-            // So it should not have items
-            // Note: This is a best-effort check since we can't be 100% certain which sale
-            // is from this test if multiple tests run concurrently
-          }
-        }
+      // Publish should fail
+      expect(response.status).toBe(500)
+      expect(data.ok).toBe(false)
+      expect(data.code).toBe('PUBLISH_FAILED')
 
-        // The key assertion: publish failed, so rollback should have run
-        expect(data.ok).toBe(false)
-      } finally {
-        // Clean up test data
-        await cleanupDraft(draftKey)
-      }
+      // Verify rollback was called
+      expect(mockDeleteSaleAndItemsForRollback).toHaveBeenCalledTimes(1)
+      expect(mockDeleteSaleAndItemsForRollback).toHaveBeenCalledWith(
+        mockAdminDb,
+        saleId
+      )
     })
   })
 })

@@ -401,9 +401,30 @@ describe('Draft Publish Rollback', () => {
       })
 
       // Mock draft deletion (fails with unexpected error)
+      // The error happens during the verification step, so we need to handle both chains
       const draftDeleteChain = createChainableQueryBuilder()
-      draftDeleteChain.select.mockImplementation(() => {
-        throw new Error('Unexpected database error during draft deletion')
+      const draftVerificationChain = createChainableQueryBuilder()
+      draftVerificationChain.maybeSingle.mockResolvedValue({
+        data: null,
+        error: null,
+      })
+      
+      let selectCallCount = 0
+      draftDeleteChain.select.mockImplementation((...args: any[]) => {
+        selectCallCount++
+        // First call is for delete (after .delete().eq()...)
+        if (selectCallCount === 1) {
+          return Promise.resolve({
+            data: [{ id: draftId }],
+            error: null,
+            count: 1,
+          })
+        }
+        // Second call is for verification - throw error here
+        if (selectCallCount === 2) {
+          throw new Error('Unexpected database error during draft deletion')
+        }
+        return draftVerificationChain
       })
 
       mockAdminDb.from.mockImplementation((table: string) => {

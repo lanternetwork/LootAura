@@ -79,7 +79,25 @@ export default function AdSenseSlot({
             elementFound: !!adElement,
             elementId: adElement?.id || 'none',
             clientId: (adElement as HTMLElement)?.getAttribute('data-ad-client'),
+            slotId: (adElement as HTMLElement)?.getAttribute('data-ad-slot'),
+            format: (adElement as HTMLElement)?.getAttribute('data-ad-format'),
+            className: adElement?.className,
+            isVisible: (adElement as HTMLElement)?.offsetParent !== null,
+            dimensions: {
+              width: (adElement as HTMLElement)?.offsetWidth,
+              height: (adElement as HTMLElement)?.offsetHeight,
+            },
           })
+          
+          // Check ad status after a delay to see if AdSense processed it
+          setTimeout(() => {
+            const status = (adElement as HTMLElement)?.getAttribute('data-adsbygoogle-status')
+            console.log('[AdSense] Ad status after push for slot:', slot, {
+              status: status || 'not set',
+              hasAdContent: (adElement as HTMLElement)?.innerHTML.length > 0,
+            })
+          }, 2000)
+          
           return true
         }
         return false

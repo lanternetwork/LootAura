@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import { generateCsrfToken } from '@/lib/csrf'
-import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 
 // Mock auth only - we need a test user for authentication

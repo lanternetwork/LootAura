@@ -262,7 +262,7 @@ export default function AdSenseSlot({
       clearTimeout(timer3)
       clearTimeout(timer4)
     }
-  }, [isClient, adsEnabled, slot, showPlaceholder])
+  }, [isClient, adsEnabled, slot])
 
   if (!adsEnabled) {
     return null

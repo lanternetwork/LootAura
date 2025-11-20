@@ -224,22 +224,34 @@ export default function AdSenseSlot({
         const hasIframe = innerHTML.includes('<iframe')
         const hasAdContent = innerHTML.length > 100 // AdSense ads typically have substantial content
         
+        // Check if ad is actually visible (has dimensions)
+        const rect = adElement.getBoundingClientRect()
+        const isVisible = rect.width > 0 && rect.height > 0 && adElement.offsetParent !== null
+        
         console.log('[AdSense] Checking placeholder status for slot:', slot, {
           status,
           hasIframe,
           hasAdContent,
           innerHTMLLength: innerHTML.length,
-          shouldShowPlaceholder: !(status === 'done' && hasIframe && hasAdContent),
+          isVisible,
+          dimensions: { width: rect.width, height: rect.height },
+          shouldShowPlaceholder: !(status === 'done' && hasIframe && hasAdContent && isVisible),
           currentShowPlaceholder: showPlaceholder,
         })
         
-        // Only hide placeholder if ad is definitely filled (status done AND has iframe AND has content)
-        if (status === 'done' && hasIframe && hasAdContent) {
-          console.log('[AdSense] Hiding placeholder - ad is filled for slot:', slot)
+        // Only hide placeholder if ad is definitely filled AND visible
+        // In non-production, we might want to keep placeholder visible for design purposes
+        const isProduction = process.env.NODE_ENV === 'production'
+        const shouldHidePlaceholder = status === 'done' && hasIframe && hasAdContent && isVisible && isProduction
+        
+        if (shouldHidePlaceholder) {
+          console.log('[AdSense] Hiding placeholder - ad is filled and visible for slot:', slot)
           setShowPlaceholder(false)
         } else {
-          // Keep showing placeholder if ad isn't filled yet
-          console.log('[AdSense] Keeping placeholder visible - ad not filled yet for slot:', slot)
+          // Keep showing placeholder if ad isn't filled yet, not visible, or in non-production
+          console.log('[AdSense] Keeping placeholder visible for slot:', slot, {
+            reason: !isProduction ? 'non-production mode' : !isVisible ? 'ad not visible' : 'ad not filled',
+          })
           setShowPlaceholder(true)
         }
       } else {

@@ -261,10 +261,12 @@ describe('Draft Publish Rollback', () => {
       
       const draftVerificationChain = createChainableQueryBuilder()
       // Explicitly ensure .select() returns the chain object for chaining
-      // We need to use mockImplementation to ensure it always returns the chain, even if mockReturnValue was cleared
-      draftVerificationChain.select.mockImplementation(() => draftVerificationChain)
+      // Reset and set up the mock to ensure it returns the chain
+      draftVerificationChain.select.mockReset()
+      draftVerificationChain.select.mockReturnValue(draftVerificationChain)
       // Also ensure .eq() returns the chain for further chaining
-      draftVerificationChain.eq.mockImplementation(() => draftVerificationChain)
+      draftVerificationChain.eq.mockReset()
+      draftVerificationChain.eq.mockReturnValue(draftVerificationChain)
       draftVerificationChain.maybeSingle.mockResolvedValue({
         data: null, // Draft deleted successfully
         error: null,
@@ -421,10 +423,12 @@ describe('Draft Publish Rollback', () => {
       
       const draftVerificationChain = createChainableQueryBuilder()
       // Explicitly ensure .select() returns the chain object for chaining
-      // We need to use mockImplementation to ensure it always returns the chain, even if mockReturnValue was cleared
-      draftVerificationChain.select.mockImplementation(() => draftVerificationChain)
+      // Reset and set up the mock to ensure it returns the chain
+      draftVerificationChain.select.mockReset()
+      draftVerificationChain.select.mockReturnValue(draftVerificationChain)
       // Also ensure .eq() returns the chain for further chaining
-      draftVerificationChain.eq.mockImplementation(() => draftVerificationChain)
+      draftVerificationChain.eq.mockReset()
+      draftVerificationChain.eq.mockReturnValue(draftVerificationChain)
       // The error happens when trying to verify - throw in maybeSingle
       draftVerificationChain.maybeSingle.mockImplementation(() => {
         throw new Error('Unexpected database error during draft deletion')

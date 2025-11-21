@@ -60,7 +60,7 @@ export default function AdSenseSlot({
 
       // Push to adsbygoogle
       try {
-        ;(window.adsbygoogle = window.adsbygoogle || []).push({})
+        (window.adsbygoogle = window.adsbygoogle || []).push({})
         hasPushedRef.current = true
       } catch (error) {
         // Silently handle errors (e.g., ad blocker)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { ENV_PUBLIC } from '@/lib/env'
 
 interface AdSenseSlotProps {
   slot: string
@@ -17,6 +18,15 @@ declare global {
   }
 }
 
+/**
+ * AdSenseSlot - Core component for rendering AdSense ad slots
+ * 
+ * Features:
+ * - Only renders when NEXT_PUBLIC_ENABLE_ADSENSE is enabled
+ * - Requests non-personalized ads (data-npa="1")
+ * - Safely initializes adsbygoogle with retry logic
+ * - Prevents duplicate initialization
+ */
 export default function AdSenseSlot({
   slot,
   className = '',
@@ -33,10 +43,8 @@ export default function AdSenseSlot({
       return
     }
 
-    // Check if ads are enabled
-    const adsEnabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
-    
-    if (!adsEnabled) {
+    // Check if ads are enabled via ENV_PUBLIC (validated env var)
+    if (!ENV_PUBLIC.NEXT_PUBLIC_ENABLE_ADSENSE) {
       return
     }
 
@@ -58,13 +66,13 @@ export default function AdSenseSlot({
         return
       }
 
-      // Push to adsbygoogle
+      // Push to adsbygoogle with empty config (non-personalized is set via data-npa attribute)
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({})
         hasPushedRef.current = true
       } catch (error) {
         // Silently handle errors (e.g., ad blocker)
-        console.warn('[AdSense] Failed to push ad:', error)
+        // Fail silently to avoid console noise in production
       }
     }
 
@@ -74,9 +82,9 @@ export default function AdSenseSlot({
       return
     }
 
-    // Wait for script to load
+    // Wait for script to load with retry logic
     let attempts = 0
-    const maxAttempts = 30 // 3 seconds
+    const maxAttempts = 30 // 3 seconds max wait
 
     const checkAndInit = () => {
       attempts++
@@ -97,9 +105,9 @@ export default function AdSenseSlot({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slot])
 
-  // Check if ads are enabled
-  const adsEnabled = typeof window !== 'undefined' && 
-    (process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1')
+  // Check if ads are enabled via ENV_PUBLIC
+  // Only render on client side when enabled
+  const adsEnabled = typeof window !== 'undefined' && ENV_PUBLIC.NEXT_PUBLIC_ENABLE_ADSENSE
 
   if (!adsEnabled) {
     return null
@@ -113,6 +121,7 @@ export default function AdSenseSlot({
       data-ad-slot={slot}
       data-ad-format={format}
       data-full-width-responsive={fullWidthResponsive ? 'true' : 'false'}
+      data-npa="1"
       {...(id && { id })}
     />
   )

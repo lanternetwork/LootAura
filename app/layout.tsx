@@ -16,7 +16,7 @@ import '@/lib/maps/telemetry'
 import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 import ClarityClient from '@/components/analytics/ClarityClient'
 import { DesktopFooterAd } from '@/components/ads/AdSlots'
-import { ENV_PUBLIC } from '@/lib/env'
+import { ENV_PUBLIC, isProduction } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -75,11 +75,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
-        <Script
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8685093412475036"
-          strategy="afterInteractive"
-          crossOrigin="anonymous"
-        />
+        {/* AdSense script: only load in production when enabled via env var */}
+        {isProduction() && ENV_PUBLIC.NEXT_PUBLIC_ENABLE_ADSENSE && (
+          <Script
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8685093412475036"
+            strategy="afterInteractive"
+            crossOrigin="anonymous"
+          />
+        )}
         <SkipToContent />
         <script
           type="application/ld+json"

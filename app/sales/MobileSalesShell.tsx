@@ -221,6 +221,8 @@ export default function MobileSalesShell({
         }
       }
       
+      const timers: NodeJS.Timeout[] = []
+      
       // First attempt - immediate
       resizeMap()
       
@@ -233,18 +235,18 @@ export default function MobileSalesShell({
           resizeMap()
           
           // Fourth attempt - after longer delay to ensure container has dimensions
-          setTimeout(() => {
+          const timer2 = setTimeout(() => {
             resizeMap()
           }, 100)
+          timers.push(timer2)
         }, 50)
-        
-        // Store timer for cleanup
-        return timer1
+        timers.push(timer1)
       })
       
       // Cleanup function
       return () => {
         cancelAnimationFrame(rafId1)
+        timers.forEach(timer => clearTimeout(timer))
       }
     }
   }, [mode, mapView])

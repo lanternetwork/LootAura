@@ -84,10 +84,10 @@ export default function MobileSalesShell({
   // Mobile-only state
   const [mode, setMode] = useState<MobileMode>('map')
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
-  const [mapReady, setMapReady] = useState(true) // Track if map container is ready to render
   const mapRef = useRef<any>(null)
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
+  const [mapLoaded, setMapLoaded] = useState(false)
   
   // Find selected sale from selectedPinId
   // selectedPinId can be either a sale ID or a location ID
@@ -180,20 +180,8 @@ export default function MobileSalesShell({
   
   // Handle mode toggle
   const handleToggleMode = useCallback(() => {
-    if (mode === 'list') {
-      // When switching back to map, delay rendering to ensure container has dimensions
-      setMapReady(false)
-      setMode('map')
-      // Small delay to ensure container is ready
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          setMapReady(true)
-        }, 50)
-      })
-    } else {
-      setMode('list')
-    }
-  }, [mode])
+    setMode(prev => prev === 'map' ? 'list' : 'map')
+  }, [])
   
   // Close callout when map is clicked or moved
   const handleMapClick = useCallback(() => {
@@ -223,145 +211,152 @@ export default function MobileSalesShell({
     }
   }, [mapView])
   
-  // Force map resize when switching back to map mode
+  // Track when map is loaded
   useEffect(() => {
-    if (mode === 'map' && mapRef.current) {
-      // Multiple resize attempts to ensure map renders properly
-      const resizeMap = () => {
+    if (mapRef.current) {
+      const checkLoaded = () => {
+        const isLoaded = mapRef.current?.isLoaded?.()
+        if (isLoaded) {
+          setMapLoaded(true)
+        }
+      }
+      
+      // Check immediately
+      checkLoaded()
+      
+      // Also check periodically until loaded (in case map loads after component mounts)
+      const interval = setInterval(() => {
+        checkLoaded()
+        if (mapRef.current?.isLoaded?.()) {
+          clearInterval(interval)
+        }
+      }, 100)
+      
+      return () => clearInterval(interval)
+    }
+  }, [])
+  
+  // Resize map when it becomes visible (mode switches to 'map' and map is loaded)
+  useEffect(() => {
+    if (mode === 'map' && mapLoaded && mapRef.current) {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
         const map = mapRef.current?.getMap?.()
         if (map) {
           map.resize()
         }
-      }
-      
-      const timers: NodeJS.Timeout[] = []
-      
-      // First attempt - immediate
-      resizeMap()
-      
-      // Second attempt - after RAF
-      const rafId1 = requestAnimationFrame(() => {
-        resizeMap()
-        
-        // Third attempt - after a short delay
-        const timer1 = setTimeout(() => {
-          resizeMap()
-          
-          // Fourth attempt - after longer delay to ensure container has dimensions
-          const timer2 = setTimeout(() => {
-            resizeMap()
-          }, 100)
-          timers.push(timer2)
-        }, 50)
-        timers.push(timer1)
       })
-      
-      // Cleanup function
-      return () => {
-        cancelAnimationFrame(rafId1)
-        timers.forEach(timer => clearTimeout(timer))
-      }
     }
-  }, [mode, mapView])
+  }, [mode, mapLoaded])
   
   return (
     <div 
-      className="flex flex-col overflow-hidden md:hidden" 
+      className="flex flex-col overflow-hidden md:hidden relative" 
       style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
     >
-      {/* Map Mode */}
-      {mode === 'map' && mapView && mapReady && (
-        <div 
-          className="relative flex-1 min-h-0 bg-gray-100 w-full h-full"
-          onClick={handleMapClick}
-          key={`map-container-${mode}`}
-        >
-          {/* Full-screen map */}
-          <SimpleMap
-            ref={mapRef}
-            center={mapView.center}
-            zoom={pendingBounds ? undefined : mapView.zoom}
-            fitBounds={pendingBounds}
-            fitBoundsOptions={pendingBounds ? { 
-              padding: 20, 
-              duration: 0
-            } : undefined}
-            hybridPins={currentViewport ? {
-              sales: mapSales,
-              selectedId: selectedPinId,
-              onLocationClick: onLocationClick,
-              onClusterClick: onClusterClick,
-              viewport: currentViewport
-            } : undefined}
-            onViewportMove={onViewportMove}
-            onViewportChange={handleViewportChangeWithDismiss}
-            onDragStart={() => {
-              // Set dragging flag to prevent pinPosition updates during drag
-              isDraggingRef.current = true
-            }}
-            onCenteringStart={onCenteringStart}
-            onCenteringEnd={onCenteringEnd}
-            onMapClick={() => {
-              if (selectedPinId) {
-                onLocationClick(selectedPinId)
-              }
-            }}
-            attributionPosition="top-right"
-            showOSMAttribution={true}
-            attributionControl={false}
-            interactive={true}
-            skipCenteringOnClick={true}
-          />
-          
-          {/* Floating Action Buttons */}
-          <div className="absolute inset-0 pointer-events-none z-10">
-            {/* Filters FAB - Top Left */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsFiltersModalOpen(true)
+      {/* Map Mode - Always mounted, visibility controlled by CSS */}
+      <div 
+        className={`absolute inset-0 transition-opacity duration-200 ${
+          mode === 'map' && mapView
+            ? 'opacity-100 pointer-events-auto' 
+            : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={handleMapClick}
+      >
+        {mapView && (
+          <div className="relative w-full h-full bg-gray-100">
+            {/* Full-screen map */}
+            <SimpleMap
+              ref={mapRef}
+              center={mapView.center}
+              zoom={pendingBounds ? undefined : mapView.zoom}
+              fitBounds={pendingBounds}
+              fitBoundsOptions={pendingBounds ? { 
+                padding: 20, 
+                duration: 0
+              } : undefined}
+              hybridPins={currentViewport ? {
+                sales: mapSales,
+                selectedId: selectedPinId,
+                onLocationClick: onLocationClick,
+                onClusterClick: onClusterClick,
+                viewport: currentViewport
+              } : undefined}
+              onViewportMove={onViewportMove}
+              onViewportChange={handleViewportChangeWithDismiss}
+              onDragStart={() => {
+                // Set dragging flag to prevent pinPosition updates during drag
+                isDraggingRef.current = true
               }}
-              className="absolute top-4 left-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
-              aria-label="Open filters"
-            >
-              <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
-              {hasActiveFilters && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-[#F4B63A] rounded-full"></span>
-              )}
-            </button>
-            
-            {/* Mode Toggle FAB - Bottom Right */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleToggleMode()
+              onCenteringStart={onCenteringStart}
+              onCenteringEnd={onCenteringEnd}
+              onMapClick={() => {
+                if (selectedPinId) {
+                  onLocationClick(selectedPinId)
+                }
               }}
-              className="absolute bottom-20 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
-              aria-label="Switch to list view"
-            >
-              <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
-          
-          {/* Callout Card - Shows when a sale is selected */}
-          {selectedSale && pinPosition && (
-            <MobileSaleCallout
-              sale={selectedSale}
-              onDismiss={() => onLocationClick(selectedPinId || '')}
-              viewport={mapViewport}
-              pinPosition={pinPosition}
+              attributionPosition="top-right"
+              showOSMAttribution={true}
+              attributionControl={false}
+              interactive={mode === 'map'}
+              skipCenteringOnClick={true}
             />
-          )}
-        </div>
-      )}
+            
+            {/* Floating Action Buttons */}
+            <div className="absolute inset-0 pointer-events-none z-10">
+              {/* Filters FAB - Top Left */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsFiltersModalOpen(true)
+                }}
+                className="absolute top-4 left-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
+                aria-label="Open filters"
+              >
+                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                {hasActiveFilters && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-[#F4B63A] rounded-full"></span>
+                )}
+              </button>
+              
+              {/* Mode Toggle FAB - Bottom Right */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleToggleMode()
+                }}
+                className="absolute bottom-20 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
+                aria-label="Switch to list view"
+              >
+                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Callout Card - Shows when a sale is selected */}
+            {selectedSale && pinPosition && (
+              <MobileSaleCallout
+                sale={selectedSale}
+                onDismiss={() => onLocationClick(selectedPinId || '')}
+                viewport={mapViewport}
+                pinPosition={pinPosition}
+              />
+            )}
+          </div>
+        )}
+      </div>
       
-      {/* List Mode */}
-      {mode === 'list' && (
-        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      {/* List Mode - Always mounted, visibility controlled by CSS */}
+      <div 
+        className={`absolute inset-0 flex flex-col transition-opacity duration-200 ${
+          mode === 'list' 
+            ? 'opacity-100 pointer-events-auto' 
+            : 'opacity-0 pointer-events-none'
+        }`}
+      >
           {/* Sticky Header */}
           <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
             <h2 className="text-lg font-semibold">
@@ -433,7 +428,7 @@ export default function MobileSalesShell({
             )}
           </div>
         </div>
-      )}
+      </div>
       
       {/* Filters Modal */}
       <MobileFiltersModal

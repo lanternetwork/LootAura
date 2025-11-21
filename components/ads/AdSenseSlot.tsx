@@ -59,17 +59,70 @@ export default function AdSenseSlot({
       try {
         if (typeof window !== 'undefined' && window.adsbygoogle) {
           // Verify the ad slot element exists in the DOM before pushing
-          const adElement = document.querySelector(`ins[data-ad-slot="${slot}"]`)
+          const adElement = document.querySelector(`ins[data-ad-slot="${slot}"]`) as HTMLElement
           if (!adElement) {
             console.warn('[AdSense] Ad slot element not found in DOM for slot:', slot)
             return false
           }
           
           // Check if this element already has an ad (AdSense may have auto-initialized it)
-          if ((adElement as HTMLElement).hasAttribute('data-adsbygoogle-status')) {
+          if (adElement.hasAttribute('data-adsbygoogle-status')) {
             console.log('[AdSense] Ad slot already initialized by AdSense for slot:', slot)
             hasPushedRef.current = true
             return true
+          }
+          
+          // CRITICAL: Ensure container has dimensions before pushing
+          // AdSense requires the container to have a width > 0
+          const rect = adElement.getBoundingClientRect()
+          const computedStyle = window.getComputedStyle(adElement)
+          const hasWidth = rect.width > 0 || parseInt(computedStyle.width) > 0
+          const isVisible = adElement.offsetParent !== null && computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden'
+          
+          if (!hasWidth || !isVisible) {
+            // Container doesn't have dimensions yet, wait and retry using requestAnimationFrame
+            console.log('[AdSense] Container has no width or is hidden, waiting for dimensions for slot:', slot, {
+              width: rect.width,
+              height: rect.height,
+              computedWidth: computedStyle.width,
+              isVisible,
+              display: computedStyle.display,
+              visibility: computedStyle.visibility,
+              offsetParent: adElement.offsetParent !== null,
+            })
+            
+            // Use requestAnimationFrame to wait for layout, then retry
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                const retryRect = adElement.getBoundingClientRect()
+                const retryComputedStyle = window.getComputedStyle(adElement)
+                const retryHasWidth = retryRect.width > 0 || parseInt(retryComputedStyle.width) > 0
+                const retryIsVisible = adElement.offsetParent !== null && retryComputedStyle.display !== 'none' && retryComputedStyle.visibility !== 'hidden'
+                
+                if (retryHasWidth && retryIsVisible && !hasPushedRef.current && window.adsbygoogle) {
+                  // Now we have dimensions, try again
+                  try {
+                    window.adsbygoogle.push({})
+                    hasPushedRef.current = true
+                    console.log('[AdSense] Pushed ad after waiting for dimensions for slot:', slot, {
+                      width: retryRect.width,
+                      height: retryRect.height,
+                    })
+                  } catch (error) {
+                    console.warn('[AdSense] Failed to push ad after retry:', error, { slot })
+                  }
+                } else {
+                  console.warn('[AdSense] Container still has no width after retry for slot:', slot, {
+                    width: retryRect.width,
+                    computedWidth: retryComputedStyle.width,
+                    isVisible: retryIsVisible,
+                    display: retryComputedStyle.display,
+                  })
+                }
+              })
+            })
+            
+            return false
           }
           
           window.adsbygoogle.push({})
@@ -326,13 +379,22 @@ export default function AdSenseSlot({
   console.log('[AdSense] Rendering ad slot:', slot, { showPlaceholder, adsEnabled, isClient })
 
   return (
-    <div className={`${className} relative`} style={{ minHeight: '100px', ...style }}>
+    <div 
+      className={`${className} relative`} 
+      style={{ 
+        minHeight: '100px', 
+        width: '100%',
+        minWidth: '200px', // Ensure minimum width for AdSense
+        ...style 
+      }}
+    >
       <ins
         className="adsbygoogle"
         style={{ 
           display: 'block', 
           minHeight: '100px', 
           width: '100%',
+          minWidth: '200px', // Ensure minimum width for AdSense
           ...style 
         }}
         data-ad-client="ca-pub-8685093412475036"
@@ -349,7 +411,8 @@ export default function AdSenseSlot({
           style={{ 
             minHeight: '100px', 
             width: '100%',
-            zIndex: showPlaceholder ? 10 : -1, // Only show on top when placeholder should be visible
+            minWidth: '200px',
+            zIndex: 10, // Always on top when placeholder is shown
             ...style 
           }}
           data-testid={`ad-placeholder-${slot}`}

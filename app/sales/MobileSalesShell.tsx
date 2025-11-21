@@ -226,13 +226,13 @@ export default function MobileSalesShell({
   
   return (
     <div 
-      className="flex flex-col overflow-hidden md:hidden" 
+      className="flex flex-col overflow-hidden md:hidden relative" 
       style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
     >
       {/* Map Mode - Keep in DOM, show/hide with CSS */}
       {mapView && (
         <div 
-          className={`relative flex-1 min-h-0 bg-gray-100 w-full h-full ${mode === 'map' ? 'flex' : 'hidden'}`}
+          className={`absolute inset-0 bg-gray-100 ${mode === 'map' ? 'flex' : 'hidden'}`}
           onClick={handleMapClick}
           style={{ flexDirection: 'column' }}
         >
@@ -320,7 +320,7 @@ export default function MobileSalesShell({
       )}
       
       {/* List Mode - Keep in DOM, show/hide with CSS */}
-      <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${mode === 'list' ? '' : 'hidden'}`}>
+      <div className={`absolute inset-0 flex flex-col overflow-hidden ${mode === 'list' ? 'flex' : 'hidden'}`}>
           {/* Sticky Header */}
           <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
             <h2 className="text-lg font-semibold">

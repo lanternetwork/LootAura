@@ -1,5 +1,6 @@
 import "./globals.css"
 import { Metadata } from 'next'
+import Script from 'next/script'
 import { Providers } from './providers'
 import WebVitals from '@/components/WebVitals'
 import { ConditionalHeader } from '@/components/landing/ConditionalHeader'
@@ -71,13 +72,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && (
           <meta name="google-site-verification" content={ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION} />
         )}
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8685093412475036"
-          crossOrigin="anonymous"
-        ></script>
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
+        <Script
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8685093412475036"
+          strategy="beforeInteractive"
+          crossOrigin="anonymous"
+        />
         <SkipToContent />
         <script
           type="application/ld+json"

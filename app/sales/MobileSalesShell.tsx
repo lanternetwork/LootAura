@@ -213,16 +213,24 @@ export default function MobileSalesShell({
   // Force map resize when switching back to map mode
   useEffect(() => {
     if (mode === 'map' && mapRef.current) {
-      // Small delay to ensure DOM is ready
-      const timer = setTimeout(() => {
-        const map = mapRef.current?.getMap?.()
-        if (map) {
-          map.resize()
-        }
-      }, 100)
-      return () => clearTimeout(timer)
+      // Use requestAnimationFrame to ensure DOM is fully rendered
+      const rafId = requestAnimationFrame(() => {
+        // Small delay to ensure map container has dimensions
+        const timer = setTimeout(() => {
+          const map = mapRef.current?.getMap?.()
+          if (map) {
+            map.resize()
+            // Force a repaint by triggering a move event
+            map.triggerRepaint()
+          }
+        }, 50)
+        return () => clearTimeout(timer)
+      })
+      return () => {
+        cancelAnimationFrame(rafId)
+      }
     }
-  }, [mode])
+  }, [mode, mapView])
   
   return (
     <div 
@@ -232,9 +240,9 @@ export default function MobileSalesShell({
       {/* Map Mode */}
       {mode === 'map' && mapView && (
         <div 
-          className="relative flex-1 min-h-0 bg-gray-100"
+          className="relative flex-1 min-h-0 bg-gray-100 w-full h-full"
           onClick={handleMapClick}
-          key="map-container"
+          key={`map-container-${mode}`}
         >
           {/* Full-screen map */}
           <SimpleMap

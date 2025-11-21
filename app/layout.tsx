@@ -15,8 +15,6 @@ import '@/lib/maps/telemetry'
 import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 import ClarityClient from '@/components/analytics/ClarityClient'
 import { DesktopFooterAd } from '@/components/ads/AdSlots'
-import AdSenseScriptLoader from '@/components/ads/AdSenseScriptLoader'
-import GoogleVerificationMeta from '@/components/ads/GoogleVerificationMeta'
 import { ENV_PUBLIC } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -61,12 +59,6 @@ export const metadata: Metadata = {
     description: 'Find and post yard sales, garage sales, and local deals on an interactive map.',
     images: [defaultOgImage],
   },
-  // Google Site Verification via metadata API (more reliable for crawlers)
-  ...(ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && {
-    verification: {
-      google: ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
-    },
-  }),
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -79,10 +71,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && (
           <meta name="google-site-verification" content={ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION} />
         )}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8685093412475036"
+          crossOrigin="anonymous"
+        ></script>
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
-        <GoogleVerificationMeta />
-        <AdSenseScriptLoader />
         <SkipToContent />
         <script
           type="application/ld+json"

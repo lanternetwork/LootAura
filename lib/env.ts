@@ -63,6 +63,8 @@ const publicSchema = z.object({
     z.boolean().optional()
   ),
   NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: z.string().optional(),
+  // For HTML file method: filename like "google1234567890.html"
+  NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION_FILE: z.string().optional(),
 })
 
 const serverSchema = z.object({
@@ -105,6 +107,7 @@ export const ENV_PUBLIC = publicSchema.parse({
   NEXT_PUBLIC_CLARITY_ID: process.env.NEXT_PUBLIC_CLARITY_ID,
   NEXT_PUBLIC_ENABLE_ADSENSE: process.env.NEXT_PUBLIC_ENABLE_ADSENSE,
   NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+  NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION_FILE: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION_FILE,
 })
 
 // Validate server environment variables (only in server context, lazy to avoid build-time validation)

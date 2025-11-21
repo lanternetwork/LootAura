@@ -66,6 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        <meta name="google-adsense-account" content="ca-pub-8685093412475036" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0b3d2e" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

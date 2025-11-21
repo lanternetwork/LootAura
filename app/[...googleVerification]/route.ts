@@ -31,10 +31,10 @@ export async function GET(
     return new NextResponse('Not Found', { status: 404 })
   }
   
-  // Extract the verification code from the filename
-  // Format: google{CODE}.html
-  // The file content should be: google-site-verification: google{CODE}.html
-  const htmlContent = `google-site-verification: ${path}`
+  // Google expects the HTML file to contain just the filename as plain text
+  // Format: google{CODE}.html should contain: google{CODE}.html
+  // The file content is just the filename itself
+  const htmlContent = path
   
   return new NextResponse(htmlContent, {
     status: 200,

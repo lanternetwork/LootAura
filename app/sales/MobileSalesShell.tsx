@@ -224,6 +224,17 @@ export default function MobileSalesShell({
     }
   }, [mode])
   
+  // Debug: Log visibleSales when switching to list mode
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && mode === 'list') {
+      console.log('[MOBILE_SHELL] List mode active, visibleSales:', {
+        count: visibleSales.length,
+        loading,
+        mode
+      })
+    }
+  }, [mode, visibleSales.length, loading])
+  
   return (
     <div 
       className="flex flex-col overflow-hidden md:hidden relative" 
@@ -320,7 +331,10 @@ export default function MobileSalesShell({
       )}
       
       {/* List Mode - Keep in DOM, show/hide with CSS */}
-      <div className={`absolute inset-0 flex flex-col overflow-hidden ${mode === 'list' ? 'flex' : 'hidden'}`}>
+      <div 
+        className={`absolute inset-0 flex flex-col overflow-hidden ${mode === 'list' ? '' : 'hidden'}`}
+        style={{ zIndex: mode === 'list' ? 10 : 0 }}
+      >
           {/* Sticky Header */}
           <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
             <h2 className="text-lg font-semibold">

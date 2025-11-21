@@ -213,20 +213,38 @@ export default function MobileSalesShell({
   // Force map resize when switching back to map mode
   useEffect(() => {
     if (mode === 'map' && mapRef.current) {
-      // Use requestAnimationFrame to ensure DOM is fully rendered
-      const rafId = requestAnimationFrame(() => {
-        // Small delay to ensure map container has dimensions
-        setTimeout(() => {
-          const map = mapRef.current?.getMap?.()
-          if (map) {
-            map.resize()
-            // Force a repaint by triggering a move event
-            map.triggerRepaint()
-          }
+      // Multiple resize attempts to ensure map renders properly
+      const resizeMap = () => {
+        const map = mapRef.current?.getMap?.()
+        if (map) {
+          map.resize()
+        }
+      }
+      
+      // First attempt - immediate
+      resizeMap()
+      
+      // Second attempt - after RAF
+      const rafId1 = requestAnimationFrame(() => {
+        resizeMap()
+        
+        // Third attempt - after a short delay
+        const timer1 = setTimeout(() => {
+          resizeMap()
+          
+          // Fourth attempt - after longer delay to ensure container has dimensions
+          const timer2 = setTimeout(() => {
+            resizeMap()
+          }, 100)
+          
+          return () => clearTimeout(timer2)
         }, 50)
+        
+        return () => clearTimeout(timer1)
       })
+      
       return () => {
-        cancelAnimationFrame(rafId)
+        cancelAnimationFrame(rafId1)
       }
     }
   }, [mode, mapView])

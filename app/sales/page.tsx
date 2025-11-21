@@ -66,7 +66,10 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   // 0.5) ZIP code lookup (only if no lat/lng in URL)
   if (!initialCenter && _zip && baseUrl) {
     try {
-      const zipRes = await fetch(`${baseUrl}/api/geocoding/zip?zip=${encodeURIComponent(_zip)}`, { cache: 'no-store' })
+      const zipRes = await Promise.race([
+        fetch(`${baseUrl}/api/geocoding/zip?zip=${encodeURIComponent(_zip)}`, { cache: 'no-store' }),
+        new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+      ])
       if (zipRes.ok) {
         const zipData = await zipRes.json()
         if (zipData?.ok && zipData.lat && zipData.lng) {
@@ -81,7 +84,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         }
       }
     } catch (error) {
-      console.error(`[SALES_PAGE] ZIP lookup error:`, error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error(`[SALES_PAGE] ZIP lookup error:`, error)
+      }
     }
   }
 
@@ -115,24 +120,38 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
   // 2) user profile.home_zip → lookup zip
   if (!initialCenter && user) {
     try {
-      // Try profiles_v2 view first
-      const { data: profile } = await supabase
+      // Try profiles_v2 view first with timeout
+      const profilePromise = supabase
         .from('profiles_v2')
         .select('home_zip')
         .eq('id', user.id)
         .maybeSingle()
+      
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500))
+      
+      const profile = await Promise.race([profilePromise, timeoutPromise])
+      const profileData = profile && 'data' in profile ? profile.data : null
 
-      const homeZip: string | undefined = profile?.home_zip || undefined
+      const homeZip: string | undefined = profileData?.home_zip || undefined
       if (homeZip && baseUrl) {
-        const zipRes = await fetch(`${baseUrl}/api/geocoding/zip?zip=${encodeURIComponent(homeZip)}`, { cache: 'no-store' })
-        if (zipRes.ok) {
-          const z = await zipRes.json()
-          if (z?.ok && z.lat && z.lng) {
-            initialCenter = { lat: z.lat, lng: z.lng, label: { zip: z.zip, city: z.city, state: z.state } }
+        try {
+          const zipRes = await Promise.race([
+            fetch(`${baseUrl}/api/geocoding/zip?zip=${encodeURIComponent(homeZip)}`, { cache: 'no-store' }),
+            new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+          ])
+          if (zipRes.ok) {
+            const z = await zipRes.json()
+            if (z?.ok && z.lat && z.lng) {
+              initialCenter = { lat: z.lat, lng: z.lng, label: { zip: z.zip, city: z.city, state: z.state } }
+            }
           }
+        } catch {
+          // Silently fail - will fall back to IP geolocation or default
         }
       }
-    } catch {}
+    } catch {
+      // Silently fail - will fall back to IP geolocation or default
+    }
   }
 
   // 3) IP geolocation - try direct approach first, then API
@@ -158,25 +177,35 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
           console.log(`[SALES_PAGE] Using Vercel location:`, initialCenter)
         }
       } else if (baseUrl) {
-        // Fallback to API
+        // Fallback to API with timeout
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log(`[SALES_PAGE] Trying IP geolocation API: ${baseUrl}/api/geolocation/ip`)
         }
-        const ipRes = await fetch(`${baseUrl}/api/geolocation/ip`, { cache: 'no-store' })
-        if (ipRes.ok) {
-          const g = await ipRes.json()
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log(`[SALES_PAGE] IP geolocation response:`, g)
-          }
-          if (g?.lat && g?.lng) {
-            initialCenter = { lat: Number(g.lat), lng: Number(g.lng), label: { city: g.city, state: g.state } }
+        try {
+          const ipRes = await Promise.race([
+            fetch(`${baseUrl}/api/geolocation/ip`, { cache: 'no-store' }),
+            new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+          ])
+          if (ipRes.ok) {
+            const g = await ipRes.json()
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log(`[SALES_PAGE] Using IP location:`, initialCenter)
+              console.log(`[SALES_PAGE] IP geolocation response:`, g)
+            }
+            if (g?.lat && g?.lng) {
+              initialCenter = { lat: Number(g.lat), lng: Number(g.lng), label: { city: g.city, state: g.state } }
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log(`[SALES_PAGE] Using IP location:`, initialCenter)
+              }
+            }
+          } else {
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log(`[SALES_PAGE] IP geolocation failed:`, ipRes.status)
             }
           }
-        } else {
+        } catch {
+          // Silently fail - will use default center
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log(`[SALES_PAGE] IP geolocation failed:`, ipRes.status)
+            console.log(`[SALES_PAGE] IP geolocation timeout or error`)
           }
         }
       }

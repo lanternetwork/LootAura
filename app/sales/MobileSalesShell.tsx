@@ -216,7 +216,7 @@ export default function MobileSalesShell({
       // Use requestAnimationFrame to ensure DOM is fully rendered
       const rafId = requestAnimationFrame(() => {
         // Small delay to ensure map container has dimensions
-        const timer = setTimeout(() => {
+        setTimeout(() => {
           const map = mapRef.current?.getMap?.()
           if (map) {
             map.resize()
@@ -224,7 +224,6 @@ export default function MobileSalesShell({
             map.triggerRepaint()
           }
         }, 50)
-        return () => clearTimeout(timer)
       })
       return () => {
         cancelAnimationFrame(rafId)

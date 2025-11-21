@@ -27,6 +27,7 @@ export default function AdSenseSlot({
 }: AdSenseSlotProps) {
   const [isClient, setIsClient] = useState(false)
   const [adsEnabled, setAdsEnabled] = useState(false)
+  const [isPreview, setIsPreview] = useState(false)
   const [showPlaceholder, setShowPlaceholder] = useState(true)
   const hasPushedRef = useRef(false) // Track if we've already pushed this ad
   const resizeObserverRef = useRef<ResizeObserver | null>(null) // Track ResizeObserver for cleanup

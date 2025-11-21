@@ -37,9 +37,9 @@ export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
       {sales.map((sale, index) => (
         <div key={sale.id}>
           <SaleCard sale={sale} viewport={viewport} />
-          {/* Show inline ad after 3rd item (index 2) and optionally after 9th item (index 8) */}
+          {/* Show inline ad after every 6th sale (indices 5, 11, 17, etc.) */}
           {/* Mobile: use MobileListInlineAd, Desktop: use ListInlineAd */}
-          {(index === 2 || (index === 8 && sales.length > 9)) && (
+          {(index + 1) % 6 === 0 && index > 0 && (
             <>
               <MobileListInlineAd />
               <div className="hidden md:block">

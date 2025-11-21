@@ -16,6 +16,7 @@ import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 import ClarityClient from '@/components/analytics/ClarityClient'
 import { DesktopFooterAd } from '@/components/ads/AdSlots'
 import AdSenseScriptLoader from '@/components/ads/AdSenseScriptLoader'
+import GoogleVerificationMeta from '@/components/ads/GoogleVerificationMeta'
 import { ENV_PUBLIC } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -74,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
+        <GoogleVerificationMeta />
         <AdSenseScriptLoader />
         <SkipToContent />
         <script

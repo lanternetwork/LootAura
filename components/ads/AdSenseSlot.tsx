@@ -145,6 +145,7 @@ export default function AdSenseSlot({
             }
             
             // Set up ResizeObserver to watch for size changes
+            // Watch both the ad element AND its parent to catch grid layout changes
             if (typeof ResizeObserver !== 'undefined') {
               // Clean up any existing observer
               if (resizeObserverRef.current) {
@@ -154,7 +155,22 @@ export default function AdSenseSlot({
               resizeObserverRef.current = new ResizeObserver(() => {
                 tryPush()
               })
+              
+              // Observe the ad element
               resizeObserverRef.current.observe(adElement)
+              
+              // Also observe the parent if it exists (for grid layout changes)
+              if (parentElement) {
+                resizeObserverRef.current.observe(parentElement)
+              }
+              
+              // Also observe the grid container if we can find it
+              const gridContainer = adElement.closest('[data-testid="sales-list"]') || 
+                                   adElement.closest('.md\\:grid') ||
+                                   adElement.closest('[class*="grid"]')
+              if (gridContainer && gridContainer !== adElement && gridContainer !== parentElement) {
+                resizeObserverRef.current.observe(gridContainer)
+              }
             }
             
             // Also try after multiple RAF cycles and timeouts as fallback

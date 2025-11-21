@@ -84,6 +84,7 @@ export default function MobileSalesShell({
   // Mobile-only state
   const [mode, setMode] = useState<MobileMode>('map')
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
+  const [mapReady, setMapReady] = useState(true) // Track if map container is ready to render
   const mapRef = useRef<any>(null)
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
@@ -179,8 +180,20 @@ export default function MobileSalesShell({
   
   // Handle mode toggle
   const handleToggleMode = useCallback(() => {
-    setMode(prev => prev === 'map' ? 'list' : 'map')
-  }, [])
+    if (mode === 'list') {
+      // When switching back to map, delay rendering to ensure container has dimensions
+      setMapReady(false)
+      setMode('map')
+      // Small delay to ensure container is ready
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          setMapReady(true)
+        }, 50)
+      })
+    } else {
+      setMode('list')
+    }
+  }, [mode])
   
   // Close callout when map is clicked or moved
   const handleMapClick = useCallback(() => {
@@ -257,7 +270,7 @@ export default function MobileSalesShell({
       style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
     >
       {/* Map Mode */}
-      {mode === 'map' && mapView && (
+      {mode === 'map' && mapView && mapReady && (
         <div 
           className="relative flex-1 min-h-0 bg-gray-100 w-full h-full"
           onClick={handleMapClick}

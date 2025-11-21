@@ -239,20 +239,50 @@ export default function AdSenseSlot({
           currentShowPlaceholder: showPlaceholder,
         })
         
-        // Only hide placeholder if ad is definitely filled AND visible
-        // Keep placeholder visible in preview/staging environments for design purposes
+        // Only hide placeholder if ad is definitely filled AND visible AND has substantial content
         // Check hostname to detect production (lootaura.com) vs preview/staging
         const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
         const isProductionDomain = hostname === 'lootaura.com' || hostname === 'www.lootaura.com'
-        const shouldHidePlaceholder = status === 'done' && hasIframe && hasAdContent && isVisible && isProductionDomain
+        
+        // More strict checks: ad must have iframe, substantial content, be visible, AND have reasonable dimensions
+        const hasReasonableDimensions = rect.width >= 200 && rect.height >= 50 // Minimum reasonable ad size
+        const hasSubstantialContent = innerHTML.length > 500 // More substantial content check
+        
+        // Also check if there's actually an iframe with src (not just empty iframe tag)
+        const iframeElement = adElement.querySelector('iframe')
+        const hasValidIframe = iframeElement && iframeElement.src && iframeElement.src.length > 0
+        
+        const shouldHidePlaceholder = status === 'done' && 
+          hasValidIframe && 
+          hasSubstantialContent && 
+          isVisible && 
+          hasReasonableDimensions &&
+          isProductionDomain
         
         if (shouldHidePlaceholder) {
-          console.log('[AdSense] Hiding placeholder - ad is filled and visible for slot:', slot)
+          console.log('[AdSense] Hiding placeholder - ad is filled and visible for slot:', slot, {
+            status,
+            hasValidIframe,
+            hasSubstantialContent,
+            isVisible,
+            hasReasonableDimensions,
+            dimensions: { width: rect.width, height: rect.height },
+          })
           setShowPlaceholder(false)
         } else {
           // Keep showing placeholder if ad isn't filled yet, not visible, or in non-production
           console.log('[AdSense] Keeping placeholder visible for slot:', slot, {
-            reason: !isProductionDomain ? 'non-production domain' : !isVisible ? 'ad not visible' : 'ad not filled',
+            reason: !isProductionDomain ? 'non-production domain' 
+              : !hasValidIframe ? 'no valid iframe' 
+              : !hasSubstantialContent ? 'insufficient content' 
+              : !isVisible ? 'ad not visible' 
+              : !hasReasonableDimensions ? 'dimensions too small' 
+              : 'ad not filled',
+            status,
+            hasIframe: !!iframeElement,
+            iframeSrc: iframeElement?.src || 'none',
+            contentLength: innerHTML.length,
+            dimensions: { width: rect.width, height: rect.height },
           })
           setShowPlaceholder(true)
         }
@@ -299,7 +329,12 @@ export default function AdSenseSlot({
     <div className={`${className} relative`} style={{ minHeight: '100px', ...style }}>
       <ins
         className="adsbygoogle"
-        style={{ display: 'block', minHeight: '100px', ...style }}
+        style={{ 
+          display: 'block', 
+          minHeight: '100px', 
+          width: '100%',
+          ...style 
+        }}
         data-ad-client="ca-pub-8685093412475036"
         data-ad-slot={slot}
         data-ad-format={format}
@@ -307,11 +342,16 @@ export default function AdSenseSlot({
         {...(id && { id })}
         suppressHydrationWarning
       />
-      {/* Placeholder ad - shows when ad isn't filled yet */}
+      {/* Placeholder ad - shows when ad isn't filled yet or in non-production */}
       {showPlaceholder && (
         <div
-          className="absolute inset-0 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded pointer-events-none z-10"
-          style={{ minHeight: '100px', width: '100%', ...style }}
+          className="absolute inset-0 flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded pointer-events-none"
+          style={{ 
+            minHeight: '100px', 
+            width: '100%',
+            zIndex: showPlaceholder ? 10 : -1, // Only show on top when placeholder should be visible
+            ...style 
+          }}
           data-testid={`ad-placeholder-${slot}`}
         >
           <div className="text-center text-gray-400">

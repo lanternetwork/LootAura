@@ -27,6 +27,7 @@ export default function AdSenseSlot({
 }: AdSenseSlotProps) {
   const [isClient, setIsClient] = useState(false)
   const [adsEnabled, setAdsEnabled] = useState(false)
+  const [isPreview, setIsPreview] = useState(false)
   const [showPlaceholder, setShowPlaceholder] = useState(true)
   const hasPushedRef = useRef(false) // Track if we've already pushed this ad
   const resizeObserverRef = useRef<ResizeObserver | null>(null) // Track ResizeObserver for cleanup
@@ -37,6 +38,13 @@ export default function AdSenseSlot({
     // Check environment variable on client side
     const enabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
     setAdsEnabled(enabled)
+    
+    // Check if we're in preview/staging (not production)
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname
+      const isProduction = hostname === 'lootaura.com' || hostname === 'www.lootaura.com'
+      setIsPreview(!isProduction)
+    }
     
     // Debug logging (always log to help troubleshoot)
     console.log('[AdSense] Environment check:', {
@@ -331,15 +339,20 @@ export default function AdSenseSlot({
 
   // Check if ad has been filled after a delay
   useEffect(() => {
-    if (!isClient || !adsEnabled) {
-      // If ads are disabled, don't show placeholder
+    if (!isClient) {
+      return
+    }
+
+    // In preview, always show placeholder for design purposes
+    // In production, only show if ads are enabled
+    if (!adsEnabled && !isPreview) {
       setShowPlaceholder(false)
       return
     }
 
-    // Always show placeholder initially when ads are enabled
+    // Always show placeholder initially when ads are enabled or in preview
     setShowPlaceholder(true)
-    console.log('[AdSense] Placeholder initialized for slot:', slot, { showPlaceholder: true })
+    console.log('[AdSense] Placeholder initialized for slot:', slot, { showPlaceholder: true, isPreview, adsEnabled })
 
     const checkAdStatus = () => {
       const adElement = document.querySelector(`ins[data-ad-slot="${slot}"]`) as HTMLElement
@@ -377,12 +390,20 @@ export default function AdSenseSlot({
         const iframeElement = adElement.querySelector('iframe')
         const hasValidIframe = iframeElement && iframeElement.src && iframeElement.src.length > 0
         
-        const shouldHidePlaceholder = status === 'done' && 
+        // Check if iframe has reasonable dimensions (not collapsed)
+        const iframeRect = iframeElement?.getBoundingClientRect()
+        const iframeHasDimensions = iframeRect && iframeRect.width > 0 && iframeRect.height > 0
+        
+        // For production, require all checks. For non-production, also require iframe to have dimensions
+        // This prevents hiding placeholder when ad is "done" but iframe is collapsed/empty
+        // In non-production (preview/staging), always show placeholder unless ad is fully loaded with dimensions
+        const shouldHidePlaceholder = isProductionDomain && 
+          status === 'done' && 
           hasValidIframe && 
           hasSubstantialContent && 
           isVisible && 
           hasReasonableDimensions &&
-          isProductionDomain
+          iframeHasDimensions // In production, require all checks including iframe dimensions
         
         if (shouldHidePlaceholder) {
           console.log('[AdSense] Hiding placeholder - ad is filled and visible for slot:', slot, {
@@ -431,9 +452,11 @@ export default function AdSenseSlot({
       clearTimeout(timer3)
       clearTimeout(timer4)
     }
-  }, [isClient, adsEnabled, slot])
+  }, [isClient, adsEnabled, isPreview, slot])
 
-  if (!adsEnabled) {
+  // In preview, always show placeholder for design purposes
+  // In production, only show if ads are enabled
+  if (!adsEnabled && !isPreview) {
     return null
   }
 

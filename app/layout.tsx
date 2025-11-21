@@ -16,6 +16,7 @@ import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 import ClarityClient from '@/components/analytics/ClarityClient'
 import { DesktopFooterAd } from '@/components/ads/AdSlots'
 import AdSenseScriptLoader from '@/components/ads/AdSenseScriptLoader'
+import { ENV_PUBLIC } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -68,6 +69,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0b3d2e" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && (
+          <meta name="google-site-verification" content={ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION} />
+        )}
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
         <AdSenseScriptLoader />

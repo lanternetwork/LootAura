@@ -35,19 +35,24 @@ export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
       style={{ width: '100%' }}
     >
       {sales.map((sale, index) => (
-        <div key={sale.id}>
-          <SaleCard sale={sale} viewport={viewport} />
+        <>
+          <div key={sale.id}>
+            <SaleCard sale={sale} viewport={viewport} />
+          </div>
           {/* Show inline ad after every 6th sale (indices 5, 11, 17, etc.) */}
           {/* Mobile: use MobileListInlineAd, Desktop: use ListInlineAd */}
+          {/* Ad must be a direct child of grid to span columns */}
           {(index + 1) % 6 === 0 && index > 0 && (
             <>
-              <MobileListInlineAd />
-              <div className="hidden md:block md:col-span-full">
+              <div key={`mobile-ad-${sale.id}`} className="block md:hidden">
+                <MobileListInlineAd />
+              </div>
+              <div key={`desktop-ad-${sale.id}`} className="hidden md:block md:col-span-2 lg:col-span-2">
                 <ListInlineAd />
               </div>
             </>
           )}
-        </div>
+        </>
       ))}
     </div>
   )

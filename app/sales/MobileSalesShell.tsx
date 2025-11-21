@@ -229,11 +229,15 @@ export default function MobileSalesShell({
     if (process.env.NEXT_PUBLIC_DEBUG === 'true' && mode === 'list') {
       console.log('[MOBILE_SHELL] List mode active, visibleSales:', {
         count: visibleSales.length,
+        mapSalesCount: mapSales.length,
         loading,
         mode
       })
     }
-  }, [mode, visibleSales.length, loading])
+  }, [mode, visibleSales.length, mapSales.length, loading])
+  
+  // Use mapSales as fallback if visibleSales is empty
+  const salesForList = visibleSales.length > 0 ? visibleSales : mapSales
   
   return (
     <div 
@@ -338,7 +342,7 @@ export default function MobileSalesShell({
           {/* Sticky Header */}
           <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
             <h2 className="text-lg font-semibold">
-              Sales ({visibleSales.length})
+              Sales ({salesForList.length})
             </h2>
             {isFetching && !loading && (
               <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -381,7 +385,7 @@ export default function MobileSalesShell({
               </div>
             )}
             
-            {!loading && visibleSales.length === 0 && (
+            {!loading && salesForList.length === 0 && (
               <div className="text-center py-12 px-4">
                 <div className="text-gray-500 mb-4">
                   No sales found in this area
@@ -395,10 +399,10 @@ export default function MobileSalesShell({
               </div>
             )}
             
-            {!loading && visibleSales.length > 0 && (
+            {!loading && salesForList.length > 0 && (
               <div className="p-4">
                 <SalesList 
-                  sales={visibleSales} 
+                  sales={salesForList} 
                   _mode="grid" 
                   viewport={mapViewport || { center: { lat: 39.8283, lng: -98.5795 }, zoom: 10 }} 
                 />

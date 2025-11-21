@@ -99,7 +99,7 @@ export default function AdSenseSlot({
                 const retryHasWidth = retryRect.width > 0 || parseInt(retryComputedStyle.width) > 0
                 const retryIsVisible = adElement.offsetParent !== null && retryComputedStyle.display !== 'none' && retryComputedStyle.visibility !== 'hidden'
                 
-                if (retryHasWidth && retryIsVisible && !hasPushedRef.current) {
+                if (retryHasWidth && retryIsVisible && !hasPushedRef.current && window.adsbygoogle) {
                   // Now we have dimensions, try again
                   try {
                     window.adsbygoogle.push({})

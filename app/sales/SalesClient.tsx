@@ -14,7 +14,6 @@ import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
-import { useHasOverflow } from '@/lib/hooks/useHasOverflow'
 import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
 import { 
   expandBounds, 
@@ -971,8 +970,8 @@ export default function SalesClient({
     // Handled by context
   }, [])
 
-  // Detect overflow in sales list to conditionally show scrollbar
-  const { ref: salesListContentRef, hasOverflow: salesListHasOverflow } = useHasOverflow<HTMLDivElement>()
+  // Ref for sales list content container (for potential scroll management)
+  const salesListContentRef = useRef<HTMLDivElement>(null)
 
   // Desktop callout card state
   const desktopMapRef = useRef<any>(null)
@@ -1264,7 +1263,7 @@ export default function SalesClient({
 
               <div 
                 ref={salesListContentRef}
-                className={`flex-1 pl-4 pr-4 pb-4 pt-4 ${salesListHasOverflow ? 'overflow-y-auto' : 'overflow-hidden'}`}
+                className="flex-1 pl-4 pr-4 pb-4 pt-4 overflow-y-auto"
               >
                 {loading && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

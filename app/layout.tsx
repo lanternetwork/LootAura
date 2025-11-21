@@ -14,6 +14,8 @@ import 'react-toastify/dist/ReactToastify.css'
 import '@/lib/maps/telemetry'
 import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 import ClarityClient from '@/components/analytics/ClarityClient'
+import { DesktopFooterAd } from '@/components/ads/AdSlots'
+import AdSenseScriptLoader from '@/components/ads/AdSenseScriptLoader'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -68,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
+        <AdSenseScriptLoader />
         <SkipToContent />
         <script
           type="application/ld+json"
@@ -100,6 +103,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               pauseOnHover
               theme="light"
             />
+            <DesktopFooterAd />
           </ErrorBoundary>
         </Providers>
       </body>

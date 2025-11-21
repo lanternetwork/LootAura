@@ -1,6 +1,7 @@
 import SaleCard from './SaleCard'
 import EmptyState from './EmptyState'
 import { Sale } from '@/lib/types'
+import { MobileListInlineAd, ListInlineAd } from '@/components/ads/AdSlots'
 
 interface SalesListProps {
   sales: Sale[]
@@ -33,8 +34,20 @@ export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
       data-testid="sales-list" 
       style={{ width: '100%' }}
     >
-      {sales.map(sale => (
-        <SaleCard key={sale.id} sale={sale} viewport={viewport} />
+      {sales.map((sale, index) => (
+        <div key={sale.id}>
+          <SaleCard sale={sale} viewport={viewport} />
+          {/* Show inline ad after every 6th sale (indices 5, 11, 17, etc.) */}
+          {/* Mobile: use MobileListInlineAd, Desktop: use ListInlineAd */}
+          {(index + 1) % 6 === 0 && index > 0 && (
+            <>
+              <MobileListInlineAd />
+              <div className="hidden md:block">
+                <ListInlineAd />
+              </div>
+            </>
+          )}
+        </div>
       ))}
     </div>
   )

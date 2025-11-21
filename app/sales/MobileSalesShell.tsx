@@ -224,32 +224,17 @@ export default function MobileSalesShell({
     }
   }, [mode])
   
-  // Debug: Log visibleSales when switching to list mode
-  useEffect(() => {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && mode === 'list') {
-      console.log('[MOBILE_SHELL] List mode active, visibleSales:', {
-        count: visibleSales.length,
-        mapSalesCount: mapSales.length,
-        loading,
-        mode
-      })
-    }
-  }, [mode, visibleSales.length, mapSales.length, loading])
-  
-  // Use mapSales as fallback if visibleSales is empty
-  const salesForList = visibleSales.length > 0 ? visibleSales : mapSales
-  
   return (
     <div 
-      className="flex flex-col overflow-hidden md:hidden relative" 
+      className="flex flex-col overflow-hidden md:hidden" 
       style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
     >
-      {/* Map Mode - Keep in DOM, show/hide with CSS */}
-      {mapView && (
+      {/* Map Mode */}
+      {mode === 'map' && mapView && (
         <div 
-          className={`absolute inset-0 bg-gray-100 ${mode === 'map' ? 'flex' : 'hidden'}`}
+          className="relative flex-1 min-h-0 bg-gray-100"
           onClick={handleMapClick}
-          style={{ flexDirection: 'column' }}
+          key="map-container"
         >
           {/* Full-screen map */}
           <SimpleMap
@@ -284,7 +269,7 @@ export default function MobileSalesShell({
             attributionPosition="top-right"
             showOSMAttribution={true}
             attributionControl={false}
-            interactive={mode === 'map'}
+            interactive={true}
             skipCenteringOnClick={true}
           />
           
@@ -334,15 +319,13 @@ export default function MobileSalesShell({
         </div>
       )}
       
-      {/* List Mode - Keep in DOM, show/hide with CSS */}
-      <div 
-        className={`absolute inset-0 flex flex-col overflow-hidden ${mode === 'list' ? '' : 'hidden'}`}
-        style={{ zIndex: mode === 'list' ? 10 : 0 }}
-      >
+      {/* List Mode */}
+      {mode === 'list' && (
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Sticky Header */}
           <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
             <h2 className="text-lg font-semibold">
-              Sales ({salesForList.length})
+              Sales ({visibleSales.length})
             </h2>
             {isFetching && !loading && (
               <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -385,7 +368,7 @@ export default function MobileSalesShell({
               </div>
             )}
             
-            {!loading && salesForList.length === 0 && (
+            {!loading && visibleSales.length === 0 && (
               <div className="text-center py-12 px-4">
                 <div className="text-gray-500 mb-4">
                   No sales found in this area
@@ -399,10 +382,10 @@ export default function MobileSalesShell({
               </div>
             )}
             
-            {!loading && salesForList.length > 0 && (
+            {!loading && visibleSales.length > 0 && (
               <div className="p-4">
                 <SalesList 
-                  sales={salesForList} 
+                  sales={visibleSales} 
                   _mode="grid" 
                   viewport={mapViewport || { center: { lat: 39.8283, lng: -98.5795 }, zoom: 10 }} 
                 />
@@ -410,6 +393,7 @@ export default function MobileSalesShell({
             )}
           </div>
         </div>
+      )}
       
       {/* Filters Modal */}
       <MobileFiltersModal

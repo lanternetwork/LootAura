@@ -377,12 +377,18 @@ export default function AdSenseSlot({
         const iframeElement = adElement.querySelector('iframe')
         const hasValidIframe = iframeElement && iframeElement.src && iframeElement.src.length > 0
         
+        // Check if iframe has reasonable dimensions (not collapsed)
+        const iframeRect = iframeElement?.getBoundingClientRect()
+        const iframeHasDimensions = iframeRect && iframeRect.width > 0 && iframeRect.height > 0
+        
+        // For production, require all checks. For non-production, also require iframe to have dimensions
+        // This prevents hiding placeholder when ad is "done" but iframe is collapsed/empty
         const shouldHidePlaceholder = status === 'done' && 
           hasValidIframe && 
           hasSubstantialContent && 
           isVisible && 
           hasReasonableDimensions &&
-          isProductionDomain
+          (iframeHasDimensions || isProductionDomain) // Iframe must have dimensions OR be in production
         
         if (shouldHidePlaceholder) {
           console.log('[AdSense] Hiding placeholder - ad is filled and visible for slot:', slot, {

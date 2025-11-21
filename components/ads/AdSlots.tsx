@@ -49,12 +49,12 @@ export function MobileListInlineAd() {
  */
 export function ListInlineAd() {
   return (
-    <div className="my-3">
+    <div className="my-3 w-full" style={{ width: '100%', minWidth: '200px' }}>
       <AdSenseSlot
         slot="2129152111"
         format="auto"
         fullWidthResponsive={true}
-        style={{ minHeight: '100px' }}
+        style={{ minHeight: '100px', width: '100%' }}
         className="w-full"
       />
     </div>

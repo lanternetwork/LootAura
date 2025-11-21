@@ -61,6 +61,12 @@ export const metadata: Metadata = {
     description: 'Find and post yard sales, garage sales, and local deals on an interactive map.',
     images: [defaultOgImage],
   },
+  // Google Site Verification via metadata API (more reliable for crawlers)
+  ...(ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && {
+    verification: {
+      google: ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+    },
+  }),
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

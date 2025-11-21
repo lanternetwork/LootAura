@@ -229,13 +229,12 @@ export default function MobileSalesShell({
       className="flex flex-col overflow-hidden md:hidden" 
       style={{ height: `calc(100vh - ${HEADER_HEIGHT}px)` }}
     >
-      {/* Map Mode */}
-      {mode === 'map' && mapView && (
+      {/* Map Mode - Keep in DOM, show/hide with CSS */}
+      {mapView && (
         <div 
-          className="relative flex-1 min-h-0 bg-gray-100 w-full h-full"
+          className={`relative flex-1 min-h-0 bg-gray-100 w-full h-full ${mode === 'map' ? 'flex' : 'hidden'}`}
           onClick={handleMapClick}
-          key="map-container"
-          style={{ display: 'flex', flexDirection: 'column' }}
+          style={{ flexDirection: 'column' }}
         >
           {/* Full-screen map */}
           <SimpleMap
@@ -270,7 +269,7 @@ export default function MobileSalesShell({
             attributionPosition="top-right"
             showOSMAttribution={true}
             attributionControl={false}
-            interactive={true}
+            interactive={mode === 'map'}
             skipCenteringOnClick={true}
           />
           
@@ -320,9 +319,8 @@ export default function MobileSalesShell({
         </div>
       )}
       
-      {/* List Mode */}
-      {mode === 'list' && (
-        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      {/* List Mode - Keep in DOM, show/hide with CSS */}
+      <div className={`flex flex-col flex-1 min-h-0 overflow-hidden ${mode === 'list' ? 'flex' : 'hidden'}`}>
           {/* Sticky Header */}
           <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
             <h2 className="text-lg font-semibold">

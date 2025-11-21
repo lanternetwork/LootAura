@@ -50,7 +50,11 @@ export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
               <div 
                 key={`desktop-ad-${sale.id}`} 
                 className="hidden md:block md:col-span-2 lg:col-span-2"
-                style={{ width: '100%', minWidth: '200px' }}
+                style={{ 
+                  width: '100%', 
+                  minWidth: '200px',
+                  gridColumn: '1 / -1' // Force full width span
+                }}
               >
                 <ListInlineAd />
               </div>

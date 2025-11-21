@@ -90,8 +90,17 @@ export default function AdSenseSlot({
           const parentRect = parentElement?.getBoundingClientRect()
           const parentWidth = parentRect?.width || 0
           
-          // Check if element or its parent has width
-          const hasWidth = rect.width > 0 || parseInt(computedStyle.width) > 0 || parentWidth > 0
+          // Also check the grid container if we can find it
+          const gridContainer = adElement.closest('[data-testid="sales-list"]') || 
+                               adElement.closest('[class*="grid"]')
+          const gridRect = gridContainer ? (gridContainer as HTMLElement).getBoundingClientRect() : null
+          const gridWidth = gridRect?.width || 0
+          
+          // Check if element, parent, or grid container has width
+          const hasWidth = rect.width > 0 || 
+                          parseInt(computedStyle.width) > 0 || 
+                          parentWidth > 0 || 
+                          gridWidth > 0
           const isVisible = adElement.offsetParent !== null && computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden'
           
           if (!hasWidth || !isVisible) {
@@ -101,6 +110,7 @@ export default function AdSenseSlot({
               height: rect.height,
               computedWidth: computedStyle.width,
               parentWidth: parentWidth,
+              gridWidth: gridWidth,
               isVisible,
               display: computedStyle.display,
               visibility: computedStyle.visibility,
@@ -117,8 +127,17 @@ export default function AdSenseSlot({
               const checkParentRect = checkParentElement?.getBoundingClientRect()
               const checkParentWidth = checkParentRect?.width || 0
               
-              // Check if element or its parent has width
-              const checkHasWidth = checkRect.width > 0 || parseInt(checkStyle.width) > 0 || checkParentWidth > 0
+              // Also check the grid container
+              const checkGridContainer = adElement.closest('[data-testid="sales-list"]') || 
+                                         adElement.closest('[class*="grid"]')
+              const checkGridRect = checkGridContainer ? (checkGridContainer as HTMLElement).getBoundingClientRect() : null
+              const checkGridWidth = checkGridRect?.width || 0
+              
+              // Check if element, parent, or grid container has width
+              const checkHasWidth = checkRect.width > 0 || 
+                                   parseInt(checkStyle.width) > 0 || 
+                                   checkParentWidth > 0 || 
+                                   checkGridWidth > 0
               const checkIsVisible = adElement.offsetParent !== null && checkStyle.display !== 'none' && checkStyle.visibility !== 'hidden'
               
               if (checkHasWidth && checkIsVisible) {
@@ -152,8 +171,16 @@ export default function AdSenseSlot({
                 resizeObserverRef.current.disconnect()
               }
               
-              resizeObserverRef.current = new ResizeObserver(() => {
-                tryPush()
+              resizeObserverRef.current = new ResizeObserver((entries) => {
+                // Check if any observed element has width now
+                for (const entry of entries) {
+                  const target = entry.target as HTMLElement
+                  const rect = target.getBoundingClientRect()
+                  if (rect.width > 0) {
+                    tryPush()
+                    break
+                  }
+                }
               })
               
               // Observe the ad element
@@ -165,11 +192,18 @@ export default function AdSenseSlot({
               }
               
               // Also observe the grid container if we can find it
+              // This is critical for inline ads in grid layouts
               const gridContainer = adElement.closest('[data-testid="sales-list"]') || 
-                                   adElement.closest('.md\\:grid') ||
-                                   adElement.closest('[class*="grid"]')
+                                   adElement.closest('[class*="grid"]') ||
+                                   adElement.closest('[class*="Grid"]')
               if (gridContainer && gridContainer !== adElement && gridContainer !== parentElement) {
                 resizeObserverRef.current.observe(gridContainer)
+                // Also try immediately if grid already has width
+                const gridRect = (gridContainer as HTMLElement).getBoundingClientRect()
+                if (gridRect.width > 0) {
+                  // Grid has width, try pushing after a short delay to let layout settle
+                  setTimeout(() => tryPush(), 50)
+                }
               }
             }
             

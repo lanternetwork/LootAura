@@ -60,6 +60,12 @@ export const metadata: Metadata = {
     description: 'Find and post yard sales, garage sales, and local deals on an interactive map.',
     images: [defaultOgImage],
   },
+  // Add Google site verification meta tag via metadata API
+  ...(ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && {
+    other: {
+      'google-site-verification': ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+    },
+  }),
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -69,9 +75,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0b3d2e" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        {ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && (
-          <meta name="google-site-verification" content={ENV_PUBLIC.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION} />
-        )}
       </head>
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
         <AdSenseScriptLoader />

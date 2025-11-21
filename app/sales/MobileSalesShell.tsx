@@ -233,16 +233,16 @@ export default function MobileSalesShell({
           resizeMap()
           
           // Fourth attempt - after longer delay to ensure container has dimensions
-          const timer2 = setTimeout(() => {
+          setTimeout(() => {
             resizeMap()
           }, 100)
-          
-          return () => clearTimeout(timer2)
         }, 50)
         
-        return () => clearTimeout(timer1)
+        // Store timer for cleanup
+        return timer1
       })
       
+      // Cleanup function
       return () => {
         cancelAnimationFrame(rafId1)
       }

@@ -62,6 +62,7 @@ const publicSchema = z.object({
     (val) => val === 'true' || val === '1',
     z.boolean().optional()
   ),
+  NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: z.string().optional(),
 })
 
 const serverSchema = z.object({
@@ -103,6 +104,7 @@ export const ENV_PUBLIC = publicSchema.parse({
   NEXT_PUBLIC_MAX_UPLOAD_SIZE: process.env.NEXT_PUBLIC_MAX_UPLOAD_SIZE,
   NEXT_PUBLIC_CLARITY_ID: process.env.NEXT_PUBLIC_CLARITY_ID,
   NEXT_PUBLIC_ENABLE_ADSENSE: process.env.NEXT_PUBLIC_ENABLE_ADSENSE,
+  NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
 })
 
 // Validate server environment variables (only in server context, lazy to avoid build-time validation)

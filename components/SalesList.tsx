@@ -42,7 +42,7 @@ export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
           {(index + 1) % 6 === 0 && index > 0 && (
             <>
               <MobileListInlineAd />
-              <div className="hidden md:block">
+              <div className="hidden md:block md:col-span-full">
                 <ListInlineAd />
               </div>
             </>

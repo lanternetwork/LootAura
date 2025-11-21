@@ -29,6 +29,8 @@ export default function AdSenseSlot({
   const [adsEnabled, setAdsEnabled] = useState(false)
   const [showPlaceholder, setShowPlaceholder] = useState(true)
   const hasPushedRef = useRef(false) // Track if we've already pushed this ad
+  const resizeObserverRef = useRef<ResizeObserver | null>(null) // Track ResizeObserver for cleanup
+  const timeoutRefsRef = useRef<NodeJS.Timeout[]>([]) // Track timeouts for cleanup
 
   useEffect(() => {
     setIsClient(true)
@@ -80,7 +82,7 @@ export default function AdSenseSlot({
           const isVisible = adElement.offsetParent !== null && computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden'
           
           if (!hasWidth || !isVisible) {
-            // Container doesn't have dimensions yet, wait and retry using requestAnimationFrame
+            // Container doesn't have dimensions yet, wait and retry using ResizeObserver
             console.log('[AdSense] Container has no width or is hidden, waiting for dimensions for slot:', slot, {
               width: rect.width,
               height: rect.height,
@@ -91,34 +93,76 @@ export default function AdSenseSlot({
               offsetParent: adElement.offsetParent !== null,
             })
             
-            // Use requestAnimationFrame to wait for layout, then retry
+            // Use ResizeObserver to wait for container to have dimensions
+            const tryPush = () => {
+              if (hasPushedRef.current || !window.adsbygoogle) return
+              
+              const checkRect = adElement.getBoundingClientRect()
+              const checkStyle = window.getComputedStyle(adElement)
+              const checkHasWidth = checkRect.width > 0 || parseInt(checkStyle.width) > 0
+              const checkIsVisible = adElement.offsetParent !== null && checkStyle.display !== 'none' && checkStyle.visibility !== 'hidden'
+              
+              if (checkHasWidth && checkIsVisible) {
+                // Clean up observer and timeouts
+                if (resizeObserverRef.current) {
+                  resizeObserverRef.current.disconnect()
+                  resizeObserverRef.current = null
+                }
+                timeoutRefsRef.current.forEach(t => clearTimeout(t))
+                timeoutRefsRef.current = []
+                
+                // Now we have dimensions, try to push
+                try {
+                  window.adsbygoogle.push({})
+                  hasPushedRef.current = true
+                  console.log('[AdSense] Pushed ad after waiting for dimensions for slot:', slot, {
+                    width: checkRect.width,
+                    height: checkRect.height,
+                  })
+                } catch (error) {
+                  console.warn('[AdSense] Failed to push ad after retry:', error, { slot })
+                }
+              }
+            }
+            
+            // Set up ResizeObserver to watch for size changes
+            if (typeof ResizeObserver !== 'undefined') {
+              // Clean up any existing observer
+              if (resizeObserverRef.current) {
+                resizeObserverRef.current.disconnect()
+              }
+              
+              resizeObserverRef.current = new ResizeObserver(() => {
+                tryPush()
+              })
+              resizeObserverRef.current.observe(adElement)
+            }
+            
+            // Also try after multiple RAF cycles and timeouts as fallback
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
-                const retryRect = adElement.getBoundingClientRect()
-                const retryComputedStyle = window.getComputedStyle(adElement)
-                const retryHasWidth = retryRect.width > 0 || parseInt(retryComputedStyle.width) > 0
-                const retryIsVisible = adElement.offsetParent !== null && retryComputedStyle.display !== 'none' && retryComputedStyle.visibility !== 'hidden'
+                tryPush()
                 
-                if (retryHasWidth && retryIsVisible && !hasPushedRef.current && window.adsbygoogle) {
-                  // Now we have dimensions, try again
-                  try {
-                    window.adsbygoogle.push({})
-                    hasPushedRef.current = true
-                    console.log('[AdSense] Pushed ad after waiting for dimensions for slot:', slot, {
-                      width: retryRect.width,
-                      height: retryRect.height,
-                    })
-                  } catch (error) {
-                    console.warn('[AdSense] Failed to push ad after retry:', error, { slot })
-                  }
-                } else {
-                  console.warn('[AdSense] Container still has no width after retry for slot:', slot, {
-                    width: retryRect.width,
-                    computedWidth: retryComputedStyle.width,
-                    isVisible: retryIsVisible,
-                    display: retryComputedStyle.display,
-                  })
-                }
+                // Additional retries with delays
+                const timeout1 = setTimeout(() => {
+                  tryPush()
+                  const timeout2 = setTimeout(() => {
+                    tryPush()
+                    // Final cleanup if still no width after 2 seconds
+                    if (!hasPushedRef.current) {
+                      console.warn('[AdSense] Container still has no width after 2 seconds for slot:', slot, {
+                        width: adElement.getBoundingClientRect().width,
+                        computedWidth: window.getComputedStyle(adElement).width,
+                      })
+                      if (resizeObserverRef.current) {
+                        resizeObserverRef.current.disconnect()
+                        resizeObserverRef.current = null
+                      }
+                    }
+                  }, 1000)
+                  timeoutRefsRef.current.push(timeout2)
+                }, 500)
+                timeoutRefsRef.current.push(timeout1)
               })
             })
             
@@ -243,7 +287,16 @@ export default function AdSenseSlot({
         
         // Also start checking after a short delay as fallback
         const timer = setTimeout(checkAndInit, 200)
-        return () => clearTimeout(timer)
+        return () => {
+          clearTimeout(timer)
+          // Clean up ResizeObserver and timeouts
+          if (resizeObserverRef.current) {
+            resizeObserverRef.current.disconnect()
+            resizeObserverRef.current = null
+          }
+          timeoutRefsRef.current.forEach(t => clearTimeout(t))
+          timeoutRefsRef.current = []
+        }
       } else {
         // Script element doesn't exist yet, wait a bit
         const timer = setTimeout(() => {
@@ -252,8 +305,27 @@ export default function AdSenseSlot({
             initAd()
           }
         }, 500)
-        return () => clearTimeout(timer)
+        return () => {
+          clearTimeout(timer)
+          // Clean up ResizeObserver and timeouts
+          if (resizeObserverRef.current) {
+            resizeObserverRef.current.disconnect()
+            resizeObserverRef.current = null
+          }
+          timeoutRefsRef.current.forEach(t => clearTimeout(t))
+          timeoutRefsRef.current = []
+        }
       }
+    }
+    
+    // Cleanup function for the effect
+    return () => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect()
+        resizeObserverRef.current = null
+      }
+      timeoutRefsRef.current.forEach(t => clearTimeout(t))
+      timeoutRefsRef.current = []
     }
   }, [isClient, adsEnabled, slot])
 

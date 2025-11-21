@@ -10,7 +10,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 const originalEnv = process.env
-const originalNodeEnv = process.env.NODE_ENV
 
 describe('AdSense Meta Tags and Script Loading', () => {
   beforeEach(() => {
@@ -20,7 +19,6 @@ describe('AdSense Meta Tags and Script Loading', () => {
 
   afterEach(() => {
     process.env = originalEnv
-    process.env.NODE_ENV = originalNodeEnv
     vi.restoreAllMocks()
   })
 
@@ -67,7 +65,8 @@ describe('AdSense Meta Tags and Script Loading', () => {
   })
 
   it('should conditionally load AdSense script in production when enabled', async () => {
-    process.env.NODE_ENV = 'production'
+    // Use type assertion to bypass readonly check for NODE_ENV in tests
+    ;(process.env as any).NODE_ENV = 'production'
     process.env.NEXT_PUBLIC_ENABLE_ADSENSE = 'true'
     
     vi.resetModules()
@@ -79,7 +78,7 @@ describe('AdSense Meta Tags and Script Loading', () => {
   })
 
   it('should not load AdSense script in development', async () => {
-    process.env.NODE_ENV = 'development'
+    ;(process.env as any).NODE_ENV = 'development'
     process.env.NEXT_PUBLIC_ENABLE_ADSENSE = 'true'
     
     vi.resetModules()
@@ -89,7 +88,7 @@ describe('AdSense Meta Tags and Script Loading', () => {
   })
 
   it('should not load AdSense script when disabled via env var', async () => {
-    process.env.NODE_ENV = 'production'
+    ;(process.env as any).NODE_ENV = 'production'
     process.env.NEXT_PUBLIC_ENABLE_ADSENSE = 'false'
     
     vi.resetModules()

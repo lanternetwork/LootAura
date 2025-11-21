@@ -28,6 +28,11 @@ export default function AdSenseSlot({
   const hasPushedRef = useRef(false)
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') {
+      return
+    }
+
     // Check if ads are enabled
     const adsEnabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
     
@@ -89,6 +94,7 @@ export default function AdSenseSlot({
     return () => {
       clearTimeout(timer)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slot])
 
   // Check if ads are enabled

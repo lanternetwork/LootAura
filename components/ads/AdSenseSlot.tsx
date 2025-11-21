@@ -86,7 +86,12 @@ export default function AdSenseSlot({
           // AdSense requires the container to have a width > 0
           const rect = adElement.getBoundingClientRect()
           const computedStyle = window.getComputedStyle(adElement)
-          const hasWidth = rect.width > 0 || parseInt(computedStyle.width) > 0
+          const parentElement = adElement.parentElement
+          const parentRect = parentElement?.getBoundingClientRect()
+          const parentWidth = parentRect?.width || 0
+          
+          // Check if element or its parent has width
+          const hasWidth = rect.width > 0 || parseInt(computedStyle.width) > 0 || parentWidth > 0
           const isVisible = adElement.offsetParent !== null && computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden'
           
           if (!hasWidth || !isVisible) {
@@ -95,6 +100,7 @@ export default function AdSenseSlot({
               width: rect.width,
               height: rect.height,
               computedWidth: computedStyle.width,
+              parentWidth: parentWidth,
               isVisible,
               display: computedStyle.display,
               visibility: computedStyle.visibility,
@@ -107,7 +113,12 @@ export default function AdSenseSlot({
               
               const checkRect = adElement.getBoundingClientRect()
               const checkStyle = window.getComputedStyle(adElement)
-              const checkHasWidth = checkRect.width > 0 || parseInt(checkStyle.width) > 0
+              const checkParentElement = adElement.parentElement
+              const checkParentRect = checkParentElement?.getBoundingClientRect()
+              const checkParentWidth = checkParentRect?.width || 0
+              
+              // Check if element or its parent has width
+              const checkHasWidth = checkRect.width > 0 || parseInt(checkStyle.width) > 0 || checkParentWidth > 0
               const checkIsVisible = adElement.offsetParent !== null && checkStyle.display !== 'none' && checkStyle.visibility !== 'hidden'
               
               if (checkHasWidth && checkIsVisible) {
@@ -394,8 +405,8 @@ export default function AdSenseSlot({
         const iframeRect = iframeElement?.getBoundingClientRect()
         const iframeHasDimensions = iframeRect && iframeRect.width > 0 && iframeRect.height > 0
         
-        // For production, require all checks. For non-production, also require iframe to have dimensions
-        // This prevents hiding placeholder when ad is "done" but iframe is collapsed/empty
+        // For production, require all checks including iframe dimensions
+        // This prevents hiding placeholder when ad is "done" but iframe is collapsed/empty or not visible
         // In non-production (preview/staging), always show placeholder unless ad is fully loaded with dimensions
         const shouldHidePlaceholder = isProductionDomain && 
           status === 'done' && 
@@ -403,7 +414,9 @@ export default function AdSenseSlot({
           hasSubstantialContent && 
           isVisible && 
           hasReasonableDimensions &&
-          iframeHasDimensions // In production, require all checks including iframe dimensions
+          iframeHasDimensions && // Iframe must have dimensions
+          (iframeRect?.width || 0) >= 200 && // Iframe must be at least 200px wide
+          (iframeRect?.height || 0) >= 50 // Iframe must be at least 50px tall
         
         if (shouldHidePlaceholder) {
           console.log('[AdSense] Hiding placeholder - ad is filled and visible for slot:', slot, {
@@ -412,7 +425,9 @@ export default function AdSenseSlot({
             hasSubstantialContent,
             isVisible,
             hasReasonableDimensions,
+            iframeHasDimensions,
             dimensions: { width: rect.width, height: rect.height },
+            iframeDimensions: iframeRect ? { width: iframeRect.width, height: iframeRect.height } : null,
           })
           setShowPlaceholder(false)
         } else {

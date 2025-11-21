@@ -68,21 +68,28 @@ export function ListInlineAd() {
  */
 export function DesktopFooterAd() {
   const [adsEnabled, setAdsEnabled] = useState(false)
+  const [isPreview, setIsPreview] = useState(false)
   const pathname = usePathname()
 
   useEffect(() => {
     // Check environment variable on client side
     const enabled = process.env.NEXT_PUBLIC_ENABLE_ADSENSE === 'true' || process.env.NEXT_PUBLIC_ENABLE_ADSENSE === '1'
     setAdsEnabled(enabled)
+    
+    // Check if we're in preview/staging (not production)
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+    const isProduction = hostname === 'lootaura.com' || hostname === 'www.lootaura.com'
+    setIsPreview(!isProduction)
   }, [])
-
-  // Don't render anything if ads are disabled
-  if (!adsEnabled) {
-    return null
-  }
 
   // Disable footer ad on /sales page (using inline ads in sales list instead)
   if (pathname === '/sales') {
+    return null
+  }
+
+  // In preview, always show placeholder for design purposes
+  // In production, only show if ads are enabled
+  if (!adsEnabled && !isPreview) {
     return null
   }
 

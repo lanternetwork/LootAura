@@ -392,7 +392,6 @@ export default function MobileSalesShell({
             )}
           </div>
         </div>
-      )}
       
       {/* Filters Modal */}
       <MobileFiltersModal

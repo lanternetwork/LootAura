@@ -21,11 +21,18 @@ describe('ads.txt', () => {
     const adsTxtPath = join(process.cwd(), 'public', 'ads.txt')
     const content = readFileSync(adsTxtPath, 'utf-8')
     
-    // Should contain the Google AdSense entry
-    expect(content).toContain('google.com')
-    expect(content).toContain('pub-8685093412475036')
-    expect(content).toContain('DIRECT')
-    expect(content).toContain('f08c47fec0942fa0')
+    // Security: Validate domain is the first field, not just a substring
+    // Parse the line to ensure 'google.com' is the domain field
+    const lines = content.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'))
+    const googleLine = lines.find(line => {
+      const fields = line.split(',').map(f => f.trim())
+      return fields[0] === 'google.com'
+    })
+    
+    expect(googleLine).toBeDefined()
+    expect(googleLine).toContain('pub-8685093412475036')
+    expect(googleLine).toContain('DIRECT')
+    expect(googleLine).toContain('f08c47fec0942fa0')
   })
 
   it('should match standard ads.txt format', () => {
@@ -46,10 +53,13 @@ describe('ads.txt', () => {
     expect(lines.length).toBeGreaterThanOrEqual(1)
     
     // At least one line should match the expected format
-    const hasGoogleEntry = lines.some(line => 
-      line.includes('google.com') && 
-      line.includes('pub-8685093412475036')
-    )
+    // Security: Validate domain is the first field, not just a substring
+    const hasGoogleEntry = lines.some(line => {
+      const fields = line.split(',').map(f => f.trim())
+      // Domain must be first field and exactly 'google.com'
+      return fields[0] === 'google.com' && 
+             fields[1] === 'pub-8685093412475036'
+    })
     expect(hasGoogleEntry).toBe(true)
   })
 })

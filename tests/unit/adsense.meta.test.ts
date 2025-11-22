@@ -66,7 +66,7 @@ describe('AdSense Meta Tags and Script Loading', () => {
 
   it('should conditionally load AdSense script in production when enabled', async () => {
     // Use type assertion to bypass readonly check for NODE_ENV in tests
-    ;(process.env as any).NODE_ENV = 'production'
+    (process.env as any).NODE_ENV = 'production'
     process.env.NEXT_PUBLIC_ENABLE_ADSENSE = 'true'
     
     vi.resetModules()
@@ -78,7 +78,7 @@ describe('AdSense Meta Tags and Script Loading', () => {
   })
 
   it('should not load AdSense script in development', async () => {
-    ;(process.env as any).NODE_ENV = 'development'
+    (process.env as any).NODE_ENV = 'development'
     process.env.NEXT_PUBLIC_ENABLE_ADSENSE = 'true'
     
     vi.resetModules()
@@ -88,7 +88,7 @@ describe('AdSense Meta Tags and Script Loading', () => {
   })
 
   it('should not load AdSense script when disabled via env var', async () => {
-    ;(process.env as any).NODE_ENV = 'production'
+    (process.env as any).NODE_ENV = 'production'
     process.env.NEXT_PUBLIC_ENABLE_ADSENSE = 'false'
     
     vi.resetModules()

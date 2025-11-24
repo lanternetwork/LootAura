@@ -19,6 +19,7 @@ import type { SaleWithOwnerInfo } from '@/lib/data'
 import type { SaleItem, Sale } from '@/lib/types'
 import { trackSaleViewed, trackFavoriteToggled } from '@/lib/analytics/clarityEvents'
 import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
+import { toast } from 'react-toastify'
 
 interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo
@@ -90,6 +91,31 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
     const displayHour = hour % 12 || 12
     return `${displayHour}:${minutes} ${ampm}`
   }
+
+  // Format date/time for meta chips (mobile)
+  const formatDateShort = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'short',
+      month: 'short', 
+      day: 'numeric'
+    })
+  }
+
+  const formatTimeShort = (timeString: string) => {
+    const [hours, minutes] = timeString.split(':')
+    const hour = parseInt(hours)
+    const ampm = hour >= 12 ? 'pm' : 'am'
+    const displayHour = hour % 12 || 12
+    return `${displayHour}:${minutes}${ampm}`
+  }
+
+  // Build date/time summary for meta chip
+  const dateTimeSummary = sale.date_start && sale.time_start
+    ? `${formatDateShort(sale.date_start)} • ${formatTimeShort(sale.time_start)}${sale.time_end ? `–${formatTimeShort(sale.time_end)}` : ''}`
+    : sale.date_start
+      ? formatDateShort(sale.date_start)
+      : null
 
 
   // Keep local favorite state in sync with favorites list
@@ -178,9 +204,35 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   const currentCenter = location || { lat: sale.lat || 38.2527, lng: sale.lng || -85.7585 }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Breadcrumb */}
-      <nav className="mb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 md:py-8">
+      {/* Mobile Header - Back button and Favorite toggle */}
+      <div className="md:hidden sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <Link
+          href={backUrl}
+          className="inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors"
+          aria-label="Back to sales"
+        >
+          <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </Link>
+        <button
+          onClick={handleFavoriteToggle}
+          aria-label={isFavorited ? 'Unsave this sale' : 'Save this sale'}
+          className={`inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
+            isFavorited
+              ? 'bg-red-100 text-red-700 hover:bg-red-200'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          <svg className="w-5 h-5" fill={isFavorited ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Breadcrumb - Desktop only */}
+      <nav className="hidden md:block mb-8">
         <ol className="flex items-center space-x-2 text-sm text-gray-500">
           <li>
             <Link href="/" className="hover:text-gray-700">
@@ -198,7 +250,172 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
         </ol>
       </nav>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Mobile Layout */}
+      <div className="md:hidden max-w-screen-sm mx-auto px-4 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+80px)] space-y-4">
+        {/* Title & Meta Chips */}
+        <div className="space-y-3">
+          <h1 className="text-xl font-semibold text-gray-900">{sale.title}</h1>
+          
+          {/* Meta Chips - Horizontally scrollable */}
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
+            {dateTimeSummary && (
+              <span className="inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 whitespace-nowrap">
+                {dateTimeSummary}
+              </span>
+            )}
+            {displayCategories.map((category) => (
+              <span key={category} className="inline-flex items-center rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 whitespace-nowrap">
+                {category}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Address & Map Section */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <div className="flex-1 min-w-0">
+              <AddressLink
+                lat={sale.lat ?? undefined}
+                lng={sale.lng ?? undefined}
+                address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
+                className="text-gray-900 font-medium break-words"
+              >
+                {sale.address && `${sale.address}, `}{sale.city}, {sale.state}
+              </AddressLink>
+            </div>
+          </div>
+          
+          {/* Map - Mobile */}
+          {typeof sale.lat === 'number' && typeof sale.lng === 'number' && (
+            <div className="w-full rounded-lg overflow-hidden bg-gray-100 aspect-video" role="region" aria-label={`Map showing location of ${sale.title || 'this sale'}`}>
+              <SimpleMap
+                center={currentCenter}
+                zoom={15}
+                pins={{
+                  sales: [{ id: sale.id, lat: sale.lat!, lng: sale.lng! }],
+                  selectedId: sale.id,
+                  onPinClick: () => {},
+                  onClusterClick: () => {}
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Primary Photo */}
+        <div className="relative w-full overflow-hidden rounded-2xl bg-gray-100 aspect-[4/3]">
+          {cover ? (
+            <Image src={cover.url} alt={cover.alt} fill className="object-cover" sizes="100vw" />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8" role="img" aria-label={`${sale.title || 'Sale'} placeholder image`}>
+              <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
+            </div>
+          )}
+        </div>
+
+        {/* Description & Key Details */}
+        {sale.description && (
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+            <h2 className="text-lg font-semibold text-gray-900">Sale details</h2>
+            <div className="prose prose-gray max-w-none">
+              <p className={`text-gray-700 text-sm leading-relaxed ${!showFullDescription && 'line-clamp-3'}`}>
+                {sale.description}
+              </p>
+              {sale.description.length > 200 && (
+                <button
+                  onClick={() => setShowFullDescription(!showFullDescription)}
+                  className="mt-2 text-sm text-purple-600 font-medium hover:text-purple-700"
+                >
+                  {showFullDescription ? 'Show less' : 'Show more'}
+                </button>
+              )}
+            </div>
+            
+            {/* Date & Time Details */}
+            <div className="pt-3 border-t border-gray-100 space-y-3">
+              <div className="flex gap-3">
+                <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <div>
+                  <div className="font-medium text-gray-900 text-sm">{formatDate(sale.date_start)}</div>
+                  <div className="text-xs text-gray-600 mt-1">{formatTime(sale.time_start)}</div>
+                </div>
+              </div>
+
+              {sale.date_end && sale.time_end && (
+                <div className="flex gap-3">
+                  <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <div className="font-medium text-gray-900 text-sm">Ends: {formatDate(sale.date_end)}</div>
+                    <div className="text-xs text-gray-600 mt-1">{formatTime(sale.time_end)}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Items Grid */}
+        {items.length > 0 && (
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+            <h2 className="text-lg font-semibold text-gray-900">Items for Sale</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {items.map((item) => (
+                <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="relative w-full aspect-square bg-gray-100">
+                    {item.photo ? (
+                      <Image
+                        src={item.photo}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 50vw, 33vw"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-200" role="img" aria-label={`${item.name} - no image available`}>
+                        <span className="text-gray-400 text-xs">No image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2 space-y-1">
+                    <h3 className="font-medium text-gray-900 text-sm line-clamp-2">{item.name}</h3>
+                    {item.price !== undefined ? (
+                      <span className="text-base font-semibold text-green-600">
+                        ${item.price.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500 italic">Price not specified</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Ad - Mobile */}
+        <div className="w-full max-w-screen-sm mx-auto">
+          <SaleDetailBannerAd />
+        </div>
+
+        {/* Nearby Sales - Mobile */}
+        {nearbySales.length > 0 && (
+          <div className="w-full">
+            <NearbySalesCard nearbySales={nearbySales} />
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Layout */}
+      <div className="hidden md:grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
           {/* Sale Header */}
@@ -456,14 +673,94 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
         </div>
       </div>
 
-      {/* Sale Detail Banner Ad - Mobile: below main content */}
-      <div className="lg:hidden mt-6">
-        <SaleDetailBannerAd />
       </div>
 
-      {/* Nearby Sales - Mobile: below main content */}
-      <div className="lg:hidden mt-6">
-        <NearbySalesCard nearbySales={nearbySales} />
+      {/* Sticky Bottom Action Bar - Mobile Only */}
+      <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200">
+        <div className="max-w-screen-sm mx-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-3">
+          <div className="flex gap-3">
+            {/* Primary: Navigate */}
+            <AddressLink
+              lat={sale.lat ?? undefined}
+              lng={sale.lng ?? undefined}
+              address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
+              className="flex-1 inline-flex items-center justify-center px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors min-h-[44px] whitespace-nowrap"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              Navigate
+            </AddressLink>
+            
+            {/* Secondary: Save */}
+            <button
+              onClick={handleFavoriteToggle}
+              aria-label={isFavorited ? 'Unsave this sale' : 'Save this sale'}
+              className={`inline-flex items-center justify-center w-12 h-12 rounded-lg transition-colors min-h-[44px] ${
+                isFavorited
+                  ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <svg className="w-5 h-5" fill={isFavorited ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </button>
+            
+            {/* Secondary: Share - Icon only */}
+            <button
+              onClick={async () => {
+                // Use Web Share API if available, otherwise show menu
+                if (typeof navigator !== 'undefined' && navigator.share) {
+                  try {
+                    await navigator.share({
+                      title: sale.title || 'Yard Sale',
+                      text: shareText || sale.title || 'Yard Sale',
+                      url: shareUrl,
+                    })
+                    // Track analytics
+                    fetch('/api/analytics/track', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        sale_id: sale.id,
+                        event_type: 'share',
+                      }),
+                    }).catch(() => {})
+                  } catch (error: any) {
+                    if (error.name !== 'AbortError') {
+                      console.error('Error sharing:', error)
+                    }
+                  }
+                } else {
+                  // Fallback: copy to clipboard
+                  try {
+                    await navigator.clipboard.writeText(shareUrl)
+                    toast.success('Link copied to clipboard')
+                    // Track analytics
+                    fetch('/api/analytics/track', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        sale_id: sale.id,
+                        event_type: 'share',
+                      }),
+                    }).catch(() => {})
+                  } catch (error) {
+                    console.error('Failed to copy link:', error)
+                    toast.error('Failed to copy link')
+                  }
+                }
+              }}
+              aria-label="Share sale"
+              className="inline-flex items-center justify-center w-12 h-12 rounded-lg transition-colors min-h-[44px] bg-[rgba(147,51,234,0.15)] text-[#3A2268] hover:bg-[rgba(147,51,234,0.25)]"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )

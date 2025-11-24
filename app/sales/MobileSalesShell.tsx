@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import SimpleMap from '@/components/location/SimpleMap'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
@@ -81,13 +82,43 @@ export default function MobileSalesShell({
   hasActiveFilters,
   hybridResult
 }: MobileSalesShellProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // Initialize mode from URL param, default to 'map'
+  const initialMode = (searchParams?.get('view') === 'list' ? 'list' : 'map') as MobileMode
+  
   // Mobile-only state
-  const [mode, setMode] = useState<MobileMode>('map')
+  const [mode, setMode] = useState<MobileMode>(initialMode)
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false)
   const mapRef = useRef<any>(null)
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
   const [mapLoaded, setMapLoaded] = useState(false)
+  
+  // Sync mode to URL params
+  useEffect(() => {
+    const currentView = searchParams?.get('view')
+    const newView = mode === 'list' ? 'list' : null // Only set 'list', remove param for 'map'
+    
+    if (currentView !== newView) {
+      const params = new URLSearchParams()
+      // Copy all existing params except 'view'
+      if (searchParams) {
+        searchParams.forEach((value, key) => {
+          if (key !== 'view') {
+            params.set(key, value)
+          }
+        })
+      }
+      // Add 'view' param if needed
+      if (newView) {
+        params.set('view', newView)
+      }
+      const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
+      router.replace(newUrl, { scroll: false })
+    }
+  }, [mode, searchParams, router])
   
   // Find selected sale from selectedPinId
   // selectedPinId can be either a sale ID or a location ID
@@ -328,11 +359,17 @@ export default function MobileSalesShell({
                   handleToggleMode()
                 }}
                 className="absolute bottom-20 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
-                aria-label="Switch to list view"
+                aria-label={mode === 'map' ? 'Switch to list view' : 'Switch to map view'}
               >
-                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
+                {mode === 'map' ? (
+                  <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                )}
               </button>
             </div>
             
@@ -426,6 +463,22 @@ export default function MobileSalesShell({
                 />
               </div>
             )}
+          </div>
+          
+          {/* Floating Action Button - Map icon when in list mode */}
+          <div className="absolute inset-0 pointer-events-none z-10">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleToggleMode()
+              }}
+              className="absolute bottom-20 right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
+              aria-label="Switch to map view"
+            >
+              <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+            </button>
           </div>
       </div>
       

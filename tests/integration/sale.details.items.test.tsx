@@ -250,8 +250,11 @@ describe('Sale Details Items Display', () => {
       />
     )
 
-    expect(screen.getByText('Free Item')).toBeInTheDocument()
-    expect(screen.getByText('Price not specified')).toBeInTheDocument()
+    // Both mobile and desktop layouts render items
+    const freeItemElements = screen.getAllByText('Free Item')
+    expect(freeItemElements.length).toBeGreaterThan(0)
+    const priceNotSpecifiedElements = screen.getAllByText('Price not specified')
+    expect(priceNotSpecifiedElements.length).toBeGreaterThan(0)
   })
 
   it('should NOT display any stock/mock item names', () => {

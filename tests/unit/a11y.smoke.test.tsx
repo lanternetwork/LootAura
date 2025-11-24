@@ -121,6 +121,14 @@ vi.mock('@/components/sales/Toast', () => ({
   default: () => null,
 }))
 
+// Mock react-toastify
+vi.mock('react-toastify', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}))
+
 vi.mock('@/components/sales/ConfirmationModal', () => ({
   default: () => null,
 }))

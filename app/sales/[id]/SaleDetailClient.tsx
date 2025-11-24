@@ -364,9 +364,13 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
         )}
 
         {/* Items Grid */}
-        {items.length > 0 && (
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-            <h2 className="text-lg font-semibold text-gray-900">Items for Sale</h2>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900">Items for Sale</h2>
+          {items.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No items listed yet.</p>
+            </div>
+          ) : (
             <div className="grid grid-cols-2 gap-3">
               {items.map((item) => (
                 <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -398,8 +402,8 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Ad - Mobile */}
         <div className="w-full max-w-screen-sm mx-auto">

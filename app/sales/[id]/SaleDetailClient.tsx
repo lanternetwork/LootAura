@@ -205,32 +205,6 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 md:py-8">
-      {/* Mobile Header - Back button and Favorite toggle */}
-      <div className="md:hidden sticky top-0 z-30 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <Link
-          href={backUrl}
-          className="inline-flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors"
-          aria-label="Back to sales"
-        >
-          <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </Link>
-        <button
-          onClick={handleFavoriteToggle}
-          aria-label={isFavorited ? 'Unsave this sale' : 'Save this sale'}
-          className={`inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
-            isFavorited
-              ? 'bg-red-100 text-red-700 hover:bg-red-200'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          <svg className="w-5 h-5" fill={isFavorited ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-      </div>
-
       {/* Breadcrumb - Desktop only */}
       <nav className="hidden md:block mb-8">
         <ol className="flex items-center space-x-2 text-sm text-gray-500">

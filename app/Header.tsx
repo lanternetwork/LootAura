@@ -24,6 +24,12 @@ export function Header() {
   // Check if we're on sales page with list view open
   const isSalesPageWithList = pathname === '/sales' && searchParams?.get('view') === 'list'
   
+  // Check current page for mobile nav button visibility
+  const isOnSalesPage = pathname === '/sales'
+  const isOnFavoritesPage = pathname === '/favorites'
+  const isOnSellNewPage = pathname === '/sell/new'
+  const isOnDashboardPage = pathname === '/dashboard'
+  
   // Build back URL with viewport params if they exist
   const backUrl = (() => {
     if (!isSaleDetailPage) return '/sales'
@@ -149,35 +155,41 @@ export function Header() {
             </div>
             {/* Mobile-only navigation icons (replaces hamburger menu) */}
             <div className="sm:hidden flex items-center gap-2">
-              <Link
-                href="/sales"
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-                aria-label="Browse Sales"
-              >
-                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </Link>
-              <Link
-                href="/favorites"
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-                aria-label="Favorites"
-              >
-                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </Link>
-              <Link
-                href="/sell/new"
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-                aria-label="Post Your Sale"
-              >
-                <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </Link>
-              {hasUser && (
+              {!isOnSalesPage && (
+                <Link
+                  href="/sales"
+                  className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                  aria-label="Browse Sales"
+                >
+                  <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </Link>
+              )}
+              {!isOnFavoritesPage && (
+                <Link
+                  href="/favorites"
+                  className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                  aria-label="Favorites"
+                >
+                  <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                </Link>
+              )}
+              {!isOnSellNewPage && (
+                <Link
+                  href="/sell/new"
+                  className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
+                  aria-label="Post Your Sale"
+                >
+                  <svg className="h-5 w-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </Link>
+              )}
+              {hasUser && !isOnDashboardPage && (
                 <Link
                   href="/dashboard"
                   className="flex items-center justify-center min-w-[44px] min-h-[44px] w-11 h-11 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
@@ -210,11 +222,19 @@ export function Header() {
       {menuOpen && isCollapsed && (
         <div role="dialog" aria-modal="true" id="site-menu" className="hidden sm:block border-t bg-white shadow-md">
           <div className="px-4 py-3 flex flex-col gap-2">
-            <Link href="/sales" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Browse Sales</Link>
-            <Link href="/favorites" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Favorites</Link>
-            <Link href="/sell/new" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Post Your Sale</Link>
-            {hasUser && <hr className="my-2" />}
-            {hasUser && <Link href="/dashboard" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Dashboard</Link>}
+            {!isOnSalesPage && (
+              <Link href="/sales" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Browse Sales</Link>
+            )}
+            {!isOnFavoritesPage && (
+              <Link href="/favorites" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Favorites</Link>
+            )}
+            {!isOnSellNewPage && (
+              <Link href="/sell/new" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Post Your Sale</Link>
+            )}
+            {hasUser && (isOnSalesPage || isOnFavoritesPage || isOnSellNewPage) && <hr className="my-2" />}
+            {hasUser && !isOnDashboardPage && (
+              <Link href="/dashboard" onClick={()=>setMenuOpen(false)} className="text-[#3A2268]">Dashboard</Link>
+            )}
           </div>
         </div>
       )}

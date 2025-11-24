@@ -673,8 +673,6 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
         </div>
       </div>
 
-      </div>
-
       {/* Sticky Bottom Action Bar - Mobile Only */}
       <div className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur border-t border-gray-200">
         <div className="max-w-screen-sm mx-auto px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-3">

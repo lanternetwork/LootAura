@@ -121,6 +121,14 @@ vi.mock('@/components/sales/Toast', () => ({
   default: () => null,
 }))
 
+// Mock react-toastify
+vi.mock('react-toastify', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}))
+
 vi.mock('@/components/sales/ConfirmationModal', () => ({
   default: () => null,
 }))
@@ -194,8 +202,9 @@ describe('Accessibility Smoke Tests', () => {
       renderWithQueryClient(<SaleDetailClient sale={mockSale} items={[]} />)
 
       await waitFor(() => {
-        const heading = screen.getByRole('heading', { level: 1, name: /Amazing Yard Sale/i })
-        expect(heading).toBeDefined()
+        // Both mobile and desktop layouts render h1, so use getAllByRole
+        const headings = screen.getAllByRole('heading', { level: 1, name: /Amazing Yard Sale/i })
+        expect(headings.length).toBeGreaterThan(0)
       })
     })
 
@@ -203,9 +212,9 @@ describe('Accessibility Smoke Tests', () => {
       renderWithQueryClient(<SaleDetailClient sale={mockSale} items={[]} />)
 
       await waitFor(() => {
-        // Should have accessible name (either visible text or aria-label)
-        const favoriteButton = screen.getByRole('button', { name: /save|unsave/i })
-        expect(favoriteButton).toBeDefined()
+        // Both mobile and desktop layouts render favorite buttons, so use getAllByRole
+        const favoriteButtons = screen.getAllByRole('button', { name: /save|unsave/i })
+        expect(favoriteButtons.length).toBeGreaterThan(0)
       })
     })
 
@@ -213,8 +222,9 @@ describe('Accessibility Smoke Tests', () => {
       renderWithQueryClient(<SaleDetailClient sale={mockSale} items={[]} />)
 
       await waitFor(() => {
-        const shareButton = screen.getByRole('button', { name: /share/i })
-        expect(shareButton).toBeDefined()
+        // Both mobile and desktop layouts render share buttons, so use getAllByRole
+        const shareButtons = screen.getAllByRole('button', { name: /share/i })
+        expect(shareButtons.length).toBeGreaterThan(0)
       })
     })
   })

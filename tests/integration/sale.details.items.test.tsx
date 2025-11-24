@@ -83,6 +83,14 @@ vi.mock('next/image', () => ({
   default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
 }))
 
+// Mock react-toastify
+vi.mock('react-toastify', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}))
+
 const mockSale = {
   id: 'test-sale-id',
   owner_id: 'test-owner-id',
@@ -162,13 +170,19 @@ describe('Sale Details Items Display', () => {
       />
     )
 
-    // Check that real items are displayed
-    expect(screen.getByText('Vintage Coffee Table')).toBeInTheDocument()
-    expect(screen.getByText('Dining Room Chairs')).toBeInTheDocument()
-    expect(screen.getByText('$50.00')).toBeInTheDocument()
-    expect(screen.getByText('$80.00')).toBeInTheDocument()
-    expect(screen.getByText('Good')).toBeInTheDocument()
-    expect(screen.getByText('Excellent')).toBeInTheDocument()
+    // Check that real items are displayed (both mobile and desktop layouts render items)
+    const coffeeTableElements = screen.getAllByText('Vintage Coffee Table')
+    expect(coffeeTableElements.length).toBeGreaterThan(0)
+    const chairsElements = screen.getAllByText('Dining Room Chairs')
+    expect(chairsElements.length).toBeGreaterThan(0)
+    const price50Elements = screen.getAllByText('$50.00')
+    expect(price50Elements.length).toBeGreaterThan(0)
+    const price80Elements = screen.getAllByText('$80.00')
+    expect(price80Elements.length).toBeGreaterThan(0)
+    const goodElements = screen.getAllByText('Good')
+    expect(goodElements.length).toBeGreaterThan(0)
+    const excellentElements = screen.getAllByText('Excellent')
+    expect(excellentElements.length).toBeGreaterThan(0)
   })
 
   it('should display item categories when available', () => {
@@ -194,10 +208,12 @@ describe('Sale Details Items Display', () => {
       />
     )
 
-    // Check that image is rendered for item with photo
-    const image = screen.getByAltText('Dining Room Chairs')
-    expect(image).toBeInTheDocument()
-    expect(image).toHaveAttribute('src', 'https://example.com/chair.jpg')
+    // Check that image is rendered for item with photo (both mobile and desktop layouts render images)
+    const images = screen.getAllByAltText('Dining Room Chairs')
+    expect(images.length).toBeGreaterThan(0)
+    // Check that at least one image has the correct src
+    const imageWithSrc = images.find(img => img.getAttribute('src') === 'https://example.com/chair.jpg')
+    expect(imageWithSrc).toBeDefined()
   })
 
   it('should show empty state when no items exist', () => {
@@ -209,7 +225,9 @@ describe('Sale Details Items Display', () => {
       />
     )
 
-    expect(screen.getByText('No items listed yet.')).toBeInTheDocument()
+    // Both mobile and desktop layouts render empty state
+    const emptyStateElements = screen.getAllByText('No items listed yet.')
+    expect(emptyStateElements.length).toBeGreaterThan(0)
     expect(screen.queryByText('Vintage Coffee Table')).not.toBeInTheDocument()
   })
 
@@ -232,8 +250,11 @@ describe('Sale Details Items Display', () => {
       />
     )
 
-    expect(screen.getByText('Free Item')).toBeInTheDocument()
-    expect(screen.getByText('Price not specified')).toBeInTheDocument()
+    // Both mobile and desktop layouts render items
+    const freeItemElements = screen.getAllByText('Free Item')
+    expect(freeItemElements.length).toBeGreaterThan(0)
+    const priceNotSpecifiedElements = screen.getAllByText('Price not specified')
+    expect(priceNotSpecifiedElements.length).toBeGreaterThan(0)
   })
 
   it('should NOT display any stock/mock item names', () => {

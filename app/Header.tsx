@@ -1,10 +1,13 @@
 'use client'
 import Link from 'next/link'
+import { usePathname, useSearchParams } from 'next/navigation'
 import UserProfile from '@/components/UserProfile'
 import { useEffect, useRef, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 
 export function Header() {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [hasUser, setHasUser] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -13,6 +16,25 @@ export function Header() {
   const mainRef = useRef<HTMLDivElement | null>(null)
   const adminRef = useRef<HTMLDivElement | null>(null)
   const userRef = useRef<HTMLDivElement | null>(null)
+  
+  // Check if we're on a sale detail page
+  const isSaleDetailPage = pathname?.startsWith('/sales/') && pathname !== '/sales'
+  
+  // Build back URL with viewport params if they exist
+  const backUrl = (() => {
+    if (!isSaleDetailPage) return '/sales'
+    try {
+      const lat = searchParams?.get('lat')
+      const lng = searchParams?.get('lng')
+      const zoom = searchParams?.get('zoom')
+      return lat && lng && zoom
+        ? `/sales?lat=${lat}&lng=${lng}&zoom=${zoom}`
+        : '/sales'
+    } catch {
+      return '/sales'
+    }
+  })()
+  
   useEffect(() => {
     const sb = createSupabaseBrowserClient()
     sb.auth.getUser().then(({ data }) => setHasUser(!!data.user)).catch(() => setHasUser(false))
@@ -56,9 +78,28 @@ export function Header() {
     <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100 shadow-sm h-16">
       <div ref={containerRef} className="w-full px-4 sm:px-6 lg:px-8 h-full">
         <div className="flex justify-between items-center h-full">
-          <Link ref={logoRef} href="/" className="flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
-            Loot Aura
-          </Link>
+          {/* Mobile: Show back button on sale detail pages, otherwise show logo */}
+          {isSaleDetailPage ? (
+            <>
+              <Link
+                href={backUrl}
+                className="sm:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors -ml-2"
+                aria-label="Back to sales"
+              >
+                <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
+              {/* Desktop: Always show logo */}
+              <Link ref={logoRef} href="/" className="hidden sm:flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
+                Loot Aura
+              </Link>
+            </>
+          ) : (
+            <Link ref={logoRef} href="/" className="flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
+              Loot Aura
+            </Link>
+          )}
           
           <div className="flex gap-3 sm:gap-6 items-center">
             {/* Main links cluster */}

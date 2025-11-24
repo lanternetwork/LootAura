@@ -271,8 +271,8 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
           </div>
         </div>
 
-        {/* Address & Map Section */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+        {/* Address Section */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <div className="flex items-start gap-2">
             <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -289,22 +289,6 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
               </AddressLink>
             </div>
           </div>
-          
-          {/* Map - Mobile */}
-          {typeof sale.lat === 'number' && typeof sale.lng === 'number' && (
-            <div className="w-full rounded-lg overflow-hidden bg-gray-100 aspect-video" role="region" aria-label={`Map showing location of ${sale.title || 'this sale'}`}>
-              <SimpleMap
-                center={currentCenter}
-                zoom={15}
-                pins={{
-                  sales: [{ id: sale.id, lat: sale.lat!, lng: sale.lng! }],
-                  selectedId: sale.id,
-                  onPinClick: () => {},
-                  onClusterClick: () => {}
-                }}
-              />
-            </div>
-          )}
         </div>
 
         {/* Primary Photo */}
@@ -409,6 +393,52 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
         <div className="w-full max-w-screen-sm mx-auto">
           <SaleDetailBannerAd />
         </div>
+
+        {/* Map Card - Mobile */}
+        {typeof sale.lat === 'number' && typeof sale.lng === 'number' && (
+          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Location</h3>
+            <div className="w-full rounded-lg overflow-hidden bg-gray-100 aspect-video" role="region" aria-label={`Map showing location of ${sale.title || 'this sale'}`}>
+              <SimpleMap
+                center={currentCenter}
+                zoom={15}
+                pins={{
+                  sales: [{ id: sale.id, lat: sale.lat!, lng: sale.lng! }],
+                  selectedId: sale.id,
+                  onPinClick: () => {},
+                  onClusterClick: () => {}
+                }}
+              />
+            </div>
+            <div className="mt-3 text-sm text-gray-600">
+              {sale.address && (
+                <p>
+                  <AddressLink
+                    lat={sale.lat ?? undefined}
+                    lng={sale.lng ?? undefined}
+                    address={sale.address}
+                  >
+                    {sale.address}
+                  </AddressLink>
+                </p>
+              )}
+              <p>
+                <AddressLink
+                  lat={sale.lat ?? undefined}
+                  lng={sale.lng ?? undefined}
+                  address={`${sale.city}, ${sale.state} ${sale.zip_code || ''}`.trim()}
+                >
+                  {sale.city}, {sale.state} {sale.zip_code}
+                </AddressLink>
+              </p>
+              {sale.address && (
+                <div className="mt-2">
+                  <OSMAttribution showGeocoding={true} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Nearby Sales - Mobile */}
         {nearbySales.length > 0 && (

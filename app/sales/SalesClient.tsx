@@ -339,7 +339,11 @@ export default function SalesClient({
       if (activeFilters.categories && activeFilters.categories.length > 0) {
         params.set('categories', activeFilters.categories.join(','))
       }
-      // Distance parameter removed - map zoom controls visible area
+      // Pass distance filter to API (convert miles to km)
+      if (activeFilters.distance) {
+        const distanceKm = activeFilters.distance * 1.60934 // Convert miles to km
+        params.set('radiusKm', distanceKm.toString())
+      }
       
       // Request more sales to show all pins in buffered area
       params.set('limit', '200')
@@ -654,10 +658,12 @@ export default function SalesClient({
     
     // Prefetch sales data for this ZIP location immediately
     // This ensures pins appear as soon as possible
+    // Use expanded bounds for buffer, and pass current filters to ensure distance filter is applied
+    const bufferedBounds = expandBounds(calculatedBounds, MAP_BUFFER_FACTOR)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[ZIP] Prefetching sales for ZIP location:', { lat, lng, bounds: calculatedBounds })
+      console.log('[ZIP] Prefetching sales for ZIP location:', { lat, lng, bounds: calculatedBounds, bufferedBounds })
     }
-    fetchMapSales(calculatedBounds).catch(err => {
+    fetchMapSales(bufferedBounds, filters).catch(err => {
       console.error('[ZIP] Failed to prefetch sales:', err)
     })
     
@@ -666,12 +672,12 @@ export default function SalesClient({
       if (!prev) {
         // Create new map view with ZIP location
         // Calculate zoom level for 10-mile radius
-        // For 10 miles radius (20 miles diameter), zoom 11-12 is appropriate
+        // For 10 miles radius (20 miles diameter), zoom 12 is appropriate (matches distanceToZoom function)
         // We'll use fitBounds with minimal padding to ensure exact bounds
         const newView: MapViewState = {
           center: { lat, lng },
           bounds: calculatedBounds,
-          zoom: 9 // Lower zoom to prevent zoom-in after fitBounds applies
+          zoom: 12 // Correct zoom level for 10-mile radius
         }
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[ZIP] New map view:', newView)
@@ -693,7 +699,7 @@ export default function SalesClient({
         ...prev,
         center: { lat, lng },
         bounds: calculatedBounds,
-        zoom: 9 // Lower zoom to prevent zoom-in after fitBounds applies
+        zoom: 12 // Correct zoom level for 10-mile radius
       }
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[ZIP] New map view:', newView)
@@ -756,13 +762,13 @@ export default function SalesClient({
     if (newFilters.distance && newFilters.distance !== filters.distance) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[DISTANCE] Converting distance to zoom:', { distance: newFilters.distance, zoom: distanceToZoom(newFilters.distance) })
-        console.log('[DISTANCE] Entry point: DISTANCE_CHANGE - No direct fetch, viewport change will trigger fetch')
+        console.log('[DISTANCE] Entry point: DISTANCE_CHANGE - Triggering refetch with new distance')
       }
       
       // Update filters for UI state
       updateFilters(newFilters)
       
-      // Change map zoom instead of triggering API call
+      // Change map zoom to match the new distance
       const newZoom = distanceToZoom(newFilters.distance)
       setMapView(prev => {
         if (!prev) {
@@ -784,7 +790,12 @@ export default function SalesClient({
         }
       })
       
-      // No direct API call - let viewport change trigger the fetch
+      // Trigger immediate refetch with new distance filter if we have viewport bounds
+      if (mapView?.bounds) {
+        const newBufferedBounds = expandBounds(mapView.bounds, MAP_BUFFER_FACTOR)
+        fetchMapSales(newBufferedBounds, newFilters)
+      }
+      
       return
     }
     

@@ -303,8 +303,9 @@ export default function MobileSalesShell({
               zoom={pendingBounds ? undefined : mapView.zoom}
               fitBounds={pendingBounds}
               fitBoundsOptions={pendingBounds ? { 
-                padding: 20, 
-                duration: 0
+                padding: 0, // No padding to show exact bounds
+                duration: 300, // Smooth transition
+                maxZoom: 15 // Prevent over-zooming
               } : undefined}
               hybridPins={currentViewport ? {
                 sales: mapSales,

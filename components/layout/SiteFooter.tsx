@@ -1,7 +1,16 @@
+'use client'
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 export function SiteFooter() {
+  const pathname = usePathname()
   const currentYear = new Date().getFullYear()
+  
+  // Hide footer on /sales page
+  if (pathname === '/sales') {
+    return null
+  }
 
   return (
     <footer role="contentinfo" className="bg-white border-t border-slate-200 mt-auto">

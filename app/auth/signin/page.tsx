@@ -52,11 +52,7 @@ export default function SignIn() {
             hasStorage: !!storageRedirect,
             storageValue: storageRedirect
           })
-        } 
-          paramValue: redirectParam,
-          hasStorage: !!storageRedirect,
-          storageValue: storageRedirect
-        })
+        }
         // Clear sessionStorage redirect if used
         if (storageRedirect) {
           sessionStorage.removeItem('auth:postLoginRedirect')

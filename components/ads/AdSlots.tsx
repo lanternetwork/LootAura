@@ -102,14 +102,16 @@ export function DesktopFooterAd() {
   }
 
   return (
-    <div className="hidden lg:block mt-6">
-      <AdSenseSlot
-        slot="2367280679"
-        format="auto"
-        fullWidthResponsive={true}
-        style={{ minHeight: '120px' }}
-        className="w-full"
-      />
+    <div className="hidden lg:block w-full bg-white border-t border-slate-200">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-6">
+        <AdSenseSlot
+          slot="2367280679"
+          format="auto"
+          fullWidthResponsive={true}
+          style={{ minHeight: '120px' }}
+          className="w-full"
+        />
+      </div>
     </div>
   )
 }

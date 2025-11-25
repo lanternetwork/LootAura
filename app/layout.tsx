@@ -99,6 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main id="main-content" tabIndex={-1}>
               {children}
             </main>
+            <DesktopFooterAd />
             <SiteFooter />
             <PWAComponents />
             <DebugToggle />
@@ -114,7 +115,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               pauseOnHover
               theme="light"
             />
-            <DesktopFooterAd />
           </ErrorBoundary>
         </Providers>
       </body>

@@ -3,7 +3,7 @@ import Link from 'next/link'
 export function LandingCta() {
   return (
     <section className="bg-[#3A2268] text-white py-10 md:py-16">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 text-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="text-2xl md:text-3xl lg:text-4xl font-semibold mb-4">
           Ready to find your next great deal?
         </h2>

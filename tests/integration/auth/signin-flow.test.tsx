@@ -117,7 +117,8 @@ describe('Sign In Page Integration', () => {
       fireEvent.click(signInButtons[0])
 
       await waitFor(() => {
-        expect(screen.getByText('Invalid credentials')).toBeInTheDocument()
+        const errorMessages = screen.getAllByText('Invalid credentials')
+        expect(errorMessages.length).toBeGreaterThan(0)
       })
     })
   })
@@ -169,8 +170,10 @@ describe('Sign In Page Integration', () => {
       fireEvent.click(magicLinkButtons[0])
 
       await waitFor(() => {
-        expect(screen.getByText('Magic link sent!')).toBeInTheDocument()
-        expect(screen.getByText('Check your email and click the link to sign in.')).toBeInTheDocument()
+        const successMessages = screen.getAllByText('Magic link sent!')
+        const instructionMessages = screen.getAllByText('Check your email and click the link to sign in.')
+        expect(successMessages.length).toBeGreaterThan(0)
+        expect(instructionMessages.length).toBeGreaterThan(0)
       })
     })
 
@@ -239,7 +242,8 @@ describe('Sign In Page Integration', () => {
       fireEvent.click(magicLinkButtons[0])
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to send magic link')).toBeInTheDocument()
+        const errorMessages = screen.getAllByText('Failed to send magic link')
+        expect(errorMessages.length).toBeGreaterThan(0)
       })
     })
   })

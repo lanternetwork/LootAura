@@ -89,7 +89,9 @@ export function usePresets() {
 
       setPresets(data.presets || [])
     } catch (err) {
-      console.warn('Failed to load local presets:', err)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('Failed to load local presets:', err)
+      }
       setPresets([])
     }
   }

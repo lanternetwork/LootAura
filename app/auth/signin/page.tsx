@@ -38,13 +38,21 @@ export default function SignIn() {
         
         // Prevent redirect loops: never redirect to auth pages
         if (redirectTo.startsWith('/auth/') || redirectTo.startsWith('/login') || redirectTo.startsWith('/signin')) {
-          console.warn('[SIGNIN] Preventing redirect loop - redirectTo is an auth page, using default:', redirectTo)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.warn('[SIGNIN] Preventing redirect loop - redirectTo is an auth page, using default:', redirectTo)
+          }
           redirectTo = '/sales'
         }
         
-        console.log('[SIGNIN] Redirecting after login:', { 
-          redirectTo, 
-          hasParam: !!redirectParam, 
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SIGNIN] Redirecting after login:', { 
+            redirectTo, 
+            hasParam: !!redirectParam,
+            paramValue: redirectParam,
+            hasStorage: !!storageRedirect,
+            storageValue: storageRedirect
+          })
+        } 
           paramValue: redirectParam,
           hasStorage: !!storageRedirect,
           storageValue: storageRedirect

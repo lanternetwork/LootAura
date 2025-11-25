@@ -31,7 +31,9 @@ export default function HomeClient({ initialSales, user: _user }: HomeClientProp
       
       setSales(results)
     } catch (error) {
-      console.error('Location search failed:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('Location search failed:', error)
+      }
     }
   }
 

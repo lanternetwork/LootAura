@@ -81,7 +81,9 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
         }
       }
     } catch (error) {
-      console.error(`[SALES_PAGE] ZIP lookup error:`, error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error(`[SALES_PAGE] ZIP lookup error:`, error)
+      }
     }
   }
 

@@ -58,7 +58,7 @@ export function validateCsrfToken(request: Request): boolean {
 
   // Debug logging in development (skip in test environment)
   const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST !== undefined
-  if (!isTestEnv && (process.env.NEXT_PUBLIC_DEBUG === 'true' || process.env.NODE_ENV !== 'production')) {
+  if (!isTestEnv && process.env.NEXT_PUBLIC_DEBUG === 'true') {
     if (!tokenFromHeader || !tokenFromCookie) {
       console.warn('[CSRF] Validation failed:', {
         hasHeader: !!tokenFromHeader,

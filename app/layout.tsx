@@ -32,7 +32,9 @@ try {
   metadataBaseUrl = new URL(siteUrl)
 } catch (error) {
   // If siteUrl is invalid, don't set metadataBase
-  console.warn('[LAYOUT] Invalid siteUrl for metadataBase:', siteUrl)
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.warn('[LAYOUT] Invalid siteUrl for metadataBase:', siteUrl)
+  }
 }
 
 export const metadata: Metadata = {

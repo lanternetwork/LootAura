@@ -61,10 +61,16 @@ describe('Sign In Page Integration', () => {
     it('should render sign in form correctly', () => {
       render(<SignIn />)
 
-      expect(screen.getByLabelText('Email')).toBeInTheDocument()
-      expect(screen.getByLabelText('Password')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Send Magic Link' })).toBeInTheDocument()
+      // Both mobile and desktop forms render, so use getAllBy and check first (mobile)
+      const emailInputs = screen.getAllByLabelText('Email')
+      const passwordInputs = screen.getAllByLabelText('Password')
+      const signInButtons = screen.getAllByRole('button', { name: 'Sign In' })
+      const magicLinkButtons = screen.getAllByRole('button', { name: 'Send Magic Link' })
+      
+      expect(emailInputs.length).toBeGreaterThan(0)
+      expect(passwordInputs.length).toBeGreaterThan(0)
+      expect(signInButtons.length).toBeGreaterThan(0)
+      expect(magicLinkButtons.length).toBeGreaterThan(0)
     })
 
     it('should handle successful email/password sign in', async () => {
@@ -72,13 +78,18 @@ describe('Sign In Page Integration', () => {
 
       render(<SignIn />)
 
-      fireEvent.change(screen.getByLabelText('Email'), {
+      // Use first form (mobile) - both forms share the same state
+      const emailInputs = screen.getAllByLabelText('Email')
+      const passwordInputs = screen.getAllByLabelText('Password')
+      const signInButtons = screen.getAllByRole('button', { name: 'Sign In' })
+
+      fireEvent.change(emailInputs[0], {
         target: { value: 'test@example.com' },
       })
-      fireEvent.change(screen.getByLabelText('Password'), {
+      fireEvent.change(passwordInputs[0], {
         target: { value: 'password123' },
       })
-      fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+      fireEvent.click(signInButtons[0])
 
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalledWith({
@@ -93,13 +104,17 @@ describe('Sign In Page Integration', () => {
 
       render(<SignIn />)
 
-      fireEvent.change(screen.getByLabelText('Email'), {
+      const emailInputs = screen.getAllByLabelText('Email')
+      const passwordInputs = screen.getAllByLabelText('Password')
+      const signInButtons = screen.getAllByRole('button', { name: 'Sign In' })
+
+      fireEvent.change(emailInputs[0], {
         target: { value: 'test@example.com' },
       })
-      fireEvent.change(screen.getByLabelText('Password'), {
+      fireEvent.change(passwordInputs[0], {
         target: { value: 'wrongpassword' },
       })
-      fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+      fireEvent.click(signInButtons[0])
 
       await waitFor(() => {
         expect(screen.getByText('Invalid credentials')).toBeInTheDocument()
@@ -117,10 +132,13 @@ describe('Sign In Page Integration', () => {
 
       render(<SignIn />)
 
-      fireEvent.change(screen.getByLabelText('Email'), {
+      const emailInputs = screen.getAllByLabelText('Email')
+      const magicLinkButtons = screen.getAllByRole('button', { name: 'Send Magic Link' })
+
+      fireEvent.change(emailInputs[0], {
         target: { value: 'test@example.com' },
       })
-      fireEvent.click(screen.getByRole('button', { name: 'Send Magic Link' }))
+      fireEvent.click(magicLinkButtons[0])
 
       await waitFor(() => {
         expect(mockFetch).toHaveBeenCalledWith('/api/auth/magic-link', {
@@ -142,10 +160,13 @@ describe('Sign In Page Integration', () => {
 
       render(<SignIn />)
 
-      fireEvent.change(screen.getByLabelText('Email'), {
+      const emailInputs = screen.getAllByLabelText('Email')
+      const magicLinkButtons = screen.getAllByRole('button', { name: 'Send Magic Link' })
+
+      fireEvent.change(emailInputs[0], {
         target: { value: 'test@example.com' },
       })
-      fireEvent.click(screen.getByRole('button', { name: 'Send Magic Link' }))
+      fireEvent.click(magicLinkButtons[0])
 
       await waitFor(() => {
         expect(screen.getByText('Magic link sent!')).toBeInTheDocument()
@@ -156,19 +177,24 @@ describe('Sign In Page Integration', () => {
     it('should disable magic link button when email is empty', () => {
       render(<SignIn />)
 
-      const magicLinkButton = screen.getByRole('button', { name: 'Send Magic Link' })
-      expect(magicLinkButton).toBeDisabled()
+      const magicLinkButtons = screen.getAllByRole('button', { name: 'Send Magic Link' })
+      // Both buttons should be disabled when email is empty
+      expect(magicLinkButtons[0]).toBeDisabled()
+      expect(magicLinkButtons[1]).toBeDisabled()
     })
 
     it('should enable magic link button when email is provided', () => {
       render(<SignIn />)
 
-      fireEvent.change(screen.getByLabelText('Email'), {
+      const emailInputs = screen.getAllByLabelText('Email')
+      fireEvent.change(emailInputs[0], {
         target: { value: 'test@example.com' },
       })
 
-      const magicLinkButton = screen.getByRole('button', { name: 'Send Magic Link' })
-      expect(magicLinkButton).not.toBeDisabled()
+      const magicLinkButtons = screen.getAllByRole('button', { name: 'Send Magic Link' })
+      // Both buttons should be enabled when email is provided (shared state)
+      expect(magicLinkButtons[0]).not.toBeDisabled()
+      expect(magicLinkButtons[1]).not.toBeDisabled()
     })
 
     it('should show loading state while sending magic link', async () => {
@@ -182,12 +208,17 @@ describe('Sign In Page Integration', () => {
 
       render(<SignIn />)
 
-      fireEvent.change(screen.getByLabelText('Email'), {
+      const emailInputs = screen.getAllByLabelText('Email')
+      const magicLinkButtons = screen.getAllByRole('button', { name: 'Send Magic Link' })
+
+      fireEvent.change(emailInputs[0], {
         target: { value: 'test@example.com' },
       })
-      fireEvent.click(screen.getByRole('button', { name: 'Send Magic Link' }))
+      fireEvent.click(magicLinkButtons[0])
 
-      expect(screen.getByText('Sending...')).toBeInTheDocument()
+      // Both forms show "Sending..." text, so use getAllByText
+      const sendingTexts = screen.getAllByText('Sending...')
+      expect(sendingTexts.length).toBeGreaterThan(0)
     })
 
     it('should display error message when magic link fails', async () => {
@@ -199,10 +230,13 @@ describe('Sign In Page Integration', () => {
 
       render(<SignIn />)
 
-      fireEvent.change(screen.getByLabelText('Email'), {
+      const emailInputs = screen.getAllByLabelText('Email')
+      const magicLinkButtons = screen.getAllByRole('button', { name: 'Send Magic Link' })
+
+      fireEvent.change(emailInputs[0], {
         target: { value: 'test@example.com' },
       })
-      fireEvent.click(screen.getByRole('button', { name: 'Send Magic Link' }))
+      fireEvent.click(magicLinkButtons[0])
 
       await waitFor(() => {
         expect(screen.getByText('Failed to send magic link')).toBeInTheDocument()
@@ -231,13 +265,17 @@ describe('Sign In Page Integration', () => {
 
       render(<SignIn />)
 
-      fireEvent.change(screen.getByLabelText('Email'), {
+      const emailInputs = screen.getAllByLabelText('Email')
+      const passwordInputs = screen.getAllByLabelText('Password')
+      const signInButtons = screen.getAllByRole('button', { name: 'Sign In' })
+
+      fireEvent.change(emailInputs[0], {
         target: { value: 'test@example.com' },
       })
-      fireEvent.change(screen.getByLabelText('Password'), {
+      fireEvent.change(passwordInputs[0], {
         target: { value: 'password123' },
       })
-      fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+      fireEvent.click(signInButtons[0])
 
       await waitFor(() => {
         expect(mockSignIn).toHaveBeenCalled()
@@ -254,7 +292,9 @@ describe('Sign In Page Integration', () => {
 
       render(<SignIn />)
 
-      expect(screen.getByText('Signing in...')).toBeInTheDocument()
+      // Both forms show "Signing in..." text, so use getAllByText
+      const signingInTexts = screen.getAllByText('Signing in...')
+      expect(signingInTexts.length).toBeGreaterThan(0)
     })
   })
 
@@ -262,20 +302,22 @@ describe('Sign In Page Integration', () => {
     it('should require email and password for sign in', () => {
       render(<SignIn />)
 
-      const emailInput = screen.getByLabelText('Email')
-      const passwordInput = screen.getByLabelText('Password')
-      const signInButton = screen.getByRole('button', { name: 'Sign In' })
+      const emailInputs = screen.getAllByLabelText('Email')
+      const passwordInputs = screen.getAllByLabelText('Password')
+      const signInButtons = screen.getAllByRole('button', { name: 'Sign In' })
 
-      expect(emailInput).toBeRequired()
-      expect(passwordInput).toBeRequired()
-      expect(signInButton).toBeInTheDocument()
+      // Check first form (mobile) - both should have same validation
+      expect(emailInputs[0]).toBeRequired()
+      expect(passwordInputs[0]).toBeRequired()
+      expect(signInButtons.length).toBeGreaterThan(0)
     })
 
     it('should validate email format', () => {
       render(<SignIn />)
 
-      const emailInput = screen.getByLabelText('Email')
-      expect(emailInput).toHaveAttribute('type', 'email')
+      const emailInputs = screen.getAllByLabelText('Email')
+      // Check first form (mobile) - both should have same validation
+      expect(emailInputs[0]).toHaveAttribute('type', 'email')
     })
   })
 })

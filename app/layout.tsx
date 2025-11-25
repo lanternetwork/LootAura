@@ -16,6 +16,7 @@ import '@/lib/maps/telemetry'
 import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 import ClarityClient from '@/components/analytics/ClarityClient'
 import { DesktopFooterAd } from '@/components/ads/AdSlots'
+import { SiteFooter } from '@/components/layout/SiteFooter'
 import { ENV_PUBLIC } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -98,6 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main id="main-content" tabIndex={-1}>
               {children}
             </main>
+            <SiteFooter />
             <PWAComponents />
             <DebugToggle />
             <ToastContainer

@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import Image from 'next/image'
 import SalePlaceholder from './placeholders/SalePlaceholder'
@@ -5,6 +7,7 @@ import FavoriteButton from './FavoriteButton'
 import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import AddressLink from '@/components/common/AddressLink'
+import { trackAnalyticsEvent } from '@/lib/analytics-client'
 
 interface SaleCardProps {
   sale: Sale
@@ -123,6 +126,12 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
           <Link 
             className="link-accent hover:text-[var(--accent-hover)] font-medium text-sm" 
             href={detailUrl}
+            onClick={() => {
+              trackAnalyticsEvent({
+                sale_id: sale.id,
+                event_type: 'click',
+              })
+            }}
           >
             View Details →
           </Link>

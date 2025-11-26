@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import { buildShareTargets, type ShareTarget } from '@/lib/share/buildShareUrls'
 import { analytics } from '@/lib/analytics'
+import { trackAnalyticsEvent } from '@/lib/analytics-client'
 
 interface SaleShareButtonProps {
   url: string
@@ -112,15 +113,9 @@ export default function SaleShareButton({ url, title, text, saleId }: SaleShareB
       analytics.trackShare(saleId, 'webshare')
       
       // Track share event in database
-      fetch('/api/analytics/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sale_id: saleId,
-          event_type: 'share',
-        }),
-      }).catch(() => {
-        // Silently fail - analytics tracking shouldn't break the page
+      trackAnalyticsEvent({
+        sale_id: saleId,
+        event_type: 'share',
       })
     } catch (error: any) {
       // User canceled or error occurred
@@ -141,15 +136,9 @@ export default function SaleShareButton({ url, title, text, saleId }: SaleShareB
         analytics.trackShare(saleId, 'copy')
         
         // Track share event in database
-        fetch('/api/analytics/track', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sale_id: saleId,
-            event_type: 'share',
-          }),
-        }).catch(() => {
-          // Silently fail - analytics tracking shouldn't break the page
+        trackAnalyticsEvent({
+          sale_id: saleId,
+          event_type: 'share',
         })
       } else if (document.execCommand) {
         // Fallback for older browsers
@@ -196,15 +185,9 @@ export default function SaleShareButton({ url, title, text, saleId }: SaleShareB
     analytics.trackShare(saleId, provider)
     
     // Track share event in database
-    fetch('/api/analytics/track', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sale_id: saleId,
-        event_type: 'share',
-      }),
-    }).catch(() => {
-      // Silently fail - analytics tracking shouldn't break the page
+    trackAnalyticsEvent({
+      sale_id: saleId,
+      event_type: 'share',
     })
     
     setIsMenuOpen(false)

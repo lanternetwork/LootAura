@@ -8,6 +8,7 @@ import { getSaleCoverUrl } from '@/lib/images/cover'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import AddressLink from '@/components/common/AddressLink'
 import { buildDesktopGoogleMapsUrl, buildIosNavUrl, buildAndroidNavUrl } from '@/lib/location/mapsLinks'
+import { trackAnalyticsEvent } from '@/lib/analytics-client'
 
 interface MobileSaleCalloutProps {
   sale: Sale | null
@@ -132,6 +133,11 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
     : `/sales/${sale.id}`
 
   const handleViewSale = () => {
+    // Track click event
+    trackAnalyticsEvent({
+      sale_id: sale.id,
+      event_type: 'click',
+    })
     router.push(detailUrl)
   }
 
@@ -252,6 +258,12 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                 rel="noopener noreferrer"
                 className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px]"
                 aria-label="Start navigation"
+                onClick={() => {
+                  trackAnalyticsEvent({
+                    sale_id: sale.id,
+                    event_type: 'click',
+                  })
+                }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -390,6 +402,12 @@ export default function MobileSaleCallout({ sale, onDismiss, viewport, pinPositi
                 rel="noopener noreferrer"
                 className="flex-shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-3 py-2.5 rounded-lg transition-colors flex items-center justify-center min-w-[48px]"
                 aria-label="Start navigation"
+                onClick={() => {
+                  trackAnalyticsEvent({
+                    sale_id: sale.id,
+                    event_type: 'click',
+                  })
+                }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />

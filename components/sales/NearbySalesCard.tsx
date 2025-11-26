@@ -7,6 +7,7 @@ import { getSaleCoverUrl } from '@/lib/images/cover'
 import { formatDistance } from '@/lib/utils/distance'
 import SalePlaceholder from '@/components/placeholders/SalePlaceholder'
 import AddressLink from '@/components/common/AddressLink'
+import { trackAnalyticsEvent } from '@/lib/analytics-client'
 
 interface NearbySalesCardProps {
   nearbySales: Array<Sale & { distance_m: number }>
@@ -74,6 +75,12 @@ export function NearbySalesCard({ nearbySales }: NearbySalesCardProps) {
               key={nearbySale.id}
               href={`/sales/${nearbySale.id}`}
               className="block group hover:bg-gray-50 rounded-lg p-3 transition-colors"
+              onClick={() => {
+                trackAnalyticsEvent({
+                  sale_id: nearbySale.id,
+                  event_type: 'click',
+                })
+              }}
             >
               <div className="flex gap-3">
                 {/* Thumbnail */}

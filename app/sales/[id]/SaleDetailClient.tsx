@@ -20,6 +20,7 @@ import type { SaleItem, Sale } from '@/lib/types'
 import { trackSaleViewed, trackFavoriteToggled } from '@/lib/analytics/clarityEvents'
 import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
 import { toast } from 'react-toastify'
+import { trackAnalyticsEvent } from '@/lib/analytics-client'
 
 interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo
@@ -51,23 +52,22 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   const viewTrackedRef = useRef(false)
   const isOptimisticRef = useRef(false)
 
+  // Track click event for navigation/directions
+  const handleNavigationClick = () => {
+    trackAnalyticsEvent({
+      sale_id: sale.id,
+      event_type: 'click',
+    })
+  }
+
   // Track view event when component mounts (only once)
   useEffect(() => {
     if (!viewTrackedRef.current) {
       viewTrackedRef.current = true
       // Track view event (internal analytics)
-      fetch('/api/analytics/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sale_id: sale.id,
-          event_type: 'view',
-        }),
-      }).catch((error) => {
-        // Silently fail - analytics tracking shouldn't break the page
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.warn('[SALE_DETAIL] Failed to track view event:', error)
-        }
+      trackAnalyticsEvent({
+        sale_id: sale.id,
+        event_type: 'view',
       })
       // Track Clarity event
       trackSaleViewed(sale.id)
@@ -153,18 +153,9 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
       
       // Track save event if favoriting (not unfavoriting)
       if (result.favorited && !wasFavorited) {
-        fetch('/api/analytics/track', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sale_id: sale.id,
-            event_type: 'save',
-          }),
-        }).catch((error) => {
-          // Silently fail - analytics tracking shouldn't break the page
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.warn('[SALE_DETAIL] Failed to track save event:', error)
-          }
+        trackAnalyticsEvent({
+          sale_id: sale.id,
+          event_type: 'save',
         })
       }
       // Track Clarity event for favorite toggle
@@ -260,6 +251,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                 lng={sale.lng ?? undefined}
                 address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
                 className="text-gray-900 font-medium break-words"
+                onClick={handleNavigationClick}
               >
                 {sale.address && `${sale.address}, `}{sale.city}, {sale.state}
               </AddressLink>
@@ -399,17 +391,19 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
                     address={sale.address}
+                    onClick={handleNavigationClick}
                   >
                     {sale.address}
                   </AddressLink>
                 </p>
               )}
               <p>
-                <AddressLink
-                  lat={sale.lat ?? undefined}
-                  lng={sale.lng ?? undefined}
-                  address={`${sale.city}, ${sale.state} ${sale.zip_code || ''}`.trim()}
-                >
+                  <AddressLink
+                    lat={sale.lat ?? undefined}
+                    lng={sale.lng ?? undefined}
+                    address={`${sale.city}, ${sale.state} ${sale.zip_code || ''}`.trim()}
+                    onClick={handleNavigationClick}
+                  >
                   {sale.city}, {sale.state} {sale.zip_code}
                 </AddressLink>
               </p>
@@ -464,6 +458,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
                     address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
+                    onClick={handleNavigationClick}
                   >
                     {sale.address && `${sale.address}, `}{sale.city}, {sale.state}
                   </AddressLink>
@@ -633,17 +628,19 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                     lat={sale.lat ?? undefined}
                     lng={sale.lng ?? undefined}
                     address={sale.address}
+                    onClick={handleNavigationClick}
                   >
                     {sale.address}
                   </AddressLink>
                 </p>
               )}
               <p>
-                <AddressLink
-                  lat={sale.lat ?? undefined}
-                  lng={sale.lng ?? undefined}
-                  address={`${sale.city}, ${sale.state} ${sale.zip_code || ''}`.trim()}
-                >
+                  <AddressLink
+                    lat={sale.lat ?? undefined}
+                    lng={sale.lng ?? undefined}
+                    address={`${sale.city}, ${sale.state} ${sale.zip_code || ''}`.trim()}
+                    onClick={handleNavigationClick}
+                  >
                   {sale.city}, {sale.state} {sale.zip_code}
                 </AddressLink>
               </p>
@@ -705,6 +702,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
               lng={sale.lng ?? undefined}
               address={sale.address ? `${sale.address}, ${sale.city}, ${sale.state}` : `${sale.city}, ${sale.state}`}
               className="flex-1 inline-flex items-center justify-center px-4 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors min-h-[44px] whitespace-nowrap"
+              onClick={handleNavigationClick}
             >
               <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -739,14 +737,10 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                       url: shareUrl,
                     })
                     // Track analytics
-                    fetch('/api/analytics/track', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        sale_id: sale.id,
-                        event_type: 'share',
-                      }),
-                    }).catch(() => {})
+                    trackAnalyticsEvent({
+                      sale_id: sale.id,
+                      event_type: 'share',
+                    })
                   } catch (error: any) {
                     if (error.name !== 'AbortError' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
                       console.error('Error sharing:', error)
@@ -758,14 +752,10 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                     await navigator.clipboard.writeText(shareUrl)
                     toast.success('Link copied to clipboard')
                     // Track analytics
-                    fetch('/api/analytics/track', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        sale_id: sale.id,
-                        event_type: 'share',
-                      }),
-                    }).catch(() => {})
+                    trackAnalyticsEvent({
+                      sale_id: sale.id,
+                      event_type: 'share',
+                    })
                   } catch (error) {
                     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
                       console.error('Failed to copy link:', error)

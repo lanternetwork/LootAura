@@ -23,8 +23,14 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
 
   const { sale, items } = result
 
-  // Compute union of sale-level categories (tags) and item categories
-  const saleCats = Array.isArray(sale.tags) ? sale.tags : []
+  // Compute union of sale-level categories (tags) and item categories.
+  // Normalize tags so we handle both text[] and comma-separated strings safely.
+  const rawTags = (sale as any).tags
+  const saleCats = Array.isArray(rawTags)
+    ? rawTags
+    : typeof rawTags === 'string'
+      ? rawTags.split(',').map((t: string) => t.trim()).filter(Boolean)
+      : []
   const itemCats = items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 
@@ -94,8 +100,13 @@ export async function generateMetadata({ params }: SaleDetailPageProps): Promise
     }
   }
 
-  // Compute categories from sale tags and item categories (same logic as page component)
-  const saleCats = Array.isArray(result.sale.tags) ? result.sale.tags : []
+  // Compute categories from sale tags and item categories (same logic as page component).
+  const rawTags = (result.sale as any).tags
+  const saleCats = Array.isArray(rawTags)
+    ? rawTags
+    : typeof rawTags === 'string'
+      ? rawTags.split(',').map((t: string) => t.trim()).filter(Boolean)
+      : []
   const itemCats = result.items.map(i => i.category).filter((cat): cat is string => Boolean(cat))
   const displayCategories = Array.from(new Set([...saleCats, ...itemCats])).sort()
 

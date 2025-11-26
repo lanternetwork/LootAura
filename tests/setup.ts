@@ -242,6 +242,9 @@ const ALLOWED_PATTERNS = [
   
   // Draft publish error logging (app/api/drafts/publish/route.ts)
   /^\[PUBLISH\/POST\] thrown:/, // Expected error logging in draft publish rollback tests - tests/integration/drafts.publish.rollback.test.ts
+  
+  // Analytics client logging (lib/analytics-client.ts)
+  /^\[ANALYTICS_CLIENT\] Tracking (error|failed):/, // Expected analytics tracking error logging in tests - tests/unit/analytics-client.test.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {

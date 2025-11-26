@@ -181,6 +181,10 @@ const handlers = [
   http.get('/api/geocoding/reverse', () => {
     return HttpResponse.json({ ok: true, data: { id: 'reverse', label: 'Reverse Result', lat: 38.2512, lng: -85.7494 } })
   }),
+  // Analytics tracking endpoint (for unit tests that test analytics client)
+  http.post('/api/analytics/track', async () => {
+    return HttpResponse.json({ ok: true, data: { event_id: 'test-event-id' } }, { status: 200 })
+  }),
   // PostgREST profiles_v2 (silence unhandled warnings in tests that probe unknown usernames)
   http.get(/\/rest\/v1\/profiles_v2.*/i, () => {
     return HttpResponse.json([], { status: 200 })

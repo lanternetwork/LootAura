@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import type { ProfileData } from '@/lib/data/profileAccess'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface ProfileInfoCardProps {
   initialProfile: ProfileData | null
@@ -72,7 +73,10 @@ export function ProfileInfoCard({ initialProfile, onSaved }: ProfileInfoCardProp
     try {
       const response = await fetch('/api/profile/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
         body: JSON.stringify(payload),
       })
 

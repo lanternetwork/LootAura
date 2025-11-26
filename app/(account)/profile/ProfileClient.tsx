@@ -9,6 +9,7 @@ import { OwnerMetrics } from '@/components/profile/OwnerMetrics'
 import { OwnerListingsTabs } from '@/components/profile/OwnerListingsTabs'
 import { PreferencesCard } from '@/components/profile/PreferencesCard'
 import { AvatarUploader as AvatarUploaderComponent } from '@/components/profile/AvatarUploader'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 type Profile = {
   id: string
@@ -185,7 +186,10 @@ export default function ProfileClient() {
     
     const res = await fetch('/api/profile', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
       body: JSON.stringify(patch),
     })
     
@@ -223,7 +227,10 @@ export default function ProfileClient() {
   const handlePreferencesSave = async (theme: string, units: string) => {
     const res = await fetch('/api/preferences', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
       body: JSON.stringify({ theme, units }),
     })
     if (!res.ok) {
@@ -347,7 +354,10 @@ export default function ProfileClient() {
           try {
             const res = await fetch(`/api/sales/${id}/archive`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                ...getCsrfHeaders(),
+              },
               body: JSON.stringify({ status: 'completed' }),
             })
             if (res.ok) {
@@ -368,7 +378,10 @@ export default function ProfileClient() {
           try {
             const res = await fetch(`/api/sales/${id}/archive`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                ...getCsrfHeaders(),
+              },
               body: JSON.stringify({ status: 'published' }),
             })
             if (res.ok) {
@@ -387,7 +400,12 @@ export default function ProfileClient() {
         }}
         onDelete={async (id) => {
           try {
-            const res = await fetch(`/api/sales/${id}/delete`, { method: 'DELETE' })
+            const res = await fetch(`/api/sales/${id}/delete`, { 
+              method: 'DELETE',
+              headers: {
+                ...getCsrfHeaders(),
+              },
+            })
             if (res.ok) {
               // Reload listings
               const [activeRes, draftsRes, archivedRes] = await Promise.all([

@@ -11,20 +11,20 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   // CSRF protection check
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-    const csrfHeader = request.headers.get('x-csrf-token')
-    const cookieHeader = request.headers.get('cookie')
-    console.log('[PROFILE_UPDATE] POST request received:', {
-      hasCsrfHeader: !!csrfHeader,
-      csrfHeaderPrefix: csrfHeader ? csrfHeader.substring(0, 8) + '...' : null,
-      hasCookieHeader: !!cookieHeader,
-      cookieHeaderPreview: cookieHeader ? cookieHeader.substring(0, 200) : null,
-      allHeaders: Array.from(request.headers.entries()).map(([k, v]) => ({ 
-        key: k, 
-        value: k === 'cookie' ? v.substring(0, 200) + '...' : v.substring(0, 50) 
-      })),
-    })
-  }
+  const csrfHeader = request.headers.get('x-csrf-token')
+  const cookieHeader = request.headers.get('cookie')
+  console.log('[PROFILE_UPDATE] POST request received:', {
+    hasCsrfHeader: !!csrfHeader,
+    csrfHeaderPrefix: csrfHeader ? csrfHeader.substring(0, 8) + '...' : null,
+    csrfHeaderFull: csrfHeader || 'MISSING',
+    hasCookieHeader: !!cookieHeader,
+    cookieHeaderPreview: cookieHeader ? cookieHeader.substring(0, 500) : null,
+    cookieHeaderFull: cookieHeader || 'MISSING',
+    allHeaders: Array.from(request.headers.entries()).map(([k, v]) => ({ 
+      key: k, 
+      value: k === 'cookie' ? v.substring(0, 500) + '...' : v.substring(0, 100) 
+    })),
+  })
   
   const csrfError = await checkCsrfIfRequired(request)
   if (csrfError) {

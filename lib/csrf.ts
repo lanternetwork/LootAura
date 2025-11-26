@@ -56,9 +56,9 @@ export function validateCsrfToken(request: Request): boolean {
     }
   }
 
-  // Debug logging in development (skip in test environment)
+  // Always log validation details (skip in test environment)
   const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST !== undefined
-  if (!isTestEnv && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+  if (!isTestEnv) {
     console.log('[CSRF] Validation check:', {
       hasHeader: !!tokenFromHeader,
       hasCookie: !!tokenFromCookie,
@@ -66,23 +66,30 @@ export function validateCsrfToken(request: Request): boolean {
       cookieTokenPrefix: tokenFromCookie ? tokenFromCookie.substring(0, 8) + '...' : null,
       headerTokenLength: tokenFromHeader?.length,
       cookieTokenLength: tokenFromCookie?.length,
-      cookieHeader: cookieHeader ? cookieHeader.substring(0, 200) : null,
+      headerTokenFull: tokenFromHeader || 'MISSING',
+      cookieTokenFull: tokenFromCookie || 'MISSING',
+      cookieHeader: cookieHeader ? cookieHeader.substring(0, 500) : null,
       cookieNames: cookieHeader ? cookieHeader.split(';').map(c => c.trim().split('=')[0]) : []
     })
     
     if (!tokenFromHeader || !tokenFromCookie) {
-      console.warn('[CSRF] Validation failed - missing token:', {
+      console.error('[CSRF] ✗ Validation failed - missing token:', {
         hasHeader: !!tokenFromHeader,
         hasCookie: !!tokenFromCookie,
+        headerValue: tokenFromHeader || 'MISSING',
+        cookieValue: tokenFromCookie || 'MISSING',
       })
     } else if (tokenFromHeader !== tokenFromCookie) {
-      console.warn('[CSRF] Validation failed - tokens do not match:', {
+      console.error('[CSRF] ✗ Validation failed - tokens do not match:', {
+        headerTokenFull: tokenFromHeader,
+        cookieTokenFull: tokenFromCookie,
         headerTokenPrefix: tokenFromHeader.substring(0, 16),
         cookieTokenPrefix: tokenFromCookie.substring(0, 16),
         tokensMatch: tokenFromHeader === tokenFromCookie,
+        tokenLengthsMatch: tokenFromHeader.length === tokenFromCookie.length,
       })
     } else {
-      console.log('[CSRF] Validation passed - tokens match')
+      console.log('[CSRF] ✓ Validation passed - tokens match')
     }
   }
 

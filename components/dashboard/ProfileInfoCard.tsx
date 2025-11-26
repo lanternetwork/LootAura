@@ -71,42 +71,42 @@ export function ProfileInfoCard({ initialProfile, onSaved }: ProfileInfoCardProp
 
     setSaving(true)
     try {
+      console.log('[PROFILE_INFO] Starting save with payload:', payload)
       const csrfHeaders = getCsrfHeaders()
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[PROFILE_INFO] CSRF headers:', {
-          hasCsrfHeader: !!csrfHeaders['x-csrf-token'],
-          csrfTokenPrefix: csrfHeaders['x-csrf-token'] ? csrfHeaders['x-csrf-token'].substring(0, 8) + '...' : null,
-          allHeaders: Object.keys(csrfHeaders),
-          payload: payload,
-        })
+      console.log('[PROFILE_INFO] CSRF headers retrieved:', {
+        hasCsrfHeader: !!csrfHeaders['x-csrf-token'],
+        csrfTokenPrefix: csrfHeaders['x-csrf-token'] ? csrfHeaders['x-csrf-token'].substring(0, 8) + '...' : null,
+        csrfTokenFull: csrfHeaders['x-csrf-token'] || 'MISSING',
+        allHeaders: Object.keys(csrfHeaders),
+        headersObject: csrfHeaders,
+      })
+      
+      const requestHeaders = { 
+        'Content-Type': 'application/json',
+        ...csrfHeaders,
       }
+      console.log('[PROFILE_INFO] Final request headers:', requestHeaders)
       
       const response = await fetch('/api/profile/update', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...csrfHeaders,
-        },
+        headers: requestHeaders,
         body: JSON.stringify(payload),
       })
 
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[PROFILE_INFO] Response status:', {
-          ok: response.ok,
-          status: response.status,
-          statusText: response.statusText,
-        })
-      }
+      console.log('[PROFILE_INFO] Response received:', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers: Array.from(response.headers.entries()),
+      })
 
       const result = await response.json()
-      
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[PROFILE_INFO] Response result:', {
-          ok: result.ok,
-          error: result.error,
-          hasData: !!result.data,
-        })
-      }
+      console.log('[PROFILE_INFO] Response result:', {
+        ok: result.ok,
+        error: result.error,
+        hasData: !!result.data,
+        fullResult: result,
+      })
 
       if (result.ok) {
         toast.success('Profile updated successfully')

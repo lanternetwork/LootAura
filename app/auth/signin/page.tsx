@@ -107,7 +107,7 @@ export default function SignIn() {
   const isLoading = signIn.isPending || authLoading
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen md:h-[calc(100vh-4rem)] bg-neutral-50">
       {/* Mobile: Centered card layout (preserved) */}
       <div className="md:hidden min-h-screen flex items-center justify-center p-8">
         <div className="max-w-md w-full space-y-8">
@@ -227,7 +227,7 @@ export default function SignIn() {
       </div>
 
       {/* Desktop: 2-column layout (left: form panel, right: hero image) */}
-      <div className="hidden md:grid md:grid-cols-[minmax(400px,480px)_1fr] h-[calc(100vh-4rem)]">
+      <div className="hidden md:grid md:grid-cols-[minmax(400px,480px)_1fr] h-full">
         {/* Left Column: Form Panel */}
         <div className="flex flex-col justify-between bg-white px-8 lg:px-12 py-12">
           <div className="max-w-[420px] w-full mx-auto space-y-8">

@@ -218,9 +218,10 @@ describe('SellerRatingStars', () => {
       '/api/seller/rating',
       expect.objectContaining({
         method: 'POST',
-        headers: {
+        headers: expect.objectContaining({
           'Content-Type': 'application/json',
-        },
+        }),
+        credentials: 'include',
         body: JSON.stringify({
           seller_id: 'seller-456',
           rating: 4,

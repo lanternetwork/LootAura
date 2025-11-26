@@ -9,6 +9,7 @@ import { OwnerMetrics } from '@/components/profile/OwnerMetrics'
 import { OwnerListingsTabs } from '@/components/profile/OwnerListingsTabs'
 import { PreferencesCard } from '@/components/profile/PreferencesCard'
 import { AvatarUploader as AvatarUploaderComponent } from '@/components/profile/AvatarUploader'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 type Profile = {
   id: string
@@ -183,13 +184,54 @@ export default function ProfileClient() {
     console.log('[ABOUT] sending PUT /api/profile with keys:', Object.keys(patch))
     console.log('[ABOUT] PUT body:', JSON.stringify(patch))
     
+    const csrfHeaders = getCsrfHeaders()
+    console.log('[ABOUT] CSRF headers retrieved:', {
+      hasCsrfHeader: !!csrfHeaders['x-csrf-token'],
+      csrfTokenPrefix: csrfHeaders['x-csrf-token'] ? csrfHeaders['x-csrf-token'].substring(0, 8) + '...' : null,
+      csrfTokenFull: csrfHeaders['x-csrf-token'] || 'MISSING',
+      allHeaders: Object.keys(csrfHeaders),
+      headersObject: csrfHeaders,
+    })
+    
+    const requestHeaders: Record<string, string> = { 
+      'Content-Type': 'application/json',
+      ...csrfHeaders,
+    }
+    const csrfTokenValue = requestHeaders['x-csrf-token'] || 'MISSING'
+    console.log('[ABOUT] Final request headers:', {
+      ...requestHeaders,
+      'x-csrf-token': csrfTokenValue,
+    })
+    
+    console.log('[ABOUT] Making fetch request with:', {
+      url: '/api/profile',
+      method: 'PUT',
+      headers: requestHeaders,
+      hasCsrfToken: !!requestHeaders['x-csrf-token'],
+      csrfTokenValue: csrfTokenValue,
+      credentials: 'include',
+    })
+    
     const res = await fetch('/api/profile', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: requestHeaders,
+      credentials: 'include', // Ensure cookies are sent with the request
       body: JSON.stringify(patch),
     })
     
     console.log('[ABOUT] response ok=', res.ok, 'status=', res.status)
+    console.log('[ABOUT] response headers:', Array.from(res.headers.entries()))
+    
+    if (!res.ok) {
+      const errorText = await res.clone().text().catch(() => 'Unable to read error')
+      console.error('[ABOUT] ✗ Error response:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText: errorText.substring(0, 1000),
+      })
+    } else {
+      console.log('[ABOUT] ✓ Success response')
+    }
     
     // Read response once - don't read it twice!
     const j = await res.json().catch(() => ({ ok: false, error: 'Failed to parse response' }))
@@ -223,7 +265,10 @@ export default function ProfileClient() {
   const handlePreferencesSave = async (theme: string, units: string) => {
     const res = await fetch('/api/preferences', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
+      },
       body: JSON.stringify({ theme, units }),
     })
     if (!res.ok) {
@@ -347,7 +392,10 @@ export default function ProfileClient() {
           try {
             const res = await fetch(`/api/sales/${id}/archive`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                ...getCsrfHeaders(),
+              },
               body: JSON.stringify({ status: 'completed' }),
             })
             if (res.ok) {
@@ -368,7 +416,10 @@ export default function ProfileClient() {
           try {
             const res = await fetch(`/api/sales/${id}/archive`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                ...getCsrfHeaders(),
+              },
               body: JSON.stringify({ status: 'published' }),
             })
             if (res.ok) {
@@ -387,7 +438,12 @@ export default function ProfileClient() {
         }}
         onDelete={async (id) => {
           try {
-            const res = await fetch(`/api/sales/${id}/delete`, { method: 'DELETE' })
+            const res = await fetch(`/api/sales/${id}/delete`, { 
+              method: 'DELETE',
+              headers: {
+                ...getCsrfHeaders(),
+              },
+            })
             if (res.ok) {
               // Reload listings
               const [activeRes, draftsRes, archivedRes] = await Promise.all([

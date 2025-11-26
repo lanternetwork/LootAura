@@ -124,7 +124,7 @@ export default function SaleShareButton({ url, title, text, saleId }: SaleShareB
       })
     } catch (error: any) {
       // User canceled or error occurred
-      if (error.name !== 'AbortError') {
+      if (error.name !== 'AbortError' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.error('Error sharing:', error)
       }
       // Silently handle AbortError (user canceled)
@@ -175,7 +175,9 @@ export default function SaleShareButton({ url, title, text, saleId }: SaleShareB
       }
       setIsMenuOpen(false)
     } catch (error) {
-      console.error('Failed to copy link:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('Failed to copy link:', error)
+      }
       toast.error('Failed to copy link')
     }
   }

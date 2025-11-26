@@ -20,7 +20,9 @@ export function useAuth() {
       } catch (error) {
         // Network errors or other issues - return null instead of throwing
         // This allows the UI to show "Sign In" button instead of being stuck loading
-        console.warn('[useAuth] Error fetching user:', error)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[useAuth] Error fetching user:', error)
+        }
         return null
       }
     },

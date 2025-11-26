@@ -230,6 +230,8 @@ const ALLOWED_PATTERNS = [
   
   // CSRF validation warnings (lib/api/csrfCheck.ts)
   /\[WARN\] \[csrfCheck\] \[csrf_validation\] CSRF token validation failed/, // Expected CSRF validation warnings in tests without CSRF tokens - tests/integration/sales.imageFields.persist.test.ts
+  /\[CSRF_CHECK\] ✗ CSRF token validation failed/, // Expected CSRF validation errors in tests without CSRF tokens - tests/integration/csrf.protection.test.ts, tests/integration/seller.rating.api.test.ts
+  /\[CSRF_CHECK\] Exception during CSRF check:/, // Expected CSRF exception logging in tests - tests/integration/csrf.protection.test.ts, tests/integration/seller.rating.api.test.ts
   
   // Map component error logging (components/location/SimpleMap.tsx)
   /^\[SIMPLE_MAP\] Map error:/, // Expected map error logging in tests - tests/unit/a11y.smoke.test.tsx

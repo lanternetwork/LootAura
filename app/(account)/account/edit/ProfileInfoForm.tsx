@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import type { ProfileData } from '@/lib/data/profileAccess'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface ProfileInfoFormProps {
   initialProfile: ProfileData
@@ -57,17 +58,22 @@ export default function ProfileInfoForm({ initialProfile, onSaved }: ProfileInfo
 
     setSaving(true)
     try {
+      const csrfHeaders = getCsrfHeaders()
+      const requestHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...csrfHeaders,
+      }
+
       const response = await fetch('/api/profile/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: requestHeaders,
+        credentials: 'include',
         body: JSON.stringify(payload),
       })
 
       const result = await response.json()
 
       if (result.ok) {
-        toast.success('Profile updated successfully')
-        
         // Update local state with saved values
         setFormValues({
           display_name: payload.display_name || '',
@@ -76,9 +82,12 @@ export default function ProfileInfoForm({ initialProfile, onSaved }: ProfileInfo
           region: payload.region || '',
         })
 
-        // Call onSaved callback if provided
+        // Notify parent so it can toast and handle navigation
         if (onSaved && result.data?.profile) {
           onSaved(result.data.profile)
+        } else {
+          // Fallback toast if no parent handler is provided
+          toast.success('Profile updated successfully')
         }
       } else {
         toast.error(result.error || 'Failed to update profile')

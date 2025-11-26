@@ -179,7 +179,8 @@ export default function MobileSalesBottomSheet({
               <SalesList 
                 sales={sales} 
                 _mode="grid" 
-                viewport={mapView || { center: { lat: 39.8283, lng: -98.5795 }, zoom: 10 }} 
+                viewport={mapView || { center: { lat: 39.8283, lng: -98.5795 }, zoom: 10 }}
+                isLoading={loading}
               />
             </div>
           )}

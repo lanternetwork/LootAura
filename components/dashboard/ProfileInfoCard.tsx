@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import type { ProfileData } from '@/lib/data/profileAccess'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface ProfileInfoCardProps {
   initialProfile: ProfileData | null
@@ -58,7 +59,11 @@ export function ProfileInfoCard({ initialProfile, onSaved }: ProfileInfoCardProp
   }, [initialProfile])
 
   const handleSave = useCallback(async () => {
-    if (!hasChanges || saving) return
+    console.log('[PROFILE_INFO] handleSave called', { hasChanges, saving })
+    if (!hasChanges || saving) {
+      console.log('[PROFILE_INFO] Early return - no changes or already saving')
+      return
+    }
 
     // Validate and trim
     const payload = {
@@ -68,15 +73,77 @@ export function ProfileInfoCard({ initialProfile, onSaved }: ProfileInfoCardProp
       region: formValues.region.trim() || null,
     }
 
+    console.log('[PROFILE_INFO] Starting save with payload:', payload)
     setSaving(true)
     try {
+      // Get CSRF token from cookie directly to verify it's accessible
+      const cookies = document.cookie.split(';')
+      let csrfTokenFromCookie: string | null = null
+      for (const cookie of cookies) {
+        const [name, value] = cookie.trim().split('=')
+        if (name === 'csrf-token') {
+          csrfTokenFromCookie = decodeURIComponent(value)
+          break
+        }
+      }
+      console.log('[PROFILE_INFO] Direct cookie read:', {
+        found: !!csrfTokenFromCookie,
+        tokenLength: csrfTokenFromCookie?.length,
+        tokenPrefix: csrfTokenFromCookie ? csrfTokenFromCookie.substring(0, 8) + '...' : null,
+        fullToken: csrfTokenFromCookie || 'NOT FOUND',
+      })
+      
+      const csrfHeaders = getCsrfHeaders()
+      console.log('[PROFILE_INFO] CSRF headers from getCsrfHeaders():', {
+        hasCsrfHeader: !!csrfHeaders['x-csrf-token'],
+        csrfTokenPrefix: csrfHeaders['x-csrf-token'] ? csrfHeaders['x-csrf-token'].substring(0, 8) + '...' : null,
+        csrfTokenFull: csrfHeaders['x-csrf-token'] || 'MISSING',
+        allHeaders: Object.keys(csrfHeaders),
+        headersObject: csrfHeaders,
+        matchesCookie: csrfHeaders['x-csrf-token'] === csrfTokenFromCookie,
+      })
+      
+      const requestHeaders: Record<string, string> = { 
+        'Content-Type': 'application/json',
+        ...csrfHeaders,
+      }
+      const csrfTokenValue = requestHeaders['x-csrf-token'] || 'MISSING'
+      console.log('[PROFILE_INFO] Final request headers being sent:', {
+        ...requestHeaders,
+        'x-csrf-token': csrfTokenValue,
+      })
+      console.log('[PROFILE_INFO] About to make fetch request to /api/profile/update')
+      
+      console.log('[PROFILE_INFO] Making fetch request with:', {
+        url: '/api/profile/update',
+        method: 'POST',
+        headers: requestHeaders,
+        hasCsrfToken: !!requestHeaders['x-csrf-token'],
+        csrfTokenValue: csrfTokenValue,
+        credentials: 'include',
+      })
+      
       const response = await fetch('/api/profile/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: requestHeaders,
+        credentials: 'include', // Ensure cookies are sent with the request
         body: JSON.stringify(payload),
       })
 
+      console.log('[PROFILE_INFO] Response received:', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        headers: Array.from(response.headers.entries()),
+      })
+
       const result = await response.json()
+      console.log('[PROFILE_INFO] Response result:', {
+        ok: result.ok,
+        error: result.error,
+        hasData: !!result.data,
+        fullResult: result,
+      })
 
       if (result.ok) {
         toast.success('Profile updated successfully')

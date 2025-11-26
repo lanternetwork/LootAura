@@ -275,7 +275,7 @@ export function FeaturedSalesSection() {
   if (status === 'resolving' || loading) {
     return (
       <section className="py-12 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl md:text-3xl font-semibold text-[#3A2268]">
               Featured sales near you
@@ -301,7 +301,7 @@ export function FeaturedSalesSection() {
   if (status === 'error' || !location) {
     return (
       <section className="py-12 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl md:text-3xl font-semibold text-[#3A2268]">
               Featured sales near you
@@ -369,7 +369,7 @@ export function FeaturedSalesSection() {
 
   return (
     <section className="py-12 bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl md:text-3xl font-semibold text-[#3A2268]">
             Featured sales near you

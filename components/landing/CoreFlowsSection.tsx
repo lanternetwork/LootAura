@@ -3,7 +3,7 @@ import Link from 'next/link'
 export function CoreFlowsSection() {
   return (
     <section className="py-12 bg-white">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <h2 className="text-2xl md:text-3xl font-semibold text-[#3A2268] mb-6">
           What do you want to do today?
         </h2>

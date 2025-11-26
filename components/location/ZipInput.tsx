@@ -29,14 +29,18 @@ export default function ZipInput({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('[ZIP_INPUT] Form submitted with zip:', zip)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ZIP_INPUT] Form submitted with zip:', zip)
+    }
     await performZipLookup()
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      console.log('[ZIP_INPUT] Enter key pressed with zip:', zip)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[ZIP_INPUT] Enter key pressed with zip:', zip)
+      }
       performZipLookup()
     }
   }
@@ -48,7 +52,9 @@ export default function ZipInput({
     
     if (!trimmedZip || !zipRegex.test(trimmedZip)) {
       const errorMsg = 'Please enter a valid ZIP code (5 digits or ZIP+4)'
-      console.log('[ZIP_INPUT] Invalid zip format:', trimmedZip)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[ZIP_INPUT] Invalid zip format:', trimmedZip)
+      }
       setError(errorMsg)
       // Flash the button with a red X to indicate invalid
       setInvalidFlash(true)
@@ -62,12 +68,16 @@ export default function ZipInput({
     onError('') // Clear previous errors
 
     try {
-      console.log('[ZIP_INPUT] Request start for:', trimmedZip)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[ZIP_INPUT] Request start for:', trimmedZip)
+      }
       const response = await fetch(`/api/geocoding/zip?zip=${encodeURIComponent(trimmedZip)}`)
       const data = await response.json()
 
       if (data.ok) {
-        console.log('[ZIP_INPUT] Request success for:', trimmedZip)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[ZIP_INPUT] Request success for:', trimmedZip)
+        }
         
         // Write location cookie with ZIP, city, state info
         const locationData = {
@@ -83,10 +93,14 @@ export default function ZipInput({
         // Pass bbox if available
         const bbox = data.bbox ? [data.bbox[0], data.bbox[1], data.bbox[2], data.bbox[3]] as [number, number, number, number] : undefined
         onLocationFound(data.lat, data.lng, data.city, data.state, data.zip, bbox)
-        console.log(`[ZIP_INPUT] Found location for ${trimmedZip}: ${data.city}, ${data.state} (${data.source})`)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[ZIP_INPUT] Found location for ${trimmedZip}: ${data.city}, ${data.state} (${data.source})`)
+        }
       } else {
         const errorMsg = data.error || 'ZIP code not found'
-        console.log('[ZIP_INPUT] Request fail for:', trimmedZip, errorMsg)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[ZIP_INPUT] Request fail for:', trimmedZip, errorMsg)
+        }
         setError(errorMsg)
         setInvalidFlash(true)
         setTimeout(() => setInvalidFlash(false), 800)
@@ -94,7 +108,9 @@ export default function ZipInput({
       }
     } catch (error) {
       const errorMsg = 'Failed to lookup ZIP code'
-      console.error('[ZIP_INPUT] Request error for:', trimmedZip, error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[ZIP_INPUT] Request error for:', trimmedZip, error)
+      }
       setError(errorMsg)
       setInvalidFlash(true)
       setTimeout(() => setInvalidFlash(false), 800)

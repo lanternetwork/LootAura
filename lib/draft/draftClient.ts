@@ -102,7 +102,9 @@ export async function deleteDraftServer(draftKey: string): Promise<ApiResponse<{
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
       },
+      credentials: 'include',
     })
 
     const result = await response.json()

@@ -376,7 +376,9 @@ export async function middleware(req: NextRequest) {
         }
       }
     } catch (error) {
-      console.error('Error upserting profile:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('Error upserting profile:', error)
+      }
       // Don't block the request if profile creation fails
     }
   }

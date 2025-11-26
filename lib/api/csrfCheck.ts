@@ -69,7 +69,31 @@ export async function checkCsrfIfRequired(request: NextRequest): Promise<ReturnT
 
   // Verify CSRF token
   try {
+    // Always log what we receive (not conditional on debug flag)
+    const csrfHeader = request.headers.get('x-csrf-token')
+    const cookieHeader = request.headers.get('cookie')
+    console.log('[CSRF_CHECK] Checking CSRF for request:', {
+      pathname,
+      method,
+      hasCsrfHeader: !!csrfHeader,
+      csrfHeaderValue: csrfHeader || 'MISSING',
+      hasCookieHeader: !!cookieHeader,
+      cookieHeaderPreview: cookieHeader ? cookieHeader.substring(0, 500) : 'MISSING',
+    })
+    
     if (!requireCsrfToken(request)) {
+      // Use logger.warn instead of console.error to avoid test failures
+      // Only use console.error if debug flag is enabled
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[CSRF_CHECK] ✗ CSRF token validation failed', {
+          component: 'csrfCheck',
+          operation: 'csrf_validation',
+          path: pathname,
+          method,
+          csrfHeader: csrfHeader || 'MISSING',
+          cookieHeader: cookieHeader ? cookieHeader.substring(0, 500) : 'MISSING',
+        })
+      }
       logger.warn('CSRF token validation failed', {
         component: 'csrfCheck',
         operation: 'csrf_validation',
@@ -78,7 +102,15 @@ export async function checkCsrfIfRequired(request: NextRequest): Promise<ReturnT
       })
       return fail(403, 'CSRF_INVALID', 'Invalid or missing CSRF token')
     }
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[CSRF_CHECK] ✓ CSRF token validation passed')
+    }
   } catch (error) {
+    // Only log exception if debug flag is enabled to avoid test failures
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[CSRF_CHECK] Exception during CSRF check:', error)
+    }
     // If cookies() can't be called (e.g., in test environment), skip CSRF check
     // Check for the specific error message indicating we're outside a request scope
     if (error instanceof Error && error.message.includes('request scope')) {

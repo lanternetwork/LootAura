@@ -16,6 +16,7 @@ import '@/lib/maps/telemetry'
 import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 import ClarityClient from '@/components/analytics/ClarityClient'
 import { DesktopFooterAd } from '@/components/ads/AdSlots'
+import { SiteFooter } from '@/components/layout/SiteFooter'
 import { ENV_PUBLIC } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -31,7 +32,9 @@ try {
   metadataBaseUrl = new URL(siteUrl)
 } catch (error) {
   // If siteUrl is invalid, don't set metadataBase
-  console.warn('[LAYOUT] Invalid siteUrl for metadataBase:', siteUrl)
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.warn('[LAYOUT] Invalid siteUrl for metadataBase:', siteUrl)
+  }
 }
 
 export const metadata: Metadata = {
@@ -98,6 +101,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main id="main-content" tabIndex={-1}>
               {children}
             </main>
+            <DesktopFooterAd />
+            <SiteFooter />
             <PWAComponents />
             <DebugToggle />
             <ToastContainer
@@ -112,7 +117,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               pauseOnHover
               theme="light"
             />
-            <DesktopFooterAd />
           </ErrorBoundary>
         </Providers>
       </body>

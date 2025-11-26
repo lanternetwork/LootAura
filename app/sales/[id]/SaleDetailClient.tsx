@@ -65,7 +65,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
         }),
       }).catch((error) => {
         // Silently fail - analytics tracking shouldn't break the page
-        if (process.env.NODE_ENV !== 'production') {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.warn('[SALE_DETAIL] Failed to track view event:', error)
         }
       })
@@ -162,7 +162,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
           }),
         }).catch((error) => {
           // Silently fail - analytics tracking shouldn't break the page
-          if (process.env.NODE_ENV !== 'production') {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.warn('[SALE_DETAIL] Failed to track save event:', error)
           }
         })
@@ -172,7 +172,9 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
     } catch (error: any) {
       // Rollback optimistic update on error
       setIsFavorited(wasFavorited)
-      console.error('[SALE_DETAIL] Failed to toggle favorite:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[SALE_DETAIL] Failed to toggle favorite:', error)
+      }
       alert(error?.message || 'Failed to save sale. Please try again.')
     } finally {
       // Allow sync to resume after API call completes
@@ -365,7 +367,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
 
         {/* Ad - Mobile */}
         <div className="w-full max-w-screen-sm mx-auto">
-          <SaleDetailBannerAd />
+          <SaleDetailBannerAd saleId={sale?.id} />
         </div>
 
         {/* Map Card - Mobile */}
@@ -671,7 +673,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
 
           {/* Sale Detail Banner Ad - Desktop: in sidebar */}
           <div className="hidden lg:block">
-            <SaleDetailBannerAd />
+            <SaleDetailBannerAd saleId={sale?.id} />
           </div>
 
           {/* Nearby Sales - Desktop: in sidebar */}
@@ -734,7 +736,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                       }),
                     }).catch(() => {})
                   } catch (error: any) {
-                    if (error.name !== 'AbortError') {
+                    if (error.name !== 'AbortError' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
                       console.error('Error sharing:', error)
                     }
                   }
@@ -753,7 +755,9 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                       }),
                     }).catch(() => {})
                   } catch (error) {
-                    console.error('Failed to copy link:', error)
+                    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                      console.error('Failed to copy link:', error)
+                    }
                     toast.error('Failed to copy link')
                   }
                 }

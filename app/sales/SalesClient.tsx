@@ -339,7 +339,11 @@ export default function SalesClient({
       if (activeFilters.categories && activeFilters.categories.length > 0) {
         params.set('categories', activeFilters.categories.join(','))
       }
-      // Distance parameter removed - map zoom controls visible area
+      // Pass distance filter to API (convert miles to km)
+      if (activeFilters.distance) {
+        const distanceKm = activeFilters.distance * 1.60934 // Convert miles to km
+        params.set('radiusKm', distanceKm.toString())
+      }
       
       // Request more sales to show all pins in buffered area
       params.set('limit', '200')
@@ -654,27 +658,31 @@ export default function SalesClient({
     
     // Prefetch sales data for this ZIP location immediately
     // This ensures pins appear as soon as possible
+    // Use expanded bounds for buffer, and pass current filters to ensure distance filter is applied
+    const bufferedBounds = expandBounds(calculatedBounds, MAP_BUFFER_FACTOR)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[ZIP] Prefetching sales for ZIP location:', { lat, lng, bounds: calculatedBounds })
+      console.log('[ZIP] Prefetching sales for ZIP location:', { lat, lng, bounds: calculatedBounds, bufferedBounds })
     }
-    fetchMapSales(calculatedBounds).catch(err => {
+    fetchMapSales(bufferedBounds, filters).catch(err => {
       console.error('[ZIP] Failed to prefetch sales:', err)
     })
     
     // Initialize or update map center - handle null prev state
     setMapView(prev => {
+      // Calculate appropriate zoom from distance (10 miles = zoom 11 per distanceToZoom)
+      // But let fitBounds determine the exact zoom to show the 10-mile radius bounds
+      const estimatedZoom = distanceToZoom(10) // This returns 12, but fitBounds will adjust
+      
       if (!prev) {
         // Create new map view with ZIP location
-        // Calculate zoom level for 10-mile radius
-        // For 10 miles radius (20 miles diameter), zoom 11-12 is appropriate
-        // We'll use fitBounds with minimal padding to ensure exact bounds
+        // Let fitBounds calculate the exact zoom to show the 10-mile radius
         const newView: MapViewState = {
           center: { lat, lng },
           bounds: calculatedBounds,
-          zoom: 9 // Lower zoom to prevent zoom-in after fitBounds applies
+          zoom: estimatedZoom // Initial zoom, fitBounds will adjust
         }
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[ZIP] New map view:', newView)
+          console.log('[ZIP] New map view:', newView, 'calculatedBounds:', calculatedBounds)
         }
         
         // Use fitBounds to ensure exactly 10-mile radius is visible
@@ -682,8 +690,11 @@ export default function SalesClient({
         setPendingBounds(calculatedBounds)
         // Clear after a longer delay to ensure map has time to apply bounds
         setTimeout(() => {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[ZIP] Clearing pendingBounds after fitBounds applied')
+          }
           setPendingBounds(null)
-        }, 500) // Give map time to apply bounds before clearing
+        }, 1000) // Give map more time to apply bounds before clearing
         
         return newView
       }
@@ -693,10 +704,10 @@ export default function SalesClient({
         ...prev,
         center: { lat, lng },
         bounds: calculatedBounds,
-        zoom: 9 // Lower zoom to prevent zoom-in after fitBounds applies
+        zoom: estimatedZoom // Initial zoom, fitBounds will adjust
       }
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[ZIP] New map view:', newView)
+        console.log('[ZIP] Updated map view:', newView, 'calculatedBounds:', calculatedBounds)
       }
       
       // Use fitBounds to ensure exactly 10-mile radius is visible
@@ -704,8 +715,11 @@ export default function SalesClient({
       setPendingBounds(calculatedBounds)
       // Clear after delay to ensure map applies bounds
       setTimeout(() => {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[ZIP] Clearing pendingBounds after fitBounds applied')
+        }
         setPendingBounds(null)
-      }, 500) // Give map time to apply bounds before clearing
+      }, 1000) // Give map more time to apply bounds before clearing
       
       return newView
     })
@@ -755,36 +769,93 @@ export default function SalesClient({
     // Check if this is a distance change
     if (newFilters.distance && newFilters.distance !== filters.distance) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[DISTANCE] Converting distance to zoom:', { distance: newFilters.distance, zoom: distanceToZoom(newFilters.distance) })
-        console.log('[DISTANCE] Entry point: DISTANCE_CHANGE - No direct fetch, viewport change will trigger fetch')
+        console.log('[DISTANCE] Distance filter changed:', { 
+          oldDistance: filters.distance, 
+          newDistance: newFilters.distance,
+          currentCenter: mapView?.center,
+          currentBounds: mapView?.bounds
+        })
       }
       
       // Update filters for UI state
       updateFilters(newFilters)
       
-      // Change map zoom instead of triggering API call
-      const newZoom = distanceToZoom(newFilters.distance)
-      setMapView(prev => {
-        if (!prev) {
-          // If mapView is null, create a default view
+      // Calculate new bounds based on current center and new distance
+      if (mapView?.center) {
+        const distanceKm = newFilters.distance * 1.60934 // Convert miles to km
+        const latRange = distanceKm / 111.0
+        const lngRange = distanceKm / (111.0 * Math.cos(mapView.center.lat * Math.PI / 180))
+        
+        const newBounds = {
+          west: mapView.center.lng - lngRange,
+          south: mapView.center.lat - latRange,
+          east: mapView.center.lng + lngRange,
+          north: mapView.center.lat + latRange
+        }
+        
+        const newZoom = distanceToZoom(newFilters.distance)
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[DISTANCE] Calculating new bounds:', {
+            center: mapView.center,
+            distanceKm,
+            newBounds,
+            newZoom
+          })
+        }
+        
+        // Update map view with new bounds and zoom
+        setMapView(prev => {
+          if (!prev) {
+            return {
+              center: { lat: 39.8283, lng: -98.5795 },
+              bounds: newBounds,
+              zoom: newZoom
+            }
+          }
           return {
-            center: { lat: 39.8283, lng: -98.5795 },
-            bounds: {
-              west: -98.5795 - 1.0,
-              south: 39.8283 - 1.0,
-              east: -98.5795 + 1.0,
-              north: 39.8283 + 1.0
-            },
+            ...prev,
+            bounds: newBounds,
             zoom: newZoom
           }
-        }
-        return {
-          ...prev,
-          zoom: newZoom
-        }
-      })
+        })
+        
+        // Use fitBounds to smoothly update the view to show the new distance
+        // This prevents the zoom in/out flicker
+        setPendingBounds(newBounds)
+        setTimeout(() => {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[DISTANCE] Clearing pendingBounds after fitBounds applied')
+          }
+          setPendingBounds(null)
+        }, 800) // Give map time to apply bounds
+        
+        // Trigger immediate refetch with new distance filter
+        const newBufferedBounds = expandBounds(newBounds, MAP_BUFFER_FACTOR)
+        fetchMapSales(newBufferedBounds, newFilters)
+      } else {
+        // No center yet, just update zoom
+        const newZoom = distanceToZoom(newFilters.distance)
+        setMapView(prev => {
+          if (!prev) {
+            return {
+              center: { lat: 39.8283, lng: -98.5795 },
+              bounds: {
+                west: -98.5795 - 1.0,
+                south: 39.8283 - 1.0,
+                east: -98.5795 + 1.0,
+                north: 39.8283 + 1.0
+              },
+              zoom: newZoom
+            }
+          }
+          return {
+            ...prev,
+            zoom: newZoom
+          }
+        })
+      }
       
-      // No direct API call - let viewport change trigger the fetch
       return
     }
     
@@ -1187,8 +1258,9 @@ export default function SalesClient({
                     zoom={pendingBounds ? undefined : mapZoom}
                     fitBounds={pendingBounds}
                     fitBoundsOptions={pendingBounds ? { 
-                      padding: 20, 
-                      duration: 0
+                      padding: 0, // No padding to show exact bounds
+                      duration: 300, // Smooth transition
+                      maxZoom: 15 // Prevent over-zooming
                     } : undefined}
                     hybridPins={{
                       sales: visibleSales,
@@ -1282,7 +1354,7 @@ export default function SalesClient({
                 )}
 
                 {!loading && visibleSalesDeduplicated.length > 0 && (
-                  <SalesList sales={visibleSalesDeduplicated} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
+                  <SalesList sales={visibleSalesDeduplicated} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} isLoading={loading} />
                 )}
               </div>
             </div>

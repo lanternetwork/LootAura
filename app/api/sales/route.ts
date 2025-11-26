@@ -864,6 +864,20 @@ async function postHandler(request: NextRequest) {
       }
     }
 
+    // Normalize tags from request body.
+    // Accepts either string[] or comma-separated string; trims and deduplicates.
+    const normalizedTags: string[] = Array.isArray(_tags)
+      ? _tags
+          .filter((t: any): t is string => typeof t === 'string')
+          .map((t: string) => t.trim())
+          .filter(Boolean)
+      : typeof _tags === 'string'
+        ? _tags
+            .split(',')
+            .map((t: string) => t.trim())
+            .filter(Boolean)
+        : []
+
     // Validate optional cover image URL
     if (cover_image_url && !isAllowedImageUrl(cover_image_url)) {
       // Log image validation failures for monitoring (production logging)
@@ -905,6 +919,7 @@ async function postHandler(request: NextRequest) {
         time_end: time_end ?? null,
         cover_image_url: cover_image_url || null,
         images: images || [],
+        tags: normalizedTags,
         pricing_mode: pricing_mode || 'negotiable',
         status: 'published',
         owner_id: user!.id
@@ -935,6 +950,7 @@ async function postHandler(request: NextRequest) {
       status: saleStatus,
       privacy_mode: 'exact', // Required (has default but explicit is better)
       is_featured: false, // Has default but explicit is better
+      tags: normalizedTags,
     }
     const firstTryPayload = {
       ...basePayload,

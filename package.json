@@ -73,7 +73,8 @@
     "react-spinners": "^0.14.1",
     "react-toastify": "^10.0.5",
     "nodemailer": "^6.9.8",
-    "lucide-react": "^0.263.1"
+    "lucide-react": "^0.263.1",
+    "recharts": "^2.12.7"
   },
   "devDependencies": {
     "eslint-config-next": "^14.2.15",

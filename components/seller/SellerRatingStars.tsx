@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/hooks/useAuth'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface SellerRatingStarsProps {
   sellerId: string
@@ -58,7 +59,9 @@ export function SellerRatingStars({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...getCsrfHeaders(),
           },
+          credentials: 'include',
           body: JSON.stringify({
             seller_id: sellerId,
             rating,

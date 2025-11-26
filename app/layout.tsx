@@ -15,8 +15,7 @@ import 'react-toastify/dist/ReactToastify.css'
 import '@/lib/maps/telemetry'
 import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 import ClarityClient from '@/components/analytics/ClarityClient'
-import { DesktopFooterAd } from '@/components/ads/AdSlots'
-import { SiteFooter } from '@/components/layout/SiteFooter'
+import { ConditionalFooter } from '@/components/layout/ConditionalFooter'
 import { ENV_PUBLIC } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -101,8 +100,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main id="main-content" tabIndex={-1}>
               {children}
             </main>
-            <DesktopFooterAd />
-            <SiteFooter />
+            <ConditionalFooter />
             <PWAComponents />
             <DebugToggle />
             <ToastContainer

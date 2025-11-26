@@ -9,6 +9,7 @@ interface AddressLinkProps {
   lng?: number
   children?: React.ReactNode
   className?: string
+  onClick?: () => void
 }
 
 type Platform = 'ios' | 'android' | 'desktop'
@@ -64,7 +65,8 @@ export default function AddressLink({
   lat,
   lng,
   children,
-  className = ''
+  className = '',
+  onClick
 }: AddressLinkProps) {
   const [platform, setPlatform] = useState<Platform>('desktop')
   const [isClient, setIsClient] = useState(false)
@@ -115,6 +117,7 @@ export default function AddressLink({
       rel="noopener noreferrer"
       className={`${className || 'hover:underline'} cursor-pointer`}
       aria-label={ariaLabel}
+      onClick={onClick}
     >
       {displayText}
     </a>

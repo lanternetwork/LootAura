@@ -259,15 +259,14 @@ export async function getSaleById(id: string): Promise<SaleWithOwnerInfo | null>
 
     const ownerId = sale.owner_id
 
-    // Fetch owner profile and stats in parallel
-    // Note: profiles_v2 view has id (references auth.users.id directly), so use id
-    // Note: We need to check if profiles_v2 has user_id or if we need to query lootaura_v2.profiles directly
-    // Based on migration 034, profiles_v2 has: id, username, full_name, avatar_url, home_zip, preferences, created_at, updated_at
-    // The id in profiles_v2 is the same as auth.users.id, so we can query by id
+    // Fetch owner profile and stats in parallel.
+    // NOTE: The primary user-facing name field in v2 is `display_name` (used by profile pages).
+    // To keep seller details in sync with the profile UI without changing downstream components,
+    // we read `display_name` here and map it into `full_name` in the returned `owner_profile`.
     const [profileRes, statsRes] = await Promise.all([
       supabase
         .from('profiles_v2')
-        .select('id, created_at, full_name')
+        .select('id, created_at, display_name, username, avatar_url')
         .eq('id', ownerId)
         .maybeSingle(),
       supabase
@@ -295,9 +294,24 @@ export async function getSaleById(id: string): Promise<SaleWithOwnerInfo | null>
       })
     }
 
+    const ownerProfileRaw = profileRes.data as
+      | { id?: string; created_at?: string | null; display_name?: string | null; username?: string | null; avatar_url?: string | null }
+      | null
+
+    const ownerProfile = ownerProfileRaw
+      ? {
+          id: ownerProfileRaw.id,
+          created_at: ownerProfileRaw.created_at,
+          // Map display_name -> full_name so existing UI (SellerActivityCard) picks up the updated name
+          full_name: ownerProfileRaw.display_name ?? null,
+          username: ownerProfileRaw.username ?? null,
+          avatar_url: ownerProfileRaw.avatar_url ?? null,
+        }
+      : null
+
     return {
       ...sale,
-      owner_profile: profileRes.data ?? null,
+      owner_profile: ownerProfile,
       owner_stats: statsRes.data ?? {
         total_sales: 0,
         avg_rating: 5.0,

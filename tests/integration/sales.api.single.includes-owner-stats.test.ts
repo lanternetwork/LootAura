@@ -30,7 +30,9 @@ const createMockFrom = (tableName: string, saleData?: any, profileData?: any, st
       data: profileData || {
         id: ownerId,
         created_at: createdAt,
-        full_name: 'Test User',
+        display_name: 'Test User',
+        username: 'testuser',
+        avatar_url: 'https://example.com/avatar.png',
       },
       error: null,
     })

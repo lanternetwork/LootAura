@@ -5,6 +5,13 @@ import * as RechartsPrimitive from 'recharts'
 
 import { cn } from '@/lib/utils'
 
+type ChartItemConfig =
+  | {
+      label?: React.ReactNode
+      className?: string
+    }
+  | React.ReactNode
+
 // Chart container component
 const ChartContainer = React.forwardRef<
   HTMLDivElement,
@@ -74,7 +81,7 @@ const ChartTooltipContent = React.forwardRef<
 
     const [item] = payload
     const key = `${labelKey || item.dataKey || item.name || 'value'}`
-    const itemConfig = (item.payload as Record<string, unknown>)?.[key]
+    const itemConfig = (item.payload as Record<string, ChartItemConfig> | undefined)?.[key]
 
     if (labelFormatter) {
       return (
@@ -108,14 +115,17 @@ const ChartTooltipContent = React.forwardRef<
       <div className="grid gap-1.5">
         {payload.map((item, index) => {
           const key = `${nameKey || item.name || item.dataKey || 'value'}`
-          const payloadRecord = item.payload as Record<string, unknown> | undefined
+          const payloadRecord = item.payload as Record<string, ChartItemConfig> | undefined
           const itemConfig = payloadRecord?.[key]
           const indicatorColor = (payloadRecord?.fill as string | undefined) || item.color
+
+          const itemConfigObj = itemConfig && typeof itemConfig === 'object' && 'label' in itemConfig ? itemConfig : null
+          const itemConfigClassName = itemConfigObj?.className
 
           return (
             <div
               key={item.dataKey}
-              className={cn('flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-neutral-500', itemConfig?.className)}
+              className={cn('flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-neutral-500', itemConfigClassName)}
             >
               {formatter && item?.value !== undefined && item.name ? (
                 formatter(item.value, item.name, item, index, item.payload)
@@ -142,10 +152,10 @@ const ChartTooltipContent = React.forwardRef<
                     })}
                   >
                     <div className="grid gap-1.5">
-                      {itemConfig && typeof itemConfig === 'object' && 'label' in itemConfig ? (
-                        itemConfig.label
+                      {itemConfigObj ? (
+                        itemConfigObj.label
                       ) : (
-                        <span className="text-neutral-500">{itemConfig || item.name}</span>
+                        <span className="text-neutral-500">{(itemConfig as React.ReactNode) || item.name}</span>
                       )}
                     </div>
                     {item.value && (
@@ -186,12 +196,15 @@ const ChartLegendContent = React.forwardRef<
     >
       {payload.map((item) => {
         const key = `${nameKey || item.dataKey || 'value'}`
-        const itemConfig = (item.payload as Record<string, unknown>)?.[key]
+        const itemConfig = (item.payload as Record<string, ChartItemConfig> | undefined)?.[key]
+
+        const itemConfigObj = itemConfig && typeof itemConfig === 'object' && 'label' in itemConfig ? itemConfig : null
+        const itemConfigClassName = itemConfigObj?.className
 
         return (
           <div
             key={item.value}
-            className={cn('flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-neutral-500', itemConfig?.className)}
+            className={cn('flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-neutral-500', itemConfigClassName)}
           >
             {!hideIcon && (
               <div
@@ -201,10 +214,10 @@ const ChartLegendContent = React.forwardRef<
                 }}
               />
             )}
-            {itemConfig && typeof itemConfig === 'object' && 'label' in itemConfig ? (
-              itemConfig.label
+            {itemConfigObj ? (
+              itemConfigObj.label
             ) : (
-              <span className="text-neutral-600">{itemConfig || item.value}</span>
+              <span className="text-neutral-600">{(itemConfig as React.ReactNode) || item.value}</span>
             )}
           </div>
         )

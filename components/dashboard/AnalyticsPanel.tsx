@@ -107,7 +107,6 @@ export default function AnalyticsPanel({ metrics7d, loading }: AnalyticsPanelPro
     views7d: 0,
     saves7d: 0,
     ctr7d: 0,
-    salesFulfilled: 0,
     series: [],
   }
 
@@ -119,13 +118,12 @@ export default function AnalyticsPanel({ metrics7d, loading }: AnalyticsPanelPro
     const clicks = d.clicks || 0
     return views > 0 ? (clicks / views) * 100 : 0
   }) || []
-  const fulfilledData = metrics.series?.map(d => d.fulfilled) || []
 
   return (
     <div className="card">
       <div className="card-body-lg">
         <h2 className="card-title mb-4">Analytics (7 days)</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <MetricCard
             title="Views"
             value={metrics.views7d ?? 0}
@@ -143,12 +141,6 @@ export default function AnalyticsPanel({ metrics7d, loading }: AnalyticsPanelPro
             value={metrics.ctr7d ? `${metrics.ctr7d.toFixed(1)}%` : '0%'}
             data={ctrData}
             color="#f59e0b"
-          />
-          <MetricCard
-            title="Fulfilled"
-            value={metrics.salesFulfilled ?? 0}
-            data={fulfilledData}
-            color="#8b5cf6"
           />
         </div>
       </div>

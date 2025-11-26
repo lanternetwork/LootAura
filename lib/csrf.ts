@@ -59,13 +59,30 @@ export function validateCsrfToken(request: Request): boolean {
   // Debug logging in development (skip in test environment)
   const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST !== undefined
   if (!isTestEnv && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[CSRF] Validation check:', {
+      hasHeader: !!tokenFromHeader,
+      hasCookie: !!tokenFromCookie,
+      headerTokenPrefix: tokenFromHeader ? tokenFromHeader.substring(0, 8) + '...' : null,
+      cookieTokenPrefix: tokenFromCookie ? tokenFromCookie.substring(0, 8) + '...' : null,
+      headerTokenLength: tokenFromHeader?.length,
+      cookieTokenLength: tokenFromCookie?.length,
+      cookieHeader: cookieHeader ? cookieHeader.substring(0, 200) : null,
+      cookieNames: cookieHeader ? cookieHeader.split(';').map(c => c.trim().split('=')[0]) : []
+    })
+    
     if (!tokenFromHeader || !tokenFromCookie) {
-      console.warn('[CSRF] Validation failed:', {
+      console.warn('[CSRF] Validation failed - missing token:', {
         hasHeader: !!tokenFromHeader,
         hasCookie: !!tokenFromCookie,
-        cookieHeader: cookieHeader ? cookieHeader.substring(0, 100) : null,
-        cookieNames: cookieHeader ? cookieHeader.split(';').map(c => c.trim().split('=')[0]) : []
       })
+    } else if (tokenFromHeader !== tokenFromCookie) {
+      console.warn('[CSRF] Validation failed - tokens do not match:', {
+        headerTokenPrefix: tokenFromHeader.substring(0, 16),
+        cookieTokenPrefix: tokenFromCookie.substring(0, 16),
+        tokensMatch: tokenFromHeader === tokenFromCookie,
+      })
+    } else {
+      console.log('[CSRF] Validation passed - tokens match')
     }
   }
 

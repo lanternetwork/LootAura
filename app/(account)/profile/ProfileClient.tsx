@@ -184,16 +184,34 @@ export default function ProfileClient() {
     console.log('[ABOUT] sending PUT /api/profile with keys:', Object.keys(patch))
     console.log('[ABOUT] PUT body:', JSON.stringify(patch))
     
+    const csrfHeaders = getCsrfHeaders()
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[ABOUT] CSRF headers:', {
+        hasCsrfHeader: !!csrfHeaders['x-csrf-token'],
+        csrfTokenPrefix: csrfHeaders['x-csrf-token'] ? csrfHeaders['x-csrf-token'].substring(0, 8) + '...' : null,
+        allHeaders: Object.keys(csrfHeaders),
+      })
+    }
+    
     const res = await fetch('/api/profile', {
       method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
-        ...getCsrfHeaders(),
+        ...csrfHeaders,
       },
       body: JSON.stringify(patch),
     })
     
     console.log('[ABOUT] response ok=', res.ok, 'status=', res.status)
+    
+    if (!res.ok && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const errorText = await res.clone().text().catch(() => 'Unable to read error')
+      console.error('[ABOUT] Error response:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText: errorText.substring(0, 500),
+      })
+    }
     
     // Read response once - don't read it twice!
     const j = await res.json().catch(() => ({ ok: false, error: 'Failed to parse response' }))

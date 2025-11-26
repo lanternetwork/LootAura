@@ -18,8 +18,24 @@ export function getCsrfToken(): string | null {
   for (const cookie of cookies) {
     const [name, value] = cookie.trim().split('=')
     if (name === CSRF_TOKEN_COOKIE) {
-      return decodeURIComponent(value)
+      const token = decodeURIComponent(value)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[CSRF_CLIENT] Found CSRF token in cookie:', {
+          tokenLength: token.length,
+          tokenPrefix: token.substring(0, 8) + '...',
+          cookieName: name,
+        })
+      }
+      return token
     }
+  }
+  
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    const allCookies = cookies.map(c => c.trim().split('=')[0])
+    console.warn('[CSRF_CLIENT] CSRF token not found in cookies:', {
+      availableCookies: allCookies,
+      cookieString: document.cookie.substring(0, 200),
+    })
   }
   return null
 }
@@ -35,14 +51,25 @@ export function getCsrfHeaders(): Record<string, string> {
       ? document.cookie.split(';').map(c => c.trim().split('=')[0])
       : []
     
-    console.warn('[CSRF] No CSRF token found in cookies.', {
+    console.warn('[CSRF_CLIENT] No CSRF token found in cookies.', {
       availableCookies,
       cookieString: typeof document !== 'undefined' ? document.cookie.substring(0, 200) : 'N/A'
     })
     return {}
   }
-  return {
+  
+  const headers = {
     [CSRF_HEADER]: token,
   }
+  
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[CSRF_CLIENT] Returning CSRF headers:', {
+      headerName: CSRF_HEADER,
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 8) + '...',
+    })
+  }
+  
+  return headers
 }
 

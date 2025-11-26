@@ -145,10 +145,35 @@ export async function GET(_req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   // CSRF protection check
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    const csrfHeader = req.headers.get('x-csrf-token')
+    const cookieHeader = req.headers.get('cookie')
+    console.log('[PROFILE] PUT request received:', {
+      hasCsrfHeader: !!csrfHeader,
+      csrfHeaderPrefix: csrfHeader ? csrfHeader.substring(0, 8) + '...' : null,
+      hasCookieHeader: !!cookieHeader,
+      cookieHeaderPreview: cookieHeader ? cookieHeader.substring(0, 200) : null,
+      allHeaders: Array.from(req.headers.entries()).map(([k, v]) => ({ 
+        key: k, 
+        value: k === 'cookie' ? v.substring(0, 200) + '...' : v.substring(0, 50) 
+      })),
+    })
+  }
+  
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(req)
   if (csrfError) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.error('[PROFILE] CSRF check failed:', {
+        error: csrfError,
+        status: csrfError.status,
+      })
+    }
     return csrfError
+  }
+  
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[PROFILE] CSRF check passed, proceeding with profile update')
   }
 
   const sb = createSupabaseServerClient()

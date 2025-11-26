@@ -71,16 +71,42 @@ export function ProfileInfoCard({ initialProfile, onSaved }: ProfileInfoCardProp
 
     setSaving(true)
     try {
+      const csrfHeaders = getCsrfHeaders()
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[PROFILE_INFO] CSRF headers:', {
+          hasCsrfHeader: !!csrfHeaders['x-csrf-token'],
+          csrfTokenPrefix: csrfHeaders['x-csrf-token'] ? csrfHeaders['x-csrf-token'].substring(0, 8) + '...' : null,
+          allHeaders: Object.keys(csrfHeaders),
+          payload: payload,
+        })
+      }
+      
       const response = await fetch('/api/profile/update', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          ...getCsrfHeaders(),
+          ...csrfHeaders,
         },
         body: JSON.stringify(payload),
       })
 
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[PROFILE_INFO] Response status:', {
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+        })
+      }
+
       const result = await response.json()
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[PROFILE_INFO] Response result:', {
+          ok: result.ok,
+          error: result.error,
+          hasData: !!result.data,
+        })
+      }
 
       if (result.ok) {
         toast.success('Profile updated successfully')

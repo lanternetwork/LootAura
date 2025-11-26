@@ -367,7 +367,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
 
         {/* Ad - Mobile */}
         <div className="w-full max-w-screen-sm mx-auto">
-          <SaleDetailBannerAd />
+          <SaleDetailBannerAd saleId={sale?.id} />
         </div>
 
         {/* Map Card - Mobile */}
@@ -673,7 +673,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
 
           {/* Sale Detail Banner Ad - Desktop: in sidebar */}
           <div className="hidden lg:block">
-            <SaleDetailBannerAd />
+            <SaleDetailBannerAd saleId={sale?.id} />
           </div>
 
           {/* Nearby Sales - Desktop: in sidebar */}

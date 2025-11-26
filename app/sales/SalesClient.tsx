@@ -1354,7 +1354,7 @@ export default function SalesClient({
                 )}
 
                 {!loading && visibleSalesDeduplicated.length > 0 && (
-                  <SalesList sales={visibleSalesDeduplicated} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} />
+                  <SalesList sales={visibleSalesDeduplicated} _mode="grid" viewport={{ center: mapView?.center || { lat: 39.8283, lng: -98.5795 }, zoom: mapView?.zoom || 10 }} isLoading={loading} />
                 )}
               </div>
             </div>

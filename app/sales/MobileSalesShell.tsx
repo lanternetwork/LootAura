@@ -460,7 +460,8 @@ export default function MobileSalesShell({
                 <SalesList 
                   sales={visibleSales} 
                   _mode="grid" 
-                  viewport={mapViewport || { center: { lat: 39.8283, lng: -98.5795 }, zoom: 10 }} 
+                  viewport={mapViewport || { center: { lat: 39.8283, lng: -98.5795 }, zoom: 10 }}
+                  isLoading={loading}
                 />
               </div>
             )}

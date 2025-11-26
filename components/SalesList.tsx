@@ -2,31 +2,51 @@ import SaleCard from './SaleCard'
 import EmptyState from './EmptyState'
 import { Sale } from '@/lib/types'
 import { MobileListInlineAd, ListInlineAd } from '@/components/ads/AdSlots'
+import { AdsenseGuard } from '@/components/ads/AdsenseGuard'
 
 interface SalesListProps {
   sales: Sale[]
   _mode?: string
   viewport?: { center: { lat: number; lng: number }; zoom: number } | null
+  /**
+   * Whether the list is in a loading state
+   * When true, no ads will be rendered (AdSense policy compliance)
+   */
+  isLoading?: boolean
 }
 
-export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
+/**
+ * Minimum number of sales required before showing inline ads
+ * AdSense policy: ads should only appear with meaningful content
+ */
+const MIN_SALES_FOR_ADS = 4
+
+export default function SalesList({ sales, _mode, viewport, isLoading = false }: SalesListProps) {
   const isEmpty = !sales?.length
 
-  if (isEmpty) {
-    return (
-      <EmptyState 
-        title="No Sales Found" 
-        cta={
-          <a 
-            href="/explore?tab=add" 
-            className="link-accent font-medium"
-          >
-            Post the first sale →
-          </a>
-        } 
-      />
-    )
+  // AdSense Policy Compliance: Never show ads when loading or empty
+  if (isEmpty || isLoading) {
+    if (isEmpty) {
+      return (
+        <EmptyState 
+          title="No Sales Found" 
+          cta={
+            <a 
+              href="/explore?tab=add" 
+              className="link-accent font-medium"
+            >
+              Post the first sale →
+            </a>
+          } 
+        />
+      )
+    }
+    // Loading state - return empty div or skeleton (no ads)
+    return null
   }
+
+  // AdSense Policy Compliance: Only show ads when we have sufficient content
+  const hasEnoughContent = sales.length >= MIN_SALES_FOR_ADS
 
   return (
     <div 
@@ -42,8 +62,9 @@ export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
           {/* Show inline ad after every 6th sale (indices 5, 11, 17, etc.) */}
           {/* Mobile: use MobileListInlineAd, Desktop: use ListInlineAd */}
           {/* Ad must be a direct child of grid to span columns */}
-          {(index + 1) % 6 === 0 && index > 0 && (
-            <>
+          {/* AdSense Policy: Only show ads when we have at least MIN_SALES_FOR_ADS sales */}
+          {(index + 1) % 6 === 0 && index > 0 && hasEnoughContent && (
+            <AdsenseGuard hasContent={hasEnoughContent}>
               <div key={`mobile-ad-${sale.id}`} className="block md:hidden">
                 <MobileListInlineAd />
               </div>
@@ -58,7 +79,7 @@ export default function SalesList({ sales, _mode, viewport }: SalesListProps) {
               >
                 <ListInlineAd />
               </div>
-            </>
+            </AdsenseGuard>
           )}
         </>
       ))}

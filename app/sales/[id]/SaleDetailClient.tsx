@@ -270,7 +270,13 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
         {/* Primary Photo */}
         <div className="relative w-full overflow-hidden rounded-2xl bg-gray-100 aspect-[4/3]">
           {cover ? (
-            <Image src={cover.url} alt={cover.alt} fill className="object-cover" sizes="100vw" />
+            <Image
+              src={cover.url}
+              alt={cover.alt}
+              fill
+              className="object-contain"
+              sizes="100vw"
+            />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8" role="img" aria-label={`${sale.title || 'Sale'} placeholder image`}>
               <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />
@@ -432,7 +438,13 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
           <div className="bg-white rounded-lg shadow-sm">
             <div className="relative w-full overflow-hidden rounded-t-lg bg-gray-100 aspect-[16/9] md:aspect-[4/3]">
               {cover ? (
-                <Image src={cover.url} alt={cover.alt} fill className="object-cover" sizes="(min-width:1024px) 66vw, 100vw" />
+                <Image
+                  src={cover.url}
+                  alt={cover.alt}
+                  fill
+                  className="object-contain"
+                  sizes="(min-width:1024px) 66vw, 100vw"
+                />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-100 p-8 md:p-10" role="img" aria-label={`${sale.title || 'Sale'} placeholder image`}>
                   <SalePlaceholder className="max-w-[88%] max-h-[88%] w-auto h-auto opacity-90 scale-[1.3]" />

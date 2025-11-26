@@ -60,6 +60,7 @@ This document summarizes the current RLS configuration and related views based o
 - **Key predicates / columns**:
   - Public read: `status = 'published'`.
   - Owner writes: `owner_id = auth.uid()`.
+  - Categories/tags: `tags TEXT[]` (added by `091_lootaura_v2_sales_add_tags.sql`) used for category chips and category-based search; not used directly in RLS predicates.
 - **Indexes supporting RLS & access patterns**:
   - Base (`033_safe_lootaura_v2_schema.sql`): `sales_owner_id_idx`, `sales_status_idx`, `sales_lat_lng_idx`, `sales_geom_gist_idx`, `sales_starts_at_idx`.
   - RLS-specific (`047_rls_hardening.sql`): `idx_sales_owner_id_status` on `(owner_id, status)` where `status = 'published'`.

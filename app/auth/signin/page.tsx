@@ -227,7 +227,7 @@ export default function SignIn() {
       </div>
 
       {/* Desktop: 2-column layout (left: form panel, right: hero image) */}
-      <div className="hidden md:grid md:grid-cols-[minmax(400px,480px)_1fr] min-h-screen">
+      <div className="hidden md:grid md:grid-cols-[minmax(400px,480px)_1fr] h-[calc(100vh-4rem)]">
         {/* Left Column: Form Panel */}
         <div className="flex flex-col justify-between bg-white px-8 lg:px-12 py-12">
           <div className="max-w-[420px] w-full mx-auto space-y-8">

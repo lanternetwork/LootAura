@@ -17,6 +17,9 @@ interface MetricChartProps {
 }
 
 function MetricChart({ data, color = '#3b82f6', dataKey = 'value' }: MetricChartProps) {
+  // Generate unique gradient ID to avoid conflicts when multiple charts render
+  const gradientId = useMemo(() => `gradient-${dataKey}-${Math.random().toString(36).substring(7)}`, [dataKey])
+  
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return []
     return data.map((value, index) => ({
@@ -47,7 +50,7 @@ function MetricChart({ data, color = '#3b82f6', dataKey = 'value' }: MetricChart
         margin={{ top: 0, right: 0, left: 0, bottom: 0 }}
       >
         <defs>
-          <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity={0.3} />
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
@@ -58,7 +61,7 @@ function MetricChart({ data, color = '#3b82f6', dataKey = 'value' }: MetricChart
           type="monotone"
           dataKey={dataKey}
           stroke={color}
-          fill={`url(#gradient-${dataKey})`}
+          fill={`url(#${gradientId})`}
           strokeWidth={2}
         />
       </AreaChart>

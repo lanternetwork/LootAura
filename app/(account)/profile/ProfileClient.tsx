@@ -185,32 +185,38 @@ export default function ProfileClient() {
     console.log('[ABOUT] PUT body:', JSON.stringify(patch))
     
     const csrfHeaders = getCsrfHeaders()
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[ABOUT] CSRF headers:', {
-        hasCsrfHeader: !!csrfHeaders['x-csrf-token'],
-        csrfTokenPrefix: csrfHeaders['x-csrf-token'] ? csrfHeaders['x-csrf-token'].substring(0, 8) + '...' : null,
-        allHeaders: Object.keys(csrfHeaders),
-      })
+    console.log('[ABOUT] CSRF headers retrieved:', {
+      hasCsrfHeader: !!csrfHeaders['x-csrf-token'],
+      csrfTokenPrefix: csrfHeaders['x-csrf-token'] ? csrfHeaders['x-csrf-token'].substring(0, 8) + '...' : null,
+      csrfTokenFull: csrfHeaders['x-csrf-token'] || 'MISSING',
+      allHeaders: Object.keys(csrfHeaders),
+      headersObject: csrfHeaders,
+    })
+    
+    const requestHeaders = { 
+      'Content-Type': 'application/json',
+      ...csrfHeaders,
     }
+    console.log('[ABOUT] Final request headers:', requestHeaders)
     
     const res = await fetch('/api/profile', {
       method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-        ...csrfHeaders,
-      },
+      headers: requestHeaders,
       body: JSON.stringify(patch),
     })
     
     console.log('[ABOUT] response ok=', res.ok, 'status=', res.status)
+    console.log('[ABOUT] response headers:', Array.from(res.headers.entries()))
     
-    if (!res.ok && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    if (!res.ok) {
       const errorText = await res.clone().text().catch(() => 'Unable to read error')
-      console.error('[ABOUT] Error response:', {
+      console.error('[ABOUT] ✗ Error response:', {
         status: res.status,
         statusText: res.statusText,
-        errorText: errorText.substring(0, 500),
+        errorText: errorText.substring(0, 1000),
       })
+    } else {
+      console.log('[ABOUT] ✓ Success response')
     }
     
     // Read response once - don't read it twice!

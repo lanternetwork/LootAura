@@ -159,9 +159,10 @@ export function WeekendStats() {
   }, [searchParams])
 
   // Show fallback values while loading, on error, or if we only have a 0 from default location
+  // IMPORTANT: never hardcode a non-zero count; fallback should be neutral (0) when we don't have real data
   const displayStats = (stats && (!isDefaultLocation || stats.activeSales > 0)) 
     ? stats 
-    : { activeSales: 12 }
+    : { activeSales: 0 }
   
   // Decode URL-encoded city name if present (safe decode)
   const cityName = (() => {

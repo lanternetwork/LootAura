@@ -119,6 +119,20 @@ export async function POST(request: NextRequest) {
     // Write sale/items with admin (or RLS if policies allow)
     const admin = getAdminDb()
 
+    // Normalize tags from draft formData. Accepts either string[] or comma-separated string; trims and deduplicates.
+    const rawTags = (formData as any)?.tags
+    const normalizedTags: string[] = Array.isArray(rawTags)
+      ? rawTags
+          .filter((t: any): t is string => typeof t === 'string')
+          .map((t: string) => t.trim())
+          .filter(Boolean)
+      : typeof rawTags === 'string'
+        ? rawTags
+            .split(',')
+            .map((t: string) => t.trim())
+            .filter(Boolean)
+        : []
+
     // Build salePayload
     const salePayload = {
       owner_id: user.id,
@@ -139,7 +153,8 @@ export async function POST(request: NextRequest) {
       pricing_mode: formData.pricing_mode || 'negotiable',
       status: 'published',
       privacy_mode: 'exact', // Required field
-      is_featured: false
+      is_featured: false,
+      tags: normalizedTags,
     }
 
     // 1. Create sale - write to base table using schema-scoped client

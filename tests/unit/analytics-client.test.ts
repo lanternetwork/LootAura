@@ -16,27 +16,24 @@ vi.mock('@/lib/csrf-client', () => ({
 }))
 
 describe('trackAnalyticsEvent', () => {
-  let requestCount = 0
-  let lastRequest: Request | null = null
-  let lastBody: any = null
+  let capturedRequests: Array<{ request: Request; body: any }> = []
 
   beforeEach(() => {
     vi.clearAllMocks()
-    requestCount = 0
-    lastRequest = null
-    lastBody = null
+    capturedRequests = []
     mockGetCsrfHeaders.mockReturnValue({ 'x-csrf-token': 'test-csrf-token' })
     
-    // Set up MSW handler to capture requests
+    // Set up MSW handler to capture requests - override default handler
     server.use(
-      http.post('*/api/analytics/track', async ({ request }) => {
-        requestCount++
-        lastRequest = request.clone()
+      http.post('/api/analytics/track', async ({ request }) => {
+        const cloned = request.clone()
+        let body: any = null
         try {
-          lastBody = await request.json()
+          body = await cloned.json()
         } catch {
           // Body might not be JSON or already consumed
         }
+        capturedRequests.push({ request: cloned, body })
         return HttpResponse.json({ ok: true, data: { event_id: 'test-event-id' } }, { status: 200 })
       })
     )
@@ -56,29 +53,25 @@ describe('trackAnalyticsEvent', () => {
     server.resetHandlers()
   })
 
-  it('should call /api/analytics/track with POST method', async () => {
+  it('should call /api/analytics/track and include CSRF headers', async () => {
     await trackAnalyticsEvent({
       sale_id: 'test-sale-id',
       event_type: 'view',
     })
 
-    expect(requestCount).toBe(1)
-    expect(lastRequest).not.toBeNull()
-    expect(lastRequest?.method).toBe('POST')
-    expect(lastRequest?.url).toContain('/api/analytics/track')
-  })
-
-  it('should include CSRF headers from getCsrfHeaders', async () => {
-    await trackAnalyticsEvent({
-      sale_id: 'test-sale-id',
-      event_type: 'click',
-    })
-
+    // Verify getCsrfHeaders was called (proves function executed)
     expect(mockGetCsrfHeaders).toHaveBeenCalled()
-    expect(lastRequest).not.toBeNull()
-    const csrfHeader = lastRequest?.headers.get('x-csrf-token')
+    
+    // Verify request was made (MSW handler captured it)
+    expect(capturedRequests.length).toBe(1)
+    const { request } = capturedRequests[0]
+    expect(request.method).toBe('POST')
+    expect(request.url).toContain('/api/analytics/track')
+    
+    // Verify CSRF header was included
+    const csrfHeader = request.headers.get('x-csrf-token')
     expect(csrfHeader).toBe('test-csrf-token')
-    expect(lastRequest?.headers.get('Content-Type')).toBe('application/json')
+    expect(request.headers.get('Content-Type')).toBe('application/json')
   })
 
   it('should send correct event payload', async () => {
@@ -87,20 +80,20 @@ describe('trackAnalyticsEvent', () => {
       event_type: 'save',
     })
 
-    expect(lastRequest).not.toBeNull()
-    expect(lastBody).not.toBeNull()
-    expect(lastBody).toMatchObject({
+    expect(capturedRequests.length).toBe(1)
+    const { body } = capturedRequests[0]
+    expect(body).toMatchObject({
       sale_id: 'test-sale-id',
       event_type: 'save',
     })
-    expect(lastBody.referrer).toBeDefined()
-    expect(lastBody.user_agent).toBeDefined()
+    expect(body.referrer).toBeDefined()
+    expect(body.user_agent).toBeDefined()
   })
 
   it('should handle errors gracefully without throwing', async () => {
     // Override handler to simulate network error
     server.use(
-      http.post('*/api/analytics/track', () => {
+      http.post('/api/analytics/track', () => {
         throw new Error('Network error')
       })
     )
@@ -112,6 +105,9 @@ describe('trackAnalyticsEvent', () => {
         event_type: 'view',
       })
     ).resolves.toBeUndefined()
+    
+    // Verify getCsrfHeaders was still called (function executed)
+    expect(mockGetCsrfHeaders).toHaveBeenCalled()
   })
 
   it('should log errors in debug mode', async () => {
@@ -119,7 +115,7 @@ describe('trackAnalyticsEvent', () => {
     
     // Override handler to simulate network error
     server.use(
-      http.post('*/api/analytics/track', () => {
+      http.post('/api/analytics/track', () => {
         throw new Error('Network error')
       })
     )
@@ -131,6 +127,9 @@ describe('trackAnalyticsEvent', () => {
         event_type: 'click',
       })
     ).resolves.toBeUndefined()
+    
+    // Verify getCsrfHeaders was still called (function executed)
+    expect(mockGetCsrfHeaders).toHaveBeenCalled()
   })
 
   it('should log failed responses in debug mode', async () => {
@@ -138,7 +137,7 @@ describe('trackAnalyticsEvent', () => {
     
     // Override handler to return error response
     server.use(
-      http.post('*/api/analytics/track', () => {
+      http.post('/api/analytics/track', () => {
         return HttpResponse.json({ error: 'Server error' }, { status: 500 })
       })
     )
@@ -150,6 +149,9 @@ describe('trackAnalyticsEvent', () => {
         event_type: 'view',
       })
     ).resolves.toBeUndefined()
+    
+    // Verify getCsrfHeaders was still called (function executed)
+    expect(mockGetCsrfHeaders).toHaveBeenCalled()
   })
 })
 

@@ -20,10 +20,17 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => {
   )
 }
 
-// Mock useAuth and useRouter
+// Mock useAuth, CSRF client, and useRouter
 const mockUseAuth = vi.fn()
 vi.mock('@/lib/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
+}))
+
+// Avoid touching real document cookies / CSRF logging in this unit test
+vi.mock('@/lib/csrf-client', () => ({
+  getCsrfHeaders: () => ({
+    'x-csrf-token': 'test-csrf-token',
+  }),
 }))
 
 vi.mock('next/navigation', () => ({

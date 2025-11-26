@@ -90,8 +90,8 @@ export function DesktopFooterAd() {
     setIsPreview(!isProduction)
   }, [])
 
-  // Disable footer ad on /sales page (using inline ads in sales list instead)
-  if (pathname === '/sales') {
+  // Disable footer ad on /sales page and auth pages (using inline ads in sales list instead)
+  if (pathname === '/sales' || pathname?.startsWith('/auth/')) {
     return null
   }
 

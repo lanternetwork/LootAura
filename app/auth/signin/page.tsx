@@ -359,7 +359,7 @@ export default function SignIn() {
         {/* Right Column: Hero Image */}
         <div className="relative hidden md:block">
           <Image
-            src="/brand/HeroImage1.png"
+            src="/brand/SignInHero.png"
             alt="Yard sale scene"
             fill
             className="object-cover"
@@ -372,6 +372,17 @@ export default function SignIn() {
           <div className="absolute bottom-12 left-12 max-w-md">
             <h3 className="text-3xl font-semibold text-white mb-2">Discover local yard sales.</h3>
             <p className="text-lg text-white/90">Browse and host sales in your neighborhood.</p>
+          </div>
+          {/* Attribution */}
+          <div className="absolute bottom-4 right-4">
+            <a
+              href="https://www.freepik.com/free-photo/full-shot-people-garage-sale_58396958.htm#fromView=keyword&page=1&position=22&uuid=a1bd528a-10ef-4a36-8e16-80febdf443bd&query=Online+yard+sale"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-white/80 hover:text-white underline transition-colors"
+            >
+              Image by freepik
+            </a>
           </div>
         </div>
       </div>

@@ -7,8 +7,8 @@ export function SiteFooter() {
   const pathname = usePathname()
   const currentYear = new Date().getFullYear()
   
-  // Hide footer on /sales page
-  if (pathname === '/sales') {
+  // Hide footer on /sales page and auth pages
+  if (pathname === '/sales' || pathname?.startsWith('/auth/')) {
     return null
   }
 

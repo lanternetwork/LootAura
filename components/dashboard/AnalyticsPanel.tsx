@@ -1,7 +1,7 @@
 'use client'
 
 import type { Metrics7d } from '@/lib/data/profileAccess'
-import { useMemo } from 'react'
+import { useMemo, useId } from 'react'
 import { Area, AreaChart, XAxis } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 
@@ -18,7 +18,8 @@ interface MetricChartProps {
 
 function MetricChart({ data, color = '#3b82f6', dataKey = 'value' }: MetricChartProps) {
   // Generate unique gradient ID to avoid conflicts when multiple charts render
-  const gradientId = useMemo(() => `gradient-${dataKey}-${Math.random().toString(36).substring(7)}`, [dataKey])
+  const uniqueId = useId()
+  const gradientId = useMemo(() => `gradient-${dataKey}-${uniqueId.replace(/:/g, '')}`, [dataKey, uniqueId])
   
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return []

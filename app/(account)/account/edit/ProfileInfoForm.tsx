@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import type { ProfileData } from '@/lib/data/profileAccess'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface ProfileInfoFormProps {
   initialProfile: ProfileData
@@ -57,9 +58,16 @@ export default function ProfileInfoForm({ initialProfile, onSaved }: ProfileInfo
 
     setSaving(true)
     try {
+      const csrfHeaders = getCsrfHeaders()
+      const requestHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...csrfHeaders,
+      }
+
       const response = await fetch('/api/profile/update', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: requestHeaders,
+        credentials: 'include',
         body: JSON.stringify(payload),
       })
 

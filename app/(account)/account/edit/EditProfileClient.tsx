@@ -24,10 +24,9 @@ export default function EditProfileClient({ initialProfile }: EditProfileClientP
   const handleProfileSaved = useCallback((updatedProfile: ProfileData) => {
     setProfile(updatedProfile)
     toast.success('Profile updated successfully')
-    // Navigate back to dashboard after a short delay to show the toast
-    setTimeout(() => {
-      router.push('/dashboard')
-    }, 1000)
+    // Navigate back to dashboard and force a refresh so updated data is visible immediately
+    router.push('/dashboard')
+    router.refresh()
   }, [router])
 
   const handleSocialLinksSaved = useCallback((updatedLinks: SocialLinks) => {

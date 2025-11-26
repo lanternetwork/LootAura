@@ -74,8 +74,6 @@ export default function ProfileInfoForm({ initialProfile, onSaved }: ProfileInfo
       const result = await response.json()
 
       if (result.ok) {
-        toast.success('Profile updated successfully')
-        
         // Update local state with saved values
         setFormValues({
           display_name: payload.display_name || '',
@@ -84,9 +82,12 @@ export default function ProfileInfoForm({ initialProfile, onSaved }: ProfileInfo
           region: payload.region || '',
         })
 
-        // Call onSaved callback if provided
+        // Notify parent so it can toast and handle navigation
         if (onSaved && result.data?.profile) {
           onSaved(result.data.profile)
+        } else {
+          // Fallback toast if no parent handler is provided
+          toast.success('Profile updated successfully')
         }
       } else {
         toast.error(result.error || 'Failed to update profile')

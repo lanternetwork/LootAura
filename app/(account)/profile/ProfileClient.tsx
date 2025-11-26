@@ -199,9 +199,18 @@ export default function ProfileClient() {
     }
     console.log('[ABOUT] Final request headers:', requestHeaders)
     
+    console.log('[ABOUT] Making fetch request with:', {
+      url: '/api/profile',
+      method: 'PUT',
+      headers: requestHeaders,
+      hasCsrfToken: !!requestHeaders['x-csrf-token'],
+      credentials: 'include',
+    })
+    
     const res = await fetch('/api/profile', {
       method: 'PUT',
       headers: requestHeaders,
+      credentials: 'include', // Ensure cookies are sent with the request
       body: JSON.stringify(patch),
     })
     

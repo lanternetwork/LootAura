@@ -474,7 +474,7 @@ export async function getSaleWithItems(
     const [profileRes, statsRes] = await Promise.all([
       supabase
         .from('profiles_v2')
-        .select('id, created_at, full_name, username, avatar_url')
+        .select('id, created_at, display_name, username, avatar_url')
         .eq('id', ownerId)
         .maybeSingle(),
       supabase
@@ -604,10 +604,26 @@ export async function getSaleWithItems(
       }
     })
 
+    // Normalize owner profile so seller details stay in sync with v2 profile data:
+    // - `display_name` (primary public name) is mapped into `full_name` used by UI components.
+    const ownerProfileRaw = profileRes.data as
+      | { id?: string; created_at?: string | null; display_name?: string | null; username?: string | null; avatar_url?: string | null }
+      | null
+
+    const ownerProfile = ownerProfileRaw
+      ? {
+          id: ownerProfileRaw.id,
+          created_at: ownerProfileRaw.created_at,
+          full_name: ownerProfileRaw.display_name ?? null,
+          username: ownerProfileRaw.username ?? null,
+          avatar_url: ownerProfileRaw.avatar_url ?? null,
+        }
+      : null
+
     return {
       sale: {
         ...saleWithTags,
-        owner_profile: profileRes.data ?? null,
+        owner_profile: ownerProfile,
         owner_stats: statsRes.data ?? {
           total_sales: 0,
           avg_rating: 5.0,

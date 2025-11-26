@@ -103,13 +103,14 @@ export function ProfileInfoCard({ initialProfile, onSaved }: ProfileInfoCardProp
         matchesCookie: csrfHeaders['x-csrf-token'] === csrfTokenFromCookie,
       })
       
-      const requestHeaders = { 
+      const requestHeaders: Record<string, string> = { 
         'Content-Type': 'application/json',
         ...csrfHeaders,
       }
+      const csrfTokenValue = requestHeaders['x-csrf-token'] || 'MISSING'
       console.log('[PROFILE_INFO] Final request headers being sent:', {
         ...requestHeaders,
-        'x-csrf-token': requestHeaders['x-csrf-token'] || 'MISSING',
+        'x-csrf-token': csrfTokenValue,
       })
       console.log('[PROFILE_INFO] About to make fetch request to /api/profile/update')
       
@@ -118,7 +119,7 @@ export function ProfileInfoCard({ initialProfile, onSaved }: ProfileInfoCardProp
         method: 'POST',
         headers: requestHeaders,
         hasCsrfToken: !!requestHeaders['x-csrf-token'],
-        csrfTokenValue: requestHeaders['x-csrf-token'] || 'MISSING',
+        csrfTokenValue: csrfTokenValue,
         credentials: 'include',
       })
       

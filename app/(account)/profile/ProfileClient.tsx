@@ -193,17 +193,22 @@ export default function ProfileClient() {
       headersObject: csrfHeaders,
     })
     
-    const requestHeaders = { 
+    const requestHeaders: Record<string, string> = { 
       'Content-Type': 'application/json',
       ...csrfHeaders,
     }
-    console.log('[ABOUT] Final request headers:', requestHeaders)
+    const csrfTokenValue = requestHeaders['x-csrf-token'] || 'MISSING'
+    console.log('[ABOUT] Final request headers:', {
+      ...requestHeaders,
+      'x-csrf-token': csrfTokenValue,
+    })
     
     console.log('[ABOUT] Making fetch request with:', {
       url: '/api/profile',
       method: 'PUT',
       headers: requestHeaders,
       hasCsrfToken: !!requestHeaders['x-csrf-token'],
+      csrfTokenValue: csrfTokenValue,
       credentials: 'include',
     })
     

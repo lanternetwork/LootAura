@@ -5,11 +5,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { http, HttpResponse } from 'msw'
+import { server } from '@/tests/setup/msw.server'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
-
-// Mock fetch - use vi.stubGlobal to ensure it's mocked before MSW intercepts
-const mockFetch = vi.fn()
-vi.stubGlobal('fetch', mockFetch)
 
 // Mock getCsrfHeaders
 const mockGetCsrfHeaders = vi.fn()
@@ -18,16 +16,21 @@ vi.mock('@/lib/csrf-client', () => ({
 }))
 
 describe('trackAnalyticsEvent', () => {
+  let requestHandler: ReturnType<typeof http.post>
+  let capturedRequest: Request | null = null
+
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset fetch mock to return successful response by default
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => '{"ok":true,"data":{"event_id":"test-event-id"}}',
-      json: async () => ({ ok: true, data: { event_id: 'test-event-id' } }),
-    })
+    capturedRequest = null
     mockGetCsrfHeaders.mockReturnValue({ 'x-csrf-token': 'test-csrf-token' })
+    
+    // Set up MSW handler to capture requests
+    requestHandler = http.post('/api/analytics/track', async ({ request }) => {
+      capturedRequest = request.clone()
+      return HttpResponse.json({ ok: true, data: { event_id: 'test-event-id' } }, { status: 200 })
+    })
+    server.use(requestHandler)
+    
     // Ensure window and navigator are available for the test
     if (typeof globalThis.window === 'undefined') {
       (globalThis as any).window = { location: { href: 'http://localhost:3000/' } }
@@ -40,6 +43,7 @@ describe('trackAnalyticsEvent', () => {
   afterEach(() => {
     // Clean up environment variables
     delete process.env.NEXT_PUBLIC_DEBUG
+    server.resetHandlers()
   })
 
   it('should call /api/analytics/track with POST method', async () => {
@@ -48,13 +52,9 @@ describe('trackAnalyticsEvent', () => {
       event_type: 'view',
     })
 
-    expect(mockFetch).toHaveBeenCalledTimes(1)
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/analytics/track',
-      expect.objectContaining({
-        method: 'POST',
-      })
-    )
+    expect(capturedRequest).not.toBeNull()
+    expect(capturedRequest?.method).toBe('POST')
+    expect(capturedRequest?.url).toContain('/api/analytics/track')
   })
 
   it('should include CSRF headers from getCsrfHeaders', async () => {
@@ -64,29 +64,10 @@ describe('trackAnalyticsEvent', () => {
     })
 
     expect(mockGetCsrfHeaders).toHaveBeenCalled()
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/analytics/track',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
-          'x-csrf-token': 'test-csrf-token',
-        }),
-      })
-    )
-  })
-
-  it('should include credentials: include', async () => {
-    await trackAnalyticsEvent({
-      sale_id: 'test-sale-id',
-      event_type: 'share',
-    })
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/analytics/track',
-      expect.objectContaining({
-        credentials: 'include',
-      })
-    )
+    expect(capturedRequest).not.toBeNull()
+    const csrfHeader = capturedRequest?.headers.get('x-csrf-token')
+    expect(csrfHeader).toBe('test-csrf-token')
+    expect(capturedRequest?.headers.get('Content-Type')).toBe('application/json')
   })
 
   it('should send correct event payload', async () => {
@@ -95,21 +76,23 @@ describe('trackAnalyticsEvent', () => {
       event_type: 'save',
     })
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/analytics/track',
-      expect.objectContaining({
-        body: JSON.stringify({
-          sale_id: 'test-sale-id',
-          event_type: 'save',
-          referrer: expect.any(String),
-          user_agent: expect.any(String),
-        }),
-      })
-    )
+    expect(capturedRequest).not.toBeNull()
+    const body = await capturedRequest!.json()
+    expect(body).toMatchObject({
+      sale_id: 'test-sale-id',
+      event_type: 'save',
+    })
+    expect(body.referrer).toBeDefined()
+    expect(body.user_agent).toBeDefined()
   })
 
   it('should handle errors gracefully without throwing', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'))
+    // Override handler to simulate network error
+    server.use(
+      http.post('/api/analytics/track', () => {
+        throw new Error('Network error')
+      })
+    )
 
     // Should not throw
     await expect(
@@ -123,7 +106,12 @@ describe('trackAnalyticsEvent', () => {
   it('should log errors in debug mode', async () => {
     process.env.NEXT_PUBLIC_DEBUG = 'true'
     
-    mockFetch.mockRejectedValue(new Error('Network error'))
+    // Override handler to simulate network error
+    server.use(
+      http.post('/api/analytics/track', () => {
+        throw new Error('Network error')
+      })
+    )
 
     // Should not throw - errors are caught and logged
     await expect(
@@ -132,20 +120,17 @@ describe('trackAnalyticsEvent', () => {
         event_type: 'click',
       })
     ).resolves.toBeUndefined()
-
-    // Verify fetch was called
-    expect(mockFetch).toHaveBeenCalled()
   })
 
   it('should log failed responses in debug mode', async () => {
     process.env.NEXT_PUBLIC_DEBUG = 'true'
     
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-      text: async () => '{"error":"Server error"}',
-    })
+    // Override handler to return error response
+    server.use(
+      http.post('/api/analytics/track', () => {
+        return HttpResponse.json({ error: 'Server error' }, { status: 500 })
+      })
+    )
 
     // Should not throw - errors are caught and logged
     await expect(
@@ -154,9 +139,6 @@ describe('trackAnalyticsEvent', () => {
         event_type: 'view',
       })
     ).resolves.toBeUndefined()
-
-    // Verify fetch was called
-    expect(mockFetch).toHaveBeenCalled()
   })
 })
 

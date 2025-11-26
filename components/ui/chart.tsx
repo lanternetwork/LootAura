@@ -74,7 +74,7 @@ const ChartTooltipContent = React.forwardRef<
 
     const [item] = payload
     const key = `${labelKey || item.dataKey || item.name || 'value'}`
-    const itemConfig = item.payload?.[key]
+    const itemConfig = (item.payload as Record<string, unknown>)?.[key]
 
     if (labelFormatter) {
       return (
@@ -108,8 +108,9 @@ const ChartTooltipContent = React.forwardRef<
       <div className="grid gap-1.5">
         {payload.map((item, index) => {
           const key = `${nameKey || item.name || item.dataKey || 'value'}`
-          const itemConfig = item.payload?.[key]
-          const indicatorColor = item.payload?.fill || item.color
+          const payloadRecord = item.payload as Record<string, unknown> | undefined
+          const itemConfig = payloadRecord?.[key]
+          const indicatorColor = (payloadRecord?.fill as string | undefined) || item.color
 
           return (
             <div
@@ -185,7 +186,7 @@ const ChartLegendContent = React.forwardRef<
     >
       {payload.map((item) => {
         const key = `${nameKey || item.dataKey || 'value'}`
-        const itemConfig = item.payload?.[key]
+        const itemConfig = (item.payload as Record<string, unknown>)?.[key]
 
         return (
           <div

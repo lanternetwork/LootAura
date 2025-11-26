@@ -1,6 +1,5 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import AdSenseSlot from './AdSenseSlot'
 import { AdsenseGuard } from './AdsenseGuard'

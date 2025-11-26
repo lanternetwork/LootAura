@@ -55,15 +55,32 @@ export default function HomeScreen() {
   const handleShouldStartLoadWithRequest = (request: any) => {
     const { url } = request;
     
-    // Allow navigation within lootaura.com domain
-    if (url.startsWith('https://lootaura.com') || url.startsWith('http://lootaura.com')) {
+    try {
+      // Parse URL to safely check hostname
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname.toLowerCase();
+      
+      // Allow navigation within lootaura.com domain (exact match or subdomain)
+      // This prevents bypasses like lootaura.com.evil.com
+      if (hostname === 'lootaura.com' || hostname.endsWith('.lootaura.com')) {
+        return true;
+      }
+      
+      // Open external HTTP/HTTPS links in system browser
+      if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+        Linking.openURL(url);
+        return false; // Prevent WebView from loading external URLs
+      }
+    } catch (e) {
+      // If URL parsing fails, check for non-HTTP protocols
+      // Allow other protocols (mailto:, tel:, etc.) to open in system apps
+      if (url.startsWith('mailto:') || url.startsWith('tel:') || url.startsWith('sms:')) {
+        Linking.openURL(url);
+        return false;
+      }
+      
+      // For relative URLs or invalid URLs, allow them (they'll be resolved by WebView)
       return true;
-    }
-    
-    // Open external links in system browser
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      Linking.openURL(url);
-      return false; // Prevent WebView from loading external URLs
     }
     
     // Allow other protocols (mailto:, tel:, etc.) to open in system apps
@@ -72,6 +89,7 @@ export default function HomeScreen() {
       return false;
     }
     
+    // Default: allow navigation (for relative URLs, data URIs, etc.)
     return true;
   };
 

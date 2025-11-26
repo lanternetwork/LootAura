@@ -15,9 +15,7 @@ import 'react-toastify/dist/ReactToastify.css'
 import '@/lib/maps/telemetry'
 import CsrfTokenInitializer from '@/components/csrf/CsrfTokenInitializer'
 import ClarityClient from '@/components/analytics/ClarityClient'
-import { DesktopFooterAd } from '@/components/ads/AdSlots'
-import { SiteFooter } from '@/components/layout/SiteFooter'
-import { headers as nextHeaders } from 'next/headers'
+import { ConditionalFooter } from '@/components/layout/ConditionalFooter'
 import { ENV_PUBLIC } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
@@ -67,14 +65,6 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // Hide global footer on immersive sell flows (create/edit sale)
-  // to avoid visual clutter and accidental navigation while composing a listing.
-  const headersList = nextHeaders()
-  const pathname = headersList.get('x-pathname') || ''
-  const hideGlobalFooter =
-    pathname.startsWith('/sell/new') ||
-    pathname.startsWith('/sell/') && pathname.includes('/edit')
-
   return (
     <html lang="en">
       <head>
@@ -110,12 +100,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main id="main-content" tabIndex={-1}>
               {children}
             </main>
-            {!hideGlobalFooter && (
-              <>
-                <DesktopFooterAd />
-                <SiteFooter />
-              </>
-            )}
+            <ConditionalFooter />
             <PWAComponents />
             <DebugToggle />
             <ToastContainer

@@ -415,7 +415,7 @@ export async function POST(request: NextRequest) {
           try {
             const { getUserProfile } = await import('@/lib/data/profileAccess')
             const profile = await getUserProfile(supabase, user.id)
-            displayName = profile?.display_name || undefined
+            displayName = profile?.display_name ?? undefined
           } catch {
             // Profile fetch failed - continue without display name
           }

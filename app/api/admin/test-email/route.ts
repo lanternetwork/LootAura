@@ -77,8 +77,9 @@ export async function POST(request: NextRequest) {
       recipientName: 'Test User',
       saleTitle: testSaleTitle,
       saleAddress: testSaleAddress,
-      saleDateRangeText: testSaleDateRange,
+      dateRange: testSaleDateRange,
       saleUrl: testSaleUrl,
+      manageUrl: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'}/dashboard`,
     })
 
     await sendEmail({

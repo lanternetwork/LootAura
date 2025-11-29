@@ -101,8 +101,9 @@ export async function triggerSaleCreatedConfirmation(
       recipientName: displayName,
       saleTitle,
       saleAddress: saleAddressLine,
-      saleDateRangeText,
+      dateRange: saleDateRangeText,
       saleUrl,
+      manageUrl: buildSaleUrl(saleId).replace('/sales/', '/dashboard'),
     })
 
     // Send email (non-blocking, errors are logged internally)

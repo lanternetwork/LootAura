@@ -20,7 +20,6 @@ export interface SaleCreatedConfirmationEmailProps {
   timeWindow?: string
   saleUrl: string
   manageUrl: string
-  supportEmail?: string
 }
 
 export function SaleCreatedConfirmationEmail({
@@ -31,7 +30,6 @@ export function SaleCreatedConfirmationEmail({
   timeWindow,
   saleUrl,
   manageUrl,
-  supportEmail = 'support@lootaura.com',
 }: SaleCreatedConfirmationEmailProps) {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
 
@@ -102,7 +100,7 @@ export function SaleCreatedConfirmationEmail({
 /**
  * Generate subject line for sale created confirmation email
  */
-export function buildSaleCreatedSubject(saleTitle: string): string {
+export function buildSaleCreatedSubject(_saleTitle: string): string {
   return `Your yard sale is live on LootAura 🚀`
 }
 

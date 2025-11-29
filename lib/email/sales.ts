@@ -7,7 +7,6 @@ import React from 'react'
 import { sendEmail } from './sendEmail'
 import { SaleCreatedConfirmationEmail, buildSaleCreatedSubject, buildSaleCreatedPreview } from './templates/SaleCreatedConfirmationEmail'
 import type { Sale } from '@/lib/types'
-import type { ProfileData } from '@/lib/data/profileAccess'
 
 /**
  * Format date range for email display
@@ -121,7 +120,7 @@ function buildSaleUrl(saleId: string): string {
 /**
  * Build absolute URL for sale management/dashboard
  */
-function buildManageUrl(saleId: string): string {
+function buildManageUrl(): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
   return `${siteUrl.replace(/\/$/, '')}/dashboard`
 }
@@ -185,19 +184,12 @@ export async function sendSaleCreatedEmail(
   try {
     // Build URLs
     const saleUrl = buildSaleUrl(sale.id)
-    const manageUrl = buildManageUrl(sale.id)
+    const manageUrl = buildManageUrl()
 
     // Format date range and time window
     const dateRange = formatSaleDateRange(sale, timezone)
     const timeWindow = formatTimeWindow(sale, timezone)
     const addressLine = buildAddressLine(sale)
-
-    // Build preview text
-    const previewText = buildSaleCreatedPreview({
-      saleTitle: sale.title,
-      dateRange,
-      addressLine,
-    })
 
     // Compose email
     const react = React.createElement(SaleCreatedConfirmationEmail, {
@@ -208,7 +200,6 @@ export async function sendSaleCreatedEmail(
       timeWindow,
       saleUrl,
       manageUrl,
-      supportEmail: 'support@lootaura.com',
     })
 
     // Send email (non-blocking, errors are logged internally)

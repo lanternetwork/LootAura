@@ -4,6 +4,7 @@
  * Server-only route
  */
 
+import React from 'react'
 import { NextRequest, NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import { sendEmail } from '@/lib/email/sendEmail'
@@ -61,15 +62,13 @@ export async function POST(request: NextRequest) {
     const testSaleDateRange = 'Sat, Dec 7 · 8:00 am – 2:00 pm'
     const testSaleUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'}/sales/test-sale-id`
 
-    const react = (
-      <SaleCreatedConfirmationEmail
-        recipientName="Test User"
-        saleTitle={testSaleTitle}
-        saleAddress={testSaleAddress}
-        saleDateRangeText={testSaleDateRange}
-        saleUrl={testSaleUrl}
-      />
-    )
+    const react = React.createElement(SaleCreatedConfirmationEmail, {
+      recipientName: 'Test User',
+      saleTitle: testSaleTitle,
+      saleAddress: testSaleAddress,
+      saleDateRangeText: testSaleDateRange,
+      saleUrl: testSaleUrl,
+    })
 
     await sendEmail({
       to,

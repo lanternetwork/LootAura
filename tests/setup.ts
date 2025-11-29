@@ -196,6 +196,9 @@ const ALLOWED_PATTERNS = [
   // Expected shortlink test errors (app/s/[id]/page.tsx)
   /^Shortlink resolution error:/, // Expected shortlink test errors - tests/integration/share.redirect.test.tsx
   
+  // React Email DOM validation warnings (lib/email/templates/*.tsx)
+  /^Warning: validateDOMNesting/, // React Email components may trigger DOM nesting warnings in test environment - tests/unit/email/*.test.tsx
+  
   // React forwardRef warnings (components/location/SalesMapClustered.tsx)
   /^Warning: Function components cannot be given refs/, // React forwardRef warnings - tests/integration/map.clusters-flow.test.tsx
   /^Warning: .*: `ref` is not a prop/, // React ref prop warnings - tests/integration/map.clusters-flow.test.tsx

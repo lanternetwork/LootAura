@@ -3,6 +3,7 @@
  * Server-only module
  */
 
+import React from 'react'
 import { sendEmail } from '../sendEmail'
 import { SaleCreatedConfirmationEmail, getSaleCreatedSubject } from '../templates/SaleCreatedConfirmationEmail'
 
@@ -96,15 +97,13 @@ export async function triggerSaleCreatedConfirmation(
     const saleDateRangeText = formatSaleDateRange(startsAt, endsAt, timezone)
 
     // Compose email
-    const react = (
-      <SaleCreatedConfirmationEmail
-        recipientName={displayName}
-        saleTitle={saleTitle}
-        saleAddress={saleAddressLine}
-        saleDateRangeText={saleDateRangeText}
-        saleUrl={saleUrl}
-      />
-    )
+    const react = React.createElement(SaleCreatedConfirmationEmail, {
+      recipientName: displayName,
+      saleTitle,
+      saleAddress: saleAddressLine,
+      saleDateRangeText,
+      saleUrl,
+    })
 
     // Send email (non-blocking, errors are logged internally)
     await sendEmail({

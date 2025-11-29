@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import UserProfile from '@/components/UserProfile'
 import { useEffect, useRef, useState, useCallback } from 'react'
@@ -125,12 +126,26 @@ export function Header() {
               )}
               {/* Desktop: Always show logo */}
               <Link ref={logoRef} href="/" className="hidden sm:flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
-                Loot Aura
+                <Image
+                  src="/brand/sitelogo.svg"
+                  alt="Loot Aura logo"
+                  width={28}
+                  height={28}
+                  priority
+                />
+                <span>Loot Aura</span>
               </Link>
             </>
           ) : (
             <Link ref={logoRef} href="/" className="flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
-              Loot Aura
+              <Image
+                src="/brand/sitelogo.svg"
+                alt="Loot Aura logo"
+                width={28}
+                height={28}
+                priority
+              />
+              <span>Loot Aura</span>
             </Link>
           )}
           

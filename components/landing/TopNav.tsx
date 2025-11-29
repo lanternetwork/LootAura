@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export function TopNav() {
   return (
@@ -7,8 +8,15 @@ export function TopNav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
         <div className="flex items-center justify-between h-full">
           {/* Logo */}
-          <Link href="/" className="text-xl font-bold text-[#3A2268]">
-            Loot Aura
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold text-[#3A2268]">
+            <Image
+              src="/brand/sitelogo.svg"
+              alt="Loot Aura logo"
+              width={28}
+              height={28}
+              priority
+            />
+            <span>Loot Aura</span>
           </Link>
 
           {/* Right side - links and sign in button */}

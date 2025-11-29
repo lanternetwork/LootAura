@@ -5,7 +5,7 @@
 
 import { ReactElement } from 'react'
 import { getResendClient } from './client'
-import type { EmailType, EmailSendOptions } from './types'
+import type { EmailSendOptions } from './types'
 
 export interface SendEmailParams extends EmailSendOptions {
   react: ReactElement

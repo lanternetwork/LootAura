@@ -400,6 +400,72 @@ export async function POST(request: NextRequest) {
     const { logDraftPublished } = await import('@/lib/events/businessEvents')
     logDraftPublished(draft.id, createdSaleId ?? '', user.id, createdItemIds.length)
     
+    // Trigger sale created confirmation email (fire-and-forget, non-blocking)
+    if (createdSaleId && user.email) {
+      try {
+        // Fetch sale data for email
+        const { data: saleData } = await fromBase(admin, 'sales')
+          .select('title, address, city, state, date_start, time_start, date_end, time_end')
+          .eq('id', createdSaleId)
+          .single()
+
+        if (saleData) {
+          // Get user profile for display name (optional)
+          let displayName: string | undefined
+          try {
+            const { getUserProfile } = await import('@/lib/data/profileAccess')
+            const profile = await getUserProfile(supabase, user.id)
+            displayName = profile?.display_name || undefined
+          } catch {
+            // Profile fetch failed - continue without display name
+          }
+
+          // Build address line
+          const addressParts = [
+            saleData.address,
+            saleData.city,
+            saleData.state,
+          ].filter(Boolean)
+          const saleAddressLine = addressParts.length > 0
+            ? addressParts.join(', ')
+            : 'Address not provided'
+
+          // Build date objects for email
+          const startsAt = new Date(`${saleData.date_start}T${saleData.time_start || '00:00'}`)
+          const endsAt = saleData.date_end && saleData.time_end
+            ? new Date(`${saleData.date_end}T${saleData.time_end}`)
+            : undefined
+
+          // Use user's timezone or default to UTC
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+
+          // Trigger email (non-blocking)
+          const { triggerSaleCreatedConfirmation } = await import('@/lib/email/trigger/triggerSaleCreatedConfirmation')
+          void triggerSaleCreatedConfirmation({
+            userId: user.id,
+            email: user.email,
+            displayName,
+            saleId: createdSaleId,
+            saleTitle: saleData.title,
+            saleAddressLine,
+            startsAt,
+            endsAt,
+            timezone,
+          })
+        }
+      } catch (emailError) {
+        // Log but don't fail - email is non-critical
+        const { logger } = await import('@/lib/log')
+        logger.warn('Failed to trigger sale created confirmation email (non-critical)', {
+          component: 'drafts/publish',
+          operation: 'trigger_email',
+          saleId: createdSaleId ?? undefined,
+          userId: user.id,
+          error: emailError instanceof Error ? emailError.message : String(emailError),
+        })
+      }
+    }
+    
     return ok({ data: { saleId: createdSaleId ?? undefined } })
   } catch (e: any) {
     const { logger } = await import('@/lib/log')

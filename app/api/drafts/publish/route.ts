@@ -439,7 +439,7 @@ export async function POST(request: NextRequest) {
               component: 'drafts/publish',
               operation: 'send_email',
               draftId: draft.id,
-              saleId: createdSaleId,
+              saleId: createdSaleId ?? undefined,
               userId: user.id,
               error: emailError instanceof Error ? emailError.message : String(emailError),
             })

@@ -5,7 +5,7 @@
 
 import React from 'react'
 import { sendEmail } from './sendEmail'
-import { SaleCreatedConfirmationEmail, buildSaleCreatedSubject, buildSaleCreatedPreview } from './templates/SaleCreatedConfirmationEmail'
+import { SaleCreatedConfirmationEmail, buildSaleCreatedSubject } from './templates/SaleCreatedConfirmationEmail'
 import type { Sale } from '@/lib/types'
 
 /**

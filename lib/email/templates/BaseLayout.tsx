@@ -21,9 +21,8 @@ export interface BaseLayoutProps {
 export function BaseLayout({ previewText, children }: BaseLayoutProps) {
   return (
     <Html>
-      <Head>
-        {previewText && <Text style={previewTextStyle}>{previewText}</Text>}
-      </Head>
+      <Head />
+      {previewText && <Text style={previewTextStyle}>{previewText}</Text>}
       <Body style={bodyStyle}>
         <Container style={containerStyle}>
           {/* Header */}

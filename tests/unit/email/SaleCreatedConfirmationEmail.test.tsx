@@ -4,15 +4,20 @@
 
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
-import { SaleCreatedConfirmationEmail, getSaleCreatedSubject } from '@/lib/email/templates/SaleCreatedConfirmationEmail'
+import {
+  SaleCreatedConfirmationEmail,
+  buildSaleCreatedSubject,
+  buildSaleCreatedPreview,
+} from '@/lib/email/templates/SaleCreatedConfirmationEmail'
 
 describe('SaleCreatedConfirmationEmail', () => {
   it('should render without throwing', () => {
     const props = {
       saleTitle: 'Test Yard Sale',
       saleAddress: '123 Main St, Anytown, ST 12345',
-      saleDateRangeText: 'Sat, Dec 7 · 8:00 am – 2:00 pm',
+      dateRange: 'Sat, Dec 7, 2025 · 8:00 AM – 2:00 PM',
       saleUrl: 'https://lootaura.com/sales/test-id',
+      manageUrl: 'https://lootaura.com/dashboard',
     }
 
     expect(() => {
@@ -24,8 +29,9 @@ describe('SaleCreatedConfirmationEmail', () => {
     const props = {
       saleTitle: 'My Awesome Yard Sale',
       saleAddress: '456 Oak Ave, City, ST 67890',
-      saleDateRangeText: 'Sun, Dec 8 · 9:00 am – 3:00 pm',
+      dateRange: 'Sun, Dec 8, 2025 · 9:00 AM – 3:00 PM',
       saleUrl: 'https://lootaura.com/sales/another-id',
+      manageUrl: 'https://lootaura.com/dashboard',
     }
 
     const { container } = render(<SaleCreatedConfirmationEmail {...props} />)
@@ -38,8 +44,9 @@ describe('SaleCreatedConfirmationEmail', () => {
     const props = {
       saleTitle: 'Test Sale',
       saleAddress: '789 Pine Rd, Town, ST 11111',
-      saleDateRangeText: 'Mon, Dec 9 · 10:00 am – 4:00 pm',
+      dateRange: 'Mon, Dec 9, 2025 · 10:00 AM – 4:00 PM',
       saleUrl: 'https://lootaura.com/sales/address-test',
+      manageUrl: 'https://lootaura.com/dashboard',
     }
 
     const { container } = render(<SaleCreatedConfirmationEmail {...props} />)
@@ -52,22 +59,24 @@ describe('SaleCreatedConfirmationEmail', () => {
     const props = {
       saleTitle: 'Date Test Sale',
       saleAddress: '321 Elm St',
-      saleDateRangeText: 'Tue, Dec 10 · 11:00 am – 5:00 pm',
+      dateRange: 'Tue, Dec 10, 2025 · 11:00 AM – 5:00 PM',
       saleUrl: 'https://lootaura.com/sales/date-test',
+      manageUrl: 'https://lootaura.com/dashboard',
     }
 
     const { container } = render(<SaleCreatedConfirmationEmail {...props} />)
     const html = container.innerHTML
 
-    expect(html).toContain('Tue, Dec 10 · 11:00 am – 5:00 pm')
+    expect(html).toContain('Tue, Dec 10, 2025 · 11:00 AM – 5:00 PM')
   })
 
   it('should include sale URL in rendered output', () => {
     const props = {
       saleTitle: 'URL Test Sale',
       saleAddress: '999 Test Ave',
-      saleDateRangeText: 'Wed, Dec 11 · 12:00 pm',
+      dateRange: 'Wed, Dec 11, 2025 · 12:00 PM',
       saleUrl: 'https://lootaura.com/sales/url-test-id',
+      manageUrl: 'https://lootaura.com/dashboard',
     }
 
     const { container } = render(<SaleCreatedConfirmationEmail {...props} />)
@@ -76,13 +85,29 @@ describe('SaleCreatedConfirmationEmail', () => {
     expect(html).toContain('https://lootaura.com/sales/url-test-id')
   })
 
+  it('should include manage URL in rendered output', () => {
+    const props = {
+      saleTitle: 'Manage Test Sale',
+      saleAddress: '123 Test St',
+      dateRange: 'Thu, Dec 12, 2025 · 1:00 PM',
+      saleUrl: 'https://lootaura.com/sales/manage-test',
+      manageUrl: 'https://lootaura.com/dashboard',
+    }
+
+    const { container } = render(<SaleCreatedConfirmationEmail {...props} />)
+    const html = container.innerHTML
+
+    expect(html).toContain('https://lootaura.com/dashboard')
+  })
+
   it('should use recipient name when provided', () => {
     const props = {
       recipientName: 'John Doe',
       saleTitle: 'Personalized Sale',
       saleAddress: '123 Test St',
-      saleDateRangeText: 'Thu, Dec 12 · 1:00 pm',
+      dateRange: 'Thu, Dec 12, 2025 · 1:00 PM',
       saleUrl: 'https://lootaura.com/sales/personalized',
+      manageUrl: 'https://lootaura.com/dashboard',
     }
 
     const { container } = render(<SaleCreatedConfirmationEmail {...props} />)
@@ -95,8 +120,9 @@ describe('SaleCreatedConfirmationEmail', () => {
     const props = {
       saleTitle: 'Generic Sale',
       saleAddress: '456 Test Ave',
-      saleDateRangeText: 'Fri, Dec 13 · 2:00 pm',
+      dateRange: 'Fri, Dec 13, 2025 · 2:00 PM',
       saleUrl: 'https://lootaura.com/sales/generic',
+      manageUrl: 'https://lootaura.com/dashboard',
     }
 
     const { container } = render(<SaleCreatedConfirmationEmail {...props} />)
@@ -104,22 +130,46 @@ describe('SaleCreatedConfirmationEmail', () => {
 
     expect(html).toContain('Hi there,')
   })
+
+  it('should include time window when provided', () => {
+    const props = {
+      saleTitle: 'Time Window Test',
+      saleAddress: '789 Test Blvd',
+      dateRange: 'Sat, Dec 14, 2025',
+      timeWindow: '9:00 AM – 2:00 PM',
+      saleUrl: 'https://lootaura.com/sales/time-test',
+      manageUrl: 'https://lootaura.com/dashboard',
+    }
+
+    const { container } = render(<SaleCreatedConfirmationEmail {...props} />)
+    const html = container.innerHTML
+
+    expect(html).toContain('9:00 AM – 2:00 PM')
+  })
 })
 
-describe('getSaleCreatedSubject', () => {
+describe('buildSaleCreatedSubject', () => {
   it('should generate correct subject line', () => {
-    const subject = getSaleCreatedSubject('My Yard Sale')
-    expect(subject).toBe('Your sale "My Yard Sale" is live on LootAura')
+    const subject = buildSaleCreatedSubject('My Yard Sale')
+    expect(subject).toBe('Your yard sale is live on LootAura 🚀')
   })
 
-  it('should handle sale titles with special characters', () => {
-    const subject = getSaleCreatedSubject('Sale & More!')
-    expect(subject).toBe('Your sale "Sale & More!" is live on LootAura')
+  it('should not include sale title in subject (consistent branding)', () => {
+    const subject = buildSaleCreatedSubject('My Awesome Sale')
+    expect(subject).toBe('Your yard sale is live on LootAura 🚀')
   })
+})
 
-  it('should handle empty sale title', () => {
-    const subject = getSaleCreatedSubject('')
-    expect(subject).toBe('Your sale "" is live on LootAura')
+describe('buildSaleCreatedPreview', () => {
+  it('should generate correct preview text', () => {
+    const preview = buildSaleCreatedPreview({
+      saleTitle: 'My Yard Sale',
+      dateRange: 'Sat, Dec 7, 2025 · 8:00 AM – 2:00 PM',
+      addressLine: '123 Main St, Anytown, ST 12345',
+    })
+    expect(preview).toContain('My Yard Sale')
+    expect(preview).toContain('Sat, Dec 7, 2025 · 8:00 AM – 2:00 PM')
+    expect(preview).toContain('123 Main St, Anytown, ST 12345')
   })
 })
 

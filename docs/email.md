@@ -12,7 +12,8 @@ LootAura uses **Resend** as the transactional email provider for sending automat
 - **`lib/email/types.ts`**: TypeScript types for email types and options
 - **`lib/email/sendEmail.ts`**: Generic email sending helper with error handling
 - **`lib/email/templates/`**: React Email template components
-- **`lib/email/trigger/`**: Trigger functions for specific email types
+- **`lib/email/sales.ts`**: Sale-related email sending functions (e.g., `sendSaleCreatedEmail`)
+- **`lib/email/trigger/`**: Legacy trigger functions (deprecated in favor of `lib/email/sales.ts`)
 
 ### Email Templates
 
@@ -66,26 +67,33 @@ await sendEmail({
 })
 ```
 
-### Triggering Specific Emails
+### Triggering Sale Created Email
 
-Use trigger functions from `lib/email/trigger/`:
+Use the `sendSaleCreatedEmail` function from `lib/email/sales.ts`:
 
 ```typescript
-import { triggerSaleCreatedConfirmation } from '@/lib/email/trigger/triggerSaleCreatedConfirmation'
+import { sendSaleCreatedEmail } from '@/lib/email/sales'
+import type { Sale } from '@/lib/types'
 
 // Fire-and-forget (non-blocking)
-void triggerSaleCreatedConfirmation({
-  userId: 'user-id',
-  email: 'user@example.com',
-  displayName: 'John Doe',
-  saleId: 'sale-id',
-  saleTitle: 'My Yard Sale',
-  saleAddressLine: '123 Main St, City, ST 12345',
-  startsAt: new Date('2024-12-07T08:00:00'),
-  endsAt: new Date('2024-12-07T14:00:00'),
-  timezone: 'America/New_York',
+const sale: Sale = {
+  // ... sale data with status: 'published'
+}
+
+void sendSaleCreatedEmail({
+  sale,
+  owner: {
+    email: 'user@example.com',
+    displayName: 'John Doe', // optional
+  },
+  timezone: 'America/New_York', // optional, defaults to 'America/New_York'
+}).catch((error) => {
+  // Additional error handling (function already logs internally)
+  console.error('Email send failed:', error)
 })
 ```
+
+**Note:** The function returns a `Promise<SendSaleCreatedEmailResult>` with `{ ok: boolean, error?: string }`. It never throws errors - all errors are logged internally and returned in the result object.
 
 ## Current Email Flows
 
@@ -95,15 +103,44 @@ void triggerSaleCreatedConfirmation({
 
 **Location:** `app/api/drafts/publish/route.ts` (after sale creation, before response)
 
+**Implementation:** `lib/email/sales.ts` → `sendSaleCreatedEmail()`
+
 **Template:** `lib/email/templates/SaleCreatedConfirmationEmail.tsx`
 
-**Data sources:**
-- User email: From authenticated user session
-- Display name: From user profile (optional)
-- Sale data: From newly created sale row
-- Sale URL: Built from `NEXT_PUBLIC_SITE_URL` and sale ID
+**Email Content:**
+- **Subject:** "Your yard sale is live on LootAura 🚀"
+- **Preview Text:** Includes sale title, date range, and address
+- **Body Sections:**
+  1. Header with LootAura branding
+  2. Personalized greeting (uses display name if available)
+  3. Sale details block:
+     - Sale title
+     - Address (formatted as "Address, City, State")
+     - Date range (formatted as "Sat, Dec 6, 2025 · 8:00 AM – 2:00 PM" or "Sat, Dec 6 – Sun, Dec 7, 2025" for multi-day)
+     - Time window (if available, e.g., "9:00 AM – 2:00 PM" or "All day")
+  4. Primary CTA button: "View Your Sale on LootAura" → links to public sale page
+  5. Secondary links: "Edit your sale" and "View seller dashboard" → both link to `/dashboard`
+  6. Footer with transactional notice
 
-**Error handling:** Non-blocking; failures are logged but do not affect sale creation
+**Data sources:**
+- User email: From authenticated user session (`user.email`)
+- Display name: From user profile via `getUserProfile()` (optional)
+- Sale data: Full sale object fetched from database after creation
+- Sale URL: Built from `NEXT_PUBLIC_SITE_URL` + `/sales/{saleId}`
+- Manage URL: Built from `NEXT_PUBLIC_SITE_URL` + `/dashboard`
+- Timezone: Detected from `Intl.DateTimeFormat().resolvedOptions().timeZone` or defaults to `America/New_York`
+
+**Date Formatting:**
+- Single day with time: "Sat, Dec 6, 2025 · 8:00 AM – 2:00 PM"
+- Multi-day: "Sat, Dec 6 – Sun, Dec 7, 2025"
+- Time window shown separately if available: "9:00 AM – 2:00 PM" or "All day"
+
+**Guards:**
+- Only sends for sales with `status === 'published'`
+- Validates owner email is present and non-empty
+- Skips sending if email validation fails (returns `{ ok: false, error: '...' }`)
+
+**Error handling:** Non-blocking; failures are logged but do not affect sale creation. The function returns `{ ok: boolean, error?: string }` and never throws.
 
 ## Testing
 

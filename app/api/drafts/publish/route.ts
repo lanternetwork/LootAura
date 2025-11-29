@@ -432,7 +432,7 @@ export async function POST(request: NextRequest) {
               displayName,
             },
             timezone,
-          }).catch((emailError) => {
+          }).catch(async (emailError) => {
             // Additional error handling (sendSaleCreatedEmail already logs internally)
             const { logger } = await import('@/lib/log')
             logger.warn('Sale created email send failed (non-critical)', {

@@ -6,6 +6,7 @@
 
 import React from 'react'
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import { sendEmail } from '@/lib/email/sendEmail'
 import { SaleCreatedConfirmationEmail, getSaleCreatedSubject } from '@/lib/email/templates/SaleCreatedConfirmationEmail'
@@ -47,9 +48,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(to)) {
+    // Validate email format with length limit to prevent ReDoS
+    // RFC 5321 specifies max email length of 320 characters (64 local + @ + 255 domain)
+    if (to.length > 320) {
+      return NextResponse.json(
+        { error: 'Invalid email address format' },
+        { status: 400 }
+      )
+    }
+
+    // Use zod for safe email validation (prevents ReDoS attacks)
+    const emailSchema = z.string().email('Invalid email address format')
+    const validationResult = emailSchema.safeParse(to)
+    if (!validationResult.success) {
       return NextResponse.json(
         { error: 'Invalid email address format' },
         { status: 400 }

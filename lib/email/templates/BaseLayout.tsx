@@ -101,7 +101,7 @@ const linkStyle = {
   textDecoration: 'underline',
 }
 
-const previewTextStyle = {
+const previewTextStyle: React.CSSProperties & { msoHide?: string } = {
   display: 'none',
   fontSize: '1px',
   lineHeight: '1px',

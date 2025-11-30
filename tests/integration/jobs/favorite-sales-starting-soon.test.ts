@@ -93,8 +93,8 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
   it('should send emails for eligible favorites and update start_soon_notified_at', async () => {
     const now = new Date()
-    // Create a sale that starts in 12 hours (definitely within 24-hour window)
-    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    // Create a sale that starts in 1 hour (definitely within 24-hour window)
+    const futureDate = new Date(now.getTime() + 1 * 60 * 60 * 1000)
     const futureDateStr = futureDate.toISOString().split('T')[0]
     const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5) // HH:MM format
 
@@ -184,8 +184,8 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
   it('should handle email send failures gracefully', async () => {
     const now = new Date()
-    // Create a sale that starts in 12 hours (definitely within 24-hour window)
-    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    // Create a sale that starts in 1 hour (definitely within 24-hour window)
+    const futureDate = new Date(now.getTime() + 1 * 60 * 60 * 1000)
     const futureDateStr = futureDate.toISOString().split('T')[0]
     const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5) // HH:MM format
 

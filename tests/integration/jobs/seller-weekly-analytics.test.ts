@@ -211,6 +211,12 @@ describe('processSellerWeeklyAnalyticsJob', () => {
   })
 
   it('should handle email send failures gracefully', async () => {
+    // Ensure auth users query is set up (same as successful test)
+    mockAuthUsersQuery.mockResolvedValue({
+      data: { users: [{ id: 'owner-1', email: 'seller@example.com' }] },
+      error: null,
+    })
+
     const now = new Date()
     const weekStart = new Date(now)
     weekStart.setUTCDate(weekStart.getUTCDate() - 7)

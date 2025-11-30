@@ -93,9 +93,10 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
   it('should send emails for eligible favorites and update start_soon_notified_at', async () => {
     const now = new Date()
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-    const tomorrowDateStr = tomorrow.toISOString().split('T')[0]
-    const tomorrowTimeStr = '10:00'
+    // Create a sale that starts in 12 hours (definitely within 24-hour window)
+    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+    const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5) // HH:MM format
 
     const mockSale = {
       id: 'sale-1',
@@ -104,8 +105,8 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       address: '123 Main St',
       city: 'Anytown',
       state: 'ST',
-      date_start: tomorrowDateStr,
-      time_start: tomorrowTimeStr,
+      date_start: futureDateStr,
+      time_start: futureTimeStr,
       status: 'published',
       privacy_mode: 'exact',
       is_featured: false,
@@ -164,14 +165,15 @@ describe('processFavoriteSalesStartingSoonJob', () => {
   it('should not send email if favorite already has start_soon_notified_at set', async () => {
     const now = new Date()
 
-    // Mock favorites query with already notified favorite
-    mockFromBase.mockReturnValueOnce({
-      select: vi.fn(() => ({
-        is: vi.fn(() => Promise.resolve({
-          data: [],
-          error: null,
-        })),
+    // Mock favorites query with already notified favorite (empty array means no unnotified favorites)
+    const mockSelect = vi.fn(() => ({
+      is: vi.fn(() => Promise.resolve({
+        data: [],
+        error: null,
       })),
+    }))
+    mockFromBase.mockReturnValueOnce({
+      select: mockSelect,
     })
 
     const result = await processFavoriteSalesStartingSoonJob({})
@@ -182,8 +184,10 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
   it('should handle email send failures gracefully', async () => {
     const now = new Date()
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-    const tomorrowDateStr = tomorrow.toISOString().split('T')[0]
+    // Create a sale that starts in 12 hours (definitely within 24-hour window)
+    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+    const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5) // HH:MM format
 
     const mockSale = {
       id: 'sale-1',
@@ -192,8 +196,8 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       address: '123 Main St',
       city: 'Anytown',
       state: 'ST',
-      date_start: tomorrowDateStr,
-      time_start: '10:00',
+      date_start: futureDateStr,
+      time_start: futureTimeStr,
       status: 'published',
       privacy_mode: 'exact',
       is_featured: false,

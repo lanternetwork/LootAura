@@ -371,6 +371,8 @@ export async function processFavoriteSalesStartingSoonJob(
     // Calculate time window: sales starting within the next 24 hours
     const now = new Date()
     const nowUtc = new Date(now.toISOString())
+    // Allow a small buffer (1 hour) for sales that just started to account for timing differences
+    const oneHourAgo = new Date(nowUtc.getTime() - 60 * 60 * 1000)
     const twentyFourHoursFromNow = new Date(nowUtc.getTime() + 24 * 60 * 60 * 1000)
 
     // Query favorites that have not been notified
@@ -410,10 +412,11 @@ export async function processFavoriteSalesStartingSoonJob(
     }
 
     // Filter sales that are starting within 24 hours
+    // Allow sales that started up to 1 hour ago to account for timing differences
     const salesStartingSoon = sales.filter(sale => {
       try {
         const startDateTime = new Date(`${sale.date_start}T${sale.time_start || '00:00'}Z`) // Explicitly UTC
-        return startDateTime >= nowUtc && startDateTime <= twentyFourHoursFromNow
+        return startDateTime >= oneHourAgo && startDateTime <= twentyFourHoursFromNow
       } catch {
         return false
       }

@@ -400,6 +400,64 @@ export async function POST(request: NextRequest) {
     const { logDraftPublished } = await import('@/lib/events/businessEvents')
     logDraftPublished(draft.id, createdSaleId ?? '', user.id, createdItemIds.length)
     
+    // Trigger sale created confirmation email (fire-and-forget, non-blocking)
+    if (createdSaleId && user.email) {
+      try {
+        // Fetch full sale data for email
+        const { data: saleData } = await fromBase(admin, 'sales')
+          .select('*')
+          .eq('id', createdSaleId)
+          .single()
+
+        if (saleData && saleData.status === 'published') {
+          // Get user profile for display name (optional)
+          let displayName: string | undefined
+          try {
+            const { getUserProfile } = await import('@/lib/data/profileAccess')
+            const profile = await getUserProfile(supabase, user.id)
+            displayName = profile?.display_name ?? undefined
+          } catch {
+            // Profile fetch failed - continue without display name
+          }
+
+          // Use user's timezone or default to America/New_York
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'
+
+          // Send email using the new comprehensive function (non-blocking)
+          const { sendSaleCreatedEmail } = await import('@/lib/email/sales')
+          void sendSaleCreatedEmail({
+            sale: saleData as any, // Type assertion needed due to Supabase query result type
+            owner: {
+              email: user.email,
+              displayName,
+            },
+            timezone,
+          }).catch(async (emailError) => {
+            // Additional error handling (sendSaleCreatedEmail already logs internally)
+            const { logger } = await import('@/lib/log')
+            logger.warn('Sale created email send failed (non-critical)', {
+              component: 'drafts/publish',
+              operation: 'send_email',
+              draftId: draft.id,
+              saleId: createdSaleId ?? undefined,
+              userId: user.id,
+              error: emailError instanceof Error ? emailError.message : String(emailError),
+            })
+          })
+        }
+      } catch (emailError) {
+        // Log but don't fail - email is non-critical
+        const { logger } = await import('@/lib/log')
+        logger.warn('Failed to trigger sale created confirmation email (non-critical)', {
+          component: 'drafts/publish',
+          operation: 'trigger_email',
+          saleId: createdSaleId ?? undefined,
+          userId: user.id,
+          error: emailError instanceof Error ? emailError.message : String(emailError),
+        })
+      }
+    }
+    
     return ok({ data: { saleId: createdSaleId ?? undefined } })
   } catch (e: any) {
     const { logger } = await import('@/lib/log')

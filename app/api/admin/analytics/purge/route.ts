@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 
+// This route uses auth (cookies) and performs DB writes, so it must always be dynamic.
+export const dynamic = 'force-dynamic'
+
 interface PurgeRequest {
   ownerId?: string
   saleId?: string

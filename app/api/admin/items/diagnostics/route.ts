@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 
+// This route reads auth state (cookies) and talks to the database, so it must be dynamic.
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     await assertAdminOrThrow(request)

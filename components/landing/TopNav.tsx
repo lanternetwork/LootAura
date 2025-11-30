@@ -7,8 +7,15 @@ export function TopNav() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
         <div className="flex items-center justify-between h-full">
           {/* Logo */}
-          <Link href="/" className="text-xl font-bold text-[#3A2268]">
-            Loot Aura
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold text-[#3A2268]">
+            <span className="inline-flex items-center justify-center">
+              <img
+                src="/sitelogo.svg"
+                alt="Loot Aura logo"
+                className="h-7 w-auto"
+              />
+            </span>
+            <span>Loot Aura</span>
           </Link>
 
           {/* Right side - links and sign in button */}

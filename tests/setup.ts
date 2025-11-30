@@ -248,6 +248,10 @@ const ALLOWED_PATTERNS = [
   
   // Analytics client logging (lib/analytics-client.ts)
   /^\[ANALYTICS_CLIENT\] Tracking (error|failed):/, // Expected analytics tracking error logging in tests - tests/unit/analytics-client.test.ts
+  
+  // Favorite sales starting soon job logging (lib/jobs/processor.ts)
+  /\[WARN\] \[jobs\/favorite-sales-starting-soon\]/, // Expected warning when email send fails in job tests - tests/integration/jobs/favorite-sales-starting-soon.test.ts
+  /\[ERROR\] \[jobs\/favorite-sales-starting-soon\]/, // Expected error logging in job tests - tests/integration/jobs/favorite-sales-starting-soon.test.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {

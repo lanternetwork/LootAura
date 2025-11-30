@@ -93,8 +93,8 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
   it('should send emails for eligible favorites and update start_soon_notified_at', async () => {
     const now = new Date()
-    // Create a sale that starts in 1 hour (definitely within 24-hour window)
-    const futureDate = new Date(now.getTime() + 1 * 60 * 60 * 1000)
+    // Create a sale that starts in 6 hours (definitely within 24-hour window, accounts for timezone differences)
+    const futureDate = new Date(now.getTime() + 6 * 60 * 60 * 1000)
     const futureDateStr = futureDate.toISOString().split('T')[0]
     const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5) // HH:MM format
 
@@ -163,17 +163,14 @@ describe('processFavoriteSalesStartingSoonJob', () => {
   })
 
   it('should not send email if favorite already has start_soon_notified_at set', async () => {
-    const now = new Date()
-
     // Mock favorites query with already notified favorite (empty array means no unnotified favorites)
-    const mockSelect = vi.fn(() => ({
-      is: vi.fn(() => Promise.resolve({
-        data: [],
-        error: null,
-      })),
-    }))
     mockFromBase.mockReturnValueOnce({
-      select: mockSelect,
+      select: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
+          data: [],
+          error: null,
+        })),
+      })),
     })
 
     const result = await processFavoriteSalesStartingSoonJob({})
@@ -184,8 +181,8 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
   it('should handle email send failures gracefully', async () => {
     const now = new Date()
-    // Create a sale that starts in 1 hour (definitely within 24-hour window)
-    const futureDate = new Date(now.getTime() + 1 * 60 * 60 * 1000)
+    // Create a sale that starts in 6 hours (definitely within 24-hour window, accounts for timezone differences)
+    const futureDate = new Date(now.getTime() + 6 * 60 * 60 * 1000)
     const futureDateStr = futureDate.toISOString().split('T')[0]
     const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5) // HH:MM format
 
@@ -222,6 +219,12 @@ describe('processFavoriteSalesStartingSoonJob', () => {
           })),
         })),
       })),
+    })
+
+    // Ensure auth.admin.listUsers() mock is set up (it's in beforeEach, but ensure it's fresh)
+    mockAuthUsersQuery.mockResolvedValue({
+      data: { users: [{ id: 'user-1', email: 'user@example.com' }] },
+      error: null,
     })
 
     // Mock failed email send

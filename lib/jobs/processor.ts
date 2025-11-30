@@ -499,7 +499,8 @@ export async function processFavoriteSalesStartingSoonJob(
         // Get user profile for display name
         let userName: string | null = null
         try {
-          const profile = await getUserProfile(admin, favorite.user_id)
+          // Use adminBase (full SupabaseClient) for getUserProfile, not admin (schema-scoped)
+          const profile = await getUserProfile(adminBase, favorite.user_id)
           userName = profile?.display_name || null
         } catch {
           // Profile fetch failed - continue without display name

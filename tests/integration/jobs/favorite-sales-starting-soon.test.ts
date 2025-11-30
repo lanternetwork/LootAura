@@ -29,19 +29,21 @@ vi.mock('@/lib/data/profileAccess', () => ({
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
-    from: () => ({
-      select: () => ({
-        in: () => mockAuthUsersQuery(),
-      }),
-    }),
+    auth: {
+      admin: {
+        listUsers: () => mockAuthUsersQuery(),
+      },
+    },
   }),
 }))
 
 describe('processFavoriteSalesStartingSoonJob', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockAuthUsersQuery.mockReturnValue({
-      data: [{ id: 'user-1', email: 'user@example.com' }],
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
+    mockAuthUsersQuery.mockResolvedValue({
+      data: { users: [{ id: 'user-1', email: 'user@example.com' }] },
       error: null,
     })
   })
@@ -50,7 +52,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     // Mock empty favorites query
     mockFromBase.mockReturnValueOnce({
       select: vi.fn(() => ({
-        is: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
           data: [],
           error: null,
         })),
@@ -67,7 +69,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     // Mock favorites with no matching sales
     mockFromBase.mockReturnValueOnce({
       select: vi.fn(() => ({
-        is: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
           data: [{ user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null }],
           error: null,
         })),
@@ -75,7 +77,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     }).mockReturnValueOnce({
       select: vi.fn(() => ({
         in: vi.fn(() => ({
-          eq: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
             data: [],
             error: null,
           })),
@@ -114,7 +116,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     // Mock favorites query
     mockFromBase.mockReturnValueOnce({
       select: vi.fn(() => ({
-        is: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
           data: [{ user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null }],
           error: null,
         })),
@@ -122,7 +124,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     }).mockReturnValueOnce({
       select: vi.fn(() => ({
         in: vi.fn(() => ({
-          eq: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
             data: [mockSale],
             error: null,
           })),
@@ -131,7 +133,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     }).mockReturnValueOnce({
       update: vi.fn(() => ({
         eq: vi.fn(() => ({
-          eq: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
             data: null,
             error: null,
           })),
@@ -165,7 +167,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     // Mock favorites query with already notified favorite
     mockFromBase.mockReturnValueOnce({
       select: vi.fn(() => ({
-        is: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
           data: [],
           error: null,
         })),
@@ -202,7 +204,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     // Mock favorites query
     mockFromBase.mockReturnValueOnce({
       select: vi.fn(() => ({
-        is: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
           data: [{ user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null }],
           error: null,
         })),
@@ -210,7 +212,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     }).mockReturnValueOnce({
       select: vi.fn(() => ({
         in: vi.fn(() => ({
-          eq: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
             data: [mockSale],
             error: null,
           })),

@@ -27,9 +27,9 @@ Templates are built using `@react-email/components` for email-safe HTML renderin
 Currently supported email types (defined in `lib/email/types.ts`):
 
 - `sale_created_confirmation`: Sent when a user publishes a sale
-- `favorite_sale_starting_soon`: (Planned) Reminder for favorited sales
+- `favorite_sale_starting_soon`: Reminder for favorited sales starting soon
 - `weekly_sales_digest`: (Planned) Weekly digest of nearby sales
-- `seller_weekly_analytics`: (Planned) Weekly analytics report for sellers
+- `seller_weekly_analytics`: Weekly analytics report for sellers
 - `admin_alert`: (Planned) Admin notifications
 
 ## Configuration
@@ -43,6 +43,12 @@ Required environment variables (see `env.example`):
 - **`LOOTAURA_ENABLE_EMAILS`**: Enable/disable email sending
   - `true`: Enable email sending (production/preview)
   - `false` or unset: Disable email sending (development, safe for local testing)
+
+Optional email feature flags (see `lib/config/email.ts`):
+
+- **`EMAIL_FAVORITE_SALE_STARTING_SOON_ENABLED`**: Enable/disable favorite sale starting soon emails (default: `true`)
+- **`EMAIL_FAVORITE_SALE_STARTING_SOON_HOURS_BEFORE_START`**: Hours before sale start to send reminder (default: `24`)
+- **`EMAIL_SELLER_WEEKLY_ANALYTICS_ENABLED`**: Enable/disable seller weekly analytics emails (default: `true`)
 
 ### Domain Verification
 
@@ -142,6 +148,113 @@ void sendSaleCreatedEmail({
 
 **Error handling:** Non-blocking; failures are logged but do not affect sale creation. The function returns `{ ok: boolean, error?: string }` and never throws.
 
+### Favorite Sale Starting Soon
+
+**Triggered when:** A scheduled job runs (typically daily via cron) and finds favorited sales starting within the configured time window
+
+**Location:** `lib/jobs/processor.ts` → `processFavoriteSalesStartingSoonJob()`
+
+**Implementation:** `lib/email/favorites.ts` → `sendFavoriteSaleStartingSoonEmail()`
+
+**Template:** `lib/email/templates/FavoriteSaleStartingSoonEmail.tsx`
+
+**Email Content:**
+- **Subject:** "A sale you saved is starting soon: [Sale Title]"
+- **Preview Text:** Includes sale title and date range
+- **Body Sections:**
+  1. Header with LootAura branding
+  2. Personalized greeting (uses display name if available)
+  3. Brief intro: "One of your favorite yard sales is about to start. Don't miss out!"
+  4. Sale details block:
+     - Sale title
+     - Address (formatted as "Address, City, State")
+     - Date range (formatted consistently with Sale Created email)
+     - Time window (if available)
+  5. Primary CTA button: "View Sale" → links to public sale page
+  6. Footer with transactional notice
+
+**Configuration:**
+- `EMAIL_FAVORITE_SALE_STARTING_SOON_ENABLED`: Enable/disable feature (default: `true`)
+- `EMAIL_FAVORITE_SALE_STARTING_SOON_HOURS_BEFORE_START`: Hours before sale start to send reminder (default: `24`)
+
+**Data sources:**
+- User email: From `auth.users` via Admin API
+- Display name: From user profile via `getUserProfile()` (optional)
+- Sale data: From `lootaura_v2.sales` joined with `lootaura_v2.favorites`
+- Sale URL: Built from `NEXT_PUBLIC_SITE_URL` + `/sales/{saleId}`
+
+**Guards:**
+- Only sends for sales with `status === 'published'`
+- Only sends for favorites where `start_soon_notified_at IS NULL` (idempotency)
+- Only sends for sales starting within the configured time window
+- Validates recipient email is present and non-empty
+- Respects `EMAIL_FAVORITE_SALE_STARTING_SOON_ENABLED` flag
+
+**Idempotency:** Uses `start_soon_notified_at` timestamp in `lootaura_v2.favorites` table to ensure each favorite only receives one "starting soon" email per sale.
+
+**Error handling:** Non-blocking; failures are logged but do not affect job execution. The function returns `{ ok: boolean, error?: string }` and never throws.
+
+**Schedule:** Intended to run daily (e.g., via Vercel cron at 09:00 UTC). Can be triggered manually via job processor.
+
+### Seller Weekly Analytics
+
+**Triggered when:** A scheduled job runs (typically weekly on Mondays via cron) to send analytics reports to sellers
+
+**Location:** `lib/jobs/processor.ts` → `processSellerWeeklyAnalyticsJob()`
+
+**Implementation:** `lib/email/sellerAnalytics.ts` → `sendSellerWeeklyAnalyticsEmail()`
+
+**Template:** `lib/email/templates/SellerWeeklyAnalyticsEmail.tsx`
+
+**Email Content:**
+- **Subject:** "Your LootAura weekly summary - [Week Start Date]"
+- **Preview Text:** Includes total views and saves
+- **Body Sections:**
+  1. Header with LootAura branding
+  2. Personalized greeting (uses display name if available)
+  3. Date range: "Here's how your sales performed from [start] to [end]:"
+  4. Main metrics row:
+     - Total Views (formatted with commas)
+     - Total Saves (formatted with commas)
+     - Total Clicks (formatted with commas)
+     - CTR (Click-Through Rate) as percentage
+  5. Top Performing Sales section:
+     - Up to 5 top sales with:
+       - Sale title
+       - Views, saves, clicks, and CTR
+  6. Primary CTA button: "View Detailed Stats" → links to seller dashboard
+  7. Footer with encouragement message
+
+**Configuration:**
+- `EMAIL_SELLER_WEEKLY_ANALYTICS_ENABLED`: Enable/disable feature (default: `true`)
+
+**Data sources:**
+- User email: From `auth.users` via Admin API
+- Display name: From user profile via `getUserProfile()` (optional)
+- Metrics: Aggregated from `analytics_events_v2` via `getSellerWeeklyAnalytics()`
+- Sale titles: From `sales_v2` for top performing sales
+- Dashboard URL: Built from `NEXT_PUBLIC_SITE_URL` + `/dashboard`
+
+**Metrics calculation:**
+- Aggregates analytics events by `sale_id` and `event_type` for the last full week
+- Filters out test events (unless `NEXT_PUBLIC_DEBUG=true`)
+- Sorts top sales by views (descending), then saves, then clicks
+- Calculates CTR as `(clicks / views) * 100`
+
+**Guards:**
+- Only sends to owners with published sales OR analytics events in the week
+- Only sends if metrics are non-zero (at least one view, save, or click)
+- Validates recipient email is present and non-empty
+- Respects `EMAIL_SELLER_WEEKLY_ANALYTICS_ENABLED` flag
+
+**Week calculation:**
+- Computes last full 7-day window (Monday 00:00 UTC to next Monday 00:00 UTC)
+- If run on Monday at 09:00, reports on the previous week
+
+**Error handling:** Non-blocking; failures are logged but do not affect job execution. The function returns `{ ok: boolean, error?: string }` and never throws.
+
+**Schedule:** Intended to run weekly on Mondays (e.g., via Vercel cron at 09:00 UTC). Can be triggered manually via job processor.
+
 ## Testing
 
 ### Admin Test Endpoint
@@ -197,14 +310,33 @@ Email sending is designed to be **non-critical** and **non-blocking**:
 - **Admin-only testing**: Test endpoint requires admin access in production
 - **Email validation**: Recipient emails are validated before sending
 
+## Background Jobs
+
+Email jobs are defined in `lib/jobs/processor.ts` and can be triggered via:
+
+1. **Vercel Cron** (production): Configure cron jobs in `vercel.json` or Vercel dashboard
+2. **Manual trigger**: Use the job processor API route (if available) or run scripts directly
+
+### Available Email Jobs
+
+- **`favorites:starting-soon`**: Scans for favorited sales starting soon and sends reminder emails
+  - Recommended schedule: Daily at 09:00 UTC
+  - Entrypoint: `processFavoriteSalesStartingSoonJob()`
+
+- **`seller:weekly-analytics`**: Sends weekly analytics reports to sellers
+  - Recommended schedule: Weekly on Mondays at 09:00 UTC
+  - Entrypoint: `processSellerWeeklyAnalyticsJob()`
+
+**Note:** These jobs must be wired to Vercel/Supabase scheduler in production. For local development, they can be run manually via the job processor entrypoint.
+
 ## Future Enhancements
 
 Planned email templates (not yet implemented):
 
-1. **Favorite Sale Starting Soon**: Reminder email for favorited sales starting within 24 hours
-2. **Weekly Sales Digest**: Weekly summary of nearby sales
-3. **Seller Weekly Analytics**: Weekly analytics report for active sellers
-4. **Admin Alerts**: System alerts for admins (errors, abuse reports, etc.)
+1. **Weekly Sales Digest**: Weekly summary of nearby sales
+2. **Admin Alerts**: System alerts for admins (errors, abuse reports, etc.)
+
+**TODO:** Add proper `email_log` table for hard guarantees on email deduplication and delivery tracking.
 
 ## Troubleshooting
 

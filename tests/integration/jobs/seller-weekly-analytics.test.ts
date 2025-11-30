@@ -216,7 +216,7 @@ describe('processSellerWeeklyAnalyticsJob', () => {
     weekStart.setUTCDate(weekStart.getUTCDate() - 7)
     weekStart.setUTCHours(0, 0, 0, 0)
 
-    // Mock sales query
+    // Mock sales query (same as successful test)
     mockFromBase.mockReturnValueOnce({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
@@ -241,15 +241,24 @@ describe('processSellerWeeklyAnalyticsJob', () => {
       })),
     })
 
-    // Mock metrics
+    // Mock metrics (same as successful test)
     vi.mocked(getSellerWeeklyAnalytics).mockResolvedValue({
       totalViews: 100,
       totalSaves: 20,
       totalClicks: 10,
-      topSales: [],
+      topSales: [
+        {
+          saleId: 'sale-1',
+          saleTitle: 'Test Sale',
+          views: 100,
+          saves: 20,
+          clicks: 10,
+          ctr: 10.0,
+        },
+      ],
     })
 
-    // Mock failed email send
+    // Mock failed email send (this is the only difference)
     vi.mocked(sendSellerWeeklyAnalyticsEmail).mockResolvedValue({
       ok: false,
       error: 'Email send failed',

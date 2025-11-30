@@ -457,15 +457,12 @@ export async function processFavoriteSalesStartingSoonJob(
     const { data: usersList, error: usersError } = await adminBase.auth.admin.listUsers()
     
     if (usersError) {
-      return { success: false, error: `Users query error: ${usersError.message}` }
+      const errorMessage = usersError instanceof Error ? usersError.message : String(usersError)
+      return { success: false, error: `Users query error: ${errorMessage}` }
     }
 
     // Filter to only users we need
     const users = usersList?.users?.filter(u => userIds.includes(u.id)) || []
-
-    if (usersError) {
-      return { success: false, error: `Users query error: ${usersError.message}` }
-    }
 
     if (!users || users.length === 0) {
       logger.warn('No users found with email addresses', {

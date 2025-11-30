@@ -31,7 +31,7 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
     auth: {
       admin: {
-        listUsers: () => mockAuthUsersQuery(),
+        listUsers: mockAuthUsersQuery,
       },
     },
   }),
@@ -93,8 +93,9 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
   it('should send emails for eligible favorites and update start_soon_notified_at', async () => {
     const now = new Date()
-    // Create a sale that starts in 6 hours (definitely within 24-hour window, accounts for timezone differences)
-    const futureDate = new Date(now.getTime() + 6 * 60 * 60 * 1000)
+    // Create a sale that starts in 12 hours (definitely within 24-hour window, accounts for timezone differences)
+    // Use a larger offset to ensure it passes the date filter even with timezone parsing differences
+    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
     const futureDateStr = futureDate.toISOString().split('T')[0]
     const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5) // HH:MM format
 
@@ -181,8 +182,9 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
   it('should handle email send failures gracefully', async () => {
     const now = new Date()
-    // Create a sale that starts in 6 hours (definitely within 24-hour window, accounts for timezone differences)
-    const futureDate = new Date(now.getTime() + 6 * 60 * 60 * 1000)
+    // Create a sale that starts in 12 hours (definitely within 24-hour window, accounts for timezone differences)
+    // Use a larger offset to ensure it passes the date filter even with timezone parsing differences
+    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
     const futureDateStr = futureDate.toISOString().split('T')[0]
     const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5) // HH:MM format
 

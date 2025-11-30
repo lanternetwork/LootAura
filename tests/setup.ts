@@ -252,6 +252,10 @@ const ALLOWED_PATTERNS = [
   // Favorite sales starting soon job logging (lib/jobs/processor.ts)
   /\[WARN\] \[jobs\/favorite-sales-starting-soon\]/, // Expected warning when email send fails in job tests - tests/integration/jobs/favorite-sales-starting-soon.test.ts
   /\[ERROR\] \[jobs\/favorite-sales-starting-soon\]/, // Expected error logging in job tests - tests/integration/jobs/favorite-sales-starting-soon.test.ts
+  
+  // Seller weekly analytics job logging (lib/jobs/processor.ts)
+  /\[WARN\] \[jobs\/seller-weekly-analytics\]/, // Expected warning when email send fails in job tests - tests/integration/jobs/seller-weekly-analytics.test.ts
+  /\[ERROR\] \[jobs\/seller-weekly-analytics\]/, // Expected error logging in job tests - tests/integration/jobs/seller-weekly-analytics.test.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {

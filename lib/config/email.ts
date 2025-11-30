@@ -34,11 +34,15 @@ export const FAVORITE_SALE_STARTING_SOON_HOURS_BEFORE_START: number = (() => {
 /**
  * Configuration for seller weekly analytics emails
  */
-export const SELLER_WEEKLY_ANALYTICS_ENABLED: boolean = (() => {
+export function getSellerWeeklyAnalyticsEnabled(): boolean {
   const value = process.env.EMAIL_SELLER_WEEKLY_ANALYTICS_ENABLED
   if (value === undefined || value === '') {
     return true // Default: enabled
   }
   return value.toLowerCase() === 'true'
-})()
+}
+
+// Export as constant for backward compatibility (reads at module load time)
+// For tests, use getSellerWeeklyAnalyticsEnabled() function instead
+export const SELLER_WEEKLY_ANALYTICS_ENABLED: boolean = getSellerWeeklyAnalyticsEnabled()
 

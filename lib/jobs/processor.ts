@@ -603,10 +603,10 @@ export async function processSellerWeeklyAnalyticsJob(
   payload: SellerWeeklyAnalyticsJobPayload
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { SELLER_WEEKLY_ANALYTICS_ENABLED } = await import('@/lib/config/email')
+    const { getSellerWeeklyAnalyticsEnabled } = await import('@/lib/config/email')
     
-    // Check if feature is enabled
-    if (!SELLER_WEEKLY_ANALYTICS_ENABLED) {
+    // Check if feature is enabled (read dynamically for tests)
+    if (!getSellerWeeklyAnalyticsEnabled()) {
       logger.info('Seller weekly analytics emails are disabled', {
         component: 'jobs/seller-weekly-analytics',
       })

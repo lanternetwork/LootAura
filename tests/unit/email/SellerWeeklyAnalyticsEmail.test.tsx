@@ -59,9 +59,11 @@ describe('SellerWeeklyAnalyticsEmail', () => {
   })
 
   it('should include dashboard URL in the CTA button', () => {
-    const { getByRole } = render(<SellerWeeklyAnalyticsEmail {...baseProps} />)
-    const button = getByRole('button', { name: 'View Detailed Stats' })
-    expect(button).toHaveAttribute('href', baseProps.dashboardUrl)
+    const { container } = render(<SellerWeeklyAnalyticsEmail {...baseProps} />)
+    // React Email Button component renders as an anchor tag, not a button
+    const link = container.querySelector(`a[href="${baseProps.dashboardUrl}"]`)
+    expect(link).toBeTruthy()
+    expect(link?.textContent).toContain('View Detailed Stats')
   })
 
   it('should use owner display name when provided', () => {

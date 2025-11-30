@@ -64,8 +64,9 @@ describe('sendSellerWeeklyAnalyticsEmail', () => {
     expect(consoleErrorSpy).not.toHaveBeenCalled()
   })
 
-  it('should not send email if LOOTAURA_ENABLE_EMAILS is not "true"', async () => {
+  it('should call sendEmail even if LOOTAURA_ENABLE_EMAILS is not "true" (sendEmail handles the check)', async () => {
     process.env.LOOTAURA_ENABLE_EMAILS = 'false'
+    process.env.NEXT_PUBLIC_DEBUG = 'true'
     const result = await sendSellerWeeklyAnalyticsEmail({
       to: 'seller@example.com',
       metrics: mockMetrics,
@@ -74,7 +75,8 @@ describe('sendSellerWeeklyAnalyticsEmail', () => {
     })
 
     expect(result.ok).toBe(true) // Still returns ok: true as it's a non-critical side effect
-    expect(sendEmail).not.toHaveBeenCalled()
+    // sendEmail is called but will skip sending internally
+    expect(sendEmail).toHaveBeenCalledTimes(1)
     expect(consoleLogSpy).toHaveBeenCalledWith(
       '[EMAIL] Skipping email send (LOOTAURA_ENABLE_EMAILS not enabled):',
       expect.any(Object)

@@ -34,6 +34,14 @@ vi.mock('@supabase/supabase-js', () => ({
         listUsers: mockAuthUsersQuery,
       },
     },
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        })),
+      })),
+    })),
+    rpc: vi.fn(() => Promise.resolve({ data: null, error: null })),
   }),
 }))
 
@@ -182,9 +190,9 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
   it('should handle email send failures gracefully', async () => {
     const now = new Date()
-    // Create a sale that starts in 12 hours (definitely within 24-hour window, accounts for timezone differences)
-    // Use a larger offset to ensure it passes the date filter even with timezone parsing differences
-    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    // Create a sale that starts in 6 hours (definitely within 24-hour window, accounts for timezone differences)
+    // Use a smaller offset to ensure it's well within the window but still in the future
+    const futureDate = new Date(now.getTime() + 6 * 60 * 60 * 1000)
     const futureDateStr = futureDate.toISOString().split('T')[0]
     const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5) // HH:MM format
 

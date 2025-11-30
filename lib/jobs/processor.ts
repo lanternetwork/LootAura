@@ -412,7 +412,7 @@ export async function processFavoriteSalesStartingSoonJob(
     // Filter sales that are starting within 24 hours
     const salesStartingSoon = sales.filter(sale => {
       try {
-        const startDateTime = new Date(`${sale.date_start}T${sale.time_start || '00:00'}`)
+        const startDateTime = new Date(`${sale.date_start}T${sale.time_start || '00:00'}Z`) // Explicitly UTC
         return startDateTime >= nowUtc && startDateTime <= twentyFourHoursFromNow
       } catch {
         return false

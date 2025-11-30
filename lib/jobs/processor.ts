@@ -550,7 +550,8 @@ export async function processFavoriteSalesStartingSoonJob(
           .eq('sale_id', favorite.sale_id)
 
         if (updateError) {
-          logger.error('Failed to update start_soon_notified_at', updateError instanceof Error ? updateError : new Error(updateError.message || String(updateError)), {
+          const errorObj = updateError instanceof Error ? updateError : new Error((updateError as { message?: string })?.message || String(updateError))
+          logger.error('Failed to update start_soon_notified_at', errorObj, {
             component: 'jobs/favorite-sales-starting-soon',
             favoriteUserId: favorite.user_id,
             saleId: favorite.sale_id,

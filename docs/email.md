@@ -314,20 +314,94 @@ Email sending is designed to be **non-critical** and **non-blocking**:
 
 Email jobs are defined in `lib/jobs/processor.ts` and can be triggered via:
 
-1. **Vercel Cron** (production): Configure cron jobs in `vercel.json` or Vercel dashboard
-2. **Manual trigger**: Use the job processor API route (if available) or run scripts directly
+1. **Cron API endpoints** (production): HTTP endpoints protected by `CRON_SECRET` Bearer token
+2. **Manual scripts**: Run scripts directly for local development/testing
+3. **Job processor API**: Admin-only endpoint for manual job execution
 
 ### Available Email Jobs
 
-- **`favorites:starting-soon`**: Scans for favorited sales starting soon and sends reminder emails
-  - Recommended schedule: Daily at 09:00 UTC
-  - Entrypoint: `processFavoriteSalesStartingSoonJob()`
+#### Favorite Sale Starting Soon
 
-- **`seller:weekly-analytics`**: Sends weekly analytics reports to sellers
-  - Recommended schedule: Weekly on Mondays at 09:00 UTC
-  - Entrypoint: `processSellerWeeklyAnalyticsJob()`
+- **Cron endpoint**: `GET /api/cron/favorite-sales-starting-soon` (also accepts POST)
+- **Recommended schedule**: Daily at 09:00 UTC
+- **Purpose**: Send reminder emails for favorited sales starting within the next N hours
+  - Window configured via `EMAIL_FAVORITE_SALE_STARTING_SOON_HOURS_BEFORE_START` (default: 24 hours)
+- **Idempotency**: Uses `start_soon_notified_at` timestamp in `lootaura_v2.favorites` table to prevent duplicate notifications
+- **Entrypoint**: `processFavoriteSalesStartingSoonJob()`
+- **Manual script**: `scripts/run-favorite-sales-starting-soon.ts`
 
-**Note:** These jobs must be wired to Vercel/Supabase scheduler in production. For local development, they can be run manually via the job processor entrypoint.
+#### Seller Weekly Analytics
+
+- **Cron endpoint**: `GET /api/cron/seller-weekly-analytics` (also accepts POST)
+- **Recommended schedule**: Weekly on Mondays at 09:00 UTC
+- **Purpose**: Send weekly performance emails to sellers for the last full week (Monday 00:00 UTC to next Monday 00:00 UTC)
+- **Optional query parameter**: `?date=2025-01-06` - Compute week for a specific date (useful for backfilling or testing)
+- **Idempotency**: Relies on time window calculation (last full week) to prevent duplicates
+- **Entrypoint**: `processSellerWeeklyAnalyticsJob()`
+- **Manual script**: `scripts/run-seller-weekly-analytics.ts [date]`
+
+### Production Scheduling
+
+#### Authentication
+
+All cron endpoints require Bearer token authentication:
+
+- **Environment variable**: `CRON_SECRET` (server-only, must be set in production)
+- **Authorization header**: `Authorization: Bearer ${CRON_SECRET}`
+- **Security**: Requests without valid token return `401 Unauthorized`
+
+#### Setting Up Cron Jobs
+
+**Vercel Cron:**
+
+1. Add cron jobs to `vercel.json`:
+   ```json
+   {
+     "crons": [
+       {
+         "path": "/api/cron/favorite-sales-starting-soon",
+         "schedule": "0 9 * * *"
+       },
+       {
+         "path": "/api/cron/seller-weekly-analytics",
+         "schedule": "0 9 * * 1"
+       }
+     ]
+   }
+   ```
+
+2. Configure `CRON_SECRET` in Vercel environment variables
+
+3. Vercel will automatically add the `Authorization` header when calling cron endpoints
+
+**Other Schedulers (Supabase Cron, external cron services):**
+
+1. Set `CRON_SECRET` environment variable in your deployment environment
+
+2. Configure your scheduler to:
+   - Make GET requests to the cron endpoints
+   - Include header: `Authorization: Bearer ${CRON_SECRET}`
+
+3. Recommended schedules:
+   - Favorite Sale Starting Soon: Daily at 09:00 UTC (`0 9 * * *`)
+   - Seller Weekly Analytics: Weekly on Mondays at 09:00 UTC (`0 9 * * 1`)
+
+#### Local Development
+
+For local development and testing, use the manual scripts:
+
+```bash
+# Run favorite sales starting soon job
+tsx scripts/run-favorite-sales-starting-soon.ts
+
+# Run seller weekly analytics job
+tsx scripts/run-seller-weekly-analytics.ts
+
+# Run seller weekly analytics for a specific date
+tsx scripts/run-seller-weekly-analytics.ts 2025-01-06
+```
+
+**Note:** The cron endpoints are production-ready and can be wired to any scheduler that supports HTTP requests with Bearer token authentication.
 
 ## Future Enhancements
 

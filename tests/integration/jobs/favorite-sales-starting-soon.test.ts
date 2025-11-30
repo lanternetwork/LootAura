@@ -254,7 +254,12 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
     const result = await processFavoriteSalesStartingSoonJob({})
 
-    expect(result.success).toBe(true) // Job should still succeed even if some emails fail
+    // Job should still succeed even if some emails fail
+    // If it failed, show the error message for debugging
+    if (!result.success) {
+      throw new Error(`Job failed with error: ${result.error}`)
+    }
+    expect(result.success).toBe(true)
     expect(sendFavoriteSaleStartingSoonEmail).toHaveBeenCalledTimes(1)
   })
 })

@@ -266,6 +266,10 @@ describe('processSellerWeeklyAnalyticsJob', () => {
 
     const result = await processSellerWeeklyAnalyticsJob({})
 
+    // If the job failed, include the error message in the assertion for better debugging
+    if (!result.success) {
+      throw new Error(`Job failed with error: ${result.error}`)
+    }
     expect(result.success).toBe(true) // Job should still succeed even if some emails fail
     expect(sendSellerWeeklyAnalyticsEmail).toHaveBeenCalledTimes(1)
   })

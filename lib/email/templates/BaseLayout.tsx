@@ -38,11 +38,11 @@ export function BaseLayout({ previewText, children }: BaseLayoutProps) {
           {/* Footer */}
           <Section style={footerStyle}>
             <Text style={footerTextStyle}>
-              You received this because you created a sale on LootAura. Visit{' '}
+              You received this email from LootAura. Visit{' '}
               <Link href="https://lootaura.com" style={linkStyle}>
                 lootaura.com
               </Link>{' '}
-              to manage your listings.
+              to manage your account.
             </Text>
           </Section>
         </Container>

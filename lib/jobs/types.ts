@@ -6,6 +6,7 @@ export const JOB_TYPES = {
   IMAGE_POSTPROCESS: 'image:postprocess',
   CLEANUP_ORPHANED_DATA: 'cleanup:orphaned-data',
   ANALYTICS_AGGREGATE: 'analytics:aggregate',
+  FAVORITE_SALES_STARTING_SOON: 'favorites:starting-soon',
 } as const
 
 export type JobType = typeof JOB_TYPES[keyof typeof JOB_TYPES]
@@ -34,5 +35,9 @@ export interface CleanupOrphanedDataJobPayload {
 export interface AnalyticsAggregateJobPayload {
   date?: string // ISO date string, defaults to yesterday
   saleId?: string // Optional: aggregate for specific sale
+}
+
+export interface FavoriteSalesStartingSoonJobPayload {
+  // No payload needed - job scans all eligible favorites
 }
 

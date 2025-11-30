@@ -2,7 +2,7 @@
  * Job processor - dispatches jobs to type-specific handlers
  */
 
-import { BaseJob, JOB_TYPES, ImagePostprocessJobPayload, CleanupOrphanedDataJobPayload, AnalyticsAggregateJobPayload } from './types'
+import { BaseJob, JOB_TYPES, ImagePostprocessJobPayload, CleanupOrphanedDataJobPayload, AnalyticsAggregateJobPayload, FavoriteSalesStartingSoonJobPayload } from './types'
 import { retryJob, completeJob } from './queue'
 import { logger } from '@/lib/log'
 import * as Sentry from '@sentry/nextjs'
@@ -34,6 +34,10 @@ export async function processJob(job: BaseJob): Promise<{ success: boolean; erro
       
       case JOB_TYPES.ANALYTICS_AGGREGATE:
         result = await processAnalyticsAggregateJob(job.payload as AnalyticsAggregateJobPayload)
+        break
+      
+      case JOB_TYPES.FAVORITE_SALES_STARTING_SOON:
+        result = await processFavoriteSalesStartingSoonJob(job.payload as FavoriteSalesStartingSoonJobPayload)
         break
       
       default:
@@ -340,6 +344,230 @@ async function processAnalyticsAggregateJob(payload: AnalyticsAggregateJobPayloa
       saleId,
       aggregateCount: aggregates.size,
       totalEvents: events.length,
+    })
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+/**
+ * Process favorite sales starting soon job
+ * Scans favorites for sales starting within 24 hours and sends reminder emails
+ */
+export async function processFavoriteSalesStartingSoonJob(
+  _payload: FavoriteSalesStartingSoonJobPayload
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { getAdminDb, fromBase } = await import('@/lib/supabase/clients')
+    const { sendFavoriteSaleStartingSoonEmail } = await import('@/lib/email/favorites')
+    const { getUserProfile } = await import('@/lib/data/profileAccess')
+    const admin = getAdminDb()
+
+    // Calculate time window: sales starting within the next 24 hours
+    const now = new Date()
+    const nowUtc = new Date(now.toISOString())
+    const twentyFourHoursFromNow = new Date(nowUtc.getTime() + 24 * 60 * 60 * 1000)
+
+    // Query favorites that have not been notified
+    const { data: favorites, error: favoritesError } = await fromBase(admin, 'favorites')
+      .select('user_id, sale_id, start_soon_notified_at')
+      .is('start_soon_notified_at', null)
+
+    if (favoritesError) {
+      return { success: false, error: `Favorites query error: ${favoritesError.message}` }
+    }
+
+    if (!favorites || favorites.length === 0) {
+      logger.info('No favorites to process for starting soon notifications', {
+        component: 'jobs/favorite-sales-starting-soon',
+      })
+      return { success: true }
+    }
+
+    // Get unique sale IDs
+    const saleIds = [...new Set(favorites.map(f => f.sale_id))]
+    
+    // Query sales that are published
+    const { data: sales, error: salesError } = await fromBase(admin, 'sales')
+      .select('*')
+      .in('id', saleIds)
+      .eq('status', 'published')
+
+    if (salesError) {
+      return { success: false, error: `Sales query error: ${salesError.message}` }
+    }
+
+    if (!sales || sales.length === 0) {
+      logger.info('No published sales found for favorites', {
+        component: 'jobs/favorite-sales-starting-soon',
+      })
+      return { success: true }
+    }
+
+    // Filter sales that are starting within 24 hours
+    const salesStartingSoon = sales.filter(sale => {
+      try {
+        const startDateTime = new Date(`${sale.date_start}T${sale.time_start || '00:00'}`)
+        return startDateTime >= nowUtc && startDateTime <= twentyFourHoursFromNow
+      } catch {
+        return false
+      }
+    })
+
+    if (salesStartingSoon.length === 0) {
+      logger.info('No sales starting within 24 hours', {
+        component: 'jobs/favorite-sales-starting-soon',
+      })
+      return { success: true }
+    }
+
+    const saleIdsStartingSoon = new Set(salesStartingSoon.map(s => s.id))
+
+    // Filter favorites to only those for sales starting soon
+    const eligibleFavorites = favorites.filter(f => saleIdsStartingSoon.has(f.sale_id))
+
+    if (eligibleFavorites.length === 0) {
+      logger.info('No eligible favorites found', {
+        component: 'jobs/favorite-sales-starting-soon',
+      })
+      return { success: true }
+    }
+
+    // Get unique user IDs
+    const userIds = [...new Set(eligibleFavorites.map(f => f.user_id))]
+
+    // Query auth.users for email addresses using admin client
+    // Note: We use the admin client's auth.admin.listUsers() method
+    // which is the proper way to access user emails with service role
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE!
+    const { createClient } = await import('@supabase/supabase-js')
+    const adminBase = createClient(url, key, { 
+      auth: { persistSession: false },
+      global: { headers: { 'apikey': key } }
+    })
+
+    // Fetch users using Admin API
+    // We'll fetch all users and filter in memory (Admin API doesn't support .in() filter)
+    const { data: usersList, error: usersError } = await adminBase.auth.admin.listUsers()
+    
+    if (usersError) {
+      return { success: false, error: `Users query error: ${usersError.message}` }
+    }
+
+    // Filter to only users we need
+    const users = usersList?.users?.filter(u => userIds.includes(u.id)) || []
+
+    if (usersError) {
+      return { success: false, error: `Users query error: ${usersError.message}` }
+    }
+
+    if (!users || users.length === 0) {
+      logger.warn('No users found with email addresses', {
+        component: 'jobs/favorite-sales-starting-soon',
+      })
+      return { success: true }
+    }
+
+    // Create a map of user_id -> email
+    const userEmailMap = new Map<string, string>()
+    for (const user of users) {
+      if (user.email) {
+        userEmailMap.set(user.id, user.email)
+      }
+    }
+
+    // Create a map of sale_id -> sale
+    const saleMap = new Map(salesStartingSoon.map(s => [s.id, s]))
+
+    // Process each eligible favorite
+    let emailsSent = 0
+    let errors = 0
+    const notifiedFavoriteIds: Array<{ user_id: string; sale_id: string }> = []
+
+    for (const favorite of eligibleFavorites) {
+      const sale = saleMap.get(favorite.sale_id)
+      const userEmail = userEmailMap.get(favorite.user_id)
+
+      if (!sale || !userEmail) {
+        continue
+      }
+
+      try {
+        // Get user profile for display name
+        let userName: string | null = null
+        try {
+          const profile = await getUserProfile(admin, favorite.user_id)
+          userName = profile?.display_name || null
+        } catch {
+          // Profile fetch failed - continue without display name
+        }
+
+        // Send email
+        const result = await sendFavoriteSaleStartingSoonEmail({
+          to: userEmail,
+          sale,
+          userName,
+        })
+
+        if (result.ok) {
+          emailsSent++
+          notifiedFavoriteIds.push({
+            user_id: favorite.user_id,
+            sale_id: favorite.sale_id,
+          })
+        } else {
+          errors++
+          logger.warn('Failed to send favorite sale starting soon email', {
+            component: 'jobs/favorite-sales-starting-soon',
+            favoriteUserId: favorite.user_id,
+            saleId: favorite.sale_id,
+            error: result.error,
+          })
+        }
+      } catch (error) {
+        errors++
+        logger.error('Error processing favorite for starting soon email', error instanceof Error ? error : new Error(String(error)), {
+          component: 'jobs/favorite-sales-starting-soon',
+          favoriteUserId: favorite.user_id,
+          saleId: favorite.sale_id,
+        })
+      }
+    }
+
+    // Update start_soon_notified_at for successfully sent emails
+    if (notifiedFavoriteIds.length > 0) {
+      const nowTimestamp = new Date().toISOString()
+      
+      // Update each favorite individually (Supabase doesn't support multi-row updates with composite keys easily)
+      for (const favorite of notifiedFavoriteIds) {
+        const { error: updateError } = await fromBase(admin, 'favorites')
+          .update({ start_soon_notified_at: nowTimestamp })
+          .eq('user_id', favorite.user_id)
+          .eq('sale_id', favorite.sale_id)
+
+        if (updateError) {
+          logger.error('Failed to update start_soon_notified_at', {
+            component: 'jobs/favorite-sales-starting-soon',
+            favoriteUserId: favorite.user_id,
+            saleId: favorite.sale_id,
+            error: updateError.message,
+          })
+        }
+      }
+    }
+
+    logger.info('Favorite sales starting soon job completed', {
+      component: 'jobs/favorite-sales-starting-soon',
+      eligibleFavorites: eligibleFavorites.length,
+      emailsSent,
+      errors,
+      notifiedCount: notifiedFavoriteIds.length,
     })
 
     return { success: true }

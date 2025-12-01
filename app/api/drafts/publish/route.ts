@@ -425,15 +425,17 @@ export async function POST(request: NextRequest) {
 
           // Send email using the new comprehensive function (non-blocking)
           const { sendSaleCreatedEmail } = await import('@/lib/email/sales')
-          void sendSaleCreatedEmail({
+          const emailResult = await sendSaleCreatedEmail({
             sale: saleData as any, // Type assertion needed due to Supabase query result type
             owner: {
               email: user.email,
               displayName,
             },
             timezone,
-          }).catch(async (emailError) => {
-            // Additional error handling (sendSaleCreatedEmail already logs internally)
+          })
+          
+          // Log email result for debugging (non-blocking, doesn't affect response)
+          if (!emailResult.ok) {
             const { logger } = await import('@/lib/log')
             logger.warn('Sale created email send failed (non-critical)', {
               component: 'drafts/publish',
@@ -441,9 +443,19 @@ export async function POST(request: NextRequest) {
               draftId: draft.id,
               saleId: createdSaleId ?? undefined,
               userId: user.id,
-              error: emailError instanceof Error ? emailError.message : String(emailError),
+              ownerEmail: user.email,
+              error: emailResult.error || 'Unknown error',
+              // Include email config status for debugging
+              emailsEnabled: process.env.LOOTAURA_ENABLE_EMAILS === 'true',
+              hasResendApiKey: !!process.env.RESEND_API_KEY,
+              hasResendFromEmail: !!process.env.RESEND_FROM_EMAIL,
             })
-          })
+          } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[DRAFTS/PUBLISH] Sale created email sent successfully:', {
+              saleId: createdSaleId,
+              ownerEmail: user.email,
+            })
+          }
         }
       } catch (emailError) {
         // Log but don't fail - email is non-critical

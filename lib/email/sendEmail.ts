@@ -35,14 +35,18 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
     return
   }
 
-  // Get from address
-  const fromEmail = process.env.RESEND_FROM_EMAIL
+  // Get from address (check RESEND_FROM_EMAIL first, fallback to EMAIL_FROM for backward compatibility)
+  const fromEmail = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM
   if (!fromEmail) {
-    const error = new Error('RESEND_FROM_EMAIL is not set')
+    const error = new Error('RESEND_FROM_EMAIL (or EMAIL_FROM) is not set')
     console.error('[EMAIL] Configuration error:', {
       type,
       to,
       error: error.message,
+      checkedVars: {
+        hasResendFromEmail: !!process.env.RESEND_FROM_EMAIL,
+        hasEmailFrom: !!process.env.EMAIL_FROM,
+      },
     })
     return
   }

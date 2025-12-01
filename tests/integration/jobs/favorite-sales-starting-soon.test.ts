@@ -508,38 +508,54 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       updated_at: now.toISOString(),
     }
 
-    // Mock favorites query - different users
-    mockFromBase.mockReturnValueOnce({
-      select: vi.fn(() => ({
-        is: vi.fn(() => Promise.resolve({
-          data: [
-            { user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null },
-            { user_id: 'user-2', sale_id: 'sale-2', start_soon_notified_at: null },
-          ],
-          error: null,
-        })),
-      })),
-    }).mockReturnValueOnce({
-      select: vi.fn(() => ({
-        in: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({
-            data: [mockSale1, mockSale2],
-            error: null,
+    // Track call order to ensure mocks match job execution
+    let callCount = 0
+    mockFromBase.mockImplementation((db: any, table: string) => {
+      callCount++
+      if (callCount === 1 && table === 'favorites') {
+        // First call: fromBase(admin, 'favorites').select(...).is(...)
+        return {
+          select: vi.fn(() => ({
+            is: vi.fn(() => Promise.resolve({
+              data: [
+                { user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null },
+                { user_id: 'user-2', sale_id: 'sale-2', start_soon_notified_at: null },
+              ],
+              error: null,
+            })),
           })),
-        })),
-      })),
-    })
-    // Mock update calls - only user-1's favorite will be updated (user-2's email failed)
-    const createUpdateChain = () => ({
-      eq: vi.fn(() => ({
-        eq: vi.fn(() => Promise.resolve({
-          data: null,
-          error: null,
-        })),
-      })),
-    })
-    mockFromBase.mockReturnValueOnce({
-      update: vi.fn(() => createUpdateChain()),
+        }
+      } else if (callCount === 2 && table === 'sales') {
+        // Second call: fromBase(admin, 'sales').select(...).in(...).eq(...)
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => ({
+              eq: vi.fn(() => Promise.resolve({
+                data: [mockSale1, mockSale2],
+                error: null,
+              })),
+            })),
+          })),
+        }
+      } else if (callCount === 3 && table === 'favorites') {
+        // Third call: fromBase(admin, 'favorites').update(...).eq(...).eq(...)
+        // Only called once because only user-1's email succeeds
+        return {
+          update: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => Promise.resolve({
+                data: null,
+                error: null,
+              })),
+            })),
+          })),
+        }
+      }
+      // Fallback: return object with both methods to avoid errors
+      return {
+        select: vi.fn(() => ({ is: vi.fn(() => Promise.resolve({ data: [], error: null })) })),
+        update: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: null, error: null })) })) })),
+      }
     })
 
     // Mock users list with both users
@@ -562,9 +578,6 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     const result = await processFavoriteSalesStartingSoonJob({})
 
     // Job should return success even if some emails fail (errors are logged but don't fail the job)
-    if (!result.success) {
-      console.error('Job failed with error:', result.error)
-    }
     expect(result.success).toBe(true)
     expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(2)
     // Only the successful email's favorites should be marked as notified
@@ -634,14 +647,19 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
     // Clear mocks for second run
     vi.clearAllMocks()
-    // Re-mock the email function to track calls (clearAllMocks clears module-level mocks)
+    // Reset and re-mock the email function to track calls (clearAllMocks clears module-level mocks)
+    vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockReset()
     vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockResolvedValue({ ok: true })
+    // Reset mockFromBase to clear call history
+    mockFromBase.mockReset()
     mockAuthUsersQuery.mockResolvedValue({
       data: { users: [{ id: 'user-1', email: 'user@example.com' }] },
       error: null,
     })
 
     // Second run: favorite now has start_soon_notified_at set (so it won't be in the query)
+    // The job will call fromBase(admin, 'favorites') once for the select query
+    // Since no favorites are found, the job should return early and not call fromBase for sales or updates
     mockFromBase.mockReturnValueOnce({
       select: vi.fn(() => ({
         is: vi.fn(() => Promise.resolve({

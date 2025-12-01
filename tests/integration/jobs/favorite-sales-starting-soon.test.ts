@@ -554,17 +554,21 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     })
 
     // Mock: user-1 succeeds, user-2 fails
+    // Note: Map iteration order is not guaranteed, so we need to handle both orders
     vi.mocked(sendFavoriteSalesStartingSoonDigestEmail)
-      .mockResolvedValueOnce({ ok: true }) // user-1 succeeds
-      .mockResolvedValueOnce({ ok: false, error: 'Email send failed' }) // user-2 fails
+      .mockResolvedValueOnce({ ok: true }) // First user succeeds
+      .mockResolvedValueOnce({ ok: false, error: 'Email send failed' }) // Second user fails
 
     const result = await processFavoriteSalesStartingSoonJob({})
 
+    // Job should return success even if some emails fail (errors are logged but don't fail the job)
+    if (!result.success) {
+      console.error('Job failed with error:', result.error)
+    }
     expect(result.success).toBe(true)
     expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(2)
-    // Only user-1's favorites should be marked as notified (user-2's failed)
-    // The update mock will be called for user-1's favorite only
-    // Verify that only one update was called (for user-1's successful email)
+    // Only the successful email's favorites should be marked as notified
+    // The update mock will be called once (for the successful email)
     const updateCalls = mockFromBase.mock.calls.filter(call => {
       const result = call[0]
       return result && typeof result.update === 'function'
@@ -630,8 +634,8 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
     // Clear mocks for second run
     vi.clearAllMocks()
-    // Reset the email mock to track calls
-    vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockReset()
+    // Re-mock the email function to track calls (clearAllMocks clears module-level mocks)
+    vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockResolvedValue({ ok: true })
     mockAuthUsersQuery.mockResolvedValue({
       data: { users: [{ id: 'user-1', email: 'user@example.com' }] },
       error: null,
@@ -649,7 +653,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
     const result2 = await processFavoriteSalesStartingSoonJob({})
     expect(result2.success).toBe(true)
-    // Should not send any emails on second run
+    // Should not send any emails on second run (no favorites found)
     expect(sendFavoriteSalesStartingSoonDigestEmail).not.toHaveBeenCalled()
   })
 })

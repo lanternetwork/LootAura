@@ -564,6 +564,12 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(2)
     // Only user-1's favorites should be marked as notified (user-2's failed)
     // The update mock will be called for user-1's favorite only
+    // Verify that only one update was called (for user-1's successful email)
+    const updateCalls = mockFromBase.mock.calls.filter(call => {
+      const result = call[0]
+      return result && typeof result.update === 'function'
+    })
+    expect(updateCalls.length).toBe(1)
   })
 
   it('should be idempotent - second run should not send emails for already notified favorites', async () => {
@@ -624,6 +630,8 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
     // Clear mocks for second run
     vi.clearAllMocks()
+    // Reset the email mock to track calls
+    vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockReset()
     mockAuthUsersQuery.mockResolvedValue({
       data: { users: [{ id: 'user-1', email: 'user@example.com' }] },
       error: null,

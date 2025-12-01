@@ -508,63 +508,51 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       updated_at: now.toISOString(),
     }
 
-    // Shared mocks for favorites select and update so we can assert on calls
-    const favoritesSelectIsMock = vi.fn(() =>
-      Promise.resolve({
-        data: [
-          { user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null },
-          { user_id: 'user-2', sale_id: 'sale-2', start_soon_notified_at: null },
-        ],
-        error: null,
-      }),
-    )
-    const favoritesUpdateEqMock = vi.fn(() =>
-      Promise.resolve({
-        data: null,
-        error: null,
-      }),
-    )
-
-    mockFromBase.mockImplementation((db: any, table: string) => {
-      if (table === 'favorites') {
-        // fromBase(admin, 'favorites') is used both for the initial select and for per-favorite updates.
-        // We expose both methods and track calls via the shared mocks above.
-        return {
-          select: vi.fn(() => ({
-            is: favoritesSelectIsMock,
-          })),
-          update: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: favoritesUpdateEqMock,
-            })),
-          })),
-        }
-      }
-
-      if (table === 'sales') {
-        // fromBase(admin, 'sales').select(...).in(...).eq(...)
-        return {
-          select: vi.fn(() => ({
-            in: vi.fn(() => ({
-              eq: vi.fn(() =>
-                Promise.resolve({
-                  data: [mockSale1, mockSale2],
-                  error: null,
-                }),
-              ),
-            })),
-          })),
-        }
-      }
-
-      // Fallback: return object with both methods to avoid errors
-      return {
-        select: vi.fn(() => ({ is: vi.fn(() => Promise.resolve({ data: [], error: null })) })),
-        update: vi.fn(() => ({
-          eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: null, error: null })) })),
-        })),
-      }
+    // Explicitly mock each fromBase call in the order used by the job:
+    // 1) fromBase(admin, 'favorites') for the initial select
+    // 2) fromBase(admin, 'sales') to load sale details
+    // 3) fromBase(admin, 'favorites') for the per-favorite update after a successful send
+    const favoritesSelectIsMock = vi.fn().mockResolvedValue({
+      data: [
+        { user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null },
+        { user_id: 'user-2', sale_id: 'sale-2', start_soon_notified_at: null },
+      ],
+      error: null,
     })
+
+    const favoritesUpdateEqMock = vi.fn().mockResolvedValue({
+      data: null,
+      error: null,
+    })
+
+    mockFromBase
+      // 1) Initial favorites select
+      .mockReturnValueOnce({
+        select: vi.fn(() => ({
+          is: favoritesSelectIsMock,
+        })),
+      })
+      // 2) Sales select
+      .mockReturnValueOnce({
+        select: vi.fn(() => ({
+          in: vi.fn(() => ({
+            eq: vi.fn(() =>
+              Promise.resolve({
+                data: [mockSale1, mockSale2],
+                error: null,
+              }),
+            ),
+          })),
+        })),
+      })
+      // 3) Favorites update for the successful user
+      .mockReturnValueOnce({
+        update: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: favoritesUpdateEqMock,
+          })),
+        })),
+      })
 
     // Mock users list with both users
     mockAuthUsersQuery.mockResolvedValue({

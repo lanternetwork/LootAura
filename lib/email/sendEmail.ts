@@ -25,13 +25,14 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   const emailsEnabled = process.env.LOOTAURA_ENABLE_EMAILS === 'true'
   
   if (!emailsEnabled) {
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[EMAIL] Skipping email send (LOOTAURA_ENABLE_EMAILS not enabled):', {
-        type,
-        to,
-        subject,
-      })
-    }
+    // Always log this - it's important for debugging
+    console.log('[EMAIL] Skipping email send (LOOTAURA_ENABLE_EMAILS not enabled):', {
+      type,
+      to,
+      subject,
+      actualValue: process.env.LOOTAURA_ENABLE_EMAILS,
+      expectedValue: 'true',
+    })
     return
   }
 
@@ -52,6 +53,15 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   }
 
   try {
+    // Log before attempting to send (always, not just in debug mode)
+    console.log('[EMAIL] Attempting to send email via Resend:', {
+      type,
+      to,
+      subject,
+      from: fromEmail,
+      hasResendApiKey: !!process.env.RESEND_API_KEY,
+    })
+    
     const resend = getResendClient()
     
     const result = await resend.emails.send({
@@ -64,15 +74,14 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       },
     })
 
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[EMAIL] Email sent successfully:', {
-        type,
-        to,
-        subject,
-        id: result.data?.id,
-        metadata,
-      })
-    }
+    // Always log success (not just in debug mode) - this confirms it reached Resend
+    console.log('[EMAIL] Email sent successfully via Resend:', {
+      type,
+      to,
+      subject,
+      resendEmailId: result.data?.id,
+      metadata,
+    })
   } catch (error) {
     // Log structured error but don't throw - emails are non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)

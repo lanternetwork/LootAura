@@ -586,6 +586,13 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     const result = await processFavoriteSalesStartingSoonJob({})
 
     // Job should return success even if some emails fail (errors are logged but don't fail the job)
+    if (!result.success) {
+      // Log debug info for CI if this ever regresses
+      // Note: console.log is allowed by the test harness; console.error would fail the test.
+      // This helps us see the underlying error without changing job behavior.
+      // eslint-disable-next-line no-console
+      console.log('PARTIAL_FAILURE_JOB_RESULT', result)
+    }
     expect(result.success).toBe(true)
     expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(2)
     // Only the successful email's favorites should be marked as notified.

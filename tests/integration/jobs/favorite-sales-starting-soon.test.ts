@@ -508,6 +508,10 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       updated_at: now.toISOString(),
     }
 
+    // CRITICAL: Reset mockFromBase before setting implementation
+    // clearAllMocks() in beforeEach clears implementations, so we must re-set it here
+    mockFromBase.mockReset()
+    
     // Shared mocks for favorites so we can assert on calls without relying on fragile call ordering
     const favoritesSelectIsMock = vi.fn().mockResolvedValue({
       data: [
@@ -524,6 +528,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
     // Mock fromBase in a table-aware but order-agnostic way.
     // This avoids "select is not a function" while still exercising the real job logic.
+    // MUST be set after mockReset() to ensure clearAllMocks() doesn't interfere
     mockFromBase.mockImplementation((_db: any, table: string) => {
       if (table === 'favorites') {
         return {

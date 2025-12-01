@@ -508,11 +508,11 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       updated_at: now.toISOString(),
     }
 
-    // Track call order to ensure mocks match job execution
-    let callCount = 0
+    // Track call order: favorites select (1st), sales select (2nd), favorites update (3rd+)
+    let callOrder = 0
     mockFromBase.mockImplementation((db: any, table: string) => {
-      callCount++
-      if (callCount === 1 && table === 'favorites') {
+      callOrder++
+      if (table === 'favorites' && callOrder === 1) {
         // First call: fromBase(admin, 'favorites').select(...).is(...)
         return {
           select: vi.fn(() => ({
@@ -524,8 +524,12 @@ describe('processFavoriteSalesStartingSoonJob', () => {
               error: null,
             })),
           })),
+          // Include update method but it shouldn't be called on first call
+          update: vi.fn(() => {
+            throw new Error('Update should not be called on first favorites call')
+          }),
         }
-      } else if (callCount === 2 && table === 'sales') {
+      } else if (table === 'sales' && callOrder === 2) {
         // Second call: fromBase(admin, 'sales').select(...).in(...).eq(...)
         return {
           select: vi.fn(() => ({
@@ -537,9 +541,9 @@ describe('processFavoriteSalesStartingSoonJob', () => {
             })),
           })),
         }
-      } else if (callCount === 3 && table === 'favorites') {
-        // Third call: fromBase(admin, 'favorites').update(...).eq(...).eq(...)
-        // Only called once because only user-1's email succeeds
+      } else if (table === 'favorites' && callOrder >= 3) {
+        // Third+ call: fromBase(admin, 'favorites').update(...).eq(...).eq(...)
+        // Only called once because only user-1's email succeeds (1 favorite to update)
         return {
           update: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -549,6 +553,10 @@ describe('processFavoriteSalesStartingSoonJob', () => {
               })),
             })),
           })),
+          // Include select method but it shouldn't be called on update calls
+          select: vi.fn(() => {
+            throw new Error('Select should not be called on favorites update call')
+          }),
         }
       }
       // Fallback: return object with both methods to avoid errors

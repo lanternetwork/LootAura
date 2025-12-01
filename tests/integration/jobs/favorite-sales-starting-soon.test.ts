@@ -508,10 +508,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       updated_at: now.toISOString(),
     }
 
-    // Explicitly mock each fromBase call in the order used by the job:
-    // 1) fromBase(admin, 'favorites') for the initial select
-    // 2) fromBase(admin, 'sales') to load sale details
-    // 3) fromBase(admin, 'favorites') for the per-favorite update after a successful send
+    // Shared mocks for favorites so we can assert on calls without relying on fragile call ordering
     const favoritesSelectIsMock = vi.fn().mockResolvedValue({
       data: [
         { user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null },
@@ -525,34 +522,49 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       error: null,
     })
 
-    mockFromBase
-      // 1) Initial favorites select
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          is: favoritesSelectIsMock,
-        })),
-      })
-      // 2) Sales select
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() =>
-              Promise.resolve({
-                data: [mockSale1, mockSale2],
-                error: null,
-              }),
-            ),
+    // Mock fromBase in a table-aware but order-agnostic way.
+    // This avoids "select is not a function" while still exercising the real job logic.
+    mockFromBase.mockImplementation((_db: any, table: string) => {
+      if (table === 'favorites') {
+        return {
+          select: vi.fn(() => ({
+            is: favoritesSelectIsMock,
           })),
+          update: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: favoritesUpdateEqMock,
+            })),
+          })),
+        }
+      }
+
+      if (table === 'sales') {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => ({
+              eq: vi.fn(() =>
+                Promise.resolve({
+                  data: [mockSale1, mockSale2],
+                  error: null,
+                }),
+              ),
+            })),
+          })),
+        }
+      }
+
+      // Fallback: return safe no-op implementations for any unexpected table
+      return {
+        select: vi.fn(() => ({
+          is: vi.fn(() => Promise.resolve({ data: [], error: null })),
         })),
-      })
-      // 3) Favorites update for the successful user
-      .mockReturnValueOnce({
         update: vi.fn(() => ({
           eq: vi.fn(() => ({
-            eq: favoritesUpdateEqMock,
+            eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
           })),
         })),
-      })
+      }
+    })
 
     // Mock users list with both users
     mockAuthUsersQuery.mockResolvedValue({

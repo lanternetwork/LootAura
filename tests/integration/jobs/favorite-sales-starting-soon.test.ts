@@ -586,6 +586,12 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     const result = await processFavoriteSalesStartingSoonJob({})
 
     // Job should return success even if some emails fail (errors are logged but don't fail the job)
+    if (!result.success) {
+      // Log the error and mock call details for debugging
+      console.error('Job failed:', result.error)
+      console.error('Mock call order:', callOrder)
+      console.error('Mock calls made:', mockFromBase.mock.calls.map((call, idx) => ({ index: idx + 1, table: call[1] })))
+    }
     expect(result.success).toBe(true)
     expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(2)
     // Only the successful email's favorites should be marked as notified

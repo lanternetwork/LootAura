@@ -1,15 +1,14 @@
 /**
- * GET /api/cron/favorite-sales-starting-soon
  * POST /api/cron/favorite-sales-starting-soon
  * 
  * Cron endpoint for triggering the "Favorite Sale Starting Soon" email job.
  * 
- * This endpoint is protected by CRON_SECRET Bearer token authentication.
+ * This endpoint is protected by CRON_SECRET header authentication.
  * It should be called by a scheduled job (Vercel Cron, Supabase Cron, etc.)
  * to send reminder emails for favorited sales starting soon.
  * 
  * Authentication:
- * - Requires Authorization header: `Bearer ${CRON_SECRET}`
+ * - Requires x-cron-secret header: `${CRON_SECRET}`
  * - Environment variable: CRON_SECRET (server-only)
  * 
  * Schedule recommendation:
@@ -25,8 +24,12 @@ import { logger } from '@/lib/log'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
-  return handleRequest(request)
+// Reject all non-POST methods
+export async function GET() {
+  return NextResponse.json(
+    { ok: false, error: 'Method not allowed. Use POST.' },
+    { status: 405 }
+  )
 }
 
 export async function POST(request: NextRequest) {
@@ -35,14 +38,40 @@ export async function POST(request: NextRequest) {
 
 async function handleRequest(request: NextRequest) {
   const runAt = new Date().toISOString()
+  const env = process.env.NODE_ENV || 'development'
+  const isProduction = env === 'production'
 
   try {
     // Validate cron authentication
     assertCronAuthorized(request)
 
+    // Check if emails are globally disabled
+    const emailsEnabled = process.env.LOOTAURA_ENABLE_EMAILS === 'true'
+    if (!emailsEnabled) {
+      logger.info('Favorite sales starting soon cron job skipped - emails disabled', {
+        component: 'api/cron/favorite-sales-starting-soon',
+        runAt,
+        env,
+        emailsEnabled: false,
+      })
+
+      return NextResponse.json({
+        ok: true,
+        job: 'favorite-sales-starting-soon',
+        runAt,
+        env,
+        emailsEnabled: false,
+        message: 'Emails disabled by configuration',
+        emailsSent: 0,
+      })
+    }
+
     logger.info('Favorite sales starting soon cron job triggered', {
       component: 'api/cron/favorite-sales-starting-soon',
       runAt,
+      env,
+      isProduction,
+      emailsEnabled: true,
     })
 
     // Execute the job
@@ -52,6 +81,7 @@ async function handleRequest(request: NextRequest) {
       logger.error('Favorite sales starting soon job failed', new Error(result.error || 'Unknown error'), {
         component: 'api/cron/favorite-sales-starting-soon',
         runAt,
+        env,
         error: result.error,
       })
 
@@ -60,6 +90,7 @@ async function handleRequest(request: NextRequest) {
           ok: false,
           job: 'favorite-sales-starting-soon',
           runAt,
+          env,
           error: result.error,
         },
         { status: 500 }
@@ -69,12 +100,15 @@ async function handleRequest(request: NextRequest) {
     logger.info('Favorite sales starting soon cron job completed', {
       component: 'api/cron/favorite-sales-starting-soon',
       runAt,
+      env,
     })
 
     return NextResponse.json({
       ok: true,
       job: 'favorite-sales-starting-soon',
       runAt,
+      env,
+      emailsEnabled: true,
     })
   } catch (error) {
     // Handle auth errors (thrown by assertCronAuthorized)
@@ -87,6 +121,7 @@ async function handleRequest(request: NextRequest) {
     logger.error('Unexpected error in favorite sales starting soon cron', error instanceof Error ? error : new Error(errorMessage), {
       component: 'api/cron/favorite-sales-starting-soon',
       runAt,
+      env,
     })
 
     return NextResponse.json(
@@ -94,6 +129,7 @@ async function handleRequest(request: NextRequest) {
         ok: false,
         job: 'favorite-sales-starting-soon',
         runAt,
+        env,
         error: 'Internal server error',
       },
       { status: 500 }

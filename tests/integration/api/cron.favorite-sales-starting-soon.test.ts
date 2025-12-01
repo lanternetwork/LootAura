@@ -29,7 +29,6 @@ vi.mock('@/lib/log', () => ({
 
 describe('GET /api/cron/favorite-sales-starting-soon', () => {
   let handler: (request: NextRequest) => Promise<Response>
-  let assertCronAuthorized: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
     vi.clearAllMocks()
@@ -37,15 +36,43 @@ describe('GET /api/cron/favorite-sales-starting-soon', () => {
     // Import the handler dynamically after mocks are set up
     const module = await import('@/app/api/cron/favorite-sales-starting-soon/route')
     handler = module.GET
-    
-    // Get the mocked function
-    const cronAuth = await import('@/lib/auth/cron')
-    assertCronAuthorized = vi.mocked(cronAuth.assertCronAuthorized)
   })
 
-  it('should return 401 when authorization header is missing', async () => {
+  it('should return 405 Method Not Allowed for GET requests', async () => {
     const request = new NextRequest('http://localhost/api/cron/favorite-sales-starting-soon', {
       method: 'GET',
+    })
+
+    const response = await handler(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(405)
+    expect(data.ok).toBe(false)
+    expect(data.error).toBe('Method not allowed. Use POST.')
+    expect(processFavoriteSalesStartingSoonJob).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/cron/favorite-sales-starting-soon', () => {
+  let handler: (request: NextRequest) => Promise<Response>
+  let assertCronAuthorized: ReturnType<typeof vi.fn>
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    
+    const module = await import('@/app/api/cron/favorite-sales-starting-soon/route')
+    handler = module.POST
+    
+    const cronAuth = await import('@/lib/auth/cron')
+    assertCronAuthorized = vi.mocked(cronAuth.assertCronAuthorized)
+    
+    // Set default env vars for tests
+    process.env.LOOTAURA_ENABLE_EMAILS = 'true'
+  })
+
+  it('should return 401 when x-cron-secret header is missing', async () => {
+    const request = new NextRequest('http://localhost/api/cron/favorite-sales-starting-soon', {
+      method: 'POST',
     })
 
     // Mock auth failure (throws NextResponse)
@@ -66,11 +93,11 @@ describe('GET /api/cron/favorite-sales-starting-soon', () => {
     expect(processFavoriteSalesStartingSoonJob).not.toHaveBeenCalled()
   })
 
-  it('should return 401 when authorization token is invalid', async () => {
+  it('should return 401 when x-cron-secret header is invalid', async () => {
     const request = new NextRequest('http://localhost/api/cron/favorite-sales-starting-soon', {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        authorization: 'Bearer wrong-token',
+        'x-cron-secret': 'wrong-token',
       },
     })
 
@@ -91,20 +118,15 @@ describe('GET /api/cron/favorite-sales-starting-soon', () => {
     expect(processFavoriteSalesStartingSoonJob).not.toHaveBeenCalled()
   })
 
-  it('should trigger job and return success when authorized', async () => {
+  it('should accept POST requests and trigger job when authorized', async () => {
     const request = new NextRequest('http://localhost/api/cron/favorite-sales-starting-soon', {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        authorization: 'Bearer valid-token',
+        'x-cron-secret': 'valid-token',
       },
     })
 
-    // Mock auth success (doesn't throw)
-    assertCronAuthorized.mockImplementation(() => {
-      // No-op, auth passes
-    })
-
-    // Mock successful job execution
+    assertCronAuthorized.mockImplementation(() => {})
     vi.mocked(processFavoriteSalesStartingSoonJob).mockResolvedValue({
       success: true,
     })
@@ -116,24 +138,47 @@ describe('GET /api/cron/favorite-sales-starting-soon', () => {
     expect(data.ok).toBe(true)
     expect(data.job).toBe('favorite-sales-starting-soon')
     expect(data.runAt).toBeDefined()
+    expect(data.env).toBeDefined()
+    expect(data.emailsEnabled).toBe(true)
     expect(processFavoriteSalesStartingSoonJob).toHaveBeenCalledTimes(1)
     expect(processFavoriteSalesStartingSoonJob).toHaveBeenCalledWith({})
   })
 
-  it('should return 500 when job execution fails', async () => {
+  it('should return success with emails disabled message when LOTAURA_ENABLE_EMAILS is false', async () => {
+    process.env.LOOTAURA_ENABLE_EMAILS = 'false'
+    
     const request = new NextRequest('http://localhost/api/cron/favorite-sales-starting-soon', {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        authorization: 'Bearer valid-token',
+        'x-cron-secret': 'valid-token',
       },
     })
 
-    // Mock auth success
-    assertCronAuthorized.mockImplementation(() => {
-      // No-op, auth passes
+    assertCronAuthorized.mockImplementation(() => {})
+
+    const response = await handler(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.emailsEnabled).toBe(false)
+    expect(data.message).toBe('Emails disabled by configuration')
+    expect(data.emailsSent).toBe(0)
+    expect(processFavoriteSalesStartingSoonJob).not.toHaveBeenCalled()
+    
+    // Reset for other tests
+    process.env.LOOTAURA_ENABLE_EMAILS = 'true'
+  })
+
+  it('should return 500 when job execution fails', async () => {
+    const request = new NextRequest('http://localhost/api/cron/favorite-sales-starting-soon', {
+      method: 'POST',
+      headers: {
+        'x-cron-secret': 'valid-token',
+      },
     })
 
-    // Mock failed job execution
+    assertCronAuthorized.mockImplementation(() => {})
     vi.mocked(processFavoriteSalesStartingSoonJob).mockResolvedValue({
       success: false,
       error: 'Job execution failed',
@@ -151,18 +196,13 @@ describe('GET /api/cron/favorite-sales-starting-soon', () => {
 
   it('should handle unexpected errors gracefully', async () => {
     const request = new NextRequest('http://localhost/api/cron/favorite-sales-starting-soon', {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        authorization: 'Bearer valid-token',
+        'x-cron-secret': 'valid-token',
       },
     })
 
-    // Mock auth success
-    assertCronAuthorized.mockImplementation(() => {
-      // No-op, auth passes
-    })
-
-    // Mock job throwing an error
+    assertCronAuthorized.mockImplementation(() => {})
     vi.mocked(processFavoriteSalesStartingSoonJob).mockRejectedValue(
       new Error('Unexpected error')
     )
@@ -174,42 +214,6 @@ describe('GET /api/cron/favorite-sales-starting-soon', () => {
     expect(data.ok).toBe(false)
     expect(data.job).toBe('favorite-sales-starting-soon')
     expect(data.error).toBe('Internal server error')
-  })
-})
-
-describe('POST /api/cron/favorite-sales-starting-soon', () => {
-  let handler: (request: NextRequest) => Promise<Response>
-  let assertCronAuthorized: ReturnType<typeof vi.fn>
-
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    
-    const module = await import('@/app/api/cron/favorite-sales-starting-soon/route')
-    handler = module.POST
-    
-    const cronAuth = await import('@/lib/auth/cron')
-    assertCronAuthorized = vi.mocked(cronAuth.assertCronAuthorized)
-  })
-
-  it('should accept POST requests and trigger job', async () => {
-    const request = new NextRequest('http://localhost/api/cron/favorite-sales-starting-soon', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer valid-token',
-      },
-    })
-
-    assertCronAuthorized.mockImplementation(() => {})
-    vi.mocked(processFavoriteSalesStartingSoonJob).mockResolvedValue({
-      success: true,
-    })
-
-    const response = await handler(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(data.ok).toBe(true)
-    expect(processFavoriteSalesStartingSoonJob).toHaveBeenCalledTimes(1)
   })
 })
 

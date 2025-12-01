@@ -1,19 +1,18 @@
 /**
- * GET /api/cron/seller-weekly-analytics
  * POST /api/cron/seller-weekly-analytics
  * 
  * Cron endpoint for triggering the "Seller Weekly Analytics" email job.
  * 
- * This endpoint is protected by CRON_SECRET Bearer token authentication.
+ * This endpoint is protected by CRON_SECRET header authentication.
  * It should be called by a scheduled job (Vercel Cron, Supabase Cron, etc.)
  * to send weekly analytics reports to sellers.
  * 
  * Authentication:
- * - Requires Authorization header: `Bearer ${CRON_SECRET}`
+ * - Requires x-cron-secret header: `${CRON_SECRET}`
  * - Environment variable: CRON_SECRET (server-only)
  * 
  * Schedule recommendation:
- * - Weekly on Mondays at 09:00 UTC
+ * - Weekly on Mondays at 09:30 UTC
  * - Purpose: Send weekly performance emails to sellers for the last full week
  * 
  * Optional query parameter:
@@ -28,8 +27,12 @@ import { logger } from '@/lib/log'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
-  return handleRequest(request)
+// Reject all non-POST methods
+export async function GET() {
+  return NextResponse.json(
+    { ok: false, error: 'Method not allowed. Use POST.' },
+    { status: 405 }
+  )
 }
 
 export async function POST(request: NextRequest) {
@@ -38,10 +41,33 @@ export async function POST(request: NextRequest) {
 
 async function handleRequest(request: NextRequest) {
   const runAt = new Date().toISOString()
+  const env = process.env.NODE_ENV || 'development'
+  const isProduction = env === 'production'
 
   try {
     // Validate cron authentication
     assertCronAuthorized(request)
+
+    // Check if emails are globally disabled
+    const emailsEnabled = process.env.LOOTAURA_ENABLE_EMAILS === 'true'
+    if (!emailsEnabled) {
+      logger.info('Seller weekly analytics cron job skipped - emails disabled', {
+        component: 'api/cron/seller-weekly-analytics',
+        runAt,
+        env,
+        emailsEnabled: false,
+      })
+
+      return NextResponse.json({
+        ok: true,
+        job: 'seller-weekly-analytics',
+        runAt,
+        env,
+        emailsEnabled: false,
+        message: 'Emails disabled by configuration',
+        emailsSent: 0,
+      })
+    }
 
     // Parse optional date parameter from query string
     const { searchParams } = new URL(request.url)
@@ -51,6 +77,9 @@ async function handleRequest(request: NextRequest) {
     logger.info('Seller weekly analytics cron job triggered', {
       component: 'api/cron/seller-weekly-analytics',
       runAt,
+      env,
+      isProduction,
+      emailsEnabled: true,
       dateParam,
     })
 
@@ -61,6 +90,7 @@ async function handleRequest(request: NextRequest) {
       logger.error('Seller weekly analytics job failed', new Error(result.error || 'Unknown error'), {
         component: 'api/cron/seller-weekly-analytics',
         runAt,
+        env,
         dateParam,
         error: result.error,
       })
@@ -70,6 +100,8 @@ async function handleRequest(request: NextRequest) {
           ok: false,
           job: 'seller-weekly-analytics',
           runAt,
+          env,
+          dateParam: dateParam || undefined,
           error: result.error,
         },
         { status: 500 }
@@ -79,6 +111,7 @@ async function handleRequest(request: NextRequest) {
     logger.info('Seller weekly analytics cron job completed', {
       component: 'api/cron/seller-weekly-analytics',
       runAt,
+      env,
       dateParam,
     })
 
@@ -86,6 +119,8 @@ async function handleRequest(request: NextRequest) {
       ok: true,
       job: 'seller-weekly-analytics',
       runAt,
+      env,
+      emailsEnabled: true,
       dateParam: dateParam || undefined,
     })
   } catch (error) {
@@ -99,6 +134,7 @@ async function handleRequest(request: NextRequest) {
     logger.error('Unexpected error in seller weekly analytics cron', error instanceof Error ? error : new Error(errorMessage), {
       component: 'api/cron/seller-weekly-analytics',
       runAt,
+      env,
     })
 
     return NextResponse.json(
@@ -106,6 +142,7 @@ async function handleRequest(request: NextRequest) {
         ok: false,
         job: 'seller-weekly-analytics',
         runAt,
+        env,
         error: 'Internal server error',
       },
       { status: 500 }

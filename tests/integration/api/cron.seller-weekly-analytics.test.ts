@@ -29,7 +29,6 @@ vi.mock('@/lib/log', () => ({
 
 describe('GET /api/cron/seller-weekly-analytics', () => {
   let handler: (request: NextRequest) => Promise<Response>
-  let assertCronAuthorized: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
     vi.clearAllMocks()
@@ -37,15 +36,43 @@ describe('GET /api/cron/seller-weekly-analytics', () => {
     // Import the handler dynamically after mocks are set up
     const module = await import('@/app/api/cron/seller-weekly-analytics/route')
     handler = module.GET
-    
-    // Get the mocked function
-    const cronAuth = await import('@/lib/auth/cron')
-    assertCronAuthorized = vi.mocked(cronAuth.assertCronAuthorized)
   })
 
-  it('should return 401 when authorization header is missing', async () => {
+  it('should return 405 Method Not Allowed for GET requests', async () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
       method: 'GET',
+    })
+
+    const response = await handler(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(405)
+    expect(data.ok).toBe(false)
+    expect(data.error).toBe('Method not allowed. Use POST.')
+    expect(processSellerWeeklyAnalyticsJob).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/cron/seller-weekly-analytics', () => {
+  let handler: (request: NextRequest) => Promise<Response>
+  let assertCronAuthorized: ReturnType<typeof vi.fn>
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    
+    const module = await import('@/app/api/cron/seller-weekly-analytics/route')
+    handler = module.POST
+    
+    const cronAuth = await import('@/lib/auth/cron')
+    assertCronAuthorized = vi.mocked(cronAuth.assertCronAuthorized)
+    
+    // Set default env vars for tests
+    process.env.LOOTAURA_ENABLE_EMAILS = 'true'
+  })
+
+  it('should return 401 when x-cron-secret header is missing', async () => {
+    const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
+      method: 'POST',
     })
 
     // Mock auth failure (throws NextResponse)
@@ -66,11 +93,11 @@ describe('GET /api/cron/seller-weekly-analytics', () => {
     expect(processSellerWeeklyAnalyticsJob).not.toHaveBeenCalled()
   })
 
-  it('should return 401 when authorization token is invalid', async () => {
+  it('should return 401 when x-cron-secret header is invalid', async () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        authorization: 'Bearer wrong-token',
+        'x-cron-secret': 'wrong-token',
       },
     })
 
@@ -91,20 +118,15 @@ describe('GET /api/cron/seller-weekly-analytics', () => {
     expect(processSellerWeeklyAnalyticsJob).not.toHaveBeenCalled()
   })
 
-  it('should trigger job and return success when authorized', async () => {
+  it('should accept POST requests and trigger job when authorized', async () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        authorization: 'Bearer valid-token',
+        'x-cron-secret': 'valid-token',
       },
     })
 
-    // Mock auth success (doesn't throw)
-    assertCronAuthorized.mockImplementation(() => {
-      // No-op, auth passes
-    })
-
-    // Mock successful job execution
+    assertCronAuthorized.mockImplementation(() => {})
     vi.mocked(processSellerWeeklyAnalyticsJob).mockResolvedValue({
       success: true,
     })
@@ -116,15 +138,17 @@ describe('GET /api/cron/seller-weekly-analytics', () => {
     expect(data.ok).toBe(true)
     expect(data.job).toBe('seller-weekly-analytics')
     expect(data.runAt).toBeDefined()
+    expect(data.env).toBeDefined()
+    expect(data.emailsEnabled).toBe(true)
     expect(processSellerWeeklyAnalyticsJob).toHaveBeenCalledTimes(1)
     expect(processSellerWeeklyAnalyticsJob).toHaveBeenCalledWith({})
   })
 
   it('should pass date query parameter to job when provided', async () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics?date=2025-01-06', {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        authorization: 'Bearer valid-token',
+        'x-cron-secret': 'valid-token',
       },
     })
 
@@ -139,26 +163,48 @@ describe('GET /api/cron/seller-weekly-analytics', () => {
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
     expect(data.dateParam).toBe('2025-01-06')
+    expect(data.emailsEnabled).toBe(true)
     expect(processSellerWeeklyAnalyticsJob).toHaveBeenCalledTimes(1)
     expect(processSellerWeeklyAnalyticsJob).toHaveBeenCalledWith({
       date: '2025-01-06',
     })
   })
 
-  it('should return 500 when job execution fails', async () => {
+  it('should return success with emails disabled message when LOTAURA_ENABLE_EMAILS is false', async () => {
+    process.env.LOOTAURA_ENABLE_EMAILS = 'false'
+    
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        authorization: 'Bearer valid-token',
+        'x-cron-secret': 'valid-token',
       },
     })
 
-    // Mock auth success
-    assertCronAuthorized.mockImplementation(() => {
-      // No-op, auth passes
+    assertCronAuthorized.mockImplementation(() => {})
+
+    const response = await handler(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.emailsEnabled).toBe(false)
+    expect(data.message).toBe('Emails disabled by configuration')
+    expect(data.emailsSent).toBe(0)
+    expect(processSellerWeeklyAnalyticsJob).not.toHaveBeenCalled()
+    
+    // Reset for other tests
+    process.env.LOOTAURA_ENABLE_EMAILS = 'true'
+  })
+
+  it('should return 500 when job execution fails', async () => {
+    const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
+      method: 'POST',
+      headers: {
+        'x-cron-secret': 'valid-token',
+      },
     })
 
-    // Mock failed job execution
+    assertCronAuthorized.mockImplementation(() => {})
     vi.mocked(processSellerWeeklyAnalyticsJob).mockResolvedValue({
       success: false,
       error: 'Job execution failed',
@@ -176,18 +222,13 @@ describe('GET /api/cron/seller-weekly-analytics', () => {
 
   it('should handle unexpected errors gracefully', async () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
-      method: 'GET',
+      method: 'POST',
       headers: {
-        authorization: 'Bearer valid-token',
+        'x-cron-secret': 'valid-token',
       },
     })
 
-    // Mock auth success
-    assertCronAuthorized.mockImplementation(() => {
-      // No-op, auth passes
-    })
-
-    // Mock job throwing an error
+    assertCronAuthorized.mockImplementation(() => {})
     vi.mocked(processSellerWeeklyAnalyticsJob).mockRejectedValue(
       new Error('Unexpected error')
     )
@@ -199,42 +240,6 @@ describe('GET /api/cron/seller-weekly-analytics', () => {
     expect(data.ok).toBe(false)
     expect(data.job).toBe('seller-weekly-analytics')
     expect(data.error).toBe('Internal server error')
-  })
-})
-
-describe('POST /api/cron/seller-weekly-analytics', () => {
-  let handler: (request: NextRequest) => Promise<Response>
-  let assertCronAuthorized: ReturnType<typeof vi.fn>
-
-  beforeEach(async () => {
-    vi.clearAllMocks()
-    
-    const module = await import('@/app/api/cron/seller-weekly-analytics/route')
-    handler = module.POST
-    
-    const cronAuth = await import('@/lib/auth/cron')
-    assertCronAuthorized = vi.mocked(cronAuth.assertCronAuthorized)
-  })
-
-  it('should accept POST requests and trigger job', async () => {
-    const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer valid-token',
-      },
-    })
-
-    assertCronAuthorized.mockImplementation(() => {})
-    vi.mocked(processSellerWeeklyAnalyticsJob).mockResolvedValue({
-      success: true,
-    })
-
-    const response = await handler(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(data.ok).toBe(true)
-    expect(processSellerWeeklyAnalyticsJob).toHaveBeenCalledTimes(1)
   })
 })
 

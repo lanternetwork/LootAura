@@ -43,6 +43,10 @@ Required environment variables (see `env.example`):
 - **`LOOTAURA_ENABLE_EMAILS`**: Enable/disable email sending
   - `true`: Enable email sending (production/preview)
   - `false` or unset: Disable email sending (development, safe for local testing)
+- **`CRON_SECRET`** (SERVER-ONLY): Shared secret for authenticating cron endpoint requests
+  - Must be set in production for cron jobs to work
+  - Should be a strong, random secret (e.g., generate with `openssl rand -hex 32`)
+  - Used in `x-cron-secret` header for cron endpoint authentication
 
 Optional email feature flags (see `lib/config/email.ts`):
 
@@ -207,7 +211,7 @@ void sendSaleCreatedEmail({
 
 **Error handling:** Non-blocking; failures are logged but do not affect job execution. If a user's digest email fails to send, only that user's favorites remain un-notified; other users' digests continue to be processed. The function returns `{ ok: boolean, error?: string }` and never throws.
 
-**Schedule:** Intended to run daily (e.g., via Vercel cron at 09:00 UTC). Can be triggered manually via job processor.
+**Schedule:** Configured to run daily at 09:00 UTC via Vercel Cron (see `vercel.json`). Can be triggered manually via scripts or cron endpoints.
 
 ### Seller Weekly Analytics
 
@@ -266,7 +270,7 @@ void sendSaleCreatedEmail({
 
 **Error handling:** Non-blocking; failures are logged but do not affect job execution. The function returns `{ ok: boolean, error?: string }` and never throws.
 
-**Schedule:** Intended to run weekly on Mondays (e.g., via Vercel cron at 09:00 UTC). Can be triggered manually via job processor.
+**Schedule:** Configured to run weekly on Mondays at 09:30 UTC via Vercel Cron (see `vercel.json`). Can be triggered manually via scripts or cron endpoints.
 
 ## Testing
 
@@ -327,7 +331,7 @@ Email sending is designed to be **non-critical** and **non-blocking**:
 
 Email jobs are defined in `lib/jobs/processor.ts` and can be triggered via:
 
-1. **Cron API endpoints** (production): HTTP endpoints protected by `CRON_SECRET` Bearer token
+1. **Cron API endpoints** (production): HTTP endpoints protected by `CRON_SECRET` header authentication
 2. **Manual scripts**: Run scripts directly for local development/testing
 3. **Job processor API**: Admin-only endpoint for manual job execution
 
@@ -335,7 +339,7 @@ Email jobs are defined in `lib/jobs/processor.ts` and can be triggered via:
 
 #### Favorite Sale Starting Soon
 
-- **Cron endpoint**: `GET /api/cron/favorite-sales-starting-soon` (also accepts POST)
+- **Cron endpoint**: `POST /api/cron/favorite-sales-starting-soon`
 - **Recommended schedule**: Daily at 09:00 UTC
 - **Purpose**: Send reminder emails for favorited sales starting within the next N hours
   - Window configured via `EMAIL_FAVORITE_SALE_STARTING_SOON_HOURS_BEFORE_START` (default: 24 hours)
@@ -345,8 +349,8 @@ Email jobs are defined in `lib/jobs/processor.ts` and can be triggered via:
 
 #### Seller Weekly Analytics
 
-- **Cron endpoint**: `GET /api/cron/seller-weekly-analytics` (also accepts POST)
-- **Recommended schedule**: Weekly on Mondays at 09:00 UTC
+- **Cron endpoint**: `POST /api/cron/seller-weekly-analytics`
+- **Recommended schedule**: Weekly on Mondays at 09:30 UTC
 - **Purpose**: Send weekly performance emails to sellers for the last full week (Monday 00:00 UTC to next Monday 00:00 UTC)
 - **Optional query parameter**: `?date=2025-01-06` - Compute week for a specific date (useful for backfilling or testing)
 - **Idempotency**: Relies on time window calculation (last full week) to prevent duplicates
@@ -357,17 +361,29 @@ Email jobs are defined in `lib/jobs/processor.ts` and can be triggered via:
 
 #### Authentication
 
-All cron endpoints require Bearer token authentication:
+All cron endpoints require header-based authentication:
 
 - **Environment variable**: `CRON_SECRET` (server-only, must be set in production)
-- **Authorization header**: `Authorization: Bearer ${CRON_SECRET}`
-- **Security**: Requests without valid token return `401 Unauthorized`
+- **Header**: `x-cron-secret: ${CRON_SECRET}`
+- **Security**: Requests without valid header return `401 Unauthorized`
+- **Method**: Only `POST` requests are accepted (other methods return `405 Method Not Allowed`)
+
+#### Email Global Toggle
+
+The cron endpoints respect the global email toggle:
+
+- **Environment variable**: `LOOTAURA_ENABLE_EMAILS`
+- **Behavior**: If set to `false`, cron endpoints will:
+  - Still authenticate and log correctly
+  - Skip sending emails
+  - Return success response with `emailsEnabled: false` and `message: "Emails disabled by configuration"`
+- **Use case**: Allows disabling emails globally without breaking cron schedules
 
 #### Setting Up Cron Jobs
 
 **Vercel Cron:**
 
-1. Add cron jobs to `vercel.json`:
+1. Cron jobs are configured in `vercel.json`:
    ```json
    {
      "crons": [
@@ -377,31 +393,53 @@ All cron endpoints require Bearer token authentication:
        },
        {
          "path": "/api/cron/seller-weekly-analytics",
-         "schedule": "0 9 * * 1"
+         "schedule": "30 9 * * 1"
        }
      ]
    }
    ```
 
-2. Configure `CRON_SECRET` in Vercel environment variables
+2. Configure `CRON_SECRET` in Vercel environment variables:
+   - Go to your Vercel project settings
+   - Add `CRON_SECRET` as an environment variable
+   - Use a strong, random secret (e.g., generate with `openssl rand -hex 32`)
 
-3. Vercel will automatically add the `Authorization` header when calling cron endpoints
+3. Vercel Cron will automatically call the endpoints on the configured schedule
+   - **Note**: Vercel Cron does not automatically add authentication headers
+   - You may need to configure Vercel Cron to include the `x-cron-secret` header, or use a Vercel Cron secret configuration
+   - Alternatively, use an external scheduler (see below) that supports custom headers
 
-**Other Schedulers (Supabase Cron, external cron services):**
+**Other Schedulers (Supabase Cron, external cron services, GitHub Actions, etc.):**
 
 1. Set `CRON_SECRET` environment variable in your deployment environment
 
 2. Configure your scheduler to:
-   - Make GET requests to the cron endpoints
-   - Include header: `Authorization: Bearer ${CRON_SECRET}`
+   - Make **POST** requests to the cron endpoints
+   - Include header: `x-cron-secret: ${CRON_SECRET}`
 
 3. Recommended schedules:
    - Favorite Sale Starting Soon: Daily at 09:00 UTC (`0 9 * * *`)
-   - Seller Weekly Analytics: Weekly on Mondays at 09:00 UTC (`0 9 * * 1`)
+   - Seller Weekly Analytics: Weekly on Mondays at 09:30 UTC (`30 9 * * 1`)
+
+**Example curl command for manual testing:**
+
+```bash
+# Test favorite sales starting soon endpoint
+curl -X POST https://your-domain.com/api/cron/favorite-sales-starting-soon \
+  -H "x-cron-secret: your-cron-secret-here"
+
+# Test seller weekly analytics endpoint
+curl -X POST https://your-domain.com/api/cron/seller-weekly-analytics \
+  -H "x-cron-secret: your-cron-secret-here"
+
+# Test with date parameter
+curl -X POST "https://your-domain.com/api/cron/seller-weekly-analytics?date=2025-01-06" \
+  -H "x-cron-secret: your-cron-secret-here"
+```
 
 #### Local Development
 
-For local development and testing, use the manual scripts:
+For local development and testing, use the manual scripts (cron endpoints are production-only):
 
 ```bash
 # Run favorite sales starting soon job
@@ -414,7 +452,10 @@ tsx scripts/run-seller-weekly-analytics.ts
 tsx scripts/run-seller-weekly-analytics.ts 2025-01-06
 ```
 
-**Note:** The cron endpoints are production-ready and can be wired to any scheduler that supports HTTP requests with Bearer token authentication.
+**Note:** 
+- Cron jobs run only when configured in your scheduler (Vercel Cron, external service, etc.)
+- Locally, you should use the scripts under `scripts/` to debug jobs
+- The cron endpoints are production-ready and can be wired to any scheduler that supports HTTP POST requests with custom headers
 
 ## Future Enhancements
 

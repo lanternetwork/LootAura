@@ -508,66 +508,61 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       updated_at: now.toISOString(),
     }
 
-    // Track calls per table to handle the exact sequence
-    let favoritesCallCount = 0
-    let salesCallCount = 0
-    
+    // Shared mocks for favorites select and update so we can assert on calls
+    const favoritesSelectIsMock = vi.fn(() =>
+      Promise.resolve({
+        data: [
+          { user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null },
+          { user_id: 'user-2', sale_id: 'sale-2', start_soon_notified_at: null },
+        ],
+        error: null,
+      }),
+    )
+    const favoritesUpdateEqMock = vi.fn(() =>
+      Promise.resolve({
+        data: null,
+        error: null,
+      }),
+    )
+
     mockFromBase.mockImplementation((db: any, table: string) => {
       if (table === 'favorites') {
-        favoritesCallCount++
-        if (favoritesCallCount === 1) {
-          // First call: fromBase(admin, 'favorites').select(...).is(...)
-          return {
-            select: vi.fn(() => ({
-              is: vi.fn(() => Promise.resolve({
-                data: [
-                  { user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null },
-                  { user_id: 'user-2', sale_id: 'sale-2', start_soon_notified_at: null },
-                ],
-                error: null,
-              })),
-            })),
-            // Include update method but it shouldn't be called on first call
-            update: vi.fn(() => {
-              throw new Error('Update should not be called on first favorites call')
-            }),
-          }
-        } else {
-          // Subsequent calls: fromBase(admin, 'favorites').update(...).eq(...).eq(...)
-          // Only called once because only user-1's email succeeds (1 favorite to update)
-          return {
-            update: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                eq: vi.fn(() => Promise.resolve({
-                  data: null,
-                  error: null,
-                })),
-              })),
-            })),
-            // Include select method but it shouldn't be called on update calls
-            select: vi.fn(() => {
-              throw new Error('Select should not be called on favorites update call')
-            }),
-          }
-        }
-      } else if (table === 'sales') {
-        salesCallCount++
-        // fromBase(admin, 'sales').select(...).in(...).eq(...)
+        // fromBase(admin, 'favorites') is used both for the initial select and for per-favorite updates.
+        // We expose both methods and track calls via the shared mocks above.
         return {
           select: vi.fn(() => ({
-            in: vi.fn(() => ({
-              eq: vi.fn(() => Promise.resolve({
-                data: [mockSale1, mockSale2],
-                error: null,
-              })),
+            is: favoritesSelectIsMock,
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: favoritesUpdateEqMock,
             })),
           })),
         }
       }
+
+      if (table === 'sales') {
+        // fromBase(admin, 'sales').select(...).in(...).eq(...)
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => ({
+              eq: vi.fn(() =>
+                Promise.resolve({
+                  data: [mockSale1, mockSale2],
+                  error: null,
+                }),
+              ),
+            })),
+          })),
+        }
+      }
+
       // Fallback: return object with both methods to avoid errors
       return {
         select: vi.fn(() => ({ is: vi.fn(() => Promise.resolve({ data: [], error: null })) })),
-        update: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: null, error: null })) })) })),
+        update: vi.fn(() => ({
+          eq: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ data: null, error: null })) })),
+        })),
       }
     })
 
@@ -593,13 +588,9 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     // Job should return success even if some emails fail (errors are logged but don't fail the job)
     expect(result.success).toBe(true)
     expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(2)
-    // Only the successful email's favorites should be marked as notified
-    // The update mock will be called once (for the successful email)
-    const updateCalls = mockFromBase.mock.calls.filter(call => {
-      const result = call[0]
-      return result && typeof result.update === 'function'
-    })
-    expect(updateCalls.length).toBe(1)
+    // Only the successful email's favorites should be marked as notified.
+    // We expect exactly one successful update (for user-1's favorite).
+    expect(favoritesUpdateEqMock).toHaveBeenCalledTimes(1)
   })
 
   it('should be idempotent - second run should not send emails for already notified favorites', async () => {

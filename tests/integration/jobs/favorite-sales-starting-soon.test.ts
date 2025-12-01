@@ -587,11 +587,18 @@ describe('processFavoriteSalesStartingSoonJob', () => {
 
     // Job should return success even if some emails fail (errors are logged but don't fail the job)
     if (!result.success) {
-      // Log debug info for CI if this ever regresses
+      // Log debug info for CI if this ever regresses.
       // Note: console.log is allowed by the test harness; console.error would fail the test.
       // This helps us see the underlying error without changing job behavior.
       // eslint-disable-next-line no-console
-      console.log('PARTIAL_FAILURE_JOB_RESULT', result)
+      console.log('PARTIAL_FAILURE_JOB_RESULT', {
+        result,
+        mockCalls: mockFromBase.mock.calls.map((call, index) => ({
+          index,
+          table: call[1],
+          keys: call[0] ? Object.keys(call[0]) : null,
+        })),
+      })
     }
     expect(result.success).toBe(true)
     expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(2)

@@ -52,6 +52,8 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     vi.clearAllMocks()
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
+    process.env.EMAIL_FAVORITE_SALE_STARTING_SOON_ENABLED = 'true'
+    process.env.EMAIL_FAVORITE_SALE_STARTING_SOON_HOURS_BEFORE_START = '24'
     mockAuthUsersQuery.mockResolvedValue({
       data: { users: [{ id: 'user-1', email: 'user@example.com' }] },
       error: null,
@@ -233,15 +235,20 @@ describe('processFavoriteSalesStartingSoonJob', () => {
           })),
         })),
       })),
-    }).mockReturnValueOnce({
-      update: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({
-            data: null,
-            error: null,
-          })),
+    })
+    // Mock update calls - need one for each favorite (2 favorites = 2 update calls)
+    const createUpdateChain = () => ({
+      eq: vi.fn(() => ({
+        eq: vi.fn(() => Promise.resolve({
+          data: null,
+          error: null,
         })),
       })),
+    })
+    mockFromBase.mockReturnValueOnce({
+      update: vi.fn(() => createUpdateChain()),
+    }).mockReturnValueOnce({
+      update: vi.fn(() => createUpdateChain()),
     })
 
     vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockResolvedValue({ ok: true })
@@ -322,15 +329,20 @@ describe('processFavoriteSalesStartingSoonJob', () => {
           })),
         })),
       })),
-    }).mockReturnValueOnce({
-      update: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({
-            data: null,
-            error: null,
-          })),
+    })
+    // Mock update calls - need one for each favorite (2 users, 1 favorite each = 2 update calls)
+    const createUpdateChain = () => ({
+      eq: vi.fn(() => ({
+        eq: vi.fn(() => Promise.resolve({
+          data: null,
+          error: null,
         })),
       })),
+    })
+    mockFromBase.mockReturnValueOnce({
+      update: vi.fn(() => createUpdateChain()),
+    }).mockReturnValueOnce({
+      update: vi.fn(() => createUpdateChain()),
     })
 
     // Mock users list with both users
@@ -516,15 +528,18 @@ describe('processFavoriteSalesStartingSoonJob', () => {
           })),
         })),
       })),
-    }).mockReturnValueOnce({
-      update: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({
-            data: null,
-            error: null,
-          })),
+    })
+    // Mock update calls - only user-1's favorite will be updated (user-2's email failed)
+    const createUpdateChain = () => ({
+      eq: vi.fn(() => ({
+        eq: vi.fn(() => Promise.resolve({
+          data: null,
+          error: null,
         })),
       })),
+    })
+    mockFromBase.mockReturnValueOnce({
+      update: vi.fn(() => createUpdateChain()),
     })
 
     // Mock users list with both users

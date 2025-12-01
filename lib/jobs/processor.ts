@@ -361,7 +361,16 @@ async function processAnalyticsAggregateJob(payload: AnalyticsAggregateJobPayloa
 
 /**
  * Process favorite sales starting soon job
- * Scans favorites for sales starting within 24 hours and sends reminder emails
+ * 
+ * Scans favorites for sales starting within the configured time window and sends
+ * digest emails to users. Consolidates multiple favorited sales into a single
+ * digest email per user to reduce inbox spam while preserving timely reminders.
+ * 
+ * Behavior:
+ * - Groups eligible favorites by user_id
+ * - Sends one digest email per user containing all their upcoming favorited sales
+ * - Marks all included favorites as notified (start_soon_notified_at) on successful send
+ * - Uses existing idempotency: only favorites with null start_soon_notified_at are processed
  */
 export async function processFavoriteSalesStartingSoonJob(
   _payload: FavoriteSalesStartingSoonJobPayload
@@ -378,7 +387,7 @@ export async function processFavoriteSalesStartingSoonJob(
     }
 
     const { getAdminDb, fromBase } = await import('@/lib/supabase/clients')
-    const { sendFavoriteSaleStartingSoonEmail } = await import('@/lib/email/favorites')
+    const { sendFavoriteSalesStartingSoonDigestEmail } = await import('@/lib/email/favorites')
     const { getUserProfile } = await import('@/lib/data/profileAccess')
     const admin = getAdminDb()
 
@@ -500,16 +509,40 @@ export async function processFavoriteSalesStartingSoonJob(
     // Create a map of sale_id -> sale
     const saleMap = new Map(salesStartingSoon.map(s => [s.id, s]))
 
-    // Process each eligible favorite
-    let emailsSent = 0
-    let errors = 0
-    const notifiedFavoriteIds: Array<{ user_id: string; sale_id: string }> = []
-
+    // Group eligible favorites by user_id
+    const favoritesByUser = new Map<string, Array<{ user_id: string; sale_id: string }>>()
     for (const favorite of eligibleFavorites) {
       const sale = saleMap.get(favorite.sale_id)
       const userEmail = userEmailMap.get(favorite.user_id)
 
-      if (!sale || !userEmail) {
+      // Only include favorites where we have both sale and user email
+      if (sale && userEmail) {
+        if (!favoritesByUser.has(favorite.user_id)) {
+          favoritesByUser.set(favorite.user_id, [])
+        }
+        favoritesByUser.get(favorite.user_id)!.push(favorite)
+      }
+    }
+
+    if (favoritesByUser.size === 0) {
+      logger.info('No eligible user-sale pairs found for digest emails', {
+        component: 'jobs/favorite-sales-starting-soon',
+      })
+      return { success: true }
+    }
+
+    // Process each user group and send digest emails
+    let digestEmailsSent = 0
+    let errors = 0
+    const notifiedFavoriteIds: Array<{ user_id: string; sale_id: string }> = []
+
+    for (const [userId, userFavorites] of favoritesByUser.entries()) {
+      const userEmail = userEmailMap.get(userId)
+      if (!userEmail) {
+        logger.warn('Skipping user - no email address', {
+          component: 'jobs/favorite-sales-starting-soon',
+          userId,
+        })
         continue
       }
 
@@ -517,41 +550,53 @@ export async function processFavoriteSalesStartingSoonJob(
         // Get user profile for display name
         let userName: string | null = null
         try {
-          // Use adminBase (full SupabaseClient) for getUserProfile, not admin (schema-scoped)
-          const profile = await getUserProfile(adminBase, favorite.user_id)
+          const profile = await getUserProfile(adminBase, userId)
           userName = profile?.display_name || null
         } catch {
           // Profile fetch failed - continue without display name
         }
 
-        // Send email
-        const result = await sendFavoriteSaleStartingSoonEmail({
+        // Collect all sales for this user
+        const userSales = userFavorites
+          .map(fav => saleMap.get(fav.sale_id))
+          .filter((sale): sale is typeof sale & { id: string } => sale !== undefined)
+
+        if (userSales.length === 0) {
+          continue
+        }
+
+        // Send digest email
+        const result = await sendFavoriteSalesStartingSoonDigestEmail({
           to: userEmail,
-          sale,
+          sales: userSales,
           userName,
+          hoursBeforeStart: FAVORITE_SALE_STARTING_SOON_HOURS_BEFORE_START,
         })
 
         if (result.ok) {
-          emailsSent++
-          notifiedFavoriteIds.push({
-            user_id: favorite.user_id,
-            sale_id: favorite.sale_id,
-          })
+          digestEmailsSent++
+          // Mark all favorites for this user as notified
+          for (const favorite of userFavorites) {
+            notifiedFavoriteIds.push({
+              user_id: favorite.user_id,
+              sale_id: favorite.sale_id,
+            })
+          }
         } else {
           errors++
-          logger.warn('Failed to send favorite sale starting soon email', {
+          logger.warn('Failed to send favorite sales starting soon digest email', {
             component: 'jobs/favorite-sales-starting-soon',
-            favoriteUserId: favorite.user_id,
-            saleId: favorite.sale_id,
+            userId,
+            salesCount: userSales.length,
             error: result.error,
           })
         }
       } catch (error) {
         errors++
-        logger.error('Error processing favorite for starting soon email', error instanceof Error ? error : new Error(String(error)), {
+        logger.error('Error processing user for starting soon digest email', error instanceof Error ? error : new Error(String(error)), {
           component: 'jobs/favorite-sales-starting-soon',
-          favoriteUserId: favorite.user_id,
-          saleId: favorite.sale_id,
+          userId,
+          favoritesCount: userFavorites.length,
         })
       }
     }
@@ -581,9 +626,10 @@ export async function processFavoriteSalesStartingSoonJob(
     logger.info('Favorite sales starting soon job completed', {
       component: 'jobs/favorite-sales-starting-soon',
       eligibleFavorites: eligibleFavorites.length,
-      emailsSent,
+      usersProcessed: favoritesByUser.size,
+      digestEmailsSent,
       errors,
-      notifiedCount: notifiedFavoriteIds.length,
+      favoritesNotified: notifiedFavoriteIds.length,
     })
 
     return { success: true }

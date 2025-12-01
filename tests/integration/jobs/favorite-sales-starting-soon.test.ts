@@ -3,11 +3,13 @@
  * 
  * Note: These tests mock the database and email sending to verify
  * the job logic without requiring a real database or sending emails.
+ * 
+ * The job now sends digest emails (one per user) instead of one email per favorite.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
-import { sendFavoriteSaleStartingSoonEmail } from '@/lib/email/favorites'
+import { sendFavoriteSalesStartingSoonDigestEmail } from '@/lib/email/favorites'
 
 // Mock dependencies
 const mockFromBase = vi.fn()
@@ -20,7 +22,7 @@ vi.mock('@/lib/supabase/clients', () => ({
 }))
 
 vi.mock('@/lib/email/favorites', () => ({
-  sendFavoriteSaleStartingSoonEmail: vi.fn(),
+  sendFavoriteSalesStartingSoonDigestEmail: vi.fn(),
 }))
 
 vi.mock('@/lib/data/profileAccess', () => ({
@@ -70,7 +72,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     const result = await processFavoriteSalesStartingSoonJob({})
 
     expect(result.success).toBe(true)
-    expect(sendFavoriteSaleStartingSoonEmail).not.toHaveBeenCalled()
+    expect(sendFavoriteSalesStartingSoonDigestEmail).not.toHaveBeenCalled()
   })
 
   it('should return success when no published sales are found', async () => {
@@ -96,10 +98,10 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     const result = await processFavoriteSalesStartingSoonJob({})
 
     expect(result.success).toBe(true)
-    expect(sendFavoriteSaleStartingSoonEmail).not.toHaveBeenCalled()
+    expect(sendFavoriteSalesStartingSoonDigestEmail).not.toHaveBeenCalled()
   })
 
-  it('should send emails for eligible favorites and update start_soon_notified_at', async () => {
+  it('should send digest email for single favorite per user and update start_soon_notified_at', async () => {
     const now = new Date()
     // Create a sale that starts in 12 hours (definitely within 24-hour window, accounts for timezone differences)
     // Use a larger offset to ensure it passes the date filter even with timezone parsing differences
@@ -151,17 +153,19 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       })),
     })
 
-    // Mock successful email send
-    vi.mocked(sendFavoriteSaleStartingSoonEmail).mockResolvedValue({ ok: true })
+    // Mock successful digest email send
+    vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockResolvedValue({ ok: true })
 
     const result = await processFavoriteSalesStartingSoonJob({})
 
     expect(result.success).toBe(true)
-    expect(sendFavoriteSaleStartingSoonEmail).toHaveBeenCalledTimes(1)
-    expect(sendFavoriteSaleStartingSoonEmail).toHaveBeenCalledWith({
+    // Should send one digest email per user (not per favorite)
+    expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(1)
+    expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledWith({
       to: 'user@example.com',
-      sale: mockSale,
+      sales: [mockSale],
       userName: 'Test User',
+      hoursBeforeStart: 24, // Default from config
     })
 
     // Verify that start_soon_notified_at was updated
@@ -169,6 +173,198 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       expect.anything(),
       'favorites'
     )
+  })
+
+  it('should send one digest email for multiple favorites from the same user', async () => {
+    const now = new Date()
+    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+    const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5)
+
+    const mockSale1 = {
+      id: 'sale-1',
+      owner_id: 'owner-1',
+      title: 'First Sale',
+      address: '123 Main St',
+      city: 'Anytown',
+      state: 'ST',
+      date_start: futureDateStr,
+      time_start: futureTimeStr,
+      status: 'published',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    }
+
+    const mockSale2 = {
+      id: 'sale-2',
+      owner_id: 'owner-2',
+      title: 'Second Sale',
+      address: '456 Oak Ave',
+      city: 'City',
+      state: 'ST',
+      date_start: futureDateStr,
+      time_start: futureTimeStr,
+      status: 'published',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    }
+
+    // Mock favorites query - same user, multiple favorites
+    mockFromBase.mockReturnValueOnce({
+      select: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
+          data: [
+            { user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null },
+            { user_id: 'user-1', sale_id: 'sale-2', start_soon_notified_at: null },
+          ],
+          error: null,
+        })),
+      })),
+    }).mockReturnValueOnce({
+      select: vi.fn(() => ({
+        in: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
+            data: [mockSale1, mockSale2],
+            error: null,
+          })),
+        })),
+      })),
+    }).mockReturnValueOnce({
+      update: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
+            data: null,
+            error: null,
+          })),
+        })),
+      })),
+    })
+
+    vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockResolvedValue({ ok: true })
+
+    const result = await processFavoriteSalesStartingSoonJob({})
+
+    expect(result.success).toBe(true)
+    // Should send only ONE digest email for the user, containing both sales
+    expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(1)
+    expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledWith({
+      to: 'user@example.com',
+      sales: expect.arrayContaining([mockSale1, mockSale2]),
+      userName: 'Test User',
+      hoursBeforeStart: 24,
+    })
+    // Verify both sales are in the digest
+    const callArgs = vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mock.calls[0][0]
+    expect(callArgs.sales).toHaveLength(2)
+    expect(callArgs.sales.map((s: any) => s.id)).toContain('sale-1')
+    expect(callArgs.sales.map((s: any) => s.id)).toContain('sale-2')
+  })
+
+  it('should send separate digest emails for multiple users', async () => {
+    const now = new Date()
+    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+    const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5)
+
+    const mockSale1 = {
+      id: 'sale-1',
+      owner_id: 'owner-1',
+      title: 'First Sale',
+      address: '123 Main St',
+      city: 'Anytown',
+      state: 'ST',
+      date_start: futureDateStr,
+      time_start: futureTimeStr,
+      status: 'published',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    }
+
+    const mockSale2 = {
+      id: 'sale-2',
+      owner_id: 'owner-2',
+      title: 'Second Sale',
+      address: '456 Oak Ave',
+      city: 'City',
+      state: 'ST',
+      date_start: futureDateStr,
+      time_start: futureTimeStr,
+      status: 'published',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    }
+
+    // Mock favorites query - different users
+    mockFromBase.mockReturnValueOnce({
+      select: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
+          data: [
+            { user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null },
+            { user_id: 'user-2', sale_id: 'sale-2', start_soon_notified_at: null },
+          ],
+          error: null,
+        })),
+      })),
+    }).mockReturnValueOnce({
+      select: vi.fn(() => ({
+        in: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
+            data: [mockSale1, mockSale2],
+            error: null,
+          })),
+        })),
+      })),
+    }).mockReturnValueOnce({
+      update: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
+            data: null,
+            error: null,
+          })),
+        })),
+      })),
+    })
+
+    // Mock users list with both users
+    mockAuthUsersQuery.mockResolvedValue({
+      data: {
+        users: [
+          { id: 'user-1', email: 'user1@example.com' },
+          { id: 'user-2', email: 'user2@example.com' },
+        ],
+      },
+      error: null,
+    })
+
+    vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockResolvedValue({ ok: true })
+
+    const result = await processFavoriteSalesStartingSoonJob({})
+
+    expect(result.success).toBe(true)
+    // Should send one digest email per user
+    expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(2)
+    // Verify user-1 gets their sale
+    expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledWith({
+      to: 'user1@example.com',
+      sales: [mockSale1],
+      userName: 'Test User',
+      hoursBeforeStart: 24,
+    })
+    // Verify user-2 gets their sale
+    expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledWith({
+      to: 'user2@example.com',
+      sales: [mockSale2],
+      userName: 'Test User',
+      hoursBeforeStart: 24,
+    })
   })
 
   it('should not send email if favorite already has start_soon_notified_at set', async () => {
@@ -185,7 +381,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     const result = await processFavoriteSalesStartingSoonJob({})
 
     expect(result.success).toBe(true)
-    expect(sendFavoriteSaleStartingSoonEmail).not.toHaveBeenCalled()
+    expect(sendFavoriteSalesStartingSoonDigestEmail).not.toHaveBeenCalled()
   })
 
   it('should handle email send failures gracefully', async () => {
@@ -246,8 +442,8 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       error: null,
     })
 
-    // Mock failed email send
-    vi.mocked(sendFavoriteSaleStartingSoonEmail).mockResolvedValue({
+    // Mock failed digest email send
+    vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockResolvedValue({
       ok: false,
       error: 'Email send failed',
     })
@@ -255,12 +451,183 @@ describe('processFavoriteSalesStartingSoonJob', () => {
     const result = await processFavoriteSalesStartingSoonJob({})
 
     // Job should still succeed even if some emails fail
-    // If it failed, show the error message for debugging
     if (!result.success) {
       throw new Error(`Job failed with error: ${result.error}`)
     }
     expect(result.success).toBe(true)
-    expect(sendFavoriteSaleStartingSoonEmail).toHaveBeenCalledTimes(1)
+    expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(1)
+  })
+
+  it('should handle partial failures - one user succeeds, one fails', async () => {
+    const now = new Date()
+    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+    const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5)
+
+    const mockSale1 = {
+      id: 'sale-1',
+      owner_id: 'owner-1',
+      title: 'First Sale',
+      address: '123 Main St',
+      city: 'Anytown',
+      state: 'ST',
+      date_start: futureDateStr,
+      time_start: futureTimeStr,
+      status: 'published',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    }
+
+    const mockSale2 = {
+      id: 'sale-2',
+      owner_id: 'owner-2',
+      title: 'Second Sale',
+      address: '456 Oak Ave',
+      city: 'City',
+      state: 'ST',
+      date_start: futureDateStr,
+      time_start: futureTimeStr,
+      status: 'published',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    }
+
+    // Mock favorites query - different users
+    mockFromBase.mockReturnValueOnce({
+      select: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
+          data: [
+            { user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null },
+            { user_id: 'user-2', sale_id: 'sale-2', start_soon_notified_at: null },
+          ],
+          error: null,
+        })),
+      })),
+    }).mockReturnValueOnce({
+      select: vi.fn(() => ({
+        in: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
+            data: [mockSale1, mockSale2],
+            error: null,
+          })),
+        })),
+      })),
+    }).mockReturnValueOnce({
+      update: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
+            data: null,
+            error: null,
+          })),
+        })),
+      })),
+    })
+
+    // Mock users list with both users
+    mockAuthUsersQuery.mockResolvedValue({
+      data: {
+        users: [
+          { id: 'user-1', email: 'user1@example.com' },
+          { id: 'user-2', email: 'user2@example.com' },
+        ],
+      },
+      error: null,
+    })
+
+    // Mock: user-1 succeeds, user-2 fails
+    vi.mocked(sendFavoriteSalesStartingSoonDigestEmail)
+      .mockResolvedValueOnce({ ok: true }) // user-1 succeeds
+      .mockResolvedValueOnce({ ok: false, error: 'Email send failed' }) // user-2 fails
+
+    const result = await processFavoriteSalesStartingSoonJob({})
+
+    expect(result.success).toBe(true)
+    expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(2)
+    // Only user-1's favorites should be marked as notified (user-2's failed)
+    // The update mock will be called for user-1's favorite only
+  })
+
+  it('should be idempotent - second run should not send emails for already notified favorites', async () => {
+    const now = new Date()
+    const futureDate = new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    const futureDateStr = futureDate.toISOString().split('T')[0]
+    const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5)
+
+    const mockSale = {
+      id: 'sale-1',
+      owner_id: 'owner-1',
+      title: 'Test Sale',
+      address: '123 Main St',
+      city: 'Anytown',
+      state: 'ST',
+      date_start: futureDateStr,
+      time_start: futureTimeStr,
+      status: 'published',
+      privacy_mode: 'exact',
+      is_featured: false,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    }
+
+    // First run: favorite has null start_soon_notified_at
+    mockFromBase.mockReturnValueOnce({
+      select: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
+          data: [{ user_id: 'user-1', sale_id: 'sale-1', start_soon_notified_at: null }],
+          error: null,
+        })),
+      })),
+    }).mockReturnValueOnce({
+      select: vi.fn(() => ({
+        in: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
+            data: [mockSale],
+            error: null,
+          })),
+        })),
+      })),
+    }).mockReturnValueOnce({
+      update: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
+            data: null,
+            error: null,
+          })),
+        })),
+      })),
+    })
+
+    vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mockResolvedValue({ ok: true })
+
+    const result1 = await processFavoriteSalesStartingSoonJob({})
+    expect(result1.success).toBe(true)
+    expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(1)
+
+    // Clear mocks for second run
+    vi.clearAllMocks()
+    mockAuthUsersQuery.mockResolvedValue({
+      data: { users: [{ id: 'user-1', email: 'user@example.com' }] },
+      error: null,
+    })
+
+    // Second run: favorite now has start_soon_notified_at set (so it won't be in the query)
+    mockFromBase.mockReturnValueOnce({
+      select: vi.fn(() => ({
+        is: vi.fn(() => Promise.resolve({
+          data: [], // Empty because start_soon_notified_at is now set
+          error: null,
+        })),
+      })),
+    })
+
+    const result2 = await processFavoriteSalesStartingSoonJob({})
+    expect(result2.success).toBe(true)
+    // Should not send any emails on second run
+    expect(sendFavoriteSalesStartingSoonDigestEmail).not.toHaveBeenCalled()
   })
 })
 

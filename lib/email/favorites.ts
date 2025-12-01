@@ -6,6 +6,7 @@
 import React from 'react'
 import { sendEmail } from './sendEmail'
 import { FavoriteSaleStartingSoonEmail, buildFavoriteSaleStartingSoonSubject } from './templates/FavoriteSaleStartingSoonEmail'
+import { FavoriteSalesStartingSoonDigestEmail, buildFavoriteSalesStartingSoonDigestSubject, type SaleDigestItem } from './templates/FavoriteSalesStartingSoonDigestEmail'
 import type { Sale } from '@/lib/types'
 
 /**
@@ -139,6 +140,9 @@ export interface SendFavoriteSaleStartingSoonEmailResult {
 /**
  * Send "Favorite Sale Starting Soon" email to a user
  * 
+ * @deprecated This function sends one email per sale. Use sendFavoriteSalesStartingSoonDigestEmail
+ * instead, which consolidates multiple sales into a single digest email per user.
+ * 
  * This function is non-blocking and will never throw errors.
  * All errors are logged internally and returned in the result.
  * 
@@ -208,6 +212,131 @@ export async function sendFavoriteSaleStartingSoonEmail(
     console.error('[EMAIL_FAVORITES] Failed to send favorite sale starting soon email:', {
       saleId: sale.id,
       recipientEmail: to,
+      error: errorMessage,
+    })
+
+    return { ok: false, error: errorMessage }
+  }
+}
+
+export interface SendFavoriteSalesStartingSoonDigestEmailParams {
+  to: string
+  sales: Sale[]
+  userName?: string | null
+  hoursBeforeStart: number
+  timezone?: string
+}
+
+export interface SendFavoriteSalesStartingSoonDigestEmailResult {
+  ok: boolean
+  error?: string
+}
+
+/**
+ * Send "Favorite Sales Starting Soon" digest email to a user
+ * 
+ * Consolidates multiple favorited sales into a single digest email per user,
+ * reducing inbox spam when users have many favorites starting at the same time.
+ * 
+ * This function is non-blocking and will never throw errors.
+ * All errors are logged internally and returned in the result.
+ * 
+ * @param params - User email, list of sales, hours before start, and optional user name
+ * @returns Result object indicating success or failure
+ */
+export async function sendFavoriteSalesStartingSoonDigestEmail(
+  params: SendFavoriteSalesStartingSoonDigestEmailParams
+): Promise<SendFavoriteSalesStartingSoonDigestEmailResult> {
+  const { to, sales, userName, hoursBeforeStart, timezone = 'America/New_York' } = params
+
+  // Guard: Validate recipient email
+  if (!to || typeof to !== 'string' || to.trim() === '') {
+    console.error('[EMAIL_FAVORITES] Cannot send digest email - invalid recipient email:', {
+      recipientEmail: to,
+      salesCount: sales.length,
+    })
+    return { ok: false, error: 'Invalid recipient email' }
+  }
+
+  // Guard: Must have at least one sale
+  if (!sales || sales.length === 0) {
+    console.error('[EMAIL_FAVORITES] Cannot send digest email - no sales provided:', {
+      recipientEmail: to,
+    })
+    return { ok: false, error: 'No sales provided' }
+  }
+
+  // Guard: Filter out unpublished sales (log but continue with published ones)
+  const publishedSales = sales.filter(sale => {
+    if (sale.status !== 'published') {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[EMAIL_FAVORITES] Skipping sale in digest - not published:', {
+          saleId: sale.id,
+          status: sale.status,
+        })
+      }
+      return false
+    }
+    return true
+  })
+
+  if (publishedSales.length === 0) {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[EMAIL_FAVORITES] Skipping digest email - no published sales:', {
+        recipientEmail: to,
+        totalSales: sales.length,
+      })
+    }
+    return { ok: false, error: 'No published sales to send' }
+  }
+
+  try {
+    // Build digest items from sales
+    const digestItems: SaleDigestItem[] = publishedSales.map(sale => {
+      const saleUrl = buildSaleUrl(sale.id)
+      const dateRange = formatSaleDateRange(sale, timezone)
+      const timeWindow = formatTimeWindow(sale, timezone)
+      const addressLine = buildAddressLine(sale)
+
+      return {
+        saleId: sale.id,
+        saleTitle: sale.title,
+        saleAddress: addressLine,
+        dateRange,
+        timeWindow,
+        saleUrl,
+      }
+    })
+
+    // Build subject line
+    const subject = buildFavoriteSalesStartingSoonDigestSubject(digestItems)
+
+    // Compose email
+    const react = React.createElement(FavoriteSalesStartingSoonDigestEmail, {
+      recipientName: userName || null,
+      sales: digestItems,
+      hoursBeforeStart,
+    })
+
+    // Send email (non-blocking, errors are logged internally)
+    await sendEmail({
+      to: to.trim(),
+      subject,
+      type: 'favorite_sale_starting_soon',
+      react,
+      metadata: {
+        salesCount: digestItems.length,
+        saleIds: digestItems.map(item => item.saleId),
+      },
+    })
+
+    return { ok: true }
+  } catch (error) {
+    // Log but don't throw - email sending is non-critical
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('[EMAIL_FAVORITES] Failed to send favorite sales starting soon digest email:', {
+      recipientEmail: to,
+      salesCount: sales.length,
       error: errorMessage,
     })
 

@@ -154,24 +154,29 @@ void sendSaleCreatedEmail({
 
 **Location:** `lib/jobs/processor.ts` → `processFavoriteSalesStartingSoonJob()`
 
-**Implementation:** `lib/email/favorites.ts` → `sendFavoriteSaleStartingSoonEmail()`
+**Implementation:** `lib/email/favorites.ts` → `sendFavoriteSalesStartingSoonDigestEmail()`
 
-**Template:** `lib/email/templates/FavoriteSaleStartingSoonEmail.tsx`
+**Template:** `lib/email/templates/FavoriteSalesStartingSoonDigestEmail.tsx`
+
+**Email Behavior:**
+- **Digest format:** Sends **one digest email per user** containing all their favorited sales that are starting soon, consolidating multiple sales into a single email to reduce inbox spam
+- **Subject line:**
+  - Single sale: "A sale you saved is starting soon: [Sale Title]"
+  - Multiple sales: "Several saved sales are starting soon near you"
+- **Preview Text:** Includes sale count or single sale title and date range
 
 **Email Content:**
-- **Subject:** "A sale you saved is starting soon: [Sale Title]"
-- **Preview Text:** Includes sale title and date range
 - **Body Sections:**
   1. Header with LootAura branding
   2. Personalized greeting (uses display name if available)
-  3. Brief intro: "One of your favorite yard sales is about to start. Don't miss out!"
-  4. Sale details block:
-     - Sale title
+  3. Brief intro explaining the time window (e.g., "You have 3 favorite yard sales starting within the next 24 hours")
+  4. **List of sales** (one card per sale):
+     - Sale title (emphasized)
      - Address (formatted as "Address, City, State")
      - Date range (formatted consistently with Sale Created email)
      - Time window (if available)
-  5. Primary CTA button: "View Sale" → links to public sale page
-  6. Footer with transactional notice
+     - CTA button: "View Sale" → links to public sale page
+  5. Footer with transactional notice and link to manage favorites
 
 **Configuration:**
 - `EMAIL_FAVORITE_SALE_STARTING_SOON_ENABLED`: Enable/disable feature (default: `true`)
@@ -181,7 +186,14 @@ void sendSaleCreatedEmail({
 - User email: From `auth.users` via Admin API
 - Display name: From user profile via `getUserProfile()` (optional)
 - Sale data: From `lootaura_v2.sales` joined with `lootaura_v2.favorites`
-- Sale URL: Built from `NEXT_PUBLIC_SITE_URL` + `/sales/{saleId}`
+- Sale URLs: Built from `NEXT_PUBLIC_SITE_URL` + `/sales/{saleId}`
+
+**Job Processing:**
+1. Queries all favorites where `start_soon_notified_at IS NULL` (idempotency)
+2. Filters to sales starting within the configured time window
+3. **Groups favorites by `user_id`**
+4. For each user, sends **one digest email** containing all their qualifying sales
+5. On successful send, marks **all** included favorites for that user as notified
 
 **Guards:**
 - Only sends for sales with `status === 'published'`
@@ -189,10 +201,11 @@ void sendSaleCreatedEmail({
 - Only sends for sales starting within the configured time window
 - Validates recipient email is present and non-empty
 - Respects `EMAIL_FAVORITE_SALE_STARTING_SOON_ENABLED` flag
+- Filters out unpublished sales from digest (continues with published ones)
 
-**Idempotency:** Uses `start_soon_notified_at` timestamp in `lootaura_v2.favorites` table to ensure each favorite only receives one "starting soon" email per sale.
+**Idempotency:** Uses `start_soon_notified_at` timestamp in `lootaura_v2.favorites` table. When a digest email is successfully sent, **all** favorites included in that digest are marked as notified, ensuring users don't receive duplicate emails for the same sales on subsequent job runs.
 
-**Error handling:** Non-blocking; failures are logged but do not affect job execution. The function returns `{ ok: boolean, error?: string }` and never throws.
+**Error handling:** Non-blocking; failures are logged but do not affect job execution. If a user's digest email fails to send, only that user's favorites remain un-notified; other users' digests continue to be processed. The function returns `{ ok: boolean, error?: string }` and never throws.
 
 **Schedule:** Intended to run daily (e.g., via Vercel cron at 09:00 UTC). Can be triggered manually via job processor.
 

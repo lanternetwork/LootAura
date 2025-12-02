@@ -22,7 +22,7 @@ interface EmailEnvironment {
   isProduction: boolean
 }
 
-interface EmailDiagnostics {
+interface EmailDiagnosticsData {
   configuration: EmailConfiguration
   featureFlags: EmailFeatureFlags
   environment: EmailEnvironment
@@ -35,7 +35,7 @@ interface TestEmailResult {
 }
 
 export default function EmailDiagnostics() {
-  const [diagnostics, setDiagnostics] = useState<EmailDiagnostics | null>(null)
+  const [diagnostics, setDiagnostics] = useState<EmailDiagnosticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [testEmailLoading, setTestEmailLoading] = useState(false)

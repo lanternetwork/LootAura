@@ -35,12 +35,12 @@ describe('GET /api/admin/email/diagnostics', () => {
     assertAdminOrThrow = vi.mocked(adminGate.assertAdminOrThrow)
     
     // Set default env vars for tests
-    process.env.LOOTAURA_ENABLE_EMAILS = 'true'
-    process.env.RESEND_API_KEY = 'test-resend-key'
-    process.env.RESEND_FROM_EMAIL = 'test@example.com'
-    process.env.CRON_SECRET = 'test-cron-secret'
-    process.env.NEXT_PUBLIC_SITE_URL = 'https://test.example.com'
-    process.env.NODE_ENV = 'test'
+    vi.stubEnv('LOOTAURA_ENABLE_EMAILS', 'true')
+    vi.stubEnv('RESEND_API_KEY', 'test-resend-key')
+    vi.stubEnv('RESEND_FROM_EMAIL', 'test@example.com')
+    vi.stubEnv('CRON_SECRET', 'test-cron-secret')
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://test.example.com')
+    vi.stubEnv('NODE_ENV', 'test')
   })
 
   it('should return 403 when not authenticated as admin', async () => {
@@ -112,10 +112,10 @@ describe('GET /api/admin/email/diagnostics', () => {
 
   it('should handle missing environment variables', async () => {
     // Clear env vars
-    delete process.env.RESEND_API_KEY
-    delete process.env.RESEND_FROM_EMAIL
-    delete process.env.CRON_SECRET
-    delete process.env.NEXT_PUBLIC_SITE_URL
+    vi.stubEnv('RESEND_API_KEY', undefined)
+    vi.stubEnv('RESEND_FROM_EMAIL', undefined)
+    vi.stubEnv('CRON_SECRET', undefined)
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', undefined)
 
     const request = new NextRequest('http://localhost/api/admin/email/diagnostics', {
       method: 'GET',
@@ -133,8 +133,8 @@ describe('GET /api/admin/email/diagnostics', () => {
   })
 
   it('should use EMAIL_FROM as fallback for RESEND_FROM_EMAIL', async () => {
-    delete process.env.RESEND_FROM_EMAIL
-    process.env.EMAIL_FROM = 'fallback@example.com'
+    vi.stubEnv('RESEND_FROM_EMAIL', undefined)
+    vi.stubEnv('EMAIL_FROM', 'fallback@example.com')
 
     const request = new NextRequest('http://localhost/api/admin/email/diagnostics', {
       method: 'GET',
@@ -149,7 +149,7 @@ describe('GET /api/admin/email/diagnostics', () => {
   })
 
   it('should detect production environment', async () => {
-    process.env.NODE_ENV = 'production'
+    vi.stubEnv('NODE_ENV', 'production')
 
     const request = new NextRequest('http://localhost/api/admin/email/diagnostics', {
       method: 'GET',

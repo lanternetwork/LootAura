@@ -227,7 +227,9 @@ describe('POST /api/cron/favorite-sales-starting-soon', () => {
     expect(data.ok).toBe(true)
     expect(data.emailsEnabled).toBe(false)
     expect(data.message).toBe('Emails disabled by configuration')
-    expect(data.emailsSent).toBe(0)
+    // Legacy route now delegates to canonical /favorites-starting-soon endpoint,
+    // which returns stats.emailsSent instead of a top-level emailsSent field.
+    expect(data.stats?.emailsSent).toBe(0)
     expect(processFavoriteSalesStartingSoonJob).not.toHaveBeenCalled()
     
     // Reset for other tests

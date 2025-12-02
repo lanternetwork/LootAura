@@ -142,23 +142,25 @@ export async function GET(request: NextRequest) {
     // Parse date bounds using shared helper
     const dateWindow = dateBounds.parseDateBounds(startDate, endDate)
     
-    // Debug logging for date filtering
-    console.log('[MARKERS API] Date filtering debug:', {
-      startDate,
-      endDate,
-      dateBounds: dateWindow,
-      totalRecords: data?.length || 0,
-      url: request.url,
-      sampleSales: data?.slice(0, 3).map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        date_start: s.date_start,
-        date_end: s.date_end,
-        time_start: s.time_start,
-        time_end: s.time_end,
-        starts_at: s.starts_at
-      }))
-    })
+    // Debug logging for date filtering (debug mode only to avoid noisy production logs)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MARKERS API] Date filtering debug:', {
+        startDate,
+        endDate,
+        dateBounds: dateWindow,
+        totalRecords: data?.length || 0,
+        url: request.url,
+        sampleSales: data?.slice(0, 3).map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          date_start: s.date_start,
+          date_end: s.date_end,
+          time_start: s.time_start,
+          time_end: s.time_end,
+          starts_at: s.starts_at
+        }))
+      })
+    }
     
     // If no date filtering is applied, return all sales
     if (!dateWindow) {

@@ -276,13 +276,12 @@ void sendSaleCreatedEmail({
 
 ### Admin Test Endpoint
 
-A test endpoint is available for safely testing email sending in non-production environments:
+A test endpoint is available for safely testing email sending:
 
 **Endpoint:** `POST /api/admin/test-email`
 
 **Access:** 
-- Admin users (via `ADMIN_EMAILS` env var)
-- Non-production environments (`NODE_ENV !== 'production'`)
+- Admin users only (via `ADMIN_EMAILS` env var, with optional debug-mode bypass in non-production)
 
 **Request body:**
 ```json
@@ -324,7 +323,7 @@ Email sending is designed to be **non-critical** and **non-blocking**:
 
 - **Server-only**: All email code is server-side only (no client imports)
 - **API key protection**: `RESEND_API_KEY` is never exposed to the client
-- **Admin-only testing**: Test endpoint requires admin access in production
+- **Admin-only testing**: Test endpoint always requires admin access (debug-mode bypass is disabled in production)
 - **Email validation**: Recipient emails are validated before sending
 
 ## Background Jobs

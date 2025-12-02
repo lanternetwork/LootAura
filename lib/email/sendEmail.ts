@@ -11,14 +11,19 @@ export interface SendEmailParams extends EmailSendOptions {
   react: ReactElement
 }
 
+export interface SendEmailResult {
+  ok: boolean
+  error?: string
+}
+
 /**
  * Send an email via Resend
  * 
  * - Honors LOOTAURA_ENABLE_EMAILS env var (skips send if not "true")
  * - Logs errors but does not throw (emails are non-critical side effects)
- * - Returns void (fire-and-forget pattern)
+ * - Returns a structured result for diagnostics (`{ ok, error? }`)
  */
-export async function sendEmail(params: SendEmailParams): Promise<void> {
+export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
   const { to, subject, react, type, metadata } = params
 
   // Check if emails are enabled
@@ -33,7 +38,10 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       actualValue: process.env.LOOTAURA_ENABLE_EMAILS,
       expectedValue: 'true',
     })
-    return
+    return {
+      ok: false,
+      error: 'LOOTAURA_ENABLE_EMAILS is not enabled',
+    }
   }
 
   // Get from address (check RESEND_FROM_EMAIL first, fallback to EMAIL_FROM for backward compatibility)
@@ -49,7 +57,10 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
         hasEmailFrom: !!process.env.EMAIL_FROM,
       },
     })
-    return
+    return {
+      ok: false,
+      error: error.message,
+    }
   }
 
   try {
@@ -82,6 +93,7 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       resendEmailId: result.data?.id,
       metadata,
     })
+    return { ok: true }
   } catch (error) {
     // Log structured error but don't throw - emails are non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)
@@ -109,6 +121,11 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
       })
     } catch {
       // Sentry not available or failed to import - ignore
+    }
+
+    return {
+      ok: false,
+      error: errorMessage,
     }
   }
 }

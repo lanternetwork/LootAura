@@ -19,23 +19,18 @@ export const dynamic = 'force-dynamic'
  * 
  * Body: { to: string }
  * 
- * Only accessible to admins or in non-production environments
+ * Only accessible to admins (debug-mode bypass is controlled in adminGate)
  */
 export async function POST(request: NextRequest) {
   try {
-    // Check admin access (allows in debug mode for development)
-    // In production, requires ADMIN_EMAILS env var
-    const isProduction = process.env.NODE_ENV === 'production'
-    
-    if (isProduction) {
-      try {
-        await assertAdminOrThrow(request)
-      } catch (adminError) {
-        return NextResponse.json(
-          { error: 'Forbidden: Admin access required' },
-          { status: 403 }
-        )
-      }
+    // Require admin access in all environments
+    try {
+      await assertAdminOrThrow(request)
+    } catch {
+      return NextResponse.json(
+        { error: 'Forbidden: Admin access required' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()

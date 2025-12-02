@@ -393,7 +393,7 @@ The cron endpoints respect the global email toggle:
        },
        {
          "path": "/api/cron/seller-weekly-analytics",
-         "schedule": "0 9 * * MON"
+         "schedule": "0 9 * * 1"
        }
      ]
    }

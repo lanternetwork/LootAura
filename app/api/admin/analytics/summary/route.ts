@@ -4,6 +4,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 
+// This route uses auth (cookies) and performs DB queries, so it must always be dynamic.
+export const dynamic = 'force-dynamic'
+
 interface AnalyticsSummaryResponse {
   ok: boolean
   meta: {

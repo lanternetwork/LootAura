@@ -931,60 +931,105 @@ export default function SalesClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapView])
 
-  // Restore ZIP from URL on page load only (not on every URL change)
+  // Restore ZIP or city name from URL on page load only (not on every URL change)
   // Skip if initialCenter already matches ZIP (server-side lookup succeeded)
   const [hasRestoredZip, setHasRestoredZip] = useState(false)
   useEffect(() => {
     if (hasRestoredZip) return // Only run once on mount
     
     const zipFromUrl = searchParams.get('zip')
-    // Only lookup ZIP client-side if:
-    // 1. There's a ZIP in URL
+    // Only lookup ZIP/city client-side if:
+    // 1. There's a ZIP/city in URL
     // 2. No lat/lng in URL
-    // 3. InitialCenter doesn't already have the correct ZIP location (server-side lookup might have failed)
+    // 3. InitialCenter doesn't already have the correct location (server-side lookup might have failed)
     const needsClientSideLookup = zipFromUrl && !urlLat && !urlLng && 
       (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== zipFromUrl.trim())
     
     if (needsClientSideLookup) {
-      // Trigger ZIP lookup from URL
+      // Trigger ZIP or city name lookup from URL
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[ZIP] Restoring from URL:', zipFromUrl)
       }
       
-      const performZipLookup = async () => {
-        const trimmedZip = zipFromUrl.trim()
+      const performLocationLookup = async () => {
+        const trimmedQuery = zipFromUrl.trim()
         const zipRegex = /^\d{5}(-\d{4})?$/
         
-        if (!zipRegex.test(trimmedZip)) {
-          console.warn('[ZIP] Invalid ZIP format from URL:', trimmedZip)
-          setHasRestoredZip(true)
-          return
+        // First, try ZIP code lookup if it matches ZIP format
+        if (zipRegex.test(trimmedQuery)) {
+          try {
+            const response = await fetch(`/api/geocoding/zip?zip=${encodeURIComponent(trimmedQuery)}`)
+            const data = await response.json()
+            
+            if (data.ok && data.lat && data.lng) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[ZIP] Lookup success from URL:', { zip: trimmedQuery, lat: data.lat, lng: data.lng })
+              }
+              
+              // Use the same handler as manual ZIP input
+              const bbox = data.bbox ? [data.bbox[0], data.bbox[1], data.bbox[2], data.bbox[3]] as [number, number, number, number] : undefined
+              handleZipLocationFound(data.lat, data.lng, data.city, data.state, data.zip, bbox)
+              setHasRestoredZip(true)
+              return
+            } else {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.warn('[ZIP] ZIP lookup failed from URL, trying city name geocoding:', trimmedQuery, data.error)
+              }
+            }
+          } catch (error) {
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.error('[ZIP] ZIP lookup error from URL, trying city name geocoding:', trimmedQuery, error)
+            }
+          }
         }
         
+        // If ZIP lookup failed or query is not a ZIP format, try city name geocoding
         try {
-          const response = await fetch(`/api/geocoding/zip?zip=${encodeURIComponent(trimmedZip)}`)
-          const data = await response.json()
-          
-          if (data.ok && data.lat && data.lng) {
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[ZIP] Lookup success from URL:', { zip: trimmedZip, lat: data.lat, lng: data.lng })
-            }
-            
-            // Use the same handler as manual ZIP input
-            const bbox = data.bbox ? [data.bbox[0], data.bbox[1], data.bbox[2], data.bbox[3]] as [number, number, number, number] : undefined
-            handleZipLocationFound(data.lat, data.lng, data.city, data.state, data.zip, bbox)
-          } else {
-            console.warn('[ZIP] Lookup failed from URL:', trimmedZip, data.error)
-            handleZipError(data.error || 'ZIP code not found')
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[ZIP] Attempting city name geocoding for:', trimmedQuery)
           }
+          const suggestResponse = await fetch(`/api/geocoding/suggest?q=${encodeURIComponent(trimmedQuery)}&limit=1`)
+          const suggestData = await suggestResponse.json()
+          
+          if (suggestData?.ok && suggestData.data && suggestData.data.length > 0) {
+            const firstResult = suggestData.data[0]
+            if (firstResult.lat && firstResult.lng) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[ZIP] City name geocoding success from URL:', { 
+                  query: trimmedQuery, 
+                  lat: firstResult.lat, 
+                  lng: firstResult.lng,
+                  city: firstResult.address?.city,
+                  state: firstResult.address?.state
+                })
+              }
+              
+              handleZipLocationFound(
+                firstResult.lat, 
+                firstResult.lng, 
+                firstResult.address?.city || firstResult.address?.town || firstResult.address?.village,
+                firstResult.address?.state,
+                firstResult.address?.postcode || firstResult.address?.zip
+              )
+              setHasRestoredZip(true)
+              return
+            }
+          }
+          
+          // Both lookups failed
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.warn('[ZIP] City name geocoding failed from URL:', trimmedQuery)
+          }
+          handleZipError('Location not found')
         } catch (error) {
-          console.error('[ZIP] Lookup error from URL:', trimmedZip, error)
-          handleZipError('Failed to lookup ZIP code')
+          console.error('[ZIP] City name geocoding error from URL:', trimmedQuery, error)
+          handleZipError('Failed to lookup location')
         }
+        
+        setHasRestoredZip(true)
       }
       
-      performZipLookup()
-      setHasRestoredZip(true) // Mark as restored
+      performLocationLookup()
     } else if (!zipFromUrl) {
       // No ZIP in URL, mark as processed
       setHasRestoredZip(true)

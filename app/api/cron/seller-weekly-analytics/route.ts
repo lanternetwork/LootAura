@@ -1,18 +1,19 @@
 /**
+ * GET /api/cron/seller-weekly-analytics
  * POST /api/cron/seller-weekly-analytics
  * 
  * Cron endpoint for triggering the "Seller Weekly Analytics" email job.
  * 
- * This endpoint is protected by CRON_SECRET header authentication.
+ * This endpoint is protected by CRON_SECRET Bearer token authentication.
  * It should be called by a scheduled job (Vercel Cron, Supabase Cron, etc.)
  * to send weekly analytics reports to sellers.
  * 
  * Authentication:
- * - Requires x-cron-secret header: `${CRON_SECRET}`
+ * - Requires Authorization header: `Bearer ${CRON_SECRET}`
  * - Environment variable: CRON_SECRET (server-only)
  * 
  * Schedule recommendation:
- * - Weekly on Mondays at 09:30 UTC
+ * - Weekly on Mondays at 09:00 UTC
  * - Purpose: Send weekly performance emails to sellers for the last full week
  * 
  * Optional query parameter:
@@ -27,12 +28,8 @@ import { logger } from '@/lib/log'
 
 export const dynamic = 'force-dynamic'
 
-// Reject all non-POST methods
-export async function GET() {
-  return NextResponse.json(
-    { ok: false, error: 'Method not allowed. Use POST.' },
-    { status: 405 }
-  )
+export async function GET(request: NextRequest) {
+  return handleRequest(request)
 }
 
 export async function POST(request: NextRequest) {

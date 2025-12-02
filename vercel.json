@@ -4,12 +4,12 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/cron/favorite-sales-starting-soon",
+      "path": "/api/cron/favorites-starting-soon",
       "schedule": "0 9 * * *"
     },
     {
       "path": "/api/cron/seller-weekly-analytics",
-      "schedule": "30 9 * * 1"
+      "schedule": "0 9 * * MON"
     }
   ]
 }

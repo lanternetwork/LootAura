@@ -29,6 +29,7 @@ vi.mock('@/lib/log', () => ({
 
 describe('GET /api/cron/seller-weekly-analytics', () => {
   let handler: (request: NextRequest) => Promise<Response>
+  let assertCronAuthorized: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
     vi.clearAllMocks()
@@ -36,20 +37,57 @@ describe('GET /api/cron/seller-weekly-analytics', () => {
     // Import the handler dynamically after mocks are set up
     const module = await import('@/app/api/cron/seller-weekly-analytics/route')
     handler = module.GET
+    
+    const cronAuth = await import('@/lib/auth/cron')
+    assertCronAuthorized = vi.mocked(cronAuth.assertCronAuthorized)
+    
+    // Set default env vars for tests
+    process.env.LOOTAURA_ENABLE_EMAILS = 'true'
   })
 
-  it('should return 405 Method Not Allowed for GET requests', async () => {
+  it('should return 401 when Authorization header is missing', async () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
       method: 'GET',
+    })
+
+    // Mock auth failure (throws NextResponse)
+    const { NextResponse } = await import('next/server')
+    assertCronAuthorized.mockImplementation(() => {
+      throw NextResponse.json(
+        { ok: false, error: 'Unauthorized', code: 'UNAUTHORIZED' },
+        { status: 401 }
+      )
     })
 
     const response = await handler(request)
     const data = await response.json()
 
-    expect(response.status).toBe(405)
+    expect(response.status).toBe(401)
     expect(data.ok).toBe(false)
-    expect(data.error).toBe('Method not allowed. Use POST.')
+    expect(data.error).toBe('Unauthorized')
     expect(processSellerWeeklyAnalyticsJob).not.toHaveBeenCalled()
+  })
+
+  it('should accept GET requests and trigger job when authorized', async () => {
+    const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
+      method: 'GET',
+      headers: {
+        authorization: 'Bearer valid-token',
+      },
+    })
+
+    assertCronAuthorized.mockImplementation(() => {})
+    vi.mocked(processSellerWeeklyAnalyticsJob).mockResolvedValue({
+      success: true,
+    })
+
+    const response = await handler(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.job).toBe('seller-weekly-analytics')
+    expect(processSellerWeeklyAnalyticsJob).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -70,7 +108,7 @@ describe('POST /api/cron/seller-weekly-analytics', () => {
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
   })
 
-  it('should return 401 when x-cron-secret header is missing', async () => {
+  it('should return 401 when Authorization header is missing', async () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
       method: 'POST',
     })
@@ -93,11 +131,11 @@ describe('POST /api/cron/seller-weekly-analytics', () => {
     expect(processSellerWeeklyAnalyticsJob).not.toHaveBeenCalled()
   })
 
-  it('should return 401 when x-cron-secret header is invalid', async () => {
+  it('should return 401 when Authorization Bearer token is invalid', async () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
       method: 'POST',
       headers: {
-        'x-cron-secret': 'wrong-token',
+        authorization: 'Bearer wrong-token',
       },
     })
 
@@ -122,7 +160,7 @@ describe('POST /api/cron/seller-weekly-analytics', () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
       method: 'POST',
       headers: {
-        'x-cron-secret': 'valid-token',
+        authorization: 'Bearer valid-token',
       },
     })
 
@@ -148,7 +186,7 @@ describe('POST /api/cron/seller-weekly-analytics', () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics?date=2025-01-06', {
       method: 'POST',
       headers: {
-        'x-cron-secret': 'valid-token',
+        authorization: 'Bearer valid-token',
       },
     })
 
@@ -176,7 +214,7 @@ describe('POST /api/cron/seller-weekly-analytics', () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
       method: 'POST',
       headers: {
-        'x-cron-secret': 'valid-token',
+        authorization: 'Bearer valid-token',
       },
     })
 
@@ -200,7 +238,7 @@ describe('POST /api/cron/seller-weekly-analytics', () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
       method: 'POST',
       headers: {
-        'x-cron-secret': 'valid-token',
+        authorization: 'Bearer valid-token',
       },
     })
 
@@ -224,7 +262,7 @@ describe('POST /api/cron/seller-weekly-analytics', () => {
     const request = new NextRequest('http://localhost/api/cron/seller-weekly-analytics', {
       method: 'POST',
       headers: {
-        'x-cron-secret': 'valid-token',
+        authorization: 'Bearer valid-token',
       },
     })
 

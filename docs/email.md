@@ -339,7 +339,7 @@ Email jobs are defined in `lib/jobs/processor.ts` and can be triggered via:
 
 #### Favorite Sale Starting Soon
 
-- **Cron endpoint**: `POST /api/cron/favorite-sales-starting-soon`
+- **Cron endpoint**: `GET /api/cron/favorites-starting-soon` (also accepts POST)
 - **Recommended schedule**: Daily at 09:00 UTC
 - **Purpose**: Send reminder emails for favorited sales starting within the next N hours
   - Window configured via `EMAIL_FAVORITE_SALE_STARTING_SOON_HOURS_BEFORE_START` (default: 24 hours)
@@ -349,8 +349,8 @@ Email jobs are defined in `lib/jobs/processor.ts` and can be triggered via:
 
 #### Seller Weekly Analytics
 
-- **Cron endpoint**: `POST /api/cron/seller-weekly-analytics`
-- **Recommended schedule**: Weekly on Mondays at 09:30 UTC
+- **Cron endpoint**: `GET /api/cron/seller-weekly-analytics` (also accepts POST)
+- **Recommended schedule**: Weekly on Mondays at 09:00 UTC
 - **Purpose**: Send weekly performance emails to sellers for the last full week (Monday 00:00 UTC to next Monday 00:00 UTC)
 - **Optional query parameter**: `?date=2025-01-06` - Compute week for a specific date (useful for backfilling or testing)
 - **Idempotency**: Relies on time window calculation (last full week) to prevent duplicates
@@ -361,12 +361,12 @@ Email jobs are defined in `lib/jobs/processor.ts` and can be triggered via:
 
 #### Authentication
 
-All cron endpoints require header-based authentication:
+All cron endpoints require Bearer token authentication:
 
 - **Environment variable**: `CRON_SECRET` (server-only, must be set in production)
-- **Header**: `x-cron-secret: ${CRON_SECRET}`
-- **Security**: Requests without valid header return `401 Unauthorized`
-- **Method**: Only `POST` requests are accepted (other methods return `405 Method Not Allowed`)
+- **Authorization header**: `Authorization: Bearer ${CRON_SECRET}`
+- **Security**: Requests without valid token return `401 Unauthorized`
+- **Method**: Both `GET` and `POST` requests are accepted (for flexibility with different schedulers)
 
 #### Email Global Toggle
 
@@ -388,12 +388,12 @@ The cron endpoints respect the global email toggle:
    {
      "crons": [
        {
-         "path": "/api/cron/favorite-sales-starting-soon",
+         "path": "/api/cron/favorites-starting-soon",
          "schedule": "0 9 * * *"
        },
        {
          "path": "/api/cron/seller-weekly-analytics",
-         "schedule": "30 9 * * 1"
+         "schedule": "0 9 * * MON"
        }
      ]
    }
@@ -414,27 +414,27 @@ The cron endpoints respect the global email toggle:
 1. Set `CRON_SECRET` environment variable in your deployment environment
 
 2. Configure your scheduler to:
-   - Make **POST** requests to the cron endpoints
-   - Include header: `x-cron-secret: ${CRON_SECRET}`
+   - Make **GET** or **POST** requests to the cron endpoints
+   - Include header: `Authorization: Bearer ${CRON_SECRET}`
 
 3. Recommended schedules:
    - Favorite Sale Starting Soon: Daily at 09:00 UTC (`0 9 * * *`)
-   - Seller Weekly Analytics: Weekly on Mondays at 09:30 UTC (`30 9 * * 1`)
+   - Seller Weekly Analytics: Weekly on Mondays at 09:00 UTC (`0 9 * * MON`)
 
 **Example curl command for manual testing:**
 
 ```bash
 # Test favorite sales starting soon endpoint
-curl -X POST https://your-domain.com/api/cron/favorite-sales-starting-soon \
-  -H "x-cron-secret: your-cron-secret-here"
+curl -X GET https://your-domain.com/api/cron/favorites-starting-soon \
+  -H "Authorization: Bearer $CRON_SECRET"
 
 # Test seller weekly analytics endpoint
-curl -X POST https://your-domain.com/api/cron/seller-weekly-analytics \
-  -H "x-cron-secret: your-cron-secret-here"
+curl -X GET https://your-domain.com/api/cron/seller-weekly-analytics \
+  -H "Authorization: Bearer $CRON_SECRET"
 
 # Test with date parameter
-curl -X POST "https://your-domain.com/api/cron/seller-weekly-analytics?date=2025-01-06" \
-  -H "x-cron-secret: your-cron-secret-here"
+curl -X GET "https://your-domain.com/api/cron/seller-weekly-analytics?date=2025-01-06" \
+  -H "Authorization: Bearer $CRON_SECRET"
 ```
 
 #### Local Development
@@ -455,7 +455,8 @@ tsx scripts/run-seller-weekly-analytics.ts 2025-01-06
 **Note:** 
 - Cron jobs run only when configured in your scheduler (Vercel Cron, external service, etc.)
 - Locally, you should use the scripts under `scripts/` to debug jobs
-- The cron endpoints are production-ready and can be wired to any scheduler that supports HTTP POST requests with custom headers
+- The cron endpoints are production-ready and can be wired to any scheduler that supports HTTP GET/POST requests with Bearer token authentication
+- Vercel automatically picks up cron jobs from `vercel.json` after deployment
 
 ## Future Enhancements
 

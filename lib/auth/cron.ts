@@ -1,6 +1,6 @@
 /**
  * Cron authentication helper
- * Validates x-cron-secret header authentication for scheduled job endpoints
+ * Validates Bearer token authentication for scheduled job endpoints
  * 
  * Used by cron endpoints (e.g., Vercel Cron, Supabase Cron) to ensure
  * only authorized schedulers can trigger jobs.
@@ -12,14 +12,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
- * Assert that the request is authorized with a valid CRON_SECRET in x-cron-secret header
+ * Assert that the request is authorized with a valid CRON_SECRET Bearer token
  * Throws NextResponse with 401 if unauthorized
  * 
  * @param request - The incoming request
  * @throws NextResponse with 401 status if unauthorized
  */
 export function assertCronAuthorized(request: NextRequest): void {
-  const cronSecretHeader = request.headers.get('x-cron-secret')
+  const authHeader = request.headers.get('authorization')
   const expectedSecret = process.env.CRON_SECRET
 
   // If no secret is configured, reject all requests (fail secure)
@@ -34,14 +34,15 @@ export function assertCronAuthorized(request: NextRequest): void {
     )
   }
 
-  // Check for x-cron-secret header
-  if (!cronSecretHeader || cronSecretHeader !== expectedSecret) {
+  // Check for Bearer token: Authorization: Bearer ${CRON_SECRET}
+  const expectedAuthHeader = `Bearer ${expectedSecret}`
+  if (!authHeader || authHeader !== expectedAuthHeader) {
     // Log warning without exposing the secret
     if (process.env.NODE_ENV !== 'test') {
       console.warn('[CRON_AUTH] Unauthorized cron request attempt', {
-        hasHeader: !!cronSecretHeader,
-        headerLength: cronSecretHeader?.length || 0,
-        expectedLength: expectedSecret.length,
+        hasHeader: !!authHeader,
+        headerLength: authHeader?.length || 0,
+        expectedLength: expectedAuthHeader.length,
       })
     }
     throw NextResponse.json(
@@ -56,20 +57,20 @@ export function assertCronAuthorized(request: NextRequest): void {
 }
 
 /**
- * Check if the request is authorized with a valid CRON_SECRET in x-cron-secret header
+ * Check if the request is authorized with a valid CRON_SECRET Bearer token
  * Returns true if authorized, false otherwise
  * 
  * @param request - The incoming request
  * @returns true if authorized, false otherwise
  */
 export function isCronAuthorized(request: NextRequest): boolean {
-  const cronSecretHeader = request.headers.get('x-cron-secret')
+  const authHeader = request.headers.get('authorization')
   const expectedSecret = process.env.CRON_SECRET
 
   if (!expectedSecret) {
     return false
   }
 
-  return cronSecretHeader === expectedSecret
+  return authHeader === `Bearer ${expectedSecret}`
 }
 

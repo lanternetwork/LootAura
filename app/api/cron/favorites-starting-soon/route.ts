@@ -1,6 +1,6 @@
 /**
- * GET /api/cron/favorite-sales-starting-soon
- * POST /api/cron/favorite-sales-starting-soon
+ * GET /api/cron/favorites-starting-soon
+ * POST /api/cron/favorites-starting-soon
  * 
  * Cron endpoint for triggering the "Favorite Sale Starting Soon" email job.
  * 
@@ -46,7 +46,7 @@ async function handleRequest(request: NextRequest) {
     const emailsEnabled = process.env.LOOTAURA_ENABLE_EMAILS === 'true'
     if (!emailsEnabled) {
       logger.info('Favorite sales starting soon cron job skipped - emails disabled', {
-        component: 'api/cron/favorite-sales-starting-soon',
+        component: 'api/cron/favorites-starting-soon',
         runAt,
         env,
         emailsEnabled: false,
@@ -59,12 +59,12 @@ async function handleRequest(request: NextRequest) {
         env,
         emailsEnabled: false,
         message: 'Emails disabled by configuration',
-        emailsSent: 0,
+        stats: { emailsSent: 0, errors: 0 },
       })
     }
 
     logger.info('Favorite sales starting soon cron job triggered', {
-      component: 'api/cron/favorite-sales-starting-soon',
+      component: 'api/cron/favorites-starting-soon',
       runAt,
       env,
       isProduction,
@@ -76,7 +76,7 @@ async function handleRequest(request: NextRequest) {
 
     if (!result.success) {
       logger.error('Favorite sales starting soon job failed', new Error(result.error || 'Unknown error'), {
-        component: 'api/cron/favorite-sales-starting-soon',
+        component: 'api/cron/favorites-starting-soon',
         runAt,
         env,
         error: result.error,
@@ -95,7 +95,7 @@ async function handleRequest(request: NextRequest) {
     }
 
     logger.info('Favorite sales starting soon cron job completed', {
-      component: 'api/cron/favorite-sales-starting-soon',
+      component: 'api/cron/favorites-starting-soon',
       runAt,
       env,
     })
@@ -106,6 +106,7 @@ async function handleRequest(request: NextRequest) {
       runAt,
       env,
       emailsEnabled: true,
+      stats: { emailsSent: 0, errors: 0 }, // Job processor doesn't expose these stats yet
     })
   } catch (error) {
     // Handle auth errors (thrown by assertCronAuthorized)
@@ -116,7 +117,7 @@ async function handleRequest(request: NextRequest) {
     // Handle unexpected errors
     const errorMessage = error instanceof Error ? error.message : String(error)
     logger.error('Unexpected error in favorite sales starting soon cron', error instanceof Error ? error : new Error(errorMessage), {
-      component: 'api/cron/favorite-sales-starting-soon',
+      component: 'api/cron/favorites-starting-soon',
       runAt,
       env,
     })

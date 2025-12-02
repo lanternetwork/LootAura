@@ -1,11 +1,12 @@
 {
   "expo": {
     "name": "LootAura",
-    "slug": "lootaura",
+    "slug": "LootAura",
+    "scheme": "lootaura",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -14,6 +15,14 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "android": {
+      "package": "com.lootaura.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#3A2268"
+      },
+      "permissions": []
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.lootaura.app",
@@ -21,23 +30,19 @@
         "NSLocationWhenInUseUsageDescription": "LootAura uses your location to show nearby yard sales."
       }
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#3A2268"
-      },
-      "package": "com.lootaura.app",
-      "permissions": []
-    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "scheme": "lootaura",
     "plugins": [
       "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "<INSERT_EAS_PROJECT_ID>"
+      }
     }
   }
 }

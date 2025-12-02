@@ -21,7 +21,7 @@ describe('assertAdminOrThrow', () => {
     vi.stubEnv('NEXT_PUBLIC_DEBUG', 'true')
     vi.stubEnv('ADMIN_EMAILS', 'admin@example.com')
 
-    ;(createSupabaseServerClient as vi.Mock).mockReturnValue({
+    ;(createSupabaseServerClient as any).mockReturnValue({
       auth: { getUser: mockGetUser },
     })
 
@@ -44,7 +44,7 @@ describe('assertAdminOrThrow', () => {
     vi.stubEnv('NEXT_PUBLIC_DEBUG', 'true')
     vi.stubEnv('ADMIN_EMAILS', 'admin@example.com')
 
-    ;(createSupabaseServerClient as vi.Mock).mockReturnValue({
+    ;(createSupabaseServerClient as any).mockReturnValue({
       auth: { getUser: mockGetUser },
     })
 

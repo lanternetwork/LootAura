@@ -539,8 +539,32 @@ export default function SalesClient({
           lngRange: bounds.east - bounds.west
         },
         bufferedBounds,
-        isInsideBuffer: bufferedBounds ? isViewportInsideBounds(viewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR) : false
+        isInsideBuffer: bufferedBounds ? isViewportInsideBounds(viewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR) : false,
+        hasPendingBounds: !!pendingBounds
       })
+    }
+    
+    // If fitBounds is active (pendingBounds is set), update the zoom in mapView
+    // This ensures that when pendingBounds is cleared, the map already has the correct zoom
+    // This prevents the zoom-out flash that happens when pendingBounds clears
+    if (pendingBounds) {
+      setMapView(prev => {
+        if (!prev) {
+          return {
+            center,
+            bounds,
+            zoom
+          }
+        }
+        return {
+          ...prev,
+          center,
+          zoom, // Update zoom to match what fitBounds calculated
+          bounds
+        }
+      })
+      // Don't proceed with fetch logic while fitBounds is active
+      return
     }
     
     // If a single location is selected and the user moves the map, exit location view
@@ -630,7 +654,7 @@ export default function SalesClient({
       lastBoundsRef.current = bounds
       initialLoadRef.current = false // Mark initial load as complete
     }, 200)
-  }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult])
+  }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult, pendingBounds])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {
@@ -679,22 +703,23 @@ export default function SalesClient({
         const newView: MapViewState = {
           center: { lat, lng },
           bounds: calculatedBounds,
-          zoom: estimatedZoom // Initial zoom, fitBounds will adjust
+          zoom: estimatedZoom // Initial zoom, fitBounds will adjust via onViewportChange
         }
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[ZIP] New map view:', newView, 'calculatedBounds:', calculatedBounds)
         }
         
         // Use fitBounds to ensure exactly 10-mile radius is visible
-        // Set bounds immediately - map will apply when loaded (no animation)
+        // Set bounds immediately - map will apply when loaded
         setPendingBounds(calculatedBounds)
-        // Clear after a longer delay to ensure map has time to apply bounds
+        // Clear after fitBounds animation completes (300ms duration + buffer)
+        // onViewportChange will update the zoom before this clears, preventing zoom flash
         setTimeout(() => {
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.log('[ZIP] Clearing pendingBounds after fitBounds applied')
           }
           setPendingBounds(null)
-        }, 1000) // Give map more time to apply bounds before clearing
+        }, 500) // Reduced from 1000ms to 500ms (300ms animation + 200ms buffer)
         
         return newView
       }
@@ -704,22 +729,23 @@ export default function SalesClient({
         ...prev,
         center: { lat, lng },
         bounds: calculatedBounds,
-        zoom: estimatedZoom // Initial zoom, fitBounds will adjust
+        zoom: estimatedZoom // Initial zoom, fitBounds will adjust via onViewportChange
       }
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[ZIP] Updated map view:', newView, 'calculatedBounds:', calculatedBounds)
       }
       
       // Use fitBounds to ensure exactly 10-mile radius is visible
-      // Set bounds - map will apply when ready (no animation)
+      // Set bounds - map will apply when ready
       setPendingBounds(calculatedBounds)
-      // Clear after delay to ensure map applies bounds
+      // Clear after fitBounds animation completes (300ms duration + buffer)
+      // onViewportChange will update the zoom before this clears, preventing zoom flash
       setTimeout(() => {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[ZIP] Clearing pendingBounds after fitBounds applied')
         }
         setPendingBounds(null)
-      }, 1000) // Give map more time to apply bounds before clearing
+      }, 500) // Reduced from 1000ms to 500ms (300ms animation + 200ms buffer)
       
       return newView
     })

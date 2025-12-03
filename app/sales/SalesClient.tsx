@@ -539,8 +539,32 @@ export default function SalesClient({
           lngRange: bounds.east - bounds.west
         },
         bufferedBounds,
-        isInsideBuffer: bufferedBounds ? isViewportInsideBounds(viewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR) : false
+        isInsideBuffer: bufferedBounds ? isViewportInsideBounds(viewportBounds, bufferedBounds, MAP_BUFFER_SAFETY_FACTOR) : false,
+        hasPendingBounds: !!pendingBounds
       })
+    }
+    
+    // If fitBounds is active (pendingBounds is set), update the zoom in mapView
+    // This ensures that when pendingBounds is cleared, the map already has the correct zoom
+    // This prevents the zoom-out flash that happens when pendingBounds clears
+    if (pendingBounds) {
+      setMapView(prev => {
+        if (!prev) {
+          return {
+            center,
+            bounds,
+            zoom
+          }
+        }
+        return {
+          ...prev,
+          center,
+          zoom, // Update zoom to match what fitBounds calculated
+          bounds
+        }
+      })
+      // Don't proceed with fetch logic while fitBounds is active
+      return
     }
     
     // If a single location is selected and the user moves the map, exit location view
@@ -630,7 +654,7 @@ export default function SalesClient({
       lastBoundsRef.current = bounds
       initialLoadRef.current = false // Mark initial load as complete
     }, 200)
-  }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult])
+  }, [bufferedBounds, fetchMapSales, selectedPinId, hybridResult, pendingBounds])
 
   // Handle ZIP search with bbox support
   const handleZipLocationFound = useCallback((lat: number, lng: number, city?: string, state?: string, zip?: string, _bbox?: [number, number, number, number]) => {
@@ -679,22 +703,23 @@ export default function SalesClient({
         const newView: MapViewState = {
           center: { lat, lng },
           bounds: calculatedBounds,
-          zoom: estimatedZoom // Initial zoom, fitBounds will adjust
+          zoom: estimatedZoom // Initial zoom, fitBounds will adjust via onViewportChange
         }
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[ZIP] New map view:', newView, 'calculatedBounds:', calculatedBounds)
         }
         
         // Use fitBounds to ensure exactly 10-mile radius is visible
-        // Set bounds immediately - map will apply when loaded (no animation)
+        // Set bounds immediately - map will apply when loaded
         setPendingBounds(calculatedBounds)
-        // Clear after a longer delay to ensure map has time to apply bounds
+        // Clear after fitBounds animation completes (300ms duration + buffer)
+        // onViewportChange will update the zoom before this clears, preventing zoom flash
         setTimeout(() => {
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
             console.log('[ZIP] Clearing pendingBounds after fitBounds applied')
           }
           setPendingBounds(null)
-        }, 1000) // Give map more time to apply bounds before clearing
+        }, 500) // Reduced from 1000ms to 500ms (300ms animation + 200ms buffer)
         
         return newView
       }
@@ -704,22 +729,23 @@ export default function SalesClient({
         ...prev,
         center: { lat, lng },
         bounds: calculatedBounds,
-        zoom: estimatedZoom // Initial zoom, fitBounds will adjust
+        zoom: estimatedZoom // Initial zoom, fitBounds will adjust via onViewportChange
       }
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[ZIP] Updated map view:', newView, 'calculatedBounds:', calculatedBounds)
       }
       
       // Use fitBounds to ensure exactly 10-mile radius is visible
-      // Set bounds - map will apply when ready (no animation)
+      // Set bounds - map will apply when ready
       setPendingBounds(calculatedBounds)
-      // Clear after delay to ensure map applies bounds
+      // Clear after fitBounds animation completes (300ms duration + buffer)
+      // onViewportChange will update the zoom before this clears, preventing zoom flash
       setTimeout(() => {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[ZIP] Clearing pendingBounds after fitBounds applied')
         }
         setPendingBounds(null)
-      }, 1000) // Give map more time to apply bounds before clearing
+      }, 500) // Reduced from 1000ms to 500ms (300ms animation + 200ms buffer)
       
       return newView
     })
@@ -931,60 +957,105 @@ export default function SalesClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapView])
 
-  // Restore ZIP from URL on page load only (not on every URL change)
+  // Restore ZIP or city name from URL on page load only (not on every URL change)
   // Skip if initialCenter already matches ZIP (server-side lookup succeeded)
   const [hasRestoredZip, setHasRestoredZip] = useState(false)
   useEffect(() => {
     if (hasRestoredZip) return // Only run once on mount
     
     const zipFromUrl = searchParams.get('zip')
-    // Only lookup ZIP client-side if:
-    // 1. There's a ZIP in URL
+    // Only lookup ZIP/city client-side if:
+    // 1. There's a ZIP/city in URL
     // 2. No lat/lng in URL
-    // 3. InitialCenter doesn't already have the correct ZIP location (server-side lookup might have failed)
+    // 3. InitialCenter doesn't already have the correct location (server-side lookup might have failed)
     const needsClientSideLookup = zipFromUrl && !urlLat && !urlLng && 
       (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== zipFromUrl.trim())
     
     if (needsClientSideLookup) {
-      // Trigger ZIP lookup from URL
+      // Trigger ZIP or city name lookup from URL
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[ZIP] Restoring from URL:', zipFromUrl)
       }
       
-      const performZipLookup = async () => {
-        const trimmedZip = zipFromUrl.trim()
+      const performLocationLookup = async () => {
+        const trimmedQuery = zipFromUrl.trim()
         const zipRegex = /^\d{5}(-\d{4})?$/
         
-        if (!zipRegex.test(trimmedZip)) {
-          console.warn('[ZIP] Invalid ZIP format from URL:', trimmedZip)
-          setHasRestoredZip(true)
-          return
+        // First, try ZIP code lookup if it matches ZIP format
+        if (zipRegex.test(trimmedQuery)) {
+          try {
+            const response = await fetch(`/api/geocoding/zip?zip=${encodeURIComponent(trimmedQuery)}`)
+            const data = await response.json()
+            
+            if (data.ok && data.lat && data.lng) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[ZIP] Lookup success from URL:', { zip: trimmedQuery, lat: data.lat, lng: data.lng })
+              }
+              
+              // Use the same handler as manual ZIP input
+              const bbox = data.bbox ? [data.bbox[0], data.bbox[1], data.bbox[2], data.bbox[3]] as [number, number, number, number] : undefined
+              handleZipLocationFound(data.lat, data.lng, data.city, data.state, data.zip, bbox)
+              setHasRestoredZip(true)
+              return
+            } else {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.warn('[ZIP] ZIP lookup failed from URL, trying city name geocoding:', trimmedQuery, data.error)
+              }
+            }
+          } catch (error) {
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.error('[ZIP] ZIP lookup error from URL, trying city name geocoding:', trimmedQuery, error)
+            }
+          }
         }
         
+        // If ZIP lookup failed or query is not a ZIP format, try city name geocoding
         try {
-          const response = await fetch(`/api/geocoding/zip?zip=${encodeURIComponent(trimmedZip)}`)
-          const data = await response.json()
-          
-          if (data.ok && data.lat && data.lng) {
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[ZIP] Lookup success from URL:', { zip: trimmedZip, lat: data.lat, lng: data.lng })
-            }
-            
-            // Use the same handler as manual ZIP input
-            const bbox = data.bbox ? [data.bbox[0], data.bbox[1], data.bbox[2], data.bbox[3]] as [number, number, number, number] : undefined
-            handleZipLocationFound(data.lat, data.lng, data.city, data.state, data.zip, bbox)
-          } else {
-            console.warn('[ZIP] Lookup failed from URL:', trimmedZip, data.error)
-            handleZipError(data.error || 'ZIP code not found')
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[ZIP] Attempting city name geocoding for:', trimmedQuery)
           }
+          const suggestResponse = await fetch(`/api/geocoding/suggest?q=${encodeURIComponent(trimmedQuery)}&limit=1`)
+          const suggestData = await suggestResponse.json()
+          
+          if (suggestData?.ok && suggestData.data && suggestData.data.length > 0) {
+            const firstResult = suggestData.data[0]
+            if (firstResult.lat && firstResult.lng) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[ZIP] City name geocoding success from URL:', { 
+                  query: trimmedQuery, 
+                  lat: firstResult.lat, 
+                  lng: firstResult.lng,
+                  city: firstResult.address?.city,
+                  state: firstResult.address?.state
+                })
+              }
+              
+              handleZipLocationFound(
+                firstResult.lat, 
+                firstResult.lng, 
+                firstResult.address?.city || firstResult.address?.town || firstResult.address?.village,
+                firstResult.address?.state,
+                firstResult.address?.postcode || firstResult.address?.zip
+              )
+              setHasRestoredZip(true)
+              return
+            }
+          }
+          
+          // Both lookups failed
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.warn('[ZIP] City name geocoding failed from URL:', trimmedQuery)
+          }
+          handleZipError('Location not found')
         } catch (error) {
-          console.error('[ZIP] Lookup error from URL:', trimmedZip, error)
-          handleZipError('Failed to lookup ZIP code')
+          console.error('[ZIP] City name geocoding error from URL:', trimmedQuery, error)
+          handleZipError('Failed to lookup location')
         }
+        
+        setHasRestoredZip(true)
       }
       
-      performZipLookup()
-      setHasRestoredZip(true) // Mark as restored
+      performLocationLookup()
     } else if (!zipFromUrl) {
       // No ZIP in URL, mark as processed
       setHasRestoredZip(true)

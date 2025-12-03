@@ -31,7 +31,8 @@ export async function assertAdminOrThrow(_req: Request): Promise<{ user: { id: s
   const isAdmin = adminEmails.includes(userEmail.toLowerCase())
 
   // Allow in debug mode for development
-  const isDebugMode = process.env.NEXT_PUBLIC_DEBUG === 'true'
+  const isDebugMode =
+    process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true'
 
   if (!isAdmin && !isDebugMode) {
     throw NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 })

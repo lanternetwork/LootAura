@@ -400,6 +400,76 @@ export async function POST(request: NextRequest) {
     const { logDraftPublished } = await import('@/lib/events/businessEvents')
     logDraftPublished(draft.id, createdSaleId ?? '', user.id, createdItemIds.length)
     
+    // Trigger sale created confirmation email (fire-and-forget, non-blocking)
+    if (createdSaleId && user.email) {
+      try {
+        // Fetch full sale data for email
+        const { data: saleData } = await fromBase(admin, 'sales')
+          .select('*')
+          .eq('id', createdSaleId)
+          .single()
+
+        if (saleData && saleData.status === 'published') {
+          // Get user profile for display name (optional)
+          let displayName: string | undefined
+          try {
+            const { getUserProfile } = await import('@/lib/data/profileAccess')
+            const profile = await getUserProfile(supabase, user.id)
+            displayName = profile?.display_name ?? undefined
+          } catch {
+            // Profile fetch failed - continue without display name
+          }
+
+          // Use user's timezone or default to America/New_York
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'
+
+          // Send email using the new comprehensive function (non-blocking)
+          const { sendSaleCreatedEmail } = await import('@/lib/email/sales')
+          const emailResult = await sendSaleCreatedEmail({
+            sale: saleData as any, // Type assertion needed due to Supabase query result type
+            owner: {
+              email: user.email,
+              displayName,
+            },
+            timezone,
+          })
+          
+          // Log email result for debugging (non-blocking, doesn't affect response)
+          if (!emailResult.ok) {
+            const { logger } = await import('@/lib/log')
+            logger.warn('Sale created email send failed (non-critical)', {
+              component: 'drafts/publish',
+              operation: 'send_email',
+              draftId: draft.id,
+              saleId: createdSaleId ?? undefined,
+              userId: user.id,
+              ownerEmail: user.email,
+              error: emailResult.error || 'Unknown error',
+              // Include email config status for debugging
+              emailsEnabled: process.env.LOOTAURA_ENABLE_EMAILS === 'true',
+              hasResendApiKey: !!process.env.RESEND_API_KEY,
+              hasResendFromEmail: !!process.env.RESEND_FROM_EMAIL,
+            })
+          } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[DRAFTS/PUBLISH] Sale created email sent successfully:', {
+              saleId: createdSaleId,
+              ownerEmail: user.email,
+            })
+          }
+        }
+      } catch (emailError) {
+        // Log but don't fail - email is non-critical
+        const { logger } = await import('@/lib/log')
+        logger.warn('Failed to trigger sale created confirmation email (non-critical)', {
+          component: 'drafts/publish',
+          operation: 'trigger_email',
+          saleId: createdSaleId ?? undefined,
+          userId: user.id,
+          error: emailError instanceof Error ? emailError.message : String(emailError),
+        })
+      }
+    }
+    
     return ok({ data: { saleId: createdSaleId ?? undefined } })
   } catch (e: any) {
     const { logger } = await import('@/lib/log')

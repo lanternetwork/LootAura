@@ -63,9 +63,10 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
     }
   }
   
-  // 0.5) ZIP code lookup (only if no lat/lng in URL)
+  // 0.5) ZIP code or city name lookup (only if no lat/lng in URL)
   if (!initialCenter && _zip && baseUrl) {
     try {
+      // First, try ZIP code lookup
       const zipRes = await fetch(`${baseUrl}/api/geocoding/zip?zip=${encodeURIComponent(_zip)}`, { cache: 'no-store' })
       if (zipRes.ok) {
         const zipData = await zipRes.json()
@@ -80,9 +81,37 @@ export default async function SalesPage({ searchParams }: SalesPageProps) {
           }
         }
       }
+      
+      // If ZIP lookup failed, try city name geocoding
+      if (!initialCenter) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[SALES_PAGE] ZIP lookup failed, trying city name geocoding for:`, _zip)
+        }
+        const suggestRes = await fetch(`${baseUrl}/api/geocoding/suggest?q=${encodeURIComponent(_zip)}&limit=1`, { cache: 'no-store' })
+        if (suggestRes.ok) {
+          const suggestData = await suggestRes.json()
+          if (suggestData?.ok && suggestData.data && suggestData.data.length > 0) {
+            const firstResult = suggestData.data[0]
+            if (firstResult.lat && firstResult.lng) {
+              initialCenter = {
+                lat: firstResult.lat,
+                lng: firstResult.lng,
+                label: {
+                  city: firstResult.address?.city || firstResult.address?.town || firstResult.address?.village,
+                  state: firstResult.address?.state,
+                  zip: firstResult.address?.postcode || firstResult.address?.zip
+                }
+              }
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log(`[SALES_PAGE] Using city name geocoding from URL:`, initialCenter)
+              }
+            }
+          }
+        }
+      }
     } catch (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.error(`[SALES_PAGE] ZIP lookup error:`, error)
+        console.error(`[SALES_PAGE] ZIP/city lookup error:`, error)
       }
     }
   }

@@ -196,6 +196,9 @@ const ALLOWED_PATTERNS = [
   // Expected shortlink test errors (app/s/[id]/page.tsx)
   /^Shortlink resolution error:/, // Expected shortlink test errors - tests/integration/share.redirect.test.tsx
   
+  // React Email DOM validation warnings (lib/email/templates/*.tsx)
+  /Warning: validateDOMNesting/, // React Email components may trigger DOM nesting warnings in test environment - tests/unit/email/*.test.tsx
+  
   // React forwardRef warnings (components/location/SalesMapClustered.tsx)
   /^Warning: Function components cannot be given refs/, // React forwardRef warnings - tests/integration/map.clusters-flow.test.tsx
   /^Warning: .*: `ref` is not a prop/, // React ref prop warnings - tests/integration/map.clusters-flow.test.tsx
@@ -245,6 +248,14 @@ const ALLOWED_PATTERNS = [
   
   // Analytics client logging (lib/analytics-client.ts)
   /^\[ANALYTICS_CLIENT\] Tracking (error|failed):/, // Expected analytics tracking error logging in tests - tests/unit/analytics-client.test.ts
+  
+  // Favorite sales starting soon job logging (lib/jobs/processor.ts)
+  /\[WARN\] \[jobs\/favorite-sales-starting-soon\]/, // Expected warning when email send fails in job tests - tests/integration/jobs/favorite-sales-starting-soon.test.ts
+  /\[ERROR\] \[jobs\/favorite-sales-starting-soon\]/, // Expected error logging in job tests - tests/integration/jobs/favorite-sales-starting-soon.test.ts
+  
+  // Seller weekly analytics job logging (lib/jobs/processor.ts)
+  /\[WARN\] \[jobs\/seller-weekly-analytics\]/, // Expected warning when email send fails in job tests - tests/integration/jobs/seller-weekly-analytics.test.ts
+  /\[ERROR\] \[jobs\/seller-weekly-analytics\]/, // Expected error logging in job tests - tests/integration/jobs/seller-weekly-analytics.test.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {

@@ -125,12 +125,26 @@ export function Header() {
               )}
               {/* Desktop: Always show logo */}
               <Link ref={logoRef} href="/" className="hidden sm:flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
-                Loot Aura
+                <span className="inline-flex items-center justify-center">
+                  <img
+                    src="/sitelogo.svg"
+                    alt="Loot Aura logo"
+                    className="h-7 w-auto"
+                  />
+                </span>
+                <span>Loot Aura</span>
               </Link>
             </>
           ) : (
             <Link ref={logoRef} href="/" className="flex items-center gap-2 text-base sm:text-xl font-bold text-[#3A2268] whitespace-nowrap">
-              Loot Aura
+              <span className="inline-flex items-center justify-center">
+                <img
+                  src="/sitelogo.svg"
+                  alt="Loot Aura logo"
+                  className="h-7 w-auto"
+                />
+              </span>
+              <span>Loot Aura</span>
             </Link>
           )}
           

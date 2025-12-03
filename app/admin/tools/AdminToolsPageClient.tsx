@@ -23,6 +23,7 @@ import AnalyticsDiagnosticsCard from '@/components/admin/AnalyticsDiagnosticsCar
 import OSMAttributionDiagnostics from '@/components/admin/OSMAttributionDiagnostics'
 import ItemImagesDiagnostics from '@/components/admin/ItemImagesDiagnostics'
 import JobControls from '@/components/admin/JobControls'
+import EmailDiagnostics from '@/components/admin/EmailDiagnostics'
 import { useState, useRef } from 'react'
 
 export default function AdminToolsPageClient() {
@@ -88,6 +89,9 @@ export default function AdminToolsPageClient() {
 
           {/* Background Jobs */}
           <JobControls />
+
+          {/* Email System Diagnostics */}
+          <EmailDiagnostics />
 
           {/* Analytics Diagnostics */}
           <AnalyticsDiagnosticsCard />

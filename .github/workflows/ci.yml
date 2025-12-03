@@ -52,13 +52,31 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
+          # Retry logic for network issues
+          for attempt in 1 2 3; do
+            echo "Install attempt $attempt/3..."
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Dependencies installed successfully"
+              break
+            else
+              echo "❌ Install attempt $attempt failed"
+              if [ $attempt -lt 3 ]; then
+                echo "Retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "All install attempts failed"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Run ESLint
         run: npm run lint
@@ -79,13 +97,31 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
+          # Retry logic for network issues
+          for attempt in 1 2 3; do
+            echo "Install attempt $attempt/3..."
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Dependencies installed successfully"
+              break
+            else
+              echo "❌ Install attempt $attempt failed"
+              if [ $attempt -lt 3 ]; then
+                echo "Retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "All install attempts failed"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Run TypeScript type checking
         run: npm run typecheck
@@ -106,13 +142,31 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
+          # Retry logic for network issues
+          for attempt in 1 2 3; do
+            echo "Install attempt $attempt/3..."
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Dependencies installed successfully"
+              break
+            else
+              echo "❌ Install attempt $attempt failed"
+              if [ $attempt -lt 3 ]; then
+                echo "Retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "All install attempts failed"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Run unit tests
         run: npm run test -- tests/unit/
@@ -147,13 +201,31 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
+          # Retry logic for network issues
+          for attempt in 1 2 3; do
+            echo "Install attempt $attempt/3..."
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Dependencies installed successfully"
+              break
+            else
+              echo "❌ Install attempt $attempt failed"
+              if [ $attempt -lt 3 ]; then
+                echo "Retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "All install attempts failed"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Run integration tests
         run: npm run test -- tests/integration/
@@ -254,13 +326,31 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
+          # Retry logic for network issues
+          for attempt in 1 2 3; do
+            echo "Install attempt $attempt/3..."
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Dependencies installed successfully"
+              break
+            else
+              echo "❌ Install attempt $attempt failed"
+              if [ $attempt -lt 3 ]; then
+                echo "Retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "All install attempts failed"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Build (fallback if artifacts not used)
         run: npm run build
@@ -293,13 +383,31 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-            # Generate package-lock.json for consistent dependency resolution
-            npm install --package-lock-only
-          fi
+          # Retry logic for network issues
+          for attempt in 1 2 3; do
+            echo "Install attempt $attempt/3..."
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Dependencies installed successfully"
+              break
+            else
+              echo "❌ Install attempt $attempt failed"
+              if [ $attempt -lt 3 ]; then
+                echo "Retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "All install attempts failed"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Verify migration
         run: node scripts/verify-migration.js

@@ -1,6 +1,17 @@
 /**
  * Logger utility with Sentry integration
  * Used for consistent logging across the application
+ * 
+ * PII-SAFE LOGGING CONVENTIONS:
+ * - Do NOT log: raw emails, full names, tokens/JWTs, raw request bodies from auth endpoints
+ * - Do NOT log: full user IDs in clear text (use short prefix or hash if needed for correlation)
+ * - Do log: component, operation, error codes, counts, boolean flags, route paths
+ * - When logging user context: prefer anonymized identifiers (e.g., "user:abc123..." instead of full UUID)
+ * - When logging errors: use sanitizeErrorMessage() for user-facing messages
+ * 
+ * Examples:
+ * ✅ logger.info('User authenticated', { component: 'auth', operation: 'signin', hasUser: true })
+ * ❌ logger.info('User authenticated', { component: 'auth', operation: 'signin', email: user.email })
  */
 
 import * as Sentry from '@sentry/nextjs'
@@ -8,8 +19,8 @@ import * as Sentry from '@sentry/nextjs'
 export interface LogContext {
   component?: string
   operation?: string
-  userId?: string
-  saleId?: string
+  userId?: string  // Use with caution - prefer anonymized/shortened IDs
+  saleId?: string   // Use with caution - prefer anonymized/shortened IDs
   [key: string]: any
 }
 

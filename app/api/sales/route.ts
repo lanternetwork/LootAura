@@ -12,6 +12,7 @@ import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
 import { z } from 'zod'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
+import { validateBboxSize, getBboxSummary } from '@/lib/shared/bboxValidation'
 
 // CRITICAL: This API MUST require lat/lng - never remove this validation
 // See docs/AI_ASSISTANT_RULES.md for full guidelines
@@ -71,12 +72,18 @@ async function salesHandler(request: NextRequest) {
             latitude = parseFloat(geoData.lat)
             longitude = parseFloat(geoData.lng)
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log(`[SALES] near=1: resolved zip=${zip} to lat=${latitude}, lng=${longitude}`)
+              logger.debug('ZIP resolved to coordinates', {
+                component: 'sales',
+                operation: 'zip_resolve'
+              })
             }
           } else {
             // ZIP not found - return empty result with 200
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log(`[SALES] near=1: zip=${zip} not found, returning empty result`)
+              logger.debug('ZIP not found, returning empty result', {
+                component: 'sales',
+                operation: 'zip_resolve'
+              })
             }
             return NextResponse.json({
               ok: true,
@@ -87,9 +94,11 @@ async function salesHandler(request: NextRequest) {
             })
           }
         } catch (error) {
-          console.error(`[SALES] near=1: failed to resolve zip=${zip}:`, error)
-          return NextResponse.json({
-            ok: true,
+          logger.error('Failed to resolve ZIP code', error instanceof Error ? error : new Error(String(error)), {
+            component: 'sales',
+            operation: 'zip_resolve'
+          })
+          return ok({
             data: [],
             sales: [],
             count: 0,
@@ -103,7 +112,10 @@ async function salesHandler(request: NextRequest) {
       } else {
         // near=1 but no location provided - return empty result with 200
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log(`[SALES] near=1: no location provided, returning empty result`)
+          logger.debug('No location provided for near=1 query', {
+            component: 'sales',
+            operation: 'near_query'
+          })
         }
         return NextResponse.json({
           ok: true,
@@ -130,9 +142,13 @@ async function salesHandler(request: NextRequest) {
         west: longitude - lngRange
       }
       
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log(`[SALES] near=1: calculated bbox from lat=${latitude}, lng=${longitude}, radius=${distanceKm}km`)
-      }
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          logger.debug('Calculated bbox from lat/lng for near=1', {
+            component: 'sales',
+            operation: 'near_query',
+            distanceKm
+          })
+        }
     }
     
     // Normal location parsing (for non-near queries)
@@ -148,9 +164,31 @@ async function salesHandler(request: NextRequest) {
           }
           
           const validatedBbox = bboxSchema.parse(bboxData)
-          console.log(`[API_SALES] bbox=${validatedBbox.north},${validatedBbox.south},${validatedBbox.east},${validatedBbox.west}`)
-          console.log(`[API_SALES] bbox range: lat=${validatedBbox.north - validatedBbox.south}, lng=${validatedBbox.east - validatedBbox.west}`)
-          console.log(`[API_SALES] bbox center: lat=${(validatedBbox.north + validatedBbox.south) / 2}, lng=${(validatedBbox.east + validatedBbox.west) / 2}`)
+          
+          // Validate bbox size to prevent abuse
+          const bboxSizeError = validateBboxSize(validatedBbox)
+          if (bboxSizeError) {
+            const bboxSummary = getBboxSummary(validatedBbox)
+            logger.warn('Bbox size validation failed', {
+              component: 'sales',
+              operation: 'bbox_validation',
+              latSpan: bboxSummary.latSpan,
+              lngSpan: bboxSummary.lngSpan,
+              centerLat: bboxSummary.centerLat,
+              centerLng: bboxSummary.lngSpan
+            })
+            return fail(400, 'BBOX_TOO_LARGE', bboxSizeError)
+          }
+          
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            const bboxSummary = getBboxSummary(validatedBbox)
+            logger.debug('Bbox validated', {
+              component: 'sales',
+              operation: 'bbox_parse',
+              latSpan: bboxSummary.latSpan,
+              lngSpan: bboxSummary.lngSpan
+            })
+          }
           
           // Calculate center and approximate distance from bbox
           latitude = (validatedBbox.north + validatedBbox.south) / 2
@@ -163,20 +201,23 @@ async function salesHandler(request: NextRequest) {
           
           // Log deprecation warning if distance parameter is provided
           if (distanceParam) {
-            console.log('[API_SALES] DEPRECATION WARNING: distance parameter ignored. Use map viewport bounds instead.')
+            logger.warn('Deprecated distance parameter used', {
+              component: 'sales',
+              operation: 'deprecated_param',
+              param: 'distance'
+            })
           }
           
           // Store the actual bbox for proper filtering
           actualBbox = validatedBbox
           
         } catch (error: any) {
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log(`[SALES] Invalid bbox: ${error.message}`)
-          }
-          return NextResponse.json({ 
-            ok: false, 
-            error: 'Invalid location parameters'
-          }, { status: 400 })
+          logger.warn('Invalid bbox format', {
+            component: 'sales',
+            operation: 'bbox_parse',
+            error: error.message
+          })
+          return fail(400, 'INVALID_BBOX', 'Invalid location parameters')
         }
       } else if (lat && lng) {
         // Legacy lat/lng support
@@ -184,18 +225,18 @@ async function salesHandler(request: NextRequest) {
         longitude = parseFloat(lng)
         
         if (isNaN(latitude) || isNaN(longitude)) {
-          console.log(`[SALES] Invalid location: lat=${lat}, lng=${lng}`)
-          return NextResponse.json({ 
-            ok: false, 
-            error: 'Invalid location coordinates' 
-          }, { status: 400 })
+          logger.warn('Invalid location coordinates', {
+            component: 'sales',
+            operation: 'location_parse'
+          })
+          return fail(400, 'INVALID_LOCATION', 'Invalid location coordinates')
         }
       } else {
-        console.log(`[SALES] Missing location: lat=${lat}, lng=${lng}, bbox=${north},${south},${east},${west}`)
-        return NextResponse.json({ 
-          ok: false, 
-          error: 'Missing location: lat/lng or bbox required' 
-        }, { status: 400 })
+        logger.warn('Missing location parameters', {
+          component: 'sales',
+          operation: 'location_validation'
+        })
+        return fail(400, 'LOCATION_REQUIRED', 'Missing location: lat/lng or bbox required')
       }
     }
     
@@ -209,7 +250,11 @@ async function salesHandler(request: NextRequest) {
       
       // Log deprecation warning for legacy distance parameter
       if (legacyDistanceParam) {
-        console.log('[API_SALES] DEPRECATION WARNING: distanceKm parameter ignored. Use map viewport bounds instead.')
+        logger.warn('Deprecated distanceKm parameter used', {
+          component: 'sales',
+          operation: 'deprecated_param',
+          param: 'distanceKm'
+        })
       }
     }
     
@@ -228,21 +273,17 @@ async function salesHandler(request: NextRequest) {
     
     // Debug server-side category processing
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[FILTER DEBUG] Server received categories:', categories)
-      console.log('[FILTER DEBUG] categoriesParam =', categoriesParam)
-      console.log('[FILTER DEBUG] normalized categories:', categories)
-      console.log('[FILTER DEBUG] db mapped categories:', dbCategories)
-      console.log('[FILTER DEBUG] categories param source:', searchParams.get('categories') ? 'categories' : searchParams.get('cat') ? 'cat (legacy)' : 'none')
-      console.log('[FILTER DEBUG] relationUsed = public.items_v2')
-      console.log('[FILTER DEBUG] predicateChosen = = ANY')
+      logger.debug('Category processing', {
+        component: 'sales',
+        operation: 'category_parse',
+        categoriesCount: categories.length,
+        dbCategoriesCount: dbCategories.length
+      })
     }
     
     const q = searchParams.get('q')
     if (q && q.length > 64) {
-      return NextResponse.json({ 
-        ok: false, 
-        error: 'Search query too long' 
-      }, { status: 400 })
+      return fail(400, 'QUERY_TOO_LONG', 'Search query too long')
     }
     
     const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24, 200)
@@ -278,14 +319,26 @@ async function salesHandler(request: NextRequest) {
     
     // Ensure latitude and longitude are defined before use
     if (latitude === undefined || longitude === undefined) {
-      console.error(`[SALES] Invalid state: latitude or longitude undefined`)
-      return NextResponse.json({
-        ok: false,
-        error: 'Invalid location: latitude or longitude not set'
-      }, { status: 400 })
+      logger.error('Invalid state: latitude or longitude undefined', undefined, {
+        component: 'sales',
+        operation: 'location_validation'
+      })
+      return fail(400, 'INVALID_LOCATION', 'Invalid location: latitude or longitude not set')
     }
     
-    console.log(`[SALES] Query params: lat=${latitude}, lng=${longitude}, km=${distanceKm}, start=${startDateParam}, end=${endDateParam}, categories=[${categories.join(',')}], q=${q}, limit=${limit}, offset=${offset}`)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      logger.debug('Sales query params', {
+        component: 'sales',
+        operation: 'query_params',
+        hasLocation: !!(latitude && longitude),
+        distanceKm,
+        hasDateRange: !!(startDateParam || endDateParam),
+        categoriesCount: categories.length,
+        hasQuery: !!q,
+        limit,
+        offset
+      })
+    }
     
     let results: PublicSale[] = []
     let degraded = false
@@ -559,7 +612,17 @@ async function salesHandler(request: NextRequest) {
       }
       
       // Debug: Log raw data before filtering
-      console.log('[SALES] Raw data before filtering:', (salesData || []).slice(0, 3).map(s => ({
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        logger.debug('Raw data before filtering', {
+          component: 'sales',
+          operation: 'data_filtering',
+          rawDataCount: (salesData || []).length
+        })
+      }
+      // Removed detailed data logging to avoid PII
+      if (false && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        // Disabled: logging raw sale data
+        const _ = (salesData || []).slice(0, 3).map(s => ({
         id: s.id,
         title: s.title,
         starts_at: s.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
@@ -568,15 +631,18 @@ async function salesHandler(request: NextRequest) {
       })))
       
       // Debug: Log date filtering details
-      console.log('[SALES] Date filtering debug:', {
-        windowStart: windowStart?.toISOString(),
-        windowEnd: windowEnd?.toISOString(),
-        totalSales: (salesData || []).length,
-        salesWithValidCoords: (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number').length
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        logger.debug('Date filtering', {
+          component: 'sales',
+          operation: 'date_filtering',
+          hasWindow: !!(windowStart && windowEnd),
+          totalSales: (salesData || []).length,
+          salesWithValidCoords: (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number').length
+        })
+      }
       
       // Debug: Check if date filtering is actually being applied
-      if (windowStart && windowEnd) {
+      if (windowStart && windowEnd && process.env.NEXT_PUBLIC_DEBUG === 'true') {
         const salesBeforeDateFilter = (salesData || []).filter(s => s && typeof s.lat === 'number' && typeof s.lng === 'number')
         const salesAfterDateFilter = salesBeforeDateFilter.filter((sale: Sale) => {
           const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null
@@ -589,7 +655,9 @@ async function salesHandler(request: NextRequest) {
           const endOk = !windowStart || e >= windowStart
           return startOk && endOk
         })
-        console.log('[SALES] Date filter impact:', {
+        logger.debug('Date filter impact', {
+          component: 'sales',
+          operation: 'date_filtering',
           beforeDateFilter: salesBeforeDateFilter.length,
           afterDateFilter: salesAfterDateFilter.length,
           filteredOut: salesBeforeDateFilter.length - salesAfterDateFilter.length
@@ -775,12 +843,13 @@ async function postHandler(request: NextRequest) {
     
     // Debug: Log auth response to diagnose Google OAuth session issues
     if (process.env.NEXT_PUBLIC_DEBUG === 'true' || !user) {
-      console.log('[SALES] POST auth check:', {
+      const { logger } = await import('@/lib/log')
+      logger.debug('Auth check', {
+        component: 'sales',
+        operation: 'auth_check',
         hasUser: !!user,
-        userId: user?.id,
-        error: authResponse?.error?.message,
-        errorCode: authResponse?.error?.code,
-        errorStatus: authResponse?.error?.status
+        hasError: !!authResponse?.error,
+        errorCode: authResponse?.error?.code
       })
     }
     
@@ -790,9 +859,11 @@ async function postHandler(request: NextRequest) {
         user = { id: 'test-user' }
       } else {
         const authError = authResponse?.error
-        console.log('[SALES] Auth failed:', { 
-          event: 'sales-create', 
-          status: 'fail', 
+        const { logger } = await import('@/lib/log')
+        logger.warn('Auth failed for sale creation', {
+          component: 'sales',
+          operation: 'auth_failed',
+          errorCode: authError?.code 
           code: authError?.message,
           errorCode: authError?.code,
           errorStatus: authError?.status
@@ -805,11 +876,11 @@ async function postHandler(request: NextRequest) {
     try {
       body = await request.json()
     } catch (error) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.error('[SALES] JSON parse error:', {
-          error: error instanceof Error ? error.message : String(error)
-        })
-      }
+      const { logger } = await import('@/lib/log')
+      logger.error('JSON parse error', error instanceof Error ? error : new Error(String(error)), {
+        component: 'sales',
+        operation: 'json_parse'
+      })
       return NextResponse.json({ 
         ok: false,
         code: 'INVALID_JSON',
@@ -843,13 +914,15 @@ async function postHandler(request: NextRequest) {
     }
     
     // Debug: log image data being received
-    console.log('[SALES] POST received image data:', {
-      cover_image_url,
-      images,
-      imagesType: typeof images,
-      imagesIsArray: Array.isArray(images),
-      imagesLength: Array.isArray(images) ? images.length : 'N/A',
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('Received image data', {
+        component: 'sales',
+        operation: 'image_validation',
+        hasCoverImage: !!cover_image_url,
+        imagesCount: Array.isArray(images) ? images.length : 0
+      })
+    }
 
     // Enforce 30-minute granularity for start time (accept HH:MM or HH:MM:SS)
     if (typeof time_start === 'string') {
@@ -881,7 +954,11 @@ async function postHandler(request: NextRequest) {
     // Validate optional cover image URL
     if (cover_image_url && !isAllowedImageUrl(cover_image_url)) {
       // Log image validation failures for monitoring (production logging)
-      console.log(`[SALES][IMAGE_VALIDATION] Rejected cover_image_url: url=${cover_image_url}, user=${user.id}, reason=invalid_url_format`)
+        logger.warn('Rejected cover image URL', {
+          component: 'sales',
+          operation: 'image_validation',
+          reason: 'invalid_url_format'
+        })
       return NextResponse.json({ error: 'Invalid cover_image_url' }, { status: 400 })
     }
 
@@ -890,7 +967,11 @@ async function postHandler(request: NextRequest) {
       for (const imageUrl of images) {
         if (!isAllowedImageUrl(imageUrl)) {
           // Log image validation failures for monitoring (production logging)
-          console.log(`[SALES][IMAGE_VALIDATION] Rejected image URL in images array: url=${imageUrl}, user=${user.id}, reason=invalid_url_format`)
+            logger.warn('Rejected image URL in array', {
+              component: 'sales',
+              operation: 'image_validation',
+              reason: 'invalid_url_format'
+            })
           return NextResponse.json({ error: 'Invalid image URL in images array' }, { status: 400 })
         }
       }
@@ -969,24 +1050,22 @@ async function postHandler(request: NextRequest) {
       
       // Log the error immediately for debugging
       if (error) {
-        console.error('[SALES] Insert failed (first attempt):', { 
-          event: 'sales-create', 
-          status: 'fail', 
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          payload: {
-            ...firstTryPayload,
-            owner_id: '[REDACTED]', // Don't log user ID
-          }
+        const { logger } = await import('@/lib/log')
+        logger.error('Sale insert failed (first attempt)', error instanceof Error ? error : new Error(String(error)), {
+          component: 'sales',
+          operation: 'sale_insert',
+          attempt: 1
         })
       }
     }
 
     // If insert failed due to schema (e.g., PGRST204 unknown column), retry without image fields
     if (error && /schema|column|PGRST204|not exist/i.test(String(error?.message || error?.details || ''))) {
-      console.warn('[SALES] Retrying insert without image fields due to schema error')
+      logger.warn('Retrying insert without image fields', {
+        component: 'sales',
+        operation: 'sale_insert_retry',
+        reason: 'schema_error'
+      })
       const retryRes = await fromSales.insert(basePayload).select().single()
       if (retryRes?.data) {
         data = { ...retryRes.data, cover_image_url: cover_image_url ?? null, images: images ?? null }
@@ -994,19 +1073,21 @@ async function postHandler(request: NextRequest) {
       } else {
         data = retryRes?.data
         error = retryRes?.error
-        console.error('[SALES] Insert failed (retry without images):', { 
-          event: 'sales-create', 
-          status: 'fail', 
-          code: error?.code,
-          message: error?.message,
-          details: error?.details,
-          hint: error?.hint
+        const { logger } = await import('@/lib/log')
+        logger.error('Sale insert failed (retry without images)', error instanceof Error ? error : new Error(String(error)), {
+          component: 'sales',
+          operation: 'sale_insert',
+          attempt: 2
         })
       }
     }
     
     if (error) {
-      console.error('[SALES/POST] supabase error:', error)
+      const { logger } = await import('@/lib/log')
+      logger.error('Supabase error in sale creation', error instanceof Error ? error : new Error(String(error)), {
+        component: 'sales',
+        operation: 'sale_create'
+      })
       return fail(500, 'SALE_CREATE_FAILED', 'Failed to create sale', error)
     }
     
@@ -1037,7 +1118,11 @@ async function postHandler(request: NextRequest) {
     
     return ok({ saleId: data.id })
   } catch (e: any) {
-    if (process.env.NODE_ENV !== 'production') console.error('[SALES/POST] thrown:', e)
+    const { logger } = await import('@/lib/log')
+    logger.error('Unexpected error in sale creation', e instanceof Error ? e : new Error(String(e)), {
+      component: 'sales',
+      operation: 'sale_create'
+    })
     return fail(500, 'SALE_CREATE_FAILED', e.message)
   }
 }

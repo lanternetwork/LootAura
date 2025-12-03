@@ -4,6 +4,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import * as dateBounds from '@/lib/shared/dateBounds'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
+import { fail, ok } from '@/lib/http/json'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'
@@ -11,7 +14,7 @@ export const dynamic = 'force-dynamic'
 // Markers API with server-side date, distance, and category filtering
 // Response shape expected by SalesMap: plain array
 // [{ id: string, title: string, lat: number, lng: number }]
-export async function GET(request: NextRequest) {
+async function markersHandler(request: NextRequest) {
   const startedAt = Date.now()
   
   try {
@@ -46,7 +49,13 @@ export async function GET(request: NextRequest) {
 
     // Debug server-side category processing
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log(`[API][markers] cats received=${catsParam} norm=${catsCsv}`)
+      const { logger } = await import('@/lib/log')
+      logger.debug('Category processing', {
+        component: 'sales',
+        operation: 'markers_category_parse',
+        categoriesReceived: catsParam,
+        categoriesNormalized: catsCsv
+      })
     }
 
     const sb = createSupabaseServerClient()
@@ -61,22 +70,13 @@ export async function GET(request: NextRequest) {
     // Apply category filtering by joining with items table
     if (Array.isArray(categories) && categories.length > 0) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[MARKERS API] Applying category filter:', { categories, dbCategories })
-      }
-      
-      // Debug: Check if items_v2 table has category column
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[FILTER DEBUG] Checking items_v2 table structure...')
-        const { data: tableInfo, error: tableError } = await sb
-          .from('items_v2')
-          .select('*')
-          .limit(1)
-        
-        if (tableError) {
-          console.error('[FILTER DEBUG] Error checking items_v2 table:', tableError)
-        } else {
-          console.log('[FILTER DEBUG] items_v2 sample row:', tableInfo?.[0])
-        }
+        const { logger } = await import('@/lib/log')
+        logger.debug('Applying category filter', {
+          component: 'sales',
+          operation: 'markers_category_filter',
+          categoriesCount: categories.length,
+          dbCategoriesCount: dbCategories.length
+        })
       }
       
       // Use a subquery approach to find sales that have items matching the categories
@@ -87,20 +87,24 @@ export async function GET(request: NextRequest) {
         .in('category', dbCategories)
       
       if (categoryError) {
-        console.error('[MARKERS API] Category filter error:', categoryError)
-        return NextResponse.json({
-          error: 'Category filter failed',
-          code: (categoryError as any)?.code,
-          details: (categoryError as any)?.message
-        }, { status: 500 })
+        const { logger } = await import('@/lib/log')
+        logger.error('Category filter error', categoryError instanceof Error ? categoryError : new Error(String(categoryError)), {
+          component: 'sales',
+          operation: 'markers_category_filter'
+        })
+        return fail(500, 'CATEGORY_FILTER_ERROR', 'Category filter failed')
       }
       
       const saleIds = salesWithCategories?.map(item => item.sale_id) || []
-      console.log('[MARKERS API] Found sales with matching categories:', saleIds.length)
       
       // Debug server-side category filtering results
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log(`[API][markers] cats norm=${catsCsv} where=in count=${saleIds.length}`)
+        const { logger } = await import('@/lib/log')
+        logger.debug('Category filter results', {
+          component: 'sales',
+          operation: 'markers_category_filter',
+          matchingSalesCount: saleIds.length
+        })
       }
       
       if (saleIds.length > 0) {
@@ -123,14 +127,12 @@ export async function GET(request: NextRequest) {
       .limit(Math.min(limit, 1000))
 
     if (error) {
-      console.error('Markers query error:', error)
-      return NextResponse.json({
-        error: 'Database query failed',
-        code: (error as any)?.code,
-        details: (error as any)?.message || (error as any)?.details,
-        hint: (error as any)?.hint,
-        relation: 'public.sales_v2'
-      }, { status: 500 })
+      const { logger } = await import('@/lib/log')
+      logger.error('Markers query error', error instanceof Error ? error : new Error(String(error)), {
+        component: 'sales',
+        operation: 'markers_query'
+      })
+      return fail(500, 'QUERY_ERROR', 'Database query failed')
     }
 
     // Validate date range parameters
@@ -144,27 +146,17 @@ export async function GET(request: NextRequest) {
     
     // Debug logging for date filtering (debug mode only to avoid noisy production logs)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[MARKERS API] Date filtering debug:', {
-        startDate,
-        endDate,
-        dateBounds: dateWindow,
-        totalRecords: data?.length || 0,
-        url: request.url,
-        sampleSales: data?.slice(0, 3).map((s: any) => ({
-          id: s.id,
-          title: s.title,
-          date_start: s.date_start,
-          date_end: s.date_end,
-          time_start: s.time_start,
-          time_end: s.time_end,
-          starts_at: s.starts_at
-        }))
+      const { logger } = await import('@/lib/log')
+      logger.debug('Date filtering', {
+        component: 'sales',
+        operation: 'markers_date_filter',
+        hasDateWindow: !!dateWindow,
+        totalRecords: data?.length || 0
       })
     }
     
     // If no date filtering is applied, return all sales
     if (!dateWindow) {
-      console.log('[MARKERS API] No date filtering applied, returning all sales')
       const markers = data?.map((sale: any) => {
         const R = 6371
         const dLat = (sale.lat - originLat) * Math.PI / 180
@@ -229,27 +221,10 @@ export async function GET(request: NextRequest) {
         
         // Skip sales with no date information
         if (!sale.saleStart && !sale.saleEnd) {
-          console.log('[MARKERS API] Sale has no date info, excluding:', {
-            saleId: sale.id,
-            title: sale.title
-          })
           return false
         }
         
         const overlaps = dateBounds.checkDateOverlap(sale.saleStart, sale.saleEnd, dateWindow)
-        if (!overlaps) {
-          console.log('[MARKERS API] Sale filtered out by date:', {
-            saleId: sale.id,
-            title: sale.title,
-            saleStart: sale.saleStart,
-            saleEnd: sale.saleEnd,
-            dateBounds: dateWindow,
-            originalDateStart: sale.date_start,
-            originalDateEnd: sale.date_end,
-            originalTimeStart: sale.time_start,
-            originalTimeEnd: sale.time_end
-          })
-        }
         return overlaps
       })
       .map((sale: any) => {
@@ -268,19 +243,16 @@ export async function GET(request: NextRequest) {
       .map((sale: any) => ({ id: sale.id, title: sale.title, lat: sale.lat, lng: sale.lng }))
 
     // Debug logging for final results
-    console.log('[MARKERS API] Final results:', {
-      totalRecords: data?.length || 0,
-      afterDateFilter: filtered.length,
-      finalMarkers: markers.length,
-      dateBounds,
-      dateFilterApplied: !!dateBounds,
-      sampleFilteredSales: filtered.slice(0, 3).map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        saleStart: s.saleStart?.toISOString(),
-        saleEnd: s.saleEnd?.toISOString()
-      }))
-    })
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('Markers query completed', {
+        component: 'sales',
+        operation: 'markers_query',
+        totalRecords: data?.length || 0,
+        afterDateFilter: filtered.length,
+        finalMarkers: markers.length
+      })
+    }
 
     // Return structured response matching /api/sales format
     return NextResponse.json({
@@ -298,16 +270,19 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error: any) {
-    console.error('Markers API error:', error)
-    return NextResponse.json({
-      ok: false,
-      error: 'Database query failed',
-      code: (error as any)?.code,
-      details: (error as any)?.message || (error as any)?.details,
-      hint: (error as any)?.hint,
-      relation: 'public.sales_v2'
-    }, { status: 500 })
+    const { logger } = await import('@/lib/log')
+    logger.error('Markers API error', error instanceof Error ? error : new Error(String(error)), {
+      component: 'sales',
+      operation: 'markers_handler',
+      durationMs: Date.now() - startedAt
+    })
+    return fail(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }
+
+export const GET = withRateLimit(markersHandler, [
+  Policies.SALES_VIEW_30S,
+  Policies.SALES_VIEW_HOURLY
+])
 
 

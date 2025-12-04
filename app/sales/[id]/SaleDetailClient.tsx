@@ -219,6 +219,17 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
 
       {/* Mobile Layout */}
       <div className="md:hidden max-w-screen-sm mx-auto px-4 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+80px)] space-y-4">
+        {/* Back to map button - Mobile only */}
+        <Link
+          href={backUrl}
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium mb-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to map
+        </Link>
+        
         {/* Title & Meta Chips */}
         <div className="space-y-3">
           <h1 className="text-xl font-semibold text-gray-900">{sale.title}</h1>

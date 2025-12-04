@@ -7,14 +7,17 @@ import SimpleMap from '@/components/location/SimpleMap'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import SalesList from '@/components/SalesList'
 import FiltersBar from '@/components/sales/FiltersBar'
+import EmptyState from '@/components/EmptyState'
 import MobileFilterSheet from '@/components/sales/MobileFilterSheet'
 import MobileSalesShell from './MobileSalesShell'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
+import RecenterButton from '@/components/location/RecenterButton'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
 import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
+import { useKeyboardShortcuts, COMMON_SHORTCUTS } from '@/lib/keyboard/shortcuts'
 import { 
   expandBounds, 
   isViewportInsideBounds, 
@@ -1087,6 +1090,31 @@ export default function SalesClient({
   }, [fetchedSales.length, visibleSales.length, visibleSalesDeduplicated.length, selectedPinId, hybridResult])
 
   // Memoized map center
+  // Handler for re-center button
+  const handleRecenter = useCallback((center: { lat: number; lng: number }, zoom?: number) => {
+    const targetZoom = zoom || mapView?.zoom || 11
+    const radiusKm = filters.distance * 1.60934 // Convert miles to km
+    const latRange = radiusKm / 111.0
+    const lngRange = radiusKm / (111.0 * Math.cos(center.lat * Math.PI / 180))
+    
+    const newBounds = {
+      west: center.lng - lngRange,
+      south: center.lat - latRange,
+      east: center.lng + lngRange,
+      north: center.lat + latRange
+    }
+    
+    setMapView({
+      center,
+      bounds: newBounds,
+      zoom: targetZoom
+    })
+    
+    // Trigger fetch for new area
+    const bufferedBbox = expandBounds(newBounds, MAP_BUFFER_FACTOR)
+    fetchMapSales(bufferedBbox, filters)
+  }, [mapView?.zoom, filters, fetchMapSales])
+
   const mapCenter = useMemo(() => {
     return mapView?.center || { lat: 39.8283, lng: -98.5795 }
   }, [mapView?.center])
@@ -1117,6 +1145,36 @@ export default function SalesClient({
 
   // Desktop callout card state
   const desktopMapRef = useRef<any>(null)
+  
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    {
+      key: COMMON_SHORTCUTS.FOCUS_SEARCH,
+      handler: () => {
+        // Focus ZIP input if it exists
+        const zipInput = document.querySelector<HTMLInputElement>('[data-testid="zip-input"] input, input[placeholder*="ZIP"]')
+        if (zipInput) {
+          zipInput.focus()
+        }
+      },
+      description: 'Focus search input'
+    },
+    {
+      key: COMMON_SHORTCUTS.OPEN_FILTERS,
+      handler: () => {
+        if (isMobile) {
+          // On mobile, open filter sheet via context
+          // The context should handle this, but we can trigger it via the filter button
+          const filterButton = document.querySelector<HTMLButtonElement>('[data-testid="filters-more"]')
+          if (filterButton) {
+            filterButton.click()
+          }
+        }
+        // On desktop, filters are always visible in the bar
+      },
+      description: 'Open filters'
+    }
+  ], !isMobile) // Only enable on desktop
   const [desktopPinPosition, setDesktopPinPosition] = useState<{ x: number; y: number } | null>(null)
 
   // Calculate selected sale for desktop callout
@@ -1310,7 +1368,7 @@ export default function SalesClient({
 
           {/* Main Content - Desktop Layout */}
           <div 
-            className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_420px] lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] 2xl:grid-cols-[minmax(0,1fr)_540px] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
+            className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_minmax(320px,420px)] lg:grid-cols-[minmax(0,1fr)_minmax(380px,480px)] xl:grid-cols-[minmax(0,1fr)_minmax(420px,540px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(480px,600px)] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
             style={{ height: MAIN_CONTENT_HEIGHT }}
           >
             {/* Map - Left on desktop */}
@@ -1367,6 +1425,17 @@ export default function SalesClient({
                 ) : null}
               </div>
               
+              {/* Re-center button */}
+              {mapView && (
+                <div className="absolute top-4 right-4 z-10">
+                  <RecenterButton
+                    onRecenter={handleRecenter}
+                    defaultCenter={effectiveCenter || { lat: 39.8283, lng: -98.5795 }}
+                    defaultZoom={mapView.zoom}
+                  />
+                </div>
+              )}
+              
               {/* Desktop callout card */}
               {selectedSale && desktopPinPosition && (
                 <MobileSaleCallout
@@ -1417,11 +1486,14 @@ export default function SalesClient({
                 )}
                   
                 {!loading && visibleSalesDeduplicated.length === 0 && (
-                  <div className="text-center py-8">
-                    <div className="text-gray-500">
-                      No sales found in this area
-                    </div>
-                  </div>
+                  <EmptyState
+                    title="No sales found in this area"
+                    suggestions={[
+                      ...(mapView && mapView.zoom > 12 ? ['Try zooming out to see more sales'] : []),
+                      ...(filters.dateRange !== 'any' || filters.categories.length > 0 ? ['Try clearing some filters'] : []),
+                      ...(mapView && mapView.zoom <= 12 ? ['Try panning to a different area'] : [])
+                    ]}
+                  />
                 )}
 
                 {!loading && visibleSalesDeduplicated.length > 0 && (

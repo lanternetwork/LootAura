@@ -241,10 +241,135 @@ export async function getItemsForSale(
 
     if (error) {
       const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-        console.error('[SALES_ACCESS] Error fetching items for sale:', error)
+      if (!isProduction()) {
+        console.error('[SALES_ACCESS] Error fetching items for sale from view:', {
+          saleId,
+          error: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        })
       }
+      
+      // If view query fails, try fallback to base table (for owner access)
+      try {
+        const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+        const db = getRlsDb()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user) {
+          // Check if user owns the sale
+          const { data: sale } = await fromBase(db, 'sales')
+            .select('id, owner_id, status')
+            .eq('id', saleId)
+            .single()
+          
+          if (sale && sale.owner_id === user.id) {
+            // Owner can read items directly from base table
+            const { data: baseItems, error: baseError } = await fromBase(db, 'items')
+              .select('id, sale_id, name, category, price, images, image_url, created_at')
+              .eq('sale_id', saleId)
+              .order('created_at', { ascending: true })
+              .limit(limit)
+            
+            if (!baseError && baseItems) {
+              const { isProduction: isProd } = await import('@/lib/env')
+              if (!isProd()) {
+                console.log('[SALES_ACCESS] Fallback to base table succeeded:', {
+                  saleId,
+                  itemsCount: baseItems.length,
+                })
+              }
+              // Map base table items to SaleItem format (same mapping logic as below)
+              const { isProduction: isProdMap } = await import('@/lib/env')
+              return ((baseItems || []) as any[]).map((item: any) => {
+                const images: string[] = Array.isArray(item.images) && item.images.length > 0
+                  ? item.images.filter((url: any): url is string => typeof url === 'string')
+                  : (item.image_url ? [item.image_url] : [])
+                return {
+                  id: item.id,
+                  sale_id: item.sale_id,
+                  name: item.name,
+                  category: item.category || undefined,
+                  condition: item.condition || undefined,
+                  price: item.price || undefined,
+                  photo: images.length > 0 ? images[0] : undefined,
+                  purchased: item.is_sold || false,
+                  created_at: item.created_at,
+                }
+              })
+            }
+          }
+        }
+      } catch (fallbackError) {
+        const { isProduction } = await import('@/lib/env')
+        if (!isProduction()) {
+          console.error('[SALES_ACCESS] Fallback to base table also failed:', fallbackError)
+        }
+      }
+      
       return []
+    }
+    
+    // If view returns 0 items, try fallback to base table for owner (in case of RLS timing issue)
+    if ((items?.length || 0) === 0) {
+      try {
+        const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+        const db = getRlsDb()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user) {
+          // Check if user owns the sale
+          const { data: sale } = await fromBase(db, 'sales')
+            .select('id, owner_id, status')
+            .eq('id', saleId)
+            .single()
+          
+          if (sale && sale.owner_id === user.id) {
+            // Owner can read items directly from base table (bypasses view RLS timing issues)
+            const { data: baseItems, error: baseError } = await fromBase(db, 'items')
+              .select('id, sale_id, name, category, price, images, image_url, created_at')
+              .eq('sale_id', saleId)
+              .order('created_at', { ascending: true })
+              .limit(limit)
+            
+            if (!baseError && baseItems && baseItems.length > 0) {
+              const { isProduction } = await import('@/lib/env')
+              if (!isProduction()) {
+                console.log('[SALES_ACCESS] View returned 0 items, but base table has items (RLS timing issue?):', {
+                  saleId,
+                  saleStatus: sale.status,
+                  itemsCount: baseItems.length,
+                })
+              }
+              // Map base table items to SaleItem format
+              const { isProduction: isProdMap } = await import('@/lib/env')
+              return ((baseItems || []) as any[]).map((item: any) => {
+                const images: string[] = Array.isArray(item.images) && item.images.length > 0
+                  ? item.images.filter((url: any): url is string => typeof url === 'string')
+                  : (item.image_url ? [item.image_url] : [])
+                return {
+                  id: item.id,
+                  sale_id: item.sale_id,
+                  name: item.name,
+                  category: item.category || undefined,
+                  condition: item.condition || undefined,
+                  price: item.price || undefined,
+                  photo: images.length > 0 ? images[0] : undefined,
+                  purchased: item.is_sold || false,
+                  created_at: item.created_at,
+                }
+              })
+            }
+          }
+        }
+      } catch (fallbackError) {
+        // Silent fail - fallback is best effort
+        const { isProduction } = await import('@/lib/env')
+        if (!isProduction()) {
+          console.warn('[SALES_ACCESS] Fallback check failed (non-critical):', fallbackError)
+        }
+      }
     }
     
     const { isProduction } = await import('@/lib/env')
@@ -510,6 +635,36 @@ export async function getSaleWithItems(
         saleId,
         errorCode: itemsRes.error?.code,
       })
+      
+      // Try fallback to base table if view query failed
+      if (itemsRes.error) {
+        try {
+          const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+          const db = getRlsDb()
+          const { data: { user } } = await supabase.auth.getUser()
+          
+          if (user && user.id === ownerId) {
+            // Owner can read items directly from base table
+            const { data: baseItems, error: baseError } = await fromBase(db, 'items')
+              .select('id, sale_id, name, category, price, images, image_url, created_at')
+              .eq('sale_id', saleId)
+              .order('created_at', { ascending: false })
+            
+            if (!baseError && baseItems) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[SALES_ACCESS] Fallback to base table succeeded after view error:', {
+                  saleId,
+                  itemsCount: baseItems.length,
+                })
+              }
+              // Use base table items instead
+              itemsRes = { data: baseItems, error: null }
+            }
+          }
+        } catch (fallbackError) {
+          // Silent fail - fallback is best effort
+        }
+      }
     }
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -527,6 +682,37 @@ export async function getSaleWithItems(
         saleStatus: sale.status,
         saleIdMatch: sale.id === saleId,
       })
+    }
+    
+    // If view returns 0 items, try fallback to base table for owner (in case of RLS timing issue)
+    if ((itemsRes.data?.length || 0) === 0 && !itemsRes.error) {
+      try {
+        const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+        const db = getRlsDb()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user && user.id === ownerId) {
+          // Owner can read items directly from base table (bypasses view RLS timing issues)
+          const { data: baseItems, error: baseError } = await fromBase(db, 'items')
+            .select('id, sale_id, name, category, price, images, image_url, created_at')
+            .eq('sale_id', saleId)
+            .order('created_at', { ascending: false })
+          
+          if (!baseError && baseItems && baseItems.length > 0) {
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SALES_ACCESS] View returned 0 items, but base table has items (RLS timing issue?):', {
+                saleId,
+                saleStatus: sale.status,
+                itemsCount: baseItems.length,
+              })
+            }
+            // Use base table items instead
+            itemsRes = { data: baseItems, error: null }
+          }
+        }
+      } catch (fallbackError) {
+        // Silent fail - fallback is best effort
+      }
     }
     
     // Additional debug: Try to query items using admin client via items_v2 view

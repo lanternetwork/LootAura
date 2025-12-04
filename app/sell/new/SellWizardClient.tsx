@@ -758,9 +758,10 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       if (payload.items && payload.items.length > 0) {
         try {
           await createItemsForSale(saleId, payload.items)
-          // Small delay to ensure database view is updated before redirect
+          // Delay to ensure database view and RLS policies are updated before redirect
           // This helps prevent race conditions where the sale detail page loads before items are visible
-          await new Promise(resolve => setTimeout(resolve, 500))
+          // Increased delay to account for view refresh and RLS policy evaluation timing
+          await new Promise(resolve => setTimeout(resolve, 1000))
         } catch (error) {
           // If items fail to create, show error but still allow user to view the sale
           // The sale was created successfully, so we don't want to fail the entire operation

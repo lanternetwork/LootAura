@@ -114,8 +114,8 @@ export function Tooltip({
 export function MapMarkerTooltip({
   content,
   children,
-  lat,
-  lng
+  lat: _lat,
+  lng: _lng
 }: {
   content: ReactNode
   children: ReactNode

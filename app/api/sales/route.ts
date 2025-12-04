@@ -628,7 +628,8 @@ async function salesHandler(request: NextRequest) {
         starts_at: s.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
         date_start: s.date_start,
         time_start: s.time_start
-      })))
+      }))
+      }
       
       // Debug: Log date filtering details
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -863,9 +864,8 @@ async function postHandler(request: NextRequest) {
         logger.warn('Auth failed for sale creation', {
           component: 'sales',
           operation: 'auth_failed',
-          errorCode: authError?.code 
-          code: authError?.message,
           errorCode: authError?.code,
+          errorMessage: authError?.message,
           errorStatus: authError?.status
         })
         return NextResponse.json({ error: 'Authentication required' }, { status: 401 })

@@ -281,7 +281,6 @@ export async function getItemsForSale(
                 })
               }
               // Map base table items to SaleItem format (same mapping logic as below)
-              const { isProduction: isProdMap } = await import('@/lib/env')
               return ((baseItems || []) as any[]).map((item: any) => {
                 const images: string[] = Array.isArray(item.images) && item.images.length > 0
                   ? item.images.filter((url: any): url is string => typeof url === 'string')
@@ -343,7 +342,6 @@ export async function getItemsForSale(
                 })
               }
               // Map base table items to SaleItem format
-              const { isProduction: isProdMap } = await import('@/lib/env')
               return ((baseItems || []) as any[]).map((item: any) => {
                 const images: string[] = Array.isArray(item.images) && item.images.length > 0
                   ? item.images.filter((url: any): url is string => typeof url === 'string')

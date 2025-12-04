@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { normalizeSocialLinks, SUPPORTED_PROVIDERS, type SocialLinks } from '@/lib/profile/social'
 import { toast } from 'react-toastify'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface SocialLinksEditorCardProps {
   initialLinks: SocialLinks | null
@@ -57,7 +58,11 @@ export function SocialLinksEditorCard({ initialLinks, onSaved }: SocialLinksEdit
 
       const response = await fetch('/api/profile/social-links', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
+        credentials: 'include',
         body: JSON.stringify({ links: normalized }),
       })
 

@@ -17,6 +17,7 @@ import type { CategoryValue } from '@/lib/types'
 import { getDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalDraft } from '@/lib/draft/localDraft'
 import { saveDraftServer, getLatestDraftServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
 import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface WizardStep {
   id: string
@@ -631,52 +632,68 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const createItemsForSale = useCallback(async (saleId: string, itemsToCreate: Array<{ name: string; price?: number; description?: string; category?: CategoryValue; image_url?: string }>) => {
     if (itemsToCreate.length === 0) return
 
-    const itemPromises = itemsToCreate.map(item =>
-      fetch('/api/items_v2', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sale_id: saleId,
-          title: item.name,
-          description: item.description,
-          price: item.price,
-          category: item.category,
-          image_url: item.image_url
-        }),
-      })
-    )
+    const itemPromises = itemsToCreate.map(async (item, index) => {
+      try {
+        const response = await fetch('/api/items_v2', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...getCsrfHeaders(),
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            sale_id: saleId,
+            title: item.name,
+            description: item.description,
+            price: item.price,
+            category: item.category,
+            image_url: item.image_url
+          }),
+        })
 
-    const results = await Promise.allSettled(itemPromises)
-    const failures = results.filter(r => r.status === 'rejected')
-    const successes = results.filter(r => r.status === 'fulfilled')
-    
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SELL_WIZARD] Item creation results:', {
-        total: itemsToCreate.length,
-        succeeded: successes.length,
-        failed: failures.length,
-        failures: failures.map(f => f.status === 'rejected' ? f.reason : null),
-      })
-    }
-    
-    // Check for HTTP errors in successful promises
-    for (const result of successes) {
-      if (result.status === 'fulfilled') {
-        const response = await result.value
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.error || `Failed to create item (${response.status})`
           console.error('[SELL_WIZARD] Item creation HTTP error:', {
+            itemIndex: index,
+            itemName: item.name,
             status: response.status,
             error: errorData,
           })
+          throw new Error(`${item.name}: ${errorMessage}`)
         }
+
+        const result = await response.json()
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[SELL_WIZARD] Item created successfully:', {
+            itemId: result.item?.id,
+            itemName: item.name,
+          })
+        }
+        return result
+      } catch (error) {
+        console.error('[SELL_WIZARD] Item creation failed:', {
+          itemIndex: index,
+          itemName: item.name,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        throw error
       }
-    }
-    
-    if (failures.length > 0) {
-      console.error('[SELL_WIZARD] Some items failed to create:', failures)
+    })
+
+    // Wait for all items to be created, throw if any fail
+    try {
+      await Promise.all(itemPromises)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SELL_WIZARD] All items created successfully:', {
+          total: itemsToCreate.length,
+          saleId,
+        })
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create items'
+      console.error('[SELL_WIZARD] Item creation failed:', errorMessage)
+      throw new Error(`Failed to create some items: ${errorMessage}`)
     }
   }, [])
 
@@ -690,7 +707,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
         },
+        credentials: 'include',
         body: JSON.stringify(payload.saleData),
       })
 
@@ -737,7 +756,19 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
       // Create items for the sale
       if (payload.items && payload.items.length > 0) {
-        await createItemsForSale(saleId, payload.items)
+        try {
+          await createItemsForSale(saleId, payload.items)
+          // Small delay to ensure database view is updated before redirect
+          // This helps prevent race conditions where the sale detail page loads before items are visible
+          await new Promise(resolve => setTimeout(resolve, 500))
+        } catch (error) {
+          // If items fail to create, show error but still allow user to view the sale
+          // The sale was created successfully, so we don't want to fail the entire operation
+          const errorMessage = error instanceof Error ? error.message : 'Failed to create some items'
+          console.error('[SELL_WIZARD] Item creation error (sale was created):', errorMessage)
+          setSubmitError(`Sale created successfully, but some items failed to save: ${errorMessage}. You can add items later from the sale detail page.`)
+          // Still show the confirmation modal so user can view the sale
+        }
       }
 
       // Clear draft keys and sessionStorage

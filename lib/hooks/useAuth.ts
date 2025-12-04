@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Profile, Sale } from '@/lib/types'
 import { ProfileSchema } from '@/lib/zodSchemas'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 const sb = createSupabaseBrowserClient()
 
@@ -201,7 +202,9 @@ export function useToggleFavorite() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
         },
+        credentials: 'include',
       })
 
       if (!response.ok) {

@@ -121,6 +121,7 @@ export default function SalesClient({
   const [bufferedBounds, setBufferedBounds] = useState<Bounds | null>(null)
   const [loading, setLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(false) // Track if a fetch is in progress
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(initialSales.length > 0) // Track if initial load is complete
   
   // Track deleted sale IDs to filter them out immediately
   const deletedSaleIdsRef = useRef<Set<string>>(new Set())
@@ -450,6 +451,10 @@ export default function SalesClient({
     } finally {
       setLoading(false)
       setIsFetching(false)
+      // Mark that initial load has completed after first fetch attempt
+      if (!hasCompletedInitialLoad) {
+        setHasCompletedInitialLoad(true)
+      }
     }
   }, [filters.dateRange, filters.categories, deduplicateSales, filterDeletedSales, fetchedSales.length])
 
@@ -1334,6 +1339,7 @@ export default function SalesClient({
           visibleSales={visibleSales}
           loading={loading}
           isFetching={isFetching}
+          hasCompletedInitialLoad={hasCompletedInitialLoad}
           filters={filters}
           onFiltersChange={handleFiltersChange}
           onClearFilters={clearFilters}
@@ -1485,7 +1491,7 @@ export default function SalesClient({
                   </div>
                 )}
                   
-                {!loading && visibleSalesDeduplicated.length === 0 && (
+                {!loading && hasCompletedInitialLoad && visibleSalesDeduplicated.length === 0 && (
                   <EmptyState
                     title="No sales found in this area"
                     suggestions={[

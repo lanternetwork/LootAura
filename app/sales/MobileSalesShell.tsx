@@ -33,6 +33,7 @@ interface MobileSalesShellProps {
   visibleSales: Sale[]
   loading: boolean
   isFetching?: boolean // Track if a buffer update is in progress
+  hasCompletedInitialLoad?: boolean // Track if initial load has completed
   
   // Filter props
   filters: {
@@ -73,6 +74,7 @@ export default function MobileSalesShell({
   visibleSales,
   loading,
   isFetching = false,
+  hasCompletedInitialLoad = false,
   filters,
   onFiltersChange,
   onClearFilters,
@@ -441,7 +443,7 @@ export default function MobileSalesShell({
               </div>
             )}
             
-            {!loading && visibleSales.length === 0 && (
+            {!loading && hasCompletedInitialLoad && visibleSales.length === 0 && (
               <div className="text-center py-12 px-4">
                 <div className="text-gray-500 mb-4">
                   No sales found in this area

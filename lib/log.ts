@@ -27,6 +27,7 @@ export interface LogContext {
 class Logger {
   private isProduction = process.env.NODE_ENV === 'production'
   private isDebug = process.env.NEXT_PUBLIC_DEBUG === 'true'
+  private isTest = process.env.NODE_ENV === 'test'
 
   private formatMessage(level: string, message: string, context?: LogContext): string {
     const timestamp = new Date().toISOString()
@@ -42,13 +43,15 @@ class Logger {
   }
 
   info(message: string, context?: LogContext): void {
-    if (!this.isProduction || this.isDebug) {
+    // Suppress console output in test mode to avoid test framework console interception
+    if (!this.isTest && (!this.isProduction || this.isDebug)) {
       console.log(this.formatMessage('INFO', message, context))
     }
   }
 
   warn(message: string, context?: LogContext): void {
-    if (!this.isProduction || this.isDebug) {
+    // Suppress console output in test mode to avoid test framework console interception
+    if (!this.isTest && (!this.isProduction || this.isDebug)) {
       console.warn(this.formatMessage('WARN', message, context))
     }
     
@@ -62,9 +65,12 @@ class Logger {
   }
 
   error(message: string, error?: Error, context?: LogContext): void {
-    // Always log errors
-    const errorMessage = error ? `${message}: ${error.message}` : message
-    console.error(this.formatMessage('ERROR', errorMessage, context))
+    // Suppress console output in test mode to avoid test framework console interception
+    // Errors are still logged in dev/prod for debugging
+    if (!this.isTest) {
+      const errorMessage = error ? `${message}: ${error.message}` : message
+      console.error(this.formatMessage('ERROR', errorMessage, context))
+    }
     
     // Send errors to Sentry in production
     if (this.isProduction && error) {

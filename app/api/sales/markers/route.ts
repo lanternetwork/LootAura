@@ -6,7 +6,7 @@ import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
 import { Policies } from '@/lib/rateLimit/policies'
-import { fail, ok } from '@/lib/http/json'
+import { fail } from '@/lib/http/json'
 
 // Force dynamic rendering for this API route
 export const dynamic = 'force-dynamic'

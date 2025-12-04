@@ -620,16 +620,7 @@ async function salesHandler(request: NextRequest) {
         })
       }
       // Removed detailed data logging to avoid PII
-      if (false && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        // Disabled: logging raw sale data
-        const _ = (salesData || []).slice(0, 3).map(s => ({
-        id: s.id,
-        title: s.title,
-        starts_at: s.date_start ? `${s.date_start}T${s.time_start || '00:00:00'}` : null,
-        date_start: s.date_start,
-        time_start: s.time_start
-      }))
-      }
+      // Disabled: logging raw sale data (previously logged first 3 sales for debugging)
       
       // Debug: Log date filtering details
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -830,6 +821,7 @@ async function salesHandler(request: NextRequest) {
 async function postHandler(request: NextRequest) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
+  const { logger } = await import('@/lib/log')
   const csrfError = await checkCsrfIfRequired(request)
   if (csrfError) {
     return csrfError

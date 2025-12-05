@@ -589,8 +589,24 @@ export async function getSaleWithItems(
             .eq('sale_id', saleId)
             .order('created_at', { ascending: false })
           
+          // Always log base table query results for owners (even in production, but only if debug is enabled)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SALES_ACCESS] Owner base table query result:', {
+              saleId,
+              hasError: !!baseItemsRes.error,
+              error: baseItemsRes.error ? {
+                code: baseItemsRes.error.code || 'unknown',
+                message: baseItemsRes.error.message || 'unknown error',
+              } : null,
+              itemsCount: baseItemsRes.data?.length || 0,
+              saleStatus: sale.status,
+              userId: user?.id,
+              ownerId,
+            })
+          }
+          
           if (!baseItemsRes.error && baseItemsRes.data && baseItemsRes.data.length > 0) {
-            // Base table query succeeded - use it
+            // Base table query succeeded with items - use it
             itemsRes = baseItemsRes
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
               console.log('[SALES_ACCESS] Owner query to base table succeeded:', {
@@ -598,13 +614,30 @@ export async function getSaleWithItems(
                 itemsCount: baseItemsRes.data.length,
               })
             }
-          } else {
-            // Base table query failed or returned 0 items - fall back to view
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SALES_ACCESS] Owner query to base table failed, falling back to view:', {
+          } else if (baseItemsRes.error) {
+            // Base table query had an error - log it and fall back to view
+            const { isProduction } = await import('@/lib/env')
+            if (!isProduction()) {
+              console.error('[SALES_ACCESS] Owner base table query error (RLS policy issue?):', {
                 saleId,
-                error: baseItemsRes.error?.message,
-                itemsCount: baseItemsRes.data?.length || 0,
+                error: baseItemsRes.error.code || 'unknown',
+                message: baseItemsRes.error.message || 'unknown error',
+                hint: 'If you see this, ensure migration 095_add_items_owner_read_policy.sql has been applied',
+              })
+            }
+            itemsRes = await supabase
+              .from('items_v2')
+              .select('id, sale_id, name, category, price, image_url, images, created_at')
+              .eq('sale_id', saleId)
+              .order('created_at', { ascending: false })
+          } else {
+            // Base table query succeeded but returned 0 items - fall back to view
+            // (This might be a timing issue - items might not be visible yet)
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SALES_ACCESS] Owner base table returned 0 items, falling back to view:', {
+                saleId,
+                saleStatus: sale.status,
+                note: 'Items may not exist yet, or there may be a timing issue',
               })
             }
             itemsRes = await supabase
@@ -614,11 +647,13 @@ export async function getSaleWithItems(
               .order('created_at', { ascending: false })
           }
         } catch (baseTableError) {
-          // If base table query throws an exception, fall back to view
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SALES_ACCESS] Owner base table query exception, falling back to view:', {
+          // If base table query throws an exception, log it and fall back to view
+          const { isProduction } = await import('@/lib/env')
+          if (!isProduction()) {
+            console.error('[SALES_ACCESS] Owner base table query exception:', {
               saleId,
               error: baseTableError instanceof Error ? baseTableError.message : String(baseTableError),
+              stack: baseTableError instanceof Error ? baseTableError.stack : undefined,
             })
           }
           itemsRes = await supabase
@@ -766,13 +801,16 @@ export async function getSaleWithItems(
       })
     }
     
-    // If view returns 0 items, try fallback to base table for owner (in case of RLS timing issue)
-    if ((itemsRes.data?.length || 0) === 0 && !itemsRes.error) {
+    // If view returns 0 items (or had an error), try fallback to base table for owner (in case of RLS timing issue)
+    // This is especially important right after item creation when views might not have refreshed yet
+    // We use isOwner here (already checked above) to avoid redundant user lookups
+    if ((itemsRes.data?.length || 0) === 0 && isOwner) {
       try {
         const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
         const db = getRlsDb()
         const { data: { user } } = await supabase.auth.getUser()
         
+        // Double-check user is still authenticated and is the owner
         if (user && user.id === ownerId) {
           // Owner can read items directly from base table (bypasses view RLS timing issues)
           // Note: This requires the items_owner_read RLS policy to be in place (migration 095)
@@ -784,8 +822,8 @@ export async function getSaleWithItems(
           if (baseError) {
             // Log the error to help diagnose RLS policy issues
             const { isProduction } = await import('@/lib/env')
-            if (!isProduction()) {
-              console.error('[SALES_ACCESS] Fallback to base table failed (RLS policy may be missing):', {
+            if (!isProduction() || process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.error('[SALES_ACCESS] Second fallback to base table failed (RLS policy may be missing):', {
                 saleId,
                 saleStatus: sale.status,
                 userId: user.id,
@@ -796,25 +834,28 @@ export async function getSaleWithItems(
               })
             }
           } else if (baseItems && baseItems.length > 0) {
+            // Base table has items - use them (this fixes the timing issue)
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SALES_ACCESS] View returned 0 items, but base table has items (RLS timing issue?):', {
+              console.log('[SALES_ACCESS] Second fallback to base table succeeded (view had 0 items):', {
                 saleId,
                 saleStatus: sale.status,
                 itemsCount: baseItems.length,
+                note: 'This suggests a view refresh timing issue was resolved',
               })
             }
             // Use base table items instead
             itemsRes = { data: baseItems, error: null }
           } else if (baseItems && baseItems.length === 0) {
-            // Base table also returns 0 items - items truly don't exist
+            // Base table also returns 0 items - items truly don't exist (or RLS is blocking)
             const { isProduction } = await import('@/lib/env')
-            if (!isProduction()) {
-              console.log('[SALES_ACCESS] Both view and base table returned 0 items:', {
+            if (!isProduction() || process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.warn('[SALES_ACCESS] Both view and base table returned 0 items for owner:', {
                 saleId,
                 saleStatus: sale.status,
                 userId: user.id,
                 ownerId,
-                note: 'Items may not have been created, or there is an RLS policy issue',
+                note: 'Items may not have been created, or there is an RLS policy issue preventing access',
+                hint: 'Check that items were actually created and that migration 095_add_items_owner_read_policy.sql is applied',
               })
             }
           }
@@ -840,10 +881,11 @@ export async function getSaleWithItems(
       } catch (fallbackError) {
         // Log fallback errors to help diagnose issues
         const { isProduction } = await import('@/lib/env')
-        if (!isProduction()) {
-          console.error('[SALES_ACCESS] Fallback check failed:', {
+        if (!isProduction() || process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[SALES_ACCESS] Second fallback check failed:', {
             saleId,
             error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+            stack: fallbackError instanceof Error ? fallbackError.stack : undefined,
           })
         }
       }

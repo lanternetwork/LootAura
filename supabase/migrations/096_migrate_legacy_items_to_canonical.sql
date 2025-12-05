@@ -22,19 +22,13 @@ DECLARE
   items_to_migrate_count INTEGER;
   migrated_count INTEGER := 0;
 BEGIN
-  -- Determine which legacy table exists (check both ways for reliability)
+  -- Determine which legacy table exists (use information_schema for reliable check)
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sale_items') THEN
     legacy_table_name := 'public.sale_items';
   ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sale_items_legacy') THEN
     legacy_table_name := 'public.sale_items_legacy';
   ELSE
     RAISE NOTICE 'No legacy items table found (checked public.sale_items and public.sale_items_legacy)';
-    RETURN;
-  END IF;
-
-  -- Verify the table actually exists before querying (double-check)
-  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = substring(legacy_table_name from position('.' in legacy_table_name) + 1)) THEN
-    RAISE NOTICE 'Legacy table % does not actually exist, skipping migration', legacy_table_name;
     RETURN;
   END IF;
 

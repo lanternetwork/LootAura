@@ -25,6 +25,14 @@ import { trackAnalyticsEvent } from '@/lib/analytics-client'
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
   const [imageError, setImageError] = useState(false)
+  const [imageLoading, setImageLoading] = useState(true)
+  
+  // Debug logging (only in debug mode)
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.debug('[ItemImage] Rendering image', { src: src?.substring(0, 50) + '...', alt, hasError: imageError, isLoading: imageLoading })
+    }
+  }, [src, alt, imageError, imageLoading])
   
   if (imageError) {
     return (
@@ -39,9 +47,21 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
       src={src}
       alt={alt}
       fill
-      className={className}
+      className={`${className} ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
       sizes={sizes}
-      onError={() => setImageError(true)}
+      onLoad={() => {
+        setImageLoading(false)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.debug('[ItemImage] Image loaded successfully', { src: src?.substring(0, 50) + '...' })
+        }
+      }}
+      onError={(e) => {
+        setImageError(true)
+        setImageLoading(false)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[ItemImage] Image failed to load', { src: src?.substring(0, 50) + '...', error: e })
+        }
+      }}
       unoptimized={src.startsWith('blob:') || src.startsWith('data:')}
     />
   )
@@ -598,7 +618,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                 {items.map((item) => (
                   <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="relative w-full h-48 mb-3 rounded-lg overflow-hidden bg-gray-100">
-                      {item.photo ? (
+                      {item.photo && item.photo.trim().length > 0 ? (
                         <ItemImage
                           src={item.photo}
                           alt={item.name}

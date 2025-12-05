@@ -662,33 +662,41 @@ export async function getSaleWithItems(
       .eq('sale_id', saleId)
       .order('created_at', { ascending: false })
     
-    // If base table query fails or returns no results, try fallback to items_v2 view
-    // This helps diagnose if the issue is RLS policy or view availability
+    // Check if items have images - if base table returns items but none have images, try view fallback
+    const itemsHaveImages = itemsRes.data && itemsRes.data.length > 0 && itemsRes.data.some((item: any) => {
+      const hasImageUrl = item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0
+      const hasImages = Array.isArray(item.images) && item.images.length > 0 && item.images.some((img: any) => typeof img === 'string' && img.trim().length > 0)
+      return hasImageUrl || hasImages
+    })
+    
+    // If base table query fails, returns no results, or items have no images, try fallback to items_v2 view
+    // This helps diagnose if the issue is RLS policy, view availability, or missing image data
     // IMPORTANT: Always try fallback if base table returns 0 items, even if no error
     // This handles cases where RLS silently blocks access (no error, but 0 results)
-    const shouldTryFallback = itemsRes.error || !itemsRes.data || itemsRes.data.length === 0
+    const shouldTryFallback = itemsRes.error || !itemsRes.data || itemsRes.data.length === 0 || !itemsHaveImages
     
     if (shouldTryFallback) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        logger.debug('Base table query failed or returned no items, trying items_v2 view fallback', {
+        logger.debug('Base table query failed, returned no items, or items have no images - trying items_v2 view fallback', {
           component: 'salesAccess',
           operation: 'getSaleWithItems',
           saleId,
           baseTableError: itemsRes.error?.code || null,
           baseTableErrorMessage: itemsRes.error?.message || null,
           baseTableCount: itemsRes.data?.length || 0,
+          itemsHaveImages,
           saleStatus: sale.status,
           isOwner: user && user.id === ownerId,
-          note: 'RLS may be silently blocking access - trying view fallback',
+          note: itemsRes.error ? 'RLS may be silently blocking access' : (!itemsRes.data || itemsRes.data.length === 0) ? 'No items returned' : 'Items returned but no images found - trying view fallback',
         })
       }
       
       // Try items_v2 view as fallback
       // The view may have different RLS behavior or may not have RLS at all
-      // Note: items_v2 view has 'images' array, not 'image_url' - we'll map it later
+      // View has both 'images' array and 'image_url' - select both for compatibility
       const viewRes = await supabase
         .from('items_v2')
-        .select('id, sale_id, name, price, images, created_at')
+        .select('id, sale_id, name, price, images, image_url, created_at')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: false })
       
@@ -703,16 +711,15 @@ export async function getSaleWithItems(
           })
         }
         // Normalize view result to match base table query structure
-        // View has 'images' array, base table has 'image_url' string
-        // Map images array to image_url for consistency
+        // View has both 'images' array and 'image_url' string - preserve both for mapping
         const normalizedData = viewRes.data.map((item: any) => ({
           id: item.id,
           sale_id: item.sale_id,
           name: item.name,
           price: item.price,
-          image_url: Array.isArray(item.images) && item.images.length > 0 
-            ? item.images[0] 
-            : null,
+          // Preserve both image_url and images from view for consistent mapping
+          image_url: item.image_url || (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : null),
+          images: item.images, // Preserve images array for mapping logic
           created_at: item.created_at,
         }))
         itemsRes = {

@@ -93,18 +93,13 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Normalize images: prefer images array, fallback to image_url
-    const images = Array.isArray(body.images) && body.images.length > 0
-      ? body.images
-      : (body.image_url ? [body.image_url] : [])
+    // Normalize image fields to canonical format (images array + image_url for compatibility)
+    const normalizedImages = normalizeItemImages({
+      image_url: body.image_url,
+      images: body.images,
+    })
     
-    // Get first image URL for image_url column (fallback for compatibility)
-    // Always use body.image_url if provided, even if empty string (to allow clearing)
-    const firstImageUrl = body.image_url !== undefined 
-      ? (body.image_url || null)  // Allow empty string to be saved as null
-      : (images.length > 0 ? images[0] : null)
-    
-    // Build insert payload - try to include both images array and image_url
+    // Build insert payload with normalized image fields
     const insertPayload: any = {
       sale_id: body.sale_id,
       name: body.title,
@@ -112,15 +107,9 @@ export async function POST(request: NextRequest) {
       price: body.price,
       category: body.category,
       condition: body.condition,
-    }
-    
-    // Add image_url (this column definitely exists)
-    // Always set it, even if null, to ensure it's saved
-    insertPayload.image_url = firstImageUrl
-    
-    // Add images array if we have images (this column might not exist, but we'll try)
-    if (images.length > 0) {
-      insertPayload.images = images
+      // Always set both fields for consistency (base table is authoritative)
+      images: normalizedImages.images,
+      image_url: normalizedImages.image_url,
     }
     
     // Log for debugging (only in debug mode)
@@ -132,7 +121,8 @@ export async function POST(request: NextRequest) {
         hasImageUrl: !!body.image_url,
         hasImages: Array.isArray(body.images) && body.images.length > 0,
         imagesCount: Array.isArray(body.images) ? body.images.length : 0,
-        firstImageUrl: firstImageUrl ? `${firstImageUrl.substring(0, 50)}...` : null,
+        normalizedImages: normalizedImages.images?.length || 0,
+        normalizedImageUrl: normalizedImages.image_url ? `${normalizedImages.image_url.substring(0, 50)}...` : null,
       })
     }
     
@@ -154,7 +144,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Enqueue image post-processing job for item image (non-blocking, non-critical)
-    if (firstImageUrl) {
+    if (normalizedImages.image_url) {
       // Import logger once if debug mode is enabled
       const logger = process.env.NEXT_PUBLIC_DEBUG === 'true' 
         ? (await import('@/lib/log')).logger
@@ -163,7 +153,7 @@ export async function POST(request: NextRequest) {
       try {
         const { enqueueJob, JOB_TYPES } = await import('@/lib/jobs')
         enqueueJob(JOB_TYPES.IMAGE_POSTPROCESS, {
-          imageUrl: firstImageUrl,
+          imageUrl: normalizedImages.image_url!,
           saleId: body.sale_id,
           ownerId: user.id,
         }).catch((err) => {
@@ -225,10 +215,22 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
+    // Normalize image fields if present in update body
+    const updatePayload: any = { ...body }
+    if ('image_url' in body || 'images' in body) {
+      const normalizedImages = normalizeItemImages({
+        image_url: body.image_url,
+        images: body.images,
+      })
+      // Always set both fields for consistency (base table is authoritative)
+      updatePayload.images = normalizedImages.images
+      updatePayload.image_url = normalizedImages.image_url
+    }
+    
     // Write to base table using schema-scoped client
     const db = getRlsDb()
     const { data: item, error } = await fromBase(db, 'items')
-      .update(body)
+      .update(updatePayload)
       .eq('id', itemId)
       .select()
       .single()

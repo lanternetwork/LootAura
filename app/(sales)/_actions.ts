@@ -4,6 +4,8 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { T } from '@/lib/supabase/tables'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 
 // Zod schemas for validation
 const SaleInputSchema = z.object({
@@ -233,14 +235,23 @@ export async function createItem(saleId: string, input: ItemInput): Promise<Acti
       return { success: false, error: 'Sale not found or access denied' }
     }
     
-    const { data, error } = await supabase
-      .from(T.items)
+    // Normalize image fields to canonical format (images array + image_url for compatibility)
+    const normalizedImages = normalizeItemImages({
+      image_url: validatedInput.image_url,
+      images: undefined, // This action only accepts image_url
+    })
+    
+    // Write to base table using schema-scoped client (base table is authoritative)
+    const db = getRlsDb()
+    const { data, error } = await fromBase(db, 'items')
       .insert({
         sale_id: saleId,
         name: validatedInput.title,
         description: validatedInput.description,
         price: validatedInput.price_cents ? validatedInput.price_cents / 100 : null,
-        image_url: validatedInput.image_url,
+        // Always set both fields for consistency (base table is authoritative)
+        images: normalizedImages.images,
+        image_url: normalizedImages.image_url,
       })
       .select()
       .single()

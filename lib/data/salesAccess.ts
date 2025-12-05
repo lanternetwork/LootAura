@@ -663,6 +663,8 @@ export async function getSaleWithItems(
       .order('created_at', { ascending: false })
     
     // Check if items have images - if base table returns items but none have images, try view fallback
+    // NOTE: After migration 097 (backfill) and normalized writes, this should rarely trigger.
+    // TODO: Remove this view fallback once we've confirmed base-table images are fully populated in production (2-4 weeks).
     const itemsHaveImages = itemsRes.data && itemsRes.data.length > 0 && itemsRes.data.some((item: any) => {
       const hasImageUrl = item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0
       const hasImages = Array.isArray(item.images) && item.images.length > 0 && item.images.some((img: any) => typeof img === 'string' && img.trim().length > 0)
@@ -670,14 +672,15 @@ export async function getSaleWithItems(
     })
     
     // If base table query fails, returns no results, or items have no images, try fallback to items_v2 view
-    // This helps diagnose if the issue is RLS policy, view availability, or missing image data
+    // TEMPORARY SAFETY NET: This fallback is kept as a safety net during the transition period.
+    // After confirming base-table images are authoritative (2-4 weeks), this should be removed.
     // IMPORTANT: Always try fallback if base table returns 0 items, even if no error
     // This handles cases where RLS silently blocks access (no error, but 0 results)
     const shouldTryFallback = itemsRes.error || !itemsRes.data || itemsRes.data.length === 0 || !itemsHaveImages
     
     if (shouldTryFallback) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        logger.debug('Base table query failed, returned no items, or items have no images - trying items_v2 view fallback', {
+        logger.debug('Base table query failed, returned no items, or items have no images - trying items_v2 view fallback (TEMPORARY SAFETY NET)', {
           component: 'salesAccess',
           operation: 'getSaleWithItems',
           saleId,
@@ -687,7 +690,11 @@ export async function getSaleWithItems(
           itemsHaveImages,
           saleStatus: sale.status,
           isOwner: user && user.id === ownerId,
-          note: itemsRes.error ? 'RLS may be silently blocking access' : (!itemsRes.data || itemsRes.data.length === 0) ? 'No items returned' : 'Items returned but no images found - trying view fallback',
+          note: itemsRes.error 
+            ? 'RLS may be silently blocking access' 
+            : (!itemsRes.data || itemsRes.data.length === 0) 
+              ? 'No items returned' 
+              : 'Items returned but no images found - this should be rare after migration 097. TODO: Remove view fallback after confirming base-table images are authoritative.',
         })
       }
       

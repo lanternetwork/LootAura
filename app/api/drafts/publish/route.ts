@@ -177,21 +177,25 @@ export async function POST(request: NextRequest) {
 
     createdSaleId = saleRow.id
 
-    // Build itemsPayload
-    // Include image_url (single string) - the database supports this column
-    // Note: We don't include 'images' array because that column doesn't exist in the base table
+    // Build itemsPayload with normalized image fields
+    // Normalize to canonical format: images array (primary) + image_url (compatibility)
+    const { normalizeItemImages } = await import('@/lib/data/itemImageNormalization')
     const itemsPayload = items && items.length > 0 ? items.map((item: any) => {
+      // Normalize image fields to canonical format
+      const normalizedImages = normalizeItemImages({
+        image_url: item.image_url,
+        images: item.images, // Draft may have images array
+      })
+      
       const payload: any = {
         sale_id: createdSaleId,
         name: item.name,
         description: item.description || null,
         price: item.price || null,
         category: item.category || null,
-      }
-      
-      // Include image_url if provided
-      if (item.image_url) {
-        payload.image_url = item.image_url
+        // Always set both fields for consistency (base table is authoritative)
+        images: normalizedImages.images,
+        image_url: normalizedImages.image_url,
       }
       
       return payload

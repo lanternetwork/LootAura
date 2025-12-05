@@ -859,6 +859,29 @@ export async function getSaleWithItems(
     // Log final mapped items (only in debug mode)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       const { logger: finalLogger } = await import('@/lib/log')
+      
+      // Log detailed image field information for debugging
+      const itemsWithImageData = mappedItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        hasPhoto: !!item.photo,
+        photoValue: item.photo ? `${item.photo.substring(0, 50)}...` : null,
+        photoLength: item.photo?.length || 0,
+      }))
+      
+      // Also log raw data from the query to see what we're working with
+      const rawItemsSample = itemsRes.data && itemsRes.data.length > 0 ? {
+        id: itemsRes.data[0].id,
+        hasImageUrl: !!itemsRes.data[0].image_url,
+        imageUrlValue: itemsRes.data[0].image_url ? `${itemsRes.data[0].image_url.substring(0, 50)}...` : null,
+        hasImages: !!itemsRes.data[0].images,
+        imagesType: Array.isArray(itemsRes.data[0].images) ? 'array' : typeof itemsRes.data[0].images,
+        imagesLength: Array.isArray(itemsRes.data[0].images) ? itemsRes.data[0].images.length : 0,
+        imagesFirst: Array.isArray(itemsRes.data[0].images) && itemsRes.data[0].images.length > 0 
+          ? `${itemsRes.data[0].images[0].substring(0, 50)}...` 
+          : null,
+      } : null
+      
       finalLogger.debug('Final mapped items for sale detail', {
         component: 'salesAccess',
         operation: 'getSaleWithItems',
@@ -867,13 +890,9 @@ export async function getSaleWithItems(
         mappedItemsCount: mappedItems.length,
         itemsWithPhotos: mappedItems.filter(i => i.photo).length,
         itemsWithoutPhotos: mappedItems.filter(i => !i.photo).length,
-        sampleItem: mappedItems.length > 0 ? {
-          id: mappedItems[0].id,
-          name: mappedItems[0].name,
-          hasPhoto: !!mappedItems[0].photo,
-          photoUrl: mappedItems[0].photo ? `${mappedItems[0].photo.substring(0, 50)}...` : null,
-        } : null,
-        note: 'If mappedItemsCount is 0 but rawItemsCount > 0, there may be a mapping issue',
+        itemsWithImageData,
+        rawItemsSample,
+        note: 'Check photoValue vs raw image_url/images to identify mapping issues',
       })
     }
 

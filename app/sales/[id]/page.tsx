@@ -31,7 +31,15 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
       saleId: params.id,
       itemsCount: items.length,
       saleStatus: sale.status,
-      items: items.map(i => ({ id: i.id, name: i.name, hasPhoto: !!i.photo })),
+      items: items.map(i => ({ 
+        id: i.id, 
+        name: i.name, 
+        hasPhoto: !!i.photo,
+        photoValue: i.photo ? `${i.photo.substring(0, 50)}...` : null,
+        photoType: typeof i.photo,
+        photoLength: i.photo?.length || 0,
+      })),
+      note: 'Verify photo field is populated and passed to ItemImage component',
     })
   }
 

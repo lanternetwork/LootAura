@@ -51,7 +51,8 @@ BEGIN
   -- Migrate items, only inserting items where:
   -- 1. The sale_id exists in lootaura_v2.sales (items must reference valid sales)
   -- 2. The item doesn't already exist in lootaura_v2.items (avoid duplicates)
-  EXECUTE format($sql$
+  BEGIN
+    EXECUTE format($sql$
     INSERT INTO lootaura_v2.items (
       id,
       sale_id,
@@ -86,12 +87,23 @@ BEGIN
     )
     ON CONFLICT (id) DO NOTHING
   $sql$, legacy_table_name);
+  EXCEPTION
+    WHEN undefined_table THEN
+      RAISE NOTICE 'Legacy table % does not actually exist, skipping migration', legacy_table_name;
+      RETURN;
+  END;
 
   GET DIAGNOSTICS migrated_count = ROW_COUNT;
   RAISE NOTICE 'Migrated % items from % to lootaura_v2.items', migrated_count, legacy_table_name;
 
   -- Log any items that couldn't be migrated (sale_id doesn't exist in lootaura_v2.sales)
-  EXECUTE format($sql$SELECT COUNT(*) FROM %I leg WHERE NOT EXISTS (SELECT 1 FROM lootaura_v2.sales s WHERE s.id = leg.sale_id)$sql$, legacy_table_name) INTO items_to_migrate_count;
+  BEGIN
+    EXECUTE format($sql$SELECT COUNT(*) FROM %I leg WHERE NOT EXISTS (SELECT 1 FROM lootaura_v2.sales s WHERE s.id = leg.sale_id)$sql$, legacy_table_name) INTO items_to_migrate_count;
+  EXCEPTION
+    WHEN undefined_table THEN
+      -- Table doesn't exist, skip this check
+      items_to_migrate_count := 0;
+  END;
   
   IF items_to_migrate_count > 0 THEN
     RAISE WARNING $msg$% items in % could not be migrated because their sale_id does not exist in lootaura_v2.sales$msg$, items_to_migrate_count, legacy_table_name;

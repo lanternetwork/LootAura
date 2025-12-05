@@ -36,7 +36,7 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
         srcType: typeof src,
         srcLength: src?.length || 0,
         alt, 
-        hasError: imageError, 
+        imageError, 
         isLoading: imageLoading, 
         useFallback 
       })
@@ -715,7 +715,8 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                       )}
                     </div>
                   </div>
-                ))}
+                )
+                })}
               </div>
             )}
           </div>

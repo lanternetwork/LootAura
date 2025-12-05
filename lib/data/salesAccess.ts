@@ -579,9 +579,11 @@ export async function getSaleWithItems(
     // Get user context for debug logging (RLS will handle visibility automatically)
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
+    // Import logger once at the top of the function for all logging
+    const { logger } = await import('@/lib/log')
+    
     // Verify session is available for RLS (log if not)
     if (userError) {
-      const { logger } = await import('@/lib/log')
       logger.warn('Auth error when fetching user for items query', {
         component: 'salesAccess',
         operation: 'getSaleWithItems',
@@ -608,7 +610,6 @@ export async function getSaleWithItems(
     // If base table query fails or returns no results, try fallback to items_v2 view
     // This helps diagnose if the issue is RLS policy or view availability
     if (itemsRes.error || (!itemsRes.data || itemsRes.data.length === 0)) {
-      const { logger } = await import('@/lib/log')
       logger.warn('Base table query failed or returned no items, trying items_v2 view fallback', {
         component: 'salesAccess',
         operation: 'getSaleWithItems',
@@ -644,7 +645,6 @@ export async function getSaleWithItems(
     }
     
     // Always log query results (PII-safe) - this is critical for debugging missing items
-    const { logger } = await import('@/lib/log')
     const userContext = user ? 'auth' : 'anon'
     const userIdShort = user?.id ? `${user.id.substring(0, 8)}...` : undefined
     const isOwner = user && user.id === ownerId

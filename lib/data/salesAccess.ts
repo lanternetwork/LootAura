@@ -636,13 +636,15 @@ export async function getSaleWithItems(
         .order('created_at', { ascending: false })
       
       if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
-        logger.info('items_v2 view fallback succeeded', {
-          component: 'salesAccess',
-          operation: 'getSaleWithItems',
-          saleId,
-          itemsCount: viewRes.data.length,
-          note: 'View returned items that base table query did not - possible RLS policy issue',
-        })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          logger.debug('items_v2 view fallback succeeded', {
+            component: 'salesAccess',
+            operation: 'getSaleWithItems',
+            saleId,
+            itemsCount: viewRes.data.length,
+            note: 'View returned items that base table query did not - possible RLS policy issue',
+          })
+        }
         // Normalize view result to match base table query structure
         // View has 'images' array, base table has 'image_url' string
         // Map images array to image_url for consistency
@@ -675,25 +677,27 @@ export async function getSaleWithItems(
       }
     }
     
-    // Always log query results (PII-safe) - this is critical for debugging missing items
-    const userContext = user ? 'auth' : 'anon'
-    const userIdShort = user?.id ? `${user.id.substring(0, 8)}...` : undefined
-    const isOwner = user && user.id === ownerId
-    
-    logger.info('Sale detail items query result', {
-      component: 'salesAccess',
-      operation: 'getSaleWithItems',
-      saleId,
-      itemsCount: itemsRes.data?.length || 0,
-      hasError: !!itemsRes.error,
-      errorCode: itemsRes.error?.code || null,
-      errorMessage: itemsRes.error?.message || null,
-      userContext,
-      userId: userIdShort,
-      isOwner,
-      saleStatus: sale.status,
-      ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
-    })
+    // Log query results (PII-safe) - only in debug mode
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const userContext = user ? 'auth' : 'anon'
+      const userIdShort = user?.id ? `${user.id.substring(0, 8)}...` : undefined
+      const isOwner = user && user.id === ownerId
+      
+      logger.debug('Sale detail items query result', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        itemsCount: itemsRes.data?.length || 0,
+        hasError: !!itemsRes.error,
+        errorCode: itemsRes.error?.code || null,
+        errorMessage: itemsRes.error?.message || null,
+        userContext,
+        userId: userIdShort,
+        isOwner,
+        saleStatus: sale.status,
+        ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
+      })
+    }
     
     // Log errors but don't fail - return with empty items array
     if (itemsRes.error) {

@@ -49,6 +49,7 @@ DO $$
 DECLARE
     table_exists BOOLEAN;
     row_count INTEGER;
+    rec RECORD;
 BEGIN
     SELECT EXISTS (
         SELECT 1 FROM information_schema.tables 
@@ -64,21 +65,21 @@ BEGIN
         RAISE NOTICE 'Sample rows (first 10):';
         FOR rec IN EXECUTE '
             SELECT 
-                id::text,
-                sale_id::text,
+                id::text as id,
+                sale_id::text as sale_id,
                 name,
-                price::text,
+                price::text as price,
                 photo,
-                created_at::text,
+                created_at::text as created_at,
                 category,
-                "condition",
-                purchased::text
+                "condition" as item_condition,
+                purchased::text as purchased
             FROM public.sale_items
             ORDER BY created_at DESC
             LIMIT 10
         ' LOOP
             RAISE NOTICE '  ID: %, Sale ID: %, Name: %, Price: %, Photo: %, Created: %, Category: %, Condition: %, Purchased: %',
-                rec.id, rec.sale_id, rec.name, rec.price, rec.photo, rec.created_at, rec.category, rec."condition", rec.purchased;
+                rec.id, rec.sale_id, rec.name, rec.price, rec.photo, rec.created_at, rec.category, rec.item_condition, rec.purchased;
         END LOOP;
     END IF;
 END $$;
@@ -104,21 +105,21 @@ BEGIN
         RAISE NOTICE 'Sample rows (first 10):';
         FOR rec IN EXECUTE '
             SELECT 
-                id::text,
-                sale_id::text,
+                id::text as id,
+                sale_id::text as sale_id,
                 name,
-                price::text,
+                price::text as price,
                 photo,
-                created_at::text,
+                created_at::text as created_at,
                 category,
-                "condition",
-                purchased::text
+                "condition" as item_condition,
+                purchased::text as purchased
             FROM public.sale_items_legacy
             ORDER BY created_at DESC
             LIMIT 10
         ' LOOP
             RAISE NOTICE '  ID: %, Sale ID: %, Name: %, Price: %, Photo: %, Created: %, Category: %, Condition: %, Purchased: %',
-                rec.id, rec.sale_id, rec.name, rec.price, rec.photo, rec.created_at, rec.category, rec."condition", rec.purchased;
+                rec.id, rec.sale_id, rec.name, rec.price, rec.photo, rec.created_at, rec.category, rec.item_condition, rec.purchased;
         END LOOP;
     ELSE
         RAISE NOTICE 'public.sale_items_legacy: DOES NOT EXIST';

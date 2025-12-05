@@ -582,9 +582,9 @@ export async function getSaleWithItems(
     // Import logger once at the top of the function for all logging
     const { logger } = await import('@/lib/log')
     
-    // Verify session is available for RLS (log if not)
-    if (userError) {
-      logger.warn('Auth error when fetching user for items query', {
+    // Verify session is available for RLS (log if not, only in debug mode)
+    if (userError && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      logger.debug('Auth error when fetching user for items query', {
         component: 'salesAccess',
         operation: 'getSaleWithItems',
         saleId,
@@ -614,17 +614,19 @@ export async function getSaleWithItems(
     const shouldTryFallback = itemsRes.error || !itemsRes.data || itemsRes.data.length === 0
     
     if (shouldTryFallback) {
-      logger.warn('Base table query failed or returned no items, trying items_v2 view fallback', {
-        component: 'salesAccess',
-        operation: 'getSaleWithItems',
-        saleId,
-        baseTableError: itemsRes.error?.code || null,
-        baseTableErrorMessage: itemsRes.error?.message || null,
-        baseTableCount: itemsRes.data?.length || 0,
-        saleStatus: sale.status,
-        isOwner: user && user.id === ownerId,
-        note: 'RLS may be silently blocking access - trying view fallback',
-      })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        logger.debug('Base table query failed or returned no items, trying items_v2 view fallback', {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
+          saleId,
+          baseTableError: itemsRes.error?.code || null,
+          baseTableErrorMessage: itemsRes.error?.message || null,
+          baseTableCount: itemsRes.data?.length || 0,
+          saleStatus: sale.status,
+          isOwner: user && user.id === ownerId,
+          note: 'RLS may be silently blocking access - trying view fallback',
+        })
+      }
       
       // Try items_v2 view as fallback
       // The view may have different RLS behavior or may not have RLS at all
@@ -663,17 +665,19 @@ export async function getSaleWithItems(
           data: normalizedData,
         } as typeof itemsRes
       } else {
-        logger.warn('items_v2 view fallback also failed or returned no items', {
-          component: 'salesAccess',
-          operation: 'getSaleWithItems',
-          saleId,
-          viewError: viewRes.error?.code || null,
-          viewErrorMessage: viewRes.error?.message || null,
-          viewCount: viewRes.data?.length || 0,
-          saleStatus: sale.status,
-          isOwner: user && user.id === ownerId,
-          note: 'Both base table and view returned no items - check if items exist in database or if RLS policies need to be applied',
-        })
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          logger.debug('items_v2 view fallback also failed or returned no items', {
+            component: 'salesAccess',
+            operation: 'getSaleWithItems',
+            saleId,
+            viewError: viewRes.error?.code || null,
+            viewErrorMessage: viewRes.error?.message || null,
+            viewCount: viewRes.data?.length || 0,
+            saleStatus: sale.status,
+            isOwner: user && user.id === ownerId,
+            note: 'Both base table and view returned no items - check if items exist in database or if RLS policies need to be applied',
+          })
+        }
       }
     }
     
@@ -715,9 +719,11 @@ export async function getSaleWithItems(
       })
     }
     
-    // If no items returned and no error, log a warning
-    if (!itemsRes.error && (!itemsRes.data || itemsRes.data.length === 0)) {
-      logger.warn('No items returned for sale (no error)', {
+    // If no items returned and no error, log a warning (only in debug mode)
+    if (!itemsRes.error && (!itemsRes.data || itemsRes.data.length === 0) && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const userContext = user ? 'auth' : 'anon'
+      const isOwner = user && user.id === ownerId
+      logger.debug('No items returned for sale (no error)', {
         component: 'salesAccess',
         operation: 'getSaleWithItems',
         saleId,

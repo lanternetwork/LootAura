@@ -268,7 +268,7 @@ export async function getItemsForSale(
             // Owner can read items directly from base table
             // Note: Only select image_url (images column may not exist in base table)
             const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-              .select('id, sale_id, name, category, price, image_url, created_at')
+              .select('id, sale_id, name, description, category, condition, price, image_url, is_sold, created_at')
               .eq('sale_id', saleId)
               .order('created_at', { ascending: true })
               .limit(limit)
@@ -330,7 +330,7 @@ export async function getItemsForSale(
             // Note: This requires the items_owner_read RLS policy to be in place (migration 095)
             // Note: Only select image_url (images column may not exist in base table)
             const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-              .select('id, sale_id, name, category, price, image_url, created_at')
+              .select('id, sale_id, name, description, category, condition, price, image_url, is_sold, created_at')
               .eq('sale_id', saleId)
               .order('created_at', { ascending: true })
               .limit(limit)
@@ -588,24 +588,34 @@ export async function getSaleWithItems(
           const db = getRlsDb()
           // Note: Only select image_url (images column may not exist in base table)
           const baseItemsRes = await fromBase(db, 'items')
-            .select('id, sale_id, name, category, price, image_url, created_at')
+            .select('id, sale_id, name, description, category, condition, price, image_url, is_sold, created_at')
             .eq('sale_id', saleId)
             .order('created_at', { ascending: false })
           
           // Always log base table query results for owners (even in production, but only if debug is enabled)
+          // Also log to server console for Vercel logs
+          const logData = {
+            saleId,
+            hasError: !!baseItemsRes.error,
+            error: baseItemsRes.error ? {
+              code: baseItemsRes.error.code || 'unknown',
+              message: baseItemsRes.error.message || 'unknown error',
+              details: baseItemsRes.error.details || null,
+              hint: baseItemsRes.error.hint || null,
+            } : null,
+            itemsCount: baseItemsRes.data?.length || 0,
+            saleStatus: sale.status,
+            userId: user?.id,
+            ownerId,
+            items: baseItemsRes.data?.map((i: any) => ({ id: i.id, name: i.name })) || [],
+          }
+          
+          // Log to server console (always visible in Vercel logs)
+          console.log('[SALES_ACCESS] Owner base table query result:', JSON.stringify(logData, null, 2))
+          
+          // Also log if debug is enabled
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SALES_ACCESS] Owner base table query result:', {
-              saleId,
-              hasError: !!baseItemsRes.error,
-              error: baseItemsRes.error ? {
-                code: baseItemsRes.error.code || 'unknown',
-                message: baseItemsRes.error.message || 'unknown error',
-              } : null,
-              itemsCount: baseItemsRes.data?.length || 0,
-              saleStatus: sale.status,
-              userId: user?.id,
-              ownerId,
-            })
+            console.log('[SALES_ACCESS] Owner base table query result (debug):', logData)
           }
           
           if (!baseItemsRes.error && baseItemsRes.data && baseItemsRes.data.length > 0) {
@@ -767,7 +777,7 @@ export async function getSaleWithItems(
             // Owner can read items directly from base table
             // Note: Only select image_url (images column may not exist in base table)
             const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-              .select('id, sale_id, name, category, price, image_url, created_at')
+              .select('id, sale_id, name, description, category, condition, price, image_url, is_sold, created_at')
               .eq('sale_id', saleId)
               .order('created_at', { ascending: false })
             
@@ -788,21 +798,28 @@ export async function getSaleWithItems(
       }
     }
     
+    // Always log items fetch result to server console for Vercel logs
+    const itemsFetchLogData = {
+      saleId,
+      hasError: !!itemsRes.error,
+      itemsResError: itemsRes.error ? {
+        code: itemsRes.error?.code || 'unknown',
+        message: itemsRes.error?.message || 'unknown error',
+        details: itemsRes.error?.details || null,
+        hint: itemsRes.error?.hint || null,
+        errorType: itemsRes.error?.constructor?.name || typeof itemsRes.error,
+      } : null,
+      itemsCount: itemsRes.data?.length || 0,
+      items: itemsRes.data?.map((i: any) => ({ id: i.id, name: i.name, category: i.category })) || [], // Log summary only
+      saleStatus: sale.status,
+      saleIdMatch: sale.id === saleId,
+      isOwner,
+      ownerId,
+    }
+    console.log('[SALES_ACCESS] Items fetch result:', JSON.stringify(itemsFetchLogData, null, 2))
+    
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SALES_ACCESS] Items fetch result:', {
-        saleId,
-        hasError: !!itemsRes.error,
-        itemsResError: itemsRes.error ? {
-          code: itemsRes.error?.code || 'unknown',
-          message: itemsRes.error?.message || 'unknown error',
-          errorType: itemsRes.error?.constructor?.name || typeof itemsRes.error,
-        } : null,
-        itemsCount: itemsRes.data?.length || 0,
-        items: itemsRes.data?.map((i: any) => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
-        // Debug: Check if sale status might be blocking items
-        saleStatus: sale.status,
-        saleIdMatch: sale.id === saleId,
-      })
+      console.log('[SALES_ACCESS] Items fetch result (debug):', itemsFetchLogData)
     }
     
     // If view returns 0 items (or had an error), try fallback to base table for owner (in case of RLS timing issue)
@@ -824,20 +841,28 @@ export async function getSaleWithItems(
             .eq('sale_id', saleId)
             .order('created_at', { ascending: false })
           
-          if (baseError) {
-            // Log the error to help diagnose RLS policy issues
-            const { isProduction } = await import('@/lib/env')
-            if (!isProduction() || process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.error('[SALES_ACCESS] Second fallback to base table failed (RLS policy may be missing):', {
+            if (baseError) {
+              // Log the error to help diagnose RLS policy issues
+              // Always log to server console for Vercel logs
+              const errorLogData = {
                 saleId,
                 saleStatus: sale.status,
                 userId: user.id,
                 ownerId,
-                error: baseError.code || 'unknown',
-                message: baseError.message || 'unknown error',
-                hint: 'If you see this, ensure migration 095_add_items_owner_read_policy.sql has been applied',
-              })
-            }
+                error: {
+                  code: baseError.code || 'unknown',
+                  message: baseError.message || 'unknown error',
+                  details: baseError.details || null,
+                  hint: baseError.hint || 'If you see this, ensure migration 095_add_items_owner_read_policy.sql has been applied',
+                },
+                note: 'This suggests the items_owner_read RLS policy may not be working correctly',
+              }
+              console.error('[SALES_ACCESS] Second fallback to base table failed (RLS policy may be missing):', JSON.stringify(errorLogData, null, 2))
+              
+              const { isProduction } = await import('@/lib/env')
+              if (!isProduction() || process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.error('[SALES_ACCESS] Second fallback to base table failed (debug):', errorLogData)
+              }
           } else if (baseItems && baseItems.length > 0) {
             // Base table has items - use them (this fixes the timing issue)
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

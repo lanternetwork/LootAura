@@ -609,16 +609,25 @@ export async function getSaleWithItems(
     
     // If base table query fails or returns no results, try fallback to items_v2 view
     // This helps diagnose if the issue is RLS policy or view availability
-    if (itemsRes.error || (!itemsRes.data || itemsRes.data.length === 0)) {
+    // IMPORTANT: Always try fallback if base table returns 0 items, even if no error
+    // This handles cases where RLS silently blocks access (no error, but 0 results)
+    const shouldTryFallback = itemsRes.error || !itemsRes.data || itemsRes.data.length === 0
+    
+    if (shouldTryFallback) {
       logger.warn('Base table query failed or returned no items, trying items_v2 view fallback', {
         component: 'salesAccess',
         operation: 'getSaleWithItems',
         saleId,
         baseTableError: itemsRes.error?.code || null,
+        baseTableErrorMessage: itemsRes.error?.message || null,
         baseTableCount: itemsRes.data?.length || 0,
+        saleStatus: sale.status,
+        isOwner: user && user.id === ownerId,
+        note: 'RLS may be silently blocking access - trying view fallback',
       })
       
       // Try items_v2 view as fallback
+      // The view may have different RLS behavior or may not have RLS at all
       const viewRes = await supabase
         .from('items_v2')
         .select('id, sale_id, name, price, image_url, created_at')
@@ -631,6 +640,7 @@ export async function getSaleWithItems(
           operation: 'getSaleWithItems',
           saleId,
           itemsCount: viewRes.data.length,
+          note: 'View returned items that base table query did not - possible RLS policy issue',
         })
         itemsRes = viewRes
       } else {
@@ -639,7 +649,11 @@ export async function getSaleWithItems(
           operation: 'getSaleWithItems',
           saleId,
           viewError: viewRes.error?.code || null,
+          viewErrorMessage: viewRes.error?.message || null,
           viewCount: viewRes.data?.length || 0,
+          saleStatus: sale.status,
+          isOwner: user && user.id === ownerId,
+          note: 'Both base table and view returned no items - check if items exist in database or if RLS policies need to be applied',
         })
       }
     }

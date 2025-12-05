@@ -2,6 +2,9 @@
 -- This allows owners to read items from their own sales regardless of sale status
 -- This fixes the issue where items don't appear immediately after creation due to RLS timing
 
+-- Drop policy if it exists (idempotent)
+DROP POLICY IF EXISTS "items_owner_read" ON lootaura_v2.items;
+
 -- Owner can read items from their own sales (regardless of sale status)
 CREATE POLICY "items_owner_read" ON lootaura_v2.items
     FOR SELECT

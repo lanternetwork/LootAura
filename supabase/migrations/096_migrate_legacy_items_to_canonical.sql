@@ -32,8 +32,14 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Count items to migrate
-  EXECUTE format($sql$SELECT COUNT(*) FROM %I$sql$, legacy_table_name) INTO items_to_migrate_count;
+  -- Count items to migrate (with error handling in case table doesn't actually exist)
+  BEGIN
+    EXECUTE format($sql$SELECT COUNT(*) FROM %I$sql$, legacy_table_name) INTO items_to_migrate_count;
+  EXCEPTION
+    WHEN undefined_table THEN
+      RAISE NOTICE 'Legacy table % does not actually exist, skipping migration', legacy_table_name;
+      RETURN;
+  END;
   
   IF items_to_migrate_count = 0 THEN
     RAISE NOTICE 'Legacy table % has no items to migrate', legacy_table_name;

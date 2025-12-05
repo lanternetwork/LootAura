@@ -93,8 +93,7 @@ BEGIN
   ', legacy_table_name) INTO items_to_migrate_count;
   
   IF items_to_migrate_count > 0 THEN
-    RAISE WARNING '% items in % could not be migrated because their sale_id does not exist in lootaura_v2.sales', 
-      items_to_migrate_count, legacy_table_name;
+    RAISE WARNING '% items in % could not be migrated because their sale_id does not exist in lootaura_v2.sales', items_to_migrate_count, legacy_table_name;
   END IF;
 
 END $$;

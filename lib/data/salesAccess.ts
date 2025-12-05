@@ -587,21 +587,9 @@ export async function getSaleWithItems(
           const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
           const db = getRlsDb()
           
-          // Verify session is available in the RLS client before querying
-          const { data: { user: rlsUser }, error: rlsAuthError } = await db.auth.getUser()
-          
-          // Always log base table query attempt for owners (even in production)
-          const sessionLogData = {
-            saleId,
-            originalUserId: user?.id,
-            rlsUserId: rlsUser?.id,
-            rlsAuthError: rlsAuthError ? {
-              code: rlsAuthError.code || 'unknown',
-              message: rlsAuthError.message || 'unknown error',
-            } : null,
-            sessionMatch: user?.id === rlsUser?.id,
-          }
-          console.log('[SALES_ACCESS] Owner base table query - session check:', JSON.stringify(sessionLogData, null, 2))
+          // Note: RLS policy will automatically use session from cookies
+          // The schema-scoped client (db) doesn't have auth methods, but RLS policies
+          // will still evaluate auth.uid() from the session cookies
           
           // Note: Only select image_url (images column may not exist in base table)
           const baseItemsRes = await fromBase(db, 'items')
@@ -623,7 +611,6 @@ export async function getSaleWithItems(
             itemsCount: baseItemsRes.data?.length || 0,
             saleStatus: sale.status,
             userId: user?.id,
-            rlsUserId: rlsUser?.id,
             ownerId,
             items: baseItemsRes.data?.map((i: any) => ({ id: i.id, name: i.name })) || [],
           }
@@ -851,21 +838,9 @@ export async function getSaleWithItems(
         
         // Double-check user is still authenticated and is the owner
         if (user && user.id === ownerId) {
-          // Verify session is available in the RLS client before querying
-          const { data: { user: rlsUser2 }, error: rlsAuthError2 } = await db.auth.getUser()
-          
-          // Log session check for second fallback
-          const sessionLogData2 = {
-            saleId,
-            originalUserId: user?.id,
-            rlsUserId: rlsUser2?.id,
-            rlsAuthError: rlsAuthError2 ? {
-              code: rlsAuthError2.code || 'unknown',
-              message: rlsAuthError2.message || 'unknown error',
-            } : null,
-            sessionMatch: user?.id === rlsUser2?.id,
-          }
-          console.log('[SALES_ACCESS] Second fallback - session check:', JSON.stringify(sessionLogData2, null, 2))
+          // Note: RLS policy will automatically use session from cookies
+          // The schema-scoped client (db) doesn't have auth methods, but RLS policies
+          // will still evaluate auth.uid() from the session cookies
           
           // Owner can read items directly from base table (bypasses view RLS timing issues)
           // Note: This requires the items_owner_read RLS policy to be in place (migration 095)
@@ -882,8 +857,6 @@ export async function getSaleWithItems(
                 saleId,
                 saleStatus: sale.status,
                 userId: user.id,
-                rlsUserId: rlsUser2?.id,
-                sessionMatch: user.id === rlsUser2?.id,
                 ownerId,
                 error: {
                   code: baseError.code || 'unknown',

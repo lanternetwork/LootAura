@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
+import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
 
 export const dynamic = 'force-dynamic'
 

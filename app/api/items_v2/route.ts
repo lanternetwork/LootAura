@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
 
 export async function GET(request: NextRequest) {
   try {

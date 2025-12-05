@@ -722,7 +722,6 @@ export async function getSaleWithItems(
     ])
 
     // Log errors but don't fail - return with defaults
-    const { logger } = await import('@/lib/log')
     if (profileRes.error) {
       logger.error('Error fetching owner profile', profileRes.error instanceof Error ? profileRes.error : new Error(String(profileRes.error)), {
         component: 'salesAccess',

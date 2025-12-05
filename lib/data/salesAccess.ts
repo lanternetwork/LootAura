@@ -643,7 +643,23 @@ export async function getSaleWithItems(
           itemsCount: viewRes.data.length,
           note: 'View returned items that base table query did not - possible RLS policy issue',
         })
-        itemsRes = viewRes
+        // Normalize view result to match base table query structure
+        // View has 'images' array, base table has 'image_url' string
+        // Map images array to image_url for consistency
+        const normalizedData = viewRes.data.map((item: any) => ({
+          id: item.id,
+          sale_id: item.sale_id,
+          name: item.name,
+          price: item.price,
+          image_url: Array.isArray(item.images) && item.images.length > 0 
+            ? item.images[0] 
+            : null,
+          created_at: item.created_at,
+        }))
+        itemsRes = {
+          ...viewRes,
+          data: normalizedData,
+        } as typeof itemsRes
       } else {
         logger.warn('items_v2 view fallback also failed or returned no items', {
           component: 'salesAccess',

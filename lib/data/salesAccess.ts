@@ -578,7 +578,6 @@ export async function getSaleWithItems(
     // (tags already fetched above)
     // Get user context for debug logging (RLS will handle visibility automatically)
     const { data: { user } } = await supabase.auth.getUser()
-    const isOwner = user && user.id === ownerId
     
     // Load items directly from base table using RLS-aware client
     // RLS policies (items_owner_read and items_public_read) will automatically handle visibility:

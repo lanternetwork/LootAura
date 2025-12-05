@@ -33,7 +33,7 @@ BEGIN
   END IF;
 
   -- Count items to migrate
-  EXECUTE format('SELECT COUNT(*) FROM %I', legacy_table_name) INTO items_to_migrate_count;
+  EXECUTE format($sql$SELECT COUNT(*) FROM %I$sql$, legacy_table_name) INTO items_to_migrate_count;
   
   IF items_to_migrate_count = 0 THEN
     RAISE NOTICE 'Legacy table % has no items to migrate', legacy_table_name;
@@ -45,7 +45,7 @@ BEGIN
   -- Migrate items, only inserting items where:
   -- 1. The sale_id exists in lootaura_v2.sales (items must reference valid sales)
   -- 2. The item doesn't already exist in lootaura_v2.items (avoid duplicates)
-  EXECUTE format('
+  EXECUTE format($sql$
     INSERT INTO lootaura_v2.items (
       id,
       sale_id,
@@ -63,12 +63,12 @@ BEGIN
       leg.id,
       leg.sale_id,
       leg.name,
-      NULL as description,  -- legacy table doesn't have description
+      NULL as description,
       leg.price,
       leg.category,
       leg."condition" as condition,
-      leg.photo as image_url,  -- map photo -> image_url
-      leg.purchased as is_sold,  -- map purchased -> is_sold
+      leg.photo as image_url,
+      leg.purchased as is_sold,
       leg.created_at,
       COALESCE(leg.created_at, NOW()) as updated_at
     FROM %I leg
@@ -79,13 +79,13 @@ BEGIN
       SELECT 1 FROM lootaura_v2.items i WHERE i.id = leg.id
     )
     ON CONFLICT (id) DO NOTHING
-  ', legacy_table_name);
+  $sql$, legacy_table_name);
 
   GET DIAGNOSTICS migrated_count = ROW_COUNT;
   RAISE NOTICE 'Migrated % items from % to lootaura_v2.items', migrated_count, legacy_table_name;
 
   -- Log any items that couldn't be migrated (sale_id doesn't exist in lootaura_v2.sales)
-  EXECUTE format('SELECT COUNT(*) FROM %I leg WHERE NOT EXISTS (SELECT 1 FROM lootaura_v2.sales s WHERE s.id = leg.sale_id)', legacy_table_name) INTO items_to_migrate_count;
+  EXECUTE format($sql$SELECT COUNT(*) FROM %I leg WHERE NOT EXISTS (SELECT 1 FROM lootaura_v2.sales s WHERE s.id = leg.sale_id)$sql$, legacy_table_name) INTO items_to_migrate_count;
   
   IF items_to_migrate_count > 0 THEN
     RAISE WARNING $msg$% items in % could not be migrated because their sale_id does not exist in lootaura_v2.sales$msg$, items_to_migrate_count, legacy_table_name;

@@ -628,9 +628,10 @@ export async function getSaleWithItems(
       
       // Try items_v2 view as fallback
       // The view may have different RLS behavior or may not have RLS at all
+      // Note: items_v2 view has 'images' array, not 'image_url' - we'll map it later
       const viewRes = await supabase
         .from('items_v2')
-        .select('id, sale_id, name, price, image_url, created_at')
+        .select('id, sale_id, name, price, images, created_at')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: false })
       
@@ -741,22 +742,33 @@ export async function getSaleWithItems(
 
     // Map items to SaleItem type
     // Base table query returns: id, sale_id, name, price, image_url, created_at
+    // View fallback returns: id, sale_id, name, price, images (array), created_at
     // Map to SaleItem format expected by components
     const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => {
-      // Normalize image_url: ensure it's a valid string or undefined
-      const photoUrl = item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0
-        ? item.image_url.trim()
-        : undefined
+      // Normalize image: handle both image_url (string) and images (array) from view
+      let photoUrl: string | undefined = undefined
+      
+      // Try image_url first (from base table query)
+      if (item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0) {
+        photoUrl = item.image_url.trim()
+      }
+      // Fallback to images array (from view fallback)
+      else if (item.images && Array.isArray(item.images) && item.images.length > 0) {
+        const firstImage = item.images[0]
+        if (typeof firstImage === 'string' && firstImage.trim().length > 0) {
+          photoUrl = firstImage.trim()
+        }
+      }
       
       return {
         id: item.id,
         sale_id: item.sale_id,
         name: item.name,
-        category: undefined, // Not selected from base table (may not exist)
-        condition: undefined, // Not selected from base table (may not exist)
+        category: item.category || undefined, // May come from view
+        condition: item.condition || undefined, // May come from view
         price: item.price || undefined,
-        photo: photoUrl, // Use normalized image_url as photo
-        purchased: false, // is_sold not selected from base table, default to false
+        photo: photoUrl, // Use normalized image as photo
+        purchased: item.is_sold || false, // May come from view
         created_at: item.created_at,
       }
     })

@@ -658,6 +658,11 @@ export async function getSaleWithItems(
     // Base table query returns: id, sale_id, name, price, image_url, created_at
     // Map to SaleItem format expected by components
     const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => {
+      // Normalize image_url: ensure it's a valid string or undefined
+      const photoUrl = item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0
+        ? item.image_url.trim()
+        : undefined
+      
       return {
         id: item.id,
         sale_id: item.sale_id,
@@ -665,11 +670,30 @@ export async function getSaleWithItems(
         category: undefined, // Not selected from base table (may not exist)
         condition: undefined, // Not selected from base table (may not exist)
         price: item.price || undefined,
-        photo: item.image_url || undefined, // Use image_url as photo
+        photo: photoUrl, // Use normalized image_url as photo
         purchased: false, // is_sold not selected from base table, default to false
         created_at: item.created_at,
       }
     })
+    
+    // Debug logging for item images (always log in non-production, or when debug flag is set)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true' || process.env.NODE_ENV !== 'production') {
+      const { logger } = await import('@/lib/log')
+      logger.info('Mapped items for sale detail', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        itemsCount: mappedItems.length,
+        itemsWithPhotos: mappedItems.filter(i => i.photo).length,
+        itemsWithoutPhotos: mappedItems.filter(i => !i.photo).length,
+        sampleItem: mappedItems.length > 0 ? {
+          id: mappedItems[0].id,
+          name: mappedItems[0].name,
+          hasPhoto: !!mappedItems[0].photo,
+          photoUrl: mappedItems[0].photo ? `${mappedItems[0].photo.substring(0, 50)}...` : null,
+        } : null,
+      })
+    }
 
     // Normalize owner profile so seller details stay in sync with v2 profile data:
     // - `display_name` (primary public name) is mapped into `full_name` used by UI components.

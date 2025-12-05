@@ -22,6 +22,31 @@ import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
 import { toast } from 'react-toastify'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 
+// Item image component with error handling
+function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
+  const [imageError, setImageError] = useState(false)
+  
+  if (imageError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-200" role="img" aria-label={`${alt} - no image available`}>
+        <span className="text-gray-400 text-sm">No image</span>
+      </div>
+    )
+  }
+  
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      className={className}
+      sizes={sizes}
+      onError={() => setImageError(true)}
+      unoptimized={src.startsWith('blob:') || src.startsWith('data:')}
+    />
+  )
+}
+
 interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo
   displayCategories?: string[]
@@ -345,10 +370,9 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                 <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
                   <div className="relative w-full aspect-square bg-gray-100">
                     {item.photo ? (
-                      <Image
+                      <ItemImage
                         src={item.photo}
                         alt={item.name}
-                        fill
                         className="object-cover"
                         sizes="(max-width: 640px) 50vw, 33vw"
                       />
@@ -575,10 +599,9 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                   <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="relative w-full h-48 mb-3 rounded-lg overflow-hidden bg-gray-100">
                       {item.photo ? (
-                        <Image
+                        <ItemImage
                           src={item.photo}
                           alt={item.name}
-                          fill
                           className="object-cover"
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         />

@@ -73,9 +73,11 @@ export async function getUserSales(
         error.message?.includes('does not exist')
 
       if (isPermissionError) {
-        const { isProduction } = await import('@/lib/env')
-        if (!isProduction()) {
-          console.warn('[SALES_ACCESS] View query failed, falling back to base table:', {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[SALES_ACCESS] View query failed, falling back to base table', {
+            component: 'salesAccess',
+            operation: 'getUserSales',
             error: error.code,
             message: error.message,
             hint: error.hint,
@@ -100,9 +102,11 @@ export async function getUserSales(
       throw error
     }
 
-    const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-      console.warn('[SALES_ACCESS] View query failed, falling back to base table:', {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('[SALES_ACCESS] View query failed, falling back to base table', {
+        component: 'salesAccess',
+        operation: 'getUserSales',
         error: error?.code,
         message: error?.message,
       })
@@ -127,11 +131,13 @@ export async function getUserSales(
       }
     }
 
-    // Log fallback usage for observability (dev only)
-    const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-      console.warn('[SALES_ACCESS] Using base-table fallback. View may need attention.', {
-        userId,
+    // Log fallback usage for observability (debug only)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('[SALES_ACCESS] Using base-table fallback. View may need attention.', {
+        component: 'salesAccess',
+        operation: 'getUserSales',
+        userId: userId.substring(0, 8) + '...',
         count: sales?.length || 0,
       })
     }
@@ -176,14 +182,16 @@ export async function getUserDrafts(
       .range(offset, offset + limit - 1)
 
     if (error) {
-      const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-        console.error('[SALES_ACCESS] Error fetching drafts:', {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('[SALES_ACCESS] Error fetching drafts', error instanceof Error ? error : new Error(String(error)), {
+          component: 'salesAccess',
+          operation: 'getUserDrafts',
           code: error.code,
           message: error.message,
           details: error.details,
           hint: error.hint,
-          userId,
+          userId: userId.substring(0, 8) + '...',
         })
       }
       return {
@@ -205,9 +213,12 @@ export async function getUserDrafts(
       data: mappedDrafts,
     }
   } catch (error) {
-    const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-      console.error('[SALES_ACCESS] Unexpected error fetching drafts:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('[SALES_ACCESS] Unexpected error fetching drafts', error instanceof Error ? error : new Error(String(error)), {
+        component: 'salesAccess',
+        operation: 'getUserDrafts',
+      })
     }
     return {
       data: [],
@@ -240,14 +251,16 @@ export async function getItemsForSale(
       .limit(limit)
 
     if (error) {
-      const { isProduction } = await import('@/lib/env')
-      if (!isProduction()) {
-        console.error('[SALES_ACCESS] Error fetching items for sale from view:', {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('[SALES_ACCESS] Error fetching items for sale from view', error instanceof Error ? error : new Error(String(error)), {
+          component: 'salesAccess',
+          operation: 'getItemsForSale',
           saleId,
-          error: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
+          errorCode: error.code,
+          errorMessage: error.message,
+          errorDetails: error.details,
+          errorHint: error.hint,
         })
       }
       
@@ -274,9 +287,11 @@ export async function getItemsForSale(
               .limit(limit)
             
             if (!baseError && baseItems) {
-              const { isProduction: isProd } = await import('@/lib/env')
-              if (!isProd()) {
-                console.log('[SALES_ACCESS] Fallback to base table succeeded:', {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                const { logger } = await import('@/lib/log')
+                logger.debug('[SALES_ACCESS] Fallback to base table succeeded', {
+                  component: 'salesAccess',
+                  operation: 'getItemsForSale',
                   saleId,
                   itemsCount: baseItems.length,
                 })
@@ -302,9 +317,13 @@ export async function getItemsForSale(
           }
         }
       } catch (fallbackError) {
-        const { isProduction } = await import('@/lib/env')
-        if (!isProduction()) {
-          console.error('[SALES_ACCESS] Fallback to base table also failed:', fallbackError)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { logger } = await import('@/lib/log')
+          logger.error('[SALES_ACCESS] Fallback to base table also failed', fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError)), {
+            component: 'salesAccess',
+            operation: 'getItemsForSale',
+            saleId,
+          })
         }
       }
       
@@ -336,23 +355,27 @@ export async function getItemsForSale(
               .limit(limit)
             
             if (baseError) {
-              // Log the error to help diagnose RLS policy issues
-              const { isProduction } = await import('@/lib/env')
-              if (!isProduction()) {
-                console.error('[SALES_ACCESS] Fallback to base table failed (RLS policy may be missing):', {
+              // Log the error to help diagnose RLS policy issues (debug only)
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                const { logger } = await import('@/lib/log')
+                logger.error('[SALES_ACCESS] Fallback to base table failed (RLS policy may be missing)', baseError instanceof Error ? baseError : new Error(String(baseError)), {
+                  component: 'salesAccess',
+                  operation: 'getItemsForSale',
                   saleId,
                   saleStatus: sale.status,
-                  userId: user.id,
-                  ownerId: sale.owner_id,
-                  error: baseError.code || 'unknown',
-                  message: baseError.message || 'unknown error',
+                  userId: user.id.substring(0, 8) + '...',
+                  ownerId: sale.owner_id.substring(0, 8) + '...',
+                  errorCode: baseError.code || 'unknown',
+                  errorMessage: baseError.message || 'unknown error',
                   hint: 'If you see this, ensure migration 095_add_items_owner_read_policy.sql has been applied',
                 })
               }
             } else if (baseItems && baseItems.length > 0) {
-              const { isProduction } = await import('@/lib/env')
-              if (!isProduction()) {
-                console.log('[SALES_ACCESS] View returned 0 items, but base table has items (RLS timing issue?):', {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                const { logger } = await import('@/lib/log')
+                logger.debug('[SALES_ACCESS] View returned 0 items, but base table has items (RLS timing issue?)', {
+                  component: 'salesAccess',
+                  operation: 'getItemsForSale',
                   saleId,
                   saleStatus: sale.status,
                   itemsCount: baseItems.length,
@@ -377,13 +400,15 @@ export async function getItemsForSale(
               })
             } else if (baseItems && baseItems.length === 0) {
               // Base table also returns 0 items - items truly don't exist
-              const { isProduction } = await import('@/lib/env')
-              if (!isProduction()) {
-                console.log('[SALES_ACCESS] Both view and base table returned 0 items:', {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                const { logger } = await import('@/lib/log')
+                logger.debug('[SALES_ACCESS] Both view and base table returned 0 items', {
+                  component: 'salesAccess',
+                  operation: 'getItemsForSale',
                   saleId,
                   saleStatus: sale.status,
-                  userId: user.id,
-                  ownerId: sale.owner_id,
+                  userId: user.id.substring(0, 8) + '...',
+                  ownerId: sale.owner_id.substring(0, 8) + '...',
                   note: 'Items may not have been created, or there is an RLS policy issue',
                 })
               }
@@ -391,10 +416,12 @@ export async function getItemsForSale(
           }
         }
       } catch (fallbackError) {
-        // Log fallback errors to help diagnose issues
-        const { isProduction } = await import('@/lib/env')
-        if (!isProduction()) {
-          console.warn('[SALES_ACCESS] Fallback check failed (non-critical):', {
+        // Log fallback errors to help diagnose issues (debug only)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[SALES_ACCESS] Fallback check failed (non-critical)', {
+            component: 'salesAccess',
+            operation: 'getItemsForSale',
             saleId,
             error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
           })
@@ -402,18 +429,16 @@ export async function getItemsForSale(
       }
     }
     
-    const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-      console.log('[SALES_ACCESS] getItemsForSale result:', {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('[SALES_ACCESS] getItemsForSale result', {
+        component: 'salesAccess',
+        operation: 'getItemsForSale',
         saleId,
         itemsCount: items?.length || 0,
-        items,
       })
     }
 
-    // Import isProduction once for use in map callback
-    const { isProduction: isProd } = await import('@/lib/env')
-    
     // Map items to SaleItem type
     // Normalize images: guarantee images: string[] with fallback to image_url
     const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => {
@@ -422,9 +447,12 @@ export async function getItemsForSale(
         ? item.images.filter((url: any): url is string => typeof url === 'string')
         : (item.image_url ? [item.image_url] : [])
       
-      // Log dev-only fallback when using image_url
-      if (!isProd() && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
-        console.log('[SALES_ACCESS] Item image fallback (image_url → images[]):', {
+      // Log debug-only fallback when using image_url
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true' && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
+        const { logger } = await import('@/lib/log')
+        logger.debug('[SALES_ACCESS] Item image fallback (image_url → images[])', {
+          component: 'salesAccess',
+          operation: 'getItemsForSale',
           itemId: item.id,
           itemName: item.name,
           hadImageUrl: !!item.image_url,
@@ -433,9 +461,12 @@ export async function getItemsForSale(
         })
       }
       
-      // Log dev-only when item has neither images nor image_url
-      if (!isProd() && images.length === 0) {
-        console.log('[SALES_ACCESS] Item has no images:', {
+      // Log debug-only when item has neither images nor image_url
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true' && images.length === 0) {
+        const { logger } = await import('@/lib/log')
+        logger.debug('[SALES_ACCESS] Item has no images', {
+          component: 'salesAccess',
+          operation: 'getItemsForSale',
           itemId: item.id,
           itemName: item.name,
           hadImageUrl: !!item.image_url,
@@ -458,9 +489,12 @@ export async function getItemsForSale(
 
     return mappedItems
   } catch (error) {
-    const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-      console.error('[SALES_ACCESS] Unexpected error in getItemsForSale:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('[SALES_ACCESS] Unexpected error in getItemsForSale', error instanceof Error ? error : new Error(String(error)), {
+        component: 'salesAccess',
+        operation: 'getItemsForSale',
+      })
     }
     return []
   }
@@ -491,9 +525,14 @@ export async function getSaleWithItems(
       if (saleError?.code === 'PGRST116') {
         return null // No rows returned
       }
-      const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-        console.error('[SALES_ACCESS] Error fetching sale:', saleError)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('[SALES_ACCESS] Error fetching sale', saleError instanceof Error ? saleError : new Error(String(saleError)), {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
+          saleId,
+          errorCode: saleError?.code,
+        })
       }
       return null
     }
@@ -522,7 +561,10 @@ export async function getSaleWithItems(
         }
       } else if (tagsRes.error) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES_ACCESS] Admin client tags query failed (schema limitation):', {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[SALES_ACCESS] Admin client tags query failed (schema limitation)', {
+            component: 'salesAccess',
+            operation: 'getSaleWithItems',
             saleId,
             error: tagsRes.error.message,
           })
@@ -531,7 +573,10 @@ export async function getSaleWithItems(
     } catch (error) {
       // Admin client not available or failed - that's okay, we'll continue without tags
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES_ACCESS] Could not fetch tags (admin client not available or failed):', {
+        const { logger } = await import('@/lib/log')
+        logger.debug('[SALES_ACCESS] Could not fetch tags (admin client not available or failed)', {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
           saleId,
           error: error instanceof Error ? error.message : String(error),
         })
@@ -539,10 +584,12 @@ export async function getSaleWithItems(
     }
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SALES_ACCESS] Tags fetch result:', {
+      const { logger } = await import('@/lib/log')
+      logger.debug('[SALES_ACCESS] Tags fetch result', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
         saleId,
         tagsCount: tags.length,
-        tags,
         note: 'Categories will still work from item categories if tags are empty',
       })
     }
@@ -553,9 +600,13 @@ export async function getSaleWithItems(
     }
 
     if (!sale.owner_id) {
-      const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-        console.error('[SALES_ACCESS] Sale found but missing owner_id')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('[SALES_ACCESS] Sale found but missing owner_id', new Error('Sale missing owner_id'), {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
+          saleId,
+        })
       }
       return {
         sale: {
@@ -882,7 +933,10 @@ export async function getNearestSalesForSale(
 
     if (saleError || !currentSale) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES_ACCESS] Could not fetch current sale for nearest sales:', {
+        const { logger } = await import('@/lib/log')
+        logger.debug('[SALES_ACCESS] Could not fetch current sale for nearest sales', {
+          component: 'salesAccess',
+          operation: 'getNearestSalesForSale',
           saleId,
           error: saleError?.message,
         })
@@ -898,7 +952,10 @@ export async function getNearestSalesForSale(
       isNaN(currentSale.lng)
     ) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES_ACCESS] Current sale has no valid coordinates:', {
+        const { logger } = await import('@/lib/log')
+        logger.debug('[SALES_ACCESS] Current sale has no valid coordinates', {
+          component: 'salesAccess',
+          operation: 'getNearestSalesForSale',
           saleId,
           lat: currentSale.lat,
           lng: currentSale.lng,
@@ -949,9 +1006,12 @@ export async function getNearestSalesForSale(
     if (rpcError) {
       // If RPC fails, fallback to manual query with Haversine calculation
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES_ACCESS] PostGIS RPC failed, using fallback query:', {
+        const { logger } = await import('@/lib/log')
+        logger.debug('[SALES_ACCESS] PostGIS RPC failed, using fallback query', {
+          component: 'salesAccess',
+          operation: 'getNearestSalesForSale',
           saleId,
-          error: rpcError.message,
+          error: rpcError instanceof Error ? rpcError.message : String(rpcError),
         })
       }
 
@@ -967,7 +1027,10 @@ export async function getNearestSalesForSale(
 
       if (queryError || !allSales) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES_ACCESS] Fallback query failed:', {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[SALES_ACCESS] Fallback query failed', {
+            component: 'salesAccess',
+            operation: 'getNearestSalesForSale',
             saleId,
             error: queryError?.message,
           })
@@ -1012,9 +1075,14 @@ export async function getNearestSalesForSale(
 
     return filtered as Array<Sale & { distance_m: number }>
   } catch (error) {
-    // Only log errors in debug mode and not in test environment
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && process.env.NODE_ENV !== 'test') {
-      console.error('[SALES_ACCESS] Unexpected error in getNearestSalesForSale:', error)
+    // Only log errors in debug mode
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('[SALES_ACCESS] Unexpected error in getNearestSalesForSale', error instanceof Error ? error : new Error(String(error)), {
+        component: 'salesAccess',
+        operation: 'getNearestSalesForSale',
+        saleId,
+      })
     }
     // Return empty array on error - don't break the page
     return []

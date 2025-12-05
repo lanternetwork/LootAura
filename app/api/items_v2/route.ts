@@ -31,13 +31,26 @@ export async function GET(request: NextRequest) {
     const { data: items, error } = await query
     
     if (error) {
-      console.error('Error fetching items:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('Error fetching items', error instanceof Error ? error : new Error(String(error)), {
+          component: 'items_v2',
+          operation: 'GET',
+          errorCode: error.code,
+        })
+      }
       return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 })
     }
     
     return NextResponse.json({ items })
   } catch (error) {
-    console.error('Unexpected error:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('Unexpected error in items_v2 GET', error instanceof Error ? error : new Error(String(error)), {
+        component: 'items_v2',
+        operation: 'GET',
+      })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -110,15 +123,16 @@ export async function POST(request: NextRequest) {
       insertPayload.images = images
     }
     
-    // Log for debugging (only in non-production)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[ITEMS_V2] Creating item with image data:', {
+    // Log for debugging (only in debug mode)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('[ITEMS_V2] Creating item with image data', {
+        component: 'items_v2',
+        operation: 'POST',
         hasImageUrl: !!body.image_url,
-        imageUrl: body.image_url,
         hasImages: Array.isArray(body.images) && body.images.length > 0,
-        images: body.images,
-        firstImageUrl,
-        insertPayloadImageUrl: insertPayload.image_url,
+        imagesCount: Array.isArray(body.images) ? body.images.length : 0,
+        firstImageUrl: firstImageUrl ? `${firstImageUrl.substring(0, 50)}...` : null,
       })
     }
     
@@ -128,7 +142,14 @@ export async function POST(request: NextRequest) {
       .single()
     
     if (error) {
-      console.error('Error creating item:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('Error creating item', error instanceof Error ? error : new Error(String(error)), {
+          component: 'items_v2',
+          operation: 'POST',
+          errorCode: error.code,
+        })
+      }
       return NextResponse.json({ error: 'Failed to create item' }, { status: 500 })
     }
     
@@ -141,18 +162,38 @@ export async function POST(request: NextRequest) {
           saleId: body.sale_id,
           ownerId: user.id,
         }).catch((err) => {
-          // Log but don't fail - job enqueueing is non-critical
-          console.warn('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical):', err)
+          // Log but don't fail - job enqueueing is non-critical (debug only)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            const { logger } = await import('@/lib/log')
+            logger.debug('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical)', {
+              component: 'items_v2',
+              operation: 'POST',
+              error: err instanceof Error ? err.message : String(err),
+            })
+          }
         })
       } catch (jobErr) {
-        // Ignore job enqueueing errors - this is non-critical
-        console.warn('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical):', jobErr)
+        // Ignore job enqueueing errors - this is non-critical (debug only)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical)', {
+            component: 'items_v2',
+            operation: 'POST',
+            error: jobErr instanceof Error ? jobErr.message : String(jobErr),
+          })
+        }
       }
     }
     
     return NextResponse.json({ item }, { status: 201 })
   } catch (error) {
-    console.error('Unexpected error:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('Unexpected error in items_v2 POST', error instanceof Error ? error : new Error(String(error)), {
+        component: 'items_v2',
+        operation: 'POST',
+      })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -190,7 +231,15 @@ export async function PUT(request: NextRequest) {
       .single()
     
     if (error) {
-      console.error('Error updating item:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('Error updating item', error instanceof Error ? error : new Error(String(error)), {
+          component: 'items_v2',
+          operation: 'PUT',
+          itemId,
+          errorCode: error.code,
+        })
+      }
       return NextResponse.json({ error: 'Failed to update item' }, { status: 500 })
     }
     
@@ -200,7 +249,13 @@ export async function PUT(request: NextRequest) {
     
     return NextResponse.json({ item })
   } catch (error) {
-    console.error('Unexpected error:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('Unexpected error in items_v2 PUT', error instanceof Error ? error : new Error(String(error)), {
+        component: 'items_v2',
+        operation: 'PUT',
+      })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -235,13 +290,27 @@ export async function DELETE(request: NextRequest) {
       .eq('id', itemId)
     
     if (error) {
-      console.error('Error deleting item:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('Error deleting item', error instanceof Error ? error : new Error(String(error)), {
+          component: 'items_v2',
+          operation: 'DELETE',
+          itemId,
+          errorCode: error.code,
+        })
+      }
       return NextResponse.json({ error: 'Failed to delete item' }, { status: 500 })
     }
     
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Unexpected error:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('Unexpected error in items_v2 DELETE', error instanceof Error ? error : new Error(String(error)), {
+        component: 'items_v2',
+        operation: 'DELETE',
+      })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

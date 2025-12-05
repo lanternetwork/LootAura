@@ -147,6 +147,21 @@ body { min-height: 100vh; }
   background-color: var(--accent-primary) !important;
 }
 
+/* Tooltip popup styling - minimal, no tip pointer */
+.mapboxgl-popup-tooltip .mapboxgl-popup-content {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.mapboxgl-popup-tooltip .mapboxgl-popup-tip {
+  display: none !important;
+}
+
+.mapboxgl-popup-tooltip {
+  pointer-events: none !important;
+}
+
 /* Global focus ring removal for map elements only */
 .mapboxgl-map *:focus,
 .mapboxgl-map *:focus-visible,

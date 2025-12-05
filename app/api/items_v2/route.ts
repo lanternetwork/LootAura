@@ -155,6 +155,11 @@ export async function POST(request: NextRequest) {
     
     // Enqueue image post-processing job for item image (non-blocking, non-critical)
     if (firstImageUrl) {
+      // Import logger once if debug mode is enabled
+      const logger = process.env.NEXT_PUBLIC_DEBUG === 'true' 
+        ? (await import('@/lib/log')).logger
+        : null
+      
       try {
         const { enqueueJob, JOB_TYPES } = await import('@/lib/jobs')
         enqueueJob(JOB_TYPES.IMAGE_POSTPROCESS, {
@@ -163,8 +168,7 @@ export async function POST(request: NextRequest) {
           ownerId: user.id,
         }).catch((err) => {
           // Log but don't fail - job enqueueing is non-critical (debug only)
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            const { logger } = await import('@/lib/log')
+          if (logger) {
             logger.debug('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical)', {
               component: 'items_v2',
               operation: 'POST',
@@ -174,8 +178,7 @@ export async function POST(request: NextRequest) {
         })
       } catch (jobErr) {
         // Ignore job enqueueing errors - this is non-critical (debug only)
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          const { logger } = await import('@/lib/log')
+        if (logger) {
           logger.debug('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical)', {
             component: 'items_v2',
             operation: 'POST',

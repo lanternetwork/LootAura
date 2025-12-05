@@ -439,6 +439,11 @@ export async function getItemsForSale(
       })
     }
 
+    // Import logger once if debug mode is enabled (for use in map callback)
+    const logger = process.env.NEXT_PUBLIC_DEBUG === 'true' 
+      ? (await import('@/lib/log')).logger
+      : null
+
     // Map items to SaleItem type
     // Normalize images: guarantee images: string[] with fallback to image_url
     const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => {
@@ -448,8 +453,7 @@ export async function getItemsForSale(
         : (item.image_url ? [item.image_url] : [])
       
       // Log debug-only fallback when using image_url
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true' && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
-        const { logger } = await import('@/lib/log')
+      if (logger && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
         logger.debug('[SALES_ACCESS] Item image fallback (image_url → images[])', {
           component: 'salesAccess',
           operation: 'getItemsForSale',
@@ -462,8 +466,7 @@ export async function getItemsForSale(
       }
       
       // Log debug-only when item has neither images nor image_url
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true' && images.length === 0) {
-        const { logger } = await import('@/lib/log')
+      if (logger && images.length === 0) {
         logger.debug('[SALES_ACCESS] Item has no images', {
           component: 'salesAccess',
           operation: 'getItemsForSale',
@@ -756,6 +759,8 @@ export async function getSaleWithItems(
     
     // Log errors but don't fail - return with empty items array
     if (itemsRes.error) {
+      const userContext = user ? 'auth' : 'anon'
+      const isOwner = user && user.id === ownerId
       logger.error('Error fetching items from base table', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
         component: 'salesAccess',
         operation: 'getSaleWithItems',

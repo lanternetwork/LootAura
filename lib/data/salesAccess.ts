@@ -266,8 +266,9 @@ export async function getItemsForSale(
           
           if (sale && sale.owner_id === user.id) {
             // Owner can read items directly from base table
+            // Note: Only select image_url (images column may not exist in base table)
             const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-              .select('id, sale_id, name, category, price, images, image_url, created_at')
+              .select('id, sale_id, name, category, price, image_url, created_at')
               .eq('sale_id', saleId)
               .order('created_at', { ascending: true })
               .limit(limit)
@@ -327,8 +328,9 @@ export async function getItemsForSale(
           if (sale && sale.owner_id === user.id) {
             // Owner can read items directly from base table (bypasses view RLS timing issues)
             // Note: This requires the items_owner_read RLS policy to be in place (migration 095)
+            // Note: Only select image_url (images column may not exist in base table)
             const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-              .select('id, sale_id, name, category, price, images, image_url, created_at')
+              .select('id, sale_id, name, category, price, image_url, created_at')
               .eq('sale_id', saleId)
               .order('created_at', { ascending: true })
               .limit(limit)
@@ -584,8 +586,9 @@ export async function getSaleWithItems(
         try {
           const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
           const db = getRlsDb()
+          // Note: Only select image_url (images column may not exist in base table)
           const baseItemsRes = await fromBase(db, 'items')
-            .select('id, sale_id, name, category, price, images, image_url, created_at')
+            .select('id, sale_id, name, category, price, image_url, created_at')
             .eq('sale_id', saleId)
             .order('created_at', { ascending: false })
           
@@ -762,8 +765,9 @@ export async function getSaleWithItems(
           
           if (user && user.id === ownerId) {
             // Owner can read items directly from base table
+            // Note: Only select image_url (images column may not exist in base table)
             const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-              .select('id, sale_id, name, category, price, images, image_url, created_at')
+              .select('id, sale_id, name, category, price, image_url, created_at')
               .eq('sale_id', saleId)
               .order('created_at', { ascending: false })
             
@@ -814,8 +818,9 @@ export async function getSaleWithItems(
         if (user && user.id === ownerId) {
           // Owner can read items directly from base table (bypasses view RLS timing issues)
           // Note: This requires the items_owner_read RLS policy to be in place (migration 095)
+          // Note: Only select image_url (images column may not exist in base table)
           const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-            .select('id, sale_id, name, category, price, images, image_url, created_at')
+            .select('id, sale_id, name, category, price, image_url, created_at')
             .eq('sale_id', saleId)
             .order('created_at', { ascending: false })
           

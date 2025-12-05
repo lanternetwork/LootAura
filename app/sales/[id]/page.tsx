@@ -23,10 +23,10 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
 
   const { sale, items } = result
   
-  // Log items being passed to client (critical for debugging)
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true' || process.env.NODE_ENV !== 'production') {
+  // Log items being passed to client (only in debug mode)
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     const { logger } = await import('@/lib/log')
-    logger.info('Sale detail page rendering', {
+    logger.debug('Sale detail page rendering', {
       component: 'sales/[id]/page',
       saleId: params.id,
       itemsCount: items.length,

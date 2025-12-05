@@ -100,24 +100,77 @@ BEGIN
 END $$;
 
 -- Step 3: Ensure items_v2 view includes all necessary columns and selects from canonical table
--- Recreate the view to ensure it has image_url and all other columns
+-- Recreate the view with only columns that exist in the base table
 DROP VIEW IF EXISTS public.items_v2 CASCADE;
 
-CREATE VIEW public.items_v2 AS
-SELECT 
-    id,
-    created_at,
-    sale_id,
-    name,
-    description,
-    price,
-    image_url,  -- Ensure image_url is included
-    category,
-    condition,
-    images,  -- Also include images array for compatibility
-    is_sold,
-    updated_at
-FROM lootaura_v2.items;
+-- Build view definition dynamically based on what columns exist
+DO $$
+DECLARE
+    has_condition BOOLEAN;
+    has_images BOOLEAN;
+    has_is_sold BOOLEAN;
+    has_updated_at BOOLEAN;
+    view_sql TEXT;
+BEGIN
+    -- Check which optional columns exist in base table
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' AND table_name = 'items' AND column_name = 'condition'
+    ) INTO has_condition;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' AND table_name = 'items' AND column_name = 'images'
+    ) INTO has_images;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' AND table_name = 'items' AND column_name = 'is_sold'
+    ) INTO has_is_sold;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' AND table_name = 'items' AND column_name = 'updated_at'
+    ) INTO has_updated_at;
+    
+    -- Build view SQL with only existing columns
+    view_sql := 'CREATE VIEW public.items_v2 AS SELECT id, created_at, sale_id, name, description, price, image_url, category';
+    
+    IF has_condition THEN
+        view_sql := view_sql || ', condition';
+    END IF;
+    
+    IF has_images THEN
+        view_sql := view_sql || ', images';
+    END IF;
+    
+    IF has_is_sold THEN
+        view_sql := view_sql || ', is_sold';
+    END IF;
+    
+    IF has_updated_at THEN
+        view_sql := view_sql || ', updated_at';
+    END IF;
+    
+    view_sql := view_sql || ' FROM lootaura_v2.items';
+    
+    -- Create the view
+    EXECUTE view_sql;
+    
+    RAISE NOTICE 'Created public.items_v2 view with columns: id, created_at, sale_id, name, description, price, image_url, category';
+    IF has_condition THEN
+        RAISE NOTICE '  + condition';
+    END IF;
+    IF has_images THEN
+        RAISE NOTICE '  + images';
+    END IF;
+    IF has_is_sold THEN
+        RAISE NOTICE '  + is_sold';
+    END IF;
+    IF has_updated_at THEN
+        RAISE NOTICE '  + updated_at';
+    END IF;
+END $$;
 
 -- Grant permissions on the view
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.items_v2 TO anon, authenticated;

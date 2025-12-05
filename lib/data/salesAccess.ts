@@ -266,9 +266,9 @@ export async function getItemsForSale(
           
           if (sale && sale.owner_id === user.id) {
             // Owner can read items directly from base table
-            // Note: Only select image_url (images column may not exist in base table)
+            // Note: Only select guaranteed columns (condition, description, is_sold may not exist in production)
             const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-              .select('id, sale_id, name, description, category, condition, price, image_url, is_sold, created_at')
+              .select('id, sale_id, name, price, image_url, created_at')
               .eq('sale_id', saleId)
               .order('created_at', { ascending: true })
               .limit(limit)
@@ -328,9 +328,9 @@ export async function getItemsForSale(
           if (sale && sale.owner_id === user.id) {
             // Owner can read items directly from base table (bypasses view RLS timing issues)
             // Note: This requires the items_owner_read RLS policy to be in place (migration 095)
-            // Note: Only select image_url (images column may not exist in base table)
+            // Note: Only select guaranteed columns (condition, description, is_sold may not exist in production)
             const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-              .select('id, sale_id, name, description, category, condition, price, image_url, is_sold, created_at')
+              .select('id, sale_id, name, price, image_url, created_at')
               .eq('sale_id', saleId)
               .order('created_at', { ascending: true })
               .limit(limit)
@@ -591,9 +591,9 @@ export async function getSaleWithItems(
           // The schema-scoped client (db) doesn't have auth methods, but RLS policies
           // will still evaluate auth.uid() from the session cookies
           
-          // Note: Only select image_url (images column may not exist in base table)
+          // Note: Only select guaranteed columns (condition, description, is_sold may not exist in production)
           const baseItemsRes = await fromBase(db, 'items')
-            .select('id, sale_id, name, description, category, condition, price, image_url, is_sold, created_at')
+            .select('id, sale_id, name, price, image_url, created_at')
             .eq('sale_id', saleId)
             .order('created_at', { ascending: false })
           
@@ -780,9 +780,9 @@ export async function getSaleWithItems(
           
           if (user && user.id === ownerId) {
             // Owner can read items directly from base table
-            // Note: Only select image_url (images column may not exist in base table)
+            // Note: Only select guaranteed columns (condition, description, is_sold may not exist in production)
             const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-              .select('id, sale_id, name, description, category, condition, price, image_url, is_sold, created_at')
+              .select('id, sale_id, name, price, image_url, created_at')
               .eq('sale_id', saleId)
               .order('created_at', { ascending: false })
             
@@ -844,9 +844,9 @@ export async function getSaleWithItems(
           
           // Owner can read items directly from base table (bypasses view RLS timing issues)
           // Note: This requires the items_owner_read RLS policy to be in place (migration 095)
-          // Note: Only select image_url (images column may not exist in base table)
+          // Note: Only select guaranteed columns (condition, description, is_sold may not exist in production)
           const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-            .select('id, sale_id, name, description, category, condition, price, image_url, is_sold, created_at')
+            .select('id, sale_id, name, price, image_url, created_at')
             .eq('sale_id', saleId)
             .order('created_at', { ascending: false })
           

@@ -577,7 +577,19 @@ export async function getSaleWithItems(
     // Fetch owner profile, stats, and items in parallel
     // (tags already fetched above)
     // Get user context for debug logging (RLS will handle visibility automatically)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    // Verify session is available for RLS (log if not)
+    if (userError) {
+      const { logger } = await import('@/lib/log')
+      logger.warn('Auth error when fetching user for items query', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        error: userError.message,
+        note: 'RLS policies may not work correctly without a valid session',
+      })
+    }
     
     // Load items directly from base table using RLS-aware client
     // RLS policies (items_owner_read and items_public_read) will automatically handle visibility:
@@ -588,37 +600,96 @@ export async function getSaleWithItems(
     
     // Query base table - RLS policies will filter results based on auth context
     // Only select guaranteed columns that exist in production
-    const itemsRes = await fromBase(db, 'items')
+    let itemsRes = await fromBase(db, 'items')
       .select('id, sale_id, name, price, image_url, created_at')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: false })
     
-    // Debug logging (only under debug flag, PII-safe)
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    // If base table query fails or returns no results, try fallback to items_v2 view
+    // This helps diagnose if the issue is RLS policy or view availability
+    if (itemsRes.error || (!itemsRes.data || itemsRes.data.length === 0)) {
       const { logger } = await import('@/lib/log')
-      const userContext = user ? 'auth' : 'anon'
-      const userIdShort = user?.id ? `${user.id.substring(0, 8)}...` : undefined
-      
-      logger.info('Sale detail items loaded', {
+      logger.warn('Base table query failed or returned no items, trying items_v2 view fallback', {
         component: 'salesAccess',
         operation: 'getSaleWithItems',
         saleId,
-        itemsCount: itemsRes.data?.length || 0,
-        hasError: !!itemsRes.error,
-        userContext,
-        userId: userIdShort, // Shortened for PII safety
-        saleStatus: sale.status,
+        baseTableError: itemsRes.error?.code || null,
+        baseTableCount: itemsRes.data?.length || 0,
       })
+      
+      // Try items_v2 view as fallback
+      const viewRes = await supabase
+        .from('items_v2')
+        .select('id, sale_id, name, price, image_url, created_at')
+        .eq('sale_id', saleId)
+        .order('created_at', { ascending: false })
+      
+      if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
+        logger.info('items_v2 view fallback succeeded', {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
+          saleId,
+          itemsCount: viewRes.data.length,
+        })
+        itemsRes = viewRes
+      } else {
+        logger.warn('items_v2 view fallback also failed or returned no items', {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
+          saleId,
+          viewError: viewRes.error?.code || null,
+          viewCount: viewRes.data?.length || 0,
+        })
+      }
     }
+    
+    // Always log query results (PII-safe) - this is critical for debugging missing items
+    const { logger } = await import('@/lib/log')
+    const userContext = user ? 'auth' : 'anon'
+    const userIdShort = user?.id ? `${user.id.substring(0, 8)}...` : undefined
+    const isOwner = user && user.id === ownerId
+    
+    logger.info('Sale detail items query result', {
+      component: 'salesAccess',
+      operation: 'getSaleWithItems',
+      saleId,
+      itemsCount: itemsRes.data?.length || 0,
+      hasError: !!itemsRes.error,
+      errorCode: itemsRes.error?.code || null,
+      errorMessage: itemsRes.error?.message || null,
+      userContext,
+      userId: userIdShort,
+      isOwner,
+      saleStatus: sale.status,
+      ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
+    })
     
     // Log errors but don't fail - return with empty items array
     if (itemsRes.error) {
-      const { logger } = await import('@/lib/log')
       logger.error('Error fetching items from base table', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
         component: 'salesAccess',
         operation: 'getSaleWithItems',
         saleId,
         errorCode: itemsRes.error?.code,
+        errorMessage: itemsRes.error?.message,
+        errorDetails: itemsRes.error?.details,
+        errorHint: itemsRes.error?.hint,
+        userContext,
+        isOwner,
+        saleStatus: sale.status,
+      })
+    }
+    
+    // If no items returned and no error, log a warning
+    if (!itemsRes.error && (!itemsRes.data || itemsRes.data.length === 0)) {
+      logger.warn('No items returned for sale (no error)', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        userContext,
+        isOwner,
+        saleStatus: sale.status,
+        note: 'This could indicate RLS policy blocking access or no items exist for this sale',
       })
     }
     
@@ -676,24 +747,24 @@ export async function getSaleWithItems(
       }
     })
     
-    // Debug logging for item images (always log in non-production, or when debug flag is set)
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true' || process.env.NODE_ENV !== 'production') {
-      const { logger } = await import('@/lib/log')
-      logger.info('Mapped items for sale detail', {
-        component: 'salesAccess',
-        operation: 'getSaleWithItems',
-        saleId,
-        itemsCount: mappedItems.length,
-        itemsWithPhotos: mappedItems.filter(i => i.photo).length,
-        itemsWithoutPhotos: mappedItems.filter(i => !i.photo).length,
-        sampleItem: mappedItems.length > 0 ? {
-          id: mappedItems[0].id,
-          name: mappedItems[0].name,
-          hasPhoto: !!mappedItems[0].photo,
-          photoUrl: mappedItems[0].photo ? `${mappedItems[0].photo.substring(0, 50)}...` : null,
-        } : null,
-      })
-    }
+    // Always log final mapped items (critical for debugging missing items)
+    const { logger: finalLogger } = await import('@/lib/log')
+    finalLogger.info('Final mapped items for sale detail', {
+      component: 'salesAccess',
+      operation: 'getSaleWithItems',
+      saleId,
+      rawItemsCount: itemsRes.data?.length || 0,
+      mappedItemsCount: mappedItems.length,
+      itemsWithPhotos: mappedItems.filter(i => i.photo).length,
+      itemsWithoutPhotos: mappedItems.filter(i => !i.photo).length,
+      sampleItem: mappedItems.length > 0 ? {
+        id: mappedItems[0].id,
+        name: mappedItems[0].name,
+        hasPhoto: !!mappedItems[0].photo,
+        photoUrl: mappedItems[0].photo ? `${mappedItems[0].photo.substring(0, 50)}...` : null,
+      } : null,
+      note: 'If mappedItemsCount is 0 but rawItemsCount > 0, there may be a mapping issue',
+    })
 
     // Normalize owner profile so seller details stay in sync with v2 profile data:
     // - `display_name` (primary public name) is mapped into `full_name` used by UI components.

@@ -22,6 +22,18 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   }
 
   const { sale, items } = result
+  
+  // Log items being passed to client (critical for debugging)
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true' || process.env.NODE_ENV !== 'production') {
+    const { logger } = await import('@/lib/log')
+    logger.info('Sale detail page rendering', {
+      component: 'sales/[id]/page',
+      saleId: params.id,
+      itemsCount: items.length,
+      saleStatus: sale.status,
+      items: items.map(i => ({ id: i.id, name: i.name, hasPhoto: !!i.photo })),
+    })
+  }
 
   // Compute union of sale-level categories (tags) and item categories.
   // Normalize tags so we handle both text[] and comma-separated strings safely.

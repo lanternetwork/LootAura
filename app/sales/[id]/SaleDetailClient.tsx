@@ -69,10 +69,9 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
   }
   
   // Determine if we should use unoptimized mode
-  // Use unoptimized for blob/data URLs, or if we're in a preview environment (Vercel preview)
-  const shouldUnoptimize = src.startsWith('blob:') || 
-                           src.startsWith('data:') || 
-                           (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') && !window.location.hostname.includes('lootaura'))
+  // Use unoptimized for blob/data URLs only
+  // Note: Preview deployments may have image optimization issues, but we'll use fallback instead
+  const shouldUnoptimize = src.startsWith('blob:') || src.startsWith('data:')
   
   return (
     <Image

@@ -798,24 +798,26 @@ export async function getSaleWithItems(
       }
     })
     
-    // Always log final mapped items (critical for debugging missing items)
-    const { logger: finalLogger } = await import('@/lib/log')
-    finalLogger.info('Final mapped items for sale detail', {
-      component: 'salesAccess',
-      operation: 'getSaleWithItems',
-      saleId,
-      rawItemsCount: itemsRes.data?.length || 0,
-      mappedItemsCount: mappedItems.length,
-      itemsWithPhotos: mappedItems.filter(i => i.photo).length,
-      itemsWithoutPhotos: mappedItems.filter(i => !i.photo).length,
-      sampleItem: mappedItems.length > 0 ? {
-        id: mappedItems[0].id,
-        name: mappedItems[0].name,
-        hasPhoto: !!mappedItems[0].photo,
-        photoUrl: mappedItems[0].photo ? `${mappedItems[0].photo.substring(0, 50)}...` : null,
-      } : null,
-      note: 'If mappedItemsCount is 0 but rawItemsCount > 0, there may be a mapping issue',
-    })
+    // Log final mapped items (only in debug mode)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger: finalLogger } = await import('@/lib/log')
+      finalLogger.debug('Final mapped items for sale detail', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        rawItemsCount: itemsRes.data?.length || 0,
+        mappedItemsCount: mappedItems.length,
+        itemsWithPhotos: mappedItems.filter(i => i.photo).length,
+        itemsWithoutPhotos: mappedItems.filter(i => !i.photo).length,
+        sampleItem: mappedItems.length > 0 ? {
+          id: mappedItems[0].id,
+          name: mappedItems[0].name,
+          hasPhoto: !!mappedItems[0].photo,
+          photoUrl: mappedItems[0].photo ? `${mappedItems[0].photo.substring(0, 50)}...` : null,
+        } : null,
+        note: 'If mappedItemsCount is 0 but rawItemsCount > 0, there may be a mapping issue',
+      })
+    }
 
     // Normalize owner profile so seller details stay in sync with v2 profile data:
     // - `display_name` (primary public name) is mapped into `full_name` used by UI components.

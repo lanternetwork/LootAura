@@ -26,13 +26,14 @@ import { trackAnalyticsEvent } from '@/lib/analytics-client'
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
   const [imageError, setImageError] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
+  const [useFallback, setUseFallback] = useState(false)
   
   // Debug logging (only in debug mode)
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.debug('[ItemImage] Rendering image', { src: src?.substring(0, 50) + '...', alt, hasError: imageError, isLoading: imageLoading })
+      console.debug('[ItemImage] Rendering image', { src: src?.substring(0, 50) + '...', alt, hasError: imageError, isLoading: imageLoading, useFallback })
     }
-  }, [src, alt, imageError, imageLoading])
+  }, [src, alt, imageError, imageLoading, useFallback])
   
   if (imageError) {
     return (
@@ -42,6 +43,37 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
     )
   }
   
+  // Fallback to regular img tag if Next.js Image fails (common in preview deployments)
+  if (useFallback) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={`${className} ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
+        onLoad={() => {
+          setImageLoading(false)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.debug('[ItemImage] Fallback image loaded successfully', { src: src?.substring(0, 50) + '...' })
+          }
+        }}
+        onError={(e) => {
+          setImageError(true)
+          setImageLoading(false)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.error('[ItemImage] Fallback image failed to load', { src: src?.substring(0, 50) + '...', error: e })
+          }
+        }}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+    )
+  }
+  
+  // Determine if we should use unoptimized mode
+  // Use unoptimized for blob/data URLs, or if we're in a preview environment (Vercel preview)
+  const shouldUnoptimize = src.startsWith('blob:') || 
+                           src.startsWith('data:') || 
+                           (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') && !window.location.hostname.includes('lootaura'))
+  
   return (
     <Image
       src={src}
@@ -49,6 +81,7 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
       fill
       className={`${className} ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
       sizes={sizes}
+      unoptimized={shouldUnoptimize}
       onLoad={() => {
         setImageLoading(false)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -56,13 +89,21 @@ function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; c
         }
       }}
       onError={(e) => {
-        setImageError(true)
-        setImageLoading(false)
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.error('[ItemImage] Image failed to load', { src: src?.substring(0, 50) + '...', error: e })
+        // Try fallback to regular img tag before giving up
+        if (!useFallback) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.warn('[ItemImage] Next.js Image failed, trying fallback img tag', { src: src?.substring(0, 50) + '...' })
+          }
+          setUseFallback(true)
+          setImageLoading(true)
+        } else {
+          setImageError(true)
+          setImageLoading(false)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.error('[ItemImage] Image failed to load after fallback', { src: src?.substring(0, 50) + '...', error: e })
+          }
         }
       }}
-      unoptimized={src.startsWith('blob:') || src.startsWith('data:')}
     />
   )
 }

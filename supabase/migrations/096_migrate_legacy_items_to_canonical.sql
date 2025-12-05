@@ -85,12 +85,7 @@ BEGIN
   RAISE NOTICE 'Migrated % items from % to lootaura_v2.items', migrated_count, legacy_table_name;
 
   -- Log any items that couldn't be migrated (sale_id doesn't exist in lootaura_v2.sales)
-  EXECUTE format('
-    SELECT COUNT(*) FROM %I leg
-    WHERE NOT EXISTS (
-      SELECT 1 FROM lootaura_v2.sales s WHERE s.id = leg.sale_id
-    )
-  ', legacy_table_name) INTO items_to_migrate_count;
+  EXECUTE format('SELECT COUNT(*) FROM %I leg WHERE NOT EXISTS (SELECT 1 FROM lootaura_v2.sales s WHERE s.id = leg.sale_id)', legacy_table_name) INTO items_to_migrate_count;
   
   IF items_to_migrate_count > 0 THEN
     RAISE WARNING $msg$% items in % could not be migrated because their sale_id does not exist in lootaura_v2.sales$msg$, items_to_migrate_count, legacy_table_name;

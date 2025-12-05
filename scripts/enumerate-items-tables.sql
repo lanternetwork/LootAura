@@ -44,41 +44,51 @@ BEGIN
     END IF;
 END $$;
 
--- Query public.sale_items if it exists (using dynamic SQL in DO block)
+-- Query public.sale_items if it exists (using dynamic SQL)
 DO $$
+DECLARE
+    table_exists BOOLEAN;
+    row_count INTEGER;
 BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sale_items') THEN
-        RAISE NOTICE '=== public.sale_items COUNT ===';
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'sale_items'
+    ) INTO table_exists;
+    
+    IF table_exists THEN
+        EXECUTE 'SELECT COUNT(*) FROM public.sale_items' INTO row_count;
+        RAISE NOTICE '=== public.sale_items RESULTS ===';
+        RAISE NOTICE 'Row count: %', row_count;
+        
+        -- Show sample data
+        RAISE NOTICE 'Sample rows (first 10):';
+        FOR rec IN EXECUTE '
+            SELECT 
+                id::text,
+                sale_id::text,
+                name,
+                price::text,
+                photo,
+                created_at::text,
+                category,
+                "condition",
+                purchased::text
+            FROM public.sale_items
+            ORDER BY created_at DESC
+            LIMIT 10
+        ' LOOP
+            RAISE NOTICE '  ID: %, Sale ID: %, Name: %, Price: %, Photo: %, Created: %, Category: %, Condition: %, Purchased: %',
+                rec.id, rec.sale_id, rec.name, rec.price, rec.photo, rec.created_at, rec.category, rec."condition", rec.purchased;
+        END LOOP;
     END IF;
 END $$;
-
--- Use a UNION to safely query (returns empty if table doesn't exist)
-SELECT 
-    'public.sale_items' as source,
-    COUNT(*) as row_count,
-    'base_table' as type
-FROM (
-    SELECT 1 
-    FROM information_schema.tables 
-    WHERE table_schema = 'public' AND table_name = 'sale_items'
-    LIMIT 1
-) t
-CROSS JOIN LATERAL (
-    SELECT COUNT(*)::INTEGER as cnt FROM public.sale_items
-) c
-WHERE EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sale_items')
-UNION ALL
-SELECT 
-    'public.sale_items' as source,
-    0 as row_count,
-    'base_table' as type
-WHERE NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sale_items');
 
 -- 2.2 Check public.sale_items_legacy (if renamed by migration 090)
 DO $$
 DECLARE
     table_exists BOOLEAN;
     row_count INTEGER;
+    rec RECORD;
 BEGIN
     SELECT EXISTS (
         SELECT 1 FROM information_schema.tables 
@@ -87,7 +97,29 @@ BEGIN
     
     IF table_exists THEN
         EXECUTE 'SELECT COUNT(*) FROM public.sale_items_legacy' INTO row_count;
-        RAISE NOTICE 'public.sale_items_legacy: EXISTS, row_count = %', row_count;
+        RAISE NOTICE '=== public.sale_items_legacy RESULTS ===';
+        RAISE NOTICE 'Row count: %', row_count;
+        
+        -- Show sample data
+        RAISE NOTICE 'Sample rows (first 10):';
+        FOR rec IN EXECUTE '
+            SELECT 
+                id::text,
+                sale_id::text,
+                name,
+                price::text,
+                photo,
+                created_at::text,
+                category,
+                "condition",
+                purchased::text
+            FROM public.sale_items_legacy
+            ORDER BY created_at DESC
+            LIMIT 10
+        ' LOOP
+            RAISE NOTICE '  ID: %, Sale ID: %, Name: %, Price: %, Photo: %, Created: %, Category: %, Condition: %, Purchased: %',
+                rec.id, rec.sale_id, rec.name, rec.price, rec.photo, rec.created_at, rec.category, rec."condition", rec.purchased;
+        END LOOP;
     ELSE
         RAISE NOTICE 'public.sale_items_legacy: DOES NOT EXIST';
     END IF;

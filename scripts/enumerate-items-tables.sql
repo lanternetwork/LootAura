@@ -133,21 +133,76 @@ SELECT
     'base_table' as type
 FROM lootaura_v2.items;
 
-SELECT 
-    'lootaura_v2.items' as source,
-    id,
-    sale_id,
-    name,
-    price,
-    image_url,
-    images,
-    created_at,
-    category,
-    condition as item_condition,
-    is_sold as purchased
-FROM lootaura_v2.items
-ORDER BY created_at DESC
-LIMIT 10;
+-- Query lootaura_v2.items with only columns that exist
+DO $$
+DECLARE
+    has_images BOOLEAN;
+    has_category BOOLEAN;
+    has_condition BOOLEAN;
+    has_is_sold BOOLEAN;
+    query_sql TEXT;
+    rec RECORD;
+BEGIN
+    -- Check which optional columns exist
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' AND table_name = 'items' AND column_name = 'images'
+    ) INTO has_images;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' AND table_name = 'items' AND column_name = 'category'
+    ) INTO has_category;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' AND table_name = 'items' AND column_name = 'condition'
+    ) INTO has_condition;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'lootaura_v2' AND table_name = 'items' AND column_name = 'is_sold'
+    ) INTO has_is_sold;
+    
+    -- Build dynamic query with only existing columns
+    query_sql := 'SELECT id, sale_id, name, price, image_url, created_at';
+    
+    IF has_category THEN
+        query_sql := query_sql || ', category';
+    END IF;
+    
+    IF has_condition THEN
+        query_sql := query_sql || ', condition as item_condition';
+    END IF;
+    
+    IF has_images THEN
+        query_sql := query_sql || ', images';
+    END IF;
+    
+    IF has_is_sold THEN
+        query_sql := query_sql || ', is_sold as purchased';
+    END IF;
+    
+    query_sql := query_sql || ' FROM lootaura_v2.items ORDER BY created_at DESC LIMIT 10';
+    
+    RAISE NOTICE '=== lootaura_v2.items Sample Rows ===';
+    FOR rec IN EXECUTE query_sql LOOP
+        RAISE NOTICE '  ID: %, Sale ID: %, Name: %, Price: %, Image URL: %, Created: %',
+            rec.id, rec.sale_id, rec.name, rec.price, rec.image_url, rec.created_at;
+        IF has_category THEN
+            RAISE NOTICE '    Category: %', rec.category;
+        END IF;
+        IF has_condition THEN
+            RAISE NOTICE '    Condition: %', rec.item_condition;
+        END IF;
+        IF has_images THEN
+            RAISE NOTICE '    Images: %', rec.images;
+        END IF;
+        IF has_is_sold THEN
+            RAISE NOTICE '    Purchased: %', rec.purchased;
+        END IF;
+    END LOOP;
+END $$;
 
 -- 2.4 Check if public.items exists (shouldn't, but check anyway)
 DO $$
@@ -170,20 +225,63 @@ SELECT
     'view' as type
 FROM public.items_v2;
 
-SELECT 
-    'public.items_v2' as source,
-    id,
-    sale_id,
-    name,
-    price,
-    image_url,
-    images,
-    created_at,
-    category,
-    condition as item_condition
-FROM public.items_v2
-ORDER BY created_at DESC
-LIMIT 10;
+-- Query public.items_v2 view with only columns that exist
+DO $$
+DECLARE
+    has_images BOOLEAN;
+    has_category BOOLEAN;
+    has_condition BOOLEAN;
+    query_sql TEXT;
+    rec RECORD;
+BEGIN
+    -- Check which optional columns exist in the view
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'items_v2' AND column_name = 'images'
+    ) INTO has_images;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'items_v2' AND column_name = 'category'
+    ) INTO has_category;
+    
+    SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' AND table_name = 'items_v2' AND column_name = 'condition'
+    ) INTO has_condition;
+    
+    -- Build dynamic query with only existing columns
+    query_sql := 'SELECT id, sale_id, name, price, image_url, created_at';
+    
+    IF has_category THEN
+        query_sql := query_sql || ', category';
+    END IF;
+    
+    IF has_condition THEN
+        query_sql := query_sql || ', condition as item_condition';
+    END IF;
+    
+    IF has_images THEN
+        query_sql := query_sql || ', images';
+    END IF;
+    
+    query_sql := query_sql || ' FROM public.items_v2 ORDER BY created_at DESC LIMIT 10';
+    
+    RAISE NOTICE '=== public.items_v2 Sample Rows ===';
+    FOR rec IN EXECUTE query_sql LOOP
+        RAISE NOTICE '  ID: %, Sale ID: %, Name: %, Price: %, Image URL: %, Created: %',
+            rec.id, rec.sale_id, rec.name, rec.price, rec.image_url, rec.created_at;
+        IF has_category THEN
+            RAISE NOTICE '    Category: %', rec.category;
+        END IF;
+        IF has_condition THEN
+            RAISE NOTICE '    Condition: %', rec.item_condition;
+        END IF;
+        IF has_images THEN
+            RAISE NOTICE '    Images: %', rec.images;
+        END IF;
+    END LOOP;
+END $$;
 
 -- ============================================================
 -- PART 4: Check column structures for comparison

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useLocation } from '@/lib/location/useLocation'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 interface RecenterButtonProps {
   /** Callback when re-center is triggered with new center coordinates */
@@ -72,13 +73,13 @@ export default function RecenterButton({
   }, [location, getLocation, requestPermission, onRecenter, defaultCenter, defaultZoom])
 
   return (
-    <button
-      onClick={handleRecenter}
-      disabled={isRecenterLoading || loading}
-      className={`bg-white hover:bg-gray-50 shadow-lg rounded-full p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-      aria-label="Re-center map"
-      title="Re-center map"
-    >
+    <Tooltip content="Re-center map to your location or default view">
+      <button
+        onClick={handleRecenter}
+        disabled={isRecenterLoading || loading}
+        className={`bg-white hover:bg-gray-50 shadow-lg rounded-full p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        aria-label="Re-center map"
+      >
       {isRecenterLoading || loading ? (
         <svg className="w-5 h-5 text-gray-700 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -90,6 +91,7 @@ export default function RecenterButton({
         </svg>
       )}
     </button>
+    </Tooltip>
   )
 }
 

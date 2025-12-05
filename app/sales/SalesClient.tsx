@@ -1156,8 +1156,8 @@ export default function SalesClient({
     {
       key: COMMON_SHORTCUTS.FOCUS_SEARCH,
       handler: () => {
-        // Focus ZIP input if it exists
-        const zipInput = document.querySelector<HTMLInputElement>('[data-testid="zip-input"] input, input[placeholder*="ZIP"]')
+        // Focus ZIP input if it exists - check both container with data-testid and direct input
+        const zipInput = document.querySelector<HTMLInputElement>('[data-testid="zip-input"] input, [data-testid="zip-input-mobile"] input, input[placeholder*="ZIP"], input[placeholder*="zip"]')
         if (zipInput) {
           zipInput.focus()
         }
@@ -1495,9 +1495,12 @@ export default function SalesClient({
                   <EmptyState
                     title="No sales found in this area"
                     suggestions={[
+                      ...(filters.distance < 10 ? ['Try increasing your distance filter'] : []),
                       ...(mapView && mapView.zoom > 12 ? ['Try zooming out to see more sales'] : []),
-                      ...(filters.dateRange !== 'any' || filters.categories.length > 0 ? ['Try clearing some filters'] : []),
-                      ...(mapView && mapView.zoom <= 12 ? ['Try panning to a different area'] : [])
+                      ...(filters.dateRange !== 'any' ? ['Try widening your date range'] : []),
+                      ...(filters.categories.length > 0 ? ['Try clearing category filters'] : []),
+                      ...(filters.dateRange !== 'any' || filters.categories.length > 0 || filters.distance !== 25 ? ['Try clearing all filters'] : []),
+                      ...(mapView && mapView.zoom <= 12 && filters.distance >= 10 ? ['Try panning to a different area'] : [])
                     ]}
                   />
                 )}

@@ -445,8 +445,14 @@ export default function MobileSalesShell({
             
             {!loading && hasCompletedInitialLoad && visibleSales.length === 0 && (
               <div className="text-center py-12 px-4">
-                <div className="text-gray-500 mb-4">
+                <div className="text-gray-500 mb-2">
                   No sales found in this area
+                </div>
+                <div className="text-sm text-gray-400 space-y-1 mb-4">
+                  {filters.distance < 10 && <div>Try increasing your distance filter</div>}
+                  {filters.dateRange !== 'any' && <div>Try widening your date range</div>}
+                  {filters.categories.length > 0 && <div>Try clearing category filters</div>}
+                  {(!filters.distance || filters.distance < 10) && filters.dateRange === 'any' && filters.categories.length === 0 && <div>Try zooming out or panning to a different area</div>}
                 </div>
                 <button
                   onClick={() => setIsFiltersModalOpen(true)}

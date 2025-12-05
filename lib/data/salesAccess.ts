@@ -655,9 +655,10 @@ export async function getSaleWithItems(
     const db = getRlsDb()
     
     // Query base table - RLS policies will filter results based on auth context
-    // Only select guaranteed columns that exist in production
+    // Select image_url and images (if available) - images array is preferred, image_url is fallback
+    // Note: Both columns exist in the base table schema (migration 096)
     let itemsRes = await fromBase(db, 'items')
-      .select('id, sale_id, name, price, image_url, created_at')
+      .select('id, sale_id, name, price, image_url, images, created_at')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: false })
     
@@ -822,23 +823,24 @@ export async function getSaleWithItems(
     }
 
     // Map items to SaleItem type
-    // Base table query returns: id, sale_id, name, price, image_url, created_at
+    // Base table query returns: id, sale_id, name, price, image_url, images, created_at
     // View fallback returns: id, sale_id, name, price, images (array), created_at
     // Map to SaleItem format expected by components
+    // IMPORTANT: Prefer images array over image_url (consistent with working view path)
     const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => {
-      // Normalize image: handle both image_url (string) and images (array) from view
+      // Normalize image: prefer images array (like working view path), fallback to image_url
       let photoUrl: string | undefined = undefined
       
-      // Try image_url first (from base table query)
-      if (item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0) {
-        photoUrl = item.image_url.trim()
-      }
-      // Fallback to images array (from view fallback)
-      else if (item.images && Array.isArray(item.images) && item.images.length > 0) {
+      // Try images array first (preferred - matches working view path behavior)
+      if (item.images && Array.isArray(item.images) && item.images.length > 0) {
         const firstImage = item.images[0]
         if (typeof firstImage === 'string' && firstImage.trim().length > 0) {
           photoUrl = firstImage.trim()
         }
+      }
+      // Fallback to image_url (from base table query or view fallback)
+      else if (item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0) {
+        photoUrl = item.image_url.trim()
       }
       
       return {

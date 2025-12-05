@@ -468,7 +468,8 @@ export async function getItemsForSale(
 
 /**
  * Fetch sale with its items (for sale details page)
- * Reads sale from public.sales_v2 view and items from public.items_v2 view
+ * Reads sale from public.sales_v2 view and items directly from lootaura_v2.items base table
+ * Uses RLS-aware client - RLS policies (items_owner_read, items_public_read) handle visibility automatically
  * Also fetches owner profile and stats to match SaleWithOwnerInfo type
  * @param supabase - Authenticated Supabase client
  * @param saleId - Sale ID to fetch
@@ -575,160 +576,51 @@ export async function getSaleWithItems(
 
     // Fetch owner profile, stats, and items in parallel
     // (tags already fetched above)
-    // First, check if current user is the owner - if so, query base table directly for better RLS policy support
+    // Get user context for debug logging (RLS will handle visibility automatically)
     const { data: { user } } = await supabase.auth.getUser()
     const isOwner = user && user.id === ownerId
     
-    let itemsRes: any
-    try {
-      // If user is the owner, try base table first (better RLS policy support)
-      if (isOwner) {
-        try {
-          const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
-          const db = getRlsDb()
-          
-          // Note: RLS policy will automatically use session from cookies
-          // The schema-scoped client (db) doesn't have auth methods, but RLS policies
-          // will still evaluate auth.uid() from the session cookies
-          
-          // Note: Only select guaranteed columns (condition, description, is_sold may not exist in production)
-          const baseItemsRes = await fromBase(db, 'items')
-            .select('id, sale_id, name, price, image_url, created_at')
-            .eq('sale_id', saleId)
-            .order('created_at', { ascending: false })
-          
-          // Always log base table query results for owners (even in production, but only if debug is enabled)
-          // Also log to server console for Vercel logs
-          const logData = {
-            saleId,
-            hasError: !!baseItemsRes.error,
-            error: baseItemsRes.error ? {
-              code: baseItemsRes.error.code || 'unknown',
-              message: baseItemsRes.error.message || 'unknown error',
-              details: baseItemsRes.error.details || null,
-              hint: baseItemsRes.error.hint || null,
-            } : null,
-            itemsCount: baseItemsRes.data?.length || 0,
-            saleStatus: sale.status,
-            userId: user?.id,
-            ownerId,
-            items: baseItemsRes.data?.map((i: any) => ({ id: i.id, name: i.name })) || [],
-          }
-          
-          // Log to server console (always visible in Vercel logs)
-          console.log('[SALES_ACCESS] Owner base table query result:', JSON.stringify(logData, null, 2))
-          
-          // Also log if debug is enabled
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SALES_ACCESS] Owner base table query result (debug):', logData)
-          }
-          
-          if (!baseItemsRes.error && baseItemsRes.data && baseItemsRes.data.length > 0) {
-            // Base table query succeeded with items - use it
-            itemsRes = baseItemsRes
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SALES_ACCESS] Owner query to base table succeeded:', {
-                saleId,
-                itemsCount: baseItemsRes.data.length,
-              })
-            }
-          } else if (baseItemsRes.error) {
-            // Base table query had an error - log it and fall back to view
-            const { isProduction } = await import('@/lib/env')
-            if (!isProduction()) {
-              console.error('[SALES_ACCESS] Owner base table query error (RLS policy issue?):', {
-                saleId,
-                error: baseItemsRes.error.code || 'unknown',
-                message: baseItemsRes.error.message || 'unknown error',
-                hint: 'If you see this, ensure migration 095_add_items_owner_read_policy.sql has been applied',
-              })
-            }
-            itemsRes = await supabase
-              .from('items_v2')
-              .select('id, sale_id, name, category, price, image_url, images, created_at')
-              .eq('sale_id', saleId)
-              .order('created_at', { ascending: false })
-          } else {
-            // Base table query succeeded but returned 0 items - fall back to view
-            // (This might be a timing issue - items might not be visible yet)
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SALES_ACCESS] Owner base table returned 0 items, falling back to view:', {
-                saleId,
-                saleStatus: sale.status,
-                note: 'Items may not exist yet, or there may be a timing issue',
-              })
-            }
-            itemsRes = await supabase
-              .from('items_v2')
-              .select('id, sale_id, name, category, price, image_url, images, created_at')
-              .eq('sale_id', saleId)
-              .order('created_at', { ascending: false })
-          }
-        } catch (baseTableError) {
-          // If base table query throws an exception, log it and fall back to view
-          const { isProduction } = await import('@/lib/env')
-          if (!isProduction()) {
-            console.error('[SALES_ACCESS] Owner base table query exception:', {
-              saleId,
-              error: baseTableError instanceof Error ? baseTableError.message : String(baseTableError),
-              stack: baseTableError instanceof Error ? baseTableError.stack : undefined,
-            })
-          }
-          itemsRes = await supabase
-            .from('items_v2')
-            .select('id, sale_id, name, category, price, image_url, images, created_at')
-            .eq('sale_id', saleId)
-            .order('created_at', { ascending: false })
-        }
-      } else {
-        // Not owner - use view as normal
-        itemsRes = await supabase
-          .from('items_v2')
-          .select('id, sale_id, name, category, price, image_url, images, created_at')
-          .eq('sale_id', saleId)
-          .order('created_at', { ascending: false })
-      }
+    // Load items directly from base table using RLS-aware client
+    // RLS policies (items_owner_read and items_public_read) will automatically handle visibility:
+    // - Owners see items for their own sales (any status)
+    // - Public/anon see items only when sale is published
+    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+    const db = getRlsDb()
+    
+    // Query base table - RLS policies will filter results based on auth context
+    // Only select guaranteed columns that exist in production
+    const itemsRes = await fromBase(db, 'items')
+      .select('id, sale_id, name, price, image_url, created_at')
+      .eq('sale_id', saleId)
+      .order('created_at', { ascending: false })
+    
+    // Debug logging (only under debug flag, PII-safe)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      const userContext = user ? 'auth' : 'anon'
+      const userIdShort = user?.id ? `${user.id.substring(0, 8)}...` : undefined
       
-      // If error is about missing images column, retry without it
-      if (itemsRes.error && 
-          (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('images')) ||
-          itemsRes.error?.code === 'PGRST301') {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES_ACCESS] images column not found, falling back to image_url only')
-        }
-        itemsRes = await supabase
-          .from('items_v2')
-          .select('id, sale_id, name, category, price, image_url, created_at')
-          .eq('sale_id', saleId)
-          .order('created_at', { ascending: false })
-      }
-      
-      // If error is about missing updated_at column, retry without it
-      if (itemsRes.error && 
-          (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('updated_at')) ||
-          itemsRes.error?.code === '42703') {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES_ACCESS] updated_at column not found, retrying without it')
-        }
-        itemsRes = await supabase
-          .from('items_v2')
-          .select('id, sale_id, name, category, price, image_url, created_at')
-          .eq('sale_id', saleId)
-          .order('created_at', { ascending: false })
-      }
-    } catch (err) {
-      // If there's an exception, create a mock error response
-      // Ensure error is an object with code and message properties
-      itemsRes = { 
-        data: null, 
-        error: err instanceof Error ? {
-          code: (err as any).code || 'UNKNOWN',
-          message: err.message || 'Unknown error',
-        } : {
-          code: 'UNKNOWN',
-          message: String(err) || 'Unknown error',
-        }
-      }
+      logger.info('Sale detail items loaded', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        itemsCount: itemsRes.data?.length || 0,
+        hasError: !!itemsRes.error,
+        userContext,
+        userId: userIdShort, // Shortened for PII safety
+        saleStatus: sale.status,
+      })
+    }
+    
+    // Log errors but don't fail - return with empty items array
+    if (itemsRes.error) {
+      const { logger } = await import('@/lib/log')
+      logger.error('Error fetching items from base table', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        errorCode: itemsRes.error?.code,
+      })
     }
     
     const [profileRes, statsRes] = await Promise.all([
@@ -762,245 +654,20 @@ export async function getSaleWithItems(
         ownerId,
       })
     }
-    if (itemsRes.error) {
-      // Always log errors since this is critical
-      logger.error('Error fetching items', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
-        component: 'salesAccess',
-        operation: 'getSaleWithItems',
-        saleId,
-        errorCode: itemsRes.error?.code,
-      })
-      
-      // Try fallback to base table if view query failed
-      if (itemsRes.error) {
-        try {
-          const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
-          const db = getRlsDb()
-          const { data: { user } } = await supabase.auth.getUser()
-          
-          if (user && user.id === ownerId) {
-            // Owner can read items directly from base table
-            // Note: Only select guaranteed columns (condition, description, is_sold may not exist in production)
-            const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-              .select('id, sale_id, name, price, image_url, created_at')
-              .eq('sale_id', saleId)
-              .order('created_at', { ascending: false })
-            
-            if (!baseError && baseItems) {
-              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.log('[SALES_ACCESS] Fallback to base table succeeded after view error:', {
-                  saleId,
-                  itemsCount: baseItems.length,
-                })
-              }
-              // Use base table items instead
-              itemsRes = { data: baseItems, error: null }
-            }
-          }
-        } catch (fallbackError) {
-          // Silent fail - fallback is best effort
-        }
-      }
-    }
-    
-    // Always log items fetch result to server console for Vercel logs
-    const itemsFetchLogData = {
-      saleId,
-      hasError: !!itemsRes.error,
-      itemsResError: itemsRes.error ? {
-        code: itemsRes.error?.code || 'unknown',
-        message: itemsRes.error?.message || 'unknown error',
-        details: itemsRes.error?.details || null,
-        hint: itemsRes.error?.hint || null,
-        errorType: itemsRes.error?.constructor?.name || typeof itemsRes.error,
-      } : null,
-      itemsCount: itemsRes.data?.length || 0,
-      items: itemsRes.data?.map((i: any) => ({ id: i.id, name: i.name, category: i.category })) || [], // Log summary only
-      saleStatus: sale.status,
-      saleIdMatch: sale.id === saleId,
-      isOwner,
-      ownerId,
-    }
-    console.log('[SALES_ACCESS] Items fetch result:', JSON.stringify(itemsFetchLogData, null, 2))
-    
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SALES_ACCESS] Items fetch result (debug):', itemsFetchLogData)
-    }
-    
-    // If view returns 0 items (or had an error), try fallback to base table for owner (in case of RLS timing issue)
-    // This is especially important right after item creation when views might not have refreshed yet
-    // We use isOwner here (already checked above) to avoid redundant user lookups
-    if ((itemsRes.data?.length || 0) === 0 && isOwner) {
-      try {
-        const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
-        const db = getRlsDb()
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        // Double-check user is still authenticated and is the owner
-        if (user && user.id === ownerId) {
-          // Note: RLS policy will automatically use session from cookies
-          // The schema-scoped client (db) doesn't have auth methods, but RLS policies
-          // will still evaluate auth.uid() from the session cookies
-          
-          // Owner can read items directly from base table (bypasses view RLS timing issues)
-          // Note: This requires the items_owner_read RLS policy to be in place (migration 095)
-          // Note: Only select guaranteed columns (condition, description, is_sold may not exist in production)
-          const { data: baseItems, error: baseError } = await fromBase(db, 'items')
-            .select('id, sale_id, name, price, image_url, created_at')
-            .eq('sale_id', saleId)
-            .order('created_at', { ascending: false })
-          
-            if (baseError) {
-              // Log the error to help diagnose RLS policy issues
-              // Always log to server console for Vercel logs
-              const errorLogData = {
-                saleId,
-                saleStatus: sale.status,
-                userId: user.id,
-                ownerId,
-                error: {
-                  code: baseError.code || 'unknown',
-                  message: baseError.message || 'unknown error',
-                  details: baseError.details || null,
-                  hint: baseError.hint || 'If you see this, ensure migration 095_add_items_owner_read_policy.sql has been applied',
-                },
-                note: 'This suggests the items_owner_read RLS policy may not be working correctly, or the session is not properly established',
-              }
-              console.error('[SALES_ACCESS] Second fallback to base table failed (RLS policy may be missing):', JSON.stringify(errorLogData, null, 2))
-              
-              const { isProduction } = await import('@/lib/env')
-              if (!isProduction() || process.env.NEXT_PUBLIC_DEBUG === 'true') {
-                console.error('[SALES_ACCESS] Second fallback to base table failed (debug):', errorLogData)
-              }
-          } else if (baseItems && baseItems.length > 0) {
-            // Base table has items - use them (this fixes the timing issue)
-            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SALES_ACCESS] Second fallback to base table succeeded (view had 0 items):', {
-                saleId,
-                saleStatus: sale.status,
-                itemsCount: baseItems.length,
-                note: 'This suggests a view refresh timing issue was resolved',
-              })
-            }
-            // Use base table items instead
-            itemsRes = { data: baseItems, error: null }
-          } else if (baseItems && baseItems.length === 0) {
-            // Base table also returns 0 items - items truly don't exist (or RLS is blocking)
-            const { isProduction } = await import('@/lib/env')
-            if (!isProduction() || process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.warn('[SALES_ACCESS] Both view and base table returned 0 items for owner:', {
-                saleId,
-                saleStatus: sale.status,
-                userId: user.id,
-                ownerId,
-                note: 'Items may not have been created, or there is an RLS policy issue preventing access',
-                hint: 'Check that items were actually created and that migration 095_add_items_owner_read_policy.sql is applied',
-              })
-            }
-          }
-        } else if (!user) {
-          const { isProduction } = await import('@/lib/env')
-          if (!isProduction()) {
-            console.log('[SALES_ACCESS] Cannot use fallback: user not authenticated:', {
-              saleId,
-              saleStatus: sale.status,
-            })
-          }
-        } else if (user.id !== ownerId) {
-          const { isProduction } = await import('@/lib/env')
-          if (!isProduction()) {
-            console.log('[SALES_ACCESS] Cannot use fallback: user is not the owner:', {
-              saleId,
-              saleStatus: sale.status,
-              userId: user.id,
-              ownerId,
-            })
-          }
-        }
-      } catch (fallbackError) {
-        // Log fallback errors to help diagnose issues
-        const { isProduction } = await import('@/lib/env')
-        if (!isProduction() || process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.error('[SALES_ACCESS] Second fallback check failed:', {
-            saleId,
-            error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
-            stack: fallbackError instanceof Error ? fallbackError.stack : undefined,
-          })
-        }
-      }
-    }
-    
-    // Additional debug: Try to query items using admin client via items_v2 view
-    // This helps diagnose if items exist but are being filtered by RLS
-    // Admin client bypasses RLS, so if it finds items but regular query doesn't, it's an RLS issue
-    if (itemsRes.data?.length === 0) {
-      try {
-        const adminModule = await import('@/lib/supabase/admin').catch(() => null)
-        if (adminModule?.adminSupabase) {
-          // Query via items_v2 view (admin client can access it and bypasses RLS on base table)
-          const adminItemsRes = await adminModule.adminSupabase
-            .from('items_v2')
-            .select('id, sale_id, name, category')
-            .eq('sale_id', saleId)
-            .limit(10)
-          
-          // Type assertion needed because admin client types may not be fully inferred
-          const adminItems = adminItemsRes.data as Array<{ id: string; sale_id: string; name: string; category: string | null }> | null
-          
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SALES_ACCESS] Admin client items check (bypasses RLS):', {
-              saleId,
-              adminItemsCount: adminItems?.length || 0,
-              adminItemsError: adminItemsRes.error ? {
-                code: adminItemsRes.error?.code || 'unknown',
-                message: adminItemsRes.error?.message || 'unknown error',
-              } : null,
-              adminItems: adminItems?.map(i => ({ id: i.id, name: i.name, category: i.category })),
-              note: 'If admin finds items but regular query returns 0, there may be an RLS issue',
-            })
-          }
-        }
-      } catch (error) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES_ACCESS] Could not check items via admin client:', {
-            saleId,
-            error: error instanceof Error ? error.message : String(error),
-          })
-        }
-      }
-    }
 
-    // Import isProduction once for use in map callback
-    const { isProduction: isProdItems } = await import('@/lib/env')
-    
     // Map items to SaleItem type
-    // Normalize images: prefer images array, fallback to image_url
+    // Base table query returns: id, sale_id, name, price, image_url, created_at
+    // Map to SaleItem format expected by components
     const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => {
-      // Normalize images: prefer images array, fallback to image_url
-      const images: string[] = Array.isArray(item.images) && item.images.length > 0
-        ? item.images.filter((url: any): url is string => typeof url === 'string')
-        : (item.image_url ? [item.image_url] : [])
-      
-      // Log dev-only fallback when using image_url
-      if (!isProdItems() && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
-        console.log('[SALES_ACCESS] Item image fallback (image_url → images[]):', {
-          itemId: item.id,
-          itemName: item.name,
-          hadImageUrl: !!item.image_url,
-          hadImages: !!item.images,
-          imagesCount: images.length,
-        })
-      }
-      
       return {
         id: item.id,
         sale_id: item.sale_id,
         name: item.name,
-        category: item.category || undefined,
-        condition: item.condition || undefined,
+        category: undefined, // Not selected from base table (may not exist)
+        condition: undefined, // Not selected from base table (may not exist)
         price: item.price || undefined,
-        photo: images.length > 0 ? images[0] : undefined, // Use first image as photo
-        purchased: item.is_sold || false, // is_sold may not exist in view, default to false
+        photo: item.image_url || undefined, // Use image_url as photo
+        purchased: false, // is_sold not selected from base table, default to false
         created_at: item.created_at,
       }
     })

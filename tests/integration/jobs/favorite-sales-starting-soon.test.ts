@@ -572,6 +572,24 @@ describe('processFavoriteSalesStartingSoonJob', () => {
         }
       }
 
+      if (table === 'profiles') {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => ({
+              eq: vi.fn(() =>
+                Promise.resolve({
+                  data: [
+                    { id: 'user-1', email_favorites_digest_enabled: true },
+                    { id: 'user-2', email_favorites_digest_enabled: true },
+                  ],
+                  error: null,
+                }),
+              ),
+            })),
+          })),
+        }
+      }
+
       // Fallback: return safe no-op implementations for any unexpected table
       return {
         select: vi.fn(() => ({

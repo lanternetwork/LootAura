@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'react-toastify'
 // These imports are used but ESLint doesn't recognize usage in typeof expressions and function calls
 import { normalizeSocialLinks, SUPPORTED_PROVIDERS, type SocialLinks } from '@/lib/profile/social' // eslint-disable-line @typescript-eslint/no-unused-vars
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface SocialLinksFormProps {
   initialLinks: SocialLinks | null
@@ -58,7 +59,11 @@ export default function SocialLinksForm({ initialLinks, onSaved }: SocialLinksFo
 
       const response = await fetch('/api/profile/social-links', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
+        credentials: 'include',
         body: JSON.stringify({ links: normalized }),
       })
 

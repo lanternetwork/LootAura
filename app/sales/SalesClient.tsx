@@ -7,6 +7,7 @@ import SimpleMap from '@/components/location/SimpleMap'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import SalesList from '@/components/SalesList'
 import FiltersBar from '@/components/sales/FiltersBar'
+import EmptyState from '@/components/EmptyState'
 import MobileFilterSheet from '@/components/sales/MobileFilterSheet'
 import MobileSalesShell from './MobileSalesShell'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
@@ -15,6 +16,7 @@ import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
 import { trackFiltersUpdated, trackPinClicked } from '@/lib/analytics/clarityEvents'
+import { useKeyboardShortcuts, COMMON_SHORTCUTS } from '@/lib/keyboard/shortcuts'
 import { 
   expandBounds, 
   isViewportInsideBounds, 
@@ -118,6 +120,7 @@ export default function SalesClient({
   const [bufferedBounds, setBufferedBounds] = useState<Bounds | null>(null)
   const [loading, setLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(false) // Track if a fetch is in progress
+  const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(initialSales.length > 0) // Track if initial load is complete
   
   // Track deleted sale IDs to filter them out immediately
   const deletedSaleIdsRef = useRef<Set<string>>(new Set())
@@ -447,6 +450,10 @@ export default function SalesClient({
     } finally {
       setLoading(false)
       setIsFetching(false)
+      // Mark that initial load has completed after first fetch attempt
+      if (!hasCompletedInitialLoad) {
+        setHasCompletedInitialLoad(true)
+      }
     }
   }, [filters.dateRange, filters.categories, deduplicateSales, filterDeletedSales, fetchedSales.length])
 
@@ -1087,6 +1094,7 @@ export default function SalesClient({
   }, [fetchedSales.length, visibleSales.length, visibleSalesDeduplicated.length, selectedPinId, hybridResult])
 
   // Memoized map center
+
   const mapCenter = useMemo(() => {
     return mapView?.center || { lat: 39.8283, lng: -98.5795 }
   }, [mapView?.center])
@@ -1117,6 +1125,36 @@ export default function SalesClient({
 
   // Desktop callout card state
   const desktopMapRef = useRef<any>(null)
+  
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    {
+      key: COMMON_SHORTCUTS.FOCUS_SEARCH,
+      handler: () => {
+        // Focus ZIP input if it exists - check both container with data-testid and direct input
+        const zipInput = document.querySelector<HTMLInputElement>('[data-testid="zip-input"] input, [data-testid="zip-input-mobile"] input, input[placeholder*="ZIP"], input[placeholder*="zip"]')
+        if (zipInput) {
+          zipInput.focus()
+        }
+      },
+      description: 'Focus search input'
+    },
+    {
+      key: COMMON_SHORTCUTS.OPEN_FILTERS,
+      handler: () => {
+        if (isMobile) {
+          // On mobile, open filter sheet via context
+          // The context should handle this, but we can trigger it via the filter button
+          const filterButton = document.querySelector<HTMLButtonElement>('[data-testid="filters-more"]')
+          if (filterButton) {
+            filterButton.click()
+          }
+        }
+        // On desktop, filters are always visible in the bar
+      },
+      description: 'Open filters'
+    }
+  ], !isMobile) // Only enable on desktop
   const [desktopPinPosition, setDesktopPinPosition] = useState<{ x: number; y: number } | null>(null)
 
   // Calculate selected sale for desktop callout
@@ -1276,6 +1314,7 @@ export default function SalesClient({
           visibleSales={visibleSales}
           loading={loading}
           isFetching={isFetching}
+          hasCompletedInitialLoad={hasCompletedInitialLoad}
           filters={filters}
           onFiltersChange={handleFiltersChange}
           onClearFilters={clearFilters}
@@ -1284,6 +1323,7 @@ export default function SalesClient({
           zipError={zipError}
           hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
           hybridResult={hybridResult}
+          userLocation={effectiveCenter || null}
         />
       ) : (
         /* Desktop Layout - md and above */
@@ -1310,7 +1350,7 @@ export default function SalesClient({
 
           {/* Main Content - Desktop Layout */}
           <div 
-            className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_420px] lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_480px] 2xl:grid-cols-[minmax(0,1fr)_540px] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
+            className="flex flex-col md:grid md:grid-cols-[minmax(0,1fr)_minmax(320px,420px)] lg:grid-cols-[minmax(0,1fr)_minmax(380px,480px)] xl:grid-cols-[minmax(0,1fr)_minmax(420px,540px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(480px,600px)] gap-0 min-h-0 min-w-0 overflow-hidden flex-1"
             style={{ height: MAIN_CONTENT_HEIGHT }}
           >
             {/* Map - Left on desktop */}
@@ -1367,6 +1407,7 @@ export default function SalesClient({
                 ) : null}
               </div>
               
+              
               {/* Desktop callout card */}
               {selectedSale && desktopPinPosition && (
                 <MobileSaleCallout
@@ -1416,12 +1457,18 @@ export default function SalesClient({
                   </div>
                 )}
                   
-                {!loading && visibleSalesDeduplicated.length === 0 && (
-                  <div className="text-center py-8">
-                    <div className="text-gray-500">
-                      No sales found in this area
-                    </div>
-                  </div>
+                {!loading && hasCompletedInitialLoad && visibleSalesDeduplicated.length === 0 && (
+                  <EmptyState
+                    title="No sales found in this area"
+                    suggestions={[
+                      ...(filters.distance < 10 ? ['Try increasing your distance filter'] : []),
+                      ...(mapView && mapView.zoom > 12 ? ['Try zooming out to see more sales'] : []),
+                      ...(filters.dateRange !== 'any' ? ['Try widening your date range'] : []),
+                      ...(filters.categories.length > 0 ? ['Try clearing category filters'] : []),
+                      ...(filters.dateRange !== 'any' || filters.categories.length > 0 || filters.distance !== 25 ? ['Try clearing all filters'] : []),
+                      ...(mapView && mapView.zoom <= 12 && filters.distance >= 10 ? ['Try panning to a different area'] : [])
+                    ]}
+                  />
                 )}
 
                 {!loading && visibleSalesDeduplicated.length > 0 && (

@@ -96,6 +96,7 @@ vi.mock('@/lib/log', () => ({
     error: vi.fn(),
     info: vi.fn(),
   },
+  generateOperationId: vi.fn(() => 'test-op-id-123'),
 }))
 
 let POST: any

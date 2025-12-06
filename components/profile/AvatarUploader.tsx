@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 type AvatarUploaderProps = {
   initialUrl?: string | null
@@ -34,7 +35,13 @@ export function AvatarUploader({ initialUrl, onUpdated, onClose }: AvatarUploade
     
     try {
       // Get Cloudinary signature
-      const sigRes = await fetch('/api/profile/avatar', { method: 'POST' })
+      const sigRes = await fetch('/api/profile/avatar', { 
+        method: 'POST',
+        headers: {
+          ...getCsrfHeaders(),
+        },
+        credentials: 'include',
+      })
       const sig = await sigRes.json()
       
       if (!sig?.ok || !sig?.data) {
@@ -122,7 +129,11 @@ export function AvatarUploader({ initialUrl, onUpdated, onClose }: AvatarUploade
       // Persist to profile - write to base table via RPC
       const profileRes = await fetch('/api/profile', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
+        credentials: 'include',
         body: JSON.stringify({ avatar_url: uploadResult.secure_url }), // Store original URL without cache bust
       })
       
@@ -155,7 +166,11 @@ export function AvatarUploader({ initialUrl, onUpdated, onClose }: AvatarUploade
     try {
       const res = await fetch('/api/profile', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
+        credentials: 'include',
         body: JSON.stringify({ avatar_url: null }),
       })
       

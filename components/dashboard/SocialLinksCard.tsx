@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { normalizeSocialLinks, SUPPORTED_PROVIDERS, type SocialLinks } from '@/lib/profile/social'
 import { toast } from 'react-toastify'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface SocialLinksCardProps {
   initial?: SocialLinks | null
@@ -61,7 +62,11 @@ export default function SocialLinksCard({ initial }: SocialLinksCardProps) {
 
       const response = await fetch('/api/profile/social-links', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
+        credentials: 'include',
         body: JSON.stringify({ links: normalized }),
       })
 

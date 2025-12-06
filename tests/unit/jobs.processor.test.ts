@@ -16,6 +16,7 @@ vi.mock('@/lib/log', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+  generateOperationId: vi.fn(() => 'test-op-id-123'),
 }))
 
 // Mock Sentry

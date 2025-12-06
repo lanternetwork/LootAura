@@ -5,6 +5,8 @@ import { resolveDatePreset } from '@/lib/shared/resolveDatePreset'
 import { normalizeCategories } from '@/lib/shared/categoryNormalizer'
 import { toDbSet } from '@/lib/shared/categoryContract'
 import { validateDateRange } from '@/lib/shared/dateBounds'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +14,7 @@ export const dynamic = 'force-dynamic'
  * Lightweight endpoint to get sales count only (no data)
  * Used for hero page stats display to improve performance
  */
-export async function GET(request: NextRequest) {
+async function countHandler(request: NextRequest) {
   const startedAt = Date.now()
   
   try {
@@ -203,4 +205,9 @@ export async function GET(request: NextRequest) {
     return fail(500, 'INTERNAL_ERROR', 'Internal server error')
   }
 }
+
+export const GET = withRateLimit(countHandler, [
+  Policies.SALES_VIEW_30S,
+  Policies.SALES_VIEW_HOURLY
+])
 

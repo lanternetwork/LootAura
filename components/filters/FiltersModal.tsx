@@ -29,6 +29,7 @@ const TagsIcon = () => (
   </svg>
 )
 import DateSelector, { DateRange } from './DateSelector'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 interface FiltersModalProps {
   isOpen: boolean
@@ -298,9 +299,11 @@ function FiltersContent({
         <div className="flex items-center mb-3">
           <MapMarkerIcon />
           <span className="text-gray-500 mr-2"></span>
-          <label className="text-sm font-medium text-gray-700">
-            Distance
-          </label>
+          <Tooltip content="Filter sales by distance from your location or search center">
+            <label className="text-sm font-medium text-gray-700 cursor-help">
+              Distance
+            </label>
+          </Tooltip>
         </div>
         <select
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
@@ -323,16 +326,22 @@ function FiltersContent({
         <div className="flex items-center mb-3">
           <CalendarIcon />
           <span className="text-gray-500 mr-2"></span>
-          <label className="text-sm font-medium text-gray-700">Date Range</label>
+          <Tooltip content="Filter sales by date range - show only sales happening on specific dates">
+            <label className="text-sm font-medium text-gray-700 cursor-help">
+              Date Range
+            </label>
+          </Tooltip>
         </div>
         <DateSelector
           value={filters.dateRange}
           onChange={onDateRangeChange}
         />
-        {/* Debug info */}
-        <div className="text-xs text-gray-500 mt-2">
-          Debug: {JSON.stringify(filters.dateRange)}
-        </div>
+        {/* Debug info - only in debug mode */}
+        {process.env.NEXT_PUBLIC_DEBUG === 'true' && (
+          <div className="text-xs text-gray-500 mt-2">
+            Debug: {JSON.stringify(filters.dateRange)}
+          </div>
+        )}
       </div>
 
       {/* Categories Filter */}
@@ -340,7 +349,11 @@ function FiltersContent({
         <div className="flex items-center mb-3">
           <TagsIcon />
           <span className="text-gray-500 mr-2"></span>
-          <label className="text-sm font-medium text-gray-700">Categories</label>
+          <Tooltip content="Filter sales by item categories - select multiple to see sales with any of these categories">
+            <label className="text-sm font-medium text-gray-700 cursor-help">
+              Categories
+            </label>
+          </Tooltip>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2">
           {CATEGORY_OPTIONS.map((category) => (

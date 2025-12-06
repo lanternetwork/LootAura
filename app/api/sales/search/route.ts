@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
+import { fail, ok } from '@/lib/http/json'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+async function searchHandler(request: NextRequest) {
+  const startedAt = Date.now()
+  const { logger, generateOperationId } = await import('@/lib/log')
+  const opId = generateOperationId()
+  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+
   try {
     // Create Supabase client with explicit public schema
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -40,7 +48,18 @@ export async function GET(request: NextRequest) {
     const categories = searchParams.get('categories')?.split(',') || undefined
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit') || '50') : 50
 
-    console.log(`[SALES_SEARCH] params lat=${lat}, lng=${lng}, distKm=${distance}, city=${city}, cats=${categories?.join(',')}, limit=${limit}`)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('Sales search params', {
+        component: 'sales',
+        operation: 'search',
+        hasLocation: !!(lat && lng),
+        distanceKm: distance,
+        hasCity: !!city,
+        categoriesCount: categories?.length || 0,
+        limit
+      })
+    }
 
     // Use the new RPC function for spatial search
     let sales: any[] = []
@@ -100,13 +119,25 @@ export async function GET(request: NextRequest) {
     }
 
     if (error) {
-      console.error('Sales search error:', error)
-      return NextResponse.json({ ok: false, code: 'SEARCH_FAILED', error: 'Failed to search sales' }, { status: 500 })
+      logger.error('Sales search error', error instanceof Error ? error : new Error(String(error)), withOpId({
+        component: 'sales',
+        operation: 'search_query'
+      }))
+      return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
     }
 
-    return NextResponse.json({ ok: true, sales: sales || [] })
+    return ok({ sales: sales || [] })
   } catch (error: any) {
-    console.error('Sales search error:', error)
-    return NextResponse.json({ ok: false, code: 'SEARCH_FAILED', error: 'Failed to search sales' }, { status: 500 })
+    logger.error('Sales search error', error instanceof Error ? error : new Error(String(error)), withOpId({
+      component: 'sales',
+      operation: 'search_handler',
+      durationMs: Date.now() - startedAt
+    }))
+    return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
   }
 }
+
+export const GET = withRateLimit(searchHandler, [
+  Policies.SALES_VIEW_30S,
+  Policies.SALES_VIEW_HOURLY
+])

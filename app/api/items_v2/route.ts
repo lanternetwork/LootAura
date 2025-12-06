@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
+import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,13 +32,26 @@ export async function GET(request: NextRequest) {
     const { data: items, error } = await query
     
     if (error) {
-      console.error('Error fetching items:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('Error fetching items', error instanceof Error ? error : new Error(String(error)), {
+          component: 'items_v2',
+          operation: 'GET',
+          errorCode: error.code,
+        })
+      }
       return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 })
     }
     
     return NextResponse.json({ items })
   } catch (error) {
-    console.error('Unexpected error:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('Unexpected error in items_v2 GET', error instanceof Error ? error : new Error(String(error)), {
+        component: 'items_v2',
+        operation: 'GET',
+      })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -80,18 +94,13 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Normalize images: prefer images array, fallback to image_url
-    const images = Array.isArray(body.images) && body.images.length > 0
-      ? body.images
-      : (body.image_url ? [body.image_url] : [])
+    // Normalize image fields to canonical format (images array + image_url for compatibility)
+    const normalizedImages = normalizeItemImages({
+      image_url: body.image_url,
+      images: body.images,
+    })
     
-    // Get first image URL for image_url column (fallback for compatibility)
-    // Always use body.image_url if provided, even if empty string (to allow clearing)
-    const firstImageUrl = body.image_url !== undefined 
-      ? (body.image_url || null)  // Allow empty string to be saved as null
-      : (images.length > 0 ? images[0] : null)
-    
-    // Build insert payload - try to include both images array and image_url
+    // Build insert payload with normalized image fields
     const insertPayload: any = {
       sale_id: body.sale_id,
       name: body.title,
@@ -99,26 +108,22 @@ export async function POST(request: NextRequest) {
       price: body.price,
       category: body.category,
       condition: body.condition,
+      // Always set both fields for consistency (base table is authoritative)
+      images: normalizedImages.images,
+      image_url: normalizedImages.image_url,
     }
     
-    // Add image_url (this column definitely exists)
-    // Always set it, even if null, to ensure it's saved
-    insertPayload.image_url = firstImageUrl
-    
-    // Add images array if we have images (this column might not exist, but we'll try)
-    if (images.length > 0) {
-      insertPayload.images = images
-    }
-    
-    // Log for debugging (only in non-production)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[ITEMS_V2] Creating item with image data:', {
+    // Log for debugging (only in debug mode)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('[ITEMS_V2] Creating item with image data', {
+        component: 'items_v2',
+        operation: 'POST',
         hasImageUrl: !!body.image_url,
-        imageUrl: body.image_url,
         hasImages: Array.isArray(body.images) && body.images.length > 0,
-        images: body.images,
-        firstImageUrl,
-        insertPayloadImageUrl: insertPayload.image_url,
+        imagesCount: Array.isArray(body.images) ? body.images.length : 0,
+        normalizedImages: normalizedImages.images?.length || 0,
+        normalizedImageUrl: normalizedImages.image_url ? `${normalizedImages.image_url.substring(0, 50)}...` : null,
       })
     }
     
@@ -128,31 +133,61 @@ export async function POST(request: NextRequest) {
       .single()
     
     if (error) {
-      console.error('Error creating item:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('Error creating item', error instanceof Error ? error : new Error(String(error)), {
+          component: 'items_v2',
+          operation: 'POST',
+          errorCode: error.code,
+        })
+      }
       return NextResponse.json({ error: 'Failed to create item' }, { status: 500 })
     }
     
     // Enqueue image post-processing job for item image (non-blocking, non-critical)
-    if (firstImageUrl) {
+    if (normalizedImages.image_url) {
+      // Import logger once if debug mode is enabled
+      const logger = process.env.NEXT_PUBLIC_DEBUG === 'true' 
+        ? (await import('@/lib/log')).logger
+        : null
+      
       try {
         const { enqueueJob, JOB_TYPES } = await import('@/lib/jobs')
         enqueueJob(JOB_TYPES.IMAGE_POSTPROCESS, {
-          imageUrl: firstImageUrl,
+          imageUrl: normalizedImages.image_url!,
           saleId: body.sale_id,
           ownerId: user.id,
         }).catch((err) => {
-          // Log but don't fail - job enqueueing is non-critical
-          console.warn('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical):', err)
+          // Log but don't fail - job enqueueing is non-critical (debug only)
+          if (logger) {
+            logger.debug('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical)', {
+              component: 'items_v2',
+              operation: 'POST',
+              error: err instanceof Error ? err.message : String(err),
+            })
+          }
         })
       } catch (jobErr) {
-        // Ignore job enqueueing errors - this is non-critical
-        console.warn('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical):', jobErr)
+        // Ignore job enqueueing errors - this is non-critical (debug only)
+        if (logger) {
+          logger.debug('[ITEMS_V2] Failed to enqueue image post-processing job (non-critical)', {
+            component: 'items_v2',
+            operation: 'POST',
+            error: jobErr instanceof Error ? jobErr.message : String(jobErr),
+          })
+        }
       }
     }
     
     return NextResponse.json({ item }, { status: 201 })
   } catch (error) {
-    console.error('Unexpected error:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('Unexpected error in items_v2 POST', error instanceof Error ? error : new Error(String(error)), {
+        component: 'items_v2',
+        operation: 'POST',
+      })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -181,16 +216,36 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
+    // Normalize image fields if present in update body
+    const updatePayload: any = { ...body }
+    if ('image_url' in body || 'images' in body) {
+      const normalizedImages = normalizeItemImages({
+        image_url: body.image_url,
+        images: body.images,
+      })
+      // Always set both fields for consistency (base table is authoritative)
+      updatePayload.images = normalizedImages.images
+      updatePayload.image_url = normalizedImages.image_url
+    }
+    
     // Write to base table using schema-scoped client
     const db = getRlsDb()
     const { data: item, error } = await fromBase(db, 'items')
-      .update(body)
+      .update(updatePayload)
       .eq('id', itemId)
       .select()
       .single()
     
     if (error) {
-      console.error('Error updating item:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('Error updating item', error instanceof Error ? error : new Error(String(error)), {
+          component: 'items_v2',
+          operation: 'PUT',
+          itemId,
+          errorCode: error.code,
+        })
+      }
       return NextResponse.json({ error: 'Failed to update item' }, { status: 500 })
     }
     
@@ -200,7 +255,13 @@ export async function PUT(request: NextRequest) {
     
     return NextResponse.json({ item })
   } catch (error) {
-    console.error('Unexpected error:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('Unexpected error in items_v2 PUT', error instanceof Error ? error : new Error(String(error)), {
+        component: 'items_v2',
+        operation: 'PUT',
+      })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -235,13 +296,27 @@ export async function DELETE(request: NextRequest) {
       .eq('id', itemId)
     
     if (error) {
-      console.error('Error deleting item:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('Error deleting item', error instanceof Error ? error : new Error(String(error)), {
+          component: 'items_v2',
+          operation: 'DELETE',
+          itemId,
+          errorCode: error.code,
+        })
+      }
       return NextResponse.json({ error: 'Failed to delete item' }, { status: 500 })
     }
     
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Unexpected error:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('Unexpected error in items_v2 DELETE', error instanceof Error ? error : new Error(String(error)), {
+        component: 'items_v2',
+        operation: 'DELETE',
+      })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

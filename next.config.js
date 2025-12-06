@@ -95,8 +95,8 @@ const nextConfig = {
                    "style-src-elem 'self' 'unsafe-inline' https://api.mapbox.com; " +
                    // Permit WebWorkers (Mapbox GL uses blob workers)
                    "worker-src 'self' blob:; child-src blob:; " +
-                   // Images and fonts
-                   "img-src 'self' data: https: https://res.cloudinary.com; font-src 'self' data:; " +
+                   // Images and fonts (allow blob: for temporary image previews before upload)
+                   "img-src 'self' data: blob: https: https://res.cloudinary.com; font-src 'self' data:; " +
                    // Network connections - allow Clarity API calls and AdSense
                    "connect-src 'self' https: https://api.cloudinary.com https://vercel.live https://www.clarity.ms https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://tpc.googlesyndication.com; " +
                    // Misc - allow AdSense frames (including safeframes, quality monitoring, and Google domains), and Vercel Live

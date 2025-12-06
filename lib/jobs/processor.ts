@@ -498,10 +498,29 @@ export async function processFavoriteSalesStartingSoonJob(
       return { success: true }
     }
 
-    // Create a map of user_id -> email
+    // Fetch user profiles to check notification preferences
+    // Only include users who have email_favorites_digest_enabled = true (default true)
+    const { data: profiles, error: profilesError } = await fromBase(admin, 'profiles')
+      .select('id, email_favorites_digest_enabled')
+      .in('id', userIds)
+      .eq('email_favorites_digest_enabled', true)
+
+    if (profilesError) {
+      logger.warn('Error fetching profiles for notification preferences, proceeding with all users', {
+        component: 'jobs/favorite-sales-starting-soon',
+        error: profilesError.message,
+      })
+    }
+
+    // Create set of user IDs with preferences enabled (if profiles query succeeded)
+    const enabledUserIds = profilesError 
+      ? new Set(userIds) // If query failed, include all users (fail open)
+      : new Set(profiles?.map(p => p.id) || [])
+
+    // Create a map of user_id -> email (only for users with preferences enabled)
     const userEmailMap = new Map<string, string>()
     for (const user of users) {
-      if (user.email) {
+      if (user.email && enabledUserIds.has(user.id)) {
         userEmailMap.set(user.id, user.email)
       }
     }
@@ -771,12 +790,32 @@ export async function processSellerWeeklyAnalyticsJob(
       return { success: true }
     }
 
-    // Process each owner
+    // Fetch user profiles to check notification preferences
+    // Only include users who have email_seller_weekly_enabled = true (default true)
+    const ownerIdArray = Array.from(ownerIds)
+    const { data: profiles, error: profilesError } = await fromBase(admin, 'profiles')
+      .select('id, email_seller_weekly_enabled')
+      .in('id', ownerIdArray)
+      .eq('email_seller_weekly_enabled', true)
+
+    if (profilesError) {
+      logger.warn('Error fetching profiles for notification preferences, proceeding with all users', {
+        component: 'jobs/seller-weekly-analytics',
+        error: profilesError.message,
+      })
+    }
+
+    // Create set of user IDs with preferences enabled (if profiles query succeeded)
+    const enabledOwnerIds = profilesError
+      ? new Set(ownerIds) // If query failed, include all users (fail open)
+      : new Set(profiles?.map(p => p.id) || [])
+
+    // Process each owner (only those with preferences enabled)
     let emailsSent = 0
     let errors = 0
 
     for (const user of users) {
-      if (!user.email) continue
+      if (!user.email || !enabledOwnerIds.has(user.id)) continue
 
       try {
         // Get user profile for display name

@@ -9,6 +9,7 @@ import { Sale } from '@/lib/types'
 import { getSaleCoverUrl } from '@/lib/images/cover'
 import { FaEdit, FaTrash } from 'react-icons/fa'
 import AddressLink from '@/components/common/AddressLink'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface DashboardSaleCardProps {
   sale: Sale
@@ -38,6 +39,10 @@ export default function DashboardSaleCard({ sale, onDelete }: DashboardSaleCardP
     try {
       const response = await fetch(`/api/sales/${sale.id}/delete`, {
         method: 'DELETE',
+        headers: {
+          ...getCsrfHeaders(),
+        },
+        credentials: 'include',
       })
 
       if (!response.ok) {

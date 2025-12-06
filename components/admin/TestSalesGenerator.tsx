@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 interface CreatedSale {
   id: string
@@ -61,6 +62,7 @@ export default function TestSalesGenerator() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getCsrfHeaders(),
       },
       credentials: 'include', // Include cookies for Google OAuth session
       body: JSON.stringify(saleData)

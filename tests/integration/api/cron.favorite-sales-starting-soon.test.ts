@@ -25,6 +25,7 @@ vi.mock('@/lib/log', () => ({
     info: vi.fn(),
     error: vi.fn(),
   },
+  generateOperationId: vi.fn(() => 'test-op-id-123'),
 }))
 
 describe('GET /api/cron/favorite-sales-starting-soon', () => {

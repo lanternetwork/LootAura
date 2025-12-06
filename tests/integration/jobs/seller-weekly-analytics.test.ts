@@ -44,6 +44,20 @@ vi.mock('@supabase/supabase-js', () => ({
 }))
 
 describe('processSellerWeeklyAnalyticsJob', () => {
+  // Helper to mock profiles query for notification preferences
+  const mockProfilesQuery = (ownerIds: string[] = ['owner-1']) => {
+    return {
+      select: vi.fn(() => ({
+        in: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
+            data: ownerIds.map(id => ({ id, email_seller_weekly_enabled: true })),
+            error: null,
+          })),
+        })),
+      })),
+    }
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
@@ -126,7 +140,7 @@ describe('processSellerWeeklyAnalyticsJob', () => {
           })),
         })),
       })),
-    })
+    }).mockReturnValueOnce(mockProfilesQuery())
 
     // Mock metrics
     vi.mocked(getSellerWeeklyAnalytics).mockResolvedValue({
@@ -194,7 +208,7 @@ describe('processSellerWeeklyAnalyticsJob', () => {
           })),
         })),
       })),
-    })
+    }).mockReturnValueOnce(mockProfilesQuery())
 
     // Mock zero metrics
     vi.mocked(getSellerWeeklyAnalytics).mockResolvedValue({
@@ -245,7 +259,7 @@ describe('processSellerWeeklyAnalyticsJob', () => {
           })),
         })),
       })),
-    })
+    }).mockReturnValueOnce(mockProfilesQuery())
 
     // Mock metrics (same as successful test)
     vi.mocked(getSellerWeeklyAnalytics).mockResolvedValue({

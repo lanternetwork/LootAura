@@ -1347,6 +1347,7 @@ export default function SalesClient({
           hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
           hybridResult={hybridResult}
           defaultViewport={getDefaultViewport()}
+          userLocation={effectiveCenter || null}
         />
       ) : (
         /* Desktop Layout - md and above */

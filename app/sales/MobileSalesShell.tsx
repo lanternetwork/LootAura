@@ -7,9 +7,11 @@ import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
+import MobileRecenterButton from '@/components/location/MobileRecenterButton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
+import { isPointInsideBounds } from '@/lib/map/bounds'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -53,6 +55,9 @@ interface MobileSalesShellProps {
   
   // Default viewport for re-center functionality
   defaultViewport: { center: { lat: number; lng: number }; zoom: number; bounds: { west: number; south: number; east: number; north: number } }
+  
+  // User location for recenter button visibility
+  userLocation: { lat: number; lng: number } | null
 }
 
 /**
@@ -86,7 +91,8 @@ export default function MobileSalesShell({
   zipError,
   hasActiveFilters,
   hybridResult,
-  defaultViewport
+  defaultViewport,
+  userLocation
 }: MobileSalesShellProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -220,11 +226,57 @@ export default function MobileSalesShell({
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
 
-  // Handle re-center - uses default viewport and triggers normal viewport change
-  // This bypasses geolocation and just uses the default/home viewport
+  // Calculate visibility of recenter button - only show when user location is outside viewport
+  const shouldShowRecenterButton = useMemo(() => {
+    if (!userLocation || !mapView?.bounds) return false
+    
+    const point: [number, number] = [userLocation.lng, userLocation.lat]
+    return !isPointInsideBounds(point, mapView.bounds)
+  }, [userLocation, mapView?.bounds])
+
+  // Handle re-center - animate map to user location using mapRef
   const handleRecenter = useCallback(() => {
-    onViewportChange(defaultViewport)
-  }, [onViewportChange, defaultViewport])
+    if (!userLocation || !mapRef.current) return
+    
+    const map = mapRef.current.getMap?.()
+    if (!map) return
+
+    // Default zoom for 10-mile distance (matches distanceToZoom logic)
+    const DEFAULT_ZOOM = 12
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MOBILE_RECENTER] Animating to user location:', userLocation, 'zoom:', DEFAULT_ZOOM)
+    }
+
+    // Animate to user location
+    map.flyTo({
+      center: [userLocation.lng, userLocation.lat],
+      zoom: DEFAULT_ZOOM,
+      duration: 1000, // 1 second animation
+      essential: true
+    })
+
+    // Calculate bounds for the new viewport (approximate for zoom 12)
+    const latRange = 0.11 // ~10 miles at mid-latitudes
+    const lngRange = latRange * Math.cos(userLocation.lat * Math.PI / 180)
+    
+    // Trigger viewport change after animation starts (Mapbox will handle the actual update)
+    // We'll use a timeout to let the animation start, then update state
+    setTimeout(() => {
+      const newBounds = {
+        west: userLocation.lng - lngRange / 2,
+        south: userLocation.lat - latRange / 2,
+        east: userLocation.lng + lngRange / 2,
+        north: userLocation.lat + latRange / 2
+      }
+      
+      onViewportChange({
+        center: userLocation,
+        zoom: DEFAULT_ZOOM,
+        bounds: newBounds
+      })
+    }, 100)
+  }, [userLocation, onViewportChange])
   
   // Close callout when map is clicked or moved
   const handleMapClick = useCallback(() => {
@@ -365,22 +417,11 @@ export default function MobileSalesShell({
                 )}
               </button>
               
-              {/* Re-center FAB - Top Right (Mobile only) - Positioned below attribution */}
-              <div className="absolute top-14 right-4 pointer-events-auto">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleRecenter()
-                  }}
-                  className="bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
-                  aria-label="Re-center map"
-                >
-                  <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </button>
-              </div>
+              {/* Re-center Map Button - Bottom Right (Mobile only, viewport-aware) */}
+              <MobileRecenterButton
+                visible={shouldShowRecenterButton}
+                onClick={handleRecenter}
+              />
               
               {/* Mode Toggle FAB - Bottom Right */}
               <button

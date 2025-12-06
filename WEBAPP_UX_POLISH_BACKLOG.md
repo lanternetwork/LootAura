@@ -118,11 +118,11 @@
 
 ### [x] [S, M] Add "Re-center" / "Reset view" button to map ✅
 
-**Area:** Map controls (`components/location/RecenterButton.tsx`)
+**Area:** Map controls (`app/sales/MobileSalesShell.tsx`)
 
-**Summary:** Re-center button implemented and integrated into map controls. Button attempts geolocation first, falls back to default center. Includes tooltip for discoverability.
+**Summary:** Re-center button implemented **mobile-only**. Button re-centers map to default/home viewport (same as initial load). Uses existing `onViewportChange` mechanism to keep map and list in sync. No desktop re-center control (by design).
 
-**Status:** ✅ **COMPLETED** - Re-center button exists and is used in SalesClient. Tooltip added.
+**Status:** ✅ **COMPLETED** - Re-center button exists in mobile shell only. Uses default viewport and triggers normal viewport change pipeline.
 
 ---
 

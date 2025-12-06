@@ -12,7 +12,6 @@ import MobileFilterSheet from '@/components/sales/MobileFilterSheet'
 import MobileSalesShell from './MobileSalesShell'
 import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import { useFilters, type DateRangeType } from '@/lib/hooks/useFilters'
-import RecenterButton from '@/components/location/RecenterButton'
 import { User } from '@supabase/supabase-js'
 import { createHybridPins } from '@/lib/pins/hybridClustering'
 import { useMobileFilter } from '@/contexts/MobileFilterContext'
@@ -80,6 +79,29 @@ export default function SalesClient({
     if (distance <= 75) return 8  // Extremely far - extremely low zoom
     return 8 // Default for 100+ miles
   }
+
+  // Helper to calculate default viewport for re-center
+  // Uses the same logic as initial map viewport calculation
+  const getDefaultViewport = useCallback((): { center: { lat: number; lng: number }; zoom: number; bounds: { west: number; south: number; east: number; north: number } } => {
+    const defaultCenter = effectiveCenter || { lat: 39.8283, lng: -98.5795 }
+    const defaultDistance = 10 // matches DEFAULT_FILTERS.distance in useFilters
+    const defaultZoom = distanceToZoom(defaultDistance)
+    
+    // Calculate bounds based on zoom level (approximate)
+    const latRange = defaultZoom === 12 ? 0.11 : defaultZoom === 10 ? 0.45 : defaultZoom === 11 ? 0.22 : 1.0
+    const lngRange = latRange * (defaultCenter.lat ? Math.cos(defaultCenter.lat * Math.PI / 180) : 1)
+    
+    return {
+      center: defaultCenter,
+      zoom: defaultZoom,
+      bounds: {
+        west: defaultCenter.lng - lngRange / 2,
+        south: defaultCenter.lat - latRange / 2,
+        east: defaultCenter.lng + lngRange / 2,
+        north: defaultCenter.lat + latRange / 2
+      }
+    }
+  }, [effectiveCenter])
 
   // Map view state - single source of truth
   // If ZIP needs resolution, wait before initializing map view to avoid showing wrong location
@@ -1095,30 +1117,6 @@ export default function SalesClient({
   }, [fetchedSales.length, visibleSales.length, visibleSalesDeduplicated.length, selectedPinId, hybridResult])
 
   // Memoized map center
-  // Handler for re-center button
-  const handleRecenter = useCallback((center: { lat: number; lng: number }, zoom?: number) => {
-    const targetZoom = zoom || mapView?.zoom || 11
-    const radiusKm = filters.distance * 1.60934 // Convert miles to km
-    const latRange = radiusKm / 111.0
-    const lngRange = radiusKm / (111.0 * Math.cos(center.lat * Math.PI / 180))
-    
-    const newBounds = {
-      west: center.lng - lngRange,
-      south: center.lat - latRange,
-      east: center.lng + lngRange,
-      north: center.lat + latRange
-    }
-    
-    setMapView({
-      center,
-      bounds: newBounds,
-      zoom: targetZoom
-    })
-    
-    // Trigger fetch for new area
-    const bufferedBbox = expandBounds(newBounds, MAP_BUFFER_FACTOR)
-    fetchMapSales(bufferedBbox, filters)
-  }, [mapView?.zoom, filters, fetchMapSales])
 
   const mapCenter = useMemo(() => {
     return mapView?.center || { lat: 39.8283, lng: -98.5795 }
@@ -1348,6 +1346,7 @@ export default function SalesClient({
           zipError={zipError}
           hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
           hybridResult={hybridResult}
+          defaultViewport={getDefaultViewport()}
         />
       ) : (
         /* Desktop Layout - md and above */
@@ -1431,16 +1430,6 @@ export default function SalesClient({
                 ) : null}
               </div>
               
-              {/* Re-center button */}
-              {mapView && (
-                <div className="absolute top-4 right-4 z-10">
-                  <RecenterButton
-                    onRecenter={handleRecenter}
-                    defaultCenter={effectiveCenter || { lat: 39.8283, lng: -98.5795 }}
-                    defaultZoom={mapView.zoom}
-                  />
-                </div>
-              )}
               
               {/* Desktop callout card */}
               {selectedSale && desktopPinPosition && (

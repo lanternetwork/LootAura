@@ -347,7 +347,7 @@ export default function MobileSalesShell({
             />
             
             {/* Floating Action Buttons */}
-            <div className="absolute inset-0 pointer-events-none z-10">
+            <div className="absolute inset-0 pointer-events-none z-[110]">
               {/* Filters FAB - Top Left */}
               <button
                 onClick={(e) => {
@@ -365,8 +365,8 @@ export default function MobileSalesShell({
                 )}
               </button>
               
-              {/* Re-center FAB - Top Right (Mobile only) */}
-              <div className="absolute top-4 right-4 pointer-events-auto">
+              {/* Re-center FAB - Top Right (Mobile only) - Positioned below attribution */}
+              <div className="absolute top-14 right-4 pointer-events-auto">
                 <button
                   onClick={(e) => {
                     e.stopPropagation()

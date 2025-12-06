@@ -580,7 +580,6 @@ export default function AddressAutocomplete({
                 setSelectedIndex(-1)
                 setShowFallbackMessage(sortedUnique.length > 0)
                 if (requestIdRef.current === currentId) setIsLoading(false)
-                return undefined
               })
         })
         .catch((err) => {

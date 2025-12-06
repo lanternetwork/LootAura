@@ -167,13 +167,13 @@ export default function MobileFiltersModal({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden"
+        className="fixed inset-0 bg-black bg-opacity-50 z-[120] md:hidden"
         onClick={onClose}
       />
 
       {/* Full-screen modal */}
       <div
-        className="fixed inset-0 bg-white z-50 md:hidden flex flex-col overflow-hidden"
+        className="fixed inset-0 bg-white z-[120] md:hidden flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -422,7 +422,7 @@ export default function AddressAutocomplete({
       
       fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
         .then((response) => {
-          if (requestIdRef.current !== currentId) return
+          if (requestIdRef.current !== currentId) return Promise.resolve(undefined)
           
           // Log for debugging distance issues (debug only)
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -633,7 +633,7 @@ export default function AddressAutocomplete({
       
       fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
         .then((response) => {
-          if (requestIdRef.current !== currentId) return
+          if (requestIdRef.current !== currentId) return Promise.resolve(undefined)
           
           // Log for debugging distance issues (debug only)
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

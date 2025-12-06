@@ -510,12 +510,13 @@ export default function AddressAutocomplete({
             setSelectedIndex(-1)
             setShowFallbackMessage(false)
             if (requestIdRef.current === currentId) setIsLoading(false)
-            return Promise.resolve(undefined)
-          } else {
-            // Overpass failed or returned empty - fallback to Nominatim
-            console.warn(`[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim for "${trimmedQuery}"`)
-            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
-              .then((results) => {
+            return
+          }
+          
+          // Overpass failed or returned empty - fallback to Nominatim
+          console.warn(`[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim for "${trimmedQuery}"`)
+          return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results) => {
                 if (requestIdRef.current !== currentId) return
                 const unique: AddressSuggestion[] = []
                 const seen = new Set<string>()
@@ -580,7 +581,6 @@ export default function AddressAutocomplete({
                 setShowFallbackMessage(sortedUnique.length > 0)
                 if (requestIdRef.current === currentId) setIsLoading(false)
               })
-          }
         })
         .catch((err) => {
           if (requestIdRef.current !== currentId) return
@@ -722,18 +722,17 @@ export default function AddressAutocomplete({
             setSelectedIndex(-1)
             setShowFallbackMessage(false)
             if (requestIdRef.current === currentId) setIsLoading(false)
-            return Promise.resolve(undefined)
-          } else {
-            // Overpass failed or returned empty
-            // For numeric-only queries, don't fallback to Nominatim because free-text search
-            // for just a number returns irrelevant results (places with the number in the name, not addresses)
-            console.warn(`[AddressAutocomplete] Overpass returned 0 results for numeric-only query "${trimmedQuery}" - showing no results (Nominatim fallback disabled for numeric-only queries)`)
-            setSuggestions([])
-            setIsOpen(false)
-            setShowFallbackMessage(false)
-            if (requestIdRef.current === currentId) setIsLoading(false)
-            return Promise.resolve(undefined)
+            return
           }
+          
+          // Overpass failed or returned empty
+          // For numeric-only queries, don't fallback to Nominatim because free-text search
+          // for just a number returns irrelevant results (places with the number in the name, not addresses)
+          console.warn(`[AddressAutocomplete] Overpass returned 0 results for numeric-only query "${trimmedQuery}" - showing no results (Nominatim fallback disabled for numeric-only queries)`)
+          setSuggestions([])
+          setIsOpen(false)
+          setShowFallbackMessage(false)
+          if (requestIdRef.current === currentId) setIsLoading(false)
         })
         .catch((err) => {
           if (requestIdRef.current !== currentId) return

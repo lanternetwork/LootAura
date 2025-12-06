@@ -396,14 +396,15 @@ export default function MobileSalesShell({
             
             {/* Floating Action Buttons */}
             <div className="absolute inset-0 pointer-events-none z-[110]">
-              {/* Filters FAB - Top Left */}
+              {/* Filters FAB - Top Left - Toggle behavior */}
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  setIsFiltersModalOpen(true)
+                  // Toggle: if open, close (discard changes); if closed, open
+                  setIsFiltersModalOpen(prev => !prev)
                 }}
                 className="absolute top-4 left-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
-                aria-label="Open filters"
+                aria-label={isFiltersModalOpen ? "Close filters" : "Open filters"}
               >
                 <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -572,6 +573,23 @@ export default function MobileSalesShell({
         onZipLocationFound={onZipLocationFound}
         onZipError={onZipError}
         zipError={zipError}
+        currentZip={(() => {
+          // Get current ZIP from cookie if available
+          if (typeof document !== 'undefined') {
+            try {
+              const cookies = document.cookie.split(';')
+              const laLocCookie = cookies.find(c => c.trim().startsWith('la_loc='))
+              if (laLocCookie) {
+                const value = laLocCookie.split('=')[1]
+                const parsed = JSON.parse(decodeURIComponent(value))
+                return parsed?.zip || null
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          }
+          return null
+        })()}
       />
     </div>
   )

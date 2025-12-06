@@ -34,6 +34,8 @@ interface MobileFiltersModalProps {
   onZipLocationFound: (lat: number, lng: number, city?: string, state?: string, zip?: string, bbox?: [number, number, number, number]) => void
   onZipError: (error: string) => void
   zipError?: string | null
+  // Current ZIP value (from applied filters) - used to initialize draft
+  currentZip?: string | null
 }
 
 /**
@@ -54,11 +56,13 @@ export default function MobileFiltersModal({
   onClearFilters,
   onZipLocationFound,
   onZipError,
-  zipError
+  zipError,
+  currentZip
 }: MobileFiltersModalProps) {
   const [tempDateRange, setTempDateRange] = useState(dateRange)
   const [tempCategories, setTempCategories] = useState(categories)
   const [tempDistance, setTempDistance] = useState(distance)
+  const [tempZip, setTempZip] = useState<string>('')
 
   // Date presets - only show Thu/Fri/Sat/Sun/This weekend (skip Today)
   const datePresets = useMemo(() => {
@@ -69,13 +73,17 @@ export default function MobileFiltersModal({
   }, [])
 
   // Sync temp state when modal opens or props change
+  // Reset to applied values when modal opens (discard any unapplied changes)
   useEffect(() => {
     if (isOpen) {
       setTempDateRange(dateRange)
       setTempCategories(categories)
       setTempDistance(distance)
+      setTempZip(currentZip || '')
+      // Clear any previous ZIP errors when opening modal
+      onZipError('')
     }
-  }, [isOpen, dateRange, categories, distance])
+  }, [isOpen, dateRange, categories, distance, currentZip, onZipError])
 
   const handleCategoryToggle = useCallback((categoryId: string) => {
     if (tempCategories.includes(categoryId)) {
@@ -85,19 +93,62 @@ export default function MobileFiltersModal({
     }
   }, [tempCategories])
 
-  const handleApply = useCallback(() => {
+  const handleApply = useCallback(async () => {
     // Update filters - this will trigger map viewport change and fetch
     onDateRangeChange(tempDateRange)
     onCategoriesChange(tempCategories)
     onDistanceChange(tempDistance)
+    
+    // Apply ZIP if it has been entered and is valid
+    if (tempZip.trim()) {
+      const zipRegex = /^\d{5}(-\d{4})?$/
+      if (zipRegex.test(tempZip.trim())) {
+        // Perform ZIP lookup and apply location
+        try {
+          const response = await fetch(`/api/geocoding/zip?zip=${encodeURIComponent(tempZip.trim())}`)
+          const data = await response.json()
+          
+          if (data.ok) {
+            // Write location cookie
+            const locationData = {
+              zip: data.zip,
+              city: data.city,
+              state: data.state,
+              lat: data.lat,
+              lng: data.lng,
+              source: data.source
+            }
+            const expires = new Date()
+            expires.setTime(expires.getTime() + (1 * 24 * 60 * 60 * 1000))
+            document.cookie = `la_loc=${JSON.stringify(locationData)};expires=${expires.toUTCString()};path=/;SameSite=Lax`
+            
+            // Pass bbox if available
+            const bbox = data.bbox ? [data.bbox[0], data.bbox[1], data.bbox[2], data.bbox[3]] as [number, number, number, number] : undefined
+            onZipLocationFound(data.lat, data.lng, data.city, data.state, data.zip, bbox)
+          } else {
+            onZipError(data.error || 'ZIP code not found')
+            return // Don't close modal if ZIP lookup failed
+          }
+        } catch (error) {
+          onZipError('Failed to lookup ZIP code')
+          return // Don't close modal if ZIP lookup failed
+        }
+      } else {
+        onZipError('Please enter a valid ZIP code (5 digits or ZIP+4)')
+        return // Don't close modal if ZIP is invalid
+      }
+    }
+    
     onClose()
-  }, [tempDateRange, tempCategories, tempDistance, onDateRangeChange, onCategoriesChange, onDistanceChange, onClose])
+  }, [tempDateRange, tempCategories, tempDistance, tempZip, onDateRangeChange, onCategoriesChange, onDistanceChange, onZipLocationFound, onZipError, onClose])
 
   const handleReset = useCallback(() => {
     setTempDateRange('any')
     setTempCategories([])
     setTempDistance(25)
-  }, [])
+    setTempZip('')
+    onZipError('')
+  }, [onZipError])
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -142,16 +193,40 @@ export default function MobileFiltersModal({
 
         {/* Content - Scrollable */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6 touch-pan-y">
-          {/* ZIP Search */}
+          {/* ZIP Search - Mobile: no Set button, only updates draft state */}
           <div>
             <label className="block text-sm font-medium mb-2">Location</label>
             {zipError && (
               <div className="mb-2 text-sm text-red-600">{zipError}</div>
             )}
-            <ZipInput
-              onLocationFound={onZipLocationFound}
-              onError={onZipError}
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={tempZip}
+                onChange={(e) => {
+                  // Allow digits and hyphens, limit to 10 chars (ZIP+4 format)
+                  const value = e.target.value.replace(/[^\d-]/g, '').slice(0, 10)
+                  setTempZip(value)
+                  // Clear error when user starts typing
+                  if (zipError) {
+                    onZipError('')
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Prevent form submission on Enter - ZIP is applied via "Apply Filters" only
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                  }
+                }}
+                placeholder="Enter ZIP code"
+                maxLength={10}
+                className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent min-h-[40px] ${
+                  zipError ? 'border-red-300' : 'border-gray-300'
+                }`}
+                disabled={isLoading}
+              />
+              {/* Set button removed on mobile - ZIP is applied via "Apply Filters" */}
+            </div>
           </div>
 
           {/* Date Range */}

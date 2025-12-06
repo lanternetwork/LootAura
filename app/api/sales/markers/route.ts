@@ -16,9 +16,6 @@ export const dynamic = 'force-dynamic'
 // [{ id: string, title: string, lat: number, lng: number }]
 async function markersHandler(request: NextRequest) {
   const startedAt = Date.now()
-  const { logger, generateOperationId } = await import('@/lib/log')
-  const opId = generateOperationId()
-  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
   
   try {
     const url = new URL(request.url)

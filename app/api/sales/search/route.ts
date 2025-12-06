@@ -8,6 +8,11 @@ import { fail, ok } from '@/lib/http/json'
 export const dynamic = 'force-dynamic'
 
 async function searchHandler(request: NextRequest) {
+  const startedAt = Date.now()
+  const { logger, generateOperationId } = await import('@/lib/log')
+  const opId = generateOperationId()
+  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+
   try {
     // Create Supabase client with explicit public schema
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -114,21 +119,20 @@ async function searchHandler(request: NextRequest) {
     }
 
     if (error) {
-      const { logger } = await import('@/lib/log')
       logger.error('Sales search error', error instanceof Error ? error : new Error(String(error)), withOpId({
         component: 'sales',
         operation: 'search_query'
-      })
+      }))
       return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
     }
 
     return ok({ sales: sales || [] })
   } catch (error: any) {
-    const { logger } = await import('@/lib/log')
     logger.error('Sales search error', error instanceof Error ? error : new Error(String(error)), withOpId({
       component: 'sales',
-      operation: 'search_handler'
-    })
+      operation: 'search_handler',
+      durationMs: Date.now() - startedAt
+    }))
     return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
   }
 }

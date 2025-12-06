@@ -24,7 +24,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertCronAuthorized } from '@/lib/auth/cron'
 import { processSellerWeeklyAnalyticsJob } from '@/lib/jobs/processor'
-import { logger } from '@/lib/log'
 
 export const dynamic = 'force-dynamic'
 

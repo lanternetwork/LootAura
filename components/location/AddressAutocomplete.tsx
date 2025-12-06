@@ -515,7 +515,7 @@ export default function AddressAutocomplete({
           
           // Overpass failed or returned empty - fallback to Nominatim
           console.warn(`[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim for "${trimmedQuery}"`)
-          return (fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+          const fallbackPromise: Promise<void> = fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
             .then((results) => {
               if (requestIdRef.current !== currentId) return Promise.resolve(undefined)
               const unique: AddressSuggestion[] = []
@@ -585,7 +585,8 @@ export default function AddressAutocomplete({
             .catch(() => {
               // Silently handle errors in fallback
               return Promise.resolve(undefined)
-            }))
+            })
+          return fallbackPromise
         })
         .catch((err) => {
           if (requestIdRef.current !== currentId) return

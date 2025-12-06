@@ -510,7 +510,7 @@ export default function AddressAutocomplete({
             setSelectedIndex(-1)
             setShowFallbackMessage(false)
             if (requestIdRef.current === currentId) setIsLoading(false)
-            return
+            return Promise.resolve(undefined)
           }
           
           // Overpass failed or returned empty - fallback to Nominatim
@@ -722,7 +722,7 @@ export default function AddressAutocomplete({
             setSelectedIndex(-1)
             setShowFallbackMessage(false)
             if (requestIdRef.current === currentId) setIsLoading(false)
-            return
+            return Promise.resolve(undefined)
           }
           
           // Overpass failed or returned empty
@@ -733,6 +733,7 @@ export default function AddressAutocomplete({
           setIsOpen(false)
           setShowFallbackMessage(false)
           if (requestIdRef.current === currentId) setIsLoading(false)
+          return Promise.resolve(undefined)
         })
         .catch((err) => {
           if (requestIdRef.current !== currentId) return

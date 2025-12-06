@@ -510,7 +510,7 @@ export default function AddressAutocomplete({
             setSelectedIndex(-1)
             setShowFallbackMessage(false)
             if (requestIdRef.current === currentId) setIsLoading(false)
-            return
+            return Promise.resolve(undefined)
           } else {
             // Overpass failed or returned empty - fallback to Nominatim
             console.warn(`[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim for "${trimmedQuery}"`)
@@ -722,7 +722,7 @@ export default function AddressAutocomplete({
             setSelectedIndex(-1)
             setShowFallbackMessage(false)
             if (requestIdRef.current === currentId) setIsLoading(false)
-            return
+            return Promise.resolve(undefined)
           } else {
             // Overpass failed or returned empty
             // For numeric-only queries, don't fallback to Nominatim because free-text search
@@ -732,7 +732,7 @@ export default function AddressAutocomplete({
             setIsOpen(false)
             setShowFallbackMessage(false)
             if (requestIdRef.current === currentId) setIsLoading(false)
-            return
+            return Promise.resolve(undefined)
           }
         })
         .catch((err) => {

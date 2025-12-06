@@ -421,7 +421,7 @@ export default function AddressAutocomplete({
       }
       
       fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
-        .then((response) => {
+        .then((response): Promise<void> => {
           if (requestIdRef.current !== currentId) return Promise.resolve(undefined)
           
           // Log for debugging distance issues (debug only)
@@ -515,8 +515,8 @@ export default function AddressAutocomplete({
           
           // Overpass failed or returned empty - fallback to Nominatim
           console.warn(`[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim for "${trimmedQuery}"`)
-          const fallbackPromise: Promise<void> = fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
-            .then((results) => {
+          return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
+            .then((results): Promise<void> => {
               if (requestIdRef.current !== currentId) return Promise.resolve(undefined)
               const unique: AddressSuggestion[] = []
               const seen = new Set<string>()
@@ -582,11 +582,10 @@ export default function AddressAutocomplete({
               if (requestIdRef.current === currentId) setIsLoading(false)
               return Promise.resolve(undefined)
             })
-            .catch(() => {
+            .catch((): Promise<void> => {
               // Silently handle errors in fallback
               return Promise.resolve(undefined)
             })
-          return fallbackPromise
         })
         .catch((err) => {
           if (requestIdRef.current !== currentId) return
@@ -633,7 +632,7 @@ export default function AddressAutocomplete({
       }
       
       fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
-        .then((response) => {
+        .then((response): Promise<void> => {
           if (requestIdRef.current !== currentId) return Promise.resolve(undefined)
           
           // Log for debugging distance issues (debug only)

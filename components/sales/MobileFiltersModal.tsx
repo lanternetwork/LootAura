@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { buildDatePresets } from '@/lib/shared/datePresets'
-import ZipInput from '@/components/location/ZipInput'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 
 // Category data

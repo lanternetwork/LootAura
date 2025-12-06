@@ -80,29 +80,6 @@ export default function SalesClient({
     return 8 // Default for 100+ miles
   }
 
-  // Helper to calculate default viewport for re-center
-  // Uses the same logic as initial map viewport calculation
-  const getDefaultViewport = useCallback((): { center: { lat: number; lng: number }; zoom: number; bounds: { west: number; south: number; east: number; north: number } } => {
-    const defaultCenter = effectiveCenter || { lat: 39.8283, lng: -98.5795 }
-    const defaultDistance = 10 // matches DEFAULT_FILTERS.distance in useFilters
-    const defaultZoom = distanceToZoom(defaultDistance)
-    
-    // Calculate bounds based on zoom level (approximate)
-    const latRange = defaultZoom === 12 ? 0.11 : defaultZoom === 10 ? 0.45 : defaultZoom === 11 ? 0.22 : 1.0
-    const lngRange = latRange * (defaultCenter.lat ? Math.cos(defaultCenter.lat * Math.PI / 180) : 1)
-    
-    return {
-      center: defaultCenter,
-      zoom: defaultZoom,
-      bounds: {
-        west: defaultCenter.lng - lngRange / 2,
-        south: defaultCenter.lat - latRange / 2,
-        east: defaultCenter.lng + lngRange / 2,
-        north: defaultCenter.lat + latRange / 2
-      }
-    }
-  }, [effectiveCenter])
-
   // Map view state - single source of truth
   // If ZIP needs resolution, wait before initializing map view to avoid showing wrong location
   // Otherwise, use effectiveCenter which should have been resolved server-side
@@ -1346,7 +1323,6 @@ export default function SalesClient({
           zipError={zipError}
           hasActiveFilters={filters.dateRange !== 'any' || filters.categories.length > 0}
           hybridResult={hybridResult}
-          defaultViewport={getDefaultViewport()}
           userLocation={effectiveCenter || null}
         />
       ) : (

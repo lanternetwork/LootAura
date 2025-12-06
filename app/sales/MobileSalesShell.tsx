@@ -53,9 +53,6 @@ interface MobileSalesShellProps {
   // Hybrid result for location-based pin selection
   hybridResult?: HybridPinsResult | null
   
-  // Default viewport for re-center functionality
-  defaultViewport: { center: { lat: number; lng: number }; zoom: number; bounds: { west: number; south: number; east: number; north: number } }
-  
   // User location for recenter button visibility
   userLocation: { lat: number; lng: number } | null
 }
@@ -91,7 +88,6 @@ export default function MobileSalesShell({
   zipError,
   hasActiveFilters,
   hybridResult,
-  defaultViewport,
   userLocation
 }: MobileSalesShellProps) {
   const router = useRouter()

@@ -34,7 +34,11 @@ const bboxSchema = z.object({
 
 async function salesHandler(request: NextRequest) {
   const startedAt = Date.now()
-  const { logger } = await import('@/lib/log')
+  const { logger, generateOperationId } = await import('@/lib/log')
+  const opId = generateOperationId()
+  
+  // Helper to add opId to log context
+  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
   
   try {
     const supabase = createSupabaseServerClient()
@@ -74,7 +78,8 @@ async function salesHandler(request: NextRequest) {
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
               logger.debug('ZIP resolved to coordinates', {
                 component: 'sales',
-                operation: 'zip_resolve'
+                operation: 'zip_resolve',
+                requestId: opId
               })
             }
           } else {
@@ -96,7 +101,8 @@ async function salesHandler(request: NextRequest) {
         } catch (error) {
           logger.error('Failed to resolve ZIP code', error instanceof Error ? error : new Error(String(error)), {
             component: 'sales',
-            operation: 'zip_resolve'
+            operation: 'zip_resolve',
+            requestId: opId
           })
           return ok({
             data: [],
@@ -114,7 +120,8 @@ async function salesHandler(request: NextRequest) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           logger.debug('No location provided for near=1 query', {
             component: 'sales',
-            operation: 'near_query'
+            operation: 'near_query',
+            requestId: opId
           })
         }
         return NextResponse.json({
@@ -786,13 +793,13 @@ async function salesHandler(request: NextRequest) {
       response.degraded = true
     }
     
-    logger.info('Sales query completed', {
+    logger.info('Sales query completed', withOpId({
       component: 'sales',
       operation: 'get_sales',
       count: results.length,
       degraded,
       durationMs: Date.now() - startedAt
-    })
+    }))
     
     // Add optimized cache headers for public sales data
     const { addCacheHeaders } = await import('@/lib/http/cache')
@@ -805,12 +812,14 @@ async function salesHandler(request: NextRequest) {
     })
     
   } catch (error: any) {
-    const { logger } = await import('@/lib/log')
-    logger.error('Sales query failed', error instanceof Error ? error : new Error(String(error)), {
+    const { logger, generateOperationId } = await import('@/lib/log')
+    const opId = generateOperationId()
+    const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
+    logger.error('Sales query failed', error instanceof Error ? error : new Error(String(error)), withOpId({
       component: 'sales',
       operation: 'get_sales',
       durationMs: Date.now() - startedAt
-    })
+    }))
     return NextResponse.json({ 
       ok: false, 
       error: 'Internal server error' 

@@ -21,6 +21,8 @@ export interface LogContext {
   operation?: string
   userId?: string  // Use with caution - prefer anonymized/shortened IDs
   saleId?: string   // Use with caution - prefer anonymized/shortened IDs
+  requestId?: string  // Correlation/operation ID for request tracing
+  opId?: string  // Alternative name for operation ID (alias for requestId)
   [key: string]: any
 }
 
@@ -32,6 +34,10 @@ class Logger {
   private formatMessage(level: string, message: string, context?: LogContext): string {
     const timestamp = new Date().toISOString()
     const parts = [`[${timestamp}]`, `[${level}]`]
+    
+    // Include correlation/operation ID early for request tracing
+    const opId = context?.requestId || context?.opId
+    if (opId) parts.push(`[op:${opId}]`)
     
     if (context?.component) parts.push(`[${context.component}]`)
     if (context?.operation) parts.push(`[${context.operation}]`)
@@ -91,3 +97,14 @@ class Logger {
 }
 
 export const logger = new Logger()
+
+/**
+ * Generate a lightweight operation ID for request correlation
+ * Format: timestamp (ms) + random suffix (4 chars)
+ * Example: "1704067200000-a3f2"
+ */
+export function generateOperationId(): string {
+  const timestamp = Date.now()
+  const randomSuffix = Math.random().toString(36).substring(2, 6)
+  return `${timestamp}-${randomSuffix}`
+}

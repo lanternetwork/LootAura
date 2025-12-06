@@ -177,8 +177,8 @@ export default function MobileFiltersModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex-shrink-0 px-4 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Filters</h2>
+        <div className="flex-shrink-0 px-4 py-5 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -191,10 +191,10 @@ export default function MobileFiltersModal({
         </div>
 
         {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6 touch-pan-y">
+        <div className="flex-1 overflow-y-auto p-4 space-y-5 touch-pan-y">
           {/* ZIP Search - Mobile: no Set button, only updates draft state */}
           <div>
-            <label className="block text-sm font-medium mb-2">Location</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2.5">Location</label>
             {zipError && (
               <div className="mb-2 text-sm text-red-600">{zipError}</div>
             )}
@@ -230,7 +230,7 @@ export default function MobileFiltersModal({
 
           {/* Date Range */}
           <div>
-            <label className="block text-sm font-medium mb-3">Date Range</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2.5">Date Range</label>
             <select
               value={tempDateRange}
               onChange={(e) => setTempDateRange(e.target.value as DateRangeType)}
@@ -248,7 +248,7 @@ export default function MobileFiltersModal({
 
           {/* Categories */}
           <div>
-            <label className="block text-sm font-medium mb-3">Categories</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2.5">Categories</label>
             <div className="flex flex-wrap gap-2">
               {CATEGORY_DATA.map((category) => {
                 const isSelected = tempCategories.includes(category.id)
@@ -276,7 +276,7 @@ export default function MobileFiltersModal({
 
           {/* Distance / Search Area */}
           <div>
-            <label className="block text-sm font-medium mb-3">Search Area</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2.5">Search Area</label>
             <select
               value={tempDistance}
               onChange={(e) => setTempDistance(Number(e.target.value))}

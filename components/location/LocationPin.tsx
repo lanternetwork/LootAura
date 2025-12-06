@@ -92,7 +92,9 @@ export default function LocationPin({
       >
         {/* Wrapper with larger hit area on mobile */}
         <div
-          className="relative flex items-center justify-center w-11 h-11 md:w-8 md:h-8 min-w-[44px] min-h-[44px] md:min-w-[32px] md:min-h-[32px]"
+          className={`relative flex items-center justify-center w-11 h-11 md:w-8 md:h-8 min-w-[44px] min-h-[44px] md:min-w-[32px] md:min-h-[32px] transition-transform duration-150 ease-out ${
+            isSelected ? 'scale-125' : 'hover:scale-110'
+          }`}
           onClick={handleClick}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -120,7 +122,21 @@ export default function LocationPin({
               cy="8"
               r="6"
               fill={isSelected ? '#dc2626' : '#ef4444'}
+              className={isSelected ? 'drop-shadow-lg' : ''}
             />
+            {/* Subtle ring on hover (desktop only) */}
+            {!isMobile && (
+              <circle
+                cx="8"
+                cy="8"
+                r="7"
+                fill="none"
+                stroke={isSelected ? '#dc2626' : '#ef4444'}
+                strokeWidth="1"
+                opacity="0.3"
+                className="hover:opacity-50 transition-opacity"
+              />
+            )}
           </svg>
         </div>
       </Marker>

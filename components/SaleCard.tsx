@@ -37,7 +37,7 @@ export default function SaleCard({ sale, className, viewport }: SaleCardProps) {
 
   return (
     <article 
-      className={`w-full rounded-2xl overflow-hidden shadow-sm border bg-white ${className ?? ''}`} 
+      className={`w-full rounded-2xl overflow-hidden shadow-sm border bg-white animate-fade-in-up ${className ?? ''}`} 
       data-testid="sale-card" 
       data-debug="sale-card" 
       data-sale-id={String(sale?.id || '')}

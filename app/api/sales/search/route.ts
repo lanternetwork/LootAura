@@ -115,7 +115,7 @@ async function searchHandler(request: NextRequest) {
 
     if (error) {
       const { logger } = await import('@/lib/log')
-      logger.error('Sales search error', error instanceof Error ? error : new Error(String(error)), {
+      logger.error('Sales search error', error instanceof Error ? error : new Error(String(error)), withOpId({
         component: 'sales',
         operation: 'search_query'
       })
@@ -125,7 +125,7 @@ async function searchHandler(request: NextRequest) {
     return ok({ sales: sales || [] })
   } catch (error: any) {
     const { logger } = await import('@/lib/log')
-    logger.error('Sales search error', error instanceof Error ? error : new Error(String(error)), {
+    logger.error('Sales search error', error instanceof Error ? error : new Error(String(error)), withOpId({
       component: 'sales',
       operation: 'search_handler'
     })

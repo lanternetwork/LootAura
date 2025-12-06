@@ -40,6 +40,9 @@ async function handleRequest(request: NextRequest) {
   const runAt = new Date().toISOString()
   const env = process.env.NODE_ENV || 'development'
   const isProduction = env === 'production'
+  const { logger, generateOperationId } = await import('@/lib/log')
+  const opId = generateOperationId()
+  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
 
   try {
     // Validate cron authentication
@@ -71,14 +74,14 @@ async function handleRequest(request: NextRequest) {
     const dateParam = searchParams.get('date')
     const payload = dateParam ? { date: dateParam } : {}
 
-    logger.info('Seller weekly analytics cron job triggered', {
+    logger.info('Seller weekly analytics cron job triggered', withOpId({
       component: 'api/cron/seller-weekly-analytics',
       runAt,
       env,
       isProduction,
       emailsEnabled: true,
       dateParam,
-    })
+    }))
 
     // Execute the job
     const result = await processSellerWeeklyAnalyticsJob(payload)

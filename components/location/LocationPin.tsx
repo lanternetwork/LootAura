@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState, useEffect } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { Marker, Popup } from 'react-map-gl'
 import { LocationGroup } from '@/lib/pins/types'
 
@@ -17,6 +17,8 @@ export default function LocationPin({
 }: LocationPinProps) {
   const [showTooltip, setShowTooltip] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const showTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Detect mobile on mount
   useEffect(() => {
@@ -28,6 +30,14 @@ export default function LocationPin({
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (showTimeoutRef.current) clearTimeout(showTimeoutRef.current)
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current)
+    }
+  }, [])
+
   const handleClick = useCallback((event: React.MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()
@@ -35,13 +45,36 @@ export default function LocationPin({
   }, [location.id, onClick])
 
   const handleMouseEnter = useCallback(() => {
-    if (!isMobile) {
-      setShowTooltip(true)
+    if (isMobile) return
+    
+    // Clear any pending hide timeout
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current)
+      hideTimeoutRef.current = null
     }
+    
+    // Clear any existing show timeout
+    if (showTimeoutRef.current) {
+      clearTimeout(showTimeoutRef.current)
+    }
+    
+    // Add small delay before showing to prevent flashing
+    showTimeoutRef.current = setTimeout(() => {
+      setShowTooltip(true)
+    }, 200)
   }, [isMobile])
 
   const handleMouseLeave = useCallback(() => {
-    setShowTooltip(false)
+    // Clear any pending show timeout
+    if (showTimeoutRef.current) {
+      clearTimeout(showTimeoutRef.current)
+      showTimeoutRef.current = null
+    }
+    
+    // Add small delay before hiding to prevent flashing when moving between marker and tooltip
+    hideTimeoutRef.current = setTimeout(() => {
+      setShowTooltip(false)
+    }, 100)
   }, [])
 
   // Get tooltip content - show first sale title or count

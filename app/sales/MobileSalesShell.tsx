@@ -244,34 +244,54 @@ export default function MobileSalesShell({
       console.log('[MOBILE_RECENTER] Animating to user location:', userLocation, 'zoom:', DEFAULT_ZOOM)
     }
 
-    // Animate to user location
-    map.flyTo({
-      center: [userLocation.lng, userLocation.lat],
-      zoom: DEFAULT_ZOOM,
-      duration: 1000, // 1 second animation
-      essential: true
-    })
-
     // Calculate bounds for the new viewport (approximate for zoom 12)
     const latRange = 0.11 // ~10 miles at mid-latitudes
     const lngRange = latRange * Math.cos(userLocation.lat * Math.PI / 180)
+    const newBounds = {
+      west: userLocation.lng - lngRange / 2,
+      south: userLocation.lat - latRange / 2,
+      east: userLocation.lng + lngRange / 2,
+      north: userLocation.lat + latRange / 2
+    }
+
+    // Calculate distance to determine appropriate duration
+    const currentCenter = map.getCenter()
+    const currentLat = currentCenter.lat
+    const currentLng = currentCenter.lng
+    const distance = Math.sqrt(
+      Math.pow((userLocation.lat - currentLat) * 111, 2) + 
+      Math.pow((userLocation.lng - currentLng) * 111 * Math.cos(currentLat * Math.PI / 180), 2)
+    ) // Approximate distance in km
     
-    // Trigger viewport change after animation starts (Mapbox will handle the actual update)
-    // We'll use a timeout to let the animation start, then update state
-    setTimeout(() => {
-      const newBounds = {
-        west: userLocation.lng - lngRange / 2,
-        south: userLocation.lat - latRange / 2,
-        east: userLocation.lng + lngRange / 2,
-        north: userLocation.lat + latRange / 2
+    // Use longer duration for longer distances (max 3 seconds for very long distances)
+    const duration = Math.min(3000, Math.max(1000, distance * 50))
+
+    // Listen for moveend event to know when flyTo animation completes
+    // Use once() to automatically remove listener after it fires
+    const handleMoveEnd = () => {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MOBILE_RECENTER] Animation completed, updating viewport state')
       }
       
+      // Update viewport state after animation completes
+      // This ensures SimpleMap's easeTo doesn't interfere with the flyTo animation
       onViewportChange({
         center: userLocation,
         zoom: DEFAULT_ZOOM,
         bounds: newBounds
       })
-    }, 100)
+    }
+
+    // Add listener before starting animation
+    map.once('moveend', handleMoveEnd)
+
+    // Animate to user location
+    map.flyTo({
+      center: [userLocation.lng, userLocation.lat],
+      zoom: DEFAULT_ZOOM,
+      duration: duration,
+      essential: true
+    })
   }, [userLocation, onViewportChange])
   
   // Close callout when map is clicked or moved

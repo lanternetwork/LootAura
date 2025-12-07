@@ -3,6 +3,7 @@
  * Uses React Email components for email-safe HTML
  */
 
+import React from 'react'
 import {
   Html,
   Head,

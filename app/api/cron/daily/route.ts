@@ -182,19 +182,39 @@ async function archiveEndedSales(
   }
 
   // Filter sales that have ended:
-  // - Sales with date_end < today
-  // - Sales without date_end but with date_start < today (single-day sales)
+  // - Sales with date_end <= today (ended today or before)
+  // - Sales without date_end but with date_start < today (single-day sales that started in the past)
   const salesToArchive = (allSales || []).filter((sale: any) => {
     if (sale.date_end) {
-      return sale.date_end < today
+      // Archive if end date is today or in the past
+      return sale.date_end <= today
     }
     // If no end_date, check if start_date is in the past (single-day sale)
     if (sale.date_start) {
+      // Archive if start date is before today (sale already happened)
       return sale.date_start < today
     }
     // If no dates at all, don't archive (shouldn't happen for published sales)
     return false
   })
+
+  // Log details about what we found for debugging
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true' || process.env.NODE_ENV !== 'production') {
+    logger.info('Archive sales filtering details', withOpId({
+      component: 'api/cron/daily',
+      task: 'archive-sales',
+      today,
+      totalSales: allSales?.length || 0,
+      salesToArchiveCount: salesToArchive.length,
+      sampleSales: salesToArchive.slice(0, 3).map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        date_start: s.date_start,
+        date_end: s.date_end,
+        status: s.status,
+      })),
+    }))
+  }
 
   const salesToArchiveCount = salesToArchive?.length || 0
 

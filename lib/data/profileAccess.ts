@@ -61,12 +61,18 @@ export async function getUserProfile(
       .eq('id', userId)
       .maybeSingle()
 
-    if (data && !error) {
+    if (error) {
+      // Log error for debugging
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[PROFILE_ACCESS] Error querying profiles_v2 view:', error)
+      }
+      // Continue to RPC fallback
+    } else if (data) {
       return data as ProfileData
     }
 
-    // Fallback to RPC if view doesn't return data
-    if (!data && !error) {
+    // Fallback to RPC if view doesn't return data or had an error
+    if (!data) {
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc('get_profile', { p_user_id: userId })
         if (rpcData && !rpcError) {

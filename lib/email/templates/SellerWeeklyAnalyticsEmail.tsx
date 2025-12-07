@@ -40,7 +40,8 @@ export function SellerWeeklyAnalyticsEmail({
   dashboardUrl,
   weekStart,
   weekEnd,
-  baseUrl = 'https://lootaura.com',
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  baseUrl: _baseUrl = 'https://lootaura.com',
   unsubscribeUrl,
 }: SellerWeeklyAnalyticsEmailProps) {
   const greeting = ownerDisplayName ? `Hi ${ownerDisplayName},` : 'Hi there,'

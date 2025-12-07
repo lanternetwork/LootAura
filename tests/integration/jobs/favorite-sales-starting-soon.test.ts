@@ -182,6 +182,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       sales: [mockSale],
       userName: 'Test User',
       hoursBeforeStart: 24, // Default from config
+      profileId: 'user-1',
     })
 
     // Verify that start_soon_notified_at was updated
@@ -277,6 +278,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       sales: expect.arrayContaining([mockSale1, mockSale2]),
       userName: 'Test User',
       hoursBeforeStart: 24,
+      profileId: 'user-1',
     })
     // Verify both sales are in the digest
     const callArgs = vi.mocked(sendFavoriteSalesStartingSoonDigestEmail).mock.calls[0][0]
@@ -383,6 +385,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       sales: [mockSale1],
       userName: 'Test User',
       hoursBeforeStart: 24,
+      profileId: 'user-1',
     })
     // Verify user-2 gets their sale
     expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledWith({
@@ -390,6 +393,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
       sales: [mockSale2],
       userName: 'Test User',
       hoursBeforeStart: 24,
+      profileId: 'user-2',
     })
   })
 

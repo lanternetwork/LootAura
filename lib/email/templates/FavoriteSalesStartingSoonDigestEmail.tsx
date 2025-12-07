@@ -34,7 +34,8 @@ export function FavoriteSalesStartingSoonDigestEmail({
   recipientName,
   sales,
   hoursBeforeStart,
-  baseUrl = 'https://lootaura.com',
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  baseUrl: _baseUrl = 'https://lootaura.com',
   unsubscribeUrl,
 }: FavoriteSalesStartingSoonDigestEmailProps) {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'

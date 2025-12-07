@@ -40,11 +40,10 @@ export function SellerWeeklyAnalyticsEmail({
   dashboardUrl,
   weekStart,
   weekEnd,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   baseUrl: _baseUrl = 'https://lootaura.com', // Kept for backward compatibility, unused
   unsubscribeUrl,
 }: SellerWeeklyAnalyticsEmailProps) {
-  // Suppress unused variable warning for backward compatibility
-  void _baseUrl
   const greeting = ownerDisplayName ? `Hi ${ownerDisplayName},` : 'Hi there,'
   const ctr = totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(1) : '0.0'
 

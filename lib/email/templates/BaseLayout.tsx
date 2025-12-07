@@ -12,15 +12,21 @@ import {
   Section,
   Text,
   Link,
+  Img,
 } from '@react-email/components'
 
 export interface BaseLayoutProps {
   previewText?: string
   children: React.ReactNode
   unsubscribeUrl?: string
+  baseUrl?: string
 }
 
-export function BaseLayout({ previewText, children, unsubscribeUrl }: BaseLayoutProps) {
+export function BaseLayout({ previewText, children, unsubscribeUrl, baseUrl }: BaseLayoutProps) {
+  // Get base URL for logo (use provided baseUrl or fallback to env var or default)
+  const siteUrl = baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
+  const logoUrl = `${siteUrl.replace(/\/$/, '')}/images/logo-white.png`
+  
   return (
     <Html>
       <Head />
@@ -29,7 +35,13 @@ export function BaseLayout({ previewText, children, unsubscribeUrl }: BaseLayout
         <Container style={containerStyle}>
           {/* Header */}
           <Section style={headerStyle}>
-            <Text style={logoStyle}>LootAura</Text>
+            <Img
+              src={logoUrl}
+              alt="LootAura"
+              width="150"
+              height="40"
+              style={logoImageStyle}
+            />
           </Section>
 
           {/* Content */}
@@ -84,11 +96,11 @@ const headerStyle = {
   textAlign: 'center' as const,
 }
 
-const logoStyle = {
-  color: '#ffffff',
-  fontSize: '24px',
-  fontWeight: 'bold',
-  margin: '0',
+const logoImageStyle = {
+  display: 'block',
+  margin: '0 auto',
+  maxWidth: '150px',
+  height: 'auto',
 }
 
 const contentStyle = {

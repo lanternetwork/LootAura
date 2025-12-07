@@ -46,7 +46,7 @@ export function FavoriteSalesStartingSoonDigestEmail({
     : `A sale you saved is starting soon: ${sales[0]?.saleTitle}`
 
   return (
-    <BaseLayout previewText={previewText} unsubscribeUrl={unsubscribeUrl}>
+    <BaseLayout previewText={previewText} unsubscribeUrl={unsubscribeUrl} baseUrl={_baseUrl}>
       <Heading style={headingStyle}>
         {isMultiple
           ? `You have ${sales.length} saved sales starting soon ⏰`

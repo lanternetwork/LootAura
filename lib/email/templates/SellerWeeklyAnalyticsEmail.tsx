@@ -50,6 +50,7 @@ export function SellerWeeklyAnalyticsEmail({
     <BaseLayout
       previewText={`Your LootAura weekly summary: ${totalViews} views, ${totalSaves} saves`}
       unsubscribeUrl={unsubscribeUrl}
+      baseUrl={baseUrl}
     >
       <Heading style={headingStyle}>
         Your LootAura weekly summary

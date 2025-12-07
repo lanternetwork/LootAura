@@ -156,16 +156,18 @@ async function archiveEndedSales(
   // Get admin DB client (bypasses RLS)
   const db = getAdminDb()
   const now = new Date()
-  const today = now.toISOString().split('T')[0] // YYYY-MM-DD format
+  // Use UTC date to avoid timezone issues
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  const todayStr = today.toISOString().split('T')[0] // YYYY-MM-DD format
 
   // Find sales that should be archived:
   // - status is 'published' or 'active'
-  // - (end_date < today OR (end_date IS NULL AND date_start < today))
+  // - (end_date <= today OR (end_date IS NULL AND date_start < today))
   // - archived_at IS NULL (not already archived)
   // Note: We need to fetch all published/active sales and filter in memory
   // because PostgREST doesn't easily support complex OR conditions
   const { data: allSales, error: queryError } = await fromBase(db, 'sales')
-    .select('id, title, date_start, date_end, status')
+    .select('id, title, date_start, date_end, status, archived_at')
     .in('status', ['published', 'active'])
     .is('archived_at', null)
 
@@ -186,35 +188,53 @@ async function archiveEndedSales(
   // - Sales without date_end but with date_start < today (single-day sales that started in the past)
   const salesToArchive = (allSales || []).filter((sale: any) => {
     if (sale.date_end) {
+      // Parse date_end and compare properly
+      const endDate = new Date(sale.date_end + 'T00:00:00Z')
       // Archive if end date is today or in the past
-      return sale.date_end <= today
+      return endDate <= today
     }
     // If no end_date, check if start_date is in the past (single-day sale)
     if (sale.date_start) {
+      // Parse date_start and compare properly
+      const startDate = new Date(sale.date_start + 'T00:00:00Z')
       // Archive if start date is before today (sale already happened)
-      return sale.date_start < today
+      return startDate < today
     }
     // If no dates at all, don't archive (shouldn't happen for published sales)
     return false
   })
 
   // Log details about what we found for debugging
-  if (process.env.NEXT_PUBLIC_DEBUG === 'true' || process.env.NODE_ENV !== 'production') {
-    logger.info('Archive sales filtering details', withOpId({
-      component: 'api/cron/daily',
-      task: 'archive-sales',
-      today,
-      totalSales: allSales?.length || 0,
-      salesToArchiveCount: salesToArchive.length,
-      sampleSales: salesToArchive.slice(0, 3).map((s: any) => ({
+  logger.info('Archive sales filtering details', withOpId({
+    component: 'api/cron/daily',
+    task: 'archive-sales',
+    today: todayStr,
+    totalSales: allSales?.length || 0,
+    salesToArchiveCount: salesToArchive.length,
+    sampleSalesToArchive: salesToArchive.slice(0, 5).map((s: any) => ({
+      id: s.id,
+      title: s.title?.substring(0, 50),
+      date_start: s.date_start,
+      date_end: s.date_end,
+      status: s.status,
+    })),
+    // Also log some sales that weren't archived (for debugging)
+    sampleSalesNotArchived: (allSales || [])
+      .filter((s: any) => !salesToArchive.some((a: any) => a.id === s.id))
+      .slice(0, 5)
+      .map((s: any) => ({
         id: s.id,
-        title: s.title,
+        title: s.title?.substring(0, 50),
         date_start: s.date_start,
         date_end: s.date_end,
         status: s.status,
+        reason: s.date_end 
+          ? `date_end (${s.date_end}) > today (${todayStr})`
+          : s.date_start
+          ? `date_start (${s.date_start}) >= today (${todayStr})`
+          : 'no dates',
       })),
-    }))
-  }
+  }))
 
   const salesToArchiveCount = salesToArchive?.length || 0
 

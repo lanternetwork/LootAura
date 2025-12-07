@@ -170,7 +170,10 @@ async function archiveEndedSales(
     .is('archived_at', null)
 
   if (queryError) {
-    logger.error('Failed to query sales for archiving', queryError instanceof Error ? queryError : new Error(String(queryError)), withOpId({
+    const errorMessage = queryError && typeof queryError === 'object' && 'message' in queryError
+      ? String(queryError.message)
+      : String(queryError)
+    logger.error('Failed to query sales for archiving', new Error(errorMessage), withOpId({
       component: 'api/cron/daily',
       task: 'archive-sales',
       error: queryError,
@@ -192,15 +195,6 @@ async function archiveEndedSales(
     // If no dates at all, don't archive (shouldn't happen for published sales)
     return false
   })
-
-  if (queryError) {
-    logger.error('Failed to query sales for archiving', queryError instanceof Error ? queryError : new Error(String(queryError)), withOpId({
-      component: 'api/cron/daily',
-      task: 'archive-sales',
-      error: queryError,
-    }))
-    throw new Error('Failed to query sales')
-  }
 
   const salesToArchiveCount = salesToArchive?.length || 0
 

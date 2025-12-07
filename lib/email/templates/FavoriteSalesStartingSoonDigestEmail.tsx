@@ -47,7 +47,7 @@ export function FavoriteSalesStartingSoonDigestEmail({
     : `A sale you saved is starting soon: ${sales[0]?.saleTitle}`
 
   return (
-    <BaseLayout previewText={previewText}>
+    <BaseLayout previewText={previewText} unsubscribeUrl={unsubscribeUrl}>
       <Heading style={headingStyle}>
         {isMultiple
           ? `You have ${sales.length} saved sales starting soon ⏰`
@@ -93,19 +93,6 @@ export function FavoriteSalesStartingSoonDigestEmail({
           )}
         </Section>
       ))}
-
-      {/* Canonical footer with unsubscribe link */}
-      <Text style={footerNoteStyle}>
-        You're receiving this email because you're subscribed to LootAura notifications.{' '}
-        {unsubscribeUrl && (
-          <>
-            To unsubscribe from all non-administrative emails,{' '}
-            <Link href={unsubscribeUrl} style={linkStyle}>
-              click here
-            </Link>.
-          </>
-        )}
-      </Text>
     </BaseLayout>
   )
 }
@@ -192,17 +179,5 @@ const dividerTextStyle = {
   color: '#cccccc',
   fontSize: '16px',
   margin: '0',
-}
-
-const footerNoteStyle = {
-  color: '#666666',
-  fontSize: '14px',
-  lineHeight: '20px',
-  margin: '24px 0 0 0',
-}
-
-const linkStyle = {
-  color: '#3A2268',
-  textDecoration: 'underline',
 }
 

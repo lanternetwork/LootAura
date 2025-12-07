@@ -16,9 +16,10 @@ import {
 export interface BaseLayoutProps {
   previewText?: string
   children: React.ReactNode
+  unsubscribeUrl?: string
 }
 
-export function BaseLayout({ previewText, children }: BaseLayoutProps) {
+export function BaseLayout({ previewText, children, unsubscribeUrl }: BaseLayoutProps) {
   return (
     <Html>
       <Head />
@@ -35,15 +36,27 @@ export function BaseLayout({ previewText, children }: BaseLayoutProps) {
             {children}
           </Section>
 
-          {/* Footer */}
+          {/* Footer - Conditional based on unsubscribeUrl */}
           <Section style={footerStyle}>
-            <Text style={footerTextStyle}>
-              You received this email from LootAura. Visit{' '}
-              <Link href="https://lootaura.com" style={linkStyle}>
-                lootaura.com
-              </Link>{' '}
-              to manage your account.
-            </Text>
+            {unsubscribeUrl ? (
+              // Mode A: Non-admin / marketing (unsubscribe)
+              <Text style={footerTextStyle}>
+                You're receiving this email because you're subscribed to LootAura notifications.{' '}
+                To unsubscribe from all non-administrative emails,{' '}
+                <Link href={unsubscribeUrl} style={linkStyle}>
+                  click here
+                </Link>.
+              </Text>
+            ) : (
+              // Mode B: Admin / transactional (account-only)
+              <Text style={footerTextStyle}>
+                You received this email from LootAura. Visit{' '}
+                <Link href="https://lootaura.com" style={linkStyle}>
+                  lootaura.com
+                </Link>{' '}
+                to manage your account.
+              </Text>
+            )}
           </Section>
         </Container>
       </Body>

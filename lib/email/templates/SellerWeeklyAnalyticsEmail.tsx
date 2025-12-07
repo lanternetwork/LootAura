@@ -50,6 +50,7 @@ export function SellerWeeklyAnalyticsEmail({
   return (
     <BaseLayout
       previewText={`Your LootAura weekly summary: ${totalViews} views, ${totalSaves} saves`}
+      unsubscribeUrl={unsubscribeUrl}
     >
       <Heading style={headingStyle}>
         Your LootAura weekly summary
@@ -113,19 +114,6 @@ export function SellerWeeklyAnalyticsEmail({
 
       <Text style={textStyle}>
         Keep creating great listings to reach more buyers in your area!
-      </Text>
-
-      {/* Canonical footer with unsubscribe link */}
-      <Text style={footerNoteStyle}>
-        You're receiving this email because you're subscribed to LootAura notifications.{' '}
-        {unsubscribeUrl && (
-          <>
-            To unsubscribe from all non-administrative emails,{' '}
-            <Link href={unsubscribeUrl} style={linkStyle}>
-              click here
-            </Link>.
-          </>
-        )}
       </Text>
     </BaseLayout>
   )
@@ -234,17 +222,5 @@ const buttonStyle = {
   lineHeight: '44px',
   padding: '0 32px',
   textDecoration: 'none',
-}
-
-const footerNoteStyle = {
-  color: '#666666',
-  fontSize: '14px',
-  lineHeight: '20px',
-  margin: '24px 0 0 0',
-}
-
-const linkStyle = {
-  color: '#3A2268',
-  textDecoration: 'underline',
 }
 

@@ -402,7 +402,7 @@ export default function ProfileClient() {
                 'Content-Type': 'application/json',
                 ...getCsrfHeaders(),
               },
-              body: JSON.stringify({ status: 'completed' }),
+              body: JSON.stringify({ status: 'archived' }),
             })
             if (res.ok) {
               // Reload listings

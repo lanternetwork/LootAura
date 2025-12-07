@@ -324,6 +324,15 @@ async function salesHandler(request: NextRequest) {
       }
     }
     
+    // "Any time" now means "any time in the future" - filter for end_date >= today
+    // This ensures archived/past sales never appear on the map
+    if (dateRange === 'any' && !startDateParam && !endDateParam) {
+      const today = new Date()
+      today.setUTCHours(0, 0, 0, 0)
+      startDateParam = today.toISOString().split('T')[0] // YYYY-MM-DD format
+      // No endDateParam means "unlimited future" - sales with end_date >= today
+    }
+    
     // Ensure latitude and longitude are defined before use
     if (latitude === undefined || longitude === undefined) {
       logger.error('Invalid state: latitude or longitude undefined', undefined, {
@@ -403,6 +412,8 @@ async function salesHandler(request: NextRequest) {
         .lte('lat', maxLat)
         .gte('lng', minLng)
         .lte('lng', maxLng)
+        // Exclude archived sales from public map/list/search
+        .in('status', ['published', 'active'])
       
       // NOTE: We filter by date window after fetching to avoid PostgREST OR-composition issues
       
@@ -526,6 +537,16 @@ async function salesHandler(request: NextRequest) {
         .filter((sale) => {
           if (!sale) return false
           if (!windowStart && !windowEnd) return true
+          
+          // For "any time in the future" (windowStart set, windowEnd null):
+          // Filter for sales where end_date >= today (sale hasn't ended yet)
+          if (windowStart && !windowEnd) {
+            const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
+            if (!saleEnd) return false // Exclude sales without end_date
+            return saleEnd >= windowStart // Sale ends today or later
+          }
+          
+          // For specific date ranges, use overlap logic
           // Build sale start/end
           const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null
           const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
@@ -678,6 +699,16 @@ async function salesHandler(request: NextRequest) {
           // date window overlap (exclude undated when window set)
           .filter((row: any) => {
             if (!windowStart && !windowEnd) return true
+            
+            // For "any time in the future" (windowStart set, windowEnd null):
+            // Filter for sales where end_date >= today (sale hasn't ended yet)
+            if (windowStart && !windowEnd) {
+              const saleEnd = row.date_end ? new Date(`${row.date_end}T${row.time_end || '23:59:59'}`) : null
+              if (!saleEnd) return false // Exclude sales without end_date
+              return saleEnd >= windowStart // Sale ends today or later
+            }
+            
+            // For specific date ranges, use overlap logic
             const saleStart = row.date_start ? new Date(`${row.date_start}T${row.time_start || '00:00:00'}`) : null
             const saleEnd = row.date_end ? new Date(`${row.date_end}T${row.time_end || '23:59:59'}`) : null
             if (!saleStart && !saleEnd) return false

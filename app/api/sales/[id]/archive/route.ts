@@ -16,12 +16,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!user?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   
   const saleId = params.id
-  const { status } = await req.json().catch(() => ({ status: 'completed' }))
+  const body = await req.json().catch(() => ({}))
+  const requestedStatus = body.status || 'archived'
+  
+  // Ensure we use 'archived' status (not 'completed')
+  const status = requestedStatus === 'completed' ? 'archived' : requestedStatus
   
   // Write to base table using schema-scoped client
   const db = getRlsDb()
+  const updateData: { status: string; archived_at?: string } = { status }
+  
+  // Set archived_at timestamp when archiving
+  if (status === 'archived') {
+    updateData.archived_at = new Date().toISOString()
+  }
+  
   const { data, error } = await fromBase(db, 'sales')
-    .update({ status })
+    .update(updateData)
     .eq('id', saleId)
     .eq('owner_id', user.user.id)
     .select()

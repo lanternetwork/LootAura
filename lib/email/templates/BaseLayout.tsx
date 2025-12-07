@@ -25,7 +25,7 @@ export interface BaseLayoutProps {
 export function BaseLayout({ previewText, children, unsubscribeUrl, baseUrl }: BaseLayoutProps) {
   // Get base URL for logo (use provided baseUrl or fallback to env var or default)
   const siteUrl = baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
-  const logoUrl = `${siteUrl.replace(/\/$/, '')}/images/logo-white.png`
+  const logoUrl = `${siteUrl.replace(/\/$/, '')}/sitelogo.svg`
   
   return (
     <Html>
@@ -35,13 +35,16 @@ export function BaseLayout({ previewText, children, unsubscribeUrl, baseUrl }: B
         <Container style={containerStyle}>
           {/* Header */}
           <Section style={headerStyle}>
-            <Img
-              src={logoUrl}
-              alt="LootAura"
-              width="150"
-              height="40"
-              style={logoImageStyle}
-            />
+            <div style={logoContainerStyle}>
+              <Img
+                src={logoUrl}
+                alt="LootAura"
+                width="32"
+                height="32"
+                style={logoImageStyle}
+              />
+              <Text style={logoTextStyle}>LootAura</Text>
+            </div>
           </Section>
 
           {/* Content */}
@@ -96,11 +99,26 @@ const headerStyle = {
   textAlign: 'center' as const,
 }
 
+const logoContainerStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '8px',
+}
+
 const logoImageStyle = {
   display: 'block',
-  margin: '0 auto',
-  maxWidth: '150px',
-  height: 'auto',
+  width: '32px',
+  height: '32px',
+  verticalAlign: 'middle',
+}
+
+const logoTextStyle = {
+  color: '#ffffff',
+  fontSize: '24px',
+  fontWeight: 'bold',
+  margin: '0',
+  verticalAlign: 'middle',
 }
 
 const contentStyle = {

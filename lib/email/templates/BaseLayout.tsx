@@ -35,19 +35,30 @@ export function BaseLayout({ previewText, children, unsubscribeUrl, baseUrl }: B
         <Container style={containerStyle}>
           {/* Header */}
           <Section style={headerStyle}>
-            <table width="100%" cellPadding="0" cellSpacing="0" border="0" style={{ margin: '0 auto' }}>
+            <table
+              role="presentation"
+              cellPadding="0"
+              cellSpacing="0"
+              border={0}
+              style={tableStyle}
+            >
               <tbody>
                 <tr>
                   <td align="center" style={{ verticalAlign: 'middle' }}>
-                    <table cellPadding="0" cellSpacing="0" border="0">
+                    <table
+                      role="presentation"
+                      cellPadding="0"
+                      cellSpacing="0"
+                      border={0}
+                    >
                       <tbody>
                         <tr>
                           <td style={{ verticalAlign: 'middle', paddingRight: '8px' }}>
                             <Img
                               src={logoUrl}
                               alt="LootAura"
-                              width="32"
-                              height="32"
+                              width={32}
+                              height={32}
                               style={logoImageStyle}
                             />
                           </td>
@@ -113,6 +124,11 @@ const headerStyle = {
   backgroundColor: '#3A2268',
   padding: '24px',
   textAlign: 'center' as const,
+}
+
+const tableStyle = {
+  width: '100%',
+  margin: '0 auto',
 }
 
 const logoImageStyle = {

@@ -35,16 +35,32 @@ export function BaseLayout({ previewText, children, unsubscribeUrl, baseUrl }: B
         <Container style={containerStyle}>
           {/* Header */}
           <Section style={headerStyle}>
-            <div style={logoContainerStyle}>
-              <Img
-                src={logoUrl}
-                alt="LootAura"
-                width="32"
-                height="32"
-                style={logoImageStyle}
-              />
-              <Text style={logoTextStyle}>LootAura</Text>
-            </div>
+            <table width="100%" cellPadding="0" cellSpacing="0" border="0" style={{ margin: '0 auto' }}>
+              <tbody>
+                <tr>
+                  <td align="center" style={{ verticalAlign: 'middle' }}>
+                    <table cellPadding="0" cellSpacing="0" border="0">
+                      <tbody>
+                        <tr>
+                          <td style={{ verticalAlign: 'middle', paddingRight: '8px' }}>
+                            <Img
+                              src={logoUrl}
+                              alt="LootAura"
+                              width="32"
+                              height="32"
+                              style={logoImageStyle}
+                            />
+                          </td>
+                          <td style={{ verticalAlign: 'middle' }}>
+                            <Text style={logoTextStyle}>LootAura</Text>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </Section>
 
           {/* Content */}
@@ -99,18 +115,10 @@ const headerStyle = {
   textAlign: 'center' as const,
 }
 
-const logoContainerStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '8px',
-}
-
 const logoImageStyle = {
   display: 'block',
   width: '32px',
   height: '32px',
-  verticalAlign: 'middle',
 }
 
 const logoTextStyle = {

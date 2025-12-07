@@ -60,7 +60,7 @@ async function handleRequest(request: NextRequest) {
 
     // Task 1: Auto-archive sales that have ended
     try {
-      const archiveResult = await archiveEndedSales(withOpId, runAt, env)
+      const archiveResult = await archiveEndedSales(withOpId)
       results.tasks.archiveSales = archiveResult
     } catch (error) {
       logger.error('Archive sales task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
@@ -87,11 +87,10 @@ async function handleRequest(request: NextRequest) {
           reason: 'emails_disabled',
         }
       } else {
-        const favoritesResult = await processFavoriteSalesStartingSoonJob()
+        const favoritesResult = await processFavoriteSalesStartingSoonJob({})
         results.tasks.favoritesStartingSoon = {
-          ok: favoritesResult.ok,
-          emailsSent: favoritesResult.emailsSent || 0,
-          errors: favoritesResult.errors || 0,
+          ok: favoritesResult.success,
+          error: favoritesResult.error,
         }
       }
     } catch (error) {
@@ -147,9 +146,7 @@ async function handleRequest(request: NextRequest) {
 }
 
 async function archiveEndedSales(
-  withOpId: (context?: any) => any,
-  runAt: string,
-  env: string
+  withOpId: (context?: any) => any
 ): Promise<any> {
   logger.info('Starting archive sales task', withOpId({
     component: 'api/cron/daily',

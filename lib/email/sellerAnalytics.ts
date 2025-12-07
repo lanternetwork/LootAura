@@ -116,12 +116,40 @@ export async function sendSellerWeeklyAnalyticsEmail(
         const { createUnsubscribeToken, buildUnsubscribeUrl } = await import('./unsubscribeTokens')
         const token = await createUnsubscribeToken(profileId)
         unsubscribeUrl = buildUnsubscribeUrl(token, baseUrl)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[EMAIL_SELLER_ANALYTICS] Generated unsubscribe URL successfully', {
+            profileId,
+            hasUnsubscribeUrl: !!unsubscribeUrl,
+          })
+        }
       } catch (error) {
         // Log but don't fail - email can still be sent without unsubscribe link
+        const errorMessage = error instanceof Error ? error.message : String(error)
         console.error('[EMAIL_SELLER_ANALYTICS] Failed to generate unsubscribe token:', {
           profileId,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined,
         })
+        
+        // In non-production environments, if token generation fails (e.g., test profileId doesn't exist),
+        // generate a test token URL for display purposes (won't work but shows the link in email)
+        if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { buildUnsubscribeUrl } = await import('./unsubscribeTokens')
+          // Generate a test token for display (won't work but shows the link)
+          const testToken = 'test-token-' + profileId.substring(0, 8)
+          unsubscribeUrl = buildUnsubscribeUrl(testToken, baseUrl)
+          console.warn('[EMAIL_SELLER_ANALYTICS] Using test unsubscribe URL (token generation failed, likely profileId does not exist):', {
+            profileId,
+            testToken: testToken.substring(0, 20) + '...',
+          })
+        } else {
+          // In production, log a warning that unsubscribe link will be missing
+          console.warn('[EMAIL_SELLER_ANALYTICS] Email will be sent without unsubscribe link. This may be because the profileId does not exist in the database.')
+        }
+      }
+    } else {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[EMAIL_SELLER_ANALYTICS] No profileId provided, skipping unsubscribe token generation')
       }
     }
 

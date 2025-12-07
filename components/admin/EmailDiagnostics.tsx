@@ -41,6 +41,7 @@ export default function EmailDiagnostics() {
   const [testEmailLoading, setTestEmailLoading] = useState(false)
   const [testEmailResult, setTestEmailResult] = useState<TestEmailResult | null>(null)
   const [testEmailAddress, setTestEmailAddress] = useState('')
+  const [testEmailType, setTestEmailType] = useState<'sale_created' | 'favorites_digest' | 'seller_weekly'>('sale_created')
 
   useEffect(() => {
     fetchDiagnostics()
@@ -80,7 +81,10 @@ export default function EmailDiagnostics() {
       const response = await fetch('/api/admin/test-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: testEmailAddress }),
+        body: JSON.stringify({ 
+          to: testEmailAddress,
+          emailType: testEmailType,
+        }),
       })
 
       const data = await response.json()
@@ -241,6 +245,15 @@ export default function EmailDiagnostics() {
           <h4 className="text-md font-semibold mb-3">Test Email</h4>
           <div className="space-y-3">
             <div className="flex gap-2">
+              <select
+                value={testEmailType}
+                onChange={(e) => setTestEmailType(e.target.value as 'sale_created' | 'favorites_digest' | 'seller_weekly')}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="sale_created">Sale Created Confirmation</option>
+                <option value="favorites_digest">Favorites Starting Soon Digest</option>
+                <option value="seller_weekly">Seller Weekly Analytics</option>
+              </select>
               <input
                 type="email"
                 value={testEmailAddress}
@@ -272,7 +285,7 @@ export default function EmailDiagnostics() {
               </div>
             )}
             <p className="text-xs text-gray-500">
-              Sends a test "Sale Created Confirmation" email to verify email configuration.
+              Sends a test email of the selected type to verify email configuration and templates.
             </p>
           </div>
         </div>

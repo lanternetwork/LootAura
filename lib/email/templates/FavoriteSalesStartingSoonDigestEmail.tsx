@@ -34,10 +34,11 @@ export function FavoriteSalesStartingSoonDigestEmail({
   recipientName,
   sales,
   hoursBeforeStart,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  baseUrl: _baseUrl = 'https://lootaura.com',
+  baseUrl: _baseUrl = 'https://lootaura.com', // Kept for backward compatibility, unused
   unsubscribeUrl,
 }: FavoriteSalesStartingSoonDigestEmailProps) {
+  // Suppress unused variable warning for backward compatibility
+  void _baseUrl
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
   const isMultiple = sales.length > 1
 

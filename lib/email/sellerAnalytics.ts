@@ -6,6 +6,7 @@
 import React from 'react'
 import { sendEmail } from './sendEmail'
 import { SellerWeeklyAnalyticsEmail, buildSellerWeeklyAnalyticsSubject } from './templates/SellerWeeklyAnalyticsEmail'
+import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import type { SellerWeeklyAnalytics } from '@/lib/data/sellerAnalytics'
 
 export interface SendSellerWeeklyAnalyticsEmailParams {
@@ -113,7 +114,6 @@ export async function sendSellerWeeklyAnalyticsEmail(
     let unsubscribeUrl: string | undefined
     if (profileId) {
       try {
-        const { createUnsubscribeToken, buildUnsubscribeUrl } = await import('./unsubscribeTokens')
         const token = await createUnsubscribeToken(profileId)
         unsubscribeUrl = buildUnsubscribeUrl(token, baseUrl)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -134,7 +134,6 @@ export async function sendSellerWeeklyAnalyticsEmail(
         // In non-production environments, if token generation fails (e.g., test profileId doesn't exist),
         // generate a test token URL for display purposes (won't work but shows the link in email)
         if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          const { buildUnsubscribeUrl } = await import('./unsubscribeTokens')
           // Generate a test token for display (won't work but shows the link)
           const testToken = 'test-token-' + profileId.substring(0, 8)
           unsubscribeUrl = buildUnsubscribeUrl(testToken, baseUrl)

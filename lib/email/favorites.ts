@@ -7,6 +7,7 @@ import React from 'react'
 import { sendEmail } from './sendEmail'
 import { FavoriteSaleStartingSoonEmail, buildFavoriteSaleStartingSoonSubject } from './templates/FavoriteSaleStartingSoonEmail'
 import { FavoriteSalesStartingSoonDigestEmail, buildFavoriteSalesStartingSoonDigestSubject, type SaleDigestItem } from './templates/FavoriteSalesStartingSoonDigestEmail'
+import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import type { Sale } from '@/lib/types'
 
 /**
@@ -319,7 +320,6 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
     let unsubscribeUrl: string | undefined
     if (profileId) {
       try {
-        const { createUnsubscribeToken, buildUnsubscribeUrl } = await import('./unsubscribeTokens')
         const token = await createUnsubscribeToken(profileId)
         unsubscribeUrl = buildUnsubscribeUrl(token, baseUrl)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -340,7 +340,6 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
         // In non-production environments, if token generation fails (e.g., test profileId doesn't exist),
         // generate a test token URL for display purposes (won't work but shows the link in email)
         if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          const { buildUnsubscribeUrl } = await import('./unsubscribeTokens')
           // Generate a test token for display (won't work but shows the link)
           const testToken = 'test-token-' + profileId.substring(0, 8)
           unsubscribeUrl = buildUnsubscribeUrl(testToken, baseUrl)

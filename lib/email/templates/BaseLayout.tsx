@@ -39,7 +39,7 @@ export function BaseLayout({ previewText, children, unsubscribeUrl }: BaseLayout
 
           {/* Footer - Conditional based on unsubscribeUrl */}
           <Section style={footerStyle}>
-            {unsubscribeUrl ? (
+            {unsubscribeUrl && unsubscribeUrl.trim() !== '' ? (
               // Mode A: Non-admin / marketing (unsubscribe)
               <Text style={footerTextStyle}>
                 You're receiving this email because you're subscribed to LootAura notifications.{' '}

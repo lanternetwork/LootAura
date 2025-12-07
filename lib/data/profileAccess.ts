@@ -18,6 +18,8 @@ export interface ProfileData {
   created_at?: string | null
   verified?: boolean | null
   social_links?: SocialLinks | null
+  email_favorites_digest_enabled?: boolean | null
+  email_seller_weekly_enabled?: boolean | null
 }
 
 export interface Metrics7d {
@@ -55,7 +57,7 @@ export async function getUserProfile(
     // Try profiles_v2 view first
     const { data, error } = await supabase
       .from('profiles_v2')
-      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, social_links')
+      .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, social_links, email_favorites_digest_enabled, email_seller_weekly_enabled')
       .eq('id', userId)
       .maybeSingle()
 

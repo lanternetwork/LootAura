@@ -311,11 +311,15 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
     // Build subject line
     const subject = buildFavoriteSalesStartingSoonDigestSubject(digestItems)
 
+    // Build base URL for unsubscribe links
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
+
     // Compose email
     const react = React.createElement(FavoriteSalesStartingSoonDigestEmail, {
       recipientName: userName || null,
       sales: digestItems,
       hoursBeforeStart,
+      baseUrl,
     })
 
     // Send email (non-blocking, errors are logged internally)

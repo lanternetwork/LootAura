@@ -13,6 +13,7 @@ export const CSRF_PROTECTED_ROUTES = [
   '/api/profile/update', // POST
   '/api/profile/avatar', // POST
   '/api/profile/social-links', // POST
+  '/api/profile/notifications', // PUT
   '/api/seller/rating', // POST
   '/api/seller-settings', // POST/PUT
   '/api/drafts', // POST/DELETE

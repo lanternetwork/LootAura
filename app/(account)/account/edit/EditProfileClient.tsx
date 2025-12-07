@@ -7,6 +7,7 @@ import type { SocialLinks } from '@/lib/profile/social'
 import type { ProfileData } from '@/lib/data/profileAccess'
 import ProfileInfoForm from './ProfileInfoForm'
 import SocialLinksForm from './SocialLinksForm'
+import NotificationPreferencesForm from './NotificationPreferencesForm'
 
 interface EditProfileClientProps {
   initialProfile: ProfileData
@@ -62,6 +63,12 @@ export default function EditProfileClient({ initialProfile }: EditProfileClientP
         <SocialLinksForm
           initialLinks={profile.social_links || null}
           onSaved={handleSocialLinksSaved}
+        />
+
+        {/* Notification Preferences Form */}
+        <NotificationPreferencesForm
+          initialProfile={profile}
+          onSaved={handleProfileSaved}
         />
       </div>
     </div>

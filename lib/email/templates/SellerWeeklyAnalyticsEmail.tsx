@@ -8,6 +8,7 @@ import {
   Text,
   Heading,
   Button,
+  Link,
 } from '@react-email/components'
 import { BaseLayout } from './BaseLayout'
 
@@ -26,6 +27,7 @@ export interface SellerWeeklyAnalyticsEmailProps {
   dashboardUrl: string
   weekStart: string
   weekEnd: string
+  baseUrl?: string
 }
 
 export function SellerWeeklyAnalyticsEmail({
@@ -37,6 +39,7 @@ export function SellerWeeklyAnalyticsEmail({
   dashboardUrl,
   weekStart,
   weekEnd,
+  baseUrl = 'https://lootaura.com',
 }: SellerWeeklyAnalyticsEmailProps) {
   const greeting = ownerDisplayName ? `Hi ${ownerDisplayName},` : 'Hi there,'
   const ctr = totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(1) : '0.0'
@@ -107,6 +110,14 @@ export function SellerWeeklyAnalyticsEmail({
 
       <Text style={textStyle}>
         Keep creating great listings to reach more buyers in your area!
+      </Text>
+
+      <Text style={footerNoteStyle}>
+        You're receiving this email because you opted in to LootAura notifications.{' '}
+        You can manage your email preferences at any time:{' '}
+        <Link href={`${baseUrl}/account/edit`} style={linkStyle}>
+          Manage notification preferences
+        </Link>.
       </Text>
     </BaseLayout>
   )
@@ -215,5 +226,17 @@ const buttonStyle = {
   lineHeight: '44px',
   padding: '0 32px',
   textDecoration: 'none',
+}
+
+const footerNoteStyle = {
+  color: '#666666',
+  fontSize: '14px',
+  lineHeight: '20px',
+  margin: '24px 0 0 0',
+}
+
+const linkStyle = {
+  color: '#3A2268',
+  textDecoration: 'underline',
 }
 

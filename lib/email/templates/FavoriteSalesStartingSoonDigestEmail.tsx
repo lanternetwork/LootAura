@@ -26,12 +26,14 @@ export interface FavoriteSalesStartingSoonDigestEmailProps {
   recipientName?: string | null
   sales: SaleDigestItem[]
   hoursBeforeStart: number
+  baseUrl?: string
 }
 
 export function FavoriteSalesStartingSoonDigestEmail({
   recipientName,
   sales,
   hoursBeforeStart,
+  baseUrl = 'https://lootaura.com',
 }: FavoriteSalesStartingSoonDigestEmailProps) {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
   const isMultiple = sales.length > 1
@@ -95,9 +97,10 @@ export function FavoriteSalesStartingSoonDigestEmail({
       </Text>
 
       <Text style={footerNoteStyle}>
-        Email preferences will be available soon. For now, you can manage your favorites at{' '}
-        <Link href="https://lootaura.com/favorites" style={linkStyle}>
-          lootaura.com/favorites
+        You're receiving this email because you opted in to LootAura notifications.{' '}
+        You can manage your email preferences at any time:{' '}
+        <Link href={`${baseUrl}/account/edit`} style={linkStyle}>
+          Manage notification preferences
         </Link>.
       </Text>
     </BaseLayout>

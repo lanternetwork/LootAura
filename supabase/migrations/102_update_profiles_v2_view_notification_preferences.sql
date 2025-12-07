@@ -25,6 +25,6 @@ SELECT
     email_seller_weekly_enabled
 FROM lootaura_v2.profiles;
 
--- Grant permissions on the view
-GRANT SELECT ON public.profiles_v2 TO anon, authenticated;
+-- Grant permissions on the view (consistent with previous migrations)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.profiles_v2 TO anon, authenticated;
 

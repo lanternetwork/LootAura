@@ -160,13 +160,38 @@ async function archiveEndedSales(
 
   // Find sales that should be archived:
   // - status is 'published' or 'active'
-  // - end_date < today (sale has ended)
+  // - (end_date < today OR (end_date IS NULL AND date_start < today))
   // - archived_at IS NULL (not already archived)
-  const { data: salesToArchive, error: queryError } = await fromBase(db, 'sales')
-    .select('id, title, date_end, status')
+  // Note: We need to fetch all published/active sales and filter in memory
+  // because PostgREST doesn't easily support complex OR conditions
+  const { data: allSales, error: queryError } = await fromBase(db, 'sales')
+    .select('id, title, date_start, date_end, status')
     .in('status', ['published', 'active'])
-    .lt('date_end', today)
     .is('archived_at', null)
+
+  if (queryError) {
+    logger.error('Failed to query sales for archiving', queryError instanceof Error ? queryError : new Error(String(queryError)), withOpId({
+      component: 'api/cron/daily',
+      task: 'archive-sales',
+      error: queryError,
+    }))
+    throw new Error('Failed to query sales')
+  }
+
+  // Filter sales that have ended:
+  // - Sales with date_end < today
+  // - Sales without date_end but with date_start < today (single-day sales)
+  const salesToArchive = (allSales || []).filter((sale: any) => {
+    if (sale.date_end) {
+      return sale.date_end < today
+    }
+    // If no end_date, check if start_date is in the past (single-day sale)
+    if (sale.date_start) {
+      return sale.date_start < today
+    }
+    // If no dates at all, don't archive (shouldn't happen for published sales)
+    return false
+  })
 
   if (queryError) {
     logger.error('Failed to query sales for archiving', queryError instanceof Error ? queryError : new Error(String(queryError)), withOpId({
@@ -198,15 +223,22 @@ async function archiveEndedSales(
     count: salesToArchiveCount,
   }))
 
-  // Archive all matching sales
+  // Archive all matching sales by ID
+  const saleIdsToArchive = salesToArchive.map((s: any) => s.id)
+  if (saleIdsToArchive.length === 0) {
+    return {
+      ok: true,
+      archived: 0,
+      errors: 0,
+    }
+  }
+
   const { data: archivedSales, error: updateError } = await fromBase(db, 'sales')
     .update({
       status: 'archived',
       archived_at: now.toISOString(),
     })
-    .in('status', ['published', 'active'])
-    .lt('date_end', today)
-    .is('archived_at', null)
+    .in('id', saleIdsToArchive)
     .select('id')
 
   if (updateError) {

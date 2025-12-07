@@ -41,8 +41,10 @@ export async function createUnsubscribeToken(profileId: string): Promise<string>
     console.error('[UNSUBSCRIBE_TOKEN] Failed to create unsubscribe token:', {
       profileId,
       error: error.message,
+      errorCode: error.code,
+      errorDetails: error.details,
     })
-    throw new Error('Failed to create unsubscribe token')
+    throw new Error(`Failed to create unsubscribe token: ${error.message}`)
   }
   
   return token

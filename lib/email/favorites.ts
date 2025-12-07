@@ -339,7 +339,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
         
         // In non-production environments, if token generation fails (e.g., test profileId doesn't exist),
         // generate a test token URL for display purposes (won't work but shows the link in email)
-        if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        if (process.env.NODE_ENV !== 'production') {
           // Generate a test token for display (won't work but shows the link)
           const testToken = 'test-token-' + profileId.substring(0, 8)
           unsubscribeUrl = buildUnsubscribeUrl(testToken, baseUrl)

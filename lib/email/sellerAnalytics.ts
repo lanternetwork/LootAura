@@ -15,6 +15,7 @@ export interface SendSellerWeeklyAnalyticsEmailParams {
   weekStart: string
   weekEnd: string
   dashboardUrl?: string
+  profileId?: string // User's profile ID for generating unsubscribe token
 }
 
 export interface SendSellerWeeklyAnalyticsEmailResult {
@@ -82,7 +83,7 @@ function formatDateRange(start: string, end: string): { weekStart: string; weekE
 export async function sendSellerWeeklyAnalyticsEmail(
   params: SendSellerWeeklyAnalyticsEmailParams
 ): Promise<SendSellerWeeklyAnalyticsEmailResult> {
-  const { to, ownerDisplayName, metrics, weekStart, weekEnd, dashboardUrl } = params
+  const { to, ownerDisplayName, metrics, weekStart, weekEnd, dashboardUrl, profileId } = params
 
   // Guard: Validate recipient email
   if (!to || typeof to !== 'string' || to.trim() === '') {
@@ -108,6 +109,22 @@ export async function sendSellerWeeklyAnalyticsEmail(
     const { weekStart: weekStartFormatted, weekEnd: weekEndFormatted } = formatDateRange(weekStart, weekEnd)
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
 
+    // Generate unsubscribe token and URL if profileId is provided
+    let unsubscribeUrl: string | undefined
+    if (profileId) {
+      try {
+        const { createUnsubscribeToken, buildUnsubscribeUrl } = await import('./unsubscribeTokens')
+        const token = await createUnsubscribeToken(profileId)
+        unsubscribeUrl = buildUnsubscribeUrl(token, baseUrl)
+      } catch (error) {
+        // Log but don't fail - email can still be sent without unsubscribe link
+        console.error('[EMAIL_SELLER_ANALYTICS] Failed to generate unsubscribe token:', {
+          profileId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
     // Compose email
     const react = React.createElement(SellerWeeklyAnalyticsEmail, {
       ownerDisplayName,
@@ -125,6 +142,7 @@ export async function sendSellerWeeklyAnalyticsEmail(
       weekStart: weekStartFormatted,
       weekEnd: weekEndFormatted,
       baseUrl,
+      unsubscribeUrl,
     })
 
     // Send email (non-blocking, errors are logged internally)

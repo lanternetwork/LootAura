@@ -27,6 +27,7 @@ export interface FavoriteSalesStartingSoonDigestEmailProps {
   sales: SaleDigestItem[]
   hoursBeforeStart: number
   baseUrl?: string
+  unsubscribeUrl?: string
 }
 
 export function FavoriteSalesStartingSoonDigestEmail({
@@ -34,6 +35,7 @@ export function FavoriteSalesStartingSoonDigestEmail({
   sales,
   hoursBeforeStart,
   baseUrl = 'https://lootaura.com',
+  unsubscribeUrl,
 }: FavoriteSalesStartingSoonDigestEmailProps) {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
   const isMultiple = sales.length > 1
@@ -91,17 +93,17 @@ export function FavoriteSalesStartingSoonDigestEmail({
         </Section>
       ))}
 
-      <Text style={textStyle}>
-        You're receiving this email because you favorited these sales on LootAura.{' '}
-        Visit your favorites to manage your saved sales.
-      </Text>
-
+      {/* Canonical footer with unsubscribe link */}
       <Text style={footerNoteStyle}>
-        You're receiving this email because you opted in to LootAura notifications.{' '}
-        You can manage your email preferences at any time:{' '}
-        <Link href={`${baseUrl}/account/edit`} style={linkStyle}>
-          Manage notification preferences
-        </Link>.
+        You're receiving this email because you're subscribed to LootAura notifications.{' '}
+        {unsubscribeUrl && (
+          <>
+            To unsubscribe from all non-administrative emails,{' '}
+            <Link href={unsubscribeUrl} style={linkStyle}>
+              click here
+            </Link>.
+          </>
+        )}
       </Text>
     </BaseLayout>
   )

@@ -225,6 +225,7 @@ export interface SendFavoriteSalesStartingSoonDigestEmailParams {
   userName?: string | null
   hoursBeforeStart: number
   timezone?: string
+  profileId?: string // User's profile ID for generating unsubscribe token
 }
 
 export interface SendFavoriteSalesStartingSoonDigestEmailResult {
@@ -247,7 +248,7 @@ export interface SendFavoriteSalesStartingSoonDigestEmailResult {
 export async function sendFavoriteSalesStartingSoonDigestEmail(
   params: SendFavoriteSalesStartingSoonDigestEmailParams
 ): Promise<SendFavoriteSalesStartingSoonDigestEmailResult> {
-  const { to, sales, userName, hoursBeforeStart, timezone = 'America/New_York' } = params
+  const { to, sales, userName, hoursBeforeStart, timezone = 'America/New_York', profileId } = params
 
   // Guard: Validate recipient email
   if (!to || typeof to !== 'string' || to.trim() === '') {
@@ -314,12 +315,29 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
     // Build base URL for unsubscribe links
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
 
+    // Generate unsubscribe token and URL if profileId is provided
+    let unsubscribeUrl: string | undefined
+    if (profileId) {
+      try {
+        const { createUnsubscribeToken, buildUnsubscribeUrl } = await import('./unsubscribeTokens')
+        const token = await createUnsubscribeToken(profileId)
+        unsubscribeUrl = buildUnsubscribeUrl(token, baseUrl)
+      } catch (error) {
+        // Log but don't fail - email can still be sent without unsubscribe link
+        console.error('[EMAIL_FAVORITES] Failed to generate unsubscribe token:', {
+          profileId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
     // Compose email
     const react = React.createElement(FavoriteSalesStartingSoonDigestEmail, {
       recipientName: userName || null,
       sales: digestItems,
       hoursBeforeStart,
       baseUrl,
+      unsubscribeUrl,
     })
 
     // Send email (non-blocking, errors are logged internally)

@@ -74,7 +74,7 @@ export function BaseLayout({ previewText, children, unsubscribeUrl, baseUrl }: B
               // Mode A: Non-admin / marketing (unsubscribe)
               <Text style={footerTextStyle}>
                 You're receiving this email because you're subscribed to LootAura notifications.{' '}
-                To unsubscribe from all non-administrative emails,{' '}
+                To unsubscribe,{' '}
                 <Link href={unsubscribeUrl} style={linkStyle}>
                   click here
                 </Link>.

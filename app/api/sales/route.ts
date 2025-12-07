@@ -539,11 +539,23 @@ async function salesHandler(request: NextRequest) {
           if (!windowStart && !windowEnd) return true
           
           // For "any time in the future" (windowStart set, windowEnd null):
-          // Filter for sales where end_date >= today (sale hasn't ended yet)
+          // Filter for sales that haven't ended yet (end_date >= today) or are ongoing (no end_date but start_date >= today)
           if (windowStart && !windowEnd) {
+            const saleStart = sale.date_start ? new Date(`${sale.date_start}T${sale.time_start || '00:00:00'}`) : null
             const saleEnd = sale.date_end ? new Date(`${sale.date_end}T${sale.time_end || '23:59:59'}`) : null
-            if (!saleEnd) return false // Exclude sales without end_date
-            return saleEnd >= windowStart // Sale ends today or later
+            
+            // If sale has an end_date, check if it ends today or later
+            if (saleEnd) {
+              return saleEnd >= windowStart
+            }
+            
+            // If sale has no end_date, treat as ongoing - include if it starts today or in the future
+            if (saleStart) {
+              return saleStart >= windowStart
+            }
+            
+            // No date information - exclude
+            return false
           }
           
           // For specific date ranges, use overlap logic

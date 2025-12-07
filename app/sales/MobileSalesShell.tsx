@@ -7,9 +7,11 @@ import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
+import MobileRecenterButton from '@/components/location/MobileRecenterButton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
+import { isPointInsideBounds } from '@/lib/map/bounds'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -33,6 +35,7 @@ interface MobileSalesShellProps {
   visibleSales: Sale[]
   loading: boolean
   isFetching?: boolean // Track if a buffer update is in progress
+  hasCompletedInitialLoad?: boolean // Track if initial load has completed
   
   // Filter props
   filters: {
@@ -49,6 +52,9 @@ interface MobileSalesShellProps {
   
   // Hybrid result for location-based pin selection
   hybridResult?: HybridPinsResult | null
+  
+  // User location for recenter button visibility
+  userLocation: { lat: number; lng: number } | null
 }
 
 /**
@@ -73,6 +79,7 @@ export default function MobileSalesShell({
   visibleSales,
   loading,
   isFetching = false,
+  hasCompletedInitialLoad = false,
   filters,
   onFiltersChange,
   onClearFilters,
@@ -80,7 +87,8 @@ export default function MobileSalesShell({
   onZipError,
   zipError,
   hasActiveFilters,
-  hybridResult
+  hybridResult,
+  userLocation
 }: MobileSalesShellProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -213,6 +221,78 @@ export default function MobileSalesShell({
   const handleToggleMode = useCallback(() => {
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
+
+  // Calculate visibility of recenter button - only show when user location is outside viewport
+  const shouldShowRecenterButton = useMemo(() => {
+    if (!userLocation || !mapView?.bounds) return false
+    
+    const point: [number, number] = [userLocation.lng, userLocation.lat]
+    return !isPointInsideBounds(point, mapView.bounds)
+  }, [userLocation, mapView?.bounds])
+
+  // Handle re-center - animate map to user location using mapRef
+  const handleRecenter = useCallback(() => {
+    if (!userLocation || !mapRef.current) return
+    
+    const map = mapRef.current.getMap?.()
+    if (!map) return
+
+    // Default zoom for 10-mile distance (matches distanceToZoom logic)
+    const DEFAULT_ZOOM = 12
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MOBILE_RECENTER] Animating to user location:', userLocation, 'zoom:', DEFAULT_ZOOM)
+    }
+
+    // Calculate bounds for the new viewport (approximate for zoom 12)
+    const latRange = 0.11 // ~10 miles at mid-latitudes
+    const lngRange = latRange * Math.cos(userLocation.lat * Math.PI / 180)
+    const newBounds = {
+      west: userLocation.lng - lngRange / 2,
+      south: userLocation.lat - latRange / 2,
+      east: userLocation.lng + lngRange / 2,
+      north: userLocation.lat + latRange / 2
+    }
+
+    // Calculate distance to determine appropriate duration
+    const currentCenter = map.getCenter()
+    const currentLat = currentCenter.lat
+    const currentLng = currentCenter.lng
+    const distance = Math.sqrt(
+      Math.pow((userLocation.lat - currentLat) * 111, 2) + 
+      Math.pow((userLocation.lng - currentLng) * 111 * Math.cos(currentLat * Math.PI / 180), 2)
+    ) // Approximate distance in km
+    
+    // Use longer duration for longer distances (max 3 seconds for very long distances)
+    const duration = Math.min(3000, Math.max(1000, distance * 50))
+
+    // Listen for moveend event to know when flyTo animation completes
+    // Use once() to automatically remove listener after it fires
+    const handleMoveEnd = () => {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MOBILE_RECENTER] Animation completed, updating viewport state')
+      }
+      
+      // Update viewport state after animation completes
+      // This ensures SimpleMap's easeTo doesn't interfere with the flyTo animation
+      onViewportChange({
+        center: userLocation,
+        zoom: DEFAULT_ZOOM,
+        bounds: newBounds
+      })
+    }
+
+    // Add listener before starting animation
+    map.once('moveend', handleMoveEnd)
+
+    // Animate to user location
+    map.flyTo({
+      center: [userLocation.lng, userLocation.lat],
+      zoom: DEFAULT_ZOOM,
+      duration: duration,
+      essential: true
+    })
+  }, [userLocation, onViewportChange])
   
   // Close callout when map is clicked or moved
   const handleMapClick = useCallback(() => {
@@ -335,15 +415,16 @@ export default function MobileSalesShell({
             />
             
             {/* Floating Action Buttons */}
-            <div className="absolute inset-0 pointer-events-none z-10">
-              {/* Filters FAB - Top Left */}
+            <div className="absolute inset-0 pointer-events-none z-[110]">
+              {/* Filters FAB - Top Left - Toggle behavior */}
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  setIsFiltersModalOpen(true)
+                  // Toggle: if open, close (discard changes); if closed, open
+                  setIsFiltersModalOpen(prev => !prev)
                 }}
                 className="absolute top-4 left-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors"
-                aria-label="Open filters"
+                aria-label={isFiltersModalOpen ? "Close filters" : "Open filters"}
               >
                 <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -352,6 +433,12 @@ export default function MobileSalesShell({
                   <span className="absolute top-1 right-1 w-2 h-2 bg-[#F4B63A] rounded-full"></span>
                 )}
               </button>
+              
+              {/* Re-center Map Button - Bottom Right (Mobile only, viewport-aware) */}
+              <MobileRecenterButton
+                visible={shouldShowRecenterButton}
+                onClick={handleRecenter}
+              />
               
               {/* Mode Toggle FAB - Bottom Right */}
               <button
@@ -441,10 +528,16 @@ export default function MobileSalesShell({
               </div>
             )}
             
-            {!loading && visibleSales.length === 0 && (
+            {!loading && hasCompletedInitialLoad && visibleSales.length === 0 && (
               <div className="text-center py-12 px-4">
-                <div className="text-gray-500 mb-4">
+                <div className="text-gray-500 mb-2">
                   No sales found in this area
+                </div>
+                <div className="text-sm text-gray-400 space-y-1 mb-4">
+                  {filters.distance < 10 && <div>Try increasing your distance filter</div>}
+                  {filters.dateRange !== 'any' && <div>Try widening your date range</div>}
+                  {filters.categories.length > 0 && <div>Try clearing category filters</div>}
+                  {(!filters.distance || filters.distance < 10) && filters.dateRange === 'any' && filters.categories.length === 0 && <div>Try zooming out or panning to a different area</div>}
                 </div>
                 <button
                   onClick={() => setIsFiltersModalOpen(true)}
@@ -500,6 +593,23 @@ export default function MobileSalesShell({
         onZipLocationFound={onZipLocationFound}
         onZipError={onZipError}
         zipError={zipError}
+        currentZip={(() => {
+          // Get current ZIP from cookie if available
+          if (typeof document !== 'undefined') {
+            try {
+              const cookies = document.cookie.split(';')
+              const laLocCookie = cookies.find(c => c.trim().startsWith('la_loc='))
+              if (laLocCookie) {
+                const value = laLocCookie.split('=')[1]
+                const parsed = JSON.parse(decodeURIComponent(value))
+                return parsed?.zip || null
+              }
+            } catch {
+              // Ignore parse errors
+            }
+          }
+          return null
+        })()}
       />
     </div>
   )

@@ -48,6 +48,20 @@ vi.mock('@supabase/supabase-js', () => ({
 }))
 
 describe('processFavoriteSalesStartingSoonJob', () => {
+  // Helper to mock profiles query for notification preferences
+  const mockProfilesQuery = (userIds: string[] = ['user-1']) => {
+    return {
+      select: vi.fn(() => ({
+        in: vi.fn(() => ({
+          eq: vi.fn(() => Promise.resolve({
+            data: userIds.map(id => ({ id, email_favorites_digest_enabled: true })),
+            error: null,
+          })),
+        })),
+      })),
+    }
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
@@ -144,7 +158,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
           })),
         })),
       })),
-    }).mockReturnValueOnce({
+    }).mockReturnValueOnce(mockProfilesQuery()).mockReturnValueOnce({
       update: vi.fn(() => ({
         eq: vi.fn(() => ({
           eq: vi.fn(() => Promise.resolve({
@@ -235,7 +249,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
           })),
         })),
       })),
-    })
+    }).mockReturnValueOnce(mockProfilesQuery())
     // Mock update calls - need one for each favorite (2 favorites = 2 update calls)
     const createUpdateChain = () => ({
       eq: vi.fn(() => ({
@@ -329,7 +343,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
           })),
         })),
       })),
-    })
+    }).mockReturnValueOnce(mockProfilesQuery(['user-1', 'user-2']))
     // Mock update calls - need one for each favorite (2 users, 1 favorite each = 2 update calls)
     const createUpdateChain = () => ({
       eq: vi.fn(() => ({
@@ -437,7 +451,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
           })),
         })),
       })),
-    }).mockReturnValueOnce({
+    }).mockReturnValueOnce(mockProfilesQuery()).mockReturnValueOnce({
       update: vi.fn(() => ({
         eq: vi.fn(() => ({
           eq: vi.fn(() => Promise.resolve({
@@ -558,6 +572,24 @@ describe('processFavoriteSalesStartingSoonJob', () => {
         }
       }
 
+      if (table === 'profiles') {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => ({
+              eq: vi.fn(() =>
+                Promise.resolve({
+                  data: [
+                    { id: 'user-1', email_favorites_digest_enabled: true },
+                    { id: 'user-2', email_favorites_digest_enabled: true },
+                  ],
+                  error: null,
+                }),
+              ),
+            })),
+          })),
+        }
+      }
+
       // Fallback: return safe no-op implementations for any unexpected table
       return {
         select: vi.fn(() => ({
@@ -651,7 +683,7 @@ describe('processFavoriteSalesStartingSoonJob', () => {
           })),
         })),
       })),
-    }).mockReturnValueOnce({
+    }).mockReturnValueOnce(mockProfilesQuery()).mockReturnValueOnce({
       update: vi.fn(() => ({
         eq: vi.fn(() => ({
           eq: vi.fn(() => Promise.resolve({

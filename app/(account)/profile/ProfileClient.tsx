@@ -62,7 +62,13 @@ export default function ProfileClient() {
         let p: any = null
         if (profRes.status === 404) {
           // Profile doesn't exist, create it
-          const createRes = await fetch('/api/profile', { method: 'POST' })
+          const createRes = await fetch('/api/profile', { 
+            method: 'POST',
+            headers: {
+              ...getCsrfHeaders(),
+            },
+            credentials: 'include',
+          })
           if (!createRes.ok) {
             const err = await createRes.json().catch(() => ({ error: 'Failed to create profile' }))
             const errorMsg = err?.error || 'Failed to create profile'
@@ -396,7 +402,7 @@ export default function ProfileClient() {
                 'Content-Type': 'application/json',
                 ...getCsrfHeaders(),
               },
-              body: JSON.stringify({ status: 'completed' }),
+              body: JSON.stringify({ status: 'archived' }),
             })
             if (res.ok) {
               // Reload listings

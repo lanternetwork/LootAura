@@ -22,6 +22,26 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   }
 
   const { sale, items } = result
+  
+  // Log items being passed to client (only in debug mode)
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    const { logger } = await import('@/lib/log')
+    logger.debug('Sale detail page rendering', {
+      component: 'sales/[id]/page',
+      saleId: params.id,
+      itemsCount: items.length,
+      saleStatus: sale.status,
+      items: items.map(i => ({ 
+        id: i.id, 
+        name: i.name, 
+        hasPhoto: !!i.photo,
+        photoValue: i.photo ? `${i.photo.substring(0, 50)}...` : null,
+        photoType: typeof i.photo,
+        photoLength: i.photo?.length || 0,
+      })),
+      note: 'Verify photo field is populated and passed to ItemImage component',
+    })
+  }
 
   // Compute union of sale-level categories (tags) and item categories.
   // Normalize tags so we handle both text[] and comma-separated strings safely.

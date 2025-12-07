@@ -45,6 +45,350 @@ function normalizeState(state: string): string {
   return stateMap[stateUpper] || state // Return abbreviation if found, otherwise return original
 }
 
+// Helper function to handle Overpass address lookup with optional fallback
+// This function uses async/await to avoid nested promise chains that confuse TypeScript parser
+async function handleOverpassLookup(
+  query: string,
+  userLat: number | undefined,
+  userLng: number | undefined,
+  currentRequestId: number,
+  requestIdRef: React.MutableRefObject<number>,
+  abortSignal: AbortSignal,
+  setIsLoading: (loading: boolean) => void,
+  setSuggestions: (suggestions: AddressSuggestion[]) => void,
+  setIsOpen: (open: boolean) => void,
+  setSelectedIndex: (index: number) => void,
+  setShowFallbackMessage: (show: boolean) => void,
+  enableFallback: boolean = true // For digits+street: true, for numeric-only: false
+): Promise<void> {
+  try {
+    // Check if request was cancelled before starting
+    if (requestIdRef.current !== currentRequestId) return
+
+    // Call Overpass
+    const response = await fetchOverpassAddresses(
+      query,
+      userLat as number,
+      userLng as number,
+      2,
+      abortSignal
+    )
+
+    // Check if request was cancelled after Overpass call
+    if (requestIdRef.current !== currentRequestId) return
+
+    // Log for debugging (debug only)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const queryType = enableFallback ? 'digits+street' : 'numeric-only'
+      console.log(`[DEBUG] [AddressAutocomplete] Overpass response (${queryType}): ok=${response.ok}, dataCount=${response.data?.length || 0}, userCoords=[${userLat}, ${userLng}]`)
+      if (queryType === 'digits+street') {
+        console.log('[DEBUG] [AddressAutocomplete] Overpass response (digits+street) details:', {
+          ok: response.ok,
+          code: response.code,
+          dataCount: response.data?.length || 0,
+          userCoords: [userLat, userLng],
+          debug: response._debug,
+          fullResponse: response,
+          firstResult: response.data?.[0] ? {
+            label: response.data[0].label,
+            coords: [response.data[0].lat, response.data[0].lng],
+            address: response.data[0].address
+          } : null
+        })
+      } else {
+        if (response.data?.length === 0) {
+          console.warn(`[DEBUG] [AddressAutocomplete] Overpass returned 0 results for prefix "${query}" at [${userLat}, ${userLng}] - will fallback to Nominatim`)
+        }
+        console.log('[DEBUG] [AddressAutocomplete] Overpass response (numeric-only) details:', {
+          ok: response.ok,
+          code: response.code,
+          dataCount: response.data?.length || 0,
+          userCoords: [userLat, userLng],
+          prefix: query,
+          debug: response._debug,
+          fullResponse: response,
+          firstResult: response.data?.[0] ? {
+            label: response.data[0].label,
+            coords: [response.data[0].lat, response.data[0].lng],
+            address: response.data[0].address
+          } : null
+        })
+      }
+    }
+
+    // If Overpass succeeded with results
+    if (response.ok && response.data && response.data.length > 0) {
+      // Deduplicate
+      const unique: AddressSuggestion[] = []
+      const seen = new Set<string>()
+      for (const s of response.data) {
+        const key = s.id
+        if (!seen.has(key)) {
+          seen.add(key)
+          unique.push(s)
+        }
+      }
+
+      // Calculate distances and sort by distance (closest first)
+      const withDistances = unique.map(s => {
+        const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
+        const dy = (s.lat - (userLat as number)) * 111320
+        const distanceM = Math.sqrt(dx * dx + dy * dy)
+        return {
+          suggestion: s,
+          distanceM: distanceM,
+          distanceKm: (distanceM / 1000).toFixed(2)
+        }
+      })
+
+      // Sort by distance (closest first)
+      withDistances.sort((a, b) => a.distanceM - b.distanceM)
+
+      // Extract sorted suggestions
+      const sortedUnique = withDistances.map(item => item.suggestion)
+
+      // Log first result distance
+      if (withDistances.length > 0) {
+        const queryType = enableFallback ? 'digits+street' : 'numeric-only'
+        if (queryType === 'digits+street') {
+          console.log(`[AddressAutocomplete] FIRST RESULT (digits+street): "${withDistances[0].suggestion.label}" - Distance: ${withDistances[0].distanceKm} km (${Math.round(withDistances[0].distanceM)} m)`)
+          if (withDistances.length > 1) {
+            console.log(`[AddressAutocomplete] SECOND RESULT (digits+street): "${withDistances[1].suggestion.label}" - Distance: ${withDistances[1].distanceKm} km (${Math.round(withDistances[1].distanceM)} m)`)
+          }
+        } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log(`[DEBUG] [AddressAutocomplete] FIRST RESULT (numeric-only): "${withDistances[0].suggestion.label}" - Distance: ${withDistances[0].distanceKm} km (${Math.round(withDistances[0].distanceM)} m)`)
+          if (withDistances.length > 1) {
+            console.log(`[DEBUG] [AddressAutocomplete] SECOND RESULT (numeric-only): "${withDistances[1].suggestion.label}" - Distance: ${withDistances[1].distanceKm} km (${Math.round(withDistances[1].distanceM)} m)`)
+          }
+        }
+      }
+
+      // Log detailed results
+      if (enableFallback) {
+        console.log('[AddressAutocomplete] Overpass results with distances (digits+street, sorted):', {
+          count: sortedUnique.length,
+          results: withDistances.map(item => ({
+            label: item.suggestion.label,
+            coords: [item.suggestion.lat, item.suggestion.lng],
+            distanceM: Math.round(item.distanceM),
+            distanceKm: item.distanceKm
+          })),
+          rawResults: sortedUnique.map(s => ({
+            id: s.id,
+            label: s.label,
+            lat: s.lat,
+            lng: s.lng,
+            address: s.address
+          })),
+          debug: response._debug
+        })
+
+        if (process.env.NODE_ENV === 'development' && sortedUnique.length > 0) {
+          console.log('[AddressAutocomplete] Received Overpass addresses (digits+street, sorted by distance)', {
+            count: sortedUnique.length,
+            first: sortedUnique[0]?.label,
+            all: sortedUnique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
+            debug: response._debug
+          })
+        }
+      } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DEBUG] [AddressAutocomplete] Overpass results with distances (numeric-only, sorted):', {
+          count: sortedUnique.length,
+          results: withDistances.map(item => ({
+            label: item.suggestion.label,
+            coords: [item.suggestion.lat, item.suggestion.lng],
+            distanceM: Math.round(item.distanceM),
+            distanceKm: item.distanceKm
+          })),
+          rawResults: sortedUnique.map(s => ({
+            id: s.id,
+            label: s.label,
+            lat: s.lat,
+            lng: s.lng,
+            address: s.address
+          })),
+          debug: response._debug
+        })
+
+        if (sortedUnique.length > 0) {
+          console.log('[DEBUG] [AddressAutocomplete] Received Overpass addresses (sorted by distance)', {
+            count: sortedUnique.length,
+            first: sortedUnique[0]?.label,
+            all: sortedUnique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
+            debug: response._debug
+          })
+        }
+      }
+
+      // Update state
+      if (requestIdRef.current === currentRequestId) {
+        setSuggestions(sortedUnique)
+        setIsOpen(sortedUnique.length > 0)
+        setSelectedIndex(-1)
+        setShowFallbackMessage(false)
+        setIsLoading(false)
+      }
+      return
+    }
+
+    // Overpass failed or returned empty
+    if (enableFallback) {
+      // For digits+street: fallback to Nominatim
+      console.warn(`[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim for "${query}"`)
+      
+      try {
+        const results = await fetchSuggestions(query, userLat, userLng, abortSignal)
+
+        // Check if request was cancelled after fallback call
+        if (requestIdRef.current !== currentRequestId) return
+
+        // Deduplicate
+        const unique: AddressSuggestion[] = []
+        const seen = new Set<string>()
+        for (const s of results) {
+          const key = s.id
+          if (!seen.has(key)) {
+            seen.add(key)
+            unique.push(s)
+          }
+        }
+
+        // Filter to only actual street addresses (with house number or matching street pattern)
+        // For very short street inputs (e.g., 'pr'), skip aggressive filtering to avoid losing valid results
+        const streetInput = (query.match(/^\d+\s+(.+)$/)?.[1] || '').trim()
+        const isShortStreet = streetInput.length > 0 && streetInput.length < 3
+        const filteredUnique = (isShortStreet ? unique : unique.filter(s => {
+          // Include if it has a house number
+          if (s.address?.houseNumber) return true
+          // Include if label matches pattern like "5001 Main St" or starts with number
+          if (s.label.match(/^\d+\s+[A-Za-z]/)) return true
+          // Include if it has a road and label starts with number
+          if (s.address?.road && s.label.match(/^\d+/)) return true
+          return false
+        }))
+
+        // Recalculate distances for filtered results
+        const filteredWithDistances = filteredUnique.map(s => {
+          const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
+          const dy = (s.lat - (userLat as number)) * 111320
+          const distanceM = Math.sqrt(dx * dx + dy * dy)
+          return {
+            suggestion: s,
+            distanceM: distanceM,
+            distanceKm: (distanceM / 1000).toFixed(2)
+          }
+        })
+
+        // Sort by distance (closest first)
+        filteredWithDistances.sort((a, b) => a.distanceM - b.distanceM)
+
+        // Filter by maximum distance (50km) to avoid showing results thousands of km away
+        const MAX_DISTANCE_M = 50 * 1000 // 50km
+        const withinDistance = filteredWithDistances.filter(item => item.distanceM <= MAX_DISTANCE_M)
+
+        console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} total, ${filteredUnique.length} after filtering, ${withinDistance.length} within 50km`)
+        if (withinDistance.length > 0) {
+          console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${withinDistance[0].suggestion.label}" - Distance: ${withinDistance[0].distanceKm} km (${Math.round(withinDistance[0].distanceM)} m)`)
+          if (withinDistance.length > 1) {
+            console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${withinDistance[1].suggestion.label}" - Distance: ${withinDistance[1].distanceKm} km (${Math.round(withinDistance[1].distanceM)} m)`)
+          }
+        } else if (filteredWithDistances.length > 0) {
+          console.warn(`[AddressAutocomplete] All Nominatim results are >50km away. Closest: "${filteredWithDistances[0].suggestion.label}" at ${filteredWithDistances[0].distanceKm} km`)
+        }
+
+        // Extract sorted suggestions (only within distance)
+        const sortedUnique = withinDistance.map(item => item.suggestion)
+
+        // Update state
+        if (requestIdRef.current === currentRequestId) {
+          setSuggestions(sortedUnique)
+          setIsOpen(sortedUnique.length > 0)
+          setSelectedIndex(-1)
+          setShowFallbackMessage(sortedUnique.length > 0)
+          setIsLoading(false)
+        }
+      } catch (fallbackErr) {
+        // Silently handle errors in fallback
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[DEBUG] [AddressAutocomplete] Nominatim fallback failed silently')
+        }
+        // Clear loading if request still matches
+        if (requestIdRef.current === currentRequestId) {
+          setIsLoading(false)
+        }
+      }
+    } else {
+      // For numeric-only: don't fallback, just show no results
+      console.warn(`[AddressAutocomplete] Overpass returned 0 results for numeric-only query "${query}" - showing no results (Nominatim fallback disabled for numeric-only queries)`)
+      if (requestIdRef.current === currentRequestId) {
+        setSuggestions([])
+        setIsOpen(false)
+        setShowFallbackMessage(false)
+        setIsLoading(false)
+      }
+    }
+  } catch (err: any) {
+    // Handle outer errors (Overpass call failed)
+    if (requestIdRef.current !== currentRequestId) return
+    
+    if (err?.name === 'AbortError') {
+      if (requestIdRef.current === currentRequestId) setIsLoading(false)
+      return
+    }
+
+    // For digits+street: fallback to Nominatim on error
+    if (enableFallback) {
+      try {
+        const results = await fetchSuggestions(query, userLat, userLng, abortSignal)
+
+        // Check if request was cancelled after fallback call
+        if (requestIdRef.current !== currentRequestId) return
+
+        // Deduplicate
+        const unique: AddressSuggestion[] = []
+        const seen = new Set<string>()
+        for (const s of results) {
+          const key = s.id
+          if (!seen.has(key)) {
+            seen.add(key)
+            unique.push(s)
+          }
+        }
+
+        // Update state
+        if (requestIdRef.current === currentRequestId) {
+          setSuggestions(unique)
+          setIsOpen(unique.length > 0)
+          setSelectedIndex(-1)
+          setShowFallbackMessage(unique.length > 0)
+          setIsLoading(false)
+        }
+      } catch (fallbackErr: any) {
+        if (requestIdRef.current !== currentRequestId) return
+        if (fallbackErr?.name === 'AbortError') {
+          if (requestIdRef.current === currentRequestId) setIsLoading(false)
+          return
+        }
+        // Final error - log and clear loading
+        console.error('Suggest error:', fallbackErr)
+        if (requestIdRef.current === currentRequestId) {
+          setSuggestions([])
+          setIsOpen(false)
+          setIsLoading(false)
+        }
+      }
+    } else {
+      // For numeric-only: log warning and clear loading on error
+      console.warn(`[AddressAutocomplete] Overpass error for numeric-only query "${query}" - showing no results`)
+      if (requestIdRef.current === currentRequestId) {
+        setSuggestions([])
+        setIsOpen(false)
+        setIsLoading(false)
+      }
+    }
+  }
+}
+
 interface AddressAutocompleteProps {
   value: string
   onChange: (address: string) => void
@@ -223,7 +567,9 @@ export default function AddressAutocomplete({
             // Check if this is a digits+street query and use Overpass
             const digitsStreetMatch = trimmedQuery.match(/^(?<num>\d{1,8})\s+(?<street>[A-Za-z].*)$/)
             if (digitsStreetMatch?.groups && hasCoords) {
-              console.log('[AddressAutocomplete] Google empty, trying Overpass (digits+street)', { q: trimmedQuery, userLat, userLng })
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.log('[DEBUG] [AddressAutocomplete] Google empty, trying Overpass (digits+street)', { q: trimmedQuery, userLat, userLng })
+              }
               return fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
                 .then((response) => {
                   if (requestIdRef.current !== currentId) return
@@ -414,330 +760,46 @@ export default function AddressAutocomplete({
 
     // For digits+street queries with coords, try Overpass first
     if (isDigitsStreet && hasCoords && digitsStreetMatch?.groups) {
-      console.log('[AddressAutocomplete] Fetching Overpass addresses (digits+street)', { q: trimmedQuery, userLat, userLng, hasGroups: !!digitsStreetMatch?.groups })
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DEBUG] [AddressAutocomplete] Fetching Overpass addresses (digits+street)', { q: trimmedQuery, userLat, userLng, hasGroups: !!digitsStreetMatch?.groups })
+      }
       
-      fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
-        .then((response) => {
-          if (requestIdRef.current !== currentId) return
-          
-          // Always log for debugging distance issues
-          console.log(`[AddressAutocomplete] Overpass response (digits+street): ok=${response.ok}, dataCount=${response.data?.length || 0}, userCoords=[${userLat}, ${userLng}]`)
-          console.log('[AddressAutocomplete] Overpass response (digits+street) details:', {
-            ok: response.ok,
-            code: response.code,
-            dataCount: response.data?.length || 0,
-            userCoords: [userLat, userLng],
-            debug: response._debug,
-            fullResponse: response, // Full response for debugging
-            firstResult: response.data?.[0] ? {
-              label: response.data[0].label,
-              coords: [response.data[0].lat, response.data[0].lng],
-              address: response.data[0].address
-            } : null
-          })
-          
-          if (response.ok && response.data && response.data.length > 0) {
-            // Overpass succeeded
-            const unique: AddressSuggestion[] = []
-            const seen = new Set<string>()
-            for (const s of response.data) {
-              const key = s.id
-              if (!seen.has(key)) {
-                seen.add(key)
-                unique.push(s)
-              }
-            }
-            
-            // Calculate distances and sort by distance (closest first)
-            const withDistances = unique.map(s => {
-              const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
-              const dy = (s.lat - (userLat as number)) * 111320
-              const distanceM = Math.sqrt(dx * dx + dy * dy)
-              return {
-                suggestion: s,
-                distanceM: distanceM,
-                distanceKm: (distanceM / 1000).toFixed(2)
-              }
-            })
-            
-            // Sort by distance (closest first)
-            withDistances.sort((a, b) => a.distanceM - b.distanceM)
-            
-            // Extract sorted suggestions
-            const sortedUnique = withDistances.map(item => item.suggestion)
-            
-            // Log first result distance directly for visibility
-            if (withDistances.length > 0) {
-              console.log(`[AddressAutocomplete] FIRST RESULT (digits+street): "${withDistances[0].suggestion.label}" - Distance: ${withDistances[0].distanceKm} km (${Math.round(withDistances[0].distanceM)} m)`)
-              if (withDistances.length > 1) {
-                console.log(`[AddressAutocomplete] SECOND RESULT (digits+street): "${withDistances[1].suggestion.label}" - Distance: ${withDistances[1].distanceKm} km (${Math.round(withDistances[1].distanceM)} m)`)
-              }
-            }
-            
-            console.log('[AddressAutocomplete] Overpass results with distances (digits+street, sorted):', {
-              count: sortedUnique.length,
-              results: withDistances.map(item => ({
-                label: item.suggestion.label,
-                coords: [item.suggestion.lat, item.suggestion.lng],
-                distanceM: Math.round(item.distanceM),
-                distanceKm: item.distanceKm
-              })),
-              rawResults: sortedUnique.map(s => ({
-                id: s.id,
-                label: s.label,
-                lat: s.lat,
-                lng: s.lng,
-                address: s.address
-              })),
-              debug: response._debug
-            })
-            
-            if (process.env.NODE_ENV === 'development' && sortedUnique.length > 0) {
-              console.log('[AddressAutocomplete] Received Overpass addresses (digits+street, sorted by distance)', {
-                count: sortedUnique.length,
-                first: sortedUnique[0]?.label,
-                all: sortedUnique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
-                debug: response._debug
-              })
-            }
-            setSuggestions(sortedUnique)
-            setIsOpen(sortedUnique.length > 0)
-            setSelectedIndex(-1)
-            setShowFallbackMessage(false)
-            if (requestIdRef.current === currentId) setIsLoading(false)
-          } else {
-            // Overpass failed or returned empty - fallback to Nominatim
-            console.warn(`[AddressAutocomplete] Overpass failed/empty (digits+street), falling back to Nominatim for "${trimmedQuery}"`)
-            return fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
-              .then((results) => {
-                if (requestIdRef.current !== currentId) return
-                const unique: AddressSuggestion[] = []
-                const seen = new Set<string>()
-                for (const s of results) {
-                  const key = s.id
-                  if (!seen.has(key)) {
-                    seen.add(key)
-                    unique.push(s)
-                  }
-                }
-                
-                // Calculate and log distances for Nominatim fallback results
-                // Filter to only actual street addresses (with house number or matching street pattern)
-                // For very short street inputs (e.g., 'pr'), skip aggressive filtering to avoid losing valid results
-                const streetInput = (trimmedQuery.match(/^\d+\s+(.+)$/)?.[1] || '').trim()
-                const isShortStreet = streetInput.length > 0 && streetInput.length < 3
-                const filteredUnique = (isShortStreet ? unique : unique.filter(s => {
-                  // Include if it has a house number
-                  if (s.address?.houseNumber) return true
-                  // Include if label matches pattern like "5001 Main St" or starts with number
-                  if (s.label.match(/^\d+\s+[A-Za-z]/)) return true
-                  // Include if it has a road and label starts with number
-                  if (s.address?.road && s.label.match(/^\d+/)) return true
-                  return false
-                }))
-                
-                // Recalculate distances for filtered results
-                const filteredWithDistances = filteredUnique.map(s => {
-                  const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
-                  const dy = (s.lat - (userLat as number)) * 111320
-                  const distanceM = Math.sqrt(dx * dx + dy * dy)
-                  return {
-                    suggestion: s,
-                    distanceM: distanceM,
-                    distanceKm: (distanceM / 1000).toFixed(2)
-                  }
-                })
-                
-                // Sort by distance (closest first)
-                filteredWithDistances.sort((a, b) => a.distanceM - b.distanceM)
-                
-                // Filter by maximum distance (50km) to avoid showing results thousands of km away
-                const MAX_DISTANCE_M = 50 * 1000 // 50km
-                const withinDistance = filteredWithDistances.filter(item => item.distanceM <= MAX_DISTANCE_M)
-                
-                console.log(`[AddressAutocomplete] Nominatim fallback results (digits+street): ${unique.length} total, ${filteredUnique.length} after filtering, ${withinDistance.length} within 50km`)
-                if (withinDistance.length > 0) {
-                  console.log(`[AddressAutocomplete] FIRST RESULT (Nominatim fallback): "${withinDistance[0].suggestion.label}" - Distance: ${withinDistance[0].distanceKm} km (${Math.round(withinDistance[0].distanceM)} m)`)
-                  if (withinDistance.length > 1) {
-                    console.log(`[AddressAutocomplete] SECOND RESULT (Nominatim fallback): "${withinDistance[1].suggestion.label}" - Distance: ${withinDistance[1].distanceKm} km (${Math.round(withinDistance[1].distanceM)} m)`)
-                  }
-                } else if (filteredWithDistances.length > 0) {
-                  console.warn(`[AddressAutocomplete] All Nominatim results are >50km away. Closest: "${filteredWithDistances[0].suggestion.label}" at ${filteredWithDistances[0].distanceKm} km`)
-                }
-                
-                // Extract sorted suggestions (only within distance)
-                const sortedUnique = withinDistance.map(item => item.suggestion)
-                
-                setSuggestions(sortedUnique)
-                setIsOpen(sortedUnique.length > 0)
-                setSelectedIndex(-1)
-                setShowFallbackMessage(sortedUnique.length > 0)
-                if (requestIdRef.current === currentId) setIsLoading(false)
-              })
-          }
-        })
-        .catch((err) => {
-          if (requestIdRef.current !== currentId) return
-          if (err?.name === 'AbortError') {
-            if (requestIdRef.current === currentId) setIsLoading(false)
-            return
-          }
-          
-          // Fallback to Nominatim on error
-          fetchSuggestions(trimmedQuery, userLat, userLng, controller.signal)
-            .then((results) => {
-              if (requestIdRef.current !== currentId) return
-              const unique: AddressSuggestion[] = []
-              const seen = new Set<string>()
-              for (const s of results) {
-                const key = s.id
-                if (!seen.has(key)) {
-                  seen.add(key)
-                  unique.push(s)
-                }
-              }
-              setSuggestions(unique)
-              setIsOpen(unique.length > 0)
-              setSelectedIndex(-1)
-              setShowFallbackMessage(unique.length > 0)
-              if (requestIdRef.current === currentId) setIsLoading(false)
-            })
-            .catch((fallbackErr) => {
-              if (requestIdRef.current !== currentId) return
-              if (fallbackErr?.name === 'AbortError') {
-                if (requestIdRef.current === currentId) setIsLoading(false)
-                return
-              }
-              console.error('Suggest error:', fallbackErr)
-              setSuggestions([])
-              setIsOpen(false)
-              if (requestIdRef.current === currentId) setIsLoading(false)
-            })
-        })
+      // Use async helper to avoid nested promise chains
+      void handleOverpassLookup(
+        trimmedQuery,
+        userLat,
+        userLng,
+        currentId,
+        requestIdRef,
+        controller.signal,
+        setIsLoading,
+        setSuggestions,
+        setIsOpen,
+        setSelectedIndex,
+        setShowFallbackMessage,
+        true // enableFallback = true for digits+street
+      )
     } else if (isNumericOnly && hasCoords) {
       // For numeric-only queries with coords, try Overpass first
       if (process.env.NODE_ENV === 'development') {
         console.log('[AddressAutocomplete] Fetching Overpass addresses', { prefix: trimmedQuery, userLat, userLng })
       }
       
-      fetchOverpassAddresses(trimmedQuery, userLat as number, userLng as number, 2, controller.signal)
-        .then((response) => {
-          if (requestIdRef.current !== currentId) return
-          
-          // Always log for debugging distance issues
-          console.log(`[AddressAutocomplete] Overpass response (numeric-only): ok=${response.ok}, dataCount=${response.data?.length || 0}, userCoords=[${userLat}, ${userLng}], prefix="${trimmedQuery}"`)
-          if (response.data?.length === 0) {
-            console.warn(`[AddressAutocomplete] Overpass returned 0 results for prefix "${trimmedQuery}" at [${userLat}, ${userLng}] - will fallback to Nominatim`)
-          }
-          console.log('[AddressAutocomplete] Overpass response (numeric-only) details:', {
-            ok: response.ok,
-            code: response.code,
-            dataCount: response.data?.length || 0,
-            userCoords: [userLat, userLng],
-            prefix: trimmedQuery,
-            debug: response._debug,
-            fullResponse: response, // Full response for debugging
-            firstResult: response.data?.[0] ? {
-              label: response.data[0].label,
-              coords: [response.data[0].lat, response.data[0].lng],
-              address: response.data[0].address
-            } : null
-          })
-          
-          if (response.ok && response.data && response.data.length > 0) {
-            // Overpass succeeded
-            const unique: AddressSuggestion[] = []
-            const seen = new Set<string>()
-            for (const s of response.data) {
-              const key = s.id
-              if (!seen.has(key)) {
-                seen.add(key)
-                unique.push(s)
-              }
-            }
-            
-            // Calculate distances and sort by distance (closest first)
-            const withDistances = unique.map(s => {
-              const dx = (s.lng - (userLng as number)) * 111320 * Math.cos((s.lat + (userLat as number)) / 2 * Math.PI / 180)
-              const dy = (s.lat - (userLat as number)) * 111320
-              const distanceM = Math.sqrt(dx * dx + dy * dy)
-              return {
-                suggestion: s,
-                distanceM: distanceM,
-                distanceKm: (distanceM / 1000).toFixed(2)
-              }
-            })
-            
-            // Sort by distance (closest first)
-            withDistances.sort((a, b) => a.distanceM - b.distanceM)
-            
-            // Extract sorted suggestions
-            const sortedUnique = withDistances.map(item => item.suggestion)
-            
-            // Log first result distance directly for visibility
-            if (withDistances.length > 0) {
-              console.log(`[AddressAutocomplete] FIRST RESULT (numeric-only): "${withDistances[0].suggestion.label}" - Distance: ${withDistances[0].distanceKm} km (${Math.round(withDistances[0].distanceM)} m)`)
-              if (withDistances.length > 1) {
-                console.log(`[AddressAutocomplete] SECOND RESULT (numeric-only): "${withDistances[1].suggestion.label}" - Distance: ${withDistances[1].distanceKm} km (${Math.round(withDistances[1].distanceM)} m)`)
-              }
-            }
-            
-            console.log('[AddressAutocomplete] Overpass results with distances (numeric-only, sorted):', {
-              count: sortedUnique.length,
-              results: withDistances.map(item => ({
-                label: item.suggestion.label,
-                coords: [item.suggestion.lat, item.suggestion.lng],
-                distanceM: Math.round(item.distanceM),
-                distanceKm: item.distanceKm
-              })),
-              rawResults: sortedUnique.map(s => ({
-                id: s.id,
-                label: s.label,
-                lat: s.lat,
-                lng: s.lng,
-                address: s.address
-              })),
-              debug: response._debug
-            })
-            
-            if (process.env.NODE_ENV === 'development' && sortedUnique.length > 0) {
-              console.log('[AddressAutocomplete] Received Overpass addresses (sorted by distance)', { 
-                count: sortedUnique.length, 
-                first: sortedUnique[0]?.label,
-                all: sortedUnique.map(s => ({ label: s.label, lat: s.lat, lng: s.lng })),
-                debug: response._debug
-              })
-            }
-            setSuggestions(sortedUnique)
-            setIsOpen(sortedUnique.length > 0)
-            setSelectedIndex(-1)
-            setShowFallbackMessage(false)
-            if (requestIdRef.current === currentId) setIsLoading(false)
-          } else {
-            // Overpass failed or returned empty
-            // For numeric-only queries, don't fallback to Nominatim because free-text search
-            // for just a number returns irrelevant results (places with the number in the name, not addresses)
-            console.warn(`[AddressAutocomplete] Overpass returned 0 results for numeric-only query "${trimmedQuery}" - showing no results (Nominatim fallback disabled for numeric-only queries)`)
-            setSuggestions([])
-            setIsOpen(false)
-            setShowFallbackMessage(false)
-            if (requestIdRef.current === currentId) setIsLoading(false)
-            return
-          }
-        })
-        .catch((err) => {
-          if (requestIdRef.current !== currentId) return
-          if (err?.name === 'AbortError') {
-            if (requestIdRef.current === currentId) setIsLoading(false)
-            return
-          }
-          
-          // On error, also don't fallback for numeric-only queries
-          console.warn(`[AddressAutocomplete] Overpass error for numeric-only query "${trimmedQuery}" - showing no results`)
-          setSuggestions([])
-          setIsOpen(false)
-          if (requestIdRef.current === currentId) setIsLoading(false)
-        })
+      // Use async helper to avoid nested promise chains
+      void handleOverpassLookup(
+        trimmedQuery,
+        userLat,
+        userLng,
+        currentId,
+        requestIdRef,
+        controller.signal,
+        setIsLoading,
+        setSuggestions,
+        setIsOpen,
+        setSelectedIndex,
+        setShowFallbackMessage,
+        false // enableFallback = false for numeric-only
+      )
       } else {
         // For non-numeric queries, use Nominatim directly (existing behavior)
         console.log(`[AddressAutocomplete] Fetching Nominatim suggestions for non-numeric query: "${trimmedQuery.substring(0, 30)}"`, { userLat, userLng, hasCoords: !!userLat && !!userLng })

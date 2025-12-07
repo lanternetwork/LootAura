@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { getCsrfHeaders } from '@/lib/csrf-client'
 
 // Generate UUID v4 using crypto.randomUUID (built-in)
 function generateUUID(): string {
@@ -121,7 +122,10 @@ export default function DraftSalesDiagnostics() {
     try {
       const response = await fetch('/api/drafts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
         credentials: 'include',
         body: JSON.stringify(payload),
       })
@@ -159,7 +163,10 @@ export default function DraftSalesDiagnostics() {
     try {
       const response = await fetch('/api/drafts/publish', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
         credentials: 'include',
         body: JSON.stringify(payload),
       })
@@ -222,7 +229,10 @@ export default function DraftSalesDiagnostics() {
     try {
       const response = await fetch('/api/sales', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
         credentials: 'include',
         body: JSON.stringify(payload),
       })

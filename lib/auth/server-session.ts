@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
@@ -48,9 +48,9 @@ export function createServerSupabaseClient(cookieStore: ReturnType<typeof cookie
         getAll() {
           return cookieStore.getAll()
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: Array<{ name: string; value: string; options?: CookieOptions }>) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) => {
+            cookiesToSet.forEach(({ name, value, options }: { name: string; value: string; options?: CookieOptions }) => {
               cookieStore.set(name, value, options)
             })
           } catch (error) {
@@ -164,14 +164,14 @@ export async function validateSession(cookieStore: ReturnType<typeof cookies>) {
         get(name: string) {
           return cookieStore.get(name)?.value
         },
-        set(name: string, value: string, options: any) {
+        set(name: string, value: string, options?: CookieOptions) {
           try {
             cookieStore.set({ name, value, ...options })
           } catch (error) {
             // Cookie setting can fail in middleware, that's ok
           }
         },
-        remove(name: string, options: any) {
+        remove(name: string, options?: CookieOptions) {
           try {
             cookieStore.set({ name, value: '', ...options, maxAge: 0 })
           } catch (error) {

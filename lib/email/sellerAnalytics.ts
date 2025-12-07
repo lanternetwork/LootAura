@@ -106,6 +106,7 @@ export async function sendSellerWeeklyAnalyticsEmail(
     // Build URLs
     const dashboardUrlFinal = dashboardUrl || buildDashboardUrl()
     const { weekStart: weekStartFormatted, weekEnd: weekEndFormatted } = formatDateRange(weekStart, weekEnd)
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
 
     // Compose email
     const react = React.createElement(SellerWeeklyAnalyticsEmail, {
@@ -123,6 +124,7 @@ export async function sendSellerWeeklyAnalyticsEmail(
       dashboardUrl: dashboardUrlFinal,
       weekStart: weekStartFormatted,
       weekEnd: weekEndFormatted,
+      baseUrl,
     })
 
     // Send email (non-blocking, errors are logged internally)

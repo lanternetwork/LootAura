@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { isAllowedImageUrl } from '@/lib/images/validateImageUrl'
+import { normalizeItemImages } from '@/lib/data/itemImageNormalization'
 
 export const dynamic = 'force-dynamic'
 
@@ -103,6 +104,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid image_url' }, { status: 400 })
     }
 
+    // Normalize image fields to canonical format (images array + image_url for compatibility)
+    const normalizedImages = normalizeItemImages({
+      image_url,
+      images: undefined, // Legacy route only accepts image_url
+    })
+    
     // Write to base table using schema-scoped client (reuse db from above)
     const { data, error } = await fromBase(db, 'items')
       .insert({
@@ -112,7 +119,9 @@ export async function POST(request: NextRequest) {
         price,
         category,
         condition,
-        images: image_url ? [image_url] : null // Convert image_url to images array
+        // Always set both fields for consistency (base table is authoritative)
+        images: normalizedImages.images,
+        image_url: normalizedImages.image_url,
       })
       .select()
       .single()
@@ -164,6 +173,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid image_url' }, { status: 400 })
     }
 
+    // Normalize image fields to canonical format (images array + image_url for compatibility)
+    const normalizedImages = normalizeItemImages({
+      image_url,
+      images: undefined, // Legacy route only accepts image_url
+    })
+    
     // Write to base table using schema-scoped client
     const db = getRlsDb()
     const { data, error } = await fromBase(db, 'items')
@@ -173,7 +188,9 @@ export async function PUT(request: NextRequest) {
         price,
         category,
         condition,
-        images: image_url ? [image_url] : null // Convert image_url to images array
+        // Always set both fields for consistency (base table is authoritative)
+        images: normalizedImages.images,
+        image_url: normalizedImages.image_url,
       })
       .eq('id', itemId)
       .select()

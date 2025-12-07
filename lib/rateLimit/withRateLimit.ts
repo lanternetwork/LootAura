@@ -62,9 +62,16 @@ export function withRateLimit(
     
     // Handle hard limit
     if (!mostRestrictive.allowed) {
-      // Log rate-limited requests for monitoring
-      const key = await deriveKey(req, mostRestrictive.policy.scope, opts.userId)
-      console.log(`[RATE_LIMIT] Request rate-limited: policy=${mostRestrictive.policy.name}, scope=${mostRestrictive.policy.scope}, key=${key}, remaining=${mostRestrictive.remaining}, resetAt=${new Date(mostRestrictive.resetAt).toISOString()}`)
+      // Log rate-limited requests for monitoring (non-PII: route path, policy, scope type only)
+      const { logger } = await import('@/lib/log')
+      logger.warn('Request rate-limited', {
+        component: 'rateLimit',
+        operation: 'rate_limit_exceeded',
+        policy: mostRestrictive.policy.name,
+        scope: mostRestrictive.policy.scope,
+        path: req.nextUrl.pathname,
+        remaining: mostRestrictive.remaining
+      })
       
       const errorResponse = NextResponse.json(
         { error: 'rate_limited', message: 'Too many requests. Please slow down.' },

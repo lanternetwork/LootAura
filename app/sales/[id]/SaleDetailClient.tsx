@@ -22,6 +22,99 @@ import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
 import { toast } from 'react-toastify'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
 
+// Item image component with error handling
+function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
+  const [imageError, setImageError] = useState(false)
+  const [imageLoading, setImageLoading] = useState(true)
+  const [useFallback, setUseFallback] = useState(false)
+  
+  // Debug logging (only in debug mode)
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.debug('[ItemImage] Rendering image', { 
+        src: src ? `${src.substring(0, 50)}...` : null, 
+        srcType: typeof src,
+        srcLength: src?.length || 0,
+        alt, 
+        imageError, 
+        isLoading: imageLoading, 
+        useFallback 
+      })
+    }
+  }, [src, alt, imageError, imageLoading, useFallback])
+  
+  if (imageError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-200" role="img" aria-label={`${alt} - no image available`}>
+        <span className="text-gray-400 text-sm">No image</span>
+      </div>
+    )
+  }
+  
+  // Fallback to regular img tag if Next.js Image fails (common in preview deployments)
+  if (useFallback) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={`${className} ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
+        onLoad={() => {
+          setImageLoading(false)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.debug('[ItemImage] Fallback image loaded successfully', { src: src?.substring(0, 50) + '...' })
+          }
+        }}
+        onError={(e) => {
+          setImageError(true)
+          setImageLoading(false)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.error('[ItemImage] Fallback image failed to load', { src: src?.substring(0, 50) + '...', error: e })
+          }
+        }}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+    )
+  }
+  
+  // Determine if we should use unoptimized mode
+  // Use unoptimized for blob/data URLs only
+  // Note: Preview deployments may have image optimization issues, but we'll use fallback instead
+  const shouldUnoptimize = src.startsWith('blob:') || src.startsWith('data:')
+  
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      className={`${className} ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
+      sizes={sizes}
+      unoptimized={shouldUnoptimize}
+      onLoad={() => {
+        setImageLoading(false)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.debug('[ItemImage] Image loaded successfully', { src: src?.substring(0, 50) + '...' })
+        }
+      }}
+      onError={(e) => {
+        // Try fallback to regular img tag before giving up
+        if (!useFallback) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.warn('[ItemImage] Next.js Image failed, trying fallback img tag', { src: src?.substring(0, 50) + '...' })
+          }
+          setUseFallback(true)
+          setImageLoading(true)
+        } else {
+          setImageError(true)
+          setImageLoading(false)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.error('[ItemImage] Image failed to load after fallback', { src: src?.substring(0, 50) + '...', error: e })
+          }
+        }
+      }}
+    />
+  )
+}
+
 interface SaleDetailClientProps {
   sale: SaleWithOwnerInfo
   displayCategories?: string[]
@@ -219,6 +312,17 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
 
       {/* Mobile Layout */}
       <div className="md:hidden max-w-screen-sm mx-auto px-4 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+80px)] space-y-4">
+        {/* Back to map button - Mobile only */}
+        <Link
+          href={backUrl}
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium mb-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to map
+        </Link>
+        
         {/* Title & Meta Chips */}
         <div className="space-y-3">
           <h1 className="text-xl font-semibold text-gray-900">{sale.title}</h1>
@@ -334,10 +438,9 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                 <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
                   <div className="relative w-full aspect-square bg-gray-100">
                     {item.photo ? (
-                      <Image
+                      <ItemImage
                         src={item.photo}
                         alt={item.name}
-                        fill
                         className="object-cover"
                         sizes="(max-width: 640px) 50vw, 33vw"
                       />
@@ -560,23 +663,37 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {items.map((item) => (
-                  <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="relative w-full h-48 mb-3 rounded-lg overflow-hidden bg-gray-100">
-                      {item.photo ? (
-                        <Image
-                          src={item.photo}
-                          alt={item.name}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-200" role="img" aria-label={`${item.name} - no image available`}>
-                          <span className="text-gray-400 text-sm">No image</span>
-                        </div>
-                      )}
-                    </div>
+                {items.map((item) => {
+                  // Debug logging (only in debug mode)
+                  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                    console.debug('[SaleDetailClient] Item card rendering', {
+                      itemId: item.id,
+                      itemName: item.name,
+                      hasPhoto: !!item.photo,
+                      photoType: typeof item.photo,
+                      photoValue: item.photo ? `${item.photo.substring(0, 50)}...` : null,
+                      photoLength: item.photo?.length || 0,
+                      photoTrimmedLength: item.photo?.trim().length || 0,
+                      willRenderImage: !!(item.photo && item.photo.trim().length > 0),
+                    })
+                  }
+                  
+                  return (
+                    <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="relative w-full h-48 mb-3 rounded-lg overflow-hidden bg-gray-100">
+                        {item.photo && item.photo.trim().length > 0 ? (
+                          <ItemImage
+                            src={item.photo}
+                            alt={item.name}
+                            className="object-cover"
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200" role="img" aria-label={`${item.name} - no image available`}>
+                            <span className="text-gray-400 text-sm">No image</span>
+                          </div>
+                        )}
+                      </div>
                     <h3 className="font-medium text-gray-900 mb-2">{item.name}</h3>
                     <div className="flex flex-col gap-2">
                       <div className="flex justify-between items-center">
@@ -598,7 +715,8 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                       )}
                     </div>
                   </div>
-                ))}
+                )
+                })}
               </div>
             )}
           </div>

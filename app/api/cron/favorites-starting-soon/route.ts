@@ -21,7 +21,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { assertCronAuthorized } from '@/lib/auth/cron'
 import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
-import { logger } from '@/lib/log'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +36,9 @@ async function handleRequest(request: NextRequest) {
   const runAt = new Date().toISOString()
   const env = process.env.NODE_ENV || 'development'
   const isProduction = env === 'production'
+  const { logger, generateOperationId } = await import('@/lib/log')
+  const opId = generateOperationId()
+  const withOpId = (context: any = {}) => ({ ...context, requestId: opId })
 
   try {
     // Validate cron authentication
@@ -45,12 +47,12 @@ async function handleRequest(request: NextRequest) {
     // Check if emails are globally disabled
     const emailsEnabled = process.env.LOOTAURA_ENABLE_EMAILS === 'true'
     if (!emailsEnabled) {
-      logger.info('Favorite sales starting soon cron job skipped - emails disabled', {
+      logger.info('Favorite sales starting soon cron job skipped - emails disabled', withOpId({
         component: 'api/cron/favorites-starting-soon',
         runAt,
         env,
         emailsEnabled: false,
-      })
+      }))
 
       return NextResponse.json({
         ok: true,
@@ -63,13 +65,13 @@ async function handleRequest(request: NextRequest) {
       })
     }
 
-    logger.info('Favorite sales starting soon cron job triggered', {
+    logger.info('Favorite sales starting soon cron job triggered', withOpId({
       component: 'api/cron/favorites-starting-soon',
       runAt,
       env,
       isProduction,
       emailsEnabled: true,
-    })
+    }))
 
     // Execute the job
     const result = await processFavoriteSalesStartingSoonJob({})

@@ -73,9 +73,11 @@ export async function getUserSales(
         error.message?.includes('does not exist')
 
       if (isPermissionError) {
-        const { isProduction } = await import('@/lib/env')
-        if (!isProduction()) {
-          console.warn('[SALES_ACCESS] View query failed, falling back to base table:', {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[SALES_ACCESS] View query failed, falling back to base table', {
+            component: 'salesAccess',
+            operation: 'getUserSales',
             error: error.code,
             message: error.message,
             hint: error.hint,
@@ -100,9 +102,11 @@ export async function getUserSales(
       throw error
     }
 
-    const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-      console.warn('[SALES_ACCESS] View query failed, falling back to base table:', {
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('[SALES_ACCESS] View query failed, falling back to base table', {
+        component: 'salesAccess',
+        operation: 'getUserSales',
         error: error?.code,
         message: error?.message,
       })
@@ -127,11 +131,13 @@ export async function getUserSales(
       }
     }
 
-    // Log fallback usage for observability (dev only)
-    const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-      console.warn('[SALES_ACCESS] Using base-table fallback. View may need attention.', {
-        userId,
+    // Log fallback usage for observability (debug only)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('[SALES_ACCESS] Using base-table fallback. View may need attention.', {
+        component: 'salesAccess',
+        operation: 'getUserSales',
+        userId: userId.substring(0, 8) + '...',
         count: sales?.length || 0,
       })
     }
@@ -176,14 +182,16 @@ export async function getUserDrafts(
       .range(offset, offset + limit - 1)
 
     if (error) {
-      const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-        console.error('[SALES_ACCESS] Error fetching drafts:', {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('[SALES_ACCESS] Error fetching drafts', error instanceof Error ? error : new Error(String(error)), {
+          component: 'salesAccess',
+          operation: 'getUserDrafts',
           code: error.code,
           message: error.message,
           details: error.details,
           hint: error.hint,
-          userId,
+          userId: userId.substring(0, 8) + '...',
         })
       }
       return {
@@ -205,9 +213,12 @@ export async function getUserDrafts(
       data: mappedDrafts,
     }
   } catch (error) {
-    const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-      console.error('[SALES_ACCESS] Unexpected error fetching drafts:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('[SALES_ACCESS] Unexpected error fetching drafts', error instanceof Error ? error : new Error(String(error)), {
+        component: 'salesAccess',
+        operation: 'getUserDrafts',
+      })
     }
     return {
       data: [],
@@ -240,25 +251,199 @@ export async function getItemsForSale(
       .limit(limit)
 
     if (error) {
-      const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-        console.error('[SALES_ACCESS] Error fetching items for sale:', error)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('[SALES_ACCESS] Error fetching items for sale from view', error instanceof Error ? error : new Error(String(error)), {
+          component: 'salesAccess',
+          operation: 'getItemsForSale',
+          saleId,
+          errorCode: error.code,
+          errorMessage: error.message,
+          errorDetails: error.details,
+          errorHint: error.hint,
+        })
       }
+      
+      // If view query fails, try fallback to base table (for owner access)
+      try {
+        const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+        const db = getRlsDb()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user) {
+          // Check if user owns the sale
+          const { data: sale } = await fromBase(db, 'sales')
+            .select('id, owner_id, status')
+            .eq('id', saleId)
+            .single()
+          
+          if (sale && sale.owner_id === user.id) {
+            // Owner can read items directly from base table
+            // Note: Only select guaranteed columns (condition, description, is_sold may not exist in production)
+            const { data: baseItems, error: baseError } = await fromBase(db, 'items')
+              .select('id, sale_id, name, price, image_url, created_at')
+              .eq('sale_id', saleId)
+              .order('created_at', { ascending: true })
+              .limit(limit)
+            
+            if (!baseError && baseItems) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                const { logger } = await import('@/lib/log')
+                logger.debug('[SALES_ACCESS] Fallback to base table succeeded', {
+                  component: 'salesAccess',
+                  operation: 'getItemsForSale',
+                  saleId,
+                  itemsCount: baseItems.length,
+                })
+              }
+              // Map base table items to SaleItem format (same mapping logic as below)
+              return ((baseItems || []) as any[]).map((item: any) => {
+                const images: string[] = Array.isArray(item.images) && item.images.length > 0
+                  ? item.images.filter((url: any): url is string => typeof url === 'string')
+                  : (item.image_url ? [item.image_url] : [])
+                return {
+                  id: item.id,
+                  sale_id: item.sale_id,
+                  name: item.name,
+                  category: item.category || undefined,
+                  condition: item.condition || undefined,
+                  price: item.price || undefined,
+                  photo: images.length > 0 ? images[0] : undefined,
+                  purchased: item.is_sold || false,
+                  created_at: item.created_at,
+                }
+              })
+            }
+          }
+        }
+      } catch (fallbackError) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { logger } = await import('@/lib/log')
+          logger.error('[SALES_ACCESS] Fallback to base table also failed', fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError)), {
+            component: 'salesAccess',
+            operation: 'getItemsForSale',
+            saleId,
+          })
+        }
+      }
+      
       return []
     }
     
-    const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-      console.log('[SALES_ACCESS] getItemsForSale result:', {
+    // If view returns 0 items, try fallback to base table for owner (in case of RLS timing issue)
+    if ((items?.length || 0) === 0) {
+      try {
+        const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+        const db = getRlsDb()
+        const { data: { user } } = await supabase.auth.getUser()
+        
+        if (user) {
+          // Check if user owns the sale
+          const { data: sale } = await fromBase(db, 'sales')
+            .select('id, owner_id, status')
+            .eq('id', saleId)
+            .single()
+          
+          if (sale && sale.owner_id === user.id) {
+            // Owner can read items directly from base table (bypasses view RLS timing issues)
+            // Note: This requires the items_owner_read RLS policy to be in place (migration 095)
+            // Note: Only select guaranteed columns (condition, description, is_sold may not exist in production)
+            const { data: baseItems, error: baseError } = await fromBase(db, 'items')
+              .select('id, sale_id, name, price, image_url, created_at')
+              .eq('sale_id', saleId)
+              .order('created_at', { ascending: true })
+              .limit(limit)
+            
+            if (baseError) {
+              // Log the error to help diagnose RLS policy issues (debug only)
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                const { logger } = await import('@/lib/log')
+                logger.error('[SALES_ACCESS] Fallback to base table failed (RLS policy may be missing)', baseError instanceof Error ? baseError : new Error(String(baseError)), {
+                  component: 'salesAccess',
+                  operation: 'getItemsForSale',
+                  saleId,
+                  saleStatus: sale.status,
+                  userId: user.id.substring(0, 8) + '...',
+                  ownerId: sale.owner_id.substring(0, 8) + '...',
+                  errorCode: baseError.code || 'unknown',
+                  errorMessage: baseError.message || 'unknown error',
+                  hint: 'If you see this, ensure migration 095_add_items_owner_read_policy.sql has been applied',
+                })
+              }
+            } else if (baseItems && baseItems.length > 0) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                const { logger } = await import('@/lib/log')
+                logger.debug('[SALES_ACCESS] View returned 0 items, but base table has items (RLS timing issue?)', {
+                  component: 'salesAccess',
+                  operation: 'getItemsForSale',
+                  saleId,
+                  saleStatus: sale.status,
+                  itemsCount: baseItems.length,
+                })
+              }
+              // Map base table items to SaleItem format
+              return ((baseItems || []) as any[]).map((item: any) => {
+                const images: string[] = Array.isArray(item.images) && item.images.length > 0
+                  ? item.images.filter((url: any): url is string => typeof url === 'string')
+                  : (item.image_url ? [item.image_url] : [])
+                return {
+                  id: item.id,
+                  sale_id: item.sale_id,
+                  name: item.name,
+                  category: item.category || undefined,
+                  condition: item.condition || undefined,
+                  price: item.price || undefined,
+                  photo: images.length > 0 ? images[0] : undefined,
+                  purchased: item.is_sold || false,
+                  created_at: item.created_at,
+                }
+              })
+            } else if (baseItems && baseItems.length === 0) {
+              // Base table also returns 0 items - items truly don't exist
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                const { logger } = await import('@/lib/log')
+                logger.debug('[SALES_ACCESS] Both view and base table returned 0 items', {
+                  component: 'salesAccess',
+                  operation: 'getItemsForSale',
+                  saleId,
+                  saleStatus: sale.status,
+                  userId: user.id.substring(0, 8) + '...',
+                  ownerId: sale.owner_id.substring(0, 8) + '...',
+                  note: 'Items may not have been created, or there is an RLS policy issue',
+                })
+              }
+            }
+          }
+        }
+      } catch (fallbackError) {
+        // Log fallback errors to help diagnose issues (debug only)
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[SALES_ACCESS] Fallback check failed (non-critical)', {
+            component: 'salesAccess',
+            operation: 'getItemsForSale',
+            saleId,
+            error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+          })
+        }
+      }
+    }
+    
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.debug('[SALES_ACCESS] getItemsForSale result', {
+        component: 'salesAccess',
+        operation: 'getItemsForSale',
         saleId,
         itemsCount: items?.length || 0,
-        items,
       })
     }
 
-    // Import isProduction once for use in map callback
-    const { isProduction: isProd } = await import('@/lib/env')
-    
+    // Import logger once if debug mode is enabled (for use in map callback)
+    const logger = process.env.NEXT_PUBLIC_DEBUG === 'true' 
+      ? (await import('@/lib/log')).logger
+      : null
+
     // Map items to SaleItem type
     // Normalize images: guarantee images: string[] with fallback to image_url
     const mappedItems: SaleItem[] = ((items || []) as any[]).map((item: any) => {
@@ -267,9 +452,11 @@ export async function getItemsForSale(
         ? item.images.filter((url: any): url is string => typeof url === 'string')
         : (item.image_url ? [item.image_url] : [])
       
-      // Log dev-only fallback when using image_url
-      if (!isProd() && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
-        console.log('[SALES_ACCESS] Item image fallback (image_url → images[]):', {
+      // Log debug-only fallback when using image_url
+      if (logger && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
+        logger.debug('[SALES_ACCESS] Item image fallback (image_url → images[])', {
+          component: 'salesAccess',
+          operation: 'getItemsForSale',
           itemId: item.id,
           itemName: item.name,
           hadImageUrl: !!item.image_url,
@@ -278,9 +465,11 @@ export async function getItemsForSale(
         })
       }
       
-      // Log dev-only when item has neither images nor image_url
-      if (!isProd() && images.length === 0) {
-        console.log('[SALES_ACCESS] Item has no images:', {
+      // Log debug-only when item has neither images nor image_url
+      if (logger && images.length === 0) {
+        logger.debug('[SALES_ACCESS] Item has no images', {
+          component: 'salesAccess',
+          operation: 'getItemsForSale',
           itemId: item.id,
           itemName: item.name,
           hadImageUrl: !!item.image_url,
@@ -303,9 +492,12 @@ export async function getItemsForSale(
 
     return mappedItems
   } catch (error) {
-    const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-      console.error('[SALES_ACCESS] Unexpected error in getItemsForSale:', error)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('[SALES_ACCESS] Unexpected error in getItemsForSale', error instanceof Error ? error : new Error(String(error)), {
+        component: 'salesAccess',
+        operation: 'getItemsForSale',
+      })
     }
     return []
   }
@@ -313,7 +505,8 @@ export async function getItemsForSale(
 
 /**
  * Fetch sale with its items (for sale details page)
- * Reads sale from public.sales_v2 view and items from public.items_v2 view
+ * Reads sale from public.sales_v2 view and items directly from lootaura_v2.items base table
+ * Uses RLS-aware client - RLS policies (items_owner_read, items_public_read) handle visibility automatically
  * Also fetches owner profile and stats to match SaleWithOwnerInfo type
  * @param supabase - Authenticated Supabase client
  * @param saleId - Sale ID to fetch
@@ -335,9 +528,14 @@ export async function getSaleWithItems(
       if (saleError?.code === 'PGRST116') {
         return null // No rows returned
       }
-      const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-        console.error('[SALES_ACCESS] Error fetching sale:', saleError)
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('[SALES_ACCESS] Error fetching sale', saleError instanceof Error ? saleError : new Error(String(saleError)), {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
+          saleId,
+          errorCode: saleError?.code,
+        })
       }
       return null
     }
@@ -366,7 +564,10 @@ export async function getSaleWithItems(
         }
       } else if (tagsRes.error) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES_ACCESS] Admin client tags query failed (schema limitation):', {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[SALES_ACCESS] Admin client tags query failed (schema limitation)', {
+            component: 'salesAccess',
+            operation: 'getSaleWithItems',
             saleId,
             error: tagsRes.error.message,
           })
@@ -375,7 +576,10 @@ export async function getSaleWithItems(
     } catch (error) {
       // Admin client not available or failed - that's okay, we'll continue without tags
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES_ACCESS] Could not fetch tags (admin client not available or failed):', {
+        const { logger } = await import('@/lib/log')
+        logger.debug('[SALES_ACCESS] Could not fetch tags (admin client not available or failed)', {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
           saleId,
           error: error instanceof Error ? error.message : String(error),
         })
@@ -383,10 +587,12 @@ export async function getSaleWithItems(
     }
     
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SALES_ACCESS] Tags fetch result:', {
+      const { logger } = await import('@/lib/log')
+      logger.debug('[SALES_ACCESS] Tags fetch result', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
         saleId,
         tagsCount: tags.length,
-        tags,
         note: 'Categories will still work from item categories if tags are empty',
       })
     }
@@ -397,9 +603,13 @@ export async function getSaleWithItems(
     }
 
     if (!sale.owner_id) {
-      const { isProduction } = await import('@/lib/env')
-    if (!isProduction()) {
-        console.error('[SALES_ACCESS] Sale found but missing owner_id')
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const { logger } = await import('@/lib/log')
+        logger.error('[SALES_ACCESS] Sale found but missing owner_id', new Error('Sale missing owner_id'), {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
+          saleId,
+        })
       }
       return {
         sale: {
@@ -420,55 +630,179 @@ export async function getSaleWithItems(
 
     // Fetch owner profile, stats, and items in parallel
     // (tags already fetched above)
-    // Try to fetch items with images column first, fallback if column doesn't exist
-    let itemsRes: any
-    try {
-      itemsRes = await supabase
+    // Get user context for debug logging (RLS will handle visibility automatically)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    // Import logger once at the top of the function for all logging
+    const { logger } = await import('@/lib/log')
+    
+    // Verify session is available for RLS (log if not, only in debug mode)
+    if (userError && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      logger.debug('Auth error when fetching user for items query', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        error: userError.message,
+        note: 'RLS policies may not work correctly without a valid session',
+      })
+    }
+    
+    // Load items directly from base table using RLS-aware client
+    // RLS policies (items_owner_read and items_public_read) will automatically handle visibility:
+    // - Owners see items for their own sales (any status)
+    // - Public/anon see items only when sale is published
+    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+    const db = getRlsDb()
+    
+    // Query base table - RLS policies will filter results based on auth context
+    // Select image_url and images (if available) - images array is preferred, image_url is fallback
+    // Note: Both columns exist in the base table schema (migration 096)
+    let itemsRes = await fromBase(db, 'items')
+      .select('id, sale_id, name, price, image_url, images, created_at')
+      .eq('sale_id', saleId)
+      .order('created_at', { ascending: false })
+    
+    // Check if items have images - if base table returns items but none have images, try view fallback
+    // NOTE: After migration 097 (backfill) and normalized writes, this should rarely trigger.
+    // TODO: Remove this view fallback once we've confirmed base-table images are fully populated in production (2-4 weeks).
+    const itemsHaveImages = itemsRes.data && itemsRes.data.length > 0 && itemsRes.data.some((item: any) => {
+      const hasImageUrl = item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0
+      const hasImages = Array.isArray(item.images) && item.images.length > 0 && item.images.some((img: any) => typeof img === 'string' && img.trim().length > 0)
+      return hasImageUrl || hasImages
+    })
+    
+    // If base table query fails, returns no results, or items have no images, try fallback to items_v2 view
+    // TEMPORARY SAFETY NET: This fallback is kept as a safety net during the transition period.
+    // After confirming base-table images are authoritative (2-4 weeks), this should be removed.
+    // IMPORTANT: Always try fallback if base table returns 0 items, even if no error
+    // This handles cases where RLS silently blocks access (no error, but 0 results)
+    const shouldTryFallback = itemsRes.error || !itemsRes.data || itemsRes.data.length === 0 || !itemsHaveImages
+    
+    if (shouldTryFallback) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        logger.debug('Base table query failed, returned no items, or items have no images - trying items_v2 view fallback (TEMPORARY SAFETY NET)', {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
+          saleId,
+          baseTableError: itemsRes.error?.code || null,
+          baseTableErrorMessage: itemsRes.error?.message || null,
+          baseTableCount: itemsRes.data?.length || 0,
+          itemsHaveImages,
+          saleStatus: sale.status,
+          isOwner: user && user.id === ownerId,
+          note: itemsRes.error 
+            ? 'RLS may be silently blocking access' 
+            : (!itemsRes.data || itemsRes.data.length === 0) 
+              ? 'No items returned' 
+              : 'Items returned but no images found - this should be rare after migration 097. TODO: Remove view fallback after confirming base-table images are authoritative.',
+        })
+      }
+      
+      // Try items_v2 view as fallback
+      // The view may have different RLS behavior or may not have RLS at all
+      // View has both 'images' array and 'image_url' - select both for compatibility
+      const viewRes = await supabase
         .from('items_v2')
-        .select('id, sale_id, name, category, price, image_url, images, created_at')
+        .select('id, sale_id, name, price, images, image_url, created_at')
         .eq('sale_id', saleId)
         .order('created_at', { ascending: false })
       
-      // If error is about missing images column, retry without it
-      if (itemsRes.error && 
-          (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('images')) ||
-          itemsRes.error?.code === 'PGRST301') {
+      if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES_ACCESS] images column not found, falling back to image_url only')
+          logger.debug('items_v2 view fallback succeeded', {
+            component: 'salesAccess',
+            operation: 'getSaleWithItems',
+            saleId,
+            itemsCount: viewRes.data.length,
+            note: 'View returned items that base table query did not - possible RLS policy issue',
+          })
         }
-        itemsRes = await supabase
-          .from('items_v2')
-          .select('id, sale_id, name, category, price, image_url, created_at')
-          .eq('sale_id', saleId)
-          .order('created_at', { ascending: false })
+        // Normalize view result to match base table query structure
+        // View has both 'images' array and 'image_url' string - preserve both for mapping
+        const normalizedData = viewRes.data.map((item: any) => ({
+          id: item.id,
+          sale_id: item.sale_id,
+          name: item.name,
+          price: item.price,
+          // Preserve both image_url and images from view for consistent mapping
+          image_url: item.image_url || (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : null),
+          images: item.images, // Preserve images array for mapping logic
+          created_at: item.created_at,
+        }))
+        itemsRes = {
+          ...viewRes,
+          data: normalizedData,
+        } as typeof itemsRes
+      } else {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          logger.debug('items_v2 view fallback also failed or returned no items', {
+            component: 'salesAccess',
+            operation: 'getSaleWithItems',
+            saleId,
+            viewError: viewRes.error?.code || null,
+            viewErrorMessage: viewRes.error?.message || null,
+            viewCount: viewRes.data?.length || 0,
+            saleStatus: sale.status,
+            isOwner: user && user.id === ownerId,
+            note: 'Both base table and view returned no items - check if items exist in database or if RLS policies need to be applied',
+          })
+        }
       }
+    }
+    
+    // Log query results (PII-safe) - only in debug mode
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const userContext = user ? 'auth' : 'anon'
+      const userIdShort = user?.id ? `${user.id.substring(0, 8)}...` : undefined
+      const isOwner = user && user.id === ownerId
       
-      // If error is about missing updated_at column, retry without it
-      if (itemsRes.error && 
-          (itemsRes.error.message?.includes('column') && itemsRes.error.message?.includes('updated_at')) ||
-          itemsRes.error?.code === '42703') {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES_ACCESS] updated_at column not found, retrying without it')
-        }
-        itemsRes = await supabase
-          .from('items_v2')
-          .select('id, sale_id, name, category, price, image_url, created_at')
-          .eq('sale_id', saleId)
-          .order('created_at', { ascending: false })
-      }
-    } catch (err) {
-      // If there's an exception, create a mock error response
-      // Ensure error is an object with code and message properties
-      itemsRes = { 
-        data: null, 
-        error: err instanceof Error ? {
-          code: (err as any).code || 'UNKNOWN',
-          message: err.message || 'Unknown error',
-        } : {
-          code: 'UNKNOWN',
-          message: String(err) || 'Unknown error',
-        }
-      }
+      logger.debug('Sale detail items query result', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        itemsCount: itemsRes.data?.length || 0,
+        hasError: !!itemsRes.error,
+        errorCode: itemsRes.error?.code || null,
+        errorMessage: itemsRes.error?.message || null,
+        userContext,
+        userId: userIdShort,
+        isOwner,
+        saleStatus: sale.status,
+        ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
+      })
+    }
+    
+    // Log errors but don't fail - return with empty items array
+    if (itemsRes.error) {
+      const userContext = user ? 'auth' : 'anon'
+      const isOwner = user && user.id === ownerId
+      logger.error('Error fetching items from base table', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        errorCode: itemsRes.error?.code,
+        errorMessage: itemsRes.error?.message,
+        errorDetails: itemsRes.error?.details,
+        errorHint: itemsRes.error?.hint,
+        userContext,
+        isOwner,
+        saleStatus: sale.status,
+      })
+    }
+    
+    // If no items returned and no error, log a warning (only in debug mode)
+    if (!itemsRes.error && (!itemsRes.data || itemsRes.data.length === 0) && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const userContext = user ? 'auth' : 'anon'
+      const isOwner = user && user.id === ownerId
+      logger.debug('No items returned for sale (no error)', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        userContext,
+        isOwner,
+        saleStatus: sale.status,
+        note: 'This could indicate RLS policy blocking access or no items exist for this sale',
+      })
     }
     
     const [profileRes, statsRes] = await Promise.all([
@@ -485,7 +819,6 @@ export async function getSaleWithItems(
     ])
 
     // Log errors but don't fail - return with defaults
-    const { logger } = await import('@/lib/log')
     if (profileRes.error) {
       logger.error('Error fetching owner profile', profileRes.error instanceof Error ? profileRes.error : new Error(String(profileRes.error)), {
         component: 'salesAccess',
@@ -502,107 +835,80 @@ export async function getSaleWithItems(
         ownerId,
       })
     }
-    if (itemsRes.error) {
-      // Always log errors since this is critical
-      logger.error('Error fetching items', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
-        component: 'salesAccess',
-        operation: 'getSaleWithItems',
-        saleId,
-        errorCode: itemsRes.error?.code,
-      })
-    }
-    
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[SALES_ACCESS] Items fetch result:', {
-        saleId,
-        hasError: !!itemsRes.error,
-        itemsResError: itemsRes.error ? {
-          code: itemsRes.error?.code || 'unknown',
-          message: itemsRes.error?.message || 'unknown error',
-          errorType: itemsRes.error?.constructor?.name || typeof itemsRes.error,
-        } : null,
-        itemsCount: itemsRes.data?.length || 0,
-        items: itemsRes.data?.map((i: any) => ({ id: i.id, name: i.name, category: i.category })), // Log summary only
-        // Debug: Check if sale status might be blocking items
-        saleStatus: sale.status,
-        saleIdMatch: sale.id === saleId,
-      })
-    }
-    
-    // Additional debug: Try to query items using admin client via items_v2 view
-    // This helps diagnose if items exist but are being filtered by RLS
-    // Admin client bypasses RLS, so if it finds items but regular query doesn't, it's an RLS issue
-    if (itemsRes.data?.length === 0) {
-      try {
-        const adminModule = await import('@/lib/supabase/admin').catch(() => null)
-        if (adminModule?.adminSupabase) {
-          // Query via items_v2 view (admin client can access it and bypasses RLS on base table)
-          const adminItemsRes = await adminModule.adminSupabase
-            .from('items_v2')
-            .select('id, sale_id, name, category')
-            .eq('sale_id', saleId)
-            .limit(10)
-          
-          // Type assertion needed because admin client types may not be fully inferred
-          const adminItems = adminItemsRes.data as Array<{ id: string; sale_id: string; name: string; category: string | null }> | null
-          
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SALES_ACCESS] Admin client items check (bypasses RLS):', {
-              saleId,
-              adminItemsCount: adminItems?.length || 0,
-              adminItemsError: adminItemsRes.error ? {
-                code: adminItemsRes.error?.code || 'unknown',
-                message: adminItemsRes.error?.message || 'unknown error',
-              } : null,
-              adminItems: adminItems?.map(i => ({ id: i.id, name: i.name, category: i.category })),
-              note: 'If admin finds items but regular query returns 0, there may be an RLS issue',
-            })
-          }
-        }
-      } catch (error) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES_ACCESS] Could not check items via admin client:', {
-            saleId,
-            error: error instanceof Error ? error.message : String(error),
-          })
+
+    // Map items to SaleItem type
+    // Base table query returns: id, sale_id, name, price, image_url, images, created_at
+    // View fallback returns: id, sale_id, name, price, images (array), created_at
+    // Map to SaleItem format expected by components
+    // IMPORTANT: Prefer images array over image_url (consistent with working view path)
+    const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => {
+      // Normalize image: prefer images array (like working view path), fallback to image_url
+      let photoUrl: string | undefined = undefined
+      
+      // Try images array first (preferred - matches working view path behavior)
+      if (item.images && Array.isArray(item.images) && item.images.length > 0) {
+        const firstImage = item.images[0]
+        if (typeof firstImage === 'string' && firstImage.trim().length > 0) {
+          photoUrl = firstImage.trim()
         }
       }
-    }
-
-    // Import isProduction once for use in map callback
-    const { isProduction: isProdItems } = await import('@/lib/env')
-    
-    // Map items to SaleItem type
-    // Normalize images: prefer images array, fallback to image_url
-    const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => {
-      // Normalize images: prefer images array, fallback to image_url
-      const images: string[] = Array.isArray(item.images) && item.images.length > 0
-        ? item.images.filter((url: any): url is string => typeof url === 'string')
-        : (item.image_url ? [item.image_url] : [])
-      
-      // Log dev-only fallback when using image_url
-      if (!isProdItems() && item.image_url && (!item.images || !Array.isArray(item.images) || item.images.length === 0)) {
-        console.log('[SALES_ACCESS] Item image fallback (image_url → images[]):', {
-          itemId: item.id,
-          itemName: item.name,
-          hadImageUrl: !!item.image_url,
-          hadImages: !!item.images,
-          imagesCount: images.length,
-        })
+      // Fallback to image_url (from base table query or view fallback)
+      else if (item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0) {
+        photoUrl = item.image_url.trim()
       }
       
       return {
         id: item.id,
         sale_id: item.sale_id,
         name: item.name,
-        category: item.category || undefined,
-        condition: item.condition || undefined,
+        category: item.category || undefined, // May come from view
+        condition: item.condition || undefined, // May come from view
         price: item.price || undefined,
-        photo: images.length > 0 ? images[0] : undefined, // Use first image as photo
-        purchased: item.is_sold || false, // is_sold may not exist in view, default to false
+        photo: photoUrl, // Use normalized image as photo
+        purchased: item.is_sold || false, // May come from view
         created_at: item.created_at,
       }
     })
+    
+    // Log final mapped items (only in debug mode)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger: finalLogger } = await import('@/lib/log')
+      
+      // Log detailed image field information for debugging
+      const itemsWithImageData = mappedItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        hasPhoto: !!item.photo,
+        photoValue: item.photo ? `${item.photo.substring(0, 50)}...` : null,
+        photoLength: item.photo?.length || 0,
+      }))
+      
+      // Also log raw data from the query to see what we're working with
+      const rawItemsSample = itemsRes.data && itemsRes.data.length > 0 ? {
+        id: itemsRes.data[0].id,
+        hasImageUrl: !!itemsRes.data[0].image_url,
+        imageUrlValue: itemsRes.data[0].image_url ? `${itemsRes.data[0].image_url.substring(0, 50)}...` : null,
+        hasImages: !!itemsRes.data[0].images,
+        imagesType: Array.isArray(itemsRes.data[0].images) ? 'array' : typeof itemsRes.data[0].images,
+        imagesLength: Array.isArray(itemsRes.data[0].images) ? itemsRes.data[0].images.length : 0,
+        imagesFirst: Array.isArray(itemsRes.data[0].images) && itemsRes.data[0].images.length > 0 
+          ? `${itemsRes.data[0].images[0].substring(0, 50)}...` 
+          : null,
+      } : null
+      
+      finalLogger.debug('Final mapped items for sale detail', {
+        component: 'salesAccess',
+        operation: 'getSaleWithItems',
+        saleId,
+        rawItemsCount: itemsRes.data?.length || 0,
+        mappedItemsCount: mappedItems.length,
+        itemsWithPhotos: mappedItems.filter(i => i.photo).length,
+        itemsWithoutPhotos: mappedItems.filter(i => !i.photo).length,
+        itemsWithImageData,
+        rawItemsSample,
+        note: 'Check photoValue vs raw image_url/images to identify mapping issues',
+      })
+    }
 
     // Normalize owner profile so seller details stay in sync with v2 profile data:
     // - `display_name` (primary public name) is mapped into `full_name` used by UI components.
@@ -667,7 +973,10 @@ export async function getNearestSalesForSale(
 
     if (saleError || !currentSale) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES_ACCESS] Could not fetch current sale for nearest sales:', {
+        const { logger } = await import('@/lib/log')
+        logger.debug('[SALES_ACCESS] Could not fetch current sale for nearest sales', {
+          component: 'salesAccess',
+          operation: 'getNearestSalesForSale',
           saleId,
           error: saleError?.message,
         })
@@ -683,7 +992,10 @@ export async function getNearestSalesForSale(
       isNaN(currentSale.lng)
     ) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES_ACCESS] Current sale has no valid coordinates:', {
+        const { logger } = await import('@/lib/log')
+        logger.debug('[SALES_ACCESS] Current sale has no valid coordinates', {
+          component: 'salesAccess',
+          operation: 'getNearestSalesForSale',
           saleId,
           lat: currentSale.lat,
           lng: currentSale.lng,
@@ -734,9 +1046,12 @@ export async function getNearestSalesForSale(
     if (rpcError) {
       // If RPC fails, fallback to manual query with Haversine calculation
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES_ACCESS] PostGIS RPC failed, using fallback query:', {
+        const { logger } = await import('@/lib/log')
+        logger.debug('[SALES_ACCESS] PostGIS RPC failed, using fallback query', {
+          component: 'salesAccess',
+          operation: 'getNearestSalesForSale',
           saleId,
-          error: rpcError.message,
+          error: rpcError instanceof Error ? rpcError.message : String(rpcError),
         })
       }
 
@@ -752,7 +1067,10 @@ export async function getNearestSalesForSale(
 
       if (queryError || !allSales) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES_ACCESS] Fallback query failed:', {
+          const { logger } = await import('@/lib/log')
+          logger.debug('[SALES_ACCESS] Fallback query failed', {
+            component: 'salesAccess',
+            operation: 'getNearestSalesForSale',
             saleId,
             error: queryError?.message,
           })
@@ -797,9 +1115,14 @@ export async function getNearestSalesForSale(
 
     return filtered as Array<Sale & { distance_m: number }>
   } catch (error) {
-    // Only log errors in debug mode and not in test environment
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true' && process.env.NODE_ENV !== 'test') {
-      console.error('[SALES_ACCESS] Unexpected error in getNearestSalesForSale:', error)
+    // Only log errors in debug mode
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      const { logger } = await import('@/lib/log')
+      logger.error('[SALES_ACCESS] Unexpected error in getNearestSalesForSale', error instanceof Error ? error : new Error(String(error)), {
+        component: 'salesAccess',
+        operation: 'getNearestSalesForSale',
+        saleId,
+      })
     }
     // Return empty array on error - don't break the page
     return []

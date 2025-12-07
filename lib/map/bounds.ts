@@ -85,6 +85,27 @@ export function isViewportInsideBounds(
 }
 
 /**
+ * Checks if a point [lng, lat] is inside the given bounds
+ * 
+ * @param point - Point as [longitude, latitude]
+ * @param bounds - Mapbox-style bounds { west, south, east, north }
+ * @returns true if point is inside bounds
+ */
+export function isPointInsideBounds(
+  point: [number, number],
+  bounds: Bounds
+): boolean {
+  const [lng, lat] = point
+  
+  return (
+    lat >= bounds.south &&
+    lat <= bounds.north &&
+    lng >= bounds.west &&
+    lng <= bounds.east
+  )
+}
+
+/**
  * Filters sales to only those within the viewport bounds
  * 
  * @param sales - Array of sales to filter

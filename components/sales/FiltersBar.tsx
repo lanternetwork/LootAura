@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import ZipInput from '@/components/location/ZipInput'
 import { buildDatePresets, type DatePreset } from '@/lib/shared/datePresets'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 type FiltersBarProps = {
   // ZIP Search
@@ -424,13 +425,14 @@ export default function FiltersBar({
           {/* Overflow menu for additional categories */}
           {overflow.length > 0 && (
             <div className="relative">
-              <button
-                onClick={() => setShowOverflowMenu(!showOverflowMenu)}
-                data-testid={filtersMoreTestId}
-                aria-label={`Show more categories (${overflow.length} more)`}
-                aria-expanded={showOverflowMenu}
-                className="flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors min-h-[44px]"
-              >
+              <Tooltip content={`Show more categories (${overflow.length} more)`}>
+                <button
+                  onClick={() => setShowOverflowMenu(!showOverflowMenu)}
+                  data-testid={filtersMoreTestId}
+                  aria-label={`Show more categories (${overflow.length} more)`}
+                  aria-expanded={showOverflowMenu}
+                  className="flex items-center gap-1 px-3 py-2 text-sm border border-gray-300 bg-white hover:bg-gray-50 rounded-md transition-colors min-h-[44px]"
+                >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                 </svg>
@@ -439,6 +441,7 @@ export default function FiltersBar({
                   <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${hasActiveFilters ? 'bg-blue-500' : 'invisible'}`} aria-hidden="true"></span>
                 </span>
               </button>
+              </Tooltip>
 
               {/* Overflow menu popover */}
               {showOverflowMenu && (
@@ -520,16 +523,18 @@ export default function FiltersBar({
             </select>
 
             {/* More Filters Button */}
-            <button
-              onClick={() => setShowMobileFilters(true)}
-              aria-label={hasActiveFilters ? 'Open filters menu (filters active)' : 'Open filters menu'}
-              className="flex items-center justify-center gap-1 px-3 py-2 border border-gray-300 bg-white hover:bg-gray-50 rounded text-sm min-h-[44px] min-w-[44px] shrink-0"
-            >
+            <Tooltip content="Open filters menu (Press F on desktop)">
+              <button
+                onClick={() => setShowMobileFilters(true)}
+                aria-label={hasActiveFilters ? 'Open filters menu (filters active)' : 'Open filters menu'}
+                className="flex items-center justify-center gap-1 px-3 py-2 border border-gray-300 bg-white hover:bg-gray-50 rounded text-sm min-h-[44px] min-w-[44px] shrink-0"
+              >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
               {hasActiveFilters && <span className="w-2 h-2 bg-blue-500 rounded-full" aria-label="Active filters indicator"></span>}
             </button>
+            </Tooltip>
           </div>
         </div>
       </div>

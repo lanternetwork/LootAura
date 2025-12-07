@@ -121,7 +121,7 @@ export default function ZipInput({
   }
 
   return (
-    <div className={className}>
+    <div className={className} data-testid="zip-input">
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
           type="text"
@@ -134,6 +134,7 @@ export default function ZipInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           maxLength={10}
+          title="Press / to focus this field"
           className={`flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent min-h-[40px] ${
             error ? 'border-red-300' : 'border-gray-300'
           }`}

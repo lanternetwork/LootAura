@@ -44,14 +44,14 @@ export default function SalesPanel({
     if (activeTab === 'live') {
       return localSales.filter((sale) => sale.status === 'published')
     } else if (activeTab === 'archived') {
-      return localSales.filter((sale) => sale.status === 'completed')
+      return localSales.filter((sale) => sale.status === 'archived')
     }
     return []
   }, [localSales, activeTab])
 
   // Calculate counts for each tab
   const liveCount = useMemo(() => localSales.filter((s) => s.status === 'published').length, [localSales])
-  const archivedCount = useMemo(() => localSales.filter((s) => s.status === 'completed').length, [localSales])
+  const archivedCount = useMemo(() => localSales.filter((s) => s.status === 'archived').length, [localSales])
   const draftsCount = drafts.length
 
   const handleSaleDelete = (saleId: string) => {

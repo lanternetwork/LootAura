@@ -42,7 +42,7 @@ describe('sendEmail', () => {
     expect(sendMock).toHaveBeenCalledTimes(1)
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: 'from@example.com',
+        from: '"Loot Aura" <from@example.com>',
         to: baseParams.to,
         subject: baseParams.subject,
       }),

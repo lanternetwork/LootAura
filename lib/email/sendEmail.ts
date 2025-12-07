@@ -63,20 +63,26 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     }
   }
 
+  // Format from address with sender name: "Loot Aura" <email@example.com>
+  // If fromEmail already includes a name (contains <), use it as-is; otherwise add "Loot Aura"
+  const fromAddress = fromEmail.includes('<') 
+    ? fromEmail 
+    : `"Loot Aura" <${fromEmail}>`
+
   try {
     // Log before attempting to send (always, not just in debug mode)
     console.log('[EMAIL] Attempting to send email via Resend:', {
       type,
       to,
       subject,
-      from: fromEmail,
+      from: fromAddress,
       hasResendApiKey: !!process.env.RESEND_API_KEY,
     })
     
     const resend = getResendClient()
     
     const result = await resend.emails.send({
-      from: fromEmail,
+      from: fromAddress,
       to,
       subject,
       react,

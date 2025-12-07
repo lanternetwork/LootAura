@@ -24,8 +24,8 @@ export function BaseLayout({ previewText, children, unsubscribeUrl }: BaseLayout
   return (
     <Html>
       <Head />
-      {previewText && <Text style={previewTextStyle}>{previewText}</Text>}
       <Body style={bodyStyle}>
+        {previewText && <Text style={previewTextStyle}>{previewText}</Text>}
         <Container style={containerStyle}>
           {/* Header */}
           <Section style={headerStyle}>

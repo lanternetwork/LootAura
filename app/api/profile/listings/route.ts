@@ -47,7 +47,7 @@ export async function GET(req: Request) {
   
   query = query.order('created_at', { ascending: false }).range(from, to)
   
-  const { data, error, count } = await query
+  const { data, error } = await query
   
   if (error) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -56,7 +56,7 @@ export async function GET(req: Request) {
     
     // If error is about missing columns, try with minimal columns
     if (error.message?.includes('column') || error.message?.includes('not found')) {
-      const { data: minimalData, error: minimalError, count: minimalCount } = await supabase
+      const { data: minimalData, error: minimalError } = await supabase
         .from('sales_v2')
         .select('id, title, status, owner_id, archived_at, date_end', { count: 'exact' })
         .eq('owner_id', user.id)

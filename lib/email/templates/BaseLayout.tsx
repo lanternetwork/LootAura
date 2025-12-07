@@ -37,8 +37,8 @@ export function BaseLayout({ previewText, children, unsubscribeUrl, baseUrl }: B
           <Section style={headerStyle}>
             <table
               role="presentation"
-              cellPadding="0"
-              cellSpacing="0"
+              cellPadding={0}
+              cellSpacing={0}
               border={0}
               style={tableStyle}
             >
@@ -47,8 +47,8 @@ export function BaseLayout({ previewText, children, unsubscribeUrl, baseUrl }: B
                   <td align="center" style={{ verticalAlign: 'middle' }}>
                     <table
                       role="presentation"
-                      cellPadding="0"
-                      cellSpacing="0"
+                      cellPadding={0}
+                      cellSpacing={0}
                       border={0}
                     >
                       <tbody>

@@ -61,6 +61,17 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const supabase = createSupabaseBrowserClient()
   const [currentStep, setCurrentStep] = useState(0)
   const [user, setUser] = useState<any>(null)
+  // Normalize tags to ensure it's always an array
+  const normalizeTags = (tags: any): string[] => {
+    if (Array.isArray(tags)) {
+      return tags.filter(Boolean) // Remove any falsy values
+    }
+    if (tags && typeof tags === 'string') {
+      return [tags]
+    }
+    return []
+  }
+
   const [formData, setFormData] = useState<Partial<SaleInput>>({
     title: initialData?.title || '',
     description: initialData?.description || '',
@@ -73,7 +84,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     date_end: initialData?.date_end || '',
     time_end: initialData?.time_end || '',
     duration_hours: initialData?.duration_hours || 4, // Default 4 hours
-    tags: initialData?.tags || [],
+    tags: normalizeTags(initialData?.tags),
     pricing_mode: initialData?.pricing_mode || 'negotiable',
     status: initialData?.status || 'draft'
   })

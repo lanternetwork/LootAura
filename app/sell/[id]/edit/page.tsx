@@ -15,6 +15,14 @@ export default async function SellEditPage({ params }: SellEditPageProps) {
     notFound()
   }
 
+  // Normalize tags to ensure it's always an array
+  // Handle both array format and potential null/undefined values
+  const normalizedTags = Array.isArray(sale.tags) 
+    ? sale.tags.filter(Boolean) // Remove any falsy values
+    : sale.tags 
+      ? (typeof sale.tags === 'string' ? [sale.tags] : [])
+      : []
+
   return (
     <div className="min-h-screen bg-gray-50">
       <SellWizardClient 
@@ -30,7 +38,7 @@ export default async function SellEditPage({ params }: SellEditPageProps) {
           date_end: sale.date_end,
           time_end: sale.time_end,
           price: sale.price,
-          tags: sale.tags,
+          tags: normalizedTags,
           status: sale.status
         }}
         isEdit={true}

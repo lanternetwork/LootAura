@@ -256,6 +256,9 @@ const ALLOWED_PATTERNS = [
   // Seller weekly analytics job logging (lib/jobs/processor.ts)
   /\[WARN\] \[jobs\/seller-weekly-analytics\]/, // Expected warning when email send fails in job tests - tests/integration/jobs/seller-weekly-analytics.test.ts
   /\[ERROR\] \[jobs\/seller-weekly-analytics\]/, // Expected error logging in job tests - tests/integration/jobs/seller-weekly-analytics.test.ts
+  
+  // Unsubscribe endpoint error logging (app/email/unsubscribe/route.ts)
+  /^\[UNSUBSCRIBE\]/, // Expected error logging in unsubscribe endpoint tests - tests/integration/email/unsubscribe.test.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {

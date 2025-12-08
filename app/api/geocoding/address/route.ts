@@ -173,8 +173,8 @@ async function addressHandler(request: NextRequest) {
   }
 }
 
-export const GET = withRateLimit(
-  [Policies.GEO_ZIP_SHORT, Policies.GEO_ZIP_HOURLY],
-  addressHandler
-)
+export const GET = withRateLimit(addressHandler, [
+  Policies.GEO_ZIP_SHORT,
+  Policies.GEO_ZIP_HOURLY
+])
 

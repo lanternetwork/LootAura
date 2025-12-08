@@ -449,16 +449,19 @@ export default function AddressAutocomplete({
   const [hasJustSelected, setHasJustSelected] = useState(false)
   const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
   const isInitialMountRef = useRef<boolean>(true)
-  const initialValueRef = useRef<string | undefined>(undefined)
+  // Capture initial value synchronously on first render (before debounce triggers)
+  const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value : undefined)
   const hasUserInteractedRef = useRef<boolean>(false)
   const hasSuppressedInitialSearchRef = useRef<boolean>(false)
 
-  // Capture initial value on mount (before any user interaction)
+  // Update initial value ref if value changes before user interaction (for programmatic updates)
   useEffect(() => {
-    if (isInitialMountRef.current && value && value.trim().length > 0 && initialValueRef.current === undefined) {
-      initialValueRef.current = value
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[AddressAutocomplete] Captured initial value:', value)
+    if (isInitialMountRef.current && !hasUserInteractedRef.current && value && value.trim().length > 0) {
+      if (initialValueRef.current === undefined) {
+        initialValueRef.current = value
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[AddressAutocomplete] Captured initial value (late):', value)
+        }
       }
     }
   }, [value])

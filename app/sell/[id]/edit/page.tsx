@@ -21,6 +21,9 @@ export default async function SellEditPage({ params }: SellEditPageProps) {
   let tags: string[] = []
   if (sale.tags && Array.isArray(sale.tags) && sale.tags.length > 0) {
     tags = sale.tags.filter(Boolean)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[EDIT_PAGE] Tags from sale.tags:', tags)
+    }
   } else {
     // Try to fetch from base table as fallback
     try {
@@ -36,11 +39,22 @@ export default async function SellEditPage({ params }: SellEditPageProps) {
         } else if (typeof saleData.tags === 'string') {
           tags = [saleData.tags]
         }
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[EDIT_PAGE] Tags from base table:', tags)
+        }
+      } else {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[EDIT_PAGE] No tags found in base table for sale:', params.id)
+        }
       }
     } catch (error) {
       // If fetching fails, continue with empty array
       console.error('[EDIT_PAGE] Error fetching tags:', error)
     }
+  }
+  
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[EDIT_PAGE] Final tags to pass to SellWizardClient:', tags)
   }
 
   return (

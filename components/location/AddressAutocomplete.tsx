@@ -449,13 +449,17 @@ export default function AddressAutocomplete({
   const [hasJustSelected, setHasJustSelected] = useState(false)
   const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
   const isInitialMountRef = useRef<boolean>(true)
-  const initialValueRef = useRef<string | undefined>(value)
+  const initialValueRef = useRef<string | undefined>(undefined)
   const hasUserInteractedRef = useRef<boolean>(false)
+  const hasSuppressedInitialSearchRef = useRef<boolean>(false)
 
-  // Update initial value ref when value prop changes (but only if user hasn't interacted)
+  // Capture initial value on mount (before any user interaction)
   useEffect(() => {
-    if (isInitialMountRef.current && !hasUserInteractedRef.current) {
+    if (isInitialMountRef.current && value && value.trim().length > 0 && initialValueRef.current === undefined) {
       initialValueRef.current = value
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[AddressAutocomplete] Captured initial value:', value)
+      }
     }
   }, [value])
 
@@ -498,16 +502,27 @@ export default function AddressAutocomplete({
 
     // Suppress search on initial mount if there's an initial value (edit mode)
     // This prevents the dropdown from appearing when the page loads with an existing address
-    // Only suppress if user hasn't interacted with the field yet
-    if (isInitialMountRef.current && !hasUserInteractedRef.current && initialValueRef.current && initialValueRef.current.trim().length > 0) {
-      // Check if current value matches initial value (no user input yet)
-      if (value === initialValueRef.current || trimmedQuery === initialValueRef.current.trim()) {
-        isInitialMountRef.current = false
-        setIsLoading(false)
-        setIsOpen(false)
-        setShowGoogleAttribution(false)
-        setShowFallbackMessage(false)
-        return
+    // Only suppress if user hasn't interacted with the field yet and we haven't already suppressed
+    if (!hasUserInteractedRef.current && !hasSuppressedInitialSearchRef.current) {
+      // If we have an initial value and current query matches it, suppress
+      if (initialValueRef.current && initialValueRef.current.trim().length > 0) {
+        const initialTrimmed = initialValueRef.current.trim()
+        if (trimmedQuery === initialTrimmed || value === initialValueRef.current || value === initialValueRef.current.trim()) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[AddressAutocomplete] Suppressing initial search - value matches initial:', {
+              initial: initialValueRef.current,
+              current: value,
+              debounced: trimmedQuery
+            })
+          }
+          hasSuppressedInitialSearchRef.current = true
+          isInitialMountRef.current = false
+          setIsLoading(false)
+          setIsOpen(false)
+          setShowGoogleAttribution(false)
+          setShowFallbackMessage(false)
+          return
+        }
       }
     }
     

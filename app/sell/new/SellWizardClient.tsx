@@ -311,15 +311,29 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
 
 
   // Ensure tags are properly set when initialData is provided (edit mode)
+  // This runs on mount and whenever initialData.tags changes
   useEffect(() => {
-    if (initialData?.tags && Array.isArray(initialData.tags) && initialData.tags.length > 0) {
-      const normalized = normalizeTags(initialData.tags)
-      // Only update if tags are different to avoid unnecessary re-renders
-      if (JSON.stringify(normalized.sort()) !== JSON.stringify((formData.tags || []).sort())) {
-        setFormData(prev => ({ ...prev, tags: normalized }))
-      }
+    const normalized = normalizeTags(initialData?.tags)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SELL_WIZARD] Tags useEffect:', {
+        initialDataTags: initialData?.tags,
+        normalized,
+        currentFormDataTags: formData.tags,
+        isEdit: _isEdit
+      })
     }
-  }, [initialData?.tags]) // Only run when initialData.tags changes
+    // Always update tags from initialData if provided (for edit mode)
+    // Only update if tags are different to avoid unnecessary re-renders
+    const currentTags = formData.tags || []
+    const currentSorted = [...currentTags].sort()
+    const normalizedSorted = [...normalized].sort()
+    if (JSON.stringify(currentSorted) !== JSON.stringify(normalizedSorted)) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SELL_WIZARD] Updating formData.tags:', normalized)
+      }
+      setFormData(prev => ({ ...prev, tags: normalized }))
+    }
+  }, [initialData?.tags, _isEdit]) // Run when initialData.tags changes or isEdit changes
 
   // Resume draft on mount (priority: server > local)
   useEffect(() => {
@@ -1525,6 +1539,16 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
             const isChecked = formData.tags?.some(tag => 
               tag && tag.trim().toLowerCase() === category.toLowerCase()
             ) || false
+            
+            // Debug logging for first category only to avoid spam
+            if (category === 'Furniture' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Category checkbox check:', {
+                category,
+                formDataTags: formData.tags,
+                isChecked,
+                initialDataTags: initialData?.tags
+              })
+            }
             
             return (
             <label key={category} className="flex items-center space-x-2">

@@ -62,14 +62,28 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const [currentStep, setCurrentStep] = useState(0)
   const [user, setUser] = useState<any>(null)
   // Normalize tags to ensure it's always an array
+  // Also normalize case to match checkbox format (capitalize first letter)
   const normalizeTags = (tags: any): string[] => {
+    const categoryList = [
+      'Furniture', 'Electronics', 'Clothing', 'Toys',
+      'Books', 'Tools', 'Kitchen', 'Sports',
+      'Garden', 'Art', 'Collectibles', 'Miscellaneous'
+    ]
+    
+    let tagArray: string[] = []
     if (Array.isArray(tags)) {
-      return tags.filter(Boolean) // Remove any falsy values
+      tagArray = tags.filter(Boolean) // Remove any falsy values
+    } else if (tags && typeof tags === 'string') {
+      tagArray = [tags]
     }
-    if (tags && typeof tags === 'string') {
-      return [tags]
-    }
-    return []
+    
+    // Normalize tags to match checkbox format (case-insensitive match)
+    return tagArray.map(tag => {
+      const trimmed = tag.trim()
+      // Find matching category from the list (case-insensitive)
+      const matched = categoryList.find(cat => cat.toLowerCase() === trimmed.toLowerCase())
+      return matched || trimmed // Use matched format, or keep original if no match
+    }).filter(Boolean)
   }
 
   const [formData, setFormData] = useState<Partial<SaleInput>>({
@@ -295,6 +309,17 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
   }, [buildDraftPayload, user])
 
+
+  // Ensure tags are properly set when initialData is provided (edit mode)
+  useEffect(() => {
+    if (initialData?.tags && Array.isArray(initialData.tags) && initialData.tags.length > 0) {
+      const normalized = normalizeTags(initialData.tags)
+      // Only update if tags are different to avoid unnecessary re-renders
+      if (JSON.stringify(normalized.sort()) !== JSON.stringify((formData.tags || []).sort())) {
+        setFormData(prev => ({ ...prev, tags: normalized }))
+      }
+    }
+  }, [initialData?.tags]) // Only run when initialData.tags changes
 
   // Resume draft on mount (priority: server > local)
   useEffect(() => {
@@ -1495,24 +1520,40 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
             'Furniture', 'Electronics', 'Clothing', 'Toys',
             'Books', 'Tools', 'Kitchen', 'Sports',
             'Garden', 'Art', 'Collectibles', 'Miscellaneous'
-          ].map((category) => (
+          ].map((category) => {
+            // Check if this category is in tags (case-insensitive comparison)
+            const isChecked = formData.tags?.some(tag => 
+              tag && tag.trim().toLowerCase() === category.toLowerCase()
+            ) || false
+            
+            return (
             <label key={category} className="flex items-center space-x-2">
               <input
                 type="checkbox"
-                checked={formData.tags?.includes(category) || false}
+                checked={isChecked}
                 onChange={(e) => {
                   const currentTags = formData.tags || []
                   if (e.target.checked) {
-                    onChange('tags', [...currentTags, category])
+                    // Add category if not already present (case-insensitive check)
+                    const alreadyExists = currentTags.some(tag => 
+                      tag && tag.trim().toLowerCase() === category.toLowerCase()
+                    )
+                    if (!alreadyExists) {
+                      onChange('tags', [...currentTags, category])
+                    }
                   } else {
-                    onChange('tags', currentTags.filter(tag => tag !== category))
+                    // Remove category (case-insensitive)
+                    onChange('tags', currentTags.filter(tag => 
+                      !tag || tag.trim().toLowerCase() !== category.toLowerCase()
+                    ))
                   }
                 }}
                 className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
               />
-              <span className="text-sm text-gray-700">{category}</span>
-            </label>
-          ))}
+                <span className="text-sm text-gray-700">{category}</span>
+              </label>
+            )
+          })}
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getSaleById } from '@/lib/data'
 import SellWizardClient from '../../new/SellWizardClient'
+import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 
 interface SellEditPageProps {
   params: {
@@ -15,13 +16,32 @@ export default async function SellEditPage({ params }: SellEditPageProps) {
     notFound()
   }
 
-  // Normalize tags to ensure it's always an array
-  // Handle both array format and potential null/undefined values
-  const normalizedTags = Array.isArray(sale.tags) 
-    ? sale.tags.filter(Boolean) // Remove any falsy values
-    : sale.tags 
-      ? (typeof sale.tags === 'string' ? [sale.tags] : [])
-      : []
+  // Fetch tags directly from base table if not in view
+  // The view might not include tags or they might be null
+  let tags: string[] = []
+  if (sale.tags && Array.isArray(sale.tags) && sale.tags.length > 0) {
+    tags = sale.tags.filter(Boolean)
+  } else {
+    // Try to fetch from base table as fallback
+    try {
+      const admin = getAdminDb()
+      const { data: saleData } = await fromBase(admin, 'sales')
+        .select('tags')
+        .eq('id', params.id)
+        .maybeSingle()
+      
+      if (saleData && saleData.tags) {
+        if (Array.isArray(saleData.tags)) {
+          tags = saleData.tags.filter(Boolean)
+        } else if (typeof saleData.tags === 'string') {
+          tags = [saleData.tags]
+        }
+      }
+    } catch (error) {
+      // If fetching fails, continue with empty array
+      console.error('[EDIT_PAGE] Error fetching tags:', error)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -38,7 +58,7 @@ export default async function SellEditPage({ params }: SellEditPageProps) {
           date_end: sale.date_end,
           time_end: sale.time_end,
           price: sale.price,
-          tags: normalizedTags,
+          tags: tags,
           status: sale.status
         }}
         isEdit={true}

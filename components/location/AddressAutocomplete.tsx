@@ -450,6 +450,14 @@ export default function AddressAutocomplete({
   const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
   const isInitialMountRef = useRef<boolean>(true)
   const initialValueRef = useRef<string | undefined>(value)
+  const hasUserInteractedRef = useRef<boolean>(false)
+
+  // Update initial value ref when value prop changes (but only if user hasn't interacted)
+  useEffect(() => {
+    if (isInitialMountRef.current && !hasUserInteractedRef.current) {
+      initialValueRef.current = value
+    }
+  }, [value])
 
   // Debounce search query (250ms per spec to avoid "empty flashes")
   const debouncedQuery = useDebounce(value, 250)
@@ -490,13 +498,17 @@ export default function AddressAutocomplete({
 
     // Suppress search on initial mount if there's an initial value (edit mode)
     // This prevents the dropdown from appearing when the page loads with an existing address
-    if (isInitialMountRef.current && initialValueRef.current && initialValueRef.current.trim().length > 0) {
-      isInitialMountRef.current = false
-      setIsLoading(false)
-      setIsOpen(false)
-      setShowGoogleAttribution(false)
-      setShowFallbackMessage(false)
-      return
+    // Only suppress if user hasn't interacted with the field yet
+    if (isInitialMountRef.current && !hasUserInteractedRef.current && initialValueRef.current && initialValueRef.current.trim().length > 0) {
+      // Check if current value matches initial value (no user input yet)
+      if (value === initialValueRef.current || trimmedQuery === initialValueRef.current.trim()) {
+        isInitialMountRef.current = false
+        setIsLoading(false)
+        setIsOpen(false)
+        setShowGoogleAttribution(false)
+        setShowFallbackMessage(false)
+        return
+      }
     }
     
     // Mark that initial mount is complete
@@ -1251,6 +1263,8 @@ export default function AddressAutocomplete({
           type="text"
           value={value}
           onChange={(e) => {
+            // Mark that user has interacted with the field
+            hasUserInteractedRef.current = true
             // Only reset selection flags if user is manually typing (not programmatic update)
             if (!suppressNextFetchRef.current) {
               justSelectedRef.current = false

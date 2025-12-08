@@ -169,10 +169,15 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
     }
     
     // Fallback to regular query without distance filtering
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+    const todayStr = today.toISOString().split('T')[0]
+
     let query = supabase
       .from('sales_v2')
       .select('*')
-      .eq('status', 'published')
+      .in('status', ['published', 'active'])
+      .is('archived_at', null)
       .order('created_at', { ascending: false })
       .limit(validatedParams.limit)
       .range(validatedParams.offset, validatedParams.offset + validatedParams.limit - 1)
@@ -192,6 +197,11 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
       query = query
         .gte('date_start', dateConstraints.start)
         .lte('date_start', dateConstraints.end)
+    } else {
+      // "Any time" means current/future only
+      query = query.or(
+        `date_end.gte.${todayStr},and(date_end.is.null,date_start.gte.${todayStr})`
+      )
     }
 
     const { data, error } = await query

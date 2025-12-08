@@ -42,6 +42,24 @@ export interface DraftListing {
  * @param limit - Maximum number of results (default: 20)
  * @returns Array of sale listings
  */
+function filterArchivedWindow(sales: Sale[]): Sale[] {
+  const cutoff = new Date()
+  cutoff.setFullYear(cutoff.getFullYear() - 1)
+
+  return (sales || []).filter((sale) => {
+    if (sale.status !== 'archived') return true
+
+    const archivedAt = sale.archived_at ? new Date(sale.archived_at) : null
+    if (archivedAt && archivedAt >= cutoff) return true
+
+    const dateEnd = sale.date_end ? new Date(`${sale.date_end}T00:00:00Z`) : null
+    if (dateEnd && dateEnd >= cutoff) return true
+
+    // Hide archived sales older than 1 year
+    return false
+  })
+}
+
 export async function getUserSales(
   supabase: SupabaseClient,
   userId: string,
@@ -57,8 +75,9 @@ export async function getUserSales(
       .limit(limit)
 
     if (!error && sales) {
+      const filtered = filterArchivedWindow(sales as Sale[])
       return {
-        data: sales as Sale[],
+        data: filtered,
         source: 'view',
       }
     }
@@ -131,6 +150,7 @@ export async function getUserSales(
       }
     }
 
+    const filtered = filterArchivedWindow((sales || []) as Sale[])
     // Log fallback usage for observability (debug only)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       const { logger } = await import('@/lib/log')
@@ -143,7 +163,7 @@ export async function getUserSales(
     }
 
     return {
-      data: (sales || []) as Sale[],
+      data: filtered,
       source: 'base_table',
     }
   } catch (error) {

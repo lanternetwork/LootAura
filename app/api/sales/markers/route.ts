@@ -63,9 +63,11 @@ async function markersHandler(request: NextRequest) {
     // Build query with category filtering if categories are provided
     let query = sb
       .from('sales_v2')
-      .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end')
+      .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
+      .in('status', ['published', 'active'])
+      .is('archived_at', null)
 
     // Apply category filtering by joining with items table
     if (Array.isArray(categories) && categories.length > 0) {
@@ -155,7 +157,8 @@ async function markersHandler(request: NextRequest) {
       })
     }
     
-    // If no date filtering is applied, return all sales
+    // If no date filtering is applied, still enforce "future-only" semantics
+    const now = new Date()
     if (!dateWindow) {
       const markers = data?.map((sale: any) => {
         const R = 6371
@@ -167,6 +170,15 @@ async function markersHandler(request: NextRequest) {
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         const distance = R * c
 
+        // Compute end date for future-only filtering
+        const startDate = sale.date_start ? new Date(`${sale.date_start}T00:00:00Z`) : null
+        const endDate = sale.date_end
+          ? new Date(`${sale.date_end}T23:59:59.999Z`)
+          : startDate
+        const isFuture = endDate ? endDate >= now : true
+
+        if (!isFuture) return null
+
         return {
           id: sale.id,
           title: sale.title,
@@ -175,7 +187,7 @@ async function markersHandler(request: NextRequest) {
           lng: sale.lng,
           distance: Math.round(distance * 100) / 100
         }
-      }) || []
+      })?.filter(Boolean) || []
 
       return NextResponse.json(markers)
     }

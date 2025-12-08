@@ -9,6 +9,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { Policies } from '@/lib/rateLimit/policies'
+import { deriveKey } from '@/lib/rateLimit/keys'
+import { check } from '@/lib/rateLimit/limiter'
+import { shouldBypassRateLimit } from '@/lib/rateLimit/config'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs' // Use Node.js runtime (not Edge) for Supabase service role
@@ -87,7 +91,7 @@ function generateUnsubscribePage(
 </html>`
 }
 
-export async function GET(request: NextRequest) {
+async function handleUnsubscribe(request: NextRequest): Promise<NextResponse> {
   try {
     // Extract token from query parameters
     const { searchParams } = new URL(request.url)
@@ -251,4 +255,45 @@ export async function GET(request: NextRequest) {
       }
     )
   }
+}
+
+/**
+ * Rate-limited GET handler for unsubscribe endpoint
+ * Returns HTML error page on rate limit instead of JSON
+ */
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  // Check rate limiting (bypass if disabled)
+  if (!shouldBypassRateLimit()) {
+    const policy = Policies.UNSUBSCRIBE_EMAIL
+    const key = await deriveKey(request, policy.scope)
+    const result = await check(policy, key)
+    
+    if (!result.allowed) {
+      // Log rate-limited requests (non-PII: route path, policy only)
+      const { logger } = await import('@/lib/log')
+      logger.warn('Unsubscribe request rate-limited', {
+        component: 'rateLimit',
+        operation: 'rate_limit_exceeded',
+        policy: policy.name,
+        scope: policy.scope,
+        path: request.nextUrl.pathname,
+        remaining: result.remaining
+      })
+      
+      // Return HTML error page for rate limit
+      return new NextResponse(
+        generateUnsubscribePage(
+          false,
+          'Too many unsubscribe requests from your network. Please try again later.'
+        ),
+        {
+          status: 429,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        }
+      )
+    }
+  }
+  
+  // Call the actual handler
+  return handleUnsubscribe(request)
 }

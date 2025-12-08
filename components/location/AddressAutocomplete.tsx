@@ -448,6 +448,8 @@ export default function AddressAutocomplete({
   const justSelectedRef = useRef<boolean>(false)
   const [hasJustSelected, setHasJustSelected] = useState(false)
   const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
+  const isInitialMountRef = useRef<boolean>(true)
+  const initialValueRef = useRef<string | undefined>(value)
 
   // Debounce search query (250ms per spec to avoid "empty flashes")
   const debouncedQuery = useDebounce(value, 250)
@@ -485,6 +487,22 @@ export default function AddressAutocomplete({
   // Fetch suggestions when query changes
   useEffect(() => {
     const trimmedQuery = debouncedQuery?.trim() || ''
+
+    // Suppress search on initial mount if there's an initial value (edit mode)
+    // This prevents the dropdown from appearing when the page loads with an existing address
+    if (isInitialMountRef.current && initialValueRef.current && initialValueRef.current.trim().length > 0) {
+      isInitialMountRef.current = false
+      setIsLoading(false)
+      setIsOpen(false)
+      setShowGoogleAttribution(false)
+      setShowFallbackMessage(false)
+      return
+    }
+    
+    // Mark that initial mount is complete
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false
+    }
 
     // If we just selected a suggestion, suppress the next search triggered by programmatic value change
     // Also check if the query looks like a complete formatted address (has multiple commas) - this indicates a selection was made

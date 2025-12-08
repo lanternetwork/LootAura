@@ -41,10 +41,10 @@ describe('Geocode Address API', () => {
     const { geocodeAddress } = await import('@/lib/geocode')
     const result = await geocodeAddress('123 Test St, Louisville, KY')
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/geocoding/address'),
-      undefined
-    )
+    expect(mockFetch).toHaveBeenCalled()
+    const callArgs = mockFetch.mock.calls[0]
+    expect(callArgs[0]).toContain('/api/geocoding/address')
+    expect(callArgs[0]).toContain('address=123%20Test%20St')
     expect(result).toEqual({
       lat: 38.2512,
       lng: -85.7494,
@@ -68,21 +68,28 @@ describe('Geocode Address API', () => {
     const { geocodeAddress } = await import('@/lib/geocode')
     const result = await geocodeAddress('Invalid Address')
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/geocoding/address'),
-      undefined
-    )
+    expect(mockFetch).toHaveBeenCalled()
+    const callArgs = mockFetch.mock.calls[0]
+    expect(callArgs[0]).toContain('/api/geocoding/address')
     expect(result).toBeNull()
   })
 
   it('should handle network errors gracefully', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    // Suppress console.error for this test since network errors are expected
+    const originalError = console.error
+    console.error = vi.fn()
+    
+    try {
+      mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
-    const { geocodeAddress } = await import('@/lib/geocode')
-    const result = await geocodeAddress('123 Test St, Louisville, KY')
+      const { geocodeAddress } = await import('@/lib/geocode')
+      const result = await geocodeAddress('123 Test St, Louisville, KY')
 
-    expect(mockFetch).toHaveBeenCalled()
-    expect(result).toBeNull()
+      expect(mockFetch).toHaveBeenCalled()
+      expect(result).toBeNull()
+    } finally {
+      console.error = originalError
+    }
   })
 })
 

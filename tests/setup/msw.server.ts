@@ -37,6 +37,27 @@ const handlers = [
     })
   }),
   // Relative Next.js routes
+  http.get('/api/geocoding/address', ({ request }) => {
+    const url = new URL(request.url)
+    const address = url.searchParams.get('address') || ''
+    if (!address || address.trim().length < 5) {
+      return HttpResponse.json({ ok: false, error: 'Address must be at least 5 characters' }, { status: 400 })
+    }
+    if (/invalid|fail/i.test(address)) {
+      return HttpResponse.json({ ok: false, error: 'Address not found' }, { status: 404 })
+    }
+    return HttpResponse.json({
+      ok: true,
+      data: {
+        lat: 38.1405,
+        lng: -85.6936,
+        formatted_address: '123 Test St, Louisville, KY',
+        city: 'Louisville',
+        state: 'KY',
+        zip: '40201'
+      }
+    })
+  }),
   http.get('/api/geocoding/suggest', ({ request }) => {
     const url = new URL(request.url)
     const q = url.searchParams.get('q') || ''

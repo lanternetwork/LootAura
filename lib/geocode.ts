@@ -1,7 +1,5 @@
 // Geocoding utilities with caching to avoid repeated API calls
 
-import { getNominatimEmail } from './env'
-
 export interface GeocodeResult {
   lat: number
   lng: number
@@ -17,24 +15,50 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
     import('./usageLogs').then(m => m.incGeocodeCall()).catch(() => {})
   }
   
-  const cacheKey = address.toLowerCase()
+  if (!address || address.trim().length < 5) {
+    return null
+  }
+  
+  const trimmedAddress = address.trim()
+  const cacheKey = trimmedAddress.toLowerCase()
   
   // Check Redis-backed cache first
-  const { getGeocodeCache, setGeocodeCache } = await import('./geocode/redisCache')
-  const cached = await getGeocodeCache(cacheKey)
-  if (cached) {
-    return cached as GeocodeResult
+  try {
+    const { getGeocodeCache } = await import('./geocode/redisCache')
+    const cached = await getGeocodeCache(cacheKey)
+    if (cached) {
+      return cached as GeocodeResult
+    }
+  } catch (cacheError) {
+    // Ignore cache errors - continue with API call
   }
 
   try {
-    // Use Nominatim for geocoding
-    const result = await geocodeWithNominatim(address)
-    if (result) {
+    // Call server-side API endpoint instead of directly accessing server env vars
+    const response = await fetch(`/api/geocoding/address?address=${encodeURIComponent(trimmedAddress)}`)
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        // Address not found - not an error, just return null
+        return null
+      }
+      // Log other errors but don't throw
+      console.error('Geocoding API error:', response.status, response.statusText)
+      return null
+    }
+    
+    const data = await response.json()
+    if (data.ok && data.data) {
       // Store in Redis-backed cache (24 hour TTL)
-      await setGeocodeCache(cacheKey, result, 86400).catch(() => {
-        // Ignore cache write errors - geocoding succeeded
-      })
-      return result
+      try {
+        const { setGeocodeCache } = await import('./geocode/redisCache')
+        await setGeocodeCache(cacheKey, data.data, 86400).catch(() => {
+          // Ignore cache write errors - geocoding succeeded
+        })
+      } catch (cacheError) {
+        // Ignore cache errors
+      }
+      return data.data as GeocodeResult
     }
 
     return null
@@ -42,55 +66,6 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
     console.error('Geocoding error:', error)
     return null
   }
-}
-
-
-async function geocodeWithNominatim(address: string): Promise<GeocodeResult | null> {
-  const { retry, isTransientError } = await import('./utils/retry')
-  const email = getNominatimEmail()
-  
-  const data = await retry(
-    async () => {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&email=${email}&limit=1`,
-        {
-          headers: {
-            'User-Agent': `LootAura/1.0 (contact: ${email})`
-          }
-        }
-      )
-      
-      if (!response.ok) {
-        // Don't retry on 4xx errors (client errors)
-        if (response.status >= 400 && response.status < 500) {
-          throw new Error(`Nominatim request failed: ${response.status}`)
-        }
-        // Retry on 5xx and network errors
-        throw new Error(`Nominatim request failed: ${response.status}`)
-      }
-      
-      return await response.json()
-    },
-    {
-      maxAttempts: 3,
-      initialDelayMs: 500,
-      retryable: isTransientError,
-    }
-  )
-  
-  if (data && data.length > 0) {
-    const result = data[0]
-    return {
-      lat: parseFloat(result.lat),
-      lng: parseFloat(result.lon),
-      formatted_address: result.display_name,
-      city: result.address?.city || result.address?.town,
-      state: result.address?.state,
-      zip: result.address?.postcode
-    }
-  }
-
-  return null
 }
 
 export async function clearGeocodeCache() {

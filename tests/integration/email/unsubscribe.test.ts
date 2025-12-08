@@ -636,26 +636,26 @@ describe('GET /email/unsubscribe', () => {
           }
         } else if (table === 'profiles') {
           profileCallCount++
-          if (profileCallCount === 1) {
-            return {
-              select: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                  maybeSingle: vi.fn().mockResolvedValue({
-                    data: {
-                      email_favorites_digest_enabled: true,
-                      email_seller_weekly_enabled: true,
-                    },
-                    error: null,
-                  }),
-                })),
-              })),
-              update: vi.fn(() => ({
-                eq: vi.fn().mockResolvedValue({
-                  data: null,
-                  error: { message: 'Update failed' },
+          // Return same structure for all profile calls
+          // First call uses select, second call uses update
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: {
+                    email_favorites_digest_enabled: true,
+                    email_seller_weekly_enabled: true,
+                  },
+                  error: null,
                 }),
               })),
-            }
+            })),
+            update: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({
+                data: null,
+                error: { message: 'Update failed' },
+              }),
+            })),
           }
         }
         return {}

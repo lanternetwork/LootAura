@@ -499,19 +499,26 @@ export default function AddressAutocomplete({
   // Fetch suggestions when query changes
   useEffect(() => {
     const trimmedQuery = debouncedQuery?.trim() || ''
+    const currentValueTrimmed = value?.trim() || ''
 
-    // Suppress search on initial mount if there's an initial value (edit mode)
+    // Suppress search if there's an initial value and user hasn't interacted (edit mode)
     // This prevents the dropdown from appearing when the page loads with an existing address
-    // Only suppress if user hasn't interacted with the field yet and we haven't already suppressed
+    // Check both current value and debounced query to catch all cases
     if (!hasUserInteractedRef.current && !hasSuppressedInitialSearchRef.current) {
-      // If we have an initial value and current query matches it, suppress
       if (initialValueRef.current && initialValueRef.current.trim().length > 0) {
         const initialTrimmed = initialValueRef.current.trim()
-        if (trimmedQuery === initialTrimmed || value === initialValueRef.current || value === initialValueRef.current.trim()) {
+        // Suppress if current value or debounced query matches initial value
+        const matchesInitial = 
+          currentValueTrimmed === initialTrimmed || 
+          trimmedQuery === initialTrimmed ||
+          value === initialValueRef.current
+        
+        if (matchesInitial) {
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[AddressAutocomplete] Suppressing initial search - value matches initial:', {
+            console.log('[AddressAutocomplete] Suppressing search - value matches initial:', {
               initial: initialValueRef.current,
               current: value,
+              currentTrimmed: currentValueTrimmed,
               debounced: trimmedQuery
             })
           }
@@ -523,6 +530,18 @@ export default function AddressAutocomplete({
           setShowFallbackMessage(false)
           return
         }
+      }
+    }
+    
+    // If user has interacted or we've already suppressed, allow normal search behavior
+    // But skip if value still matches initial (to prevent re-triggering)
+    if (hasSuppressedInitialSearchRef.current && initialValueRef.current) {
+      const initialTrimmed = initialValueRef.current.trim()
+      if (currentValueTrimmed === initialTrimmed || trimmedQuery === initialTrimmed) {
+        // Still matches initial - don't search
+        setIsLoading(false)
+        setIsOpen(false)
+        return
       }
     }
     

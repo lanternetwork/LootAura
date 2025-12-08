@@ -313,10 +313,11 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   // Ensure tags are properly set when initialData is provided (edit mode)
   // This runs on mount and whenever initialData.tags changes
   useEffect(() => {
-    const normalized = normalizeTags(initialData?.tags)
+    const tagsFromInitialData = initialData?.tags
+    const normalized = normalizeTags(tagsFromInitialData)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[SELL_WIZARD] Tags useEffect:', {
-        initialDataTags: initialData?.tags,
+        initialDataTags: tagsFromInitialData,
         normalized,
         currentFormDataTags: formData.tags,
         isEdit: _isEdit
@@ -333,7 +334,8 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       }
       setFormData(prev => ({ ...prev, tags: normalized }))
     }
-  }, [initialData?.tags, _isEdit]) // Run when initialData.tags changes or isEdit changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData, _isEdit, normalizeTags]) // Run when initialData changes or isEdit changes
 
   // Resume draft on mount (priority: server > local)
   useEffect(() => {
@@ -1545,8 +1547,7 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
               console.log('[SELL_WIZARD] Category checkbox check:', {
                 category,
                 formDataTags: formData.tags,
-                isChecked,
-                initialDataTags: initialData?.tags
+                isChecked
               })
             }
             

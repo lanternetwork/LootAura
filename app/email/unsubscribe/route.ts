@@ -14,6 +14,17 @@ import { deriveKey } from '@/lib/rateLimit/keys'
 import { check } from '@/lib/rateLimit/limiter'
 import { shouldBypassRateLimit } from '@/lib/rateLimit/config'
 
+const isTestEnv = process.env.NODE_ENV === 'test'
+
+function logUnsubscribeError(message: string, context?: Record<string, unknown>) {
+  const formatted = context ? `${message} ${JSON.stringify(context)}` : message
+  if (isTestEnv) {
+    console.warn(formatted)
+  } else {
+    console.error(formatted)
+  }
+}
+
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs' // Use Node.js runtime (not Edge) for Supabase service role
 
@@ -130,9 +141,8 @@ async function handleUnsubscribe(request: NextRequest): Promise<NextResponse> {
     
     if (lookupError) {
       // Log error but don't expose details to user
-      console.error('[UNSUBSCRIBE] Error looking up token:', {
+      logUnsubscribeError('[UNSUBSCRIBE] Error looking up token', {
         error: lookupError.message,
-        // Do not log the token itself
       })
       
       return new NextResponse(
@@ -193,10 +203,9 @@ async function handleUnsubscribe(request: NextRequest): Promise<NextResponse> {
       .eq('id', profile_id)
     
     if (updateError) {
-      console.error('[UNSUBSCRIBE] Error updating profile preferences:', {
+      logUnsubscribeError('[UNSUBSCRIBE] Error updating profile preferences', {
         profileId: profile_id,
         error: updateError.message,
-        // Do not log the token
       })
       
       return new NextResponse(
@@ -218,9 +227,8 @@ async function handleUnsubscribe(request: NextRequest): Promise<NextResponse> {
     
     if (markUsedError) {
       // Log but don't fail - preferences were already updated
-      console.error('[UNSUBSCRIBE] Error marking token as used:', {
+      logUnsubscribeError('[UNSUBSCRIBE] Error marking token as used', {
         error: markUsedError.message,
-        // Do not log the token
       })
     }
     
@@ -239,10 +247,7 @@ async function handleUnsubscribe(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     // Catch-all error handler
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('[UNSUBSCRIBE] Unexpected error:', {
-      error: errorMessage,
-      // Do not log request details that might contain tokens
-    })
+    logUnsubscribeError('[UNSUBSCRIBE] Unexpected error', { error: errorMessage })
     
     return new NextResponse(
       generateUnsubscribePage(

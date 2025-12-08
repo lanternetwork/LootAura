@@ -27,20 +27,19 @@ describe('Geocode Cache TTL', () => {
   })
 
   it('should cache results for 24 hours', async () => {
-    process.env.NOMINATIM_APP_EMAIL = 'test@example.com'
-    
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => [{
-        lat: '38.2512',
-        lon: '-85.7494',
-        display_name: '123 Test St, Louisville, KY',
-        address: {
+      json: async () => ({
+        ok: true,
+        data: {
+          lat: 38.2512,
+          lng: -85.7494,
+          formatted_address: '123 Test St, Louisville, KY',
           city: 'Louisville',
           state: 'KY',
-          postcode: '40201'
+          zip: '40201'
         }
-      }]
+      })
     })
 
     const { geocodeAddress } = await import('@/lib/geocode')
@@ -58,20 +57,19 @@ describe('Geocode Cache TTL', () => {
   })
 
   it('should evict expired cache entries', async () => {
-    process.env.NOMINATIM_APP_EMAIL = 'test@example.com'
-    
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => [{
-        lat: '38.2512',
-        lon: '-85.7494',
-        display_name: '123 Test St, Louisville, KY',
-        address: {
+      json: async () => ({
+        ok: true,
+        data: {
+          lat: 38.2512,
+          lng: -85.7494,
+          formatted_address: '123 Test St, Louisville, KY',
           city: 'Louisville',
           state: 'KY',
-          postcode: '40201'
+          zip: '40201'
         }
-      }]
+      })
     })
 
     const { geocodeAddress } = await import('@/lib/geocode')
@@ -87,16 +85,19 @@ describe('Geocode Cache TTL', () => {
   })
 
   it('should limit cache size to 100 entries', async () => {
-    process.env.NOMINATIM_APP_EMAIL = 'test@example.com'
-    
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => [{
-        lat: '38.2512',
-        lon: '-85.7494',
-        display_name: 'Test Address',
-        address: {}
-      }]
+      json: async () => ({
+        ok: true,
+        data: {
+          lat: 38.2512,
+          lng: -85.7494,
+          formatted_address: 'Test Address',
+          city: 'Test',
+          state: 'KY',
+          zip: '40201'
+        }
+      })
     })
 
     const { geocodeAddress } = await import('@/lib/geocode')
@@ -118,20 +119,19 @@ describe('Geocode Cache TTL', () => {
   })
 
   it('should clear cache when clearGeocodeCache is called', async () => {
-    process.env.NOMINATIM_APP_EMAIL = 'test@example.com'
-    
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => [{
-        lat: '38.2512',
-        lon: '-85.7494',
-        display_name: '123 Test St, Louisville, KY',
-        address: {
+      json: async () => ({
+        ok: true,
+        data: {
+          lat: 38.2512,
+          lng: -85.7494,
+          formatted_address: '123 Test St, Louisville, KY',
           city: 'Louisville',
           state: 'KY',
-          postcode: '40201'
+          zip: '40201'
         }
-      }]
+      })
     })
 
     const { geocodeAddress, clearGeocodeCache } = await import('@/lib/geocode')

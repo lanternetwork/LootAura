@@ -2,12 +2,13 @@
 import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { normalizeSocialLinks, type SocialLinks } from '@/lib/profile/social'
+import { SocialLinksSchema } from '@/lib/validators/socialLinks'
 import { ok, fail } from '@/lib/http/json'
 import * as Sentry from '@sentry/nextjs'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest) {
+async function updateSocialLinksHandler(request: NextRequest) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(request)
@@ -44,12 +45,20 @@ export async function POST(request: NextRequest) {
       return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
     }
 
+    // Validate input with Zod schema
     if (!body || typeof body !== 'object' || !body.links) {
       return fail(400, 'INVALID_INPUT', 'Missing or invalid links field')
     }
 
-    // Normalize social links
-    const normalizedLinks = normalizeSocialLinks(body.links as Partial<SocialLinks>)
+    const validationResult = SocialLinksSchema.safeParse(body.links)
+    if (!validationResult.success) {
+      return fail(400, 'INVALID_INPUT', 'Invalid social links data', {
+        details: validationResult.error.issues,
+      })
+    }
+
+    // Normalize social links (normalizeSocialLinks handles URL validation)
+    const normalizedLinks = normalizeSocialLinks(validationResult.data as Partial<SocialLinks>)
 
     // Ensure normalizedLinks is a valid JSONB object (not null/undefined)
     const socialLinksValue = Object.keys(normalizedLinks).length > 0 ? normalizedLinks : {}
@@ -106,5 +115,21 @@ export async function POST(request: NextRequest) {
     
     return fail(500, 'INTERNAL_ERROR', errorMessage)
   }
+}
+
+export async function POST(request: NextRequest) {
+  // Get user ID for rate limiting
+  const supabase = createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  const { withRateLimit } = await import('@/lib/rateLimit/withRateLimit')
+  const { Policies } = await import('@/lib/rateLimit/policies')
+
+  return withRateLimit(
+    updateSocialLinksHandler,
+    [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
+    { userId }
+  )(request)
 }
 

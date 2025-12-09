@@ -60,22 +60,61 @@ function filterArchivedWindow(sales: Sale[]): Sale[] {
   })
 }
 
+export interface GetUserSalesOptions {
+  statusFilter?: 'active' | 'archived' | 'all'
+  limit?: number
+}
+
 export async function getUserSales(
   supabase: SupabaseClient,
   userId: string,
-  limit: number = 20
+  limitOrOptions: number | GetUserSalesOptions = 20
 ): Promise<{ data: Sale[]; source: 'view' | 'base_table'; error?: any }> {
+  // Handle both old signature (limit: number) and new signature (options: GetUserSalesOptions)
+  const options: GetUserSalesOptions = typeof limitOrOptions === 'number'
+    ? { limit: limitOrOptions }
+    : limitOrOptions
+  
+  const limit = options.limit ?? 20
+  const statusFilter = options.statusFilter ?? 'active'
+
+  // Calculate 1-year cutoff for archived sales
+  const oneYearAgo = new Date()
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+  const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0] // YYYY-MM-DD format
+
   // Try view first (preferred)
   try {
-    const { data: sales, error } = await supabase
+    let query = supabase
       .from('sales_v2')
       .select('*')
       .eq('owner_id', userId)
+
+    // Apply status filter server-side
+    if (statusFilter === 'archived') {
+      // Only archived sales within 1-year window
+      query = query
+        .eq('status', 'archived')
+        .or(`archived_at.gte.${oneYearAgoStr},date_end.gte.${oneYearAgoStr}`)
+    } else if (statusFilter === 'active') {
+      // Only active/published sales (not archived)
+      query = query
+        .in('status', ['published', 'active'])
+        .is('archived_at', null)
+    }
+    // else 'all' - no status filter (but still apply 1-year window for archived)
+
+    query = query
       .order('updated_at', { ascending: false })
       .limit(limit)
 
+    const { data: sales, error } = await query
+
     if (!error && sales) {
-      const filtered = filterArchivedWindow(sales as Sale[])
+      // For 'all' status, still apply 1-year window filter client-side for archived sales
+      const filtered = statusFilter === 'all' 
+        ? filterArchivedWindow(sales as Sale[])
+        : (sales as Sale[])
       return {
         data: filtered,
         source: 'view',
@@ -136,9 +175,25 @@ export async function getUserSales(
   try {
     const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
     const db = getRlsDb()
-    const { data: sales, error } = await fromBase(db, 'sales')
+    let query = fromBase(db, 'sales')
       .select('*')
       .eq('owner_id', userId)
+
+    // Apply status filter server-side
+    if (statusFilter === 'archived') {
+      // Only archived sales within 1-year window
+      query = query
+        .eq('status', 'archived')
+        .or(`archived_at.gte.${oneYearAgoStr},date_end.gte.${oneYearAgoStr}`)
+    } else if (statusFilter === 'active') {
+      // Only active/published sales (not archived)
+      query = query
+        .in('status', ['published', 'active'])
+        .is('archived_at', null)
+    }
+    // else 'all' - no status filter (but still apply 1-year window for archived)
+
+    const { data: sales, error } = await query
       .order('updated_at', { ascending: false })
       .limit(limit)
 
@@ -150,7 +205,11 @@ export async function getUserSales(
       }
     }
 
-    const filtered = filterArchivedWindow((sales || []) as Sale[])
+    // For 'all' status, still apply 1-year window filter client-side for archived sales
+    const filtered = statusFilter === 'all' 
+      ? filterArchivedWindow((sales || []) as Sale[])
+      : ((sales || []) as Sale[])
+    
     // Log fallback usage for observability (debug only)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       const { logger } = await import('@/lib/log')
@@ -159,6 +218,7 @@ export async function getUserSales(
         operation: 'getUserSales',
         userId: userId.substring(0, 8) + '...',
         count: sales?.length || 0,
+        statusFilter,
       })
     }
 
@@ -677,98 +737,11 @@ export async function getSaleWithItems(
     // Query base table - RLS policies will filter results based on auth context
     // Select image_url and images (if available) - images array is preferred, image_url is fallback
     // Note: Both columns exist in the base table schema (migration 096)
-    let itemsRes = await fromBase(db, 'items')
+    // The base table is authoritative for items and images - migration 097 backfilled all item images.
+    const itemsRes = await fromBase(db, 'items')
       .select('id, sale_id, name, price, image_url, images, created_at')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: false })
-    
-    // Check if items have images - if base table returns items but none have images, try view fallback
-    // NOTE: After migration 097 (backfill) and normalized writes, this should rarely trigger.
-    // TODO: Remove this view fallback once we've confirmed base-table images are fully populated in production (2-4 weeks).
-    const itemsHaveImages = itemsRes.data && itemsRes.data.length > 0 && itemsRes.data.some((item: any) => {
-      const hasImageUrl = item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0
-      const hasImages = Array.isArray(item.images) && item.images.length > 0 && item.images.some((img: any) => typeof img === 'string' && img.trim().length > 0)
-      return hasImageUrl || hasImages
-    })
-    
-    // If base table query fails, returns no results, or items have no images, try fallback to items_v2 view
-    // TEMPORARY SAFETY NET: This fallback is kept as a safety net during the transition period.
-    // After confirming base-table images are authoritative (2-4 weeks), this should be removed.
-    // IMPORTANT: Always try fallback if base table returns 0 items, even if no error
-    // This handles cases where RLS silently blocks access (no error, but 0 results)
-    const shouldTryFallback = itemsRes.error || !itemsRes.data || itemsRes.data.length === 0 || !itemsHaveImages
-    
-    if (shouldTryFallback) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        logger.debug('Base table query failed, returned no items, or items have no images - trying items_v2 view fallback (TEMPORARY SAFETY NET)', {
-          component: 'salesAccess',
-          operation: 'getSaleWithItems',
-          saleId,
-          baseTableError: itemsRes.error?.code || null,
-          baseTableErrorMessage: itemsRes.error?.message || null,
-          baseTableCount: itemsRes.data?.length || 0,
-          itemsHaveImages,
-          saleStatus: sale.status,
-          isOwner: user && user.id === ownerId,
-          note: itemsRes.error 
-            ? 'RLS may be silently blocking access' 
-            : (!itemsRes.data || itemsRes.data.length === 0) 
-              ? 'No items returned' 
-              : 'Items returned but no images found - this should be rare after migration 097. TODO: Remove view fallback after confirming base-table images are authoritative.',
-        })
-      }
-      
-      // Try items_v2 view as fallback
-      // The view may have different RLS behavior or may not have RLS at all
-      // View has both 'images' array and 'image_url' - select both for compatibility
-      const viewRes = await supabase
-        .from('items_v2')
-        .select('id, sale_id, name, price, images, image_url, created_at')
-        .eq('sale_id', saleId)
-        .order('created_at', { ascending: false })
-      
-      if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          logger.debug('items_v2 view fallback succeeded', {
-            component: 'salesAccess',
-            operation: 'getSaleWithItems',
-            saleId,
-            itemsCount: viewRes.data.length,
-            note: 'View returned items that base table query did not - possible RLS policy issue',
-          })
-        }
-        // Normalize view result to match base table query structure
-        // View has both 'images' array and 'image_url' string - preserve both for mapping
-        const normalizedData = viewRes.data.map((item: any) => ({
-          id: item.id,
-          sale_id: item.sale_id,
-          name: item.name,
-          price: item.price,
-          // Preserve both image_url and images from view for consistent mapping
-          image_url: item.image_url || (Array.isArray(item.images) && item.images.length > 0 ? item.images[0] : null),
-          images: item.images, // Preserve images array for mapping logic
-          created_at: item.created_at,
-        }))
-        itemsRes = {
-          ...viewRes,
-          data: normalizedData,
-        } as typeof itemsRes
-      } else {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          logger.debug('items_v2 view fallback also failed or returned no items', {
-            component: 'salesAccess',
-            operation: 'getSaleWithItems',
-            saleId,
-            viewError: viewRes.error?.code || null,
-            viewErrorMessage: viewRes.error?.message || null,
-            viewCount: viewRes.data?.length || 0,
-            saleStatus: sale.status,
-            isOwner: user && user.id === ownerId,
-            note: 'Both base table and view returned no items - check if items exist in database or if RLS policies need to be applied',
-          })
-        }
-      }
-    }
     
     // Log query results (PII-safe) - only in debug mode
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

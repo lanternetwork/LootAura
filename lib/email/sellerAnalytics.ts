@@ -7,6 +7,7 @@ import React from 'react'
 import { sendEmail } from './sendEmail'
 import { SellerWeeklyAnalyticsEmail, buildSellerWeeklyAnalyticsSubject } from './templates/SellerWeeklyAnalyticsEmail'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
+import { recordEmailSend, canSendEmail, generateSellerWeeklyDedupeKey } from './emailLog'
 import type { SellerWeeklyAnalytics } from '@/lib/data/sellerAnalytics'
 
 export interface SendSellerWeeklyAnalyticsEmailParams {
@@ -110,6 +111,31 @@ export async function sendSellerWeeklyAnalyticsEmail(
     const { weekStart: weekStartFormatted, weekEnd: weekEndFormatted } = formatDateRange(weekStart, weekEnd)
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
 
+    // Generate dedupe key and check if email was already sent
+    let dedupeKey: string | undefined
+    if (profileId) {
+      const weekStartDate = new Date(weekStart)
+      dedupeKey = generateSellerWeeklyDedupeKey(profileId, weekStartDate)
+      
+      // Check if email was already sent for this week
+      const canSend = await canSendEmail({
+        profileId,
+        emailType: 'seller_weekly',
+        dedupeKey,
+        lookbackWindow: '7 days',
+      })
+      
+      if (!canSend) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[EMAIL_SELLER_ANALYTICS] Skipping duplicate email (already sent for this week):', {
+            profileId,
+            dedupeKey,
+          })
+        }
+        return { ok: false, error: 'Email already sent for this week' }
+      }
+    }
+
     // Generate unsubscribe token and URL if profileId is provided
     let unsubscribeUrl: string | undefined
     if (profileId) {
@@ -169,10 +195,12 @@ export async function sendSellerWeeklyAnalyticsEmail(
       unsubscribeUrl,
     })
 
+    const subject = buildSellerWeeklyAnalyticsSubject(weekStartFormatted)
+
     // Send email (non-blocking, errors are logged internally)
-    await sendEmail({
+    const sendResult = await sendEmail({
       to: to.trim(),
-      subject: buildSellerWeeklyAnalyticsSubject(weekStartFormatted),
+      subject,
       type: 'seller_weekly_analytics',
       react,
       metadata: {
@@ -184,7 +212,26 @@ export async function sendSellerWeeklyAnalyticsEmail(
       },
     })
 
-    return { ok: true }
+    // Log email send to email_log table
+    await recordEmailSend({
+      profileId: profileId || undefined,
+      emailType: 'seller_weekly',
+      toEmail: to.trim(),
+      subject,
+      dedupeKey,
+      deliveryStatus: sendResult.ok ? 'sent' : 'failed',
+      errorMessage: sendResult.error,
+      meta: {
+        totalViews: metrics.totalViews,
+        totalSaves: metrics.totalSaves,
+        totalClicks: metrics.totalClicks,
+        topSalesCount: metrics.topSales.length,
+        weekStart,
+        weekEnd,
+      },
+    })
+
+    return sendResult
   } catch (error) {
     // Log but don't throw - email sending is non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)

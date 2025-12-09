@@ -1,26 +1,29 @@
 /**
- * Legacy cron endpoint for "Favorite Sale Starting Soon" email job.
+ * Deprecated endpoint.
  *
- * This path is kept for backwards compatibility and delegates to the
- * canonical `/api/cron/favorites-starting-soon` implementation so
- * behavior cannot drift.
+ * Favorite sales starting soon emails are now handled by /api/cron/daily.
+ * This endpoint is intentionally disabled to prevent duplicate cron paths.
+ * 
+ * This route is kept as a stub to avoid 404s if any old external integrations
+ * or cron configurations still reference it.
  */
 
-import { NextRequest } from 'next/server'
-import {
-  GET as CanonicalGet,
-  POST as CanonicalPost,
-  dynamic as canonicalDynamic,
-} from '../favorites-starting-soon/route'
+import { NextResponse } from 'next/server'
 
-export const dynamic = canonicalDynamic
+export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
-  return CanonicalGet(request)
+export async function GET() {
+  return NextResponse.json(
+    { ok: false, deprecated: true, message: 'Use /api/cron/daily for favorite sales starting soon emails' },
+    { status: 410 }
+  )
 }
 
-export async function POST(request: NextRequest) {
-  return CanonicalPost(request)
+export async function POST() {
+  return NextResponse.json(
+    { ok: false, deprecated: true, message: 'Use /api/cron/daily for favorite sales starting soon emails' },
+    { status: 410 }
+  )
 }
 
 

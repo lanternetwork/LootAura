@@ -9,7 +9,7 @@ import { Sale } from '@/lib/types'
 import type { DraftListing } from '@/lib/data/salesAccess'
 
 interface SalesPanelProps {
-  sales: Sale[]
+  sales: Sale[] // Active sales (for Live tab)
   drafts?: DraftListing[]
   isLoadingDrafts?: boolean
   draftsError?: any
@@ -32,26 +32,50 @@ export default function SalesPanel({
   onRetryDrafts,
 }: SalesPanelProps) {
   const [localSales, setLocalSales] = useState<Sale[]>(sales)
+  const [archivedSales, setArchivedSales] = useState<Sale[]>([])
+  const [isLoadingArchived, setIsLoadingArchived] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>('live')
 
-  // Sync local sales with prop changes
+  // Sync local sales with prop changes (active sales)
   useEffect(() => {
     setLocalSales(sales)
   }, [sales])
+
+  // Fetch archived sales when archived tab is activated
+  useEffect(() => {
+    if (activeTab === 'archived' && archivedSales.length === 0 && !isLoadingArchived) {
+      setIsLoadingArchived(true)
+      fetch('/api/profile/listings?status=archived&limit=50')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.items && Array.isArray(data.items)) {
+            setArchivedSales(data.items as Sale[])
+          }
+        })
+        .catch((err) => {
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('[SALES_PANEL] Error fetching archived sales:', err)
+          }
+        })
+        .finally(() => {
+          setIsLoadingArchived(false)
+        })
+    }
+  }, [activeTab, archivedSales.length, isLoadingArchived])
 
   // Filter sales based on active tab
   const filteredSales = useMemo(() => {
     if (activeTab === 'live') {
       return localSales.filter((sale) => sale.status === 'published')
     } else if (activeTab === 'archived') {
-      return localSales.filter((sale) => sale.status === 'archived')
+      return archivedSales // Use server-filtered archived sales
     }
     return []
-  }, [localSales, activeTab])
+  }, [localSales, archivedSales, activeTab])
 
   // Calculate counts for each tab
   const liveCount = useMemo(() => localSales.filter((s) => s.status === 'published').length, [localSales])
-  const archivedCount = useMemo(() => localSales.filter((s) => s.status === 'archived').length, [localSales])
+  const archivedCount = archivedSales.length // Use fetched archived count
   const draftsCount = drafts.length
 
   const handleSaleDelete = (saleId: string) => {
@@ -188,12 +212,28 @@ export default function SalesPanel({
               </div>
             )}
           </>
+        ) : isLoadingArchived ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="card animate-pulse">
+                <div className="card-body">
+                  <div className="w-full h-32 bg-gray-200 rounded mb-3" />
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2 mb-3" />
+                  <div className="flex gap-2">
+                    <div className="h-8 bg-gray-200 rounded flex-1" />
+                    <div className="h-8 bg-gray-200 rounded w-16" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : filteredSales.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-600 mb-4">
               {activeTab === 'live'
                 ? 'No live sales yet. Create your first sale.'
-                : 'No archived sales yet.'}
+                : 'You don\'t have any archived sales from the last 12 months yet.'}
             </p>
             {activeTab === 'live' && (
               <Link href="/sell/new" className="btn-accent inline-flex items-center gap-1">

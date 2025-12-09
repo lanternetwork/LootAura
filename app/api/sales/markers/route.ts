@@ -59,6 +59,35 @@ async function markersHandler(request: NextRequest) {
     }
 
     const sb = createSupabaseServerClient()
+    
+    // Parse favorites-only filter
+    const favoritesOnly = q.get('favoritesOnly') === '1' || q.get('favorites') === '1'
+    
+    // If favorites-only is requested, require authentication
+    let favoriteSaleIds: string[] | null = null
+    if (favoritesOnly) {
+      const { data: { user }, error: authError } = await sb.auth.getUser()
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Authentication required for favorites-only filter' }, { status: 401 })
+      }
+      
+      // Fetch user's favorite sale IDs
+      const { data: favorites, error: favoritesError } = await sb
+        .from('favorites_v2')
+        .select('sale_id')
+        .eq('user_id', user.id)
+      
+      if (favoritesError) {
+        return NextResponse.json({ error: 'Failed to fetch favorites' }, { status: 500 })
+      }
+      
+      favoriteSaleIds = favorites?.map(f => f.sale_id) || []
+      
+      // If user has no favorites, return empty results
+      if (favoriteSaleIds.length === 0) {
+        return NextResponse.json([])
+      }
+    }
 
     // Build query with category filtering if categories are provided
     let query = sb
@@ -68,6 +97,11 @@ async function markersHandler(request: NextRequest) {
       .not('lng', 'is', null)
       .in('status', ['published', 'active'])
       .is('archived_at', null)
+    
+    // Apply favorites-only filter if requested
+    if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
+      query = query.in('id', favoriteSaleIds)
+    }
 
     // Apply category filtering by joining with items table
     if (Array.isArray(categories) && categories.length > 0) {

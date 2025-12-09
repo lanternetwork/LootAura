@@ -78,7 +78,7 @@ export async function GET(_request: NextRequest) {
 }
 
 // POST: Save or update draft
-export async function POST(request: NextRequest) {
+async function postDraftHandler(request: NextRequest) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(request)
@@ -207,8 +207,24 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  // Get user ID for rate limiting
+  const supabase = createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  const { withRateLimit } = await import('@/lib/rateLimit/withRateLimit')
+  const { Policies } = await import('@/lib/rateLimit/policies')
+
+  return withRateLimit(
+    postDraftHandler,
+    [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
+    { userId }
+  )(request)
+}
+
 // DELETE: Delete/archive draft
-export async function DELETE(request: NextRequest) {
+async function deleteDraftHandler(request: NextRequest) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(request)

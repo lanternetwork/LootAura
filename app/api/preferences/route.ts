@@ -36,7 +36,7 @@ export async function GET() {
   return NextResponse.json({ ok: true, data: data ?? { user_id: user.id, ...DEFAULTS } })
 }
 
-export async function PUT(req: Request) {
+async function putPreferencesHandler(req: Request) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(req as any)
@@ -110,6 +110,22 @@ export async function PUT(req: Request) {
   }
 
   return NextResponse.json({ ok: true, data })
+}
+
+export async function PUT(req: Request) {
+  // Get user ID for rate limiting
+  const sb = createSupabaseServerClient()
+  const { data: { user } } = await sb.auth.getUser()
+  const userId = user?.id
+
+  const { withRateLimit } = await import('@/lib/rateLimit/withRateLimit')
+  const { Policies } = await import('@/lib/rateLimit/policies')
+
+  return withRateLimit(
+    putPreferencesHandler,
+    [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
+    { userId }
+  )(req as any)
 }
 
 

@@ -559,6 +559,7 @@ export async function processFavoriteSalesStartingSoonJob(
       const userEmail = userEmailMap.get(userId)
       if (!userEmail) {
         logger.warn('Skipping user - no email address', {
+          // Do not log email address (PII)
           component: 'jobs/favorite-sales-starting-soon',
           userId,
         })

@@ -8,6 +8,7 @@ import { sendEmail } from './sendEmail'
 import { FavoriteSaleStartingSoonEmail, buildFavoriteSaleStartingSoonSubject } from './templates/FavoriteSaleStartingSoonEmail'
 import { FavoriteSalesStartingSoonDigestEmail, buildFavoriteSalesStartingSoonDigestSubject, type SaleDigestItem } from './templates/FavoriteSalesStartingSoonDigestEmail'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
+import { recordEmailSend, canSendEmail, generateFavoritesDigestDedupeKey } from './emailLog'
 import type { Sale } from '@/lib/types'
 
 /**
@@ -316,6 +317,30 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
     // Build base URL for unsubscribe links
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
 
+    // Generate dedupe key and check if email was already sent
+    let dedupeKey: string | undefined
+    if (profileId) {
+      dedupeKey = generateFavoritesDigestDedupeKey(profileId)
+      
+      // Check if email was already sent in the last 24 hours
+      const canSend = await canSendEmail({
+        profileId,
+        emailType: 'favorites_digest',
+        dedupeKey,
+        lookbackWindow: '1 day',
+      })
+      
+      if (!canSend) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[EMAIL_FAVORITES] Skipping duplicate email (already sent in last 24h):', {
+            profileId,
+            dedupeKey,
+          })
+        }
+        return { ok: false, error: 'Email already sent recently' }
+      }
+    }
+
     // Generate unsubscribe token and URL if profileId is provided
     let unsubscribeUrl: string | undefined
     if (profileId) {
@@ -365,7 +390,7 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
     })
 
     // Send email (non-blocking, errors are logged internally)
-    await sendEmail({
+    const sendResult = await sendEmail({
       to: to.trim(),
       subject,
       type: 'favorite_sale_starting_soon',
@@ -376,7 +401,22 @@ export async function sendFavoriteSalesStartingSoonDigestEmail(
       },
     })
 
-    return { ok: true }
+    // Log email send to email_log table
+    await recordEmailSend({
+      profileId: profileId || undefined,
+      emailType: 'favorites_digest',
+      toEmail: to.trim(),
+      subject,
+      dedupeKey,
+      deliveryStatus: sendResult.ok ? 'sent' : 'failed',
+      errorMessage: sendResult.error,
+      meta: {
+        salesCount: digestItems.length,
+        hoursBeforeStart,
+      },
+    })
+
+    return sendResult
   } catch (error) {
     // Log but don't throw - email sending is non-critical
     const errorMessage = error instanceof Error ? error.message : String(error)

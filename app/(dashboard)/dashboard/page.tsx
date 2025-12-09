@@ -29,8 +29,9 @@ export default async function DashboardPage() {
   }
 
   // Fetch all data in parallel via SSR helpers
+  // Fetch active sales by default (for Live tab)
   const [salesResult, draftsResult, profile, metrics] = await Promise.all([
-    getUserSales(supabase, user.id, 24),
+    getUserSales(supabase, user.id, { statusFilter: 'active', limit: 24 }),
     getUserDrafts(supabase, user.id, 12, 0),
     getUserProfile(supabase, user.id),
     getUserMetrics7d(supabase, user.id),

@@ -42,6 +42,7 @@ const GetSalesParamsSchema = z.object({
   lng: z.number().optional(),
   dateRange: z.enum(['today', 'weekend', 'next_weekend', 'any']).optional(),
   categories: z.array(z.string()).optional(),
+  favoritesOnly: z.boolean().optional(),
   limit: z.number().default(50),
   offset: z.number().default(0),
 })

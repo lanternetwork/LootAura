@@ -22,6 +22,8 @@ SELECT
     email_favorites_digest_enabled,
     email_seller_weekly_enabled,
     is_locked,
+    locked_at,
+    locked_by,
     lock_reason
 FROM lootaura_v2.profiles;
 

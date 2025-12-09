@@ -5,11 +5,11 @@ import { z } from 'zod'
  * All fields are optional URLs
  */
 export const SocialLinksSchema = z.object({
-  facebook: z.string().url().optional().nullable(),
-  instagram: z.string().url().optional().nullable(),
-  twitter: z.string().url().optional().nullable(),
-  tiktok: z.string().url().optional().nullable(),
-}).strict() // Reject unknown fields
+  facebook: z.string().optional().nullable(),
+  instagram: z.string().optional().nullable(),
+  twitter: z.string().optional().nullable(),
+  tiktok: z.string().optional().nullable(),
+}).passthrough() // Allow unknown keys; normalization will drop unsupported providers
 
 export type SocialLinksInput = z.infer<typeof SocialLinksSchema>
 

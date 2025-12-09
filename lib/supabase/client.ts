@@ -20,5 +20,14 @@ export function createSupabaseBrowserClient() {
   }
 
   // Use public schema for reading views (sales_v2, items_v2)
-  return createBrowserClient(url, anon, { db: { schema: 'public' } });
+  // Disable URL session detection to prevent client-side code exchange
+  // Session should be read from cookies set by server-side callback
+  return createBrowserClient(url, anon, { 
+    db: { schema: 'public' },
+    auth: {
+      detectSessionInUrl: false, // Don't auto-exchange codes from URL
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
 }

@@ -11,6 +11,16 @@ import { generateCsrfToken } from '@/lib/csrf'
 const mockSingle = vi.fn()
 let lastInsertedPayload: any = null
 
+// Create a query chain for profile lookups (account lock checks)
+const createQueryChain = () => {
+  const chain: any = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    maybeSingle: vi.fn(() => Promise.resolve({ data: { is_locked: false }, error: null })),
+  }
+  return chain
+}
+
 const fromChain = {
   insert: vi.fn((payload: any) => {
     // Store the payload so we can return it with the inserted row
@@ -27,7 +37,13 @@ const mockSupabaseClient = {
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null })
   },
-  from: vi.fn(() => fromChain)
+  from: vi.fn((table: string) => {
+    // For profiles table (account lock checks), return a query chain
+    if (table === 'profiles') {
+      return createProfileQueryChain()
+    }
+    return fromChain
+  })
 }
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -43,6 +59,10 @@ vi.mock('@/lib/supabase/clients', () => ({
     // fromBase() receives a schema-scoped client, so just use .from() directly
     if (table.includes('.')) {
       throw new Error(`Do not qualify table names: received "${table}"`)
+    }
+    // For profiles table (account lock checks), return a query chain
+    if (table === 'profiles') {
+      return createProfileQueryChain()
     }
     return db.from(table)
   },

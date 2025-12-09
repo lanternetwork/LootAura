@@ -3,9 +3,7 @@
  * Checks if a user account is locked and throws appropriate error
  */
 
-import { SupabaseClient } from '@supabase/supabase-js'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
-import { fail } from '@/lib/http/json'
 import { NextResponse } from 'next/server'
 
 /**

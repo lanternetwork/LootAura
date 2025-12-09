@@ -8,7 +8,6 @@ import {
   Text,
   Heading,
   Button,
-  Link,
 } from '@react-email/components'
 import { BaseLayout } from './BaseLayout'
 

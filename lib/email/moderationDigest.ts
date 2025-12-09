@@ -5,9 +5,8 @@
 
 import React from 'react'
 import { sendEmail } from './sendEmail'
-import { ModerationDailyDigestEmail, buildModerationDigestSubject } from './templates/ModerationDailyDigestEmail'
+import { ModerationDailyDigestEmail, buildModerationDigestSubject, type ReportDigestItem } from './templates/ModerationDailyDigestEmail'
 import { recordEmailSend } from './emailLog'
-import type { ReportDigestItem } from './templates/ModerationDailyDigestEmail'
 
 export interface SendModerationDailyDigestEmailParams {
   reports: ReportDigestItem[]

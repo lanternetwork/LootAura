@@ -1,5 +1,5 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
@@ -97,7 +97,7 @@ async function reportHandler(req: NextRequest, { params }: { params: { id: strin
   }
 
   // Insert new report
-  const { data: newReport, error: insertError } = await fromBase(adminDb, 'sale_reports')
+  const { error: insertError } = await fromBase(adminDb, 'sale_reports')
     .insert({
       sale_id: saleId,
       reporter_profile_id: user.id, // profile_id = user.id

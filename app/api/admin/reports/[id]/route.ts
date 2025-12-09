@@ -19,9 +19,11 @@ const UpdateReportSchema = z.object({
 })
 
 async function updateReportHandler(request: NextRequest, { params }: { params: { id: string } }) {
+  let user: { id: string; email?: string }
   try {
     // Require admin access
-    const { user } = await assertAdminOrThrow(request)
+    const adminResult = await assertAdminOrThrow(request)
+    user = adminResult.user
   } catch (error) {
     if (error instanceof NextResponse) {
       return error
@@ -33,7 +35,6 @@ async function updateReportHandler(request: NextRequest, { params }: { params: {
   }
 
   try {
-    const { user } = await assertAdminOrThrow(request)
     const reportId = params.id
 
     // Parse and validate request body

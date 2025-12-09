@@ -132,6 +132,7 @@ const createQueryChain = (shouldReturnData: boolean = true) => {
   chain.gte = vi.fn(() => chain)
   chain.lte = vi.fn(() => chain)
   chain.eq = vi.fn(() => chain) // Chain continues, resolution happens on await
+  chain.neq = vi.fn(() => chain) // Support moderation_status filter
   chain.in = vi.fn(() => chain)
   chain.or = vi.fn(() => chain)
   chain.order = vi.fn(() => chain)

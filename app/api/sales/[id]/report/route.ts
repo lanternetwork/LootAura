@@ -145,21 +145,29 @@ async function reportHandler(req: NextRequest, { params }: { params: { id: strin
     
     if (uniqueReporters.size >= 5) {
       // Auto-hide the sale (only if not already hidden)
-      const { error: hideError } = await fromBase(adminDb, 'sales')
+      // First check if sale is already hidden to avoid unnecessary updates
+      const { data: existingSale } = await fromBase(adminDb, 'sales')
+        .select('moderation_status')
         .eq('id', saleId)
-        .neq('moderation_status', 'hidden_by_admin') // Only update if not already hidden
-        .update({
-          moderation_status: 'hidden_by_admin',
-          moderation_notes: `Auto-hidden due to ${uniqueReporters.size} unique reports in 24h`,
-        })
+        .maybeSingle()
+      
+      // Only update if not already hidden
+      if (existingSale && existingSale.moderation_status !== 'hidden_by_admin') {
+        const { error: hideError } = await fromBase(adminDb, 'sales')
+          .update({
+            moderation_status: 'hidden_by_admin',
+            moderation_notes: `Auto-hidden due to ${uniqueReporters.size} unique reports in 24h`,
+          })
+          .eq('id', saleId)
 
-      if (!hideError) {
-        logger.info('Sale auto-hidden due to report threshold', {
-          component: 'moderation',
-          operation: 'sale_auto_hidden',
-          saleId,
-          reportCount: uniqueReporters.size,
-        })
+        if (!hideError) {
+          logger.info('Sale auto-hidden due to report threshold', {
+            component: 'moderation',
+            operation: 'sale_auto_hidden',
+            saleId,
+            reportCount: uniqueReporters.size,
+          })
+        }
       }
     }
   }

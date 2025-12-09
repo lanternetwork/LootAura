@@ -146,12 +146,12 @@ async function reportHandler(req: NextRequest, { params }: { params: { id: strin
     if (uniqueReporters.size >= 5) {
       // Auto-hide the sale (only if not already hidden)
       const { error: hideError } = await fromBase(adminDb, 'sales')
+        .eq('id', saleId)
+        .neq('moderation_status', 'hidden_by_admin') // Only update if not already hidden
         .update({
           moderation_status: 'hidden_by_admin',
           moderation_notes: `Auto-hidden due to ${uniqueReporters.size} unique reports in 24h`,
         })
-        .eq('id', saleId)
-        .neq('moderation_status', 'hidden_by_admin') // Only update if not already hidden
 
       if (!hideError) {
         logger.info('Sale auto-hidden due to report threshold', {

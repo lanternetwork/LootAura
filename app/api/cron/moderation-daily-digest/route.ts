@@ -41,7 +41,16 @@ async function handleRequest(request: NextRequest) {
 
   try {
     // Validate cron authentication
-    assertCronAuthorized(request)
+    try {
+      assertCronAuthorized(request)
+    } catch (error) {
+      // assertCronAuthorized throws NextResponse if unauthorized or misconfigured
+      if (error instanceof NextResponse) {
+        return error
+      }
+      // If it's not a NextResponse, rethrow
+      throw error
+    }
 
     logger.info('Moderation daily digest cron job triggered', withOpId({
       component: 'api/cron/moderation-daily-digest',

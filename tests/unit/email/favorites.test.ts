@@ -41,6 +41,8 @@ describe('sendFavoriteSaleStartingSoonEmail', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default mock: email send succeeds
+    vi.mocked(sendEmail).mockResolvedValue({ ok: true })
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
     process.env.RESEND_FROM_EMAIL = 'no-reply@lootaura.com'
     process.env.NEXT_PUBLIC_SITE_URL = 'https://lootaura.com'

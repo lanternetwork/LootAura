@@ -269,3 +269,19 @@ async function deleteDraftHandler(request: NextRequest) {
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  // Get user ID for rate limiting
+  const supabase = createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  const { withRateLimit } = await import('@/lib/rateLimit/withRateLimit')
+  const { Policies } = await import('@/lib/rateLimit/policies')
+
+  return withRateLimit(
+    deleteDraftHandler,
+    [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
+    { userId }
+  )(request)
+}
+

@@ -453,12 +453,14 @@ export default function AddressAutocomplete({
   const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value : undefined)
   const hasUserInteractedRef = useRef<boolean>(false)
   const hasSuppressedInitialSearchRef = useRef<boolean>(false)
+  const hasSetInitialValueRef = useRef<boolean>(false)
 
   // Update initial value ref if value changes before user interaction (for programmatic updates)
   useEffect(() => {
     if (isInitialMountRef.current && !hasUserInteractedRef.current && value && value.trim().length > 0) {
-      if (initialValueRef.current === undefined) {
+      if (!hasSetInitialValueRef.current) {
         initialValueRef.current = value
+        hasSetInitialValueRef.current = true
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[AddressAutocomplete] Captured initial value (late):', value)
         }
@@ -1226,6 +1228,8 @@ export default function AddressAutocomplete({
       // 3. Not already geocoding
       // 4. Value is long enough
       // 5. Suppress flag is not active (additional safety check)
+      // 6. User has interacted (not just initial value on page load)
+      // 7. Not suppressing initial search (edit mode with existing address)
       if (
         value && 
         value.length >= 5 && 
@@ -1234,7 +1238,9 @@ export default function AddressAutocomplete({
         !isOpen && 
         !justSelectedRef.current && 
         !hasJustSelected &&
-        !suppressNextFetchRef.current
+        !suppressNextFetchRef.current &&
+        hasUserInteractedRef.current && // Don't geocode on initial blur if user hasn't interacted
+        !hasSuppressedInitialSearchRef.current // Don't geocode if we suppressed initial search (edit mode)
       ) {
         setIsGeocoding(true)
         try {

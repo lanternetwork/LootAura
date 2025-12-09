@@ -9,9 +9,15 @@ import { buildFavoriteSaleStartingSoonSubject } from '@/lib/email/templates/Favo
 import { buildFavoriteSalesStartingSoonDigestSubject } from '@/lib/email/templates/FavoriteSalesStartingSoonDigestEmail'
 import type { Sale } from '@/lib/types'
 
-// Mock the sendEmail function
+// Mock the sendEmail function and email log helpers
 vi.mock('@/lib/email/sendEmail', () => ({
   sendEmail: vi.fn(),
+}))
+
+vi.mock('@/lib/email/emailLog', () => ({
+  canSendEmail: vi.fn().mockResolvedValue(true),
+  recordEmailSend: vi.fn().mockResolvedValue(undefined),
+  generateFavoritesDigestDedupeKey: vi.fn((profileId: string) => `dedupe-${profileId}`),
 }))
 
 // Mock console methods

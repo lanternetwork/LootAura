@@ -224,6 +224,7 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE: Delete/archive draft
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Function is used as argument to withRateLimit
 async function deleteDraftHandler(request: NextRequest) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')

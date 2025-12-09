@@ -40,7 +40,7 @@ const mockSupabaseClient = {
   from: vi.fn((table: string) => {
     // For profiles table (account lock checks), return a query chain
     if (table === 'profiles') {
-      return createProfileQueryChain()
+      return createQueryChain()
     }
     return fromChain
   })
@@ -62,7 +62,7 @@ vi.mock('@/lib/supabase/clients', () => ({
     }
     // For profiles table (account lock checks), return a query chain
     if (table === 'profiles') {
-      return createProfileQueryChain()
+      return createQueryChain()
     }
     return db.from(table)
   },

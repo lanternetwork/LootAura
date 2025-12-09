@@ -68,7 +68,6 @@ async function archiveEndedSales(
   const now = new Date()
   // Use UTC date to avoid timezone issues
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-  const todayStr = today.toISOString().split('T')[0] // YYYY-MM-DD format
 
   // Find sales that should be archived:
   // - status is 'published' or 'active'

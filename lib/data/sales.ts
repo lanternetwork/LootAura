@@ -174,13 +174,22 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
     today.setUTCHours(0, 0, 0, 0)
     const todayStr = today.toISOString().split('T')[0]
 
+    // Try query with moderation_status filter first
     let query = supabase
       .from('sales_v2')
       .select('*')
       .in('status', ['published', 'active'])
       .is('archived_at', null)
-      // Exclude hidden sales from public queries
-      .neq('moderation_status', 'hidden_by_admin')
+    
+    // Try to add moderation_status filter (may fail if migrations not run)
+    let useModerationFilter = true
+    try {
+      query = query.neq('moderation_status', 'hidden_by_admin')
+    } catch (e) {
+      useModerationFilter = false
+    }
+    
+    query = query
       .order('created_at', { ascending: false })
       .limit(validatedParams.limit)
       .range(validatedParams.offset, validatedParams.offset + validatedParams.limit - 1)
@@ -207,7 +216,49 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
       )
     }
 
-    const { data, error } = await query
+    let { data, error } = await query
+
+    // If query failed due to missing moderation_status column, retry without it
+    if (error && useModerationFilter && (
+      String(error).includes('moderation_status') ||
+      String(error).includes('column') ||
+      (error as any)?.code === 'PGRST204' ||
+      (error as any)?.message?.includes('moderation_status')
+    )) {
+      console.warn('moderation_status column not found, retrying without filter:', error)
+      
+      // Rebuild query without moderation_status filter
+      query = supabase
+        .from('sales_v2')
+        .select('*')
+        .in('status', ['published', 'active'])
+        .is('archived_at', null)
+        .order('created_at', { ascending: false })
+        .limit(validatedParams.limit)
+        .range(validatedParams.offset, validatedParams.offset + validatedParams.limit - 1)
+      
+      if (validatedParams.city) {
+        query = query.ilike('city', `%${validatedParams.city}%`)
+      }
+      
+      if (validatedParams.categories && validatedParams.categories.length > 0) {
+        query = query.overlaps('tags', validatedParams.categories)
+      }
+      
+      if (dateConstraints) {
+        query = query
+          .gte('date_start', dateConstraints.start)
+          .lte('date_start', dateConstraints.end)
+      } else {
+        query = query.or(
+          `date_end.gte.${todayStr},and(date_end.is.null,date_start.gte.${todayStr})`
+        )
+      }
+      
+      const retryResult = await query
+      data = retryResult.data
+      error = retryResult.error
+    }
 
     if (error) {
       console.error('Error fetching sales:', error)

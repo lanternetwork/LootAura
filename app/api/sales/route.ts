@@ -443,6 +443,8 @@ async function salesHandler(request: NextRequest) {
         logger.debug('Calculated bbox from distance', { component: 'sales', minLat, maxLat, minLng, maxLng, distanceKm })
       }
       
+      // Build base query - try with moderation_status filter first
+      // If column doesn't exist (migrations not run), retry without it
       let query = supabase
         .from('sales_v2')
         .select('*')
@@ -452,8 +454,15 @@ async function salesHandler(request: NextRequest) {
         .lte('lng', maxLng)
         // Exclude archived sales from public map/list/search
         .in('status', ['published', 'active'])
-        // Exclude hidden sales from public views
-        .neq('moderation_status', 'hidden_by_admin')
+      
+      // Try to add moderation_status filter (may fail if migrations not run)
+      let useModerationFilter = true
+      try {
+        query = query.neq('moderation_status', 'hidden_by_admin')
+      } catch (e) {
+        // If filter fails at build time, we'll catch it at query time
+        useModerationFilter = false
+      }
       
       // Apply favorites-only filter if requested
       if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
@@ -530,9 +539,68 @@ async function salesHandler(request: NextRequest) {
       
       // Fetch a wider slice to allow client-side distance filtering
       const fetchWindow = Math.min(1000, Math.max(limit * 10, 200))
-      const { data: salesData, error: salesError } = await query
+      let { data: salesData, error: salesError } = await query
         .order('id', { ascending: true })
         .range(0, fetchWindow - 1)
+      
+      // If query failed due to missing moderation_status column, retry without it
+      if (salesError && useModerationFilter && (
+        String(salesError).includes('moderation_status') ||
+        String(salesError).includes('column') ||
+        (salesError as any)?.code === 'PGRST204' ||
+        (salesError as any)?.message?.includes('moderation_status')
+      )) {
+        logger.warn('moderation_status column not found, retrying without filter', {
+          component: 'sales',
+          operation: 'get_sales',
+          error: String(salesError)
+        })
+        
+        // Rebuild query without moderation_status filter
+        query = supabase
+          .from('sales_v2')
+          .select('*')
+          .gte('lat', minLat)
+          .lte('lat', maxLat)
+          .gte('lng', minLng)
+          .lte('lng', maxLng)
+          .in('status', ['published', 'active'])
+        
+        if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
+          query = query.in('id', favoriteSaleIds)
+        }
+        
+        if (categories.length > 0) {
+          const { data: salesWithCategories } = await supabase
+            .from('items_v2')
+            .select('sale_id')
+            .in('category', dbCategories)
+          const saleIds = salesWithCategories?.map(item => item.sale_id) || []
+          if (saleIds.length > 0) {
+            query = query.in('id', saleIds)
+          } else {
+            return NextResponse.json({
+              ok: true,
+              data: [],
+              center: { lat: latitude, lng: longitude },
+              distanceKm,
+              count: 0,
+              durationMs: Date.now() - startedAt
+            })
+          }
+        }
+        
+        if (q) {
+          query = query.or(`title.ilike.%${q}%,description.ilike.%${q}%,address.ilike.%${q}%`)
+        }
+        
+        const retryResult = await query
+          .order('id', { ascending: true })
+          .range(0, fetchWindow - 1)
+        
+        salesData = retryResult.data
+        salesError = retryResult.error
+      }
       
       logger.debug('Direct query response', { 
         component: 'sales',

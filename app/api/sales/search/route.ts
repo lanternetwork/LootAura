@@ -67,16 +67,42 @@ async function searchHandler(request: NextRequest) {
 
     if (lat && lng) {
       // Use lat/lng-based distance filtering instead of geometry columns
-      const { data: salesData, error: salesError } = await supabase
+      // Try query with moderation_status filter first
+      let { data: salesData, error: salesError } = await supabase
         .from('sales_v2')
         .select('*')
         .not('lat', 'is', null)
         .not('lng', 'is', null)
         .eq('status', 'published')
-        // Exclude hidden sales from public search
         .neq('moderation_status', 'hidden_by_admin')
         .order('created_at', { ascending: false })
         .limit(Math.min(limit * 3, 500)) // Fetch more to allow for distance filtering
+
+      // If query failed due to missing moderation_status column, retry without it
+      if (salesError && (
+        String(salesError).includes('moderation_status') ||
+        String(salesError).includes('column') ||
+        (salesError as any)?.code === 'PGRST204' ||
+        (salesError as any)?.message?.includes('moderation_status')
+      )) {
+        logger.warn('moderation_status column not found, retrying without filter', {
+          component: 'sales',
+          operation: 'search',
+          error: String(salesError)
+        })
+        
+        const retryResult = await supabase
+          .from('sales_v2')
+          .select('*')
+          .not('lat', 'is', null)
+          .not('lng', 'is', null)
+          .eq('status', 'published')
+          .order('created_at', { ascending: false })
+          .limit(Math.min(limit * 3, 500))
+        
+        salesData = retryResult.data
+        salesError = retryResult.error
+      }
 
       if (salesError) {
         error = salesError

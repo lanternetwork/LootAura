@@ -90,6 +90,7 @@ async function markersHandler(request: NextRequest) {
     }
 
     // Build query with category filtering if categories are provided
+    // Try with moderation_status filter first, retry without if column doesn't exist
     let query = sb
       .from('sales_v2')
       .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
@@ -97,8 +98,14 @@ async function markersHandler(request: NextRequest) {
       .not('lng', 'is', null)
       .in('status', ['published', 'active'])
       .is('archived_at', null)
-      // Exclude hidden sales from public map
-      .neq('moderation_status', 'hidden_by_admin')
+    
+    // Try to add moderation_status filter (may fail if migrations not run)
+    let useModerationFilter = true
+    try {
+      query = query.neq('moderation_status', 'hidden_by_admin')
+    } catch (e) {
+      useModerationFilter = false
+    }
     
     // Apply favorites-only filter if requested
     if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
@@ -160,9 +167,64 @@ async function markersHandler(request: NextRequest) {
       }
     }
 
-    const { data, error } = await query
+    let { data, error } = await query
       .order('id', { ascending: true })
       .limit(Math.min(limit, 1000))
+
+    // If query failed due to missing moderation_status column, retry without it
+    if (error && useModerationFilter && (
+      String(error).includes('moderation_status') ||
+      String(error).includes('column') ||
+      (error as any)?.code === 'PGRST204' ||
+      (error as any)?.message?.includes('moderation_status')
+    )) {
+      const { logger } = await import('@/lib/log')
+      logger.warn('moderation_status column not found, retrying without filter', {
+        component: 'sales',
+        operation: 'markers',
+        error: String(error)
+      })
+      
+      // Rebuild query without moderation_status filter
+      query = sb
+        .from('sales_v2')
+        .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .in('status', ['published', 'active'])
+        .is('archived_at', null)
+      
+      if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
+        query = query.in('id', favoriteSaleIds)
+      }
+      
+      if (Array.isArray(categories) && categories.length > 0) {
+        const { data: salesWithCategories } = await sb
+          .from('items_v2')
+          .select('sale_id')
+          .in('category', dbCategories)
+        const saleIds = salesWithCategories?.map(item => item.sale_id) || []
+        if (saleIds.length > 0) {
+          query = query.in('id', saleIds)
+        } else {
+          return NextResponse.json({
+            ok: true,
+            data: [],
+            center: { lat: originLat, lng: originLng },
+            distanceKm,
+            count: 0,
+            durationMs: Date.now() - startedAt
+          })
+        }
+      }
+      
+      const retryResult = await query
+        .order('id', { ascending: true })
+        .limit(Math.min(limit, 1000))
+      
+      data = retryResult.data
+      error = retryResult.error
+    }
 
     if (error) {
       const { logger } = await import('@/lib/log')

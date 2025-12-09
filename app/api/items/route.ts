@@ -76,6 +76,19 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Check if account is locked
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      // assertAccountNotLocked throws NextResponse if locked
+      if (error instanceof NextResponse) {
+        return error
+      }
+      // If it's not a NextResponse, rethrow
+      throw error
+    }
     
     const body = await request.json()
     const { title, description, price, sale_id, category, condition, image_url } = body

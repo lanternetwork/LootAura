@@ -179,6 +179,8 @@ export async function getSales(params: GetSalesParams = { distanceKm: 25, limit:
       .select('*')
       .in('status', ['published', 'active'])
       .is('archived_at', null)
+      // Exclude hidden sales from public queries
+      .neq('moderation_status', 'hidden_by_admin')
       .order('created_at', { ascending: false })
       .limit(validatedParams.limit)
       .range(validatedParams.offset, validatedParams.offset + validatedParams.limit - 1)

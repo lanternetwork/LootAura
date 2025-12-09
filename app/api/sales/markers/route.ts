@@ -97,6 +97,8 @@ async function markersHandler(request: NextRequest) {
       .not('lng', 'is', null)
       .in('status', ['published', 'active'])
       .is('archived_at', null)
+      // Exclude hidden sales from public map
+      .neq('moderation_status', 'hidden_by_admin')
     
     // Apply favorites-only filter if requested
     if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {

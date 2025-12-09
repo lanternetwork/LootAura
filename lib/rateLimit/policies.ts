@@ -32,6 +32,7 @@ export const Policies = {
   ADMIN_TOOLS:       { name: 'ADMIN_TOOLS',       limit: 3,  windowSec: 30, scope: 'ip' as const },
   ADMIN_HOURLY:      { name: 'ADMIN_HOURLY',      limit: 60, windowSec: 3600, scope: 'ip' as const },
   UNSUBSCRIBE_EMAIL: { name: 'UNSUBSCRIBE_EMAIL', limit: 5,  windowSec: 900, scope: 'ip' as const }, // 5 requests per 15 minutes
+  REPORT_SALE:       { name: 'REPORT_SALE',       limit: 5,  windowSec: 3600, scope: 'user' as const }, // 5 reports per hour per user
 } as const
 
 export type PolicyName = keyof typeof Policies

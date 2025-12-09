@@ -73,6 +73,8 @@ async function searchHandler(request: NextRequest) {
         .not('lat', 'is', null)
         .not('lng', 'is', null)
         .eq('status', 'published')
+        // Exclude hidden sales from public search
+        .neq('moderation_status', 'hidden_by_admin')
         .order('created_at', { ascending: false })
         .limit(Math.min(limit * 3, 500)) // Fetch more to allow for distance filtering
 

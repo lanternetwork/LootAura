@@ -58,6 +58,19 @@ async function updateProfileHandler(request: NextRequest) {
       return fail(401, 'AUTH_REQUIRED', 'Authentication required')
     }
 
+    // Check if account is locked
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      // assertAccountNotLocked throws NextResponse if locked
+      if (error instanceof NextResponse) {
+        return error
+      }
+      // If it's not a NextResponse, rethrow
+      throw error
+    }
+
     let body: any
     try {
       body = await request.json()

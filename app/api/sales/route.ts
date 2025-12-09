@@ -452,6 +452,8 @@ async function salesHandler(request: NextRequest) {
         .lte('lng', maxLng)
         // Exclude archived sales from public map/list/search
         .in('status', ['published', 'active'])
+        // Exclude hidden sales from public views
+        .neq('moderation_status', 'hidden_by_admin')
       
       // Apply favorites-only filter if requested
       if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
@@ -952,6 +954,19 @@ async function postHandler(request: NextRequest) {
         })
         return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
       }
+    }
+
+    // Check if account is locked
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      // assertAccountNotLocked throws NextResponse if locked
+      if (error instanceof NextResponse) {
+        return error
+      }
+      // If it's not a NextResponse, rethrow
+      throw error
     }
     
     let body: any

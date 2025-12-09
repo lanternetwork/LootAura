@@ -453,14 +453,12 @@ export default function AddressAutocomplete({
   const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value : undefined)
   const hasUserInteractedRef = useRef<boolean>(false)
   const hasSuppressedInitialSearchRef = useRef<boolean>(false)
-  const hasSetInitialValueRef = useRef<boolean>(false)
 
   // Update initial value ref if value changes before user interaction (for programmatic updates)
   useEffect(() => {
     if (isInitialMountRef.current && !hasUserInteractedRef.current && value && value.trim().length > 0) {
-      if (!hasSetInitialValueRef.current) {
+      if (initialValueRef.current === undefined) {
         initialValueRef.current = value
-        hasSetInitialValueRef.current = true
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.log('[AddressAutocomplete] Captured initial value (late):', value)
         }
@@ -506,17 +504,19 @@ export default function AddressAutocomplete({
     const trimmedQuery = debouncedQuery?.trim() || ''
     const currentValueTrimmed = value?.trim() || ''
 
-    // Suppress search if there's an initial value and user hasn't interacted (edit mode)
+    // EARLY RETURN: Suppress search if there's an initial value and user hasn't interacted (edit mode)
     // This prevents the dropdown from appearing when the page loads with an existing address
     // Check both current value and debounced query to catch all cases
-    if (!hasUserInteractedRef.current && !hasSuppressedInitialSearchRef.current) {
+    // This must be the FIRST check to prevent any fetch from starting
+    if (!hasUserInteractedRef.current) {
       if (initialValueRef.current && initialValueRef.current.trim().length > 0) {
         const initialTrimmed = initialValueRef.current.trim()
         // Suppress if current value or debounced query matches initial value
         const matchesInitial = 
           currentValueTrimmed === initialTrimmed || 
           trimmedQuery === initialTrimmed ||
-          value === initialValueRef.current
+          value === initialValueRef.current ||
+          (trimmedQuery && trimmedQuery === initialValueRef.current.trim())
         
         if (matchesInitial) {
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -524,8 +524,14 @@ export default function AddressAutocomplete({
               initial: initialValueRef.current,
               current: value,
               currentTrimmed: currentValueTrimmed,
-              debounced: trimmedQuery
+              debounced: trimmedQuery,
+              hasSuppressed: hasSuppressedInitialSearchRef.current
             })
+          }
+          // Abort any in-flight requests
+          if (abortRef.current) {
+            abortRef.current.abort()
+            abortRef.current = null
           }
           hasSuppressedInitialSearchRef.current = true
           isInitialMountRef.current = false
@@ -533,20 +539,26 @@ export default function AddressAutocomplete({
           setIsOpen(false)
           setShowGoogleAttribution(false)
           setShowFallbackMessage(false)
-          return
+          setSuggestions([]) // Clear any existing suggestions
+          return // EARLY RETURN - don't proceed with any fetch logic
         }
       }
     }
     
-    // If user has interacted or we've already suppressed, allow normal search behavior
-    // But skip if value still matches initial (to prevent re-triggering)
+    // If we've already suppressed and value still matches initial, don't search
     if (hasSuppressedInitialSearchRef.current && initialValueRef.current) {
       const initialTrimmed = initialValueRef.current.trim()
-      if (currentValueTrimmed === initialTrimmed || trimmedQuery === initialTrimmed) {
+      if (currentValueTrimmed === initialTrimmed || trimmedQuery === initialTrimmed || (trimmedQuery && trimmedQuery === initialTrimmed)) {
         // Still matches initial - don't search
+        // Abort any in-flight requests
+        if (abortRef.current) {
+          abortRef.current.abort()
+          abortRef.current = null
+        }
         setIsLoading(false)
         setIsOpen(false)
-        return
+        setSuggestions([]) // Clear any existing suggestions
+        return // EARLY RETURN - don't proceed with any fetch logic
       }
     }
     
@@ -1228,8 +1240,6 @@ export default function AddressAutocomplete({
       // 3. Not already geocoding
       // 4. Value is long enough
       // 5. Suppress flag is not active (additional safety check)
-      // 6. User has interacted (not just initial value on page load)
-      // 7. Not suppressing initial search (edit mode with existing address)
       if (
         value && 
         value.length >= 5 && 
@@ -1238,9 +1248,7 @@ export default function AddressAutocomplete({
         !isOpen && 
         !justSelectedRef.current && 
         !hasJustSelected &&
-        !suppressNextFetchRef.current &&
-        hasUserInteractedRef.current && // Don't geocode on initial blur if user hasn't interacted
-        !hasSuppressedInitialSearchRef.current // Don't geocode if we suppressed initial search (edit mode)
+        !suppressNextFetchRef.current
       ) {
         setIsGeocoding(true)
         try {

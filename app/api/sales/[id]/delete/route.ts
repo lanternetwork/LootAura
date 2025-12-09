@@ -41,7 +41,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const userId = user?.id
 
   return withRateLimit(
-    (request) => deleteHandler(request, params),
+    (request) => deleteHandler(request, { params }),
     [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
     { userId }
   )(req)

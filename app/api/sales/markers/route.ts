@@ -59,13 +59,49 @@ async function markersHandler(request: NextRequest) {
     }
 
     const sb = createSupabaseServerClient()
+    
+    // Parse favorites-only filter
+    const favoritesOnly = q.get('favoritesOnly') === '1' || q.get('favorites') === '1'
+    
+    // If favorites-only is requested, require authentication
+    let favoriteSaleIds: string[] | null = null
+    if (favoritesOnly) {
+      const { data: { user }, error: authError } = await sb.auth.getUser()
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Authentication required for favorites-only filter' }, { status: 401 })
+      }
+      
+      // Fetch user's favorite sale IDs
+      const { data: favorites, error: favoritesError } = await sb
+        .from('favorites_v2')
+        .select('sale_id')
+        .eq('user_id', user.id)
+      
+      if (favoritesError) {
+        return NextResponse.json({ error: 'Failed to fetch favorites' }, { status: 500 })
+      }
+      
+      favoriteSaleIds = favorites?.map(f => f.sale_id) || []
+      
+      // If user has no favorites, return empty results
+      if (favoriteSaleIds.length === 0) {
+        return NextResponse.json([])
+      }
+    }
 
     // Build query with category filtering if categories are provided
     let query = sb
       .from('sales_v2')
-      .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end')
+      .select('id, title, description, lat, lng, starts_at, date_start, date_end, time_start, time_end, status, archived_at')
       .not('lat', 'is', null)
       .not('lng', 'is', null)
+      .in('status', ['published', 'active'])
+      .is('archived_at', null)
+    
+    // Apply favorites-only filter if requested
+    if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
+      query = query.in('id', favoriteSaleIds)
+    }
 
     // Apply category filtering by joining with items table
     if (Array.isArray(categories) && categories.length > 0) {
@@ -155,7 +191,8 @@ async function markersHandler(request: NextRequest) {
       })
     }
     
-    // If no date filtering is applied, return all sales
+    // If no date filtering is applied, still enforce "future-only" semantics
+    const now = new Date()
     if (!dateWindow) {
       const markers = data?.map((sale: any) => {
         const R = 6371
@@ -167,6 +204,15 @@ async function markersHandler(request: NextRequest) {
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         const distance = R * c
 
+        // Compute end date for future-only filtering
+        const startDate = sale.date_start ? new Date(`${sale.date_start}T00:00:00Z`) : null
+        const endDate = sale.date_end
+          ? new Date(`${sale.date_end}T23:59:59.999Z`)
+          : startDate
+        const isFuture = endDate ? endDate >= now : true
+
+        if (!isFuture) return null
+
         return {
           id: sale.id,
           title: sale.title,
@@ -175,7 +221,7 @@ async function markersHandler(request: NextRequest) {
           lng: sale.lng,
           distance: Math.round(distance * 100) / 100
         }
-      }) || []
+      })?.filter(Boolean) || []
 
       return NextResponse.json(markers)
     }

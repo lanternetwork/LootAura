@@ -61,6 +61,31 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const supabase = createSupabaseBrowserClient()
   const [currentStep, setCurrentStep] = useState(0)
   const [user, setUser] = useState<any>(null)
+  // Normalize tags to ensure it's always an array
+  // Also normalize case to match checkbox format (capitalize first letter)
+  const normalizeTags = (tags: any): string[] => {
+    const categoryList = [
+      'Furniture', 'Electronics', 'Clothing', 'Toys',
+      'Books', 'Tools', 'Kitchen', 'Sports',
+      'Garden', 'Art', 'Collectibles', 'Miscellaneous'
+    ]
+    
+    let tagArray: string[] = []
+    if (Array.isArray(tags)) {
+      tagArray = tags.filter(Boolean) // Remove any falsy values
+    } else if (tags && typeof tags === 'string') {
+      tagArray = [tags]
+    }
+    
+    // Normalize tags to match checkbox format (case-insensitive match)
+    return tagArray.map(tag => {
+      const trimmed = tag.trim()
+      // Find matching category from the list (case-insensitive)
+      const matched = categoryList.find(cat => cat.toLowerCase() === trimmed.toLowerCase())
+      return matched || trimmed // Use matched format, or keep original if no match
+    }).filter(Boolean)
+  }
+
   const [formData, setFormData] = useState<Partial<SaleInput>>({
     title: initialData?.title || '',
     description: initialData?.description || '',
@@ -73,7 +98,7 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     date_end: initialData?.date_end || '',
     time_end: initialData?.time_end || '',
     duration_hours: initialData?.duration_hours || 4, // Default 4 hours
-    tags: initialData?.tags || [],
+    tags: normalizeTags(initialData?.tags),
     pricing_mode: initialData?.pricing_mode || 'negotiable',
     status: initialData?.status || 'draft'
   })
@@ -284,6 +309,33 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
     }
   }, [buildDraftPayload, user])
 
+
+  // Ensure tags are properly set when initialData is provided (edit mode)
+  // This runs on mount and whenever initialData.tags changes
+  useEffect(() => {
+    const tagsFromInitialData = initialData?.tags
+    const normalized = normalizeTags(tagsFromInitialData)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[SELL_WIZARD] Tags useEffect:', {
+        initialDataTags: tagsFromInitialData,
+        normalized,
+        currentFormDataTags: formData.tags,
+        isEdit: _isEdit
+      })
+    }
+    // Always update tags from initialData if provided (for edit mode)
+    // Only update if tags are different to avoid unnecessary re-renders
+    const currentTags = formData.tags || []
+    const currentSorted = [...currentTags].sort()
+    const normalizedSorted = [...normalized].sort()
+    if (JSON.stringify(currentSorted) !== JSON.stringify(normalizedSorted)) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[SELL_WIZARD] Updating formData.tags:', normalized)
+      }
+      setFormData(prev => ({ ...prev, tags: normalized }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData, _isEdit, normalizeTags]) // Run when initialData changes or isEdit changes
 
   // Resume draft on mount (priority: server > local)
   useEffect(() => {
@@ -1484,24 +1536,49 @@ function DetailsStep({ formData, onChange, errors, userLat, userLng }: { formDat
             'Furniture', 'Electronics', 'Clothing', 'Toys',
             'Books', 'Tools', 'Kitchen', 'Sports',
             'Garden', 'Art', 'Collectibles', 'Miscellaneous'
-          ].map((category) => (
+          ].map((category) => {
+            // Check if this category is in tags (case-insensitive comparison)
+            const isChecked = formData.tags?.some(tag => 
+              tag && tag.trim().toLowerCase() === category.toLowerCase()
+            ) || false
+            
+            // Debug logging for first category only to avoid spam
+            if (category === 'Furniture' && process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Category checkbox check:', {
+                category,
+                formDataTags: formData.tags,
+                isChecked
+              })
+            }
+            
+            return (
             <label key={category} className="flex items-center space-x-2">
               <input
                 type="checkbox"
-                checked={formData.tags?.includes(category) || false}
+                checked={isChecked}
                 onChange={(e) => {
                   const currentTags = formData.tags || []
                   if (e.target.checked) {
-                    onChange('tags', [...currentTags, category])
+                    // Add category if not already present (case-insensitive check)
+                    const alreadyExists = currentTags.some(tag => 
+                      tag && tag.trim().toLowerCase() === category.toLowerCase()
+                    )
+                    if (!alreadyExists) {
+                      onChange('tags', [...currentTags, category])
+                    }
                   } else {
-                    onChange('tags', currentTags.filter(tag => tag !== category))
+                    // Remove category (case-insensitive)
+                    onChange('tags', currentTags.filter(tag => 
+                      !tag || tag.trim().toLowerCase() !== category.toLowerCase()
+                    ))
                   }
                 }}
                 className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
               />
-              <span className="text-sm text-gray-700">{category}</span>
-            </label>
-          ))}
+                <span className="text-sm text-gray-700">{category}</span>
+              </label>
+            )
+          })}
         </div>
       </div>
     </div>

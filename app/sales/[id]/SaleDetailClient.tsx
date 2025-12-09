@@ -125,6 +125,7 @@ interface SaleDetailClientProps {
 
 export default function SaleDetailClient({ sale, displayCategories = [], items = [], nearbySales = [], currentUserRating }: SaleDetailClientProps) {
   const searchParams = useSearchParams()
+  const isArchived = sale.status === 'archived'
   
   // Get viewport params from URL to preserve on back navigation
   const lat = searchParams.get('lat')
@@ -552,6 +553,14 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
             <div className="flex justify-between items-start mb-4">
               <div className="flex-1">
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">{sale.title}</h1>
+                {isArchived && (
+                  <div className="mb-3 inline-flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 border border-amber-200">
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-.75-11.5a.75.75 0 111.5 0v4.25a.75.75 0 11-1.5 0V6.5zm.75 7.75a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                    </svg>
+                    <span>This sale has ended and is archived.</span>
+                  </div>
+                )}
                 <div className="flex items-center text-gray-600 mb-4">
                   <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -568,29 +577,31 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                 </div>
               </div>
               
-              <div className="flex gap-2 ml-4 flex-shrink-0">
-                <button
-                  onClick={handleFavoriteToggle}
-                  aria-label={isFavorited ? 'Unsave this sale' : 'Save this sale'}
-                  className={`inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors min-h-[44px] ${
-                    isFavorited
-                      ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  <svg className="w-5 h-5 mr-2" fill={isFavorited ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  {isFavorited ? 'Saved' : 'Save'}
-                </button>
-                
-                <SaleShareButton
-                  url={shareUrl}
-                  title={sale.title || 'Yard Sale'}
-                  text={shareText}
-                  saleId={sale.id}
-                />
-              </div>
+              {!isArchived && (
+                <div className="flex gap-2 ml-4 flex-shrink-0">
+                  <button
+                    onClick={handleFavoriteToggle}
+                    aria-label={isFavorited ? 'Unsave this sale' : 'Save this sale'}
+                    className={`inline-flex items-center px-4 py-2 rounded-lg font-medium transition-colors min-h-[44px] ${
+                      isFavorited
+                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <svg className="w-5 h-5 mr-2" fill={isFavorited ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                    {isFavorited ? 'Saved' : 'Save'}
+                  </button>
+                  
+                  <SaleShareButton
+                    url={shareUrl}
+                    title={sale.title || 'Yard Sale'}
+                    text={shareText}
+                    saleId={sale.id}
+                  />
+                </div>
+              )}
             </div>
             </div>
 

@@ -448,6 +448,23 @@ export default function AddressAutocomplete({
   const justSelectedRef = useRef<boolean>(false)
   const [hasJustSelected, setHasJustSelected] = useState(false)
   const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
+  const isInitialMountRef = useRef<boolean>(true)
+  // Capture initial value synchronously on first render (before debounce triggers)
+  const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value : undefined)
+  const hasUserInteractedRef = useRef<boolean>(false)
+  const hasSuppressedInitialSearchRef = useRef<boolean>(false)
+
+  // Update initial value ref if value changes before user interaction (for programmatic updates)
+  useEffect(() => {
+    if (isInitialMountRef.current && !hasUserInteractedRef.current && value && value.trim().length > 0) {
+      if (initialValueRef.current === undefined) {
+        initialValueRef.current = value
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[AddressAutocomplete] Captured initial value (late):', value)
+        }
+      }
+    }
+  }, [value])
 
   // Debounce search query (250ms per spec to avoid "empty flashes")
   const debouncedQuery = useDebounce(value, 250)
@@ -485,6 +502,70 @@ export default function AddressAutocomplete({
   // Fetch suggestions when query changes
   useEffect(() => {
     const trimmedQuery = debouncedQuery?.trim() || ''
+    const currentValueTrimmed = value?.trim() || ''
+
+    // EARLY RETURN: Suppress search if there's an initial value and user hasn't interacted (edit mode)
+    // This prevents the dropdown from appearing when the page loads with an existing address
+    // Check both current value and debounced query to catch all cases
+    // This must be the FIRST check to prevent any fetch from starting
+    if (!hasUserInteractedRef.current) {
+      if (initialValueRef.current && initialValueRef.current.trim().length > 0) {
+        const initialTrimmed = initialValueRef.current.trim()
+        // Suppress if current value or debounced query matches initial value
+        const matchesInitial = 
+          currentValueTrimmed === initialTrimmed || 
+          trimmedQuery === initialTrimmed ||
+          value === initialValueRef.current ||
+          (trimmedQuery && trimmedQuery === initialValueRef.current.trim())
+        
+        if (matchesInitial) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[AddressAutocomplete] Suppressing search - value matches initial:', {
+              initial: initialValueRef.current,
+              current: value,
+              currentTrimmed: currentValueTrimmed,
+              debounced: trimmedQuery,
+              hasSuppressed: hasSuppressedInitialSearchRef.current
+            })
+          }
+          // Abort any in-flight requests
+          if (abortRef.current) {
+            abortRef.current.abort()
+            abortRef.current = null
+          }
+          hasSuppressedInitialSearchRef.current = true
+          isInitialMountRef.current = false
+          setIsLoading(false)
+          setIsOpen(false)
+          setShowGoogleAttribution(false)
+          setShowFallbackMessage(false)
+          setSuggestions([]) // Clear any existing suggestions
+          return // EARLY RETURN - don't proceed with any fetch logic
+        }
+      }
+    }
+    
+    // If we've already suppressed and value still matches initial, don't search
+    if (hasSuppressedInitialSearchRef.current && initialValueRef.current) {
+      const initialTrimmed = initialValueRef.current.trim()
+      if (currentValueTrimmed === initialTrimmed || trimmedQuery === initialTrimmed || (trimmedQuery && trimmedQuery === initialTrimmed)) {
+        // Still matches initial - don't search
+        // Abort any in-flight requests
+        if (abortRef.current) {
+          abortRef.current.abort()
+          abortRef.current = null
+        }
+        setIsLoading(false)
+        setIsOpen(false)
+        setSuggestions([]) // Clear any existing suggestions
+        return // EARLY RETURN - don't proceed with any fetch logic
+      }
+    }
+    
+    // Mark that initial mount is complete
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false
+    }
 
     // If we just selected a suggestion, suppress the next search triggered by programmatic value change
     // Also check if the query looks like a complete formatted address (has multiple commas) - this indicates a selection was made
@@ -1233,6 +1314,8 @@ export default function AddressAutocomplete({
           type="text"
           value={value}
           onChange={(e) => {
+            // Mark that user has interacted with the field
+            hasUserInteractedRef.current = true
             // Only reset selection flags if user is manually typing (not programmatic update)
             if (!suppressNextFetchRef.current) {
               justSelectedRef.current = false

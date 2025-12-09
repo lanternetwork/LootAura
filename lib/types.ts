@@ -17,6 +17,7 @@ export type Sale = {
   tags?: string[]
   cover_image_url?: string | null
   images?: string[] | null
+  archived_at?: string | null
   status: 'draft' | 'published' | 'completed' | 'cancelled' | 'archived'
   privacy_mode: 'exact' | 'block_until_24h'
   is_featured: boolean

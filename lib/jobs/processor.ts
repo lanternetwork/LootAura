@@ -559,6 +559,7 @@ export async function processFavoriteSalesStartingSoonJob(
       const userEmail = userEmailMap.get(userId)
       if (!userEmail) {
         logger.warn('Skipping user - no email address', {
+          // Do not log email address (PII)
           component: 'jobs/favorite-sales-starting-soon',
           userId,
         })
@@ -585,11 +586,13 @@ export async function processFavoriteSalesStartingSoonJob(
         }
 
         // Send digest email
+        // Note: userId is the same as profileId in Supabase (same UUID)
         const result = await sendFavoriteSalesStartingSoonDigestEmail({
           to: userEmail,
           sales: userSales,
           userName,
           hoursBeforeStart: FAVORITE_SALE_STARTING_SOON_HOURS_BEFORE_START,
+          profileId: userId, // Pass profileId for unsubscribe token generation
         })
 
         if (result.ok) {
@@ -841,12 +844,14 @@ export async function processSellerWeeklyAnalyticsJob(
         }
 
         // Send email
+        // Note: user.id is the same as profileId in Supabase (same UUID)
         const result = await sendSellerWeeklyAnalyticsEmail({
           to: user.email,
           ownerDisplayName,
           metrics,
           weekStart: reportWeekStart.toISOString(),
           weekEnd: reportWeekEnd.toISOString(),
+          profileId: user.id, // Pass profileId for unsubscribe token generation
         })
 
         if (result.ok) {

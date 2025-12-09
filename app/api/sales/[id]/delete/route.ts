@@ -2,8 +2,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+async function deleteHandler(req: NextRequest, { params }: { params: { id: string } }) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(req)
@@ -30,5 +32,18 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   }
   
   return NextResponse.json({ success: true })
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  // Get user ID for rate limiting
+  const supabase = createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id
+
+  return withRateLimit(
+    (request) => deleteHandler(request, { params }),
+    [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
+    { userId }
+  )(req)
 }
 

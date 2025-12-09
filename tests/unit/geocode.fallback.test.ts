@@ -74,73 +74,30 @@ describe('Geocoding Fallback', () => {
     expect(result).toBeNull()
   })
 
-  it('should include proper headers for Nominatim requests', async () => {
-    process.env.NOMINATIM_APP_EMAIL = 'test@example.com'
-    
-    let capturedHeaders: Headers | null = null
-    
-    // Override the Nominatim handler to capture headers
-    server.use(
-      http.get('https://nominatim.openstreetmap.org/search', ({ request }) => {
-        capturedHeaders = request.headers as Headers
-        const url = new URL(request.url)
-        const q = url.searchParams.get('q') || ''
-        if (/invalid|fail/i.test(q)) {
-          return HttpResponse.json([], { status: 200 })
-        }
-        return HttpResponse.json([
-          {
-            lat: '38.1405',
-            lon: '-85.6936',
-            display_name: '123 Test St, Louisville, KY',
-            address: { city: 'Louisville', state: 'KY', postcode: '40201', country_code: 'us', country: 'United States' },
-          },
-        ])
-      })
-    )
-    
-    const addresses = getAddressFixtures()
-    const testAddress = addresses[0]
-    
-    const result = await geocodeAddress(testAddress.address)
-    
-    // Should get Louisville coordinates from Nominatim
-    expect(result).toEqual({
-      lat: 38.1405,
-      lng: -85.6936,
-      formatted_address: '123 Test St, Louisville, KY',
-      city: 'Louisville',
-      state: 'KY',
-      zip: '40201'
-    })
-
-    // Verify User-Agent header is present
-    expect(capturedHeaders).toBeTruthy()
-    const headers = capturedHeaders!
-    expect(headers.get('User-Agent')).toContain('LootAura/1.0')
-    expect(headers.get('User-Agent')).toContain('test@example.com')
-  })
 
   it('should cache results to avoid repeated API calls', async () => {
     let requestCount = 0
     
-    // Override the Nominatim handler to count requests
+    // Override the API endpoint handler to count requests
     server.use(
-      http.get('https://nominatim.openstreetmap.org/search', ({ request }) => {
+      http.get('/api/geocoding/address', ({ request }) => {
         requestCount++
         const url = new URL(request.url)
-        const q = url.searchParams.get('q') || ''
-        if (/invalid|fail/i.test(q)) {
-          return HttpResponse.json([], { status: 200 })
+        const address = url.searchParams.get('address') || ''
+        if (/invalid|fail/i.test(address)) {
+          return HttpResponse.json({ ok: false, error: 'Address not found' }, { status: 404 })
         }
-        return HttpResponse.json([
-          {
-            lat: '38.1405',
-            lon: '-85.6936',
-            display_name: '123 Test St, Louisville, KY',
-            address: { city: 'Louisville', state: 'KY', postcode: '40201', country_code: 'us', country: 'United States' },
-          },
-        ])
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            lat: 38.1405,
+            lng: -85.6936,
+            formatted_address: '123 Test St, Louisville, KY',
+            city: 'Louisville',
+            state: 'KY',
+            zip: '40201'
+          }
+        })
       })
     )
     
@@ -161,23 +118,26 @@ describe('Geocoding Fallback', () => {
   it('should respect cache TTL and expire entries after 24 hours', async () => {
     let requestCount = 0
     
-    // Override the Nominatim handler to count requests
+    // Override the API endpoint handler to count requests
     server.use(
-      http.get('https://nominatim.openstreetmap.org/search', ({ request }) => {
+      http.get('/api/geocoding/address', ({ request }) => {
         requestCount++
         const url = new URL(request.url)
-        const q = url.searchParams.get('q') || ''
-        if (/invalid|fail/i.test(q)) {
-          return HttpResponse.json([], { status: 200 })
+        const address = url.searchParams.get('address') || ''
+        if (/invalid|fail/i.test(address)) {
+          return HttpResponse.json({ ok: false, error: 'Address not found' }, { status: 404 })
         }
-        return HttpResponse.json([
-          {
-            lat: '38.1405',
-            lon: '-85.6936',
-            display_name: '123 Test St, Louisville, KY',
-            address: { city: 'Louisville', state: 'KY', postcode: '40201', country_code: 'us', country: 'United States' },
-          },
-        ])
+        return HttpResponse.json({
+          ok: true,
+          data: {
+            lat: 38.1405,
+            lng: -85.6936,
+            formatted_address: '123 Test St, Louisville, KY',
+            city: 'Louisville',
+            state: 'KY',
+            zip: '40201'
+          }
+        })
       })
     )
     
@@ -209,15 +169,15 @@ describe('Geocoding Fallback', () => {
     Date.now = originalNow
   })
 
-  it('should handle malformed Nominatim responses', async () => {
-    // Use an address that doesn't match MSW handler patterns to get null result
+  it('should handle API endpoint errors gracefully', async () => {
+    // Use an address that returns 404 from API endpoint
     const result = await geocodeAddress('Invalid Address That Should Fail')
     
     expect(result).toBeNull()
   })
 
   it('should handle network errors gracefully', async () => {
-    // Use an address that doesn't match MSW handler patterns to get null result
+    // Use an address that returns 404 from API endpoint
     const result = await geocodeAddress('Invalid Address That Should Fail')
     
     expect(result).toBeNull()

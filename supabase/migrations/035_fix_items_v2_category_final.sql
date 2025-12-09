@@ -1,3 +1,7 @@
+-- DEPRECATED / UNUSED MIGRATION VARIANT
+-- Kept only for historical reference. Not applied in production.
+-- The canonical migration is 035_fix_items_v2_category.sql (or another variant that was actually applied).
+--
 -- Fix items_v2 view to include category column
 -- Based on actual schema: id, created_at, sale_id, name, description, price, image_url
 

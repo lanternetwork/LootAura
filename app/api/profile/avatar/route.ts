@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
 import { getCloudinaryConfig } from '@/lib/cloudinary'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
+import { Policies } from '@/lib/rateLimit/policies'
 
-export async function POST(request: NextRequest) {
+async function avatarHandler(request: NextRequest) {
   // CSRF protection check
   const { checkCsrfIfRequired } = await import('@/lib/api/csrfCheck')
   const csrfError = await checkCsrfIfRequired(request)
@@ -87,4 +89,16 @@ export async function POST(request: NextRequest) {
   })
 }
 
+export async function POST(request: NextRequest) {
+  // Get user ID for rate limiting
+  const sb = createSupabaseServerClient()
+  const { data: { user } } = await sb.auth.getUser()
+  const userId = user?.id
+
+  return withRateLimit(
+    avatarHandler,
+    [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
+    { userId }
+  )(request)
+}
 

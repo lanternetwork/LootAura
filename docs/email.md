@@ -490,6 +490,119 @@ Planned email templates (not yet implemented):
 3. Test templates in multiple email clients
 4. Use the unit tests in `tests/unit/email/` to verify rendering
 
+## Unsubscribe System
+
+LootAura supports one-click unsubscribe for all non-administrative emails (favorites digest and seller weekly analytics). Users can unsubscribe without logging in using a secure, token-based system.
+
+### How It Works
+
+1. **Token Generation**: When sending a non-admin email, a unique, single-use token is generated for each recipient and stored in `lootaura_v2.email_unsubscribe_tokens`.
+   - Tokens are 256-bit cryptographically secure random values
+   - Each token expires after 30 days
+   - Tokens are single-use (marked as `used_at` after successful unsubscribe)
+
+2. **Unsubscribe Link**: Each non-admin email includes a footer with an unsubscribe link:
+   ```
+   https://lootaura.com/email/unsubscribe?token=<token>
+   ```
+
+3. **Unsubscribe Endpoint**: The `/email/unsubscribe` endpoint (GET):
+   - Requires no authentication
+   - Validates the token (must be valid, not expired, not used, scope = 'all_non_admin')
+   - Updates the user's profile to set:
+     - `email_favorites_digest_enabled = false`
+     - `email_seller_weekly_enabled = false`
+   - Marks the token as used
+   - Returns an HTML confirmation page
+
+### Security
+
+- **Token Security**:
+  - Tokens are 256-bit random values (32 bytes, hex-encoded)
+  - Tokens are never logged in server logs
+  - Tokens are single-use and expire after 30 days
+
+- **Database Security**:
+  - `email_unsubscribe_tokens` table has RLS enabled
+  - RLS policy denies all direct access (no anon/auth access)
+  - Only service role can access tokens (via `getAdminDb()`)
+  - Tokens are deleted when profiles are deleted (CASCADE)
+
+- **Rate Limiting**:
+  - Endpoint is rate limited: **5 requests per IP per 15 minutes**
+  - Rate limit errors return HTML (not JSON) for better UX
+  - Rate limiting can be bypassed in development/preview environments
+
+### Email Types
+
+**Non-Admin Emails** (include unsubscribe link):
+- `favorite_sale_starting_soon`: Favorites digest email
+- `seller_weekly_analytics`: Seller weekly analytics email
+
+**Admin/Transactional Emails** (do NOT include unsubscribe link):
+- `sale_created_confirmation`: Sale creation confirmation
+- Any future transactional/account emails
+
+### Implementation Details
+
+**Token Generation** (`lib/email/unsubscribeTokens.ts`):
+- `createUnsubscribeToken(profileId)`: Creates a new token and stores it in the database
+- `buildUnsubscribeUrl(token, baseUrl)`: Constructs the unsubscribe URL
+
+**Email Integration**:
+- `lib/email/favorites.ts`: Generates unsubscribe token and URL for favorites digest
+- `lib/email/sellerAnalytics.ts`: Generates unsubscribe token and URL for seller weekly
+- Both pass `unsubscribeUrl` to email templates
+
+**Email Templates**:
+- `lib/email/templates/BaseLayout.tsx`: Conditionally renders unsubscribe footer
+- Footer only appears when `unsubscribeUrl` is provided
+- Footer text: "You're receiving this email because you're subscribed to LootAura notifications. To unsubscribe, click here."
+
+**Unsubscribe Endpoint** (`app/email/unsubscribe/route.ts`):
+- GET handler with rate limiting
+- Validates token and updates user preferences
+- Returns HTML confirmation or error pages
+- Handles edge cases: expired tokens, already-used tokens, already-unsubscribed users
+
+### User Experience
+
+1. **Unsubscribing**:
+   - User clicks unsubscribe link in email
+   - Sees confirmation page: "You've been successfully unsubscribed"
+   - No login required
+
+2. **Re-subscribing**:
+   - Users can re-enable notifications in account settings (`/account/edit`)
+   - UI toggles update the same database fields
+
+3. **Already Unsubscribed**:
+   - If user clicks unsubscribe link when already unsubscribed, they see a note indicating they were already unsubscribed
+   - Preferences remain unchanged (idempotent)
+
+### Database Schema
+
+**`lootaura_v2.email_unsubscribe_tokens`**:
+- `id`: UUID primary key
+- `profile_id`: References `lootaura_v2.profiles(id)` with CASCADE delete
+- `token`: Unique text token (256-bit hex string)
+- `scope`: Text (default: 'all_non_admin')
+- `created_at`: Timestamp
+- `expires_at`: Timestamp (30 days from creation)
+- `used_at`: Timestamp (NULL until used)
+
+**Indexes**:
+- `idx_email_unsubscribe_tokens_token`: For efficient token lookups (filtered: unused, not expired)
+- `idx_email_unsubscribe_tokens_profile_id`: For profile-based lookups
+
+### Environment Variables
+
+Required for unsubscribe system:
+- `SUPABASE_SERVICE_ROLE_KEY`: Service role key for database access (server-only)
+- `NEXT_PUBLIC_SITE_URL`: Base URL for constructing unsubscribe links
+
+See [Production Environment Variables](./PRODUCTION_ENV.md) for full configuration details.
+
 ## Related Documentation
 
 - [Resend Documentation](https://resend.com/docs)

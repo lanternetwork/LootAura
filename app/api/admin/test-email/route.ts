@@ -127,11 +127,16 @@ export async function POST(request: NextRequest) {
           },
         ]
 
+        // Use a test profile ID for unsubscribe token generation
+        // In production, this would be the actual user's profile ID
+        const testProfileId = '00000000-0000-0000-0000-000000000000'
+        
         const result = await sendFavoriteSalesStartingSoonDigestEmail({
           to,
           sales: testSales,
           userName: 'Test User',
           hoursBeforeStart: 24,
+          profileId: testProfileId, // Pass test profileId for unsubscribe token generation
         })
 
         if (!result.ok) {
@@ -172,12 +177,17 @@ export async function POST(request: NextRequest) {
         const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
         const weekEnd = new Date().toISOString()
 
+        // Use a test profile ID for unsubscribe token generation
+        // In production, this would be the actual user's profile ID
+        const testProfileId = '00000000-0000-0000-0000-000000000000'
+        
         const result = await sendSellerWeeklyAnalyticsEmail({
           to,
           ownerDisplayName: 'Test Seller',
           metrics: testMetrics,
           weekStart,
           weekEnd,
+          profileId: testProfileId, // Pass test profileId for unsubscribe token generation
         })
 
         if (!result.ok) {

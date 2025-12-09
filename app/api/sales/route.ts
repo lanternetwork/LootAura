@@ -293,6 +293,44 @@ async function salesHandler(request: NextRequest) {
       return fail(400, 'QUERY_TOO_LONG', 'Search query too long')
     }
     
+    // Parse favorites-only filter
+    const favoritesOnly = searchParams.get('favoritesOnly') === '1' || searchParams.get('favorites') === '1'
+    
+    // If favorites-only is requested, require authentication
+    let favoriteSaleIds: string[] | null = null
+    if (favoritesOnly) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) {
+        return fail(401, 'AUTH_REQUIRED', 'Authentication required for favorites-only filter')
+      }
+      
+      // Fetch user's favorite sale IDs
+      const { data: favorites, error: favoritesError } = await supabase
+        .from('favorites_v2')
+        .select('sale_id')
+        .eq('user_id', user.id)
+      
+      if (favoritesError) {
+        logger.error('Failed to fetch favorites', favoritesError instanceof Error ? favoritesError : new Error(String(favoritesError)), {
+          component: 'sales',
+          operation: 'fetch_favorites',
+        })
+        return fail(500, 'FETCH_FAVORITES_ERROR', 'Failed to fetch favorites')
+      }
+      
+      favoriteSaleIds = favorites?.map(f => f.sale_id) || []
+      
+      // If user has no favorites, return empty results
+      if (favoriteSaleIds.length === 0) {
+        return NextResponse.json({
+          ok: true,
+          sales: [],
+          total: 0,
+          degraded: false,
+        })
+      }
+    }
+    
     const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit') || '24') : 24, 200)
     const offset = Math.max(searchParams.get('offset') ? parseInt(searchParams.get('offset') || '0') : 0, 0)
     
@@ -414,6 +452,11 @@ async function salesHandler(request: NextRequest) {
         .lte('lng', maxLng)
         // Exclude archived sales from public map/list/search
         .in('status', ['published', 'active'])
+      
+      // Apply favorites-only filter if requested
+      if (favoritesOnly && favoriteSaleIds && favoriteSaleIds.length > 0) {
+        query = query.in('id', favoriteSaleIds)
+      }
       
       // NOTE: We filter by date window after fetching to avoid PostgREST OR-composition issues
       

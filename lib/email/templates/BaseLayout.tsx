@@ -3,6 +3,7 @@
  * Uses React Email components for email-safe HTML
  */
 
+import React from 'react'
 import {
   Html,
   Head,
@@ -11,23 +12,66 @@ import {
   Section,
   Text,
   Link,
+  Img,
 } from '@react-email/components'
 
 export interface BaseLayoutProps {
   previewText?: string
   children: React.ReactNode
+  unsubscribeUrl?: string
+  baseUrl?: string
 }
 
-export function BaseLayout({ previewText, children }: BaseLayoutProps) {
+export function BaseLayout({ previewText, children, unsubscribeUrl, baseUrl }: BaseLayoutProps) {
+  // Get base URL for logo (use provided baseUrl or fallback to env var or default)
+  const siteUrl = baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
+  const logoUrl = `${siteUrl.replace(/\/$/, '')}/sitelogo.svg`
+  
   return (
     <Html>
       <Head />
-      {previewText && <Text style={previewTextStyle}>{previewText}</Text>}
       <Body style={bodyStyle}>
+        {previewText && <Text style={previewTextStyle}>{previewText}</Text>}
         <Container style={containerStyle}>
           {/* Header */}
           <Section style={headerStyle}>
-            <Text style={logoStyle}>LootAura</Text>
+            <table
+              role="presentation"
+              cellPadding={0}
+              cellSpacing={0}
+              border={0}
+              style={tableStyle}
+            >
+              <tbody>
+                <tr>
+                  <td align="center" style={{ verticalAlign: 'middle' }}>
+                    <table
+                      role="presentation"
+                      cellPadding={0}
+                      cellSpacing={0}
+                      border={0}
+                    >
+                      <tbody>
+                        <tr>
+                          <td style={{ verticalAlign: 'middle', paddingRight: '8px' }}>
+                            <Img
+                              src={logoUrl}
+                              alt="LootAura"
+                              width={32}
+                              height={32}
+                              style={logoImageStyle}
+                            />
+                          </td>
+                          <td style={{ verticalAlign: 'middle' }}>
+                            <Text style={logoTextStyle}>LootAura</Text>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </Section>
 
           {/* Content */}
@@ -35,15 +79,27 @@ export function BaseLayout({ previewText, children }: BaseLayoutProps) {
             {children}
           </Section>
 
-          {/* Footer */}
+          {/* Footer - Conditional based on unsubscribeUrl */}
           <Section style={footerStyle}>
-            <Text style={footerTextStyle}>
-              You received this email from LootAura. Visit{' '}
-              <Link href="https://lootaura.com" style={linkStyle}>
-                lootaura.com
-              </Link>{' '}
-              to manage your account.
-            </Text>
+            {unsubscribeUrl && unsubscribeUrl.trim() !== '' ? (
+              // Mode A: Non-admin / marketing (unsubscribe)
+              <Text style={footerTextStyle}>
+                You're receiving this email because you're subscribed to LootAura notifications.{' '}
+                To unsubscribe,{' '}
+                <Link href={unsubscribeUrl} style={linkStyle}>
+                  click here
+                </Link>.
+              </Text>
+            ) : (
+              // Mode B: Admin / transactional (account-only)
+              <Text style={footerTextStyle}>
+                You received this email from LootAura. Visit{' '}
+                <Link href="https://lootaura.com" style={linkStyle}>
+                  lootaura.com
+                </Link>{' '}
+                to manage your account.
+              </Text>
+            )}
           </Section>
         </Container>
       </Body>
@@ -70,11 +126,23 @@ const headerStyle = {
   textAlign: 'center' as const,
 }
 
-const logoStyle = {
+const tableStyle = {
+  width: '100%',
+  margin: '0 auto',
+}
+
+const logoImageStyle = {
+  display: 'block',
+  width: '32px',
+  height: '32px',
+}
+
+const logoTextStyle = {
   color: '#ffffff',
   fontSize: '24px',
   fontWeight: 'bold',
   margin: '0',
+  verticalAlign: 'middle',
 }
 
 const contentStyle = {

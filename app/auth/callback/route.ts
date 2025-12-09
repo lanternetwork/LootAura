@@ -52,6 +52,11 @@ export async function GET(req: Request) {
           }
         },
       },
+      auth: {
+        detectSessionInUrl: false, // We handle code exchange manually, don't auto-detect
+        persistSession: true,
+        autoRefreshToken: true,
+      },
     }
   )
 
@@ -106,13 +111,19 @@ export async function GET(req: Request) {
       // Success: user session cookies are automatically set by auth-helpers
       // Prevent redirect loops: never redirect to auth pages
       let finalRedirectTo = redirectTo
-      if (redirectTo.startsWith('/auth/') || redirectTo.startsWith('/login') || redirectTo.startsWith('/signin')) {
+      if (finalRedirectTo.startsWith('/auth/') || finalRedirectTo.startsWith('/login') || finalRedirectTo.startsWith('/signin')) {
         console.warn('[AUTH_CALLBACK] Preventing redirect loop - redirectTo is an auth page, using default:', redirectTo)
         finalRedirectTo = '/sales'
       }
       
-      console.log('[AUTH_CALLBACK] Redirecting to:', finalRedirectTo)
-      return NextResponse.redirect(new URL(finalRedirectTo, url.origin))
+      // Build redirect URL and ensure it doesn't contain the code parameter
+      // This prevents the client-side from trying to exchange the code again
+      const redirectUrl = new URL(finalRedirectTo, url.origin)
+      redirectUrl.searchParams.delete('code')
+      redirectUrl.searchParams.delete('error')
+      
+      console.log('[AUTH_CALLBACK] Redirecting to:', redirectUrl.toString())
+      return NextResponse.redirect(redirectUrl)
     } else {
       console.log('[AUTH_CALLBACK] Code exchange succeeded but no session received')
       return NextResponse.redirect(new URL('/auth/error?error=no_session', url.origin))

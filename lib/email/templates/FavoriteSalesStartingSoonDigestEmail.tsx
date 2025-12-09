@@ -9,7 +9,6 @@ import {
   Text,
   Heading,
   Button,
-  Link,
 } from '@react-email/components'
 import { BaseLayout } from './BaseLayout'
 
@@ -27,13 +26,16 @@ export interface FavoriteSalesStartingSoonDigestEmailProps {
   sales: SaleDigestItem[]
   hoursBeforeStart: number
   baseUrl?: string
+  unsubscribeUrl?: string
 }
 
 export function FavoriteSalesStartingSoonDigestEmail({
   recipientName,
   sales,
   hoursBeforeStart,
-  baseUrl = 'https://lootaura.com',
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  baseUrl: _baseUrl = 'https://lootaura.com', // Kept for backward compatibility, unused
+  unsubscribeUrl,
 }: FavoriteSalesStartingSoonDigestEmailProps) {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
   const isMultiple = sales.length > 1
@@ -44,7 +46,7 @@ export function FavoriteSalesStartingSoonDigestEmail({
     : `A sale you saved is starting soon: ${sales[0]?.saleTitle}`
 
   return (
-    <BaseLayout previewText={previewText}>
+    <BaseLayout previewText={previewText} unsubscribeUrl={unsubscribeUrl} baseUrl={_baseUrl}>
       <Heading style={headingStyle}>
         {isMultiple
           ? `You have ${sales.length} saved sales starting soon ⏰`
@@ -90,19 +92,6 @@ export function FavoriteSalesStartingSoonDigestEmail({
           )}
         </Section>
       ))}
-
-      <Text style={textStyle}>
-        You're receiving this email because you favorited these sales on LootAura.{' '}
-        Visit your favorites to manage your saved sales.
-      </Text>
-
-      <Text style={footerNoteStyle}>
-        You're receiving this email because you opted in to LootAura notifications.{' '}
-        You can manage your email preferences at any time:{' '}
-        <Link href={`${baseUrl}/account/edit`} style={linkStyle}>
-          Manage notification preferences
-        </Link>.
-      </Text>
     </BaseLayout>
   )
 }
@@ -189,17 +178,5 @@ const dividerTextStyle = {
   color: '#cccccc',
   fontSize: '16px',
   margin: '0',
-}
-
-const footerNoteStyle = {
-  color: '#666666',
-  fontSize: '14px',
-  lineHeight: '20px',
-  margin: '24px 0 0 0',
-}
-
-const linkStyle = {
-  color: '#3A2268',
-  textDecoration: 'underline',
 }
 

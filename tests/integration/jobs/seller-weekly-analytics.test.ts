@@ -176,6 +176,7 @@ describe('processSellerWeeklyAnalyticsJob', () => {
       }),
       weekStart: expect.any(String),
       weekEnd: expect.any(String),
+      profileId: 'owner-1',
     })
   })
 

@@ -7,6 +7,13 @@ export async function GET(_req: NextRequest) {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  try {
+    const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+    await assertAccountNotLocked(user.id)
+  } catch (error) {
+    if (error instanceof NextResponse) return error
+    throw error
+  }
 
   console.log('[PROFILE] GET /api/profile start', { userId: user.id })
 
@@ -373,6 +380,13 @@ export async function POST(_request: NextRequest) {
   const supabase = createSupabaseServerClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  try {
+    const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+    await assertAccountNotLocked(user.id)
+  } catch (error) {
+    if (error instanceof NextResponse) return error
+    throw error
+  }
 
   // Check existing
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

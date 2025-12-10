@@ -8,6 +8,13 @@ export async function GET() {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  try {
+    const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+    await assertAccountNotLocked(user.id)
+  } catch (error) {
+    if (error instanceof NextResponse) return error
+    throw error
+  }
 
   // Try to get preferences from user_preferences table
   // If table doesn't exist or query fails, return defaults

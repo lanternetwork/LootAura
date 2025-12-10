@@ -84,6 +84,13 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      if (error instanceof NextResponse) return error
+      throw error
+    }
 
     // Get schema-aware table name
     const schema = getSchema()
@@ -149,6 +156,13 @@ export async function DELETE(request: NextRequest) {
         { error: 'Authentication required' },
         { status: 401 }
       )
+    }
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      if (error instanceof NextResponse) return error
+      throw error
     }
 
     // Get schema-aware table name

@@ -1,5 +1,5 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
@@ -93,6 +93,13 @@ async function postDraftHandler(request: NextRequest) {
 
     if (authError || !user) {
       return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+    }
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      if (error instanceof NextResponse) return error
+      throw error
     }
 
     let body: any
@@ -239,6 +246,13 @@ async function deleteDraftHandler(request: NextRequest) {
 
     if (authError || !user) {
       return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+    }
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      if (error instanceof NextResponse) return error
+      throw error
     }
 
     const { searchParams } = new URL(request.url)

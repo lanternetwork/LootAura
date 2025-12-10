@@ -1,5 +1,5 @@
 // NOTE: Writes → lootaura_v2.* via schema-scoped clients. Reads from views allowed. Do not write to views.
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
@@ -34,6 +34,13 @@ export async function POST(request: NextRequest) {
     }
 
     user = authUser
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      if (error instanceof NextResponse) return error
+      throw error
+    }
 
     let body: any
     try {

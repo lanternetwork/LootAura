@@ -15,6 +15,11 @@ interface SaleDetailPageProps {
 
 export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   const supabase = createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
+  const isDebugAdmin = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true'
+  const isAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase())) || isDebugAdmin
   const result = await getSaleWithItems(supabase, params.id)
 
   if (!result) {
@@ -22,6 +27,11 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
   }
 
   const { sale, items } = result
+
+  // Block hidden sales for non-admins
+  if ((sale as any).moderation_status === 'hidden_by_admin' && !isAdmin) {
+    notFound()
+  }
   
   // Log items being passed to client (only in debug mode)
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -101,9 +111,13 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
 
 export async function generateMetadata({ params }: SaleDetailPageProps): Promise<Metadata> {
   const supabase = createSupabaseServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
+  const isDebugAdmin = process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEBUG === 'true'
+  const isAdmin = !!(user?.email && adminEmails.includes(user.email.toLowerCase())) || isDebugAdmin
   const result = await getSaleWithItems(supabase, params.id)
   
-  if (!result) {
+  if (!result || ((result.sale as any).moderation_status === 'hidden_by_admin' && !isAdmin)) {
     return {
       title: 'Sale not found · LootAura',
       description: 'This sale no longer exists or is not available.',

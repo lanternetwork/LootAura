@@ -23,7 +23,6 @@ type IdentityCardProps = {
 export function IdentityCard({ profile, mode, onAvatarChange, onViewPublic }: IdentityCardProps) {
   const { data: currentUser } = useAuth()
   const [copied, setCopied] = useState(false)
-  const [showReportDialog, setShowReportDialog] = useState(false)
 
   const handleCopyLink = async () => {
     const url = typeof window !== 'undefined' ? window.location.href : ''
@@ -34,19 +33,6 @@ export function IdentityCard({ profile, mode, onAvatarChange, onViewPublic }: Id
     } catch (e) {
       console.error('Failed to copy link:', e)
     }
-  }
-
-  const handleReport = () => {
-    setShowReportDialog(true)
-  }
-
-  const handleReportSubmit = () => {
-    // Stub: TODO implement report API
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[PROFILE] report submitted', { username: profile.username })
-    }
-    setShowReportDialog(false)
-    alert('Report submitted. Thank you for your feedback.')
   }
 
   return (
@@ -108,13 +94,6 @@ export function IdentityCard({ profile, mode, onAvatarChange, onViewPublic }: Id
               >
                 {copied ? '✓ Copied!' : 'Copy Link'}
               </button>
-              <button
-                type="button"
-                onClick={handleReport}
-                className="rounded px-4 py-2 border text-sm hover:bg-neutral-50"
-              >
-                Report
-              </button>
             </div>
           )}
           {mode === 'owner' && onViewPublic && (
@@ -149,43 +128,10 @@ export function IdentityCard({ profile, mode, onAvatarChange, onViewPublic }: Id
             >
               {copied ? '✓' : 'Copy'}
             </button>
-            <button
-              type="button"
-              onClick={handleReport}
-              className="rounded px-4 py-2 border text-sm hover:bg-neutral-50"
-            >
-              Report
-            </button>
           </div>
         )}
       </div>
-
-      {showReportDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowReportDialog(false)}>
-          <div className="bg-white rounded-lg p-6 w-96 max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-medium mb-4">Report User</h3>
-            <p className="text-sm text-neutral-600 mb-4">
-              If you believe this user is violating our terms of service, please report them.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowReportDialog(false)}
-                className="rounded px-4 py-2 border text-sm hover:bg-neutral-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleReportSubmit}
-                className="btn-accent text-sm"
-              >
-                Submit Report
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* TODO: Add user reporting when backend endpoint exists. Hidden for v1 to avoid dead UI. */}
     </>
   )
 }

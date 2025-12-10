@@ -21,6 +21,13 @@ export async function GET(_request: NextRequest) {
         { status: 401 }
       )
     }
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      if (error instanceof NextResponse) return error
+      throw error
+    }
 
     // Get user's favorites from favorites_v2 table
     const { data: favorites, error } = await supabase
@@ -78,6 +85,13 @@ export async function POST(request: NextRequest) {
         { error: 'Authentication required' },
         { status: 401 }
       )
+    }
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      if (error instanceof NextResponse) return error
+      throw error
     }
 
     // Add favorite to favorites_v2 table

@@ -22,6 +22,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
     return fail(401, 'AUTH_REQUIRED', 'Authentication required')
   }
+  try {
+    const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+    await assertAccountNotLocked(user.id)
+  } catch (error) {
+    if (error instanceof NextResponse) return error
+    throw error
+  }
 
   // Handle params as Promise (Next.js 15+) or object (Next.js 13/14)
   const resolvedParams = await Promise.resolve(params)

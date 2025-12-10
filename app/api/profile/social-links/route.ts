@@ -1,5 +1,5 @@
 // NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { normalizeSocialLinks, type SocialLinks } from '@/lib/profile/social'
 import { SocialLinksSchema } from '@/lib/validators/socialLinks'
@@ -36,6 +36,13 @@ async function updateSocialLinksHandler(request: NextRequest) {
 
     if (authError || !user) {
       return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+    }
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      if (error instanceof NextResponse) return error
+      throw error
     }
 
     let body: any

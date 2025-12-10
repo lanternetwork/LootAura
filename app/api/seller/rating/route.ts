@@ -24,6 +24,13 @@ async function postHandler(req: NextRequest) {
     })
     return fail(401, 'AUTH_REQUIRED', 'Authentication required')
   }
+  try {
+    const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+    await assertAccountNotLocked(user.id)
+  } catch (error) {
+    if (error instanceof Response) return error as any
+    throw error
+  }
 
   // Rate limiting check (after auth so we have userId)
   // We'll do this inline since we need userId from auth

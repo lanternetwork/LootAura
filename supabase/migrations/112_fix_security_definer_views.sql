@@ -10,12 +10,17 @@
 --
 -- Note: The spatial_ref_sys table RLS alert is expected - it's a PostGIS system table
 -- managed by PostGIS and typically should not have RLS enabled. This is acceptable.
+--
+-- PostgreSQL 15+ supports WITH (security_invoker = true) syntax.
+-- For PostgreSQL < 15, views default to SECURITY INVOKER unless SECURITY DEFINER is specified.
+-- This migration uses explicit syntax for PostgreSQL 15+ compatibility.
 
 -- Recreate sales_v2 view with SECURITY INVOKER
--- Note: Views default to SECURITY INVOKER unless SECURITY DEFINER is specified
+-- PostgreSQL 15+ supports WITH (security_invoker = true) syntax
 DROP VIEW IF EXISTS public.sales_v2 CASCADE;
 
-CREATE VIEW public.sales_v2 AS
+CREATE VIEW public.sales_v2
+WITH (security_invoker = true) AS
 SELECT 
     id,
     created_at,
@@ -47,10 +52,11 @@ SELECT
 FROM lootaura_v2.sales;
 
 -- Recreate items_v2 view with SECURITY INVOKER
--- Note: Views default to SECURITY INVOKER unless SECURITY DEFINER is specified
+-- PostgreSQL 15+ supports WITH (security_invoker = true) syntax
 DROP VIEW IF EXISTS public.items_v2 CASCADE;
 
-CREATE VIEW public.items_v2 AS
+CREATE VIEW public.items_v2
+WITH (security_invoker = true) AS
 SELECT 
     id,
     created_at,
@@ -66,10 +72,11 @@ SELECT
 FROM lootaura_v2.items;
 
 -- Recreate favorites_v2 view with SECURITY INVOKER
--- Note: Views default to SECURITY INVOKER unless SECURITY DEFINER is specified
+-- PostgreSQL 15+ supports WITH (security_invoker = true) syntax
 DROP VIEW IF EXISTS public.favorites_v2 CASCADE;
 
-CREATE VIEW public.favorites_v2 AS
+CREATE VIEW public.favorites_v2
+WITH (security_invoker = true) AS
 SELECT 
     user_id,
     sale_id,
@@ -77,10 +84,11 @@ SELECT
 FROM lootaura_v2.favorites;
 
 -- Recreate profiles_v2 view with SECURITY INVOKER
--- Note: Views default to SECURITY INVOKER unless SECURITY DEFINER is specified
+-- PostgreSQL 15+ supports WITH (security_invoker = true) syntax
 DROP VIEW IF EXISTS public.profiles_v2 CASCADE;
 
-CREATE VIEW public.profiles_v2 AS
+CREATE VIEW public.profiles_v2
+WITH (security_invoker = true) AS
 SELECT 
     id,
     username,

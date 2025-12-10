@@ -22,25 +22,25 @@ const mockSupabaseClient = {
 
 // Mock admin DB and query chains
 const mockReportChain = {
-  select: vi.fn(),
-  update: vi.fn(),
-  eq: vi.fn(),
-  order: vi.fn(),
-  range: vi.fn(),
-  maybeSingle: vi.fn(),
-  single: vi.fn(),
+  select: vi.fn(() => mockReportChain),
+  update: vi.fn(() => mockReportChain),
+  eq: vi.fn(() => mockReportChain),
+  order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+  range: vi.fn(() => Promise.resolve({ data: [], error: null })),
+  maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  single: vi.fn(() => Promise.resolve({ data: null, error: null })),
 }
 
 const mockSaleChain = {
-  select: vi.fn(),
-  update: vi.fn(),
-  eq: vi.fn(),
-  maybeSingle: vi.fn(),
+  select: vi.fn(() => mockSaleChain),
+  update: vi.fn(() => mockSaleChain),
+  eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
 }
 
 const mockProfileChain = {
-  update: vi.fn(),
-  eq: vi.fn(),
+  update: vi.fn(() => mockProfileChain),
+  eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
 }
 
 const mockAdminDb = {
@@ -237,13 +237,15 @@ describe('PATCH /api/admin/reports/[id]', () => {
       error: null,
     })
     
-    // Mock report update
-    mockReportChain.eq.mockImplementation((field: string, value: string) => {
-      if (field === 'id' && value === reportId) {
-        return Promise.resolve({ data: null, error: null })
-      }
-      return mockReportChain
-    })
+    // Mock report update - eq() should return chainable, update().eq() should resolve
+    mockReportChain.update.mockReturnValue(mockReportChain)
+    mockReportChain.eq.mockReturnValue(mockReportChain)
+    
+    // Create a mock that resolves when update().eq() is called
+    const updateChain = {
+      eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+    }
+    mockReportChain.update.mockReturnValue(updateChain as any)
 
     const request = new NextRequest(`http://localhost/api/admin/reports/${reportId}`, {
       method: 'PATCH',
@@ -259,33 +261,29 @@ describe('PATCH /api/admin/reports/[id]', () => {
   })
 
   it('hides sale when hide_sale is true', async () => {
-    // Mock report lookup
-    mockReportChain.maybeSingle.mockResolvedValue({
-      data: { id: reportId, sale_id: saleId, status: 'open' },
-      error: null,
-    })
-    
-    // Mock report update
-    mockReportChain.eq.mockImplementation((field: string, value: string) => {
-      if (field === 'id' && value === reportId) {
-        return Promise.resolve({ data: null, error: null })
-      }
-      return mockReportChain
-    })
-    
     // Mock sale update
     let saleUpdateCalled = false
+    const saleUpdateChain = {
+      eq: vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      }),
+    }
+    
+    // Mock report update chain
+    const reportUpdateChain = {
+      eq: vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      }),
+    }
+    
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
         return {
           update: vi.fn(() => {
             saleUpdateCalled = true
-            return {
-              eq: vi.fn().mockResolvedValue({
-                data: null,
-                error: null,
-              }),
-            }
+            return saleUpdateChain
           }),
         }
       }
@@ -299,12 +297,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
               }),
             })),
           })),
-          update: vi.fn(() => ({
-            eq: vi.fn().mockResolvedValue({
-              data: null,
-              error: null,
-            }),
-          })),
+          update: vi.fn(() => reportUpdateChain),
         }
       }
       return mockReportChain
@@ -332,28 +325,23 @@ describe('PATCH /api/admin/reports/[id]', () => {
   })
 
   it('locks account when lock_account is true', async () => {
-    // Mock report lookup
-    mockReportChain.maybeSingle.mockResolvedValue({
-      data: { id: reportId, sale_id: saleId, status: 'open' },
-      error: null,
-    })
-    
-    // Mock sale lookup for owner_id
-    mockSaleChain.maybeSingle.mockResolvedValue({
-      data: { owner_id: ownerId },
-      error: null,
-    })
-    
-    // Mock report update
-    mockReportChain.eq.mockImplementation((field: string, value: string) => {
-      if (field === 'id' && value === reportId) {
-        return Promise.resolve({ data: null, error: null })
-      }
-      return mockReportChain
-    })
-    
     // Mock profile update
     let profileUpdateCalled = false
+    const profileUpdateChain = {
+      eq: vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      }),
+    }
+    
+    // Mock report update chain
+    const reportUpdateChain = {
+      eq: vi.fn().mockResolvedValue({
+        data: null,
+        error: null,
+      }),
+    }
+    
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sale_reports') {
         return {
@@ -365,12 +353,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
               }),
             })),
           })),
-          update: vi.fn(() => ({
-            eq: vi.fn().mockResolvedValue({
-              data: null,
-              error: null,
-            }),
-          })),
+          update: vi.fn(() => reportUpdateChain),
         }
       }
       if (table === 'sales') {
@@ -389,12 +372,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
         return {
           update: vi.fn(() => {
             profileUpdateCalled = true
-            return {
-              eq: vi.fn().mockResolvedValue({
-                data: null,
-                error: null,
-              }),
-            }
+            return profileUpdateChain
           }),
         }
       }

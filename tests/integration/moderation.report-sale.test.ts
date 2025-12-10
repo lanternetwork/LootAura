@@ -334,26 +334,17 @@ describe('POST /api/sales/[id]/report', () => {
     })
 
     it('prevents self-reporting', async () => {
-      // Mock sale owned by same user
-      mockRlsDb.from.mockImplementation((table: string) => {
+      // Configure supabase mock for sale owned by the same user
+      mockSupabaseFromHandler = (table: string) => {
         if (table === 'sales_v2') {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                maybeSingle: vi.fn().mockResolvedValue({
-                  data: {
-                    id: saleId,
-                    owner_id: userId, // Same as reporter
-                    title: 'Test Sale',
-                  },
-                  error: null,
-                }),
-              })),
-            })),
-          }
+          return createSupabaseChain({
+            id: saleId,
+            owner_id: userId, // Same as reporter
+            title: 'Test Sale',
+          }, null)
         }
-        return mockSaleChain
-      })
+        return createSupabaseChain(null, null)
+      }
 
       const request = createRequestWithCsrf(
         `http://localhost/api/sales/${saleId}/report`,
@@ -579,6 +570,18 @@ describe('POST /api/sales/[id]/report', () => {
         resetAt: 1736942400000 + 60000, // MOCK_BASE_TIME + 60s
       })
 
+      // Configure supabase mock for sale lookup (rate limit check happens before sale lookup)
+      mockSupabaseFromHandler = (table: string) => {
+        if (table === 'sales_v2') {
+          return createSupabaseChain({
+            id: saleId,
+            owner_id: ownerId,
+            title: 'Test Sale',
+          }, null)
+        }
+        return createSupabaseChain(null, null)
+      }
+
       const request = createRequestWithCsrf(
         `http://localhost/api/sales/${saleId}/report`,
         { reason: 'spam' }
@@ -595,21 +598,13 @@ describe('POST /api/sales/[id]/report', () => {
 
   describe('Error handling', () => {
     it('returns 404 for non-existent sale', async () => {
-      mockRlsDb.from.mockImplementation((table: string) => {
+      // Configure supabase mock to return null (sale not found)
+      mockSupabaseFromHandler = (table: string) => {
         if (table === 'sales_v2') {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                maybeSingle: vi.fn().mockResolvedValue({
-                  data: null,
-                  error: null,
-                }),
-              })),
-            })),
-          }
+          return createSupabaseChain(null, null) // Sale not found
         }
-        return mockSaleChain
-      })
+        return createSupabaseChain(null, null)
+      }
 
       const request = createRequestWithCsrf(
         `http://localhost/api/sales/${saleId}/report`,

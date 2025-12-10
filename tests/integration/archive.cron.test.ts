@@ -136,12 +136,24 @@ describe('GET /api/cron/daily - Archive task', () => {
             return {
               in: vi.fn(() => ({
                 select: vi.fn().mockResolvedValue({
-                  data: [], // No sales to archive (already archived)
+                  data: salesToArchive.map((s: any) => ({ id: s.id })),
                   error: null,
                 }),
               })),
             }
           }),
+        }
+      }
+      if (table === 'sale_reports') {
+        return {
+          select: vi.fn(() => ({
+            gte: vi.fn(() => ({
+              order: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            })),
+          })),
         }
       }
       return { from: vi.fn() }
@@ -197,12 +209,24 @@ describe('GET /api/cron/daily - Archive task', () => {
             return {
               in: vi.fn(() => ({
                 select: vi.fn().mockResolvedValue({
-                  data: [], // No sales to archive (already archived)
+                  data: salesToArchive.map((s: any) => ({ id: s.id })),
                   error: null,
                 }),
               })),
             }
           }),
+        }
+      }
+      if (table === 'sale_reports') {
+        return {
+          select: vi.fn(() => ({
+            gte: vi.fn(() => ({
+              order: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            })),
+          })),
         }
       }
       return { from: vi.fn() }
@@ -317,6 +341,18 @@ describe('GET /api/cron/daily - Archive task', () => {
               })),
             }
           }),
+        }
+      }
+      if (table === 'sale_reports') {
+        return {
+          select: vi.fn(() => ({
+            gte: vi.fn(() => ({
+              order: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            })),
+          })),
         }
       }
       return { from: vi.fn() }

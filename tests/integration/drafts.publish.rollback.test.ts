@@ -215,6 +215,14 @@ describe('Draft publish rollback', () => {
     mockItemChain.insert.mockReturnValue(mockItemChain)
     mockItemChain.delete.mockReturnValue(mockItemChain)
     mockItemChain.limit.mockReturnValue(mockItemChain)
+    
+    // Set up profile chain for account lock check - user is not locked by default
+    mockProfileChain.select.mockReturnValue(mockProfileChain)
+    mockProfileChain.eq.mockReturnValue(mockProfileChain)
+    mockProfileChain.maybeSingle.mockResolvedValue({
+      data: { is_locked: false },
+      error: null,
+    })
   })
 
   describe('Rollback on failure', () => {

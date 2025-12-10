@@ -7,21 +7,27 @@ import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import { generateCsrfToken } from '@/lib/csrf'
 
+// Create a chainable mock object
+const createChainableMock = () => {
+  const chain = {
+    select: vi.fn(() => chain),
+    insert: vi.fn(() => chain),
+    upsert: vi.fn(() => chain),
+    update: vi.fn(() => chain),
+    delete: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    single: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    maybeSingle: vi.fn().mockResolvedValue({ data: { is_locked: false }, error: null }),
+  }
+  return chain
+}
+
 // Mock Supabase client
 const mockSupabaseClient = {
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null }),
   },
-  from: vi.fn(() => ({
-    select: vi.fn().mockReturnThis(),
-    insert: vi.fn().mockReturnThis(),
-    upsert: vi.fn().mockReturnThis(),
-    update: vi.fn().mockReturnThis(),
-    delete: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data: {}, error: null }),
-    maybeSingle: vi.fn().mockResolvedValue({ data: {}, error: null }),
-  })),
+  from: vi.fn(() => createChainableMock()),
 }
 
 vi.mock('@/lib/supabase/server', () => ({

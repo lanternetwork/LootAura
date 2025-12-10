@@ -49,7 +49,7 @@ const mockAdminDb = {
     if (table === 'sales') return mockSaleChain
     if (table === 'profiles') return mockProfileChain
     return mockReportChain
-  }),
+  }) as any,
 }
 
 vi.mock('@/lib/supabase/server', () => ({

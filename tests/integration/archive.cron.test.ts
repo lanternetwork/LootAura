@@ -126,7 +126,7 @@ describe('GET /api/cron/daily - Archive task', () => {
           select: vi.fn(() => ({
             in: vi.fn(() => ({
               is: vi.fn().mockResolvedValue({
-                data: [...salesToArchive, ...salesNotToArchive],
+                data: salesToArchive,
                 error: null,
               }),
             })),
@@ -134,10 +134,12 @@ describe('GET /api/cron/daily - Archive task', () => {
           update: vi.fn(() => {
             updateCalled = true
             return {
-              eq: vi.fn().mockResolvedValue({
-                data: null,
-                error: null,
-              }),
+              in: vi.fn(() => ({
+                select: vi.fn().mockResolvedValue({
+                  data: salesToArchive.map((s: any) => ({ id: s.id })),
+                  error: null,
+                }),
+              })),
             }
           }),
         }
@@ -159,7 +161,7 @@ describe('GET /api/cron/daily - Archive task', () => {
     expect(data.ok).toBe(true)
     expect(data.tasks.archiveSales).toBeDefined()
     expect(data.tasks.archiveSales.ok).toBe(true)
-    expect(data.tasks.archiveSales.archivedCount).toBe(1)
+    expect(data.tasks.archiveSales.archived).toBe(1)
     
     // Verify update was called to archive the sale
     expect(updateCalled).toBe(true)
@@ -193,10 +195,12 @@ describe('GET /api/cron/daily - Archive task', () => {
           update: vi.fn(() => {
             updateCalled = true
             return {
-              eq: vi.fn().mockResolvedValue({
-                data: null,
-                error: null,
-              }),
+              in: vi.fn(() => ({
+                select: vi.fn().mockResolvedValue({
+                  data: salesToArchive.map((s: any) => ({ id: s.id })),
+                  error: null,
+                }),
+              })),
             }
           }),
         }
@@ -216,7 +220,7 @@ describe('GET /api/cron/daily - Archive task', () => {
 
     expect(response.status).toBe(200)
     expect(data.tasks.archiveSales.ok).toBe(true)
-    expect(data.tasks.archiveSales.archivedCount).toBe(1)
+    expect(data.tasks.archiveSales.archived).toBe(1)
     expect(updateCalled).toBe(true)
   })
 
@@ -248,10 +252,12 @@ describe('GET /api/cron/daily - Archive task', () => {
           update: vi.fn(() => {
             updateCalled = true
             return {
-              eq: vi.fn().mockResolvedValue({
-                data: null,
-                error: null,
-              }),
+              in: vi.fn(() => ({
+                select: vi.fn().mockResolvedValue({
+                  data: salesToArchive.map((s: any) => ({ id: s.id })),
+                  error: null,
+                }),
+              })),
             }
           }),
         }
@@ -303,10 +309,12 @@ describe('GET /api/cron/daily - Archive task', () => {
           update: vi.fn(() => {
             updateCalled = true
             return {
-              eq: vi.fn().mockResolvedValue({
-                data: null,
-                error: null,
-              }),
+              in: vi.fn(() => ({
+                select: vi.fn().mockResolvedValue({
+                  data: salesToArchive.map((s: any) => ({ id: s.id })),
+                  error: null,
+                }),
+              })),
             }
           }),
         }

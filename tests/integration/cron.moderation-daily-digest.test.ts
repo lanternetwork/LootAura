@@ -166,7 +166,7 @@ describe('GET /api/cron/moderation-daily-digest', () => {
                 
                 return {
                   order: vi.fn().mockResolvedValue({
-                    data: [recentReport], // Only recent report in results
+                    data: [recentReport], // Only recent report in results (with nested sales relation)
                     error: null,
                   }),
                 }
@@ -175,6 +175,11 @@ describe('GET /api/cron/moderation-daily-digest', () => {
           }
         }
         return { from: vi.fn() }
+      })
+      
+      // Ensure email mock returns success
+      mockSendModerationDailyDigestEmail.mockResolvedValue({
+        ok: true,
       })
 
       const request = new NextRequest('http://localhost/api/cron/moderation-daily-digest', {

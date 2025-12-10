@@ -37,7 +37,7 @@ const mockAdminDb = {
     if (table === 'sale_reports') return mockReportChain
     if (table === 'sales') return mockSaleChain
     return mockReportChain
-  }),
+  }) as any,
 }
 
 const mockRlsDb = {
@@ -71,7 +71,9 @@ vi.mock('@/lib/supabase/clients', () => ({
     if (table === 'profiles') {
       return createQueryChain()
     }
-    return db.from(table)
+    const result = db.from(table)
+    // Ensure we always return a chain, even if db.from returns undefined
+    return result || mockReportChain
   },
 }))
 

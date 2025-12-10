@@ -4,8 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { processFavoriteSalesStartingSoonJob } from '@/lib/jobs/processor'
-import { processSellerWeeklyAnalyticsJob } from '@/lib/jobs/processor'
+import { processFavoriteSalesStartingSoonJob, processSellerWeeklyAnalyticsJob } from '@/lib/jobs/processor'
 import { sendFavoriteSalesStartingSoonDigestEmail } from '@/lib/email/favorites'
 import { sendSellerWeeklyAnalyticsEmail } from '@/lib/email/sellerAnalytics'
 

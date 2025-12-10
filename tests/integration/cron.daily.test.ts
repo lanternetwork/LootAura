@@ -20,14 +20,14 @@ const mockAdminDb = {
 
 // Mock job processors
 const mockProcessFavoriteSalesStartingSoonJob = vi.fn()
-const mockSendModerationDailyDigest = vi.fn()
+const mockSendModerationDailyDigestEmailEmail = vi.fn()
 
 vi.mock('@/lib/jobs/processor', () => ({
   processFavoriteSalesStartingSoonJob: (...args: any[]) => mockProcessFavoriteSalesStartingSoonJob(...args),
 }))
 
 vi.mock('@/lib/email/moderationDigest', () => ({
-  sendModerationDailyDigest: (...args: any[]) => mockSendModerationDailyDigest(...args),
+  sendModerationDailyDigestEmail: (...args: any[]) => mockSendModerationDailyDigestEmailEmail(...args),
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
@@ -68,7 +68,7 @@ describe('GET /api/cron/daily', () => {
     vi.clearAllMocks()
     mockAssertCronAuthorized.mockImplementation(() => {}) // Pass auth by default
     mockProcessFavoriteSalesStartingSoonJob.mockResolvedValue({ success: true })
-    mockSendModerationDailyDigest.mockResolvedValue({ ok: true })
+    mockSendModerationDailyDigestEmailEmail.mockResolvedValue({ ok: true })
     
     process.env.CRON_SECRET = 'test-cron-secret'
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
@@ -97,7 +97,7 @@ describe('GET /api/cron/daily', () => {
       
       // Verify no jobs were executed
       expect(mockProcessFavoriteSalesStartingSoonJob).not.toHaveBeenCalled()
-      expect(mockSendModerationDailyDigest).not.toHaveBeenCalled()
+      expect(mockSendModerationDailyDigestEmail).not.toHaveBeenCalled()
     })
 
     it('allows request with valid cron auth', async () => {
@@ -138,12 +138,25 @@ describe('GET /api/cron/daily', () => {
   describe('Task orchestration', () => {
     beforeEach(() => {
       // Mock archive sales query (no sales to archive)
+      // Mock sale_reports query for moderation digest (empty)
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sales') {
           return {
             select: vi.fn(() => ({
               in: vi.fn(() => ({
                 is: vi.fn().mockResolvedValue({
+                  data: [],
+                  error: null,
+                }),
+              })),
+            })),
+          }
+        }
+        if (table === 'sale_reports') {
+          return {
+            select: vi.fn(() => ({
+              gte: vi.fn(() => ({
+                order: vi.fn().mockResolvedValue({
                   data: [],
                   error: null,
                 }),
@@ -176,7 +189,7 @@ describe('GET /api/cron/daily', () => {
       
       // Verify job processors were called
       expect(mockProcessFavoriteSalesStartingSoonJob).toHaveBeenCalledTimes(1)
-      expect(mockSendModerationDailyDigest).toHaveBeenCalledTimes(1)
+      expect(mockSendModerationDailyDigestEmail).toHaveBeenCalledTimes(1)
     })
 
     it('includes archive sales task result', async () => {
@@ -204,10 +217,24 @@ describe('GET /api/cron/daily', () => {
               })),
             })),
             update: vi.fn(() => ({
-              eq: vi.fn().mockResolvedValue({
-                data: [{ id: 'sale-1' }],
-                error: null,
-              }),
+              in: vi.fn(() => ({
+                select: vi.fn().mockResolvedValue({
+                  data: [{ id: 'sale-1' }],
+                  error: null,
+                }),
+              })),
+            })),
+          }
+        }
+        if (table === 'sale_reports') {
+          return {
+            select: vi.fn(() => ({
+              gte: vi.fn(() => ({
+                order: vi.fn().mockResolvedValue({
+                  data: [],
+                  error: null,
+                }),
+              })),
             })),
           }
         }
@@ -235,6 +262,36 @@ describe('GET /api/cron/daily', () => {
         success: true,
       })
 
+      // Mock archive sales query (no sales to archive)
+      // Mock sale_reports query for moderation digest (empty)
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'sales') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(() => ({
+                is: vi.fn().mockResolvedValue({
+                  data: [],
+                  error: null,
+                }),
+              })),
+            })),
+          }
+        }
+        if (table === 'sale_reports') {
+          return {
+            select: vi.fn(() => ({
+              gte: vi.fn(() => ({
+                order: vi.fn().mockResolvedValue({
+                  data: [],
+                  error: null,
+                }),
+              })),
+            })),
+          }
+        }
+        return { from: vi.fn() }
+      })
+
       const request = new NextRequest('http://localhost/api/cron/daily', {
         method: 'GET',
         headers: {
@@ -251,7 +308,7 @@ describe('GET /api/cron/daily', () => {
     })
 
     it('includes moderation digest task result', async () => {
-      mockSendModerationDailyDigest.mockResolvedValue({
+      mockSendModerationDailyDigestEmail.mockResolvedValue({
         ok: true,
         reportCount: 5,
       })
@@ -352,7 +409,7 @@ describe('GET /api/cron/daily', () => {
       })
 
       // Mock moderation digest to succeed
-      mockSendModerationDailyDigest.mockResolvedValue({
+      mockSendModerationDailyDigestEmail.mockResolvedValue({
         ok: true,
         reportCount: 0,
       })
@@ -413,7 +470,7 @@ describe('GET /api/cron/daily', () => {
       
       // Verify all tasks were attempted
       expect(mockProcessFavoriteSalesStartingSoonJob).toHaveBeenCalledTimes(1)
-      expect(mockSendModerationDailyDigest).toHaveBeenCalledTimes(1)
+      expect(mockSendModerationDailyDigestEmail).toHaveBeenCalledTimes(1)
     })
 
     it('returns ok: false when all tasks fail', async () => {
@@ -423,21 +480,18 @@ describe('GET /api/cron/daily', () => {
         error: 'Favorites job failed',
       })
 
-      mockSendModerationDailyDigest.mockResolvedValue({
+      mockSendModerationDailyDigestEmail.mockResolvedValue({
         ok: false,
         error: 'Moderation digest failed',
       })
 
-      // Mock reports query for moderation digest
+      // Mock archive sales query to fail (throw error)
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sales') {
           return {
             select: vi.fn(() => ({
               in: vi.fn(() => ({
-                is: vi.fn().mockResolvedValue({
-                  data: [],
-                  error: null,
-                }),
+                is: vi.fn().mockRejectedValue(new Error('Archive query failed')),
               })),
             })),
           }
@@ -471,6 +525,7 @@ describe('GET /api/cron/daily', () => {
       expect(data.ok).toBe(false)
       
       // All tasks should have failed
+      expect(data.tasks.archiveSales.ok).toBe(false)
       expect(data.tasks.favoritesStartingSoon.ok).toBe(false)
       expect(data.tasks.moderationDigest.ok).toBe(false)
     })
@@ -482,7 +537,7 @@ describe('GET /api/cron/daily', () => {
       )
 
       // Mock moderation digest to succeed
-      mockSendModerationDailyDigest.mockResolvedValue({
+      mockSendModerationDailyDigestEmail.mockResolvedValue({
         ok: true,
         reportCount: 0,
       })

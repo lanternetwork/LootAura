@@ -10,7 +10,21 @@ import { generateCsrfToken } from '@/lib/csrf'
 // Create chainable mock for supabase client
 const createSupabaseChain = (data: any = null, error: any = null) => {
   const chain: any = {
-    select: vi.fn(() => chain),
+    select: vi.fn((fields?: string) => {
+      // Return a new chain that has eq() and maybeSingle()
+      const selectChain: any = {
+        eq: vi.fn((field: string, value: any) => {
+          const eqChain: any = {
+            maybeSingle: vi.fn(() => Promise.resolve({ data, error })),
+            single: vi.fn(() => Promise.resolve({ data, error })),
+          }
+          return eqChain
+        }),
+        maybeSingle: vi.fn(() => Promise.resolve({ data, error })),
+        single: vi.fn(() => Promise.resolve({ data, error })),
+      }
+      return selectChain
+    }),
     eq: vi.fn(() => chain),
     maybeSingle: vi.fn(() => Promise.resolve({ data, error })),
     single: vi.fn(() => Promise.resolve({ data, error })),

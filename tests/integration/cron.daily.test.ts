@@ -308,12 +308,27 @@ describe('GET /api/cron/daily', () => {
     })
 
     it('includes moderation digest task result', async () => {
+      // Mock 5 reports for moderation digest
+      const mockReports = Array.from({ length: 5 }, (_, i) => ({
+        id: `report-${i + 1}`,
+        sale_id: `sale-${i + 1}`,
+        reporter_profile_id: `reporter-${i + 1}`,
+        reason: 'spam',
+        created_at: new Date().toISOString(),
+        sales: {
+          id: `sale-${i + 1}`,
+          title: `Sale ${i + 1}`,
+          address: '123 Main St',
+          city: 'Test City',
+          state: 'KY',
+        },
+      }))
+
       mockSendModerationDailyDigestEmail.mockResolvedValue({
         ok: true,
-        reportCount: 5,
       })
 
-      // Mock reports query for moderation digest
+      // Mock reports query for moderation digest - return 5 reports
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sales') {
           return {
@@ -332,7 +347,7 @@ describe('GET /api/cron/daily', () => {
             select: vi.fn(() => ({
               gte: vi.fn(() => ({
                 order: vi.fn().mockResolvedValue({
-                  data: [],
+                  data: mockReports,
                   error: null,
                 }),
               })),

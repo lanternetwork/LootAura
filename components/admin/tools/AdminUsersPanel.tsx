@@ -221,7 +221,7 @@ export default function AdminUsersPanel() {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex flex-col">
                           <Link
-                            href={`/profile/${user.username || user.id}`}
+                            href={`/u/${user.username || user.id}`}
                             target="_blank"
                             className="text-sm font-medium text-purple-600 hover:text-purple-700"
                           >
@@ -249,7 +249,7 @@ export default function AdminUsersPanel() {
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         <div className="flex gap-2">
                           <Link
-                            href={`/profile/${user.username || user.id}`}
+                            href={`/u/${user.username || user.id}`}
                             target="_blank"
                             className="text-purple-600 hover:text-purple-700"
                           >

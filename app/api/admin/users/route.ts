@@ -33,14 +33,13 @@ async function getUsersHandler(request: NextRequest) {
 
     const adminDb = getAdminDb()
 
-    // Build query for profiles
+    // Build query for profiles - use base table directly with admin client
     let query = fromBase(adminDb, 'profiles')
       .select('id, username, full_name, created_at, is_locked, locked_at, locked_by, lock_reason', { count: 'exact' })
 
-    // Search by email (via auth.users) or username
+    // Search by username or full_name
     if (q) {
-      // For now, search by username/full_name only
-      // To search by email, we'd need to join with auth.users (requires service role)
+      // Use OR condition to search both username and full_name
       query = query.or(`username.ilike.%${q}%,full_name.ilike.%${q}%`)
     }
 
@@ -54,11 +53,27 @@ async function getUsersHandler(request: NextRequest) {
       logger.error('Failed to fetch users', error instanceof Error ? error : new Error(String(error)), {
         component: 'moderation',
         operation: 'get_users',
+        errorCode: (error as any)?.code,
+        errorMessage: (error as any)?.message,
+        errorDetails: (error as any)?.details,
+        errorHint: (error as any)?.hint,
       })
       return NextResponse.json(
-        { error: 'Failed to fetch users' },
+        { error: 'Failed to fetch users', details: error instanceof Error ? error.message : String(error) },
         { status: 500 }
       )
+    }
+
+    // Log for debugging (only in non-production)
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      logger.debug('Fetched users', {
+        component: 'moderation',
+        operation: 'get_users',
+        count: profiles?.length || 0,
+        total: count || 0,
+        page,
+        limit,
+      })
     }
 
     // Get sale counts and report counts for each user (optional, can be expensive)

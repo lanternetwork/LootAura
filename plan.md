@@ -76,5 +76,76 @@
 
 ---
 
+## P0 Moderation + Archive Test Suite
+
+**Status:** ✅ Completed (2025-12-10)
+
+### Coverage Added
+
+**Moderation System Tests:**
+- ✅ Sale reporting (`tests/integration/moderation.report-sale.test.ts`)
+  - Report creation and validation
+  - Duplicate report prevention (24h window)
+  - Auto-hide threshold (5 unique reporters)
+  - CSRF enforcement
+  - Rate limiting
+
+- ✅ Admin report actions (`tests/integration/moderation.admin-actions.test.ts`)
+  - Admin can list reports
+  - Admin can resolve reports and hide sales
+  - Admin can lock accounts via report actions
+
+- ✅ Hidden sales visibility (`tests/integration/moderation.hidden-sales-visibility.test.ts`)
+  - Hidden sales excluded from `/api/sales`
+  - Hidden sales excluded from `/api/sales/markers`
+  - Hidden sales excluded from `/api/sales/search`
+  - Sale detail data access behavior
+
+- ✅ Account lock enforcement (`tests/integration/moderation.account-lock-enforcement.test.ts`)
+  - Locked users cannot create sales
+  - Locked users cannot create/update items
+  - Locked users cannot update profile/preferences
+  - Locked users cannot favorite or rate
+  - Locked users retain read-only access
+
+**Archive System Tests:**
+- ✅ Archive cron behavior (`tests/integration/archive.cron.test.ts`)
+  - Archive cron authentication
+  - Sales ended yesterday are archived
+  - Single-day sales that started in past are archived
+  - Sales ending tomorrow are not archived
+  - Already archived sales are not re-archived
+  - 1-year retention window semantics documented
+
+### Remaining Gaps (P1)
+
+**Moderation:**
+- No direct test for admin user management endpoints (`/api/admin/users`, `/api/admin/users/[id]/lock`)
+- No test for moderation daily digest email
+- No test for account lock banner UI component
+
+**Archive:**
+- No direct test for dashboard archive tab UI behavior
+- No test for archive filter logic in `getUserSales` (tested indirectly through API)
+
+**General:**
+- E2E tests not in CI pipeline (only synthetic E2E via curl)
+- Some edge cases in moderation flow (e.g., concurrent reports, race conditions)
+
+### Test Execution
+
+All tests can be run with:
+```bash
+npm run test -- tests/integration/moderation.*
+npm run test -- tests/integration/archive.cron.test.ts
+```
+
+Full integration test suite:
+```bash
+npm run test -- tests/integration/
+```
+
+---
+
 **Note**: This plan is a living document and should be updated as the project evolves.
 

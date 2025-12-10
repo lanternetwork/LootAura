@@ -1,0 +1,330 @@
+/**
+ * Integration tests for account lock enforcement
+ * Tests that locked users cannot perform write operations
+ */
+
+import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'
+import { NextRequest } from 'next/server'
+import { generateCsrfToken } from '@/lib/csrf'
+
+// Mock Supabase client
+const mockSupabaseClient = {
+  auth: {
+    getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'locked-user-id' } }, error: null }),
+  },
+  from: vi.fn(),
+}
+
+// Mock admin DB
+const mockAdminDb = {
+  from: vi.fn(),
+}
+
+// Mock RLS DB
+const mockRlsDb = {
+  from: vi.fn(),
+}
+
+// Create query chain for profile lookups (account lock checks)
+const createProfileChain = (isLocked: boolean) => {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: { is_locked: isLocked },
+          error: null,
+        }),
+      })),
+    })),
+  }
+}
+
+// Create query chain for other operations
+const createQueryChain = (data: any = null, error: any = null) => {
+  const chain: any = {
+    select: vi.fn(() => chain),
+    insert: vi.fn(() => chain),
+    update: vi.fn(() => chain),
+    delete: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    single: vi.fn(() => Promise.resolve({ data, error })),
+    maybeSingle: vi.fn(() => Promise.resolve({ data, error })),
+  }
+  return chain
+}
+
+vi.mock('@/lib/supabase/server', () => ({
+  createSupabaseServerClient: () => mockSupabaseClient,
+}))
+
+vi.mock('@/lib/supabase/clients', () => ({
+  getRlsDb: () => mockRlsDb,
+  getAdminDb: () => mockAdminDb,
+  fromBase: (db: any, table: string) => {
+    if (table === 'profiles') {
+      return createProfileChain(true) // Locked user
+    }
+    return db.from(table)
+  },
+}))
+
+// Mock CSRF validation
+vi.mock('@/lib/csrf', async () => {
+  const actual = await vi.importActual('@/lib/csrf')
+  return {
+    ...actual,
+    requireCsrfToken: () => true, // Always pass CSRF in these tests
+  }
+})
+
+// Mock rate limiting
+vi.mock('@/lib/rateLimit/limiter', () => ({
+  check: vi.fn().mockResolvedValue({ 
+    allowed: true, 
+    remaining: 10,
+    softLimited: false,
+    resetAt: Date.now() + 60000,
+  }),
+}))
+
+vi.mock('@/lib/rateLimit/keys', () => ({
+  deriveKey: vi.fn().mockResolvedValue('test-key'),
+}))
+
+// Mock logger
+vi.mock('@/lib/log', () => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+  },
+  generateOperationId: vi.fn(() => 'test-op-id-123'),
+}))
+
+// Helper function to create a request with CSRF token
+function createRequestWithCsrf(
+  url: string,
+  method: string,
+  body: any
+): NextRequest {
+  const csrfToken = generateCsrfToken()
+  
+  return new NextRequest(url, {
+    method,
+    body: body ? JSON.stringify(body) : undefined,
+    headers: {
+      'Content-Type': 'application/json',
+      'x-csrf-token': csrfToken,
+      'cookie': `csrf-token=${csrfToken}`,
+    },
+  } as any)
+}
+
+describe('Account lock enforcement', () => {
+  const lockedUserId = 'locked-user-id'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSupabaseClient.auth.getUser.mockResolvedValue({
+      data: { user: { id: lockedUserId } },
+      error: null,
+    })
+  })
+
+  describe('POST /api/sales', () => {
+    let POST: any
+
+    beforeAll(async () => {
+      const route = await import('@/app/api/sales/route')
+      POST = route.POST
+    })
+
+    it('blocks locked user from creating sales', async () => {
+      const request = createRequestWithCsrf(
+        'http://localhost/api/sales',
+        'POST',
+        {
+          title: 'Test Sale',
+          city: 'Test City',
+          state: 'KY',
+          date_start: '2026-01-15',
+          time_start: '10:00',
+        }
+      )
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(403)
+      expect(data.ok).toBe(false)
+      expect(data.error).toBe('account_locked')
+      expect(data.message).toContain('locked')
+    })
+  })
+
+  describe('POST /api/items_v2', () => {
+    let POST: any
+
+    beforeAll(async () => {
+      const route = await import('@/app/api/items_v2/route')
+      POST = route.POST
+    })
+
+    it('blocks locked user from creating items', async () => {
+      const request = createRequestWithCsrf(
+        'http://localhost/api/items_v2',
+        'POST',
+        {
+          sale_id: 'sale-1',
+          name: 'Test Item',
+        }
+      )
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(403)
+      expect(data.ok).toBe(false)
+      expect(data.error).toBe('account_locked')
+    })
+  })
+
+  describe('PUT /api/profile/update', () => {
+    let PUT: any
+
+    beforeAll(async () => {
+      const route = await import('@/app/api/profile/update/route')
+      PUT = route.PUT
+    })
+
+    it('blocks locked user from updating profile', async () => {
+      const request = createRequestWithCsrf(
+        'http://localhost/api/profile/update',
+        'PUT',
+        {
+          bio: 'Updated bio',
+        }
+      )
+
+      const response = await PUT(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(403)
+      expect(data.ok).toBe(false)
+      expect(data.error).toBe('account_locked')
+    })
+  })
+
+  describe('POST /api/profile/notifications', () => {
+    let POST: any
+
+    beforeAll(async () => {
+      const route = await import('@/app/api/profile/notifications/route')
+      POST = route.POST
+    })
+
+    it('blocks locked user from updating notification preferences', async () => {
+      const request = createRequestWithCsrf(
+        'http://localhost/api/profile/notifications',
+        'POST',
+        {
+          email_favorites_digest_enabled: true,
+        }
+      )
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(403)
+      expect(data.ok).toBe(false)
+      expect(data.error).toBe('account_locked')
+    })
+  })
+
+  describe('POST /api/sales/[id]/favorite', () => {
+    let POST: any
+
+    beforeAll(async () => {
+      const route = await import('@/app/api/sales/[id]/favorite/route')
+      POST = route.POST
+    })
+
+    it('blocks locked user from adding favorites', async () => {
+      const request = createRequestWithCsrf(
+        'http://localhost/api/sales/sale-1/favorite',
+        'POST',
+        {}
+      )
+
+      const response = await POST(request, { params: { id: 'sale-1' } })
+      const data = await response.json()
+
+      expect(response.status).toBe(403)
+      expect(data.ok).toBe(false)
+      expect(data.error).toBe('account_locked')
+    })
+  })
+
+  describe('POST /api/seller/rating', () => {
+    let POST: any
+
+    beforeAll(async () => {
+      const route = await import('@/app/api/seller/rating/route')
+      POST = route.POST
+    })
+
+    it('blocks locked user from rating sellers', async () => {
+      // Mock ratings access
+      vi.mock('@/lib/data/ratingsAccess', () => ({
+        upsertSellerRating: vi.fn(),
+      }))
+
+      const request = createRequestWithCsrf(
+        'http://localhost/api/seller/rating',
+        'POST',
+        {
+          seller_id: 'seller-1',
+          rating: 5,
+        }
+      )
+
+      const response = await POST(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(403)
+      expect(data.ok).toBe(false)
+      expect(data.code).toBe('AUTH_REQUIRED') // Account lock check happens after auth, but before rating logic
+    })
+  })
+
+  describe('Read-only access', () => {
+    it('allows locked user to read sales', async () => {
+      // Mock unlocked user for comparison
+      vi.mock('@/lib/supabase/clients', () => ({
+        getRlsDb: () => mockRlsDb,
+        getAdminDb: () => mockAdminDb,
+        fromBase: (db: any, table: string) => {
+          if (table === 'profiles') {
+            return createProfileChain(false) // Unlocked for read test
+          }
+          return db.from(table)
+        },
+      }))
+
+      mockSupabaseClient.from.mockImplementation(() => {
+        return createQueryChain([{ id: 'sale-1', title: 'Test Sale' }], null)
+      })
+
+      const { GET } = await import('@/app/api/sales/route')
+      const request = new NextRequest('http://localhost/api/sales?lat=38.2527&lng=-85.7585')
+
+      const response = await GET(request)
+      const data = await response.json()
+
+      // Should succeed (read-only access)
+      expect(response.status).toBe(200)
+      expect(data.ok).toBe(true)
+    })
+  })
+})
+

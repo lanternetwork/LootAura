@@ -171,12 +171,70 @@
 - E2E tests not in CI pipeline (only synthetic E2E via curl)
 - Some edge cases in moderation flow (e.g., concurrent reports, race conditions)
 
+---
+
+## P1 Daily Cron + Email Preference Tests
+
+**Status:** ✅ Completed (2025-01-31)
+
+### Coverage Added
+
+**Daily Cron Orchestration Tests:**
+- ✅ Daily cron endpoint (`tests/integration/cron.daily.test.ts`)
+  - Cron authentication enforcement
+  - Task orchestration (archive sales, favorites digest, moderation digest)
+  - Partial failure behavior (one task fails, others continue)
+  - Email enablement check (skips favorites when emails disabled)
+  - Overall success determination (at least one task must succeed)
+
+**Email Job Preferences Tests:**
+- ✅ Email preferences and unsubscribe (`tests/integration/email.preferences-jobs.test.ts`)
+  - Favorites digest respects `email_favorites_digest_enabled` preference
+  - Favorites digest skips users with preferences disabled
+  - Favorites digest skips unsubscribed users (preferences set to false)
+  - Seller weekly analytics respects `email_seller_weekly_enabled` preference
+  - Seller weekly analytics skips sellers with preferences disabled
+  - Seller weekly analytics skips unsubscribed sellers (preferences set to false)
+
+**Moderation Daily Digest Tests:**
+- ✅ Moderation digest cron (`tests/integration/cron.moderation-daily-digest.test.ts`)
+  - Cron authentication enforcement
+  - Digest includes only reports from last 24 hours
+  - Sends empty digest when no reports
+  - Sends to moderation inbox (not affected by user preferences)
+  - Includes only template-permitted fields (no extra PII)
+  - Handles missing sale data gracefully
+  - Error handling for query failures and email send failures
+
+### Test Patterns
+
+- Uses deterministic timestamps (2025-01-15 12:00:00 UTC base)
+- Mocks Supabase clients and email sending (no external service calls)
+- Verifies job processors are called with correct parameters
+- Tests preference filtering matches production behavior
+- Ensures unsubscribe state (preferences = false) is respected
+
+### Remaining Gaps (P2)
+
+**Cron & Email:**
+- No direct test for seller weekly analytics cron endpoint (`/api/cron/seller-weekly-analytics`)
+- No direct test for favorites starting soon cron endpoint (`/api/cron/favorites-starting-soon`)
+- No test for email deduplication logic (`canSendEmail` behavior)
+- No test for unsubscribe token expiration handling in jobs
+
+**General:**
+- E2E tests not in CI pipeline (only synthetic E2E via curl)
+- Some edge cases in moderation flow (e.g., concurrent reports, race conditions)
+
 ### Test Execution
 
 All tests can be run with:
 ```bash
 npm run test -- tests/integration/moderation.*
 npm run test -- tests/integration/archive.cron.test.ts
+npm run test -- tests/integration/cron.daily.test.ts
+npm run test -- tests/integration/email.preferences-jobs.test.ts
+npm run test -- tests/integration/cron.moderation-daily-digest.test.ts
 ```
 
 Full integration test suite:

@@ -7,12 +7,34 @@ import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import { generateCsrfToken } from '@/lib/csrf'
 
-// Mock Supabase client
+// Create chainable mock for supabase client
+const createSupabaseChain = (data: any = null, error: any = null) => {
+  const chain: any = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    maybeSingle: vi.fn(() => Promise.resolve({ data, error })),
+    single: vi.fn(() => Promise.resolve({ data, error })),
+  }
+  return chain
+}
+
+// Mock Supabase client - make from() configurable per test
+let mockSupabaseFromHandler: ((table: string) => any) | null = null
+
 const mockSupabaseClient = {
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null }),
   },
-  from: vi.fn(),
+  from: vi.fn((table: string) => {
+    if (mockSupabaseFromHandler) {
+      return mockSupabaseFromHandler(table)
+    }
+    // Default: return a chain for sales_v2
+    if (table === 'sales_v2') {
+      return createSupabaseChain({ id: 'test-sale-id', owner_id: 'other-user-id', title: 'Test Sale' }, null)
+    }
+    return createSupabaseChain(null, null)
+  }),
 }
 
 // Mock admin DB and query chains
@@ -172,6 +194,7 @@ describe('POST /api/sales/[id]/report', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSupabaseFromHandler = null // Reset to default
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: { id: userId } },
       error: null,
@@ -186,7 +209,7 @@ describe('POST /api/sales/[id]/report', () => {
     mockSaleChain.update.mockReturnValue(mockSaleChain)
     mockSaleChain.eq.mockReturnValue(mockSaleChain)
     
-    // Default sale lookup (visible sale)
+    // Default sale lookup (visible sale) - configure both mockRlsDb and mockSupabaseClient
     mockRlsDb.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
         return {
@@ -206,6 +229,18 @@ describe('POST /api/sales/[id]/report', () => {
       }
       return mockSaleChain
     })
+    
+    // Configure mockSupabaseClient.from for sales_v2 (used by report route)
+    mockSupabaseFromHandler = (table: string) => {
+      if (table === 'sales_v2') {
+        return createSupabaseChain({
+          id: saleId,
+          owner_id: ownerId,
+          title: 'Test Sale',
+        }, null)
+      }
+      return createSupabaseChain(null, null)
+    }
   })
 
   describe('Report creation', () => {

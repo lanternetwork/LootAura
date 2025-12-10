@@ -7,12 +7,31 @@ import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import { generateCsrfToken } from '@/lib/csrf'
 
+// Create chainable mock for supabase client
+const createSupabaseChain = (data: any = null, error: any = null) => {
+  const chain: any = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    maybeSingle: vi.fn(() => Promise.resolve({ data, error })),
+    single: vi.fn(() => Promise.resolve({ data, error })),
+  }
+  return chain
+}
+
 // Mock Supabase client
 const mockSupabaseClient = {
   auth: {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'locked-user-id' } }, error: null }),
   },
-  from: vi.fn(),
+  from: vi.fn((table: string) => {
+    if (table === 'profiles_v2') {
+      return createSupabaseChain({ id: 'locked-user-id' }, null)
+    }
+    if (table === 'sales_v2') {
+      return createSupabaseChain(null, null)
+    }
+    return createSupabaseChain(null, null)
+  }),
 }
 
 // Mock admin DB

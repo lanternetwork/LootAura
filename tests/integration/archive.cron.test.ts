@@ -271,7 +271,7 @@ describe('GET /api/cron/daily - Archive task', () => {
 
     expect(response.status).toBe(200)
     expect(data.tasks.archiveSales.ok).toBe(true)
-    expect(data.tasks.archiveSales.archivedCount).toBe(0)
+    expect(data.tasks.archiveSales.archived).toBe(0)
     expect(updateCalled).toBe(false)
   })
 
@@ -326,7 +326,7 @@ describe('GET /api/cron/daily - Archive task', () => {
 
     expect(response.status).toBe(200)
     expect(data.tasks.archiveSales.ok).toBe(true)
-    expect(data.tasks.archiveSales.archivedCount).toBe(0)
+    expect(data.tasks.archiveSales.archived).toBe(0)
     expect(updateCalled).toBe(false)
   })
 })

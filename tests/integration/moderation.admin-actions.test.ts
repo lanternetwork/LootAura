@@ -27,6 +27,8 @@ const mockReportChain = {
   eq: vi.fn(),
   order: vi.fn(),
   range: vi.fn(),
+  maybeSingle: vi.fn(),
+  single: vi.fn(),
 }
 
 const mockSaleChain = {

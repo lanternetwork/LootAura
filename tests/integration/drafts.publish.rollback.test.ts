@@ -47,6 +47,7 @@ const createChainableMock = () => {
 const mockDraftChain = createChainableMock()
 const mockSaleChain = createChainableMock()
 const mockItemChain = createChainableMock()
+const mockProfileChain = createChainableMock()
 
 const mockRlsDb = {
   from: vi.fn((table: string) => {
@@ -68,14 +69,25 @@ const mockAdminDb = {
     if (table === 'sale_drafts') {
       return mockDraftChain
     }
+    if (table === 'profiles') {
+      return mockProfileChain
+    }
     return createChainableMock()
   }),
 }
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockRlsDb,
+  getRlsDb: () => {
+    // Simulate cookies() error in test environment
+    throw new Error('cookies() can only be called inside a Server Component or Route Handler')
+  },
   getAdminDb: () => mockAdminDb,
-  fromBase: (db: any, table: string) => db.from(table),
+  fromBase: (db: any, table: string) => {
+    if (table === 'profiles') {
+      return mockProfileChain
+    }
+    return db.from(table)
+  },
 }))
 
 // Mock image validation - allow all URLs in tests
@@ -206,6 +218,16 @@ describe('Draft publish rollback', () => {
   })
 
   describe('Rollback on failure', () => {
+    beforeEach(() => {
+      // Mock account lock check - user is not locked
+      mockProfileChain.select.mockReturnValue(mockProfileChain)
+      mockProfileChain.eq.mockReturnValue(mockProfileChain)
+      mockProfileChain.maybeSingle.mockResolvedValue({
+        data: { is_locked: false },
+        error: null,
+      })
+    })
+
     it('calls rollback when items creation fails after sale creation', async () => {
       // Mock successful draft lookup
       mockDraftChain.maybeSingle.mockResolvedValue({
@@ -281,6 +303,14 @@ describe('Draft publish rollback', () => {
       // The route calls: fromBase(admin, 'items').insert(itemsData).select('id')
       mockItemChain.insert.mockReturnValue(mockItemChain)
       mockItemChain.select.mockRejectedValue(new Error('Unexpected database error'))
+      
+      // Ensure account lock check passes
+      mockProfileChain.select.mockReturnValue(mockProfileChain)
+      mockProfileChain.eq.mockReturnValue(mockProfileChain)
+      mockProfileChain.maybeSingle.mockResolvedValue({
+        data: { is_locked: false },
+        error: null,
+      })
 
       // Call the publish endpoint
       const request = createRequestWithCsrf('http://localhost/api/drafts/publish', {

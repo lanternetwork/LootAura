@@ -62,9 +62,17 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => mockRlsDb,
+  getRlsDb: () => {
+    // Simulate cookies() error in test environment
+    throw new Error('cookies() can only be called inside a Server Component or Route Handler')
+  },
   getAdminDb: () => mockAdminDb,
-  fromBase: (db: any, table: string) => db.from(table),
+  fromBase: (db: any, table: string) => {
+    if (table === 'profiles') {
+      return createQueryChain()
+    }
+    return db.from(table)
+  },
 }))
 
 // Mock CSRF validation

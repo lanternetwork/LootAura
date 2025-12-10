@@ -27,9 +27,10 @@ CREATE INDEX IF NOT EXISTS idx_sale_reports_reporter
   WHERE reporter_profile_id IS NOT NULL;
 
 -- Index for auto-hide logic: count recent reports per sale
+-- Note: Time-based filtering (e.g., last 7 days) is handled at query time, not in the index
+-- This index supports efficient queries filtering by sale_id and ordering by created_at
 CREATE INDEX IF NOT EXISTS idx_sale_reports_sale_created_recent 
-  ON lootaura_v2.sale_reports(sale_id, created_at DESC)
-  WHERE created_at >= now() - interval '7 days';
+  ON lootaura_v2.sale_reports(sale_id, created_at DESC);
 
 -- Enable RLS
 ALTER TABLE lootaura_v2.sale_reports ENABLE ROW LEVEL SECURITY;

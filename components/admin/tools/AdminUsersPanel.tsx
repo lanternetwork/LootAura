@@ -125,6 +125,12 @@ export default function AdminUsersPanel() {
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <h2 className="text-xl font-semibold text-gray-900 mb-4">User Management</h2>
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-800 font-medium">Error loading users</p>
+          <p className="text-xs text-red-600 mt-1">{error instanceof Error ? error.message : 'Unknown error'}</p>
+        </div>
+      )}
 
       {/* Search */}
       <div className="mb-4">

@@ -21,6 +21,7 @@ import { trackSaleViewed, trackFavoriteToggled } from '@/lib/analytics/clarityEv
 import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
 import { toast } from 'react-toastify'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
+import ReportSaleModal from '@/components/moderation/ReportSaleModal'
 
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
@@ -142,6 +143,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   const { data: favoriteSales = [] } = useFavorites()
   const toggleFavorite = useToggleFavorite()
   const [showFullDescription, setShowFullDescription] = useState(false)
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const cover = getSaleCoverUrl(sale)
   const viewTrackedRef = useRef(false)
   const isOptimisticRef = useRef(false)
@@ -526,6 +528,18 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
             <NearbySalesCard nearbySales={nearbySales} />
           </div>
         )}
+
+        {/* Report Sale Link - Mobile */}
+        {currentUser && currentUser.id !== sale.owner_id && (
+          <div className="w-full pt-4 border-t border-gray-200">
+            <button
+              onClick={() => setIsReportModalOpen(true)}
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Report this sale
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Desktop Layout */}
@@ -603,6 +617,18 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                 </div>
               )}
             </div>
+            
+            {/* Report Sale Link - Desktop */}
+            {currentUser && currentUser.id !== sale.owner_id && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Report this sale
+                </button>
+              </div>
+            )}
             </div>
 
             {/* Sale Details */}
@@ -903,6 +929,15 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
           </div>
         </div>
       </div>
+
+      {/* Report Sale Modal */}
+      {currentUser && currentUser.id !== sale.owner_id && (
+        <ReportSaleModal
+          saleId={sale.id}
+          open={isReportModalOpen}
+          onOpenChange={setIsReportModalOpen}
+        />
+      )}
     </div>
   )
 }

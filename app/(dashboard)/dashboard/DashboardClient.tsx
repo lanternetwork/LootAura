@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { ProfileSummaryCard } from '@/components/dashboard/ProfileSummaryCard'
 import SalesPanel from '@/components/dashboard/SalesPanel'
 import AnalyticsPanel from '@/components/dashboard/AnalyticsPanel'
+import AccountLockedBanner from '@/components/account/AccountLockedBanner'
+import { useProfile } from '@/lib/hooks/useAuth'
 import type { DraftListing } from '@/lib/data/salesAccess'
 import type { ProfileData, Metrics7d } from '@/lib/data/profileAccess'
 import { Sale } from '@/lib/types'
@@ -102,11 +104,18 @@ export default function DashboardClient({
       })
   }, [initialSales])
 
+  const { data: profile } = useProfile()
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold">Seller Dashboard</h1>
       </div>
+
+      {/* Account Locked Banner */}
+      {profile?.is_locked && (
+        <AccountLockedBanner lockReason={profile.lock_reason || undefined} />
+      )}
 
       <div className="space-y-6">
         {/* Row 1: Profile Summary (read-only with Edit Profile button) */}

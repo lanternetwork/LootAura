@@ -20,14 +20,14 @@ const mockAdminDb = {
 
 // Mock job processors
 const mockProcessFavoriteSalesStartingSoonJob = vi.fn()
-const mockSendModerationDailyDigestEmailEmail = vi.fn()
+const mockSendModerationDailyDigestEmail = vi.fn()
 
 vi.mock('@/lib/jobs/processor', () => ({
   processFavoriteSalesStartingSoonJob: (...args: any[]) => mockProcessFavoriteSalesStartingSoonJob(...args),
 }))
 
 vi.mock('@/lib/email/moderationDigest', () => ({
-  sendModerationDailyDigestEmail: (...args: any[]) => mockSendModerationDailyDigestEmailEmail(...args),
+  sendModerationDailyDigestEmail: (...args: any[]) => mockSendModerationDailyDigestEmail(...args),
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
@@ -68,7 +68,7 @@ describe('GET /api/cron/daily', () => {
     vi.clearAllMocks()
     mockAssertCronAuthorized.mockImplementation(() => {}) // Pass auth by default
     mockProcessFavoriteSalesStartingSoonJob.mockResolvedValue({ success: true })
-    mockSendModerationDailyDigestEmailEmail.mockResolvedValue({ ok: true })
+    mockSendModerationDailyDigestEmail.mockResolvedValue({ ok: true })
     
     process.env.CRON_SECRET = 'test-cron-secret'
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'

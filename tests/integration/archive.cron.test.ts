@@ -136,7 +136,7 @@ describe('GET /api/cron/daily - Archive task', () => {
             return {
               in: vi.fn(() => ({
                 select: vi.fn().mockResolvedValue({
-                  data: salesToArchive.map((s: any) => ({ id: s.id })),
+                  data: [], // No sales to archive (already archived)
                   error: null,
                 }),
               })),
@@ -197,7 +197,7 @@ describe('GET /api/cron/daily - Archive task', () => {
             return {
               in: vi.fn(() => ({
                 select: vi.fn().mockResolvedValue({
-                  data: salesToArchive.map((s: any) => ({ id: s.id })),
+                  data: [], // No sales to archive (already archived)
                   error: null,
                 }),
               })),
@@ -254,7 +254,7 @@ describe('GET /api/cron/daily - Archive task', () => {
             return {
               in: vi.fn(() => ({
                 select: vi.fn().mockResolvedValue({
-                  data: salesToArchive.map((s: any) => ({ id: s.id })),
+                  data: [], // No sales to archive in this test
                   error: null,
                 }),
               })),
@@ -311,7 +311,7 @@ describe('GET /api/cron/daily - Archive task', () => {
             return {
               in: vi.fn(() => ({
                 select: vi.fn().mockResolvedValue({
-                  data: salesToArchive.map((s: any) => ({ id: s.id })),
+                  data: [], // No sales to archive (already archived)
                   error: null,
                 }),
               })),

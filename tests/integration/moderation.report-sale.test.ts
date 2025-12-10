@@ -44,7 +44,7 @@ const mockRlsDb = {
   from: vi.fn((table: string) => {
     if (table === 'sales_v2') return mockSaleChain
     return mockSaleChain
-  }),
+  }) as any,
 }
 
 // Create query chain for profile lookups (account lock checks)

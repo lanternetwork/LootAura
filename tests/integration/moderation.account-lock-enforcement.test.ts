@@ -77,13 +77,14 @@ vi.mock('@/lib/csrf', async () => {
   }
 })
 
-// Mock rate limiting
+// Mock rate limiting - use deterministic timestamp
+// Base time: 2025-01-15 12:00:00 UTC
 vi.mock('@/lib/rateLimit/limiter', () => ({
   check: vi.fn().mockResolvedValue({ 
     allowed: true, 
     remaining: 10,
     softLimited: false,
-    resetAt: Date.now() + 60000,
+    resetAt: 1736942400000 + 60000, // 2025-01-15 12:00:00 UTC + 60s
   }),
 }))
 
@@ -299,18 +300,11 @@ describe('Account lock enforcement', () => {
 
   describe('Read-only access', () => {
     it('allows locked user to read sales', async () => {
-      // Mock unlocked user for comparison
-      vi.mock('@/lib/supabase/clients', () => ({
-        getRlsDb: () => mockRlsDb,
-        getAdminDb: () => mockAdminDb,
-        fromBase: (db: any, table: string) => {
-          if (table === 'profiles') {
-            return createProfileChain(false) // Unlocked for read test
-          }
-          return db.from(table)
-        },
-      }))
-
+      // Read operations should work even for locked users
+      // The account lock check only applies to write operations
+      // Note: The GET /api/sales endpoint doesn't call assertAccountNotLocked
+      // because it's a read-only operation
+      
       mockSupabaseClient.from.mockImplementation(() => {
         return createQueryChain([{ id: 'sale-1', title: 'Test Sale' }], null)
       })
@@ -321,7 +315,7 @@ describe('Account lock enforcement', () => {
       const response = await GET(request)
       const data = await response.json()
 
-      // Should succeed (read-only access)
+      // Should succeed (read-only access is not blocked)
       expect(response.status).toBe(200)
       expect(data.ok).toBe(true)
     })

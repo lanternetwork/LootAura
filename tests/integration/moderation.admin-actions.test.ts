@@ -59,13 +59,14 @@ vi.mock('@/lib/supabase/clients', () => ({
   fromBase: (db: any, table: string) => db.from(table),
 }))
 
-// Mock rate limiting
+// Mock rate limiting - use deterministic timestamp
+// Base time: 2025-01-15 12:00:00 UTC
 vi.mock('@/lib/rateLimit/limiter', () => ({
   check: vi.fn().mockResolvedValue({ 
     allowed: true, 
     remaining: 10,
     softLimited: false,
-    resetAt: Date.now() + 60000,
+    resetAt: 1736942400000 + 60000, // 2025-01-15 12:00:00 UTC + 60s
   }),
 }))
 
@@ -127,8 +128,8 @@ describe('GET /api/admin/reports', () => {
         status: 'open',
         action_taken: null,
         admin_notes: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: '2025-01-15T12:00:00.000Z', // Deterministic timestamp
+        updated_at: '2025-01-15T12:00:00.000Z', // Deterministic timestamp
         sales: {
           id: 'sale-1',
           title: 'Test Sale',

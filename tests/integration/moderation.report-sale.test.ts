@@ -101,12 +101,13 @@ vi.mock('@/lib/csrf', async () => {
 })
 
 // Mock rate limiting - allow all requests by default
+// Use deterministic timestamp: 2025-01-15 12:00:00 UTC + 60s
 vi.mock('@/lib/rateLimit/limiter', () => ({
   check: vi.fn().mockResolvedValue({ 
     allowed: true, 
     remaining: 10,
     softLimited: false,
-    resetAt: Date.now() + 60000,
+    resetAt: 1736942400000 + 60000, // MOCK_BASE_TIME + 60s
   }),
 }))
 
@@ -352,11 +353,12 @@ describe('POST /api/sales/[id]/report', () => {
       })
       
       // Mock recent reports query returning 5 unique reporters (threshold)
+      // Use deterministic user IDs to ensure test isolation
       const uniqueReporters = [
-        { reporter_profile_id: 'user-1' },
-        { reporter_profile_id: 'user-2' },
-        { reporter_profile_id: 'user-3' },
-        { reporter_profile_id: 'user-4' },
+        { reporter_profile_id: 'reporter-001' },
+        { reporter_profile_id: 'reporter-002' },
+        { reporter_profile_id: 'reporter-003' },
+        { reporter_profile_id: 'reporter-004' },
         { reporter_profile_id: userId }, // Current reporter makes 5
       ]
       
@@ -430,13 +432,14 @@ describe('POST /api/sales/[id]/report', () => {
       })
       
       // Mock recent reports query returning only 2 unique reporters (below threshold)
+      // Use deterministic user IDs to ensure test isolation
       mockReportChain.select.mockImplementation((fields: string) => {
         if (fields === 'reporter_profile_id') {
           return {
             eq: vi.fn(() => ({
               gte: vi.fn().mockResolvedValue({
                 data: [
-                  { reporter_profile_id: 'user-1' },
+                  { reporter_profile_id: 'reporter-001' },
                   { reporter_profile_id: userId },
                 ],
                 error: null,
@@ -514,7 +517,7 @@ describe('POST /api/sales/[id]/report', () => {
         allowed: false,
         remaining: 0,
         softLimited: false,
-        resetAt: Date.now() + 60000,
+        resetAt: 1736942400000 + 60000, // MOCK_BASE_TIME + 60s
       })
 
       const request = createRequestWithCsrf(

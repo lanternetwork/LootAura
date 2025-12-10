@@ -46,9 +46,12 @@ vi.mock('@/lib/log', () => ({
   generateOperationId: vi.fn(() => 'test-op-id-123'),
 }))
 
-// Helper to create date strings
+// Deterministic base date for all tests: 2025-01-15 12:00:00 UTC
+const MOCK_BASE_DATE = new Date('2025-01-15T12:00:00.000Z')
+
+// Helper to create date strings relative to base date
 function getDateString(daysOffset: number): string {
-  const date = new Date()
+  const date = new Date(MOCK_BASE_DATE)
   date.setUTCDate(date.getUTCDate() + daysOffset)
   return date.toISOString().split('T')[0] // YYYY-MM-DD
 }
@@ -337,21 +340,23 @@ describe('1-year retention semantics', () => {
     // 2. getUserSales filters archived sales by 1-year window (tested in salesAccess integration)
     // 3. Dashboard archive tab only shows sales within retention window (UI-level concern)
     
-    // This test documents the expected behavior:
+    // This test documents the expected behavior using deterministic dates:
     // - Sales archived 11 months ago: included in archive tab
     // - Sales archived 13 months ago: excluded from archive tab (but still in DB)
     // - Active sales: always shown when not archived
     
-    const oneYearAgo = new Date()
+    // Use deterministic base date: 2025-01-15
+    const baseDate = new Date('2025-01-15T12:00:00.000Z')
+    const oneYearAgo = new Date(baseDate)
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
     
-    const elevenMonthsAgo = new Date()
+    const elevenMonthsAgo = new Date(baseDate)
     elevenMonthsAgo.setMonth(elevenMonthsAgo.getMonth() - 11)
     
-    const thirteenMonthsAgo = new Date()
+    const thirteenMonthsAgo = new Date(baseDate)
     thirteenMonthsAgo.setMonth(thirteenMonthsAgo.getMonth() - 13)
     
-    // Verify date calculations
+    // Verify date calculations are deterministic
     expect(elevenMonthsAgo.getTime()).toBeGreaterThan(oneYearAgo.getTime())
     expect(thirteenMonthsAgo.getTime()).toBeLessThan(oneYearAgo.getTime())
     

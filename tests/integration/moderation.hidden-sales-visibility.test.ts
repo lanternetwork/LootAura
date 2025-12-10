@@ -60,13 +60,14 @@ vi.mock('@/lib/log', () => ({
   generateOperationId: vi.fn(() => 'test-op-id-123'),
 }))
 
-// Mock rate limiting
+// Mock rate limiting - use deterministic timestamp
+// Base time: 2025-01-15 12:00:00 UTC
 vi.mock('@/lib/rateLimit/limiter', () => ({
   check: vi.fn().mockResolvedValue({ 
     allowed: true, 
     remaining: 10,
     softLimited: false,
-    resetAt: Date.now() + 60000,
+    resetAt: 1736942400000 + 60000, // 2025-01-15 12:00:00 UTC + 60s
   }),
 }))
 

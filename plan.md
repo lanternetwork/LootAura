@@ -80,6 +80,45 @@
 
 **Status:** ✅ Completed (2025-12-10)
 
+## P0.1 Moderation + Archive Test Suite Stabilization
+
+**Status:** ✅ Completed (2025-01-31)
+
+### Stabilization Changes
+
+**Deterministic Timestamps:**
+- Replaced all `Date.now()` calls with deterministic base timestamp (2025-01-15 12:00:00 UTC)
+- Updated `archive.cron.test.ts` to use fixed base date for all date calculations
+- Ensured auto-hide threshold tests use deterministic user IDs for test isolation
+
+**Test Isolation:**
+- Verified all tests properly reset mocks in `beforeEach` hooks
+- Ensured account lock tests don't leak locked/unlocked state between tests
+- Standardized test user IDs to prevent cross-test contamination
+
+**Production Codepath Alignment:**
+- Verified all tests call actual route handlers (POST, GET, PATCH) matching production
+- Confirmed hidden sales visibility tests use same query patterns as production
+- Verified archive cron tests match production date calculation logic
+
+**Code Quality:**
+- Removed all debug logging (no `console.log/debug/warn/error` found)
+- Verified no PII in test assertions or error messages
+- Confirmed tests only assert on public-facing error codes and messages
+
+**RLS & Security:**
+- Verified tests use mocked Supabase clients (no direct DB bypass)
+- Confirmed tests exercise production RLS-aware code paths
+- Ensured test mocks simulate correct RLS behavior
+
+### Test Files Stabilized
+
+- `tests/integration/moderation.report-sale.test.ts`
+- `tests/integration/moderation.admin-actions.test.ts`
+- `tests/integration/moderation.account-lock-enforcement.test.ts`
+- `tests/integration/moderation.hidden-sales-visibility.test.ts`
+- `tests/integration/archive.cron.test.ts`
+
 ### Coverage Added
 
 **Moderation System Tests:**

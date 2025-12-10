@@ -225,10 +225,13 @@ export default function AdminUsersPanel() {
                             target="_blank"
                             className="text-sm font-medium text-purple-600 hover:text-purple-700"
                           >
-                            {user.username || user.full_name || 'Unknown'}
+                            {user.username || user.full_name || user.id.substring(0, 8) || 'Unknown'}
                           </Link>
                           {user.full_name && user.username && (
                             <span className="text-xs text-gray-500">{user.full_name}</span>
+                          )}
+                          {!user.username && (
+                            <span className="text-xs text-gray-400">ID: {user.id.substring(0, 8)}...</span>
                           )}
                         </div>
                       </td>

@@ -33,13 +33,14 @@ async function getUsersHandler(request: NextRequest) {
 
     const adminDb = getAdminDb()
 
-    // Build query for profiles - use base table directly with admin client
+    // Build query for profiles - query lootaura_v2.profiles directly
     let query = fromBase(adminDb, 'profiles')
       .select('id, username, full_name, created_at, is_locked, locked_at, locked_by, lock_reason', { count: 'exact' })
 
     // Search by username or full_name
     if (q) {
-      // Use OR condition to search both username and full_name
+      // Search by username or full_name (case-insensitive)
+      // Use OR condition to match either field
       query = query.or(`username.ilike.%${q}%,full_name.ilike.%${q}%`)
     }
 
@@ -53,26 +54,28 @@ async function getUsersHandler(request: NextRequest) {
       logger.error('Failed to fetch users', error instanceof Error ? error : new Error(String(error)), {
         component: 'moderation',
         operation: 'get_users',
+        q,
+        page,
+        limit,
         errorCode: (error as any)?.code,
         errorMessage: (error as any)?.message,
-        errorDetails: (error as any)?.details,
-        errorHint: (error as any)?.hint,
       })
       return NextResponse.json(
-        { error: 'Failed to fetch users', details: error instanceof Error ? error.message : String(error) },
+        { error: 'Failed to fetch users', details: process.env.NEXT_PUBLIC_DEBUG === 'true' ? String(error) : undefined },
         { status: 500 }
       )
     }
 
-    // Log for debugging (only in non-production)
+    // Log for debugging
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      logger.debug('Fetched users', {
+      logger.debug('Admin users query result', {
         component: 'moderation',
         operation: 'get_users',
-        count: profiles?.length || 0,
-        total: count || 0,
+        q,
         page,
         limit,
+        profilesCount: profiles?.length || 0,
+        totalCount: count || 0,
       })
     }
 

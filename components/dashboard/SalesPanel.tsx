@@ -17,6 +17,7 @@ interface SalesPanelProps {
   onDraftDelete?: (draftKey: string) => void
   onDraftPublish?: (draftKey: string, saleId: string) => void
   onRetryDrafts?: () => void
+  initialArchivedCount?: number // Initial count for archived sales tab badge
 }
 
 type TabType = 'live' | 'archived' | 'drafts'
@@ -30,10 +31,12 @@ export default function SalesPanel({
   onDraftDelete,
   onDraftPublish,
   onRetryDrafts,
+  initialArchivedCount = 0,
 }: SalesPanelProps) {
   const [localSales, setLocalSales] = useState<Sale[]>(sales)
   const [archivedSales, setArchivedSales] = useState<Sale[]>([])
   const [isLoadingArchived, setIsLoadingArchived] = useState(false)
+  const [archivedCount, setArchivedCount] = useState<number>(initialArchivedCount)
   const [activeTab, setActiveTab] = useState<TabType>('live')
 
   // Sync local sales with prop changes (active sales)
@@ -41,7 +44,34 @@ export default function SalesPanel({
     setLocalSales(sales)
   }, [sales])
 
-  // Fetch archived sales when archived tab is activated
+  // Prefetch archived sales in the background after a short delay
+  // This makes the tab feel faster when clicked
+  useEffect(() => {
+    // Only prefetch if we have archived sales (count > 0) and haven't loaded them yet
+    if (archivedCount > 0 && archivedSales.length === 0 && !isLoadingArchived && activeTab !== 'archived') {
+      // Prefetch after 2 seconds (don't block initial render)
+      const timer = setTimeout(() => {
+        fetch('/api/profile/listings?status=archived&limit=50')
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.items && Array.isArray(data.items)) {
+              setArchivedSales(data.items as Sale[])
+              // Update count from actual data if available
+              if (data.total !== undefined) {
+                setArchivedCount(data.total)
+              }
+            }
+          })
+          .catch(() => {
+            // Silently fail - prefetch is not critical
+          })
+      }, 2000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [archivedCount, archivedSales.length, isLoadingArchived, activeTab])
+
+  // Fetch archived sales when archived tab is activated (if not already prefetched)
   useEffect(() => {
     if (activeTab === 'archived' && archivedSales.length === 0 && !isLoadingArchived) {
       setIsLoadingArchived(true)
@@ -50,6 +80,10 @@ export default function SalesPanel({
         .then((data) => {
           if (data.items && Array.isArray(data.items)) {
             setArchivedSales(data.items as Sale[])
+            // Update count from actual data if available
+            if (data.total !== undefined) {
+              setArchivedCount(data.total)
+            }
           }
         })
         .catch((err) => {
@@ -75,7 +109,7 @@ export default function SalesPanel({
 
   // Calculate counts for each tab
   const liveCount = useMemo(() => localSales.filter((s) => s.status === 'published').length, [localSales])
-  const archivedCount = archivedSales.length // Use fetched archived count
+  // Use state for archived count (initialized from props, updated when data loads)
   const draftsCount = drafts.length
 
   const handleSaleDelete = (saleId: string) => {

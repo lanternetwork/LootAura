@@ -236,6 +236,73 @@ export async function getUserSales(
 }
 
 /**
+ * Get count of archived sales for a user (within 1-year retention window)
+ * Lightweight query that only returns the count, not the data
+ * @param supabase - Authenticated Supabase client
+ * @param userId - User ID to filter by
+ * @returns Count of archived sales
+ */
+export async function getArchivedSalesCount(
+  supabase: SupabaseClient,
+  userId: string
+): Promise<number> {
+  // Calculate 1-year cutoff for archived sales
+  const oneYearAgo = new Date()
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+  const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0] // YYYY-MM-DD format
+
+  try {
+    // Try view first (preferred)
+    const { count, error } = await supabase
+      .from('sales_v2')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_id', userId)
+      .eq('status', 'archived')
+      .or(`archived_at.gte.${oneYearAgoStr},date_end.gte.${oneYearAgoStr}`)
+
+    if (!error && count !== null) {
+      return count
+    }
+
+    // If error is permissions/column related, fallback to base table
+    if (error) {
+      const isPermissionError = 
+        error.code === 'PGRST301' ||
+        error.code === '42501' ||
+        error.message?.includes('permission') ||
+        error.message?.includes('column') ||
+        error.message?.includes('does not exist')
+
+      if (!isPermissionError) {
+        // Non-permission error, return 0
+        return 0
+      }
+    }
+  } catch (error) {
+    // Fall through to base table query
+  }
+
+  // Fallback: query base table directly
+  try {
+    const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
+    const db = getRlsDb()
+    const { count, error } = await fromBase(db, 'sales')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_id', userId)
+      .eq('status', 'archived')
+      .or(`archived_at.gte.${oneYearAgoStr},date_end.gte.${oneYearAgoStr}`)
+
+    if (error) {
+      return 0
+    }
+
+    return count || 0
+  } catch (error) {
+    return 0
+  }
+}
+
+/**
  * Fetch user's active drafts
  * @param supabase - Authenticated Supabase client
  * @param userId - User ID to filter by

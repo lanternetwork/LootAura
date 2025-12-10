@@ -15,6 +15,7 @@ interface DashboardClientProps {
   initialDrafts?: DraftListing[]
   initialProfile?: ProfileData | null
   initialMetrics?: Metrics7d | null
+  initialArchivedCount?: number
 }
 
 export default function DashboardClient({
@@ -22,6 +23,7 @@ export default function DashboardClient({
   initialDrafts = [],
   initialProfile,
   initialMetrics,
+  initialArchivedCount = 0,
 }: DashboardClientProps) {
   const [sales, setSales] = useState<Sale[]>(initialSales)
   const [drafts, setDrafts] = useState<DraftListing[]>(initialDrafts)
@@ -122,7 +124,8 @@ export default function DashboardClient({
         <ProfileSummaryCard profile={initialProfile || null} />
 
         {/* Row 3: Sales Panel (with Live, Archived, and Drafts tabs) */}
-        <SalesPanel 
+        <SalesPanel
+          initialArchivedCount={initialArchivedCount} 
           sales={sales}
           drafts={drafts}
           isLoadingDrafts={draftsLoading}

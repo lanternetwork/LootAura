@@ -105,8 +105,8 @@ describe('GET /api/admin/reports', () => {
     // Reset chain mocks
     mockReportChain.select.mockReturnValue(mockReportChain)
     mockReportChain.eq.mockReturnValue(mockReportChain)
-    mockReportChain.order.mockResolvedValue({ data: [], error: null })
-    mockReportChain.range.mockResolvedValue({ data: [], error: null })
+    mockReportChain.order.mockReturnValue(mockReportChain)
+    mockReportChain.range.mockResolvedValue({ data: [], error: null, count: 0 })
   })
 
   it('returns 403 when admin check fails', async () => {

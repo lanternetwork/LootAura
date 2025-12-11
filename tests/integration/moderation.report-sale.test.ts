@@ -566,8 +566,9 @@ describe('POST /api/sales/[id]/report', () => {
       const rateLimitModule = await import('@/lib/rateLimit/limiter')
       
       // Override the check function to return rate limited
+      // The wrapper calls check for each policy, so we need to mock it to always return rate limited
       vi.mocked(rateLimitModule.check).mockReset()
-      vi.mocked(rateLimitModule.check).mockResolvedValueOnce({
+      vi.mocked(rateLimitModule.check).mockResolvedValue({
         allowed: false,
         remaining: 0,
         softLimited: false,

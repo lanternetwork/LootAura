@@ -25,22 +25,27 @@ const mockRlsDb = {
   from: vi.fn(),
 }
 
-// Create query chain helper
+// Create query chain helper - supports chaining multiple filters
 const createQueryChain = (data: any[] = [], error: any = null) => {
-  const chain: any = {
-    select: vi.fn(() => chain),
-    eq: vi.fn(() => chain),
-    neq: vi.fn(() => chain),
-    in: vi.fn(() => chain),
-    not: vi.fn(() => chain),
-    gte: vi.fn(() => chain),
-    lte: vi.fn(() => chain),
-    order: vi.fn(() => chain),
-    limit: vi.fn(() => Promise.resolve({ data, error })),
-    maybeSingle: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),
-    single: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),
+  // Create a chainable object that supports all query methods
+  const createChainable = (): any => {
+    const chain: any = {
+      select: vi.fn(() => chain),
+      eq: vi.fn(() => chain),
+      neq: vi.fn(() => chain),
+      in: vi.fn(() => chain),
+      not: vi.fn(() => chain),
+      is: vi.fn(() => chain),
+      gte: vi.fn(() => chain),
+      lte: vi.fn(() => chain),
+      order: vi.fn(() => chain),
+      limit: vi.fn(() => Promise.resolve({ data, error })),
+      maybeSingle: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),
+      single: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),
+    }
+    return chain
   }
-  return chain
+  return createChainable()
 }
 
 vi.mock('@/lib/supabase/server', () => ({

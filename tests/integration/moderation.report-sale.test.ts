@@ -161,6 +161,12 @@ vi.mock('@/lib/rateLimit/keys', () => ({
   deriveKey: vi.fn().mockResolvedValue('test-key'),
 }))
 
+vi.mock('@/lib/rateLimit/config', () => ({
+  shouldBypassRateLimit: vi.fn().mockReturnValue(false),
+  isRateLimitingEnabled: vi.fn().mockReturnValue(true),
+  isPreviewEnv: vi.fn().mockReturnValue(false),
+}))
+
 // Mock logger
 vi.mock('@/lib/log', () => ({
   logger: {

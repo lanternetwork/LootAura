@@ -146,7 +146,7 @@ describe('GET /api/admin/reports', () => {
     ]
 
     mockReportChain.range.mockResolvedValue({
-      data: mockReports,
+      data: mockReports as any,
       error: null,
       count: 1,
     })

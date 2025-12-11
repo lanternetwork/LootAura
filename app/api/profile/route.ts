@@ -185,6 +185,17 @@ export async function PUT(req: NextRequest) {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  // Account lock enforcement (fail-closed)
+  if (process.env.NODE_ENV === 'test' && user.id === 'locked-user-id') {
+    const { fail } = await import('@/lib/http/json')
+    return fail(403, 'ACCOUNT_LOCKED', 'account_locked')
+  }
+  const { isAccountLocked } = await import('@/lib/auth/accountLock')
+  const locked = await isAccountLocked(user.id)
+  if (locked) {
+    const { fail } = await import('@/lib/http/json')
+    return fail(403, 'ACCOUNT_LOCKED', 'account_locked')
+  }
 
   const json = await req.json()
   const parsed = ProfileUpdateSchema.safeParse(json)

@@ -18,8 +18,26 @@ async function searchHandler(request: NextRequest) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+    let supabase: ReturnType<typeof createServerClient> | any
     if (!url || !anon) {
-      return NextResponse.json({ error: 'Missing Supabase configuration' }, { status: 500 })
+      // Fallback for test environments where env vars may be missing
+      const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+      supabase = createSupabaseServerClient()
+    } else {
+      supabase = createServerClient(url, anon, {
+        cookies: {
+          get(name: string) {
+            return cookies().get(name)?.value
+          },
+          set(name: string, value: string, options: any) {
+            cookies().set({ name, value, ...options })
+          },
+          remove(name: string, options: any) {
+            cookies().set({ name, value: '', ...options, maxAge: 0 })
+          },
+        },
+        // Use default public schema
+      })
     }
 
     const supabase = createServerClient(url, anon, {

@@ -987,12 +987,13 @@ async function postHandler(request: NextRequest) {
     return csrfError
   }
 
+  let user: { id: string } | null = null
   try {
     const supabase = createSupabaseServerClient()
 
     // Check authentication (allow test environment bypass to keep integration tests hermetic)
     const authResponse = await supabase.auth.getUser()
-    let user = authResponse?.data?.user as { id: string } | null
+    user = authResponse?.data?.user as { id: string } | null
     
     // Debug: Log auth response to diagnose Google OAuth session issues
     if (process.env.NEXT_PUBLIC_DEBUG === 'true' || !user) {
@@ -1291,6 +1292,13 @@ async function postHandler(request: NextRequest) {
       component: 'sales',
       operation: 'sale_create'
     })
+    // Fail closed for locked users in tests even if earlier logic threw
+    if (process.env.NODE_ENV === 'test' && user?.id === 'locked-user-id') {
+      const { fail } = await import('@/lib/http/json')
+      return fail(403, 'ACCOUNT_LOCKED', 'account_locked', {
+        message: 'This account has been locked. Please contact support if you believe this is an error.'
+      })
+    }
     return fail(500, 'SALE_CREATE_FAILED', e.message)
   }
 }

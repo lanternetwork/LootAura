@@ -12,7 +12,8 @@ export async function GET(_req: NextRequest) {
     await assertAccountNotLocked(user.id)
   } catch (error) {
     if (error instanceof NextResponse || error instanceof Response) return error as any
-    throw error
+    const { fail } = await import('@/lib/http/json')
+    return fail(403, 'ACCOUNT_LOCKED', 'account_locked')
   }
 
   console.log('[PROFILE] GET /api/profile start', { userId: user.id })

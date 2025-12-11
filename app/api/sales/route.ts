@@ -1033,8 +1033,9 @@ async function postHandler(request: NextRequest) {
       if (error instanceof NextResponse || error instanceof Response) {
         return error as any
       }
-      // If it's not a Response, rethrow
-      throw error
+      // On unexpected errors, fail closed to avoid write for potentially locked account
+      const { fail } = await import('@/lib/http/json')
+      return fail(403, 'ACCOUNT_LOCKED', 'account_locked')
     }
     
     let body: any

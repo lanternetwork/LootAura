@@ -34,13 +34,15 @@ const mockReportChain = {
 const mockSaleChain = {
   select: vi.fn(() => mockSaleChain),
   update: vi.fn(() => mockSaleChain),
-  eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  eq: vi.fn(() => mockSaleChain),
   maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
 }
 
 const mockProfileChain = {
+  select: vi.fn(() => mockProfileChain),
   update: vi.fn(() => mockProfileChain),
-  eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  eq: vi.fn(() => mockProfileChain),
+  maybeSingle: vi.fn(() => Promise.resolve({ data: { is_locked: false }, error: null })),
 }
 
 const mockAdminDb = {

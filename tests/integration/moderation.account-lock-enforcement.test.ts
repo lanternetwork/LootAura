@@ -46,16 +46,15 @@ const mockRlsDb = {
 
 // Create query chain for profile lookups (account lock checks)
 const createProfileChain = (isLocked: boolean) => {
-  return {
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        maybeSingle: vi.fn().mockResolvedValue({
-          data: { is_locked: isLocked },
-          error: null,
-        }),
-      })),
-    })),
+  const chain: any = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    maybeSingle: vi.fn().mockResolvedValue({
+      data: { is_locked: isLocked },
+      error: null,
+    }),
   }
+  return chain
 }
 
 // Create query chain for other operations

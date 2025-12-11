@@ -88,6 +88,7 @@ describe('GET /api/cron/moderation-daily-digest', () => {
 
     it('allows request with valid cron auth', async () => {
       // Mock reports query (empty)
+      mockAdminDb.from.mockReset()
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sale_reports') {
           return {
@@ -101,7 +102,14 @@ describe('GET /api/cron/moderation-daily-digest', () => {
             })),
           }
         }
-        return { from: vi.fn() }
+        // Return a default chainable mock for other tables
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            })),
+          })),
+        }
       })
 
       const request = new NextRequest('http://localhost/api/cron/moderation-daily-digest', {

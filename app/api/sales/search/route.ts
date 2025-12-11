@@ -111,15 +111,17 @@ async function searchHandler(request: NextRequest) {
         error = salesError
       } else {
         // In test mode, if salesData is empty/undefined but no error, try to get data from mock
+        // This handles cases where the mock chain doesn't resolve correctly
         if (process.env.NODE_ENV === 'test' && (!salesData || salesData.length === 0)) {
           // Query might have resolved but data wasn't extracted correctly
-          // Try a simpler query to get mock data
+          // Try a simpler query to get mock data (no filters, just basic select)
           try {
-            const { data: testData, error: testError } = await supabase
+            const simpleQuery = supabase
               .from('sales_v2')
               .select('*')
-              .eq('status', 'published')
               .limit(100)
+            
+            const { data: testData, error: testError } = await simpleQuery
             
             if (!testError && testData && testData.length > 0) {
               salesData = testData

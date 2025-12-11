@@ -72,12 +72,19 @@ const MOCK_BASE_DATE = new Date('2025-01-15T12:00:00.000Z')
 describe('Email job preferences and unsubscribe behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Mock Date to use MOCK_BASE_DATE so the job's date filtering works correctly
+    vi.useFakeTimers()
+    vi.setSystemTime(MOCK_BASE_DATE)
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
     process.env.EMAIL_FAVORITE_SALE_STARTING_SOON_ENABLED = 'true'
     process.env.EMAIL_FAVORITE_SALE_STARTING_SOON_HOURS_BEFORE_START = '24'
     process.env.EMAIL_SELLER_WEEKLY_ANALYTICS_ENABLED = 'true'
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   describe('Favorites digest respects preferences', () => {

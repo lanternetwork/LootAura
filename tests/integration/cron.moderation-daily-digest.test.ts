@@ -164,30 +164,32 @@ describe('GET /api/cron/moderation-daily-digest', () => {
       mockAdminDb.from.mockReset()
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sale_reports') {
+          const orderChain = {
+            order: vi.fn((field: string, options?: { ascending: boolean }) => {
+              // Verify order parameters
+              expect(field).toBe('created_at')
+              if (options) {
+                expect(options.ascending).toBe(false)
+              }
+              // Return a thenable that resolves with the data
+              return Promise.resolve({
+                data: [recentReport], // Only recent report in results (with nested sales relation)
+                error: null,
+              })
+            }),
+          }
+          const gteChain = {
+            gte: vi.fn((field: string, value: string) => {
+              // Verify it's filtering by created_at >= 24 hours ago
+              expect(field).toBe('created_at')
+              const cutoffDate = new Date(value)
+              const expectedCutoff = new Date(MOCK_BASE_DATE.getTime() - 24 * 60 * 60 * 1000)
+              expect(cutoffDate.getTime()).toBeCloseTo(expectedCutoff.getTime(), -3) // Within 1 second
+              return orderChain
+            }),
+          }
           return {
-            select: vi.fn(() => ({
-              gte: vi.fn((field: string, value: string) => {
-                // Verify it's filtering by created_at >= 24 hours ago
-                expect(field).toBe('created_at')
-                const cutoffDate = new Date(value)
-                const expectedCutoff = new Date(MOCK_BASE_DATE.getTime() - 24 * 60 * 60 * 1000)
-                expect(cutoffDate.getTime()).toBeCloseTo(expectedCutoff.getTime(), -3) // Within 1 second
-                
-                return {
-                  order: vi.fn((field: string, options?: { ascending: boolean }) => {
-                    // Verify order parameters
-                    expect(field).toBe('created_at')
-                    if (options) {
-                      expect(options.ascending).toBe(false)
-                    }
-                    return Promise.resolve({
-                      data: [recentReport], // Only recent report in results (with nested sales relation)
-                      error: null,
-                    })
-                  }),
-                }
-              }),
-            })),
+            select: vi.fn(() => gteChain),
           }
         }
         // Return a default chainable mock for other tables

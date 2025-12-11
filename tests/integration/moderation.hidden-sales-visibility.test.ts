@@ -235,23 +235,83 @@ describe('Hidden sales visibility', () => {
       
       const { getSaleWithItems } = await import('@/lib/data/salesAccess')
       
-      // Mock Supabase client that returns hidden sale
-      const mockClient = {
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              maybeSingle: vi.fn().mockResolvedValue({
-                data: { ...hiddenSale, owner_id: 'owner-1' },
-                error: null,
-              }),
-            })),
-          })),
-        })),
+      // Set up mocks for getSaleWithItems
+      const mockSingleChain = {
+        single: vi.fn().mockResolvedValue({
+          data: { ...hiddenSale, owner_id: 'owner-1' },
+          error: null,
+        }),
       }
+      const mockEqChain = {
+        eq: vi.fn(() => mockSingleChain),
+      }
+      const mockSelectChain = {
+        select: vi.fn(() => mockEqChain),
+      }
+      const mockOrderChain = {
+        order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+      }
+      const mockItemsEqChain = {
+        eq: vi.fn(() => mockOrderChain),
+      }
+      const mockItemsSelectChain = {
+        select: vi.fn(() => mockItemsEqChain),
+      }
+      const mockMaybeSingleChain = {
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }
+      const mockProfilesEqChain = {
+        eq: vi.fn(() => mockMaybeSingleChain),
+      }
+      const mockProfilesSelectChain = {
+        select: vi.fn(() => mockProfilesEqChain),
+      }
+      const mockStatsEqChain = {
+        eq: vi.fn(() => mockMaybeSingleChain),
+      }
+      const mockStatsSelectChain = {
+        select: vi.fn(() => mockStatsEqChain),
+      }
+      
+      // Set up mockSupabaseClient for sales_v2, profiles_v2, and owner_stats queries
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'sales_v2') {
+          return mockSelectChain
+        }
+        if (table === 'profiles_v2') {
+          return mockProfilesSelectChain
+        }
+        if (table === 'owner_stats') {
+          return mockStatsSelectChain
+        }
+        return mockSelectChain
+      })
+      
+      // Set up mockRlsDb.from for items query (getSaleWithItems calls getRlsDb())
+      mockRlsDb.from.mockImplementation((table: string) => {
+        if (table === 'items') {
+          return mockItemsSelectChain
+        }
+        return mockSelectChain
+      })
+      
+      // Set up mockAdminDb.from for sales query (tags query)
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'sales') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              })),
+            })),
+          }
+        }
+        return mockSelectChain
+      })
       
       // getSaleWithItems should return the sale (including hidden ones)
       // The page component then checks moderation_status and calls notFound for non-admins
-      const result = await getSaleWithItems(mockClient as any, 'sale-hidden')
+      const result = await getSaleWithItems(mockSupabaseClient as any, 'sale-hidden')
       
       // Function should return the sale (visibility filtering is page-level)
       expect(result).toBeDefined()

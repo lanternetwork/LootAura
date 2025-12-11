@@ -96,10 +96,10 @@ export async function isAccountLocked(
           try {
             client = getAdminDb()
           } catch {
-            return false // Default to not locked if we can't check
+            return true // Fail closed: assume locked if we can't check
           }
         } else {
-          return false // Default to not locked on error
+          return true // Fail closed on unexpected error
         }
       }
     }
@@ -110,12 +110,12 @@ export async function isAccountLocked(
       .maybeSingle()
 
     if (error || !profile) {
-      return false // Default to not locked if we can't check
+      return true // Fail closed if we can't confirm
     }
 
     return profile.is_locked === true
   } catch {
-    return false // Default to not locked on error
+    return true // Fail closed on error
   }
 }
 

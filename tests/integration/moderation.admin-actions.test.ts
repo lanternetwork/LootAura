@@ -25,8 +25,8 @@ const mockReportChain = {
   select: vi.fn(() => mockReportChain),
   update: vi.fn(() => mockReportChain),
   eq: vi.fn(() => mockReportChain),
-  order: vi.fn(() => Promise.resolve({ data: [], error: null })),
-  range: vi.fn(() => Promise.resolve({ data: [], error: null })),
+  order: vi.fn(() => mockReportChain),
+  range: vi.fn(() => Promise.resolve({ data: [], error: null, count: 0 })),
   maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
   single: vi.fn(() => Promise.resolve({ data: null, error: null })),
 }
@@ -148,6 +148,7 @@ describe('GET /api/admin/reports', () => {
     mockReportChain.range.mockResolvedValue({
       data: mockReports,
       error: null,
+      count: 1,
     })
 
     const request = new NextRequest('http://localhost/api/admin/reports')
@@ -170,6 +171,7 @@ describe('GET /api/admin/reports', () => {
     mockReportChain.range.mockResolvedValue({
       data: [],
       error: null,
+      count: 0,
     })
 
     const request = new NextRequest('http://localhost/api/admin/reports?status=resolved')

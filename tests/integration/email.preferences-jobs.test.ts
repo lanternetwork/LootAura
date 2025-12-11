@@ -86,9 +86,10 @@ describe('Email job preferences and unsubscribe behavior', () => {
       const userEmail = 'user-a@example.test'
       const saleId = 'sale-1'
       
-      // Create sale starting in 12 hours
+      // Create sale starting in 12 hours (within 24-hour window)
+      // Use UTC to match job's date parsing
       const futureDate = new Date(MOCK_BASE_DATE)
-      futureDate.setHours(futureDate.getHours() + 12)
+      futureDate.setUTCHours(futureDate.getUTCHours() + 12)
       const futureDateStr = futureDate.toISOString().split('T')[0]
       const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5)
 
@@ -179,9 +180,10 @@ describe('Email job preferences and unsubscribe behavior', () => {
       const userEmailDisabled = 'user-b@example.test'
       const saleId = 'sale-1'
       
-      // Create sale starting in 12 hours
+      // Create sale starting in 12 hours (within 24-hour window)
+      // Use UTC to match job's date parsing
       const futureDate = new Date(MOCK_BASE_DATE)
-      futureDate.setHours(futureDate.getHours() + 12)
+      futureDate.setUTCHours(futureDate.getUTCHours() + 12)
       const futureDateStr = futureDate.toISOString().split('T')[0]
       const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5)
 
@@ -285,9 +287,10 @@ describe('Email job preferences and unsubscribe behavior', () => {
       const userEmail = 'user-c@example.test'
       const saleId = 'sale-1'
       
-      // Create sale starting in 12 hours
+      // Create sale starting in 12 hours (within 24-hour window)
+      // Use UTC to match job's date parsing
       const futureDate = new Date(MOCK_BASE_DATE)
-      futureDate.setHours(futureDate.getHours() + 12)
+      futureDate.setUTCHours(futureDate.getUTCHours() + 12)
       const futureDateStr = futureDate.toISOString().split('T')[0]
       const futureTimeStr = futureDate.toISOString().split('T')[1].substring(0, 5)
 

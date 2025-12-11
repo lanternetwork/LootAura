@@ -32,6 +32,7 @@ const mockSupabaseClient = {
     }
     return createSupabaseChain(null, null)
   }),
+  rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
 }
 
 // Mock admin DB
@@ -82,16 +83,13 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: () => {
-    // Simulate cookies() error in test environment
+    // Simulate cookies() error in test environment - this triggers fallback to getAdminDb
     throw new Error('cookies() can only be called inside a Server Component or Route Handler')
   },
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => {
-    if (table === 'profiles') {
-      return createProfileChain(true) // Locked user
-    }
-    // For other tables, return a query chain
-    return createQueryChain(null, null)
+    // Use the db's from method (which is mockAdminDb.from)
+    return db.from(table)
   },
 }))
 

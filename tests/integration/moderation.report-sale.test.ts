@@ -564,15 +564,15 @@ describe('POST /api/sales/[id]/report', () => {
     it('enforces rate limits on reporting', async () => {
       // Get the check function and override it for this test
       const rateLimitModule = await import('@/lib/rateLimit/limiter')
-      const originalCheck = rateLimitModule.check
       
       // Override the check function to return rate limited
-      vi.mocked(rateLimitModule.check).mockImplementationOnce(async () => ({
+      vi.mocked(rateLimitModule.check).mockReset()
+      vi.mocked(rateLimitModule.check).mockResolvedValueOnce({
         allowed: false,
         remaining: 0,
         softLimited: false,
         resetAt: 1736942400000 + 60000, // MOCK_BASE_TIME + 60s
-      }))
+      })
 
       // Configure supabase mock for sale lookup (rate limit check happens before sale lookup)
       mockSupabaseFromHandler = (table: string) => {

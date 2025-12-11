@@ -181,6 +181,9 @@ describe('Email job preferences and unsubscribe behavior', () => {
 
       const result = await processFavoriteSalesStartingSoonJob({})
 
+      if (!result.success) {
+        console.error('Job failed with error:', result.error)
+      }
       expect(result.success).toBe(true)
       expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(1)
       expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledWith(

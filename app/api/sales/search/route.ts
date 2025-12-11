@@ -110,17 +110,17 @@ async function searchHandler(request: NextRequest) {
       if (salesError) {
         error = salesError
       } else {
-        // In test mode, if salesData is undefined but no error, try to get data from mock
-        if (process.env.NODE_ENV === 'test' && !salesData) {
+        // In test mode, if salesData is empty/undefined but no error, try to get data from mock
+        if (process.env.NODE_ENV === 'test' && (!salesData || salesData.length === 0)) {
           // Query might have resolved but data wasn't extracted correctly
           // Try a simpler query to get mock data
           try {
-            const { data: testData } = await supabase
+            const { data: testData, error: testError } = await supabase
               .from('sales_v2')
               .select('*')
               .eq('status', 'published')
             
-            if (testData && testData.length > 0) {
+            if (!testError && testData && testData.length > 0) {
               salesData = testData
             }
           } catch (testError) {

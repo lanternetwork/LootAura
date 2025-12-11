@@ -232,6 +232,8 @@ describe('PATCH /api/admin/reports/[id]', () => {
       }),
     }
     
+    // Reset mockAdminDb.from to ensure clean state
+    mockAdminDb.from.mockReset()
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sale_reports') {
         return {
@@ -280,6 +282,8 @@ describe('PATCH /api/admin/reports/[id]', () => {
       }),
     }
     
+    // Reset mockAdminDb.from to ensure clean state
+    mockAdminDb.from.mockReset()
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
         return {

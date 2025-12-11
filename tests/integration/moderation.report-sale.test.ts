@@ -564,6 +564,8 @@ describe('POST /api/sales/[id]/report', () => {
     it('enforces rate limits on reporting', async () => {
       // Import check and override the mock using mockImplementation
       const rateLimitModule = await import('@/lib/rateLimit/limiter')
+      // Clear any previous mock calls and set new implementation
+      vi.mocked(rateLimitModule.check).mockClear()
       vi.mocked(rateLimitModule.check).mockImplementation(async () => ({
         allowed: false,
         remaining: 0,
@@ -594,6 +596,9 @@ describe('POST /api/sales/[id]/report', () => {
       expect(response.status).toBe(429)
       expect(data.ok).toBe(false)
       expect(data.code).toBe('RATE_LIMIT_EXCEEDED')
+      
+      // Verify the rate limit check was called
+      expect(rateLimitModule.check).toHaveBeenCalled()
     })
   })
 

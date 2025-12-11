@@ -153,6 +153,7 @@ describe('GET /api/cron/moderation-daily-digest', () => {
       }
 
       // Mock reports query - should filter by created_at >= 24 hours ago
+      mockAdminDb.from.mockReset()
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sale_reports') {
           return {
@@ -174,7 +175,14 @@ describe('GET /api/cron/moderation-daily-digest', () => {
             })),
           }
         }
-        return { from: vi.fn() }
+        // Return a default chainable mock for other tables
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            })),
+          })),
+        }
       })
       
       // Ensure email mock returns success

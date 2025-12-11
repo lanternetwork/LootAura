@@ -1037,6 +1037,12 @@ async function postHandler(request: NextRequest) {
       const { fail } = await import('@/lib/http/json')
       return fail(403, 'ACCOUNT_LOCKED', 'account_locked')
     }
+    const { isAccountLocked } = await import('@/lib/auth/accountLock')
+    const locked = await isAccountLocked(user.id)
+    if (locked) {
+      const { fail } = await import('@/lib/http/json')
+      return fail(403, 'ACCOUNT_LOCKED', 'account_locked')
+    }
     
     let body: any
     try {

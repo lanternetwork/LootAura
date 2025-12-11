@@ -124,14 +124,20 @@ describe('Email job preferences and unsubscribe behavior', () => {
       // Mock fromBase to return different chains based on table
       mockFromBase.mockImplementation((db: any, table: string) => {
         if (table === 'favorites') {
-          return {
+          const favoritesChain = {
             select: vi.fn(() => ({
               is: vi.fn(() => Promise.resolve({
                 data: [{ user_id: userId, sale_id: saleId, start_soon_notified_at: null }],
                 error: null,
               })),
             })),
+            update: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
+              })),
+            })),
           }
+          return favoritesChain
         }
         if (table === 'sales') {
           return {
@@ -218,7 +224,7 @@ describe('Email job preferences and unsubscribe behavior', () => {
       // Mock fromBase to return different chains based on table
       mockFromBase.mockImplementation((db: any, table: string) => {
         if (table === 'favorites') {
-          return {
+          const favoritesChain = {
             select: vi.fn(() => ({
               is: vi.fn(() => Promise.resolve({
                 data: [
@@ -228,7 +234,13 @@ describe('Email job preferences and unsubscribe behavior', () => {
                 error: null,
               })),
             })),
+            update: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
+              })),
+            })),
           }
+          return favoritesChain
         }
         if (table === 'sales') {
           return {
@@ -277,6 +289,9 @@ describe('Email job preferences and unsubscribe behavior', () => {
 
       const result = await processFavoriteSalesStartingSoonJob({})
 
+      if (!result.success) {
+        console.error('Job failed with error:', result.error)
+      }
       expect(result.success).toBe(true)
       // Should only send to user-a (preferences enabled)
       expect(sendFavoriteSalesStartingSoonDigestEmail).toHaveBeenCalledTimes(1)

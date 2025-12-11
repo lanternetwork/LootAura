@@ -7,14 +7,6 @@ export async function GET(_req: NextRequest) {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  try {
-    const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
-    await assertAccountNotLocked(user.id)
-  } catch (error) {
-    if (error instanceof NextResponse || error instanceof Response) return error as any
-    const { fail } = await import('@/lib/http/json')
-    return fail(403, 'ACCOUNT_LOCKED', 'account_locked')
-  }
   const { isAccountLocked } = await import('@/lib/auth/accountLock')
   const locked = await isAccountLocked(user.id)
   if (locked) {

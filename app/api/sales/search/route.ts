@@ -119,6 +119,7 @@ async function searchHandler(request: NextRequest) {
               .from('sales_v2')
               .select('*')
               .eq('status', 'published')
+              .limit(100)
             
             if (!testError && testData && testData.length > 0) {
               salesData = testData
@@ -179,6 +180,7 @@ async function searchHandler(request: NextRequest) {
             .from('sales_v2')
             .select('*')
             .eq('status', 'published')
+            .limit(100)
           
           const filtered = (testData || []).filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
           if (filtered.length > 0) {
@@ -201,6 +203,7 @@ async function searchHandler(request: NextRequest) {
           .from('sales_v2')
           .select('*')
           .eq('status', 'published')
+          .limit(100)
 
         const filtered = (testData || []).filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
         results = filtered

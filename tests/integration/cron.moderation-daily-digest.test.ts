@@ -56,9 +56,15 @@ describe('GET /api/cron/moderation-daily-digest', () => {
     vi.clearAllMocks()
     mockAssertCronAuthorized.mockImplementation(() => {}) // Pass auth by default
     mockSendModerationDailyDigestEmail.mockResolvedValue({ ok: true })
+    vi.useFakeTimers()
+    vi.setSystemTime(MOCK_BASE_DATE)
     
     process.env.CRON_SECRET = 'test-cron-secret'
     process.env.NEXT_PUBLIC_SITE_URL = 'https://test.example.com'
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   describe('Cron authentication', () => {

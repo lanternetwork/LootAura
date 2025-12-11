@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest) {
     const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
     await assertAccountNotLocked(user.id)
   } catch (error) {
-    if (error instanceof NextResponse) return error
+    if (error instanceof NextResponse || error instanceof Response) return error as any
     throw error
   }
 

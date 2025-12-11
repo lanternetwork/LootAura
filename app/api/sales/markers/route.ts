@@ -287,7 +287,14 @@ async function markersHandler(request: NextRequest) {
         }
       })?.filter(Boolean) || []
 
-      return NextResponse.json(markers)
+      return NextResponse.json({
+        ok: true,
+        data: markers,
+        center: { lat: originLat, lng: originLng },
+        distanceKm,
+        count: markers.length,
+        durationMs: Date.now() - startedAt
+      })
     }
 
     const filtered = (data || [])

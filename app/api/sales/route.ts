@@ -1029,11 +1029,11 @@ async function postHandler(request: NextRequest) {
       const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
       await assertAccountNotLocked(user.id)
     } catch (error) {
-      // assertAccountNotLocked throws NextResponse if locked
-      if (error instanceof NextResponse) {
-        return error
+      // assertAccountNotLocked throws a NextResponse (or Response) if locked
+      if (error instanceof NextResponse || error instanceof Response) {
+        return error as any
       }
-      // If it's not a NextResponse, rethrow
+      // If it's not a Response, rethrow
       throw error
     }
     

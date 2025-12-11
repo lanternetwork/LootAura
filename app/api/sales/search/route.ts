@@ -154,7 +154,8 @@ async function searchHandler(request: NextRequest) {
       return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
     }
 
-    return ok({ sales: sales || [] })
+    const results = sales || []
+    return ok({ sales: results, data: results })
   } catch (error: any) {
     logger.error('Sales search error', error instanceof Error ? error : new Error(String(error)), withOpId({
       component: 'sales',

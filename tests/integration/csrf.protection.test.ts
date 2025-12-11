@@ -65,12 +65,8 @@ vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: () => mockSupabaseClient,
   getAdminDb: () => mockSupabaseClient,
   fromBase: (db: any, table: string) => {
-    const chain = db.from(table)
-    // Ensure the chain has all necessary methods
-    if (!chain.eq) {
-      return createChainableMock()
-    }
-    return chain
+    // Always return a proper chainable mock
+    return createChainableMock()
   },
 }))
 

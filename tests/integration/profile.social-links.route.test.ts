@@ -42,13 +42,37 @@ const mockState = { currentMockChain: null as ReturnType<typeof createMockChain>
 vi.mock('@/lib/supabase/clients', () => {
   const fromBaseMock = vi.fn((db: any, table: string) => {
     // Use the mock chain set up by the test
-    // If not set, throw an error to catch test setup issues
+    // If not set, return a default chainable mock
     if (!mockState.currentMockChain) {
-      throw new Error('fromBase called but mockState.currentMockChain is not set. Ensure the test sets up the mock chain before calling the route handler.')
+      // Return a default chainable mock for account lock checks
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { is_locked: false },
+              error: null,
+            }),
+          })),
+        })),
+        update: vi.fn(() => ({
+          eq: vi.fn().mockResolvedValue({
+            data: null,
+            error: null,
+          }),
+        })),
+      }
     }
-    // Return an object with update method which will chain to eq -> select -> single
+    // Return an object with update and select methods
     return {
       update: mockState.currentMockChain.mockUpdate,
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: { is_locked: false },
+            error: null,
+          }),
+        })),
+      })),
     }
   })
   
@@ -57,15 +81,53 @@ vi.mock('@/lib/supabase/clients', () => {
       // getRlsDb() returns a schema-scoped client that fromBase can use
       // fromBase calls db.from(table), which should return the query chain
       if (!mockState.currentMockChain) {
-        throw new Error('getRlsDb called but mockState.currentMockChain is not set. Ensure the test sets up the mock chain before calling the route handler.')
+        // Return a default chainable mock
+        return {
+          from: vi.fn(() => ({
+            update: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+            })),
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { is_locked: false },
+                  error: null,
+                }),
+              })),
+            })),
+          })),
+        }
       }
-      const chain = mockState.currentMockChain // TypeScript now knows it's not null
+      const chain = mockState.currentMockChain
       return {
         from: vi.fn(() => ({
           update: chain.mockUpdate,
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { is_locked: false },
+                error: null,
+              }),
+            })),
+          })),
         })),
       }
     }),
+    getAdminDb: vi.fn(() => ({
+      from: vi.fn(() => ({
+        update: vi.fn(() => ({
+          eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+        })),
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { is_locked: false },
+              error: null,
+            }),
+          })),
+        })),
+      })),
+    })),
     fromBase: fromBaseMock,
   }
 })

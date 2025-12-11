@@ -162,6 +162,7 @@
 - No direct test for admin user management endpoints (`/api/admin/users`, `/api/admin/users/[id]/lock`)
 - No test for moderation daily digest email
 - No test for account lock banner UI component
+- Account lock enforcement hardened on write endpoints (sales, profile) to fail closed with consistent 403 `account_locked` responses; `/api/sales/search` mocks/handler aligned to avoid 500s in hidden sales visibility path
 
 **Archive:**
 - No direct test for dashboard archive tab UI behavior

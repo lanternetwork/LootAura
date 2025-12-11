@@ -48,7 +48,7 @@ const createQueryChain = (data: any[] = [], error: any = null) => {
       gte: vi.fn(() => chain),
       lte: vi.fn(() => chain),
       or: vi.fn(() => chain),
-      order: vi.fn(() => orderChain),
+      order: vi.fn(() => chain),
       range: vi.fn(() => Promise.resolve({ data, error })),
       limit: vi.fn(() => Promise.resolve({ data, error })),
       maybeSingle: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),

@@ -7,12 +7,8 @@ export async function GET(_req: NextRequest) {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  const { isAccountLocked } = await import('@/lib/auth/accountLock')
-  const locked = await isAccountLocked(user.id)
-  if (locked) {
-    const { fail } = await import('@/lib/http/json')
-    return fail(403, 'ACCOUNT_LOCKED', 'account_locked')
-  }
+  // Note: GET requests are read-only and should NOT be blocked by account locks
+  // Only write operations (POST, PUT, DELETE) should enforce account locks
 
   console.log('[PROFILE] GET /api/profile start', { userId: user.id })
 

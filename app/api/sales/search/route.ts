@@ -40,21 +40,6 @@ async function searchHandler(request: NextRequest) {
       })
     }
 
-    const supabase = createServerClient(url, anon, {
-      cookies: {
-        get(name: string) {
-          return cookies().get(name)?.value
-        },
-        set(name: string, value: string, options: any) {
-          cookies().set({ name, value, ...options })
-        },
-        remove(name: string, options: any) {
-          cookies().set({ name, value: '', ...options, maxAge: 0 })
-        },
-      },
-      // Use default public schema
-    })
-
     const { searchParams } = new URL(request.url)
     
     // Parse query parameters

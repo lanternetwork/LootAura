@@ -101,6 +101,9 @@
 - Confirmed hidden sales visibility tests use same query patterns as production
 - Verified archive cron tests match production date calculation logic
 
+**Recent Stabilization Notes (2025-12-11):**
+- Account lock checks on sales/profile now fail closed with explicit `account_locked` detail messages; hidden sales search path fixed by removing duplicate Supabase client instantiation and aligning mocks to the `.order().limit()` chain.
+
 **Code Quality:**
 - Removed all debug logging (no `console.log/debug/warn/error` found)
 - Verified no PII in test assertions or error messages

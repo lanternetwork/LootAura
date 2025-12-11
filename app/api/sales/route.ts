@@ -1027,13 +1027,17 @@ async function postHandler(request: NextRequest) {
     // Check if account is locked (fail closed)
     if (process.env.NODE_ENV === 'test' && user.id === 'locked-user-id') {
       const { fail } = await import('@/lib/http/json')
-      return fail(403, 'ACCOUNT_LOCKED', 'account_locked')
+      return fail(403, 'ACCOUNT_LOCKED', 'account_locked', {
+        message: 'This account has been locked. Please contact support if you believe this is an error.'
+      })
     }
     const { isAccountLocked } = await import('@/lib/auth/accountLock')
     const locked = await isAccountLocked(user.id)
     if (locked) {
       const { fail } = await import('@/lib/http/json')
-      return fail(403, 'ACCOUNT_LOCKED', 'account_locked')
+      return fail(403, 'ACCOUNT_LOCKED', 'account_locked', {
+        message: 'This account has been locked. Please contact support if you believe this is an error.'
+      })
     }
     
     let body: any

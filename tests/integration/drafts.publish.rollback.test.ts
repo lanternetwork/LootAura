@@ -77,10 +77,7 @@ const mockAdminDb = {
 }
 
 vi.mock('@/lib/supabase/clients', () => ({
-  getRlsDb: () => {
-    // Simulate cookies() error in test environment
-    throw new Error('cookies() can only be called inside a Server Component or Route Handler')
-  },
+  getRlsDb: () => mockRlsDb, // Return mock RLS DB instead of throwing
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => {
     if (table === 'profiles') {

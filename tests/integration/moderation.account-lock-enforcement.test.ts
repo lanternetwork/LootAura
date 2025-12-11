@@ -36,7 +36,12 @@ const mockSupabaseClient = {
 
 // Mock admin DB
 const mockAdminDb = {
-  from: vi.fn(),
+  from: vi.fn((table: string) => {
+    if (table === 'profiles') {
+      return createProfileChain(true) // Locked user
+    }
+    return createQueryChain(null, null)
+  }),
 }
 
 // Mock RLS DB

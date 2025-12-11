@@ -174,9 +174,16 @@ describe('GET /api/cron/moderation-daily-digest', () => {
                 expect(cutoffDate.getTime()).toBeCloseTo(expectedCutoff.getTime(), -3) // Within 1 second
                 
                 return {
-                  order: vi.fn().mockResolvedValue({
-                    data: [recentReport], // Only recent report in results (with nested sales relation)
-                    error: null,
+                  order: vi.fn((field: string, options?: { ascending: boolean }) => {
+                    // Verify order parameters
+                    expect(field).toBe('created_at')
+                    if (options) {
+                      expect(options.ascending).toBe(false)
+                    }
+                    return Promise.resolve({
+                      data: [recentReport], // Only recent report in results (with nested sales relation)
+                      error: null,
+                    })
                   }),
                 }
               }),

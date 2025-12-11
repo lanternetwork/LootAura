@@ -108,36 +108,47 @@ describe('Email job preferences and unsubscribe behavior', () => {
         updated_at: MOCK_BASE_DATE.toISOString(),
       }
 
-      // Mock favorites query
-      mockFromBase.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          is: vi.fn(() => Promise.resolve({
-            data: [{ user_id: userId, sale_id: saleId, start_soon_notified_at: null }],
-            error: null,
-          })),
-        })),
-      })
-      // Mock sales query
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({
-              data: [mockSale],
-              error: null,
+      // Mock fromBase to return different chains based on table
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'favorites') {
+          return {
+            select: vi.fn(() => ({
+              is: vi.fn(() => Promise.resolve({
+                data: [{ user_id: userId, sale_id: saleId, start_soon_notified_at: null }],
+                error: null,
+              })),
             })),
-          })),
-        })),
-      })
-      // Mock profiles query - user has preferences enabled
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({
-              data: [{ id: userId, email_favorites_digest_enabled: true }],
-              error: null,
+          }
+        }
+        if (table === 'sales') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({
+                  data: [mockSale],
+                  error: null,
+                })),
+              })),
             })),
+          }
+        }
+        if (table === 'profiles') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({
+                  data: [{ id: userId, email_favorites_digest_enabled: true }],
+                  error: null,
+                })),
+              })),
+            })),
+          }
+        }
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
           })),
-        })),
+        }
       })
 
       mockAuthUsersQuery.mockResolvedValue({
@@ -190,39 +201,50 @@ describe('Email job preferences and unsubscribe behavior', () => {
         updated_at: MOCK_BASE_DATE.toISOString(),
       }
 
-      // Mock favorites query - both users have favorites
-      mockFromBase.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          is: vi.fn(() => Promise.resolve({
-            data: [
-              { user_id: userIdEnabled, sale_id: saleId, start_soon_notified_at: null },
-              { user_id: userIdDisabled, sale_id: saleId, start_soon_notified_at: null },
-            ],
-            error: null,
-          })),
-        })),
-      })
-      // Mock sales query
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({
-              data: [mockSale],
-              error: null,
+      // Mock fromBase to return different chains based on table
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'favorites') {
+          return {
+            select: vi.fn(() => ({
+              is: vi.fn(() => Promise.resolve({
+                data: [
+                  { user_id: userIdEnabled, sale_id: saleId, start_soon_notified_at: null },
+                  { user_id: userIdDisabled, sale_id: saleId, start_soon_notified_at: null },
+                ],
+                error: null,
+              })),
             })),
-          })),
-        })),
-      })
-      // Mock profiles query - only user-a has preferences enabled
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({
-              data: [{ id: userIdEnabled, email_favorites_digest_enabled: true }],
-              error: null,
+          }
+        }
+        if (table === 'sales') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({
+                  data: [mockSale],
+                  error: null,
+                })),
+              })),
             })),
+          }
+        }
+        if (table === 'profiles') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({
+                  data: [{ id: userIdEnabled, email_favorites_digest_enabled: true }],
+                  error: null,
+                })),
+              })),
+            })),
+          }
+        }
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
           })),
-        })),
+        }
       })
 
       mockAuthUsersQuery.mockResolvedValue({
@@ -285,36 +307,47 @@ describe('Email job preferences and unsubscribe behavior', () => {
         updated_at: MOCK_BASE_DATE.toISOString(),
       }
 
-      // Mock favorites query
-      mockFromBase.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          is: vi.fn(() => Promise.resolve({
-            data: [{ user_id: userId, sale_id: saleId, start_soon_notified_at: null }],
-            error: null,
-          })),
-        })),
-      })
-      // Mock sales query
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({
-              data: [mockSale],
-              error: null,
+      // Mock fromBase to return different chains based on table
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'favorites') {
+          return {
+            select: vi.fn(() => ({
+              is: vi.fn(() => Promise.resolve({
+                data: [{ user_id: userId, sale_id: saleId, start_soon_notified_at: null }],
+                error: null,
+              })),
             })),
-          })),
-        })),
-      })
-      // Mock profiles query - user has preferences disabled (unsubscribed)
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({
-              data: [], // User not in results because email_favorites_digest_enabled = false
-              error: null,
+          }
+        }
+        if (table === 'sales') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({
+                  data: [mockSale],
+                  error: null,
+                })),
+              })),
             })),
+          }
+        }
+        if (table === 'profiles') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({
+                  data: [], // User not in results because email_favorites_digest_enabled = false
+                  error: null,
+                })),
+              })),
+            })),
+          }
+        }
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
           })),
-        })),
+        }
       })
 
       mockAuthUsersQuery.mockResolvedValue({
@@ -342,42 +375,53 @@ describe('Email job preferences and unsubscribe behavior', () => {
       const weekEnd = new Date(weekStart)
       weekEnd.setUTCDate(weekEnd.getUTCDate() + 7)
 
-      // Mock sales query
-      mockFromBase.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            gte: vi.fn(() => ({
-              lt: vi.fn(() => Promise.resolve({
-                data: [{ owner_id: ownerId }],
-                error: null,
+      // Mock fromBase to return different chains based on table
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'sales') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                gte: vi.fn(() => ({
+                  lt: vi.fn(() => Promise.resolve({
+                    data: [{ owner_id: ownerId }],
+                    error: null,
+                  })),
+                })),
               })),
             })),
-          })),
-        })),
-      })
-      // Mock analytics events query
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          gte: vi.fn(() => ({
-            lt: vi.fn(() => ({
-              eq: vi.fn(() => Promise.resolve({
-                data: [],
-                error: null,
+          }
+        }
+        if (table === 'analytics_events') {
+          return {
+            select: vi.fn(() => ({
+              gte: vi.fn(() => ({
+                lt: vi.fn(() => ({
+                  eq: vi.fn(() => Promise.resolve({
+                    data: [],
+                    error: null,
+                  })),
+                })),
               })),
             })),
-          })),
-        })),
-      })
-      // Mock profiles query - owner has preferences enabled
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({
-              data: [{ id: ownerId, email_seller_weekly_enabled: true }],
-              error: null,
+          }
+        }
+        if (table === 'profiles') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({
+                  data: [{ id: ownerId, email_seller_weekly_enabled: true }],
+                  error: null,
+                })),
+              })),
             })),
+          }
+        }
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
           })),
-        })),
+        }
       })
 
       mockAuthUsersQuery.mockResolvedValue({
@@ -414,45 +458,56 @@ describe('Email job preferences and unsubscribe behavior', () => {
       const weekEnd = new Date(weekStart)
       weekEnd.setUTCDate(weekEnd.getUTCDate() + 7)
 
-      // Mock sales query - both owners have sales
-      mockFromBase.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            gte: vi.fn(() => ({
-              lt: vi.fn(() => Promise.resolve({
-                data: [
-                  { owner_id: ownerIdEnabled },
-                  { owner_id: ownerIdDisabled },
-                ],
-                error: null,
+      // Mock fromBase to return different chains based on table
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'sales') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                gte: vi.fn(() => ({
+                  lt: vi.fn(() => Promise.resolve({
+                    data: [
+                      { owner_id: ownerIdEnabled },
+                      { owner_id: ownerIdDisabled },
+                    ],
+                    error: null,
+                  })),
+                })),
               })),
             })),
-          })),
-        })),
-      })
-      // Mock analytics events query
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          gte: vi.fn(() => ({
-            lt: vi.fn(() => ({
-              eq: vi.fn(() => Promise.resolve({
-                data: [],
-                error: null,
+          }
+        }
+        if (table === 'analytics_events') {
+          return {
+            select: vi.fn(() => ({
+              gte: vi.fn(() => ({
+                lt: vi.fn(() => ({
+                  eq: vi.fn(() => Promise.resolve({
+                    data: [],
+                    error: null,
+                  })),
+                })),
               })),
             })),
-          })),
-        })),
-      })
-      // Mock profiles query - only owner-a has preferences enabled
-      .mockReturnValueOnce({
-        select: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({
-              data: [{ id: ownerIdEnabled, email_seller_weekly_enabled: true }],
-              error: null,
+          }
+        }
+        if (table === 'profiles') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({
+                  data: [{ id: ownerIdEnabled, email_seller_weekly_enabled: true }],
+                  error: null,
+                })),
+              })),
             })),
+          }
+        }
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
           })),
-        })),
+        }
       })
 
       mockAuthUsersQuery.mockResolvedValue({

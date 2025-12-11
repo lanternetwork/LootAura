@@ -268,7 +268,7 @@ describe('GET /api/cron/daily - Archive task', () => {
           select: vi.fn(() => ({
             in: vi.fn(() => ({
               is: vi.fn().mockResolvedValue({
-                data: salesNotToArchive,
+                data: [], // No sales to archive (they end tomorrow, not yesterday)
                 error: null,
               }),
             })),
@@ -284,6 +284,18 @@ describe('GET /api/cron/daily - Archive task', () => {
               })),
             }
           }),
+        }
+      }
+      if (table === 'sale_reports') {
+        return {
+          select: vi.fn(() => ({
+            gte: vi.fn(() => ({
+              order: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            })),
+          })),
         }
       }
       return { from: vi.fn() }

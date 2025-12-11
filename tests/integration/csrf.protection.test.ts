@@ -64,7 +64,14 @@ vi.mock('@/lib/data/ratingsAccess', () => ({
 vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: () => mockSupabaseClient,
   getAdminDb: () => mockSupabaseClient,
-  fromBase: (db: any, table: string) => db.from(table),
+  fromBase: (db: any, table: string) => {
+    const chain = db.from(table)
+    // Ensure the chain has all necessary methods
+    if (!chain.eq) {
+      return createChainableMock()
+    }
+    return chain
+  },
 }))
 
 // Mock CSRF validation to actually enforce in tests

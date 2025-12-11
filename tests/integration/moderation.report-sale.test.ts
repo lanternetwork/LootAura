@@ -562,8 +562,9 @@ describe('POST /api/sales/[id]/report', () => {
 
   describe('Rate limiting', () => {
     it('enforces rate limits on reporting', async () => {
-      const { check } = await import('@/lib/rateLimit/limiter')
-      vi.mocked(check).mockResolvedValue({
+      // Import check and override the mock
+      const rateLimitModule = await import('@/lib/rateLimit/limiter')
+      vi.mocked(rateLimitModule.check).mockResolvedValue({
         allowed: false,
         remaining: 0,
         softLimited: false,

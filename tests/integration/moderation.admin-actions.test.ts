@@ -103,8 +103,8 @@ describe('GET /api/admin/reports', () => {
     // Reset chain mocks
     mockReportChain.select.mockReturnValue(mockReportChain)
     mockReportChain.eq.mockReturnValue(mockReportChain)
-    mockReportChain.order.mockReturnValue(mockReportChain)
-    mockReportChain.range.mockReturnValue(mockReportChain)
+    mockReportChain.order.mockResolvedValue({ data: [], error: null })
+    mockReportChain.range.mockResolvedValue({ data: [], error: null, count: 0 })
   })
 
   it('returns 403 when admin check fails', async () => {
@@ -146,7 +146,6 @@ describe('GET /api/admin/reports', () => {
     mockReportChain.range.mockResolvedValue({
       data: mockReports,
       error: null,
-      count: 1,
     })
 
     const request = new NextRequest('http://localhost/api/admin/reports')
@@ -164,17 +163,11 @@ describe('GET /api/admin/reports', () => {
   })
 
   it('filters reports by status', async () => {
-    mockReportChain.eq.mockImplementation((field: string, value: string) => {
-      if (field === 'status' && value === 'resolved') {
-        return mockReportChain
-      }
-      return mockReportChain
-    })
+    mockReportChain.eq.mockReturnValue(mockReportChain)
     
     mockReportChain.range.mockResolvedValue({
       data: [],
       error: null,
-      count: 0,
     })
 
     const request = new NextRequest('http://localhost/api/admin/reports?status=resolved')
@@ -262,13 +255,14 @@ describe('PATCH /api/admin/reports/[id]', () => {
 
   it('hides sale when hide_sale is true', async () => {
     // Mock sale update
-    let saleUpdateCalled = false
+    const saleUpdateFn = vi.fn()
     const saleUpdateChain = {
       eq: vi.fn().mockResolvedValue({
         data: null,
         error: null,
       }),
     }
+    saleUpdateFn.mockReturnValue(saleUpdateChain)
     
     // Mock report update chain
     const reportUpdateChain = {
@@ -281,10 +275,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
         return {
-          update: vi.fn(() => {
-            saleUpdateCalled = true
-            return saleUpdateChain
-          }),
+          update: saleUpdateFn,
         }
       }
       if (table === 'sale_reports') {
@@ -313,11 +304,9 @@ describe('PATCH /api/admin/reports/[id]', () => {
 
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
-    expect(saleUpdateCalled).toBe(true)
     
     // Verify sale was updated with hidden_by_admin
-    const saleUpdateCall = mockAdminDb.from('sales').update
-    expect(saleUpdateCall).toHaveBeenCalledWith(
+    expect(saleUpdateFn).toHaveBeenCalledWith(
       expect.objectContaining({
         moderation_status: 'hidden_by_admin',
       })
@@ -326,13 +315,14 @@ describe('PATCH /api/admin/reports/[id]', () => {
 
   it('locks account when lock_account is true', async () => {
     // Mock profile update
-    let profileUpdateCalled = false
+    const profileUpdateFn = vi.fn()
     const profileUpdateChain = {
       eq: vi.fn().mockResolvedValue({
         data: null,
         error: null,
       }),
     }
+    profileUpdateFn.mockReturnValue(profileUpdateChain)
     
     // Mock report update chain
     const reportUpdateChain = {
@@ -370,10 +360,7 @@ describe('PATCH /api/admin/reports/[id]', () => {
       }
       if (table === 'profiles') {
         return {
-          update: vi.fn(() => {
-            profileUpdateCalled = true
-            return profileUpdateChain
-          }),
+          update: profileUpdateFn,
         }
       }
       return mockReportChain
@@ -389,11 +376,9 @@ describe('PATCH /api/admin/reports/[id]', () => {
 
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
-    expect(profileUpdateCalled).toBe(true)
     
     // Verify profile was updated with lock fields
-    const profileUpdateCall = mockAdminDb.from('profiles').update
-    expect(profileUpdateCall).toHaveBeenCalledWith(
+    expect(profileUpdateFn).toHaveBeenCalledWith(
       expect.objectContaining({
         is_locked: true,
         locked_at: expect.any(String),
@@ -404,9 +389,20 @@ describe('PATCH /api/admin/reports/[id]', () => {
   })
 
   it('returns 404 for non-existent report', async () => {
-    mockReportChain.maybeSingle.mockResolvedValue({
-      data: null,
-      error: null,
+    mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'sale_reports') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: null, // Report not found
+                error: null,
+              }),
+            })),
+          })),
+        }
+      }
+      return mockReportChain
     })
 
     const request = new NextRequest(`http://localhost/api/admin/reports/${reportId}`, {

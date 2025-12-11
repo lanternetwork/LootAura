@@ -68,10 +68,8 @@ export async function assertAccountNotLocked(
   }
 
   if (profile?.is_locked) {
-    throw NextResponse.json(
-      { error: 'account_locked', message: 'This account has been locked. Please contact support if you believe this is an error.' },
-      { status: 403 }
-    )
+    const { fail } = await import('@/lib/http/json')
+    throw fail(403, 'ACCOUNT_LOCKED', 'account_locked', { message: 'This account has been locked. Please contact support if you believe this is an error.' })
   }
 }
 

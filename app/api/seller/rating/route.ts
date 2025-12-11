@@ -1,4 +1,4 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { upsertSellerRating } from '@/lib/data/ratingsAccess'
 import { Policies } from '@/lib/rateLimit/policies'
@@ -28,7 +28,7 @@ async function postHandler(req: NextRequest) {
     const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
     await assertAccountNotLocked(user.id)
   } catch (error) {
-    if (error instanceof Response) return error as any
+    if (error instanceof NextResponse) return error
     throw error
   }
 

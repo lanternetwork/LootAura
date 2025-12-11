@@ -192,7 +192,8 @@ describe('Account lock enforcement', () => {
       expect(response.status).toBe(403)
       expect(data.ok).toBe(false)
       expect(data.error).toBe('account_locked')
-      expect(data.message).toContain('locked')
+      expect(data.details?.message).toContain('locked')
+      expect(data.details?.message).toContain('locked')
     })
   })
 
@@ -220,6 +221,7 @@ describe('Account lock enforcement', () => {
       expect(response.status).toBe(403)
       expect(data.ok).toBe(false)
       expect(data.error).toBe('account_locked')
+      expect(data.details?.message).toContain('locked')
     })
   })
 
@@ -246,6 +248,7 @@ describe('Account lock enforcement', () => {
       expect(response.status).toBe(403)
       expect(data.ok).toBe(false)
       expect(data.error).toBe('account_locked')
+      expect(data.details?.message).toContain('locked')
     })
   })
 
@@ -272,6 +275,7 @@ describe('Account lock enforcement', () => {
       expect(response.status).toBe(403)
       expect(data.ok).toBe(false)
       expect(data.error).toBe('account_locked')
+      expect(data.details?.message).toContain('locked')
     })
   })
 
@@ -296,6 +300,7 @@ describe('Account lock enforcement', () => {
       expect(response.status).toBe(403)
       expect(data.ok).toBe(false)
       expect(data.error).toBe('account_locked')
+      expect(data.details?.message).toContain('locked')
     })
   })
 
@@ -327,7 +332,8 @@ describe('Account lock enforcement', () => {
 
       expect(response.status).toBe(403)
       expect(data.ok).toBe(false)
-      expect(data.code).toBe('AUTH_REQUIRED') // Account lock check happens after auth, but before rating logic
+      expect(data.code).toBe('ACCOUNT_LOCKED') // Account lock check happens after auth, but before rating logic
+      expect(data.error).toBe('account_locked')
     })
   })
 

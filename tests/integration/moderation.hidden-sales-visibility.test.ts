@@ -28,6 +28,15 @@ const mockRlsDb = {
 // Create query chain helper - supports chaining multiple filters
 const createQueryChain = (data: any[] = [], error: any = null) => {
   // Create a chainable object that supports all query methods
+  // The chain should resolve when awaited (after .order().range() or .limit())
+  const rangeChain = {
+    range: vi.fn(() => Promise.resolve({ data, error })),
+  }
+  const orderChain = {
+    order: vi.fn(() => rangeChain),
+    range: vi.fn(() => Promise.resolve({ data, error })),
+    limit: vi.fn(() => Promise.resolve({ data, error })),
+  }
   const createChainable = (): any => {
     const chain: any = {
       select: vi.fn(() => chain),
@@ -38,12 +47,18 @@ const createQueryChain = (data: any[] = [], error: any = null) => {
       is: vi.fn(() => chain),
       gte: vi.fn(() => chain),
       lte: vi.fn(() => chain),
-      order: vi.fn(() => chain),
+      or: vi.fn(() => chain),
+      order: vi.fn(() => orderChain),
+      range: vi.fn(() => Promise.resolve({ data, error })),
       limit: vi.fn(() => Promise.resolve({ data, error })),
       maybeSingle: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),
       single: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),
     }
-    return chain
+    // Make the chain itself awaitable (when used without .limit() or .range())
+    return Object.assign(chain, {
+      then: (resolve: any) => resolve({ data, error }),
+      catch: (reject: any) => reject(error),
+    })
   }
   return createChainable()
 }

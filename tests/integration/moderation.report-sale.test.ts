@@ -161,8 +161,10 @@ vi.mock('@/lib/rateLimit/keys', () => ({
   deriveKey: vi.fn().mockResolvedValue('test-key'),
 }))
 
+const mockShouldBypassRateLimit = vi.fn().mockReturnValue(true) // Default: bypass rate limiting
+
 vi.mock('@/lib/rateLimit/config', () => ({
-  shouldBypassRateLimit: vi.fn().mockReturnValue(false),
+  shouldBypassRateLimit: (...args: any[]) => mockShouldBypassRateLimit(...args),
   isRateLimitingEnabled: vi.fn().mockReturnValue(true),
   isPreviewEnv: vi.fn().mockReturnValue(false),
 }))
@@ -215,6 +217,7 @@ describe('POST /api/sales/[id]/report', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSupabaseFromHandler = null // Reset to default
+    mockShouldBypassRateLimit.mockReturnValue(true) // Default: bypass rate limiting
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: { id: userId } },
       error: null,
@@ -568,6 +571,9 @@ describe('POST /api/sales/[id]/report', () => {
 
   describe('Rate limiting', () => {
     it('enforces rate limits on reporting', async () => {
+      // Enable rate limiting for this test
+      mockShouldBypassRateLimit.mockReturnValue(false)
+      
       // Get the check function and override it for this test
       const rateLimitModule = await import('@/lib/rateLimit/limiter')
       
@@ -602,8 +608,8 @@ describe('POST /api/sales/[id]/report', () => {
       const data = await response.json()
 
       expect(response.status).toBe(429)
-      expect(data.ok).toBe(false)
-      expect(data.code).toBe('RATE_LIMIT_EXCEEDED')
+      expect(data.error).toBe('rate_limited')
+      expect(data.message).toContain('Too many requests')
       
       // Verify the rate limit check was called
       expect(rateLimitModule.check).toHaveBeenCalled()

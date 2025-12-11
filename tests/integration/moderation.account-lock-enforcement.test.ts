@@ -155,6 +155,13 @@ describe('Account lock enforcement', () => {
       data: { user: { id: lockedUserId } },
       error: null,
     })
+    // Reset mockAdminDb.from to return locked profile chain
+    mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return createProfileChain(true) // Locked user
+      }
+      return createQueryChain(null, null)
+    })
   })
 
   describe('POST /api/sales', () => {

@@ -156,6 +156,7 @@ describe('Account lock enforcement', () => {
       error: null,
     })
     // Reset mockAdminDb.from to return locked profile chain
+    mockAdminDb.from.mockReset()
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'profiles') {
         return createProfileChain(true) // Locked user

@@ -71,6 +71,13 @@ export async function PUT(request: NextRequest) {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+  try {
+    const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+    await assertAccountNotLocked(user.id)
+  } catch (error) {
+    if (error instanceof NextResponse) return error
+    throw error
+  }
 
   try {
     let body: any

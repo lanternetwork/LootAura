@@ -174,10 +174,13 @@ describe('Hidden sales visibility', () => {
         if (table === 'sales_v2') {
           return createQueryChain([visibleSale], null)
         }
+        if (table === 'items_v2') {
+          return createQueryChain([], null) // Empty items for category filtering
+        }
         return createQueryChain()
       })
 
-      const request = new NextRequest('http://localhost/api/sales/markers?north=38.3&south=38.2&east=-85.7&west=-85.8')
+      const request = new NextRequest('http://localhost/api/sales/markers?lat=38.25&lng=-85.75')
 
       const response = await GET(request)
       const data = await response.json()
@@ -210,7 +213,7 @@ describe('Hidden sales visibility', () => {
         return createQueryChain()
       })
 
-      const request = new NextRequest('http://localhost/api/sales/search?q=test')
+      const request = new NextRequest('http://localhost/api/sales/search?q=test&lat=38.25&lng=-85.75')
 
       const response = await GET(request)
       const data = await response.json()

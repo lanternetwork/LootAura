@@ -75,6 +75,11 @@ describe('Email job preferences and unsubscribe behavior', () => {
     // Mock Date to use MOCK_BASE_DATE so the job's date filtering works correctly
     vi.useFakeTimers()
     vi.setSystemTime(MOCK_BASE_DATE)
+    // Reset mockAuthUsersQuery to default (no users)
+    mockAuthUsersQuery.mockResolvedValue({
+      data: { users: [] },
+      error: null,
+    })
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
     process.env.EMAIL_FAVORITE_SALE_STARTING_SOON_ENABLED = 'true'

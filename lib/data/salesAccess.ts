@@ -801,6 +801,14 @@ export async function getSaleWithItems(
     const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
     const db = getRlsDb()
     
+    // Log that we're starting the items query
+    console.error('[ITEMS_QUERY] Starting items query', {
+      saleId,
+      saleStatus: sale.status,
+      ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
+      userContext: user ? 'auth' : 'anon',
+    })
+    
     // Query base table - RLS policies will filter results based on auth context
     // Select image_url and images (if available) - images array is preferred, image_url is fallback
     // Note: Both columns exist in the base table schema (migration 096)
@@ -855,7 +863,7 @@ export async function getSaleWithItems(
     let itemsData = itemsRes.data || []
     
     // Always log items query result for debugging (not just in debug mode)
-    console.log('[ITEMS_QUERY] Base table query result', {
+    console.error('[ITEMS_QUERY] Base table query result', {
       saleId,
       itemsCount: itemsData.length,
       hasError: !!itemsRes.error,
@@ -868,7 +876,7 @@ export async function getSaleWithItems(
     
     if (!itemsRes.error && itemsData.length === 0) {
       // Log this attempt (always, not just in debug mode) to diagnose the issue
-      console.log('[ITEMS_QUERY] No items from base table, trying view fallback', {
+      console.error('[ITEMS_QUERY] No items from base table, trying view fallback', {
         saleId,
         userContext: user ? 'auth' : 'anon',
         isOwner: user && user.id === ownerId,
@@ -885,7 +893,7 @@ export async function getSaleWithItems(
           .order('created_at', { ascending: false })
         
         // Always log view fallback result
-        console.log('[ITEMS_QUERY] View fallback result', {
+        console.error('[ITEMS_QUERY] View fallback result', {
           saleId,
           hasError: !!viewRes.error,
           errorCode: viewRes.error?.code || null,
@@ -895,19 +903,19 @@ export async function getSaleWithItems(
         
         if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
           itemsData = viewRes.data
-          console.log('[ITEMS_QUERY] View fallback succeeded', {
+          console.error('[ITEMS_QUERY] View fallback succeeded', {
             saleId,
             itemsCount: itemsData.length,
           })
         } else {
-          console.log('[ITEMS_QUERY] View fallback also returned no items', {
+          console.error('[ITEMS_QUERY] View fallback also returned no items', {
             saleId,
             viewError: viewRes.error?.message || null,
             viewErrorCode: viewRes.error?.code || null,
           })
         }
       } catch (viewError) {
-        console.log('[ITEMS_QUERY] View fallback failed', {
+        console.error('[ITEMS_QUERY] View fallback failed', {
           saleId,
           error: viewError instanceof Error ? viewError.message : String(viewError),
         })
@@ -1003,7 +1011,7 @@ export async function getSaleWithItems(
     })
     
     // Always log final mapped items count for debugging
-    console.log('[ITEMS_QUERY] Final mapped items', {
+    console.error('[ITEMS_QUERY] Final mapped items', {
       saleId,
       mappedCount: mappedItems.length,
       rawCount: itemsData.length,

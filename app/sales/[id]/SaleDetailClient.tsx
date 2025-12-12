@@ -132,6 +132,28 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
     saleId: sale.id,
     saleStatus: sale.status,
   })
+  
+  // Also log the raw items array to see if it's actually empty
+  console.log('[SALE_DETAIL_CLIENT] Raw items array:', items)
+  console.log('[SALE_DETAIL_CLIENT] Items length:', items.length)
+  console.log('[SALE_DETAIL_CLIENT] Items === []?', items === [])
+  console.log('[SALE_DETAIL_CLIENT] Items.length === 0?', items.length === 0)
+  
+  // Log each item individually
+  if (items.length > 0) {
+    console.log('[SALE_DETAIL_CLIENT] Items found:', items.length)
+    items.forEach((item, index) => {
+      console.log(`[SALE_DETAIL_CLIENT] Item ${index}:`, {
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        photo: item.photo,
+        hasPhoto: !!item.photo,
+      })
+    })
+  } else {
+    console.warn('[SALE_DETAIL_CLIENT] ⚠️ NO ITEMS RECEIVED - items array is empty!')
+  }
   const searchParams = useSearchParams()
   const isArchived = sale.status === 'archived'
   

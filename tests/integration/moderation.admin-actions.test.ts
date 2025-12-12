@@ -182,6 +182,76 @@ describe('GET /api/admin/reports', () => {
     expect(response.status).toBe(200)
     expect(mockReportChain.eq).toHaveBeenCalledWith('status', 'resolved')
   })
+
+  it('includes moderation_status and owner lock status in response', async () => {
+    const mockReports = [
+      {
+        id: 'report-1',
+        sale_id: 'sale-1',
+        reporter_profile_id: 'user-1',
+        reason: 'spam',
+        details: 'Test report',
+        status: 'open',
+        action_taken: null,
+        admin_notes: null,
+        created_at: '2025-01-15T12:00:00.000Z',
+        updated_at: '2025-01-15T12:00:00.000Z',
+        sales: {
+          id: 'sale-1',
+          title: 'Test Sale',
+          address: '123 Main St',
+          city: 'Test City',
+          state: 'KY',
+          owner_id: 'owner-1',
+          moderation_status: 'hidden_by_admin',
+        },
+      },
+    ]
+
+    const mockProfiles = [
+      {
+        id: 'owner-1',
+        is_locked: true,
+        lock_reason: 'Test lock reason',
+        locked_at: '2025-01-14T12:00:00.000Z',
+      },
+    ]
+
+    // Mock reports query
+    mockReportChain.range.mockResolvedValue({
+      data: mockReports as any,
+      error: null,
+      count: 1,
+    })
+
+    // Mock profiles query for owner lock status
+    const mockProfileSelectChain = {
+      in: vi.fn(() => Promise.resolve({ data: mockProfiles, error: null })),
+    }
+    const mockProfileChainWithSelect = {
+      select: vi.fn(() => mockProfileSelectChain),
+    }
+
+    // Override mockAdminDb.from to return profile chain when needed
+    mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return mockProfileChainWithSelect
+      }
+      return mockReportChain
+    })
+
+    const request = new NextRequest('http://localhost/api/admin/reports')
+
+    const response = await GET(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.ok).toBe(true)
+    expect(data.data.length).toBe(1)
+    expect(data.data[0].sales.moderation_status).toBe('hidden_by_admin')
+    expect(data.data[0].sales.owner_is_locked).toBe(true)
+    expect(data.data[0].sales.owner_lock_reason).toBe('Test lock reason')
+  })
 })
 
 describe('PATCH /api/admin/reports/[id]', () => {

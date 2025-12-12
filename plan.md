@@ -105,6 +105,13 @@
 - Account lock checks on sales/profile now fail closed with explicit `account_locked` detail messages; hidden sales search path fixed by removing duplicate Supabase client instantiation and aligning mocks to the `.order().limit()` chain.
 - Simplified `/api/sales/search` to remove test-only fallback code paths; fixed Supabase mock chain for hidden-sales integration test to properly support chaining and awaitable behavior. Removed account lock checks from GET handlers (read-only operations should not be blocked).
 
+**Admin Tools UX + Tests (2025-01-31):**
+- Enhanced Admin Reports Panel with search, moderation status filter, summary counts, badges, and quick actions (hide/unhide sale, lock/unlock account).
+- Enhanced Admin Users Panel with lock status filter, better lock info display (reason, timestamp), and lock reason input when locking accounts.
+- Updated `/api/admin/reports` to include sale `moderation_status` and owner lock status in response.
+- Added `locked` query parameter to `/api/admin/users` for server-side filtering.
+- Added integration tests for new query params and enriched report responses (`tests/integration/moderation.admin-actions.test.ts`, `tests/integration/admin.users.test.ts`).
+
 **Code Quality:**
 - Removed all debug logging (no `console.log/debug/warn/error` found)
 - Verified no PII in test assertions or error messages

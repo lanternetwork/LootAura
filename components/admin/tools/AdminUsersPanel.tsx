@@ -29,13 +29,16 @@ interface UsersResponse {
   }
 }
 
-async function fetchUsers(q: string, page: number): Promise<UsersResponse> {
+async function fetchUsers(q: string, locked: string, page: number): Promise<UsersResponse> {
   const params = new URLSearchParams({
     page: page.toString(),
     limit: '50',
   })
   if (q) {
     params.set('q', q)
+  }
+  if (locked && locked !== 'all') {
+    params.set('locked', locked)
   }
 
   const response = await fetch(`/api/admin/users?${params.toString()}`, {
@@ -72,21 +75,23 @@ async function lockUser(userId: string, locked: boolean, reason?: string): Promi
 
 export default function AdminUsersPanel() {
   const [searchQuery, setSearchQuery] = useState('')
+  const [lockFilter, setLockFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
-  const [lockConfirm, setLockConfirm] = useState<{ userId: string; locked: boolean } | null>(null)
+  const [lockConfirm, setLockConfirm] = useState<{ userId: string; locked: boolean; reason?: string } | null>(null)
+  const [lockReason, setLockReason] = useState('')
   const queryClient = useQueryClient()
 
   // Debounce search query
   const debouncedSearch = useDebounce(searchQuery, 300)
 
-  // Reset to page 1 when search changes
+  // Reset to page 1 when search or filter changes
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch])
+  }, [debouncedSearch, lockFilter])
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['admin-users', debouncedSearch, page],
-    queryFn: () => fetchUsers(debouncedSearch, page),
+    queryKey: ['admin-users', debouncedSearch, lockFilter, page],
+    queryFn: () => fetchUsers(debouncedSearch, lockFilter, page),
   })
 
   const lockMutation = useMutation({
@@ -96,6 +101,7 @@ export default function AdminUsersPanel() {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
       toast.success('User lock status updated')
       setLockConfirm(null)
+      setLockReason('')
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to update user lock status')
@@ -103,6 +109,7 @@ export default function AdminUsersPanel() {
   })
 
   const handleLockClick = (userId: string, currentlyLocked: boolean) => {
+    setLockReason('')
     setLockConfirm({ userId, locked: !currentlyLocked })
   }
 
@@ -111,7 +118,21 @@ export default function AdminUsersPanel() {
     lockMutation.mutate({
       userId: lockConfirm.userId,
       locked: lockConfirm.locked,
+      reason: lockConfirm.locked && lockReason.trim() ? lockReason.trim() : undefined,
     })
+  }
+
+  const formatRelativeTime = (dateString: string | null | undefined) => {
+    if (!dateString) return 'N/A'
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    if (diffDays === 0) return 'Today'
+    if (diffDays === 1) return '1 day ago'
+    if (diffDays < 7) return `${diffDays} days ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+    return `${Math.floor(diffDays / 30)} months ago`
   }
 
   const formatDate = (dateString: string) => {
@@ -132,15 +153,32 @@ export default function AdminUsersPanel() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search by username or name..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-        />
+      {/* Search and Filters */}
+      <div className="mb-4 flex gap-4">
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="Search by username or name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+        <div className="w-48">
+          <label htmlFor="lock-filter" className="block text-sm font-medium text-gray-700 mb-1">
+            Lock Status
+          </label>
+          <select
+            id="lock-filter"
+            value={lockFilter}
+            onChange={(e) => setLockFilter(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            <option value="all">All</option>
+            <option value="true">Locked</option>
+            <option value="false">Unlocked</option>
+          </select>
+        </div>
       </div>
 
       {/* Confirmation Modal */}
@@ -150,11 +188,30 @@ export default function AdminUsersPanel() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               {lockConfirm.locked ? 'Lock Account' : 'Unlock Account'}
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 mb-4">
               {lockConfirm.locked
                 ? 'Lock this account? They will no longer be able to create or edit sales, leave reviews, or change their profile.'
                 : 'Unlock this account and restore normal access?'}
             </p>
+            {lockConfirm.locked && (
+              <div className="mb-4">
+                <label htmlFor="lock-reason" className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason (optional)
+                </label>
+                <textarea
+                  id="lock-reason"
+                  value={lockReason}
+                  onChange={(e) => setLockReason(e.target.value)}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Enter reason for locking this account..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                />
+                <div className="mt-1 text-xs text-gray-500 text-right">
+                  {lockReason.length}/500
+                </div>
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={handleConfirmLock}
@@ -164,7 +221,10 @@ export default function AdminUsersPanel() {
                 {lockMutation.isPending ? 'Updating...' : 'Confirm'}
               </button>
               <button
-                onClick={() => setLockConfirm(null)}
+                onClick={() => {
+                  setLockConfirm(null)
+                  setLockReason('')
+                }}
                 disabled={lockMutation.isPending}
                 className="flex-1 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed min-h-[44px]"
               >
@@ -239,15 +299,27 @@ export default function AdminUsersPanel() {
                         {formatDate(user.created_at)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {user.is_locked ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            Locked
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Active
-                          </span>
-                        )}
+                        <div className="flex flex-col gap-1">
+                          {user.is_locked ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              Locked
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Active
+                            </span>
+                          )}
+                          {user.is_locked && user.lock_reason && (
+                            <div className="text-xs text-gray-500 max-w-xs truncate" title={user.lock_reason}>
+                              {user.lock_reason}
+                            </div>
+                          )}
+                          {user.is_locked && user.locked_at && (
+                            <div className="text-xs text-gray-400">
+                              {formatRelativeTime(user.locked_at)}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         <div className="flex gap-2">

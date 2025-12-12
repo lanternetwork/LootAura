@@ -27,6 +27,7 @@ async function getUsersHandler(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q') || ''
+    const locked = searchParams.get('locked')
     const page = parseInt(searchParams.get('page') || '1', 10)
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100) // Max 100
     const offset = (page - 1) * limit
@@ -42,6 +43,13 @@ async function getUsersHandler(request: NextRequest) {
       // Search by username or full_name (case-insensitive)
       // Use OR condition to match either field
       query = query.or(`username.ilike.%${q}%,full_name.ilike.%${q}%`)
+    }
+
+    // Filter by lock status
+    if (locked === 'true') {
+      query = query.eq('is_locked', true)
+    } else if (locked === 'false') {
+      query = query.eq('is_locked', false)
     }
 
     query = query

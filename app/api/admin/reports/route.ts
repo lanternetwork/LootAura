@@ -52,7 +52,8 @@ async function getReportsHandler(request: NextRequest) {
           address,
           city,
           state,
-          owner_id
+          owner_id,
+          moderation_status
         )
       `, { count: 'exact' })
 
@@ -83,12 +84,49 @@ async function getReportsHandler(request: NextRequest) {
       )
     }
 
-    // Get reporter and owner profile info (minimal - username/email snippets)
-    // For now, return basic info - can enhance later
+    // Enrich reports with owner lock status
+    // Get unique owner IDs from reports
+    const ownerIds = new Set<string>()
+    reports?.forEach((report: any) => {
+      if (report.sales?.owner_id) {
+        ownerIds.add(report.sales.owner_id)
+      }
+    })
+
+    // Fetch lock status for owners
+    const ownerLockStatus: Record<string, { is_locked: boolean; lock_reason: string | null; locked_at: string | null }> = {}
+    if (ownerIds.size > 0) {
+      const { data: profiles } = await fromBase(adminDb, 'profiles')
+        .select('id, is_locked, lock_reason, locked_at')
+        .in('id', Array.from(ownerIds))
+
+      profiles?.forEach((profile: any) => {
+        ownerLockStatus[profile.id] = {
+          is_locked: profile.is_locked || false,
+          lock_reason: profile.lock_reason || null,
+          locked_at: profile.locked_at || null,
+        }
+      })
+    }
+
+    // Enrich reports with owner lock status
+    const enrichedReports = reports?.map((report: any) => {
+      const ownerId = report.sales?.owner_id
+      const lockInfo = ownerId ? ownerLockStatus[ownerId] : null
+      return {
+        ...report,
+        sales: report.sales ? {
+          ...report.sales,
+          owner_is_locked: lockInfo?.is_locked || false,
+          owner_lock_reason: lockInfo?.lock_reason || null,
+          owner_locked_at: lockInfo?.locked_at || null,
+        } : null,
+      }
+    }) || []
 
     return NextResponse.json({
       ok: true,
-      data: reports || [],
+      data: enrichedReports,
       pagination: {
         page,
         limit,

@@ -288,10 +288,15 @@ describe('Hidden sales visibility', () => {
         if (table === 'items') {
           return mockItemsSelectChain
         }
+        // Also handle sales_v2 in case getSaleWithItems uses RLS DB for sale query
+        if (table === 'sales_v2') {
+          return mockSelectChain
+        }
         return mockSelectChain
       })
       
       // Set up mockAdminDb.from for sales query (tags query)
+      // Note: getSaleWithItems uses fromBase(admin, 'sales') which calls admin.from('sales')
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sales') {
           return {

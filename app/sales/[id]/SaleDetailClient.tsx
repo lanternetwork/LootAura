@@ -125,6 +125,13 @@ interface SaleDetailClientProps {
 }
 
 export default function SaleDetailClient({ sale, displayCategories = [], items = [], nearbySales = [], currentUserRating }: SaleDetailClientProps) {
+  // Debug logging to diagnose items visibility issue
+  console.log('[SALE_DETAIL_CLIENT] Items received', {
+    itemsCount: items.length,
+    items: items.map(i => ({ id: i.id, name: i.name, hasPhoto: !!i.photo })),
+    saleId: sale.id,
+    saleStatus: sale.status,
+  })
   const searchParams = useSearchParams()
   const isArchived = sale.status === 'archived'
   

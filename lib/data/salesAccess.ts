@@ -854,19 +854,16 @@ export async function getSaleWithItems(
     // This handles cases where RLS might be silently filtering results
     let itemsData = itemsRes.data || []
     if (!itemsRes.error && itemsData.length === 0) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        const userContext = user ? 'auth' : 'anon'
-        const isOwner = user && user.id === ownerId
-        logger.debug('No items from base table, trying view fallback', {
-          component: 'salesAccess',
-          operation: 'getSaleWithItems',
-          saleId,
-          userContext,
-          isOwner,
-          saleStatus: sale.status,
-          note: 'RLS may be blocking base table access, trying items_v2 view',
-        })
-      }
+      // Always log this attempt (not just in debug mode) to diagnose the issue
+      const userContext = user ? 'auth' : 'anon'
+      const isOwner = user && user.id === ownerId
+      console.log('[ITEMS_DEBUG] No items from base table, trying view fallback', {
+        saleId,
+        userContext,
+        isOwner,
+        saleStatus: sale.status,
+        ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
+      })
       
       // Try fallback to view (for published sales, view should work)
       try {
@@ -876,34 +873,47 @@ export async function getSaleWithItems(
           .eq('sale_id', saleId)
           .order('created_at', { ascending: false })
         
+        console.log('[ITEMS_DEBUG] View fallback result', {
+          saleId,
+          hasError: !!viewRes.error,
+          errorCode: viewRes.error?.code || null,
+          errorMessage: viewRes.error?.message || null,
+          itemsCount: viewRes.data?.length || 0,
+        })
+        
         if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
           itemsData = viewRes.data
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            logger.debug('View fallback succeeded', {
-              component: 'salesAccess',
-              operation: 'getSaleWithItems',
-              saleId,
-              itemsCount: itemsData.length,
-            })
-          }
-        } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          logger.debug('View fallback also returned no items', {
-            component: 'salesAccess',
-            operation: 'getSaleWithItems',
+          console.log('[ITEMS_DEBUG] View fallback succeeded', {
+            saleId,
+            itemsCount: itemsData.length,
+          })
+        } else {
+          console.log('[ITEMS_DEBUG] View fallback also returned no items', {
             saleId,
             viewError: viewRes.error?.message || null,
+            viewErrorCode: viewRes.error?.code || null,
           })
         }
       } catch (viewError) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          logger.debug('View fallback failed', {
-            component: 'salesAccess',
-            operation: 'getSaleWithItems',
-            saleId,
-            error: viewError instanceof Error ? viewError.message : String(viewError),
-          })
-        }
+        console.error('[ITEMS_DEBUG] View fallback failed', {
+          saleId,
+          error: viewError instanceof Error ? viewError.message : String(viewError),
+        })
       }
+    } else if (itemsRes.error) {
+      // Always log errors (not just in debug mode)
+      console.error('[ITEMS_DEBUG] Base table query error', {
+        saleId,
+        errorCode: itemsRes.error?.code,
+        errorMessage: itemsRes.error?.message,
+        errorDetails: itemsRes.error?.details,
+        errorHint: itemsRes.error?.hint,
+      })
+    } else if (itemsData.length > 0) {
+      console.log('[ITEMS_DEBUG] Base table query succeeded', {
+        saleId,
+        itemsCount: itemsData.length,
+      })
     }
     
     const [profileRes, statsRes] = await Promise.all([

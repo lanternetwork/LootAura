@@ -1,9 +1,7 @@
 import { test, expect } from '@playwright/test'
 
-test.describe.configure({ tag: '@smoke' })
-
 test.describe('Smoke Tests - Critical Flows', () => {
-  test('home page loads and map area renders', async ({ page }) => {
+  test('@smoke: home page loads and map area renders', async ({ page }) => {
     await page.goto('/')
     
     // Check landing page loads
@@ -22,7 +20,7 @@ test.describe('Smoke Tests - Critical Flows', () => {
     await expect(mapContainer).toBeVisible({ timeout: 10000 })
   })
 
-  test('auth basic flow - sign in redirects to dashboard', async ({ page }) => {
+  test('@smoke: auth basic flow - sign in redirects to dashboard', async ({ page }) => {
     // Mock authentication success
     await page.route('**/auth/v1/token?grant_type=password', async (route) => {
       await route.fulfill({
@@ -71,7 +69,7 @@ test.describe('Smoke Tests - Critical Flows', () => {
     await expect(page.getByRole('heading', { name: /Welcome to YardSaleFinder/i })).not.toBeVisible()
   })
 
-  test('create sale happy path', async ({ page }) => {
+  test('@smoke: create sale happy path', async ({ page }) => {
     // Mock authentication
     await page.route('**/auth/v1/user', async (route) => {
       await route.fulfill({
@@ -163,7 +161,7 @@ test.describe('Smoke Tests - Critical Flows', () => {
     await expect(successIndicator).toBeVisible({ timeout: 10000 })
   })
 
-  test('moderation smoke - report sale and admin sees it', async ({ page }) => {
+  test('@smoke: moderation smoke - report sale and admin sees it', async ({ page }) => {
     const testSaleId = 'smoke-test-sale-for-report'
     
     // Mock a published sale

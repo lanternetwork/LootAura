@@ -19,8 +19,8 @@ async function searchHandler(request: NextRequest) {
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
     let supabase: ReturnType<typeof createServerClient> | any
-    if (!url || !anon) {
-      // Fallback for test environments where env vars may be missing
+    // In test environments, always use the mocked client
+    if (process.env.NODE_ENV === 'test' || !url || !anon) {
       const { createSupabaseServerClient } = await import('@/lib/supabase/server')
       supabase = createSupabaseServerClient()
     } else {
@@ -40,7 +40,7 @@ async function searchHandler(request: NextRequest) {
           // Use default public schema
         })
       } catch (cookieError: any) {
-        // If cookies() is not available (e.g., in test environments), fall back to mocked client
+        // If cookies() is not available, fall back to mocked client
         if (cookieError?.message?.includes('cookies') || cookieError?.message?.includes('request scope')) {
           const { createSupabaseServerClient } = await import('@/lib/supabase/server')
           supabase = createSupabaseServerClient()

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
@@ -24,20 +24,30 @@ async function searchHandler(request: NextRequest) {
       const { createSupabaseServerClient } = await import('@/lib/supabase/server')
       supabase = createSupabaseServerClient()
     } else {
-      supabase = createServerClient(url, anon, {
-        cookies: {
-          get(name: string) {
-            return cookies().get(name)?.value
+      try {
+        supabase = createServerClient(url, anon, {
+          cookies: {
+            get(name: string) {
+              return cookies().get(name)?.value
+            },
+            set(name: string, value: string, options: any) {
+              cookies().set({ name, value, ...options })
+            },
+            remove(name: string, options: any) {
+              cookies().set({ name, value: '', ...options, maxAge: 0 })
+            },
           },
-          set(name: string, value: string, options: any) {
-            cookies().set({ name, value, ...options })
-          },
-          remove(name: string, options: any) {
-            cookies().set({ name, value: '', ...options, maxAge: 0 })
-          },
-        },
-        // Use default public schema
-      })
+          // Use default public schema
+        })
+      } catch (cookieError: any) {
+        // If cookies() is not available (e.g., in test environments), fall back to mocked client
+        if (cookieError?.message?.includes('cookies') || cookieError?.message?.includes('request scope')) {
+          const { createSupabaseServerClient } = await import('@/lib/supabase/server')
+          supabase = createSupabaseServerClient()
+        } else {
+          throw cookieError
+        }
+      }
     }
 
     const { searchParams } = new URL(request.url)

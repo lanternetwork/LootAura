@@ -4,7 +4,6 @@
  */
 
 import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
-import { NextResponse } from 'next/server'
 
 /**
  * Assert that the current user's account is not locked

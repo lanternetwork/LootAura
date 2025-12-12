@@ -874,6 +874,33 @@ export async function getSaleWithItems(
       saleStatus: sale.status,
     })
     
+    // If no items and no error, check if items exist using admin client (bypasses RLS)
+    if (!itemsRes.error && itemsData.length === 0) {
+      try {
+        const { getAdminDb, fromBase } = await import('@/lib/supabase/clients')
+        const admin = getAdminDb()
+        const adminCheck = await fromBase(admin, 'items')
+          .select('id')
+          .eq('sale_id', saleId)
+          .limit(1)
+        
+        console.error('[ITEMS_QUERY] Admin check (bypasses RLS)', {
+          saleId,
+          itemsExist: (adminCheck.data?.length || 0) > 0,
+          adminItemsCount: adminCheck.data?.length || 0,
+          hasError: !!adminCheck.error,
+          errorCode: adminCheck.error?.code || null,
+          saleStatus: sale.status,
+          note: 'If itemsExist=true but itemsCount=0, RLS is blocking the query',
+        })
+      } catch (adminError) {
+        console.error('[ITEMS_QUERY] Admin check failed', {
+          saleId,
+          error: adminError instanceof Error ? adminError.message : String(adminError),
+        })
+      }
+    }
+    
     if (!itemsRes.error && itemsData.length === 0) {
       // Log this attempt (always, not just in debug mode) to diagnose the issue
       console.error('[ITEMS_QUERY] No items from base table, trying view fallback', {

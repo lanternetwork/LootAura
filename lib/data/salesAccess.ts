@@ -806,7 +806,7 @@ export async function getSaleWithItems(
     // Note: Both columns exist in the base table schema (migration 096)
     // The base table is authoritative for items and images - migration 097 backfilled all item images.
     const itemsRes = await fromBase(db, 'items')
-      .select('id, sale_id, name, price, image_url, images, created_at')
+      .select('id, sale_id, name, price, image_url, images, created_at, category, condition, is_sold')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: false })
     

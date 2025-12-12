@@ -256,5 +256,64 @@ npm run test -- tests/integration/
 
 ---
 
+## Playwright Smoke Suite in CI
+
+**Status:** ✅ Completed (2025-01-31)
+
+### Overview
+
+A small, fast, deterministic Playwright smoke suite has been added to CI to validate critical end-to-end flows on every PR. The suite runs after integration tests and blocks merges if any test fails.
+
+### Coverage
+
+The smoke suite (`tests/e2e/smoke.spec.ts`) covers 4 critical flows:
+
+1. **Public baseline**: Home page loads and map area renders (even if markers are minimal/mocked)
+2. **Auth basic flow**: Sign in using mocked auth, verify redirect to dashboard/main post-login page
+3. **Create sale happy path**: Navigate to sell wizard, fill minimal valid fields, publish sale, verify success
+4. **Moderation smoke**: Report an existing sale as a normal user, then verify admin can see the report listed as "Open" in admin reports UI
+
+### Configuration
+
+**Playwright Config:**
+- Smoke tests are tagged with `@smoke` annotation
+- A dedicated `smoke` project is configured in `playwright.config.ts`:
+  - Runs only Chromium (fastest, most stable)
+  - Uses `grep: /@smoke/` to filter tests
+  - Timeout: 60 seconds per test
+  - Retries: 1 in CI, 0 locally
+
+**CI Integration:**
+- Job name: `test-e2e-smoke`
+- Runs after: `test-integration` and `build`
+- Command: `npx playwright test --project=smoke`
+- Blocks merges: Yes (required check, no `continue-on-error`)
+
+### Running Locally
+
+To run the smoke suite locally:
+
+```bash
+# Run smoke tests only
+npx playwright test --project=smoke
+
+# Or using grep
+npx playwright test --grep @smoke
+```
+
+The smoke suite uses existing Playwright mocks and helpers:
+- Auth routes are mocked to avoid real email delivery
+- Geocoding/Mapbox calls are mocked to avoid external service dependencies
+- API routes are mocked to ensure deterministic behavior
+
+### Design Principles
+
+- **Fast**: Target runtime < 60-90 seconds total
+- **Deterministic**: All external services (Mapbox, Resend, geocoding) are mocked
+- **Stable**: Uses robust selectors and explicit waits, avoids fragile timing assumptions
+- **Isolated**: Each test is independent and can run in any order
+
+---
+
 **Note**: This plan is a living document and should be updated as the project evolves.
 

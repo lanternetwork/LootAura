@@ -33,9 +33,16 @@ export default defineConfig({
       name: 'Mobile Safari',
       use: { ...devices['iPhone 12'] },
     },
+    {
+      name: 'smoke',
+      use: { ...devices['Desktop Chrome'] },
+      grep: /@smoke/,
+      retries: process.env.CI ? 1 : 0,
+      timeout: 60 * 1000, // 60 seconds per test for smoke
+    },
   ],
   webServer: {
-    command: 'pnpm run dev',
+    command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes

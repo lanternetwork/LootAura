@@ -26,41 +26,30 @@ const mockRlsDb = {
 }
 
 // Create query chain helper - supports chaining multiple filters
+// The chain must be awaitable and resolve to { data, error } when awaited
 const createQueryChain = (data: any[] = [], error: any = null) => {
-  // Create a chainable object that supports all query methods
-  // The chain should resolve when awaited (after .order().range() or .limit())
-  const rangeChain = {
-    range: vi.fn(() => Promise.resolve({ data, error })),
-  }
-  const orderChain = {
-    order: vi.fn(() => rangeChain),
+  const chain: any = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    neq: vi.fn(() => chain),
+    in: vi.fn(() => chain),
+    not: vi.fn(() => chain),
+    is: vi.fn(() => chain),
+    gte: vi.fn(() => chain),
+    lte: vi.fn(() => chain),
+    or: vi.fn(() => chain),
+    order: vi.fn(() => chain),
     range: vi.fn(() => Promise.resolve({ data, error })),
     limit: vi.fn(() => Promise.resolve({ data, error })),
+    maybeSingle: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),
+    single: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),
   }
-  const createChainable = (): any => {
-    const chain: any = {
-      select: vi.fn(() => chain),
-      eq: vi.fn(() => chain),
-      neq: vi.fn(() => chain),
-      in: vi.fn(() => chain),
-      not: vi.fn(() => chain),
-      is: vi.fn(() => chain),
-      gte: vi.fn(() => chain),
-      lte: vi.fn(() => chain),
-      or: vi.fn(() => chain),
-      order: vi.fn(() => chain),
-      range: vi.fn(() => Promise.resolve({ data, error })),
-      limit: vi.fn(() => Promise.resolve({ data, error })),
-      maybeSingle: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),
-      single: vi.fn(() => Promise.resolve({ data: data[0] || null, error })),
-    }
-    // Make the chain itself awaitable (when used without .limit() or .range())
-    return Object.assign(chain, {
-      then: (resolve: any) => resolve({ data, error }),
-      catch: (reject: any) => reject(error),
-    })
-  }
-  return createChainable()
+  // Make the chain itself awaitable (when used without .limit() or .range())
+  // This allows: await supabase.from('table').select('*').eq(...).order(...).limit(...)
+  return Object.assign(chain, {
+    then: (resolve: any) => resolve({ data, error }),
+    catch: (reject: any) => reject(error),
+  })
 }
 
 vi.mock('@/lib/supabase/server', () => ({

@@ -107,49 +107,13 @@ async function searchHandler(request: NextRequest) {
         salesError = retryResult.error
       }
 
-      // In test mode, if query failed or returned empty, try simplest possible query
-      if (process.env.NODE_ENV === 'test' && (salesError || !salesData || salesData.length === 0)) {
-        try {
-          const { data: testData } = await supabase
-            .from('sales_v2')
-            .select('*')
-            .limit(100)
-          
-          if (testData && testData.length > 0) {
-            salesData = testData
-            salesError = null
-          }
-        } catch (testError) {
-          // Ignore test query errors
-        }
-      }
-
       if (salesError) {
         error = salesError
       } else {
-        // In test mode, if salesData is empty/undefined but no error, try to get data from mock
-        // This handles cases where the mock chain doesn't resolve correctly
-        if (process.env.NODE_ENV === 'test' && (!salesData || salesData.length === 0)) {
-          // Query might have resolved but data wasn't extracted correctly
-          // Try a simpler query to get mock data (no filters, just basic select)
-          try {
-            const simpleQuery = supabase
-              .from('sales_v2')
-              .select('*')
-              .limit(100)
-            
-            const { data: testData, error: testError } = await simpleQuery
-            
-            if (!testError && testData && testData.length > 0) {
-              salesData = testData
-            }
-          } catch (testError) {
-            // Ignore test query errors
-          }
-        }
-        
         // Client-side distance filtering using Haversine formula
+        // Also filter out hidden_by_admin sales if they weren't filtered by the query
         sales = (salesData || [])
+          .filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
           .map((sale: any) => {
             // Haversine distance calculation
             const R = 6371000 // Earth's radius in meters
@@ -177,13 +141,37 @@ async function searchHandler(request: NextRequest) {
         .from('sales_v2')
         .select('*')
         .eq('status', 'published')
+        .neq('moderation_status', 'hidden_by_admin')
         .order('created_at', { ascending: false })
         .limit(limit)
 
       if (basicError) {
-        error = basicError
+        // If moderation_status column doesn't exist, retry without it
+        if (
+          String(basicError).includes('moderation_status') ||
+          String(basicError).includes('column') ||
+          (basicError as any)?.code === 'PGRST204' ||
+          (basicError as any)?.message?.includes('moderation_status')
+        ) {
+          const retryResult = await supabase
+            .from('sales_v2')
+            .select('*')
+            .eq('status', 'published')
+            .order('created_at', { ascending: false })
+            .limit(limit)
+          
+          if (retryResult.error) {
+            error = retryResult.error
+          } else {
+            // Filter out hidden sales client-side
+            sales = (retryResult.data || []).filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
+          }
+        } else {
+          error = basicError
+        }
       } else {
-        sales = basicData || []
+        // Filter out hidden sales client-side as a safety measure
+        sales = (basicData || []).filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
       }
     }
 
@@ -192,44 +180,11 @@ async function searchHandler(request: NextRequest) {
         component: 'sales',
         operation: 'search_query'
       }))
-      // In test environment, try fallback query before returning empty results
-      if (process.env.NODE_ENV === 'test') {
-        try {
-          // Try simplest possible query to get mock data
-          const { data: testData } = await supabase
-            .from('sales_v2')
-            .select('*')
-            .limit(100)
-          
-          const filtered = (testData || []).filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
-          if (filtered.length > 0) {
-            return ok({ sales: filtered, data: filtered })
-          }
-        } catch (fallbackError) {
-          // Ignore fallback errors
-        }
-        return ok({ sales: [], data: [] })
-      }
       return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
     }
 
-    let results = sales || []
-
-    // Test-mode safety: if mocks returned empty (or undefined), perform a minimal fallback query
-    if (process.env.NODE_ENV === 'test' && (!results || results.length === 0)) {
-      try {
-        const { data: testData } = await supabase
-          .from('sales_v2')
-          .select('*')
-          .eq('status', 'published')
-          .limit(100)
-
-        const filtered = (testData || []).filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
-        results = filtered
-      } catch (fallbackError) {
-        // Ignore fallback errors, keep empty results
-      }
-    }
+    // Ensure hidden sales are filtered out (safety check)
+    const results = (sales || []).filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
 
     return ok({ sales: results, data: results })
   } catch (error: any) {
@@ -238,10 +193,6 @@ async function searchHandler(request: NextRequest) {
       operation: 'search_handler',
       durationMs: Date.now() - startedAt
     }))
-    // In test environment, fall back to empty results instead of failing
-    if (process.env.NODE_ENV === 'test') {
-      return ok({ sales: [], data: [] })
-    }
     return fail(500, 'SEARCH_FAILED', 'Failed to search sales')
   }
 }

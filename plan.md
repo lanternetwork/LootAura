@@ -103,6 +103,7 @@
 
 **Recent Stabilization Notes (2025-12-11):**
 - Account lock checks on sales/profile now fail closed with explicit `account_locked` detail messages; hidden sales search path fixed by removing duplicate Supabase client instantiation and aligning mocks to the `.order().limit()` chain.
+- Simplified `/api/sales/search` to remove test-only fallback code paths; fixed Supabase mock chain for hidden-sales integration test to properly support chaining and awaitable behavior. Removed account lock checks from GET handlers (read-only operations should not be blocked).
 
 **Code Quality:**
 - Removed all debug logging (no `console.log/debug/warn/error` found)

@@ -265,7 +265,7 @@ describe('Hidden sales visibility', () => {
         select: vi.fn(() => mockStatsEqChain),
       }
       
-      // Set up mockSupabaseClient for sales_v2, profiles_v2, and owner_stats queries
+      // Set up mockSupabaseClient for sales_v2, profiles_v2, owner_stats, and items_v2 (fallback) queries
       mockSupabaseClient.from.mockImplementation((table: string) => {
         if (table === 'sales_v2') {
           return mockSelectChain
@@ -275,6 +275,10 @@ describe('Hidden sales visibility', () => {
         }
         if (table === 'owner_stats') {
           return mockStatsSelectChain
+        }
+        if (table === 'items_v2') {
+          // Mock items_v2 view fallback query
+          return mockItemsSelectChain
         }
         return mockSelectChain
       })

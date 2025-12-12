@@ -266,6 +266,12 @@ describe('Hidden sales visibility', () => {
       }
       
       // Set up mockSupabaseClient for sales_v2, profiles_v2, owner_stats, and items_v2 (fallback) queries
+      // Also ensure auth.getUser() is mocked (getSaleWithItems calls this)
+      mockSupabaseClient.auth.getUser.mockResolvedValue({
+        data: { user: null },
+        error: null,
+      })
+      
       mockSupabaseClient.from.mockImplementation((table: string) => {
         if (table === 'sales_v2') {
           return mockSelectChain
@@ -295,8 +301,18 @@ describe('Hidden sales visibility', () => {
         return mockSelectChain
       })
       
-      // Set up mockAdminDb.from for sales query (tags query)
+      // Set up mockAdminDb.from for sales query (tags query) and items check (admin check)
       // Note: getSaleWithItems uses fromBase(admin, 'sales') which calls admin.from('sales')
+      // Also handles admin check for items (bypasses RLS)
+      const mockAdminItemsEqChain = {
+        eq: vi.fn(() => ({
+          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        })),
+      }
+      const mockAdminItemsSelectChain = {
+        select: vi.fn(() => mockAdminItemsEqChain),
+      }
+      
       mockAdminDb.from.mockImplementation((table: string) => {
         if (table === 'sales') {
           return {
@@ -306,6 +322,10 @@ describe('Hidden sales visibility', () => {
               })),
             })),
           }
+        }
+        if (table === 'items') {
+          // Mock admin check for items (bypasses RLS)
+          return mockAdminItemsSelectChain
         }
         return mockSelectChain
       })

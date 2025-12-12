@@ -850,19 +850,60 @@ export async function getSaleWithItems(
       })
     }
     
-    // If no items returned and no error, log a warning (only in debug mode)
-    if (!itemsRes.error && (!itemsRes.data || itemsRes.data.length === 0) && process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      const userContext = user ? 'auth' : 'anon'
-      const isOwner = user && user.id === ownerId
-      logger.debug('No items returned for sale (no error)', {
-        component: 'salesAccess',
-        operation: 'getSaleWithItems',
-        saleId,
-        userContext,
-        isOwner,
-        saleStatus: sale.status,
-        note: 'This could indicate RLS policy blocking access or no items exist for this sale',
-      })
+    // If no items returned and no error, try fallback to view
+    // This handles cases where RLS might be silently filtering results
+    let itemsData = itemsRes.data || []
+    if (!itemsRes.error && itemsData.length === 0) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        const userContext = user ? 'auth' : 'anon'
+        const isOwner = user && user.id === ownerId
+        logger.debug('No items from base table, trying view fallback', {
+          component: 'salesAccess',
+          operation: 'getSaleWithItems',
+          saleId,
+          userContext,
+          isOwner,
+          saleStatus: sale.status,
+          note: 'RLS may be blocking base table access, trying items_v2 view',
+        })
+      }
+      
+      // Try fallback to view (for published sales, view should work)
+      try {
+        const viewRes = await supabase
+          .from('items_v2')
+          .select('id, sale_id, name, price, image_url, images, created_at, category, condition, is_sold')
+          .eq('sale_id', saleId)
+          .order('created_at', { ascending: false })
+        
+        if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
+          itemsData = viewRes.data
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            logger.debug('View fallback succeeded', {
+              component: 'salesAccess',
+              operation: 'getSaleWithItems',
+              saleId,
+              itemsCount: itemsData.length,
+            })
+          }
+        } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          logger.debug('View fallback also returned no items', {
+            component: 'salesAccess',
+            operation: 'getSaleWithItems',
+            saleId,
+            viewError: viewRes.error?.message || null,
+          })
+        }
+      } catch (viewError) {
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          logger.debug('View fallback failed', {
+            component: 'salesAccess',
+            operation: 'getSaleWithItems',
+            saleId,
+            error: viewError instanceof Error ? viewError.message : String(viewError),
+          })
+        }
+      }
     }
     
     const [profileRes, statsRes] = await Promise.all([
@@ -897,11 +938,11 @@ export async function getSaleWithItems(
     }
 
     // Map items to SaleItem type
-    // Base table query returns: id, sale_id, name, price, image_url, images, created_at
-    // View fallback returns: id, sale_id, name, price, images (array), created_at
+    // Base table query returns: id, sale_id, name, price, image_url, images, created_at, category, condition, is_sold
+    // View fallback returns: id, sale_id, name, price, images (array), created_at, category, condition, is_sold
     // Map to SaleItem format expected by components
     // IMPORTANT: Prefer images array over image_url (consistent with working view path)
-    const mappedItems: SaleItem[] = ((itemsRes.data || []) as any[]).map((item: any) => {
+    const mappedItems: SaleItem[] = (itemsData as any[]).map((item: any) => {
       // Normalize image: prefer images array (like working view path), fallback to image_url
       let photoUrl: string | undefined = undefined
       
@@ -944,15 +985,15 @@ export async function getSaleWithItems(
       }))
       
       // Also log raw data from the query to see what we're working with
-      const rawItemsSample = itemsRes.data && itemsRes.data.length > 0 ? {
-        id: itemsRes.data[0].id,
-        hasImageUrl: !!itemsRes.data[0].image_url,
-        imageUrlValue: itemsRes.data[0].image_url ? `${itemsRes.data[0].image_url.substring(0, 50)}...` : null,
-        hasImages: !!itemsRes.data[0].images,
-        imagesType: Array.isArray(itemsRes.data[0].images) ? 'array' : typeof itemsRes.data[0].images,
-        imagesLength: Array.isArray(itemsRes.data[0].images) ? itemsRes.data[0].images.length : 0,
-        imagesFirst: Array.isArray(itemsRes.data[0].images) && itemsRes.data[0].images.length > 0 
-          ? `${itemsRes.data[0].images[0].substring(0, 50)}...` 
+      const rawItemsSample = itemsData && itemsData.length > 0 ? {
+        id: itemsData[0].id,
+        hasImageUrl: !!itemsData[0].image_url,
+        imageUrlValue: itemsData[0].image_url ? `${itemsData[0].image_url.substring(0, 50)}...` : null,
+        hasImages: !!itemsData[0].images,
+        imagesType: Array.isArray(itemsData[0].images) ? 'array' : typeof itemsData[0].images,
+        imagesLength: Array.isArray(itemsData[0].images) ? itemsData[0].images.length : 0,
+        imagesFirst: Array.isArray(itemsData[0].images) && itemsData[0].images.length > 0 
+          ? `${itemsData[0].images[0].substring(0, 50)}...` 
           : null,
       } : null
       
@@ -960,7 +1001,7 @@ export async function getSaleWithItems(
         component: 'salesAccess',
         operation: 'getSaleWithItems',
         saleId,
-        rawItemsCount: itemsRes.data?.length || 0,
+        rawItemsCount: itemsData?.length || 0,
         mappedItemsCount: mappedItems.length,
         itemsWithPhotos: mappedItems.filter(i => i.photo).length,
         itemsWithoutPhotos: mappedItems.filter(i => !i.photo).length,

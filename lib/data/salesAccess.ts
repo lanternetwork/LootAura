@@ -853,21 +853,28 @@ export async function getSaleWithItems(
     // If no items returned and no error, try fallback to view
     // This handles cases where RLS might be silently filtering results
     let itemsData = itemsRes.data || []
+    
+    // Always log items query result for debugging (not just in debug mode)
+    console.log('[ITEMS_QUERY] Base table query result', {
+      saleId,
+      itemsCount: itemsData.length,
+      hasError: !!itemsRes.error,
+      errorCode: itemsRes.error?.code || null,
+      errorMessage: itemsRes.error?.message || null,
+      userContext: user ? 'auth' : 'anon',
+      isOwner: user && user.id === ownerId,
+      saleStatus: sale.status,
+    })
+    
     if (!itemsRes.error && itemsData.length === 0) {
-      // Log this attempt (only in debug mode) to diagnose the issue
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        const userContext = user ? 'auth' : 'anon'
-        const isOwner = user && user.id === ownerId
-        logger.debug('No items from base table, trying view fallback', {
-          component: 'salesAccess',
-          operation: 'getSaleWithItems',
-          saleId,
-          userContext,
-          isOwner,
-          saleStatus: sale.status,
-          note: 'RLS may be blocking base table access, trying items_v2 view',
-        })
-      }
+      // Log this attempt (always, not just in debug mode) to diagnose the issue
+      console.log('[ITEMS_QUERY] No items from base table, trying view fallback', {
+        saleId,
+        userContext: user ? 'auth' : 'anon',
+        isOwner: user && user.id === ownerId,
+        saleStatus: sale.status,
+        ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
+      })
       
       // Try fallback to view (for published sales, view should work)
       try {
@@ -877,46 +884,33 @@ export async function getSaleWithItems(
           .eq('sale_id', saleId)
           .order('created_at', { ascending: false })
         
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          logger.debug('View fallback result', {
-            component: 'salesAccess',
-            operation: 'getSaleWithItems',
-            saleId,
-            hasError: !!viewRes.error,
-            errorCode: viewRes.error?.code || null,
-            errorMessage: viewRes.error?.message || null,
-            itemsCount: viewRes.data?.length || 0,
-          })
-        }
+        // Always log view fallback result
+        console.log('[ITEMS_QUERY] View fallback result', {
+          saleId,
+          hasError: !!viewRes.error,
+          errorCode: viewRes.error?.code || null,
+          errorMessage: viewRes.error?.message || null,
+          itemsCount: viewRes.data?.length || 0,
+        })
         
         if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
           itemsData = viewRes.data
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            logger.debug('View fallback succeeded', {
-              component: 'salesAccess',
-              operation: 'getSaleWithItems',
-              saleId,
-              itemsCount: itemsData.length,
-            })
-          }
-        } else if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          logger.debug('View fallback also returned no items', {
-            component: 'salesAccess',
-            operation: 'getSaleWithItems',
+          console.log('[ITEMS_QUERY] View fallback succeeded', {
+            saleId,
+            itemsCount: itemsData.length,
+          })
+        } else {
+          console.log('[ITEMS_QUERY] View fallback also returned no items', {
             saleId,
             viewError: viewRes.error?.message || null,
             viewErrorCode: viewRes.error?.code || null,
           })
         }
       } catch (viewError) {
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          logger.debug('View fallback failed', {
-            component: 'salesAccess',
-            operation: 'getSaleWithItems',
-            saleId,
-            error: viewError instanceof Error ? viewError.message : String(viewError),
-          })
-        }
+        console.log('[ITEMS_QUERY] View fallback failed', {
+          saleId,
+          error: viewError instanceof Error ? viewError.message : String(viewError),
+        })
       }
     } else if (itemsRes.error) {
       // Log errors (only in debug mode)
@@ -1006,6 +1000,13 @@ export async function getSaleWithItems(
         purchased: item.is_sold || false, // May come from view
         created_at: item.created_at,
       }
+    })
+    
+    // Always log final mapped items count for debugging
+    console.log('[ITEMS_QUERY] Final mapped items', {
+      saleId,
+      mappedCount: mappedItems.length,
+      rawCount: itemsData.length,
     })
     
     // Log final mapped items (only in debug mode)

@@ -141,14 +141,41 @@ describe('GET /api/admin/reports', () => {
           city: 'Test City',
           state: 'KY',
           owner_id: 'owner-1',
+          moderation_status: 'published',
         },
       },
     ]
 
+    const mockProfiles = [
+      {
+        id: 'owner-1',
+        is_locked: false,
+        lock_reason: null,
+        locked_at: null,
+      },
+    ]
+
+    // Mock reports query
     mockReportChain.range.mockResolvedValue({
       data: mockReports as any,
       error: null,
       count: 1,
+    })
+
+    // Mock profiles query for owner lock status
+    const mockProfileSelectChain = {
+      in: vi.fn(() => Promise.resolve({ data: mockProfiles, error: null })),
+    }
+    const mockProfileChainWithSelect = {
+      select: vi.fn(() => mockProfileSelectChain),
+    }
+
+    // Override mockAdminDb.from to return profile chain when needed
+    mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return mockProfileChainWithSelect
+      }
+      return mockReportChain
     })
 
     const request = new NextRequest('http://localhost/api/admin/reports')
@@ -172,6 +199,21 @@ describe('GET /api/admin/reports', () => {
       data: [],
       error: null,
       count: 0,
+    })
+
+    // Mock profiles query (empty since no reports = no owners)
+    const mockProfileSelectChain = {
+      in: vi.fn(() => Promise.resolve({ data: [], error: null })),
+    }
+    const mockProfileChainWithSelect = {
+      select: vi.fn(() => mockProfileSelectChain),
+    }
+
+    mockAdminDb.from.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return mockProfileChainWithSelect
+      }
+      return mockReportChain
     })
 
     const request = new NextRequest('http://localhost/api/admin/reports?status=resolved')

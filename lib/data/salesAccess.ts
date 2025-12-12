@@ -807,16 +807,33 @@ export async function getSaleWithItems(
       saleStatus: sale.status,
       ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
       userContext: user ? 'auth' : 'anon',
+      userId: user?.id ? `${user.id.substring(0, 8)}...` : null,
+      isOwner: user && user.id === ownerId,
     })
     
     // Query base table - RLS policies will filter results based on auth context
     // Select image_url and images (if available) - images array is preferred, image_url is fallback
     // Note: Both columns exist in the base table schema (migration 096)
     // The base table is authoritative for items and images - migration 097 backfilled all item images.
+    console.error('[ITEMS_QUERY] Executing base table query', {
+      saleId,
+      table: 'lootaura_v2.items',
+      userContext: user ? 'auth' : 'anon',
+    })
+    
     const itemsRes = await fromBase(db, 'items')
       .select('id, sale_id, name, price, image_url, images, created_at, category, condition, is_sold')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: false })
+    
+    console.error('[ITEMS_QUERY] Base table query completed', {
+      saleId,
+      hasData: !!itemsRes.data,
+      dataLength: itemsRes.data?.length || 0,
+      hasError: !!itemsRes.error,
+      errorCode: itemsRes.error?.code || null,
+      errorMessage: itemsRes.error?.message || null,
+    })
     
     // Log query results (PII-safe) - only in debug mode
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -875,10 +892,21 @@ export async function getSaleWithItems(
     })
     
     // If no items and no error, check if items exist using admin client (bypasses RLS)
+    // This diagnostic is CRITICAL - it tells us if items exist but RLS is blocking them
     if (!itemsRes.error && itemsData.length === 0) {
+      console.error('[ITEMS_QUERY] No items from RLS query, running admin check to see if items exist', {
+        saleId,
+        saleStatus: sale.status,
+        userContext: user ? 'auth' : 'anon',
+        isOwner: user && user.id === ownerId,
+      })
+      
       try {
         const { getAdminDb, fromBase } = await import('@/lib/supabase/clients')
         const admin = getAdminDb()
+        
+        console.error('[ITEMS_QUERY] Admin client obtained, querying items table', { saleId })
+        
         const adminCheck = await fromBase(admin, 'items')
           .select('id')
           .eq('sale_id', saleId)
@@ -890,13 +918,32 @@ export async function getSaleWithItems(
           adminItemsCount: adminCheck.data?.length || 0,
           hasError: !!adminCheck.error,
           errorCode: adminCheck.error?.code || null,
+          errorMessage: adminCheck.error?.message || null,
           saleStatus: sale.status,
           note: 'If itemsExist=true but itemsCount=0, RLS is blocking the query',
         })
+        
+        // If admin check finds items but RLS query didn't, this is an RLS issue
+        if ((adminCheck.data?.length || 0) > 0) {
+          console.error('[ITEMS_QUERY] ⚠️ RLS BLOCKING: Admin found items but RLS query returned 0', {
+            saleId,
+            adminItemsCount: adminCheck.data?.length || 0,
+            saleStatus: sale.status,
+            userContext: user ? 'auth' : 'anon',
+            isOwner: user && user.id === ownerId,
+            expectedPolicy: sale.status === 'published' ? 'items_public_read' : 'items_owner_read (if owner)',
+          })
+        } else {
+          console.error('[ITEMS_QUERY] No items exist in database for this sale', {
+            saleId,
+            saleStatus: sale.status,
+          })
+        }
       } catch (adminError) {
-        console.error('[ITEMS_QUERY] Admin check failed', {
+        console.error('[ITEMS_QUERY] Admin check failed with exception', {
           saleId,
           error: adminError instanceof Error ? adminError.message : String(adminError),
+          errorStack: adminError instanceof Error ? adminError.stack : null,
         })
       }
     }

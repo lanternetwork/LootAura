@@ -267,7 +267,6 @@ describe('Items Public Visibility', () => {
 
     // Mock sale query (from sales_v2 view) - hidden sale can still be fetched
     // (page component blocks it, but getSaleWithItems can return it)
-    mockSupabaseClient.from.mockReset()
     const mockSaleSingleChain = {
       single: vi.fn().mockResolvedValue({
         data: hiddenSale,

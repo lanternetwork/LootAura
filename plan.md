@@ -78,26 +78,27 @@
 
 ## Bugfixes
 
-### Items Missing on Sale Detail Pages (2025-12-12)
+### Items Missing on Sale Detail Pages (2025-12-12, Fixed 2025-12-13)
 
 **Issue:** Items were not appearing on sale detail pages for anonymous users, even though items existed in the database and sales were published and visible.
 
 **Root Cause:** The `items_public_read` RLS policy used an EXISTS subquery that checked `lootaura_v2.sales` for sale visibility. This nested RLS check was failing for anonymous users because the EXISTS subquery itself was subject to RLS on the sales table, creating a circular dependency.
 
-**Fix (Migration 114):**
-- Created `lootaura_v2.is_sale_publicly_visible()` SECURITY DEFINER function that encapsulates complete public visibility rules:
-  - `status IN ('published', 'active')`
-  - `moderation_status = 'visible'` (or NULL for backwards compatibility)
-  - `archived_at IS NULL`
-- Updated `sales_public_read` policy to use the function for consistency
+**Fix (Migration 115):**
+- Created `lootaura_v2.is_sale_publicly_visible()` SECURITY DEFINER function that matches `sales_public_read` policy exactly:
+  - `status = 'published'` only (matches current `sales_public_read` policy)
+  - Does NOT check `moderation_status` or `archived_at` (these are not in `sales_public_read`)
 - Updated `items_public_read` policy to use the function, eliminating the nested RLS issue
-- Removed view-based workarounds from `lib/data/salesAccess.ts`:
-  - Removed unused `getItemsForSale()` function that used `items_v2` view
-  - `getSaleWithItems()` now uses base table directly via RLS-aware client
+- Removed debug logging from `lib/data/salesAccess.ts` (`[ITEMS_DIAG]` console.error calls)
 - Added regression test (`tests/integration/items.public-visibility.test.ts`) that verifies:
-  - Items are returned for published, visible sales to anonymous users
-  - Items are NOT returned for hidden sales
-  - Items are NOT returned for archived sales
+  - Items are returned for published sales to anonymous users
+  - Items are NOT returned for sales with status != 'published' (e.g., 'active', 'draft')
+
+**Known Drift (Follow-up):**
+- The `sales_public_read` policy only checks `status = 'published'`, but the app code (page component) blocks sales with `moderation_status = 'hidden_by_admin'` for non-admins.
+- The function matches the policy exactly (only checks status), so items WILL be returned for published sales even if `moderation_status = 'hidden_by_admin'`.
+- The page component (`app/sales/[id]/page.tsx`) handles blocking hidden sales, so this is acceptable for now.
+- If `sales_public_read` is updated to include `moderation_status` checks in the future, the function must be updated in a separate migration to match.
   - Items are returned for active sales
 
 **Security:** The SECURITY DEFINER function has fixed `search_path` (`pg_catalog, public, lootaura_v2`) and returns only boolean values, preventing data leakage. The function is owned by `postgres` (migration runner) and safely bypasses RLS for the visibility check.

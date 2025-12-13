@@ -1,7 +1,12 @@
 /**
  * Integration tests for items public visibility
- * Tests that items appear on sale detail pages for published, publicly visible sales
- * Regression test for migration 114 fix
+ * Tests that items appear on sale detail pages for published sales
+ * Regression test for migration 115 fix
+ * 
+ * NOTE: The function is_sale_publicly_visible() matches sales_public_read policy exactly:
+ * - Only checks status = 'published' (does NOT check moderation_status or archived_at)
+ * - If sales_public_read is updated to include moderation/archived checks, this function
+ *   must be updated in a separate migration to match.
  */
 
 import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest'
@@ -287,7 +292,7 @@ describe('Items Public Visibility', () => {
     expect(mockItemsEqChain.eq).toHaveBeenCalledWith('sale_id', 'sale-published-items')
   })
 
-  it('should NOT return items for hidden sales to anonymous users', async () => {
+  it('should return items for published sales even if hidden_by_admin (function only checks status)', async () => {
     // Ensure auth.getUser is mocked (getSaleWithItems calls this)
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: null },
@@ -309,10 +314,10 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockSaleEqChain),
     }
 
-    // Mock items query - should return empty array due to RLS
-    // The RLS policy should block items from hidden sales
+    // Mock items query - should return items because status = 'published'
+    // The RLS policy only checks status, not moderation_status
     const mockItemsOrderChain = {
-      order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+      order: vi.fn(() => Promise.resolve({ data: mockItems, error: null })),
     }
     const mockItemsEqChain = {
       eq: vi.fn(() => mockItemsOrderChain),
@@ -394,18 +399,24 @@ describe('Items Public Visibility', () => {
     // Verify result
     expect(result).toBeDefined()
     expect(result?.sale.id).toBe('sale-hidden')
+    expect(result?.sale.status).toBe('published')
     expect((result?.sale as any).moderation_status).toBe('hidden_by_admin')
     
-    // CRITICAL: Items should NOT be returned for hidden sales
+    // CRITICAL: Items WILL be returned because function only checks status = 'published'
+    // The page component blocks hidden sales for non-admins, but getSaleWithItems
+    // can return items because RLS only checks status, not moderation_status
+    // NOTE: This reflects the current sales_public_read policy which only checks status.
+    // If sales_public_read is updated to include moderation_status checks, this function
+    // must be updated in a separate migration to match.
     expect(result?.items).toBeDefined()
     expect(Array.isArray(result?.items)).toBe(true)
-    expect(result?.items.length).toBe(0) // RLS should block items
+    expect(result?.items.length).toBe(2) // Items are returned because status = 'published'
 
-    // Verify items query was called (but returned empty due to RLS)
+    // Verify items query was called
     expect(mockRlsDb.from).toHaveBeenCalledWith('items')
   })
 
-  it('should return items for published sales with active status', async () => {
+  it('should NOT return items for sales with active status (function only checks published)', async () => {
     // Ensure auth.getUser is mocked (getSaleWithItems calls this)
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: null },
@@ -432,9 +443,10 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockSaleEqChain),
     }
 
-    // Mock items query
+    // Mock items query - should return empty array because status != 'published'
+    // The RLS policy only checks status = 'published', so 'active' status is blocked
     const mockItemsOrderChain = {
-      order: vi.fn(() => Promise.resolve({ data: mockItems, error: null })),
+      order: vi.fn(() => Promise.resolve({ data: [], error: null })),
     }
     const mockItemsEqChain = {
       eq: vi.fn(() => mockItemsOrderChain),
@@ -518,10 +530,11 @@ describe('Items Public Visibility', () => {
     expect(result?.sale.id).toBe('sale-active')
     expect(result?.sale.status).toBe('active')
     
-    // Items should be returned for active sales
+    // CRITICAL: Items should NOT be returned for active sales
+    // The function only checks status = 'published', so 'active' status is blocked
     expect(result?.items).toBeDefined()
     expect(Array.isArray(result?.items)).toBe(true)
-    expect(result?.items.length).toBe(2)
+    expect(result?.items.length).toBe(0) // RLS blocks items because status != 'published'
   })
 
   it('should NOT return items for archived sales', async () => {

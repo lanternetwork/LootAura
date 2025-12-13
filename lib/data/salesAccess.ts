@@ -891,74 +891,16 @@ export async function getSaleWithItems(
       saleStatus: sale.status,
     })
     
-    // If no items and no error, check if items exist using admin client (bypasses RLS)
-    // This diagnostic is CRITICAL - it tells us if items exist but RLS is blocking them
-    if (!itemsRes.error && itemsData.length === 0) {
-      console.error('[ITEMS_QUERY] No items from RLS query, running admin check to see if items exist', {
+    // For published sales, prefer using items_v2 view directly
+    // The view uses SECURITY INVOKER and should work better with RLS
+    // Only use base table query if user is owner (for draft sales)
+    if (sale.status === 'published' && itemsData.length === 0 && !itemsRes.error) {
+      console.error('[ITEMS_QUERY] Published sale with 0 items from base table, trying items_v2 view', {
         saleId,
-        saleStatus: sale.status,
         userContext: user ? 'auth' : 'anon',
         isOwner: user && user.id === ownerId,
       })
       
-      try {
-        const { getAdminDb, fromBase } = await import('@/lib/supabase/clients')
-        const admin = getAdminDb()
-        
-        console.error('[ITEMS_QUERY] Admin client obtained, querying items table', { saleId })
-        
-        const adminCheck = await fromBase(admin, 'items')
-          .select('id')
-          .eq('sale_id', saleId)
-          .limit(1)
-        
-        console.error('[ITEMS_QUERY] Admin check (bypasses RLS)', {
-          saleId,
-          itemsExist: (adminCheck.data?.length || 0) > 0,
-          adminItemsCount: adminCheck.data?.length || 0,
-          hasError: !!adminCheck.error,
-          errorCode: adminCheck.error?.code || null,
-          errorMessage: adminCheck.error?.message || null,
-          saleStatus: sale.status,
-          note: 'If itemsExist=true but itemsCount=0, RLS is blocking the query',
-        })
-        
-        // If admin check finds items but RLS query didn't, this is an RLS issue
-        if ((adminCheck.data?.length || 0) > 0) {
-          console.error('[ITEMS_QUERY] ⚠️ RLS BLOCKING: Admin found items but RLS query returned 0', {
-            saleId,
-            adminItemsCount: adminCheck.data?.length || 0,
-            saleStatus: sale.status,
-            userContext: user ? 'auth' : 'anon',
-            isOwner: user && user.id === ownerId,
-            expectedPolicy: sale.status === 'published' ? 'items_public_read' : 'items_owner_read (if owner)',
-          })
-        } else {
-          console.error('[ITEMS_QUERY] No items exist in database for this sale', {
-            saleId,
-            saleStatus: sale.status,
-          })
-        }
-      } catch (adminError) {
-        console.error('[ITEMS_QUERY] Admin check failed with exception', {
-          saleId,
-          error: adminError instanceof Error ? adminError.message : String(adminError),
-          errorStack: adminError instanceof Error ? adminError.stack : null,
-        })
-      }
-    }
-    
-    if (!itemsRes.error && itemsData.length === 0) {
-      // Log this attempt (always, not just in debug mode) to diagnose the issue
-      console.error('[ITEMS_QUERY] No items from base table, trying view fallback', {
-        saleId,
-        userContext: user ? 'auth' : 'anon',
-        isOwner: user && user.id === ownerId,
-        saleStatus: sale.status,
-        ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
-      })
-      
-      // Try fallback to view (for published sales, view should work)
       try {
         const viewRes = await supabase
           .from('items_v2')
@@ -966,8 +908,7 @@ export async function getSaleWithItems(
           .eq('sale_id', saleId)
           .order('created_at', { ascending: false })
         
-        // Always log view fallback result
-        console.error('[ITEMS_QUERY] View fallback result', {
+        console.error('[ITEMS_QUERY] items_v2 view query result', {
           saleId,
           hasError: !!viewRes.error,
           errorCode: viewRes.error?.code || null,
@@ -977,15 +918,69 @@ export async function getSaleWithItems(
         
         if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
           itemsData = viewRes.data
-          console.error('[ITEMS_QUERY] View fallback succeeded', {
+          console.error('[ITEMS_QUERY] items_v2 view succeeded, using view data', {
             saleId,
             itemsCount: itemsData.length,
           })
-        } else {
-          console.error('[ITEMS_QUERY] View fallback also returned no items', {
+        } else if (!viewRes.error && viewRes.data && viewRes.data.length === 0) {
+          // View also returned 0 items - check if items actually exist
+          console.error('[ITEMS_QUERY] items_v2 view also returned 0 items, checking if items exist', {
             saleId,
-            viewError: viewRes.error?.message || null,
-            viewErrorCode: viewRes.error?.code || null,
+          })
+          
+          try {
+            const { getAdminDb, fromBase } = await import('@/lib/supabase/clients')
+            const admin = getAdminDb()
+            const adminCheck = await fromBase(admin, 'items')
+              .select('id')
+              .eq('sale_id', saleId)
+              .limit(1)
+            
+            if ((adminCheck.data?.length || 0) > 0) {
+              console.error('[ITEMS_QUERY] ⚠️ RLS BLOCKING: Items exist but both base table and view returned 0', {
+                saleId,
+                adminItemsCount: adminCheck.data?.length || 0,
+                saleStatus: sale.status,
+                userContext: user ? 'auth' : 'anon',
+                isOwner: user && user.id === ownerId,
+                note: 'RLS policies are blocking item access. This is a database policy issue.',
+              })
+            }
+          } catch (adminError) {
+            // Admin check failed, but that's okay - we'll continue with empty items
+            console.error('[ITEMS_QUERY] Admin check failed', {
+              saleId,
+              error: adminError instanceof Error ? adminError.message : String(adminError),
+            })
+          }
+        }
+      } catch (viewError) {
+        console.error('[ITEMS_QUERY] items_v2 view query failed', {
+          saleId,
+          error: viewError instanceof Error ? viewError.message : String(viewError),
+        })
+      }
+    } else if (itemsData.length === 0 && !itemsRes.error) {
+      // For non-published sales or if base query failed, try view as fallback
+      console.error('[ITEMS_QUERY] Trying items_v2 view as fallback', {
+        saleId,
+        saleStatus: sale.status,
+        userContext: user ? 'auth' : 'anon',
+        isOwner: user && user.id === ownerId,
+      })
+      
+      try {
+        const viewRes = await supabase
+          .from('items_v2')
+          .select('id, sale_id, name, price, image_url, images, created_at, category, condition, is_sold')
+          .eq('sale_id', saleId)
+          .order('created_at', { ascending: false })
+        
+        if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
+          itemsData = viewRes.data
+          console.error('[ITEMS_QUERY] View fallback succeeded', {
+            saleId,
+            itemsCount: itemsData.length,
           })
         }
       } catch (viewError) {

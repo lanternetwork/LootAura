@@ -391,7 +391,6 @@ describe('Items Public Visibility', () => {
     }
 
     // Mock sale query
-    mockSupabaseClient.from.mockReset()
     const mockSaleSingleChain = {
       single: vi.fn().mockResolvedValue({
         data: activeSale,

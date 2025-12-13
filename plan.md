@@ -100,6 +100,18 @@
 
 **Security:** The SECURITY DEFINER function has fixed `search_path` and returns only boolean values, preventing data leakage.
 
+### Debug Endpoints
+
+**Admin-Only Debug Routes:**
+- `/api/debug/items` - Diagnostic endpoint to check if items exist for a sale (exposes owner_id, moderation_status). Protected by:
+  - Admin authentication (`assertAdminOrThrow`)
+  - Production environment check (disabled by default, can enable with `ENABLE_DEBUG_ENDPOINTS=true`)
+- `/api/debug/db` - Database connection diagnostic endpoint. Protected by:
+  - Admin authentication (`assertAdminOrThrow`)
+  - Production environment check (disabled by default, can enable with `ENABLE_DEBUG_ENDPOINTS=true`)
+
+**Removal Plan:** These endpoints were created for troubleshooting items visibility issues. They should be removed once the RLS fix (migration 114) is verified stable in production. To remove: delete `app/api/debug/items/route.ts` and `app/api/debug/db/route.ts`.
+
 ---
 
 ## P0 Moderation + Archive Test Suite

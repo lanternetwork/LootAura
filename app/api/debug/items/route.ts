@@ -12,6 +12,14 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
+    // Disable in production by default (can be overridden with env var if needed)
+    if (process.env.NODE_ENV === 'production' && process.env.ENABLE_DEBUG_ENDPOINTS !== 'true') {
+      return NextResponse.json(
+        { error: 'Debug endpoints are disabled in production' },
+        { status: 403 }
+      )
+    }
+    
     // Admin gating - this endpoint exposes sensitive data (owner_id, moderation_status)
     await assertAdminOrThrow(request)
     

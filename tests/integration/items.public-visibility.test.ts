@@ -220,6 +220,8 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockAdminItemsEqChain),
     }
     
+    // Reset first to ensure clean state
+    mockAdminDb.from.mockReset()
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
         // Mock tags query - set up inline like the working test

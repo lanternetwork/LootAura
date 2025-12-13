@@ -141,6 +141,12 @@ describe('Items Public Visibility', () => {
       data: { user: null },
       error: null,
     })
+    // CRITICAL: Re-initialize from() mock after clearAllMocks()
+    // clearAllMocks() clears implementations of ALL vi.fn() mocks
+    // We need to set up a default implementation that can be overridden in tests
+    mockSupabaseClient.from.mockImplementation(() => createQueryChain([], null))
+    mockRlsDb.from.mockImplementation(() => createQueryChain([], null))
+    mockAdminDb.from.mockImplementation(() => createQueryChain([], null))
   })
 
   it('should return items for published, visible sales to anonymous users', async () => {

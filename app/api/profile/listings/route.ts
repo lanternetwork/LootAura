@@ -25,7 +25,8 @@ export async function GET(req: Request) {
   // OR if archived_at is NULL, use date_end >= now() - 1 year as fallback
   const oneYearAgo = new Date()
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
-  const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0] // YYYY-MM-DD format for date comparison
+  // Use ISO timestamp for consistent server/client comparison (not just date string)
+  const oneYearAgoISO = oneYearAgo.toISOString()
   
   let query = supabase
     .from('sales_v2')
@@ -36,7 +37,8 @@ export async function GET(req: Request) {
   // Apply 1-year retention filter for archived sales
   if (dbStatus === 'archived') {
     // Use OR to match either archived_at or date_end within 1 year
-    query = query.or(`archived_at.gte.${oneYearAgoStr},date_end.gte.${oneYearAgoStr}`)
+    // Use ISO timestamp to match client-side filtering logic
+    query = query.or(`archived_at.gte.${oneYearAgoISO},date_end.gte.${oneYearAgoISO}`)
   }
   
   query = query.order('created_at', { ascending: false }).range(from, to)

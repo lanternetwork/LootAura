@@ -801,39 +801,16 @@ export async function getSaleWithItems(
     const { getRlsDb, fromBase } = await import('@/lib/supabase/clients')
     const db = getRlsDb()
     
-    // Log that we're starting the items query
-    console.error('[ITEMS_QUERY] Starting items query', {
-      saleId,
-      saleStatus: sale.status,
-      ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
-      userContext: user ? 'auth' : 'anon',
-      userId: user?.id ? `${user.id.substring(0, 8)}...` : null,
-      isOwner: user && user.id === ownerId,
-    })
-    
     // Query base table - RLS policies will filter results based on auth context
     // Select image_url and images (if available) - images array is preferred, image_url is fallback
     // Note: Both columns exist in the base table schema (migration 096)
     // The base table is authoritative for items and images - migration 097 backfilled all item images.
-    console.error('[ITEMS_QUERY] Executing base table query', {
-      saleId,
-      table: 'lootaura_v2.items',
-      userContext: user ? 'auth' : 'anon',
-    })
-    
+    // RLS policy items_public_read uses is_sale_publicly_visible() function (migration 114)
+    // to avoid nested RLS issues that previously blocked items for anonymous users.
     const itemsRes = await fromBase(db, 'items')
       .select('id, sale_id, name, price, image_url, images, created_at, category, condition, is_sold')
       .eq('sale_id', saleId)
       .order('created_at', { ascending: false })
-    
-    console.error('[ITEMS_QUERY] Base table query completed', {
-      saleId,
-      hasData: !!itemsRes.data,
-      dataLength: itemsRes.data?.length || 0,
-      hasError: !!itemsRes.error,
-      errorCode: itemsRes.error?.code || null,
-      errorMessage: itemsRes.error?.message || null,
-    })
     
     // Log query results (PII-safe) - only in debug mode
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -875,121 +852,9 @@ export async function getSaleWithItems(
       })
     }
     
-    // If no items returned and no error, try fallback to view
-    // This handles cases where RLS might be silently filtering results
-    let itemsData = itemsRes.data || []
-    
-    // Always log items query result for debugging (not just in debug mode)
-    console.error('[ITEMS_QUERY] Base table query result', {
-      saleId,
-      itemsCount: itemsData.length,
-      hasError: !!itemsRes.error,
-      errorCode: itemsRes.error?.code || null,
-      errorMessage: itemsRes.error?.message || null,
-      userContext: user ? 'auth' : 'anon',
-      isOwner: user && user.id === ownerId,
-      saleStatus: sale.status,
-    })
-    
-    // For published sales, prefer using items_v2 view directly
-    // The view uses SECURITY INVOKER and should work better with RLS
-    // Only use base table query if user is owner (for draft sales)
-    if (sale.status === 'published' && itemsData.length === 0 && !itemsRes.error) {
-      console.error('[ITEMS_QUERY] Published sale with 0 items from base table, trying items_v2 view', {
-        saleId,
-        userContext: user ? 'auth' : 'anon',
-        isOwner: user && user.id === ownerId,
-      })
-      
-      try {
-        const viewRes = await supabase
-          .from('items_v2')
-          .select('id, sale_id, name, price, image_url, images, created_at, category, condition, is_sold')
-          .eq('sale_id', saleId)
-          .order('created_at', { ascending: false })
-        
-        console.error('[ITEMS_QUERY] items_v2 view query result', {
-          saleId,
-          hasError: !!viewRes.error,
-          errorCode: viewRes.error?.code || null,
-          errorMessage: viewRes.error?.message || null,
-          itemsCount: viewRes.data?.length || 0,
-        })
-        
-        if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
-          itemsData = viewRes.data
-          console.error('[ITEMS_QUERY] items_v2 view succeeded, using view data', {
-            saleId,
-            itemsCount: itemsData.length,
-          })
-        } else if (!viewRes.error && viewRes.data && viewRes.data.length === 0) {
-          // View also returned 0 items - check if items actually exist
-          console.error('[ITEMS_QUERY] items_v2 view also returned 0 items, checking if items exist', {
-            saleId,
-          })
-          
-          try {
-            const { getAdminDb, fromBase } = await import('@/lib/supabase/clients')
-            const admin = getAdminDb()
-            const adminCheck = await fromBase(admin, 'items')
-              .select('id')
-              .eq('sale_id', saleId)
-              .limit(1)
-            
-            if ((adminCheck.data?.length || 0) > 0) {
-              console.error('[ITEMS_QUERY] ⚠️ RLS BLOCKING: Items exist but both base table and view returned 0', {
-                saleId,
-                adminItemsCount: adminCheck.data?.length || 0,
-                saleStatus: sale.status,
-                userContext: user ? 'auth' : 'anon',
-                isOwner: user && user.id === ownerId,
-                note: 'RLS policies are blocking item access. This is a database policy issue.',
-              })
-            }
-          } catch (adminError) {
-            // Admin check failed, but that's okay - we'll continue with empty items
-            console.error('[ITEMS_QUERY] Admin check failed', {
-              saleId,
-              error: adminError instanceof Error ? adminError.message : String(adminError),
-            })
-          }
-        }
-      } catch (viewError) {
-        console.error('[ITEMS_QUERY] items_v2 view query failed', {
-          saleId,
-          error: viewError instanceof Error ? viewError.message : String(viewError),
-        })
-      }
-    } else if (itemsData.length === 0 && !itemsRes.error) {
-      // For non-published sales or if base query failed, try view as fallback
-      console.error('[ITEMS_QUERY] Trying items_v2 view as fallback', {
-        saleId,
-        saleStatus: sale.status,
-        userContext: user ? 'auth' : 'anon',
-        isOwner: user && user.id === ownerId,
-      })
-      
-      try {
-        const viewRes = await supabase
-          .from('items_v2')
-          .select('id, sale_id, name, price, image_url, images, created_at, category, condition, is_sold')
-          .eq('sale_id', saleId)
-          .order('created_at', { ascending: false })
-        
-        if (!viewRes.error && viewRes.data && viewRes.data.length > 0) {
-          itemsData = viewRes.data
-          console.error('[ITEMS_QUERY] View fallback succeeded', {
-            saleId,
-            itemsCount: itemsData.length,
-          })
-        }
-      } catch (viewError) {
-        console.error('[ITEMS_QUERY] View fallback failed', {
-          saleId,
-          error: viewError instanceof Error ? viewError.message : String(viewError),
-        })
-      }
-    } else if (itemsRes.error) {
+    // Use base table query result - RLS policy should now work correctly
+    // after migration 114 fixes the items_public_read policy
+    let itemsData = itemsRes.data || [] else if (itemsRes.error) {
       // Log errors (only in debug mode)
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         logger.error('Error fetching items from base table', itemsRes.error instanceof Error ? itemsRes.error : new Error(String(itemsRes.error)), {
@@ -1047,9 +912,8 @@ export async function getSaleWithItems(
 
     // Map items to SaleItem type
     // Base table query returns: id, sale_id, name, price, image_url, images, created_at, category, condition, is_sold
-    // View fallback returns: id, sale_id, name, price, images (array), created_at, category, condition, is_sold
     // Map to SaleItem format expected by components
-    // IMPORTANT: Prefer images array over image_url (consistent with working view path)
+    // IMPORTANT: Prefer images array over image_url
     const mappedItems: SaleItem[] = (itemsData as any[]).map((item: any) => {
       // Normalize image: prefer images array (like working view path), fallback to image_url
       let photoUrl: string | undefined = undefined
@@ -1061,7 +925,7 @@ export async function getSaleWithItems(
           photoUrl = firstImage.trim()
         }
       }
-      // Fallback to image_url (from base table query or view fallback)
+      // Fallback to image_url (from base table query)
       else if (item.image_url && typeof item.image_url === 'string' && item.image_url.trim().length > 0) {
         photoUrl = item.image_url.trim()
       }
@@ -1077,13 +941,6 @@ export async function getSaleWithItems(
         purchased: item.is_sold || false, // May come from view
         created_at: item.created_at,
       }
-    })
-    
-    // Always log final mapped items count for debugging
-    console.error('[ITEMS_QUERY] Final mapped items', {
-      saleId,
-      mappedCount: mappedItems.length,
-      rawCount: itemsData.length,
     })
     
     // Log final mapped items (only in debug mode)

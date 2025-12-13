@@ -76,6 +76,32 @@
 
 ---
 
+## Bugfixes
+
+### Items Missing on Sale Detail Pages (2025-12-12)
+
+**Issue:** Items were not appearing on sale detail pages for anonymous users, even though items existed in the database and sales were published and visible.
+
+**Root Cause:** The `items_public_read` RLS policy used an EXISTS subquery that checked `lootaura_v2.sales` for sale visibility. This nested RLS check was failing for anonymous users because the EXISTS subquery itself was subject to RLS on the sales table, creating a circular dependency.
+
+**Fix (Migration 114):**
+- Created `lootaura_v2.is_sale_publicly_visible()` SECURITY DEFINER function that encapsulates complete public visibility rules:
+  - `status IN ('published', 'active')`
+  - `moderation_status = 'visible'`
+  - `archived_at IS NULL`
+- Updated `sales_public_read` policy to use the function for consistency
+- Updated `items_public_read` policy to use the function, eliminating the nested RLS issue
+- Removed view-based workarounds from `lib/data/salesAccess.ts`
+- Added regression test (`tests/integration/items.public-visibility.test.ts`) that verifies:
+  - Items are returned for published, visible sales to anonymous users
+  - Items are NOT returned for hidden sales
+  - Items are NOT returned for archived sales
+  - Items are returned for active sales
+
+**Security:** The SECURITY DEFINER function has fixed `search_path` and returns only boolean values, preventing data leakage.
+
+---
+
 ## P0 Moderation + Archive Test Suite
 
 **Status:** ✅ Completed (2025-12-10)

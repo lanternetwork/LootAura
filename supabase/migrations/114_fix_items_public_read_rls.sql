@@ -3,7 +3,7 @@
 -- The EXISTS subquery in the original policy was failing due to nested RLS checks
 --
 -- Solution: Create a SECURITY DEFINER function that bypasses RLS to check sale visibility,
--- then update both sales_public_read and items_public_read policies to use it.
+-- then update items_public_read policy to use it. The sales_public_read policy remains unchanged.
 
 -- Step 1: Create SECURITY DEFINER function to check if a sale is publicly visible
 -- This function encapsulates the complete public visibility rules:
@@ -64,13 +64,21 @@ $$;
 COMMENT ON FUNCTION lootaura_v2.is_sale_publicly_visible(uuid) IS 
     'Returns true if a sale is publicly visible. Checks status IN (published, active), moderation_status = visible, and archived_at IS NULL. Uses SECURITY DEFINER to bypass RLS for the check. Used by RLS policies to determine item visibility.';
 
--- Step 2: Update sales_public_read policy to use the function
--- This ensures consistency between sales and items visibility
-DROP POLICY IF EXISTS "sales_public_read" ON lootaura_v2.sales;
+-- Step 1.5: Harden function EXECUTE privileges
+-- REVOKE default PUBLIC execute permission (security best practice for SECURITY DEFINER functions)
+REVOKE EXECUTE ON FUNCTION lootaura_v2.is_sale_publicly_visible(uuid) FROM PUBLIC;
 
-CREATE POLICY "sales_public_read" ON lootaura_v2.sales
-    FOR SELECT
-    USING (lootaura_v2.is_sale_publicly_visible(id));
+-- GRANT execute permission only to roles that need it for RLS policies
+-- anon and authenticated roles need this for RLS policy evaluation
+GRANT EXECUTE ON FUNCTION lootaura_v2.is_sale_publicly_visible(uuid) TO anon, authenticated;
+
+-- Step 2: DO NOT update sales_public_read policy
+-- The existing sales_public_read policy (status = 'published') remains unchanged.
+-- This migration only fixes items_public_read to resolve the nested RLS issue.
+-- Note: The function allows both 'published' and 'active' to match application code expectations,
+-- but the sales_public_read policy remains as-is (status = 'published' only) to avoid breaking changes.
+-- If sales_public_read needs to be updated to include 'active' and moderation checks, that should
+-- be done in a separate migration after verifying the items fix works correctly.
 
 -- Step 3: Update items_public_read policy to use the function
 -- This fixes the nested RLS issue that was blocking items
@@ -80,10 +88,7 @@ CREATE POLICY "items_public_read" ON lootaura_v2.items
     FOR SELECT
     USING (lootaura_v2.is_sale_publicly_visible(sale_id));
 
--- Add comments for documentation
-COMMENT ON POLICY "sales_public_read" ON lootaura_v2.sales IS 
-    'Allows public read access to sales that are publicly visible (published/active, visible moderation status, not archived). Uses is_sale_publicly_visible() function for consistent visibility checks.';
-
+-- Add comment for documentation
 COMMENT ON POLICY "items_public_read" ON lootaura_v2.items IS 
     'Allows public read access to items from sales that are publicly visible. Uses is_sale_publicly_visible() function to avoid nested RLS issues. Fixed in migration 114 to resolve items not appearing on sale detail pages.';
 

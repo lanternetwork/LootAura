@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { assertAdminOrThrow } from '@/lib/auth/adminGate'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * Diagnostic endpoint to check if items exist for a sale
+ * ADMIN-ONLY: Requires admin authentication
  * Bypasses RLS to verify if items exist in the database
  * Usage: /api/debug/items?sale_id=<sale-id>
  */
 export async function GET(request: NextRequest) {
   try {
+    // Admin gating - this endpoint exposes sensitive data (owner_id, moderation_status)
+    await assertAdminOrThrow(request)
+    
     const { searchParams } = new URL(request.url)
     const saleId = searchParams.get('sale_id')
     
@@ -17,7 +22,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing sale_id parameter' }, { status: 400 })
     }
     
-    // Use admin client to bypass RLS
+    // Use admin client to bypass RLS (admin-only operation)
     const admin = getAdminDb()
     
     // Check if items exist in base table

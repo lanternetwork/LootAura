@@ -135,18 +135,27 @@ describe('Items Public Visibility', () => {
   ]
 
   beforeEach(() => {
-    // Use resetAllMocks() instead of clearAllMocks()
-    // resetAllMocks() clears call history but preserves implementations
-    // clearAllMocks() clears both call history AND implementations
-    vi.resetAllMocks()
+    // Clear call history but keep implementations
+    // Note: clearAllMocks() in Vitest clears call history, not implementations
+    // However, we still need to re-initialize mocks that were set up in tests
+    vi.clearAllMocks()
     // Default: anonymous user
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: null },
       error: null,
     })
-    // CRITICAL: Do NOT set default mock implementations here
-    // Tests must set up their own mock implementations after resetAllMocks()
-    // Setting defaults here can interfere with test-specific mocks
+    // CRITICAL: Re-initialize from() mocks after clearAllMocks()
+    // Even though clearAllMocks() shouldn't clear implementations, we need to ensure
+    // the mocks are properly initialized for each test
+    mockSupabaseClient.from.mockImplementation(() => {
+      throw new Error('Mock not set up in test - each test must set up its own mocks')
+    })
+    mockRlsDb.from.mockImplementation(() => {
+      throw new Error('Mock not set up in test - each test must set up its own mocks')
+    })
+    mockAdminDb.from.mockImplementation(() => {
+      throw new Error('Mock not set up in test - each test must set up its own mocks')
+    })
   })
 
   it('should return items for published, visible sales to anonymous users', async () => {

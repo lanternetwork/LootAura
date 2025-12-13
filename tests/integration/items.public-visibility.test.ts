@@ -215,10 +215,23 @@ describe('Items Public Visibility', () => {
       return mockItemsSelectChain
     })
 
-    // Set up mockAdminDb for tags query
+    // Set up mockAdminDb for tags query and items check (admin check)
+    const mockAdminItemsEqChain = {
+      eq: vi.fn(() => ({
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+      })),
+    }
+    const mockAdminItemsSelectChain = {
+      select: vi.fn(() => mockAdminItemsEqChain),
+    }
+    
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
         return mockTagsSelectChain
+      }
+      if (table === 'items') {
+        // Mock admin check for items (bypasses RLS)
+        return mockAdminItemsSelectChain
       }
       return mockTagsSelectChain
     })
@@ -330,9 +343,23 @@ describe('Items Public Visibility', () => {
       return mockItemsSelectChain
     })
 
+    // Set up mockAdminDb for tags query and items check (admin check)
+    const mockAdminItemsEqChain = {
+      eq: vi.fn(() => ({
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+      })),
+    }
+    const mockAdminItemsSelectChain = {
+      select: vi.fn(() => mockAdminItemsEqChain),
+    }
+    
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
         return mockTagsSelectChain
+      }
+      if (table === 'items') {
+        // Mock admin check for items (bypasses RLS)
+        return mockAdminItemsSelectChain
       }
       return mockTagsSelectChain
     })
@@ -549,9 +576,23 @@ describe('Items Public Visibility', () => {
       return mockItemsSelectChain
     })
 
+    // Set up mockAdminDb for tags query and items check (admin check)
+    const mockAdminItemsEqChain = {
+      eq: vi.fn(() => ({
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+      })),
+    }
+    const mockAdminItemsSelectChain = {
+      select: vi.fn(() => mockAdminItemsEqChain),
+    }
+    
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
         return mockTagsSelectChain
+      }
+      if (table === 'items') {
+        // Mock admin check for items (bypasses RLS)
+        return mockAdminItemsSelectChain
       }
       return mockTagsSelectChain
     })

@@ -135,8 +135,9 @@ describe('Items Public Visibility', () => {
   ]
 
   beforeEach(() => {
-    // Clear call history but keep implementations
-    vi.clearAllMocks()
+    // Reset all mocks (clears call history and resets implementations)
+    // This ensures each test starts with a clean slate
+    vi.resetAllMocks()
     // Default: anonymous user
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: null },

@@ -154,9 +154,6 @@ describe('Items Public Visibility', () => {
     const mockSaleSelectChain = {
       select: vi.fn(() => mockSaleEqChain),
     }
-    
-    // Ensure mockSupabaseClient.from is properly reset before setting up the mock
-    mockSupabaseClient.from.mockReset()
 
     // Mock items query (from base table via RLS DB)
     const mockItemsOrderChain = {
@@ -514,7 +511,6 @@ describe('Items Public Visibility', () => {
     }
 
     // Mock sale query
-    mockSupabaseClient.from.mockReset()
     const mockSaleSingleChain = {
       single: vi.fn().mockResolvedValue({
         data: archivedSale,

@@ -80,6 +80,8 @@ describe('Items Public Visibility', () => {
     owner_id: 'owner-2',
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
+    lat: 38.2527,
+    lng: -85.7585,
   }
 
   const hiddenSale = {
@@ -91,6 +93,8 @@ describe('Items Public Visibility', () => {
     owner_id: 'owner-3',
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
+    lat: 38.2527,
+    lng: -85.7585,
   }
 
   const mockItems = [
@@ -130,6 +134,12 @@ describe('Items Public Visibility', () => {
   })
 
   it('should return items for published, visible sales to anonymous users', async () => {
+    // Ensure auth.getUser is mocked (getSaleWithItems calls this)
+    mockSupabaseClient.auth.getUser.mockResolvedValue({
+      data: { user: null },
+      error: null,
+    })
+
     // Mock sale query (from sales_v2 view)
     const mockSaleSingleChain = {
       single: vi.fn().mockResolvedValue({
@@ -238,6 +248,12 @@ describe('Items Public Visibility', () => {
   })
 
   it('should NOT return items for hidden sales to anonymous users', async () => {
+    // Ensure auth.getUser is mocked (getSaleWithItems calls this)
+    mockSupabaseClient.auth.getUser.mockResolvedValue({
+      data: { user: null },
+      error: null,
+    })
+
     // Mock sale query (from sales_v2 view) - hidden sale can still be fetched
     // (page component blocks it, but getSaleWithItems can return it)
     const mockSaleSingleChain = {
@@ -339,6 +355,12 @@ describe('Items Public Visibility', () => {
   })
 
   it('should return items for published sales with active status', async () => {
+    // Ensure auth.getUser is mocked (getSaleWithItems calls this)
+    mockSupabaseClient.auth.getUser.mockResolvedValue({
+      data: { user: null },
+      error: null,
+    })
+
     const activeSale = {
       ...publishedSaleWithItems,
       id: 'sale-active',
@@ -441,6 +463,12 @@ describe('Items Public Visibility', () => {
   })
 
   it('should NOT return items for archived sales', async () => {
+    // Ensure auth.getUser is mocked (getSaleWithItems calls this)
+    mockSupabaseClient.auth.getUser.mockResolvedValue({
+      data: { user: null },
+      error: null,
+    })
+
     const archivedSale = {
       ...publishedSaleWithItems,
       id: 'sale-archived',

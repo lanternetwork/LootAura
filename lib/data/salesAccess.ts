@@ -598,7 +598,7 @@ export async function getSaleWithItems(
     
     // Use base table query result - RLS policy should now work correctly
     // after migration 114 fixes the items_public_read policy
-    let itemsData = itemsRes.data || []
+    const itemsData = itemsRes.data || []
     if (itemsRes.error) {
       // Log errors (only in debug mode)
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

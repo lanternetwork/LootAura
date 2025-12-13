@@ -166,16 +166,10 @@ describe('Items Public Visibility', () => {
     }
 
     // Mock items query (from base table via RLS DB)
-    // The chain must be thenable when order is the last method
-    // In Supabase, order() returns the chain itself, and the chain is thenable
-    const mockItemsOrderChain: any = {
-      order: vi.fn(function(this: any) { return this; }), // Return chain itself, not a promise
+    // The order method returns a promise when it's the last method in the chain
+    const mockItemsOrderChain = {
+      order: vi.fn(() => Promise.resolve({ data: mockItems, error: null })),
     }
-    // Make the chain itself thenable (for when order is the last method)
-    Object.assign(mockItemsOrderChain, {
-      then: (resolve: any) => Promise.resolve({ data: mockItems, error: null }).then(resolve),
-      catch: (reject: any) => Promise.resolve({ data: mockItems, error: null }).catch(reject),
-    })
     const mockItemsEqChain = {
       eq: vi.fn(() => mockItemsOrderChain),
     }

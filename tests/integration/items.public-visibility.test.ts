@@ -52,6 +52,15 @@ const createQueryChain = (data: any[] = [], error: any = null) => {
   })
 }
 
+// Mock next/headers to prevent cookies() errors
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(() => ({
+    get: vi.fn(),
+    set: vi.fn(),
+    getAll: vi.fn(),
+  })),
+}))
+
 // Mock schema-scoped clients
 vi.mock('@/lib/supabase/clients', () => ({
   getRlsDb: () => mockRlsDb,
@@ -135,6 +144,11 @@ describe('Items Public Visibility', () => {
   ]
 
   beforeEach(() => {
+    // Set up environment variables to prevent getRlsDb/getAdminDb from throwing
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
+    
     // Reset all mocks (clears call history and resets implementations)
     // This ensures each test starts with a clean slate
     vi.resetAllMocks()

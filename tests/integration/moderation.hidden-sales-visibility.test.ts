@@ -52,6 +52,15 @@ const createQueryChain = (data: any[] = [], error: any = null) => {
   })
 }
 
+// Mock next/headers to prevent cookies() errors
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(() => ({
+    get: vi.fn(),
+    set: vi.fn(),
+    getAll: vi.fn(),
+  })),
+}))
+
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseClient,
 }))
@@ -87,6 +96,13 @@ vi.mock('@/lib/rateLimit/limiter', () => ({
 vi.mock('@/lib/rateLimit/keys', () => ({
   deriveKey: vi.fn().mockResolvedValue('test-key'),
 }))
+
+// Set up environment variables to prevent getRlsDb/getAdminDb from throwing
+beforeAll(() => {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
+})
 
 describe('Hidden sales visibility', () => {
   const visibleSale = {

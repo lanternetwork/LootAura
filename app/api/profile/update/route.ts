@@ -64,10 +64,7 @@ async function updateProfileHandler(request: NextRequest): Promise<NextResponse>
       await assertAccountNotLocked(user.id)
     } catch (error) {
       // assertAccountNotLocked throws NextResponse if locked
-      if (error instanceof NextResponse) {
-        return error
-      }
-      // If it's not a NextResponse, rethrow
+      if (error instanceof NextResponse) return error
       throw error
     }
 

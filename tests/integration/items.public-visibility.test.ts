@@ -186,17 +186,6 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockStatsEqChain),
     }
 
-    // Mock tags query (from admin DB)
-    const mockTagsMaybeSingleChain = {
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }
-    const mockTagsEqChain = {
-      eq: vi.fn(() => mockTagsMaybeSingleChain),
-    }
-    const mockTagsSelectChain = {
-      select: vi.fn(() => mockTagsEqChain),
-    }
-
     // Set up mockSupabaseClient for sales_v2, profiles_v2, owner_stats
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
@@ -220,6 +209,7 @@ describe('Items Public Visibility', () => {
     })
 
     // Set up mockAdminDb for tags query and items check (admin check)
+    // Note: getSaleWithItems uses fromBase(admin, 'sales') which calls admin.from('sales')
     const mockAdminItemsEqChain = {
       eq: vi.fn(() => ({
         limit: vi.fn().mockResolvedValue({ data: [], error: null }),
@@ -231,13 +221,20 @@ describe('Items Public Visibility', () => {
     
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
-        return mockTagsSelectChain
+        // Mock tags query - set up inline like the working test
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            })),
+          })),
+        }
       }
       if (table === 'items') {
         // Mock admin check for items (bypasses RLS)
         return mockAdminItemsSelectChain
       }
-      return mockTagsSelectChain
+      return mockSaleSelectChain
     })
 
     // Call getSaleWithItems
@@ -316,17 +313,6 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockStatsEqChain),
     }
 
-    // Mock tags query
-    const mockTagsMaybeSingleChain = {
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }
-    const mockTagsEqChain = {
-      eq: vi.fn(() => mockTagsMaybeSingleChain),
-    }
-    const mockTagsSelectChain = {
-      select: vi.fn(() => mockTagsEqChain),
-    }
-
     // Set up mocks
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
@@ -349,6 +335,7 @@ describe('Items Public Visibility', () => {
     })
 
     // Set up mockAdminDb for tags query and items check (admin check)
+    // Note: getSaleWithItems uses fromBase(admin, 'sales') which calls admin.from('sales')
     const mockAdminItemsEqChain = {
       eq: vi.fn(() => ({
         limit: vi.fn().mockResolvedValue({ data: [], error: null }),
@@ -360,13 +347,20 @@ describe('Items Public Visibility', () => {
     
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
-        return mockTagsSelectChain
+        // Mock tags query - set up inline like the working test
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            })),
+          })),
+        }
       }
       if (table === 'items') {
         // Mock admin check for items (bypasses RLS)
         return mockAdminItemsSelectChain
       }
-      return mockTagsSelectChain
+      return mockSaleSelectChain
     })
 
     // Call getSaleWithItems
@@ -442,17 +436,6 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockStatsEqChain),
     }
 
-    // Mock tags
-    const mockTagsMaybeSingleChain = {
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }
-    const mockTagsEqChain = {
-      eq: vi.fn(() => mockTagsMaybeSingleChain),
-    }
-    const mockTagsSelectChain = {
-      select: vi.fn(() => mockTagsEqChain),
-    }
-
     // Set up mocks
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
@@ -474,11 +457,33 @@ describe('Items Public Visibility', () => {
       return mockItemsSelectChain
     })
 
+    // Set up mockAdminDb for tags query and items check (admin check)
+    // Note: getSaleWithItems uses fromBase(admin, 'sales') which calls admin.from('sales')
+    const mockAdminItemsEqChain = {
+      eq: vi.fn(() => ({
+        limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+      })),
+    }
+    const mockAdminItemsSelectChain = {
+      select: vi.fn(() => mockAdminItemsEqChain),
+    }
+    
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
-        return mockTagsSelectChain
+        // Mock tags query - set up inline like the working test
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            })),
+          })),
+        }
       }
-      return mockTagsSelectChain
+      if (table === 'items') {
+        // Mock admin check for items (bypasses RLS)
+        return mockAdminItemsSelectChain
+      }
+      return mockSaleSelectChain
     })
 
     // Call getSaleWithItems
@@ -551,17 +556,6 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockStatsEqChain),
     }
 
-    // Mock tags
-    const mockTagsMaybeSingleChain = {
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    }
-    const mockTagsEqChain = {
-      eq: vi.fn(() => mockTagsMaybeSingleChain),
-    }
-    const mockTagsSelectChain = {
-      select: vi.fn(() => mockTagsEqChain),
-    }
-
     // Set up mocks
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
@@ -584,6 +578,7 @@ describe('Items Public Visibility', () => {
     })
 
     // Set up mockAdminDb for tags query and items check (admin check)
+    // Note: getSaleWithItems uses fromBase(admin, 'sales') which calls admin.from('sales')
     const mockAdminItemsEqChain = {
       eq: vi.fn(() => ({
         limit: vi.fn().mockResolvedValue({ data: [], error: null }),
@@ -595,13 +590,20 @@ describe('Items Public Visibility', () => {
     
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
-        return mockTagsSelectChain
+        // Mock tags query - set up inline like the working test
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            })),
+          })),
+        }
       }
       if (table === 'items') {
         // Mock admin check for items (bypasses RLS)
         return mockAdminItemsSelectChain
       }
-      return mockTagsSelectChain
+      return mockSaleSelectChain
     })
 
     // Call getSaleWithItems

@@ -536,6 +536,26 @@ export async function getSaleWithItems(
       .eq('sale_id', saleId)
       .order('created_at', { ascending: false })
     
+    // TEMPORARY: Always log items query results to diagnose RLS fix
+    // TODO: Remove after confirming items visibility is fixed
+    const userContext = user ? 'auth' : 'anon'
+    const userIdShort = user?.id ? `${user.id.substring(0, 8)}...` : undefined
+    const isOwner = user && user.id === ownerId
+    console.error('[ITEMS_DIAG] Query result', {
+      saleId,
+      itemsCount: itemsRes.data?.length || 0,
+      hasError: !!itemsRes.error,
+      errorCode: itemsRes.error?.code || null,
+      errorMessage: itemsRes.error?.message || null,
+      userContext,
+      userId: userIdShort,
+      isOwner,
+      saleStatus: sale.status,
+      moderationStatus: (sale as any).moderation_status || null,
+      archivedAt: (sale as any).archived_at || null,
+      ownerId: ownerId ? `${ownerId.substring(0, 8)}...` : null,
+    })
+    
     // Log query results (PII-safe) - only in debug mode
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       const userContext = user ? 'auth' : 'anon'

@@ -166,9 +166,15 @@ describe('Items Public Visibility', () => {
     }
 
     // Mock items query (from base table via RLS DB)
-    const mockItemsOrderChain = {
+    // The chain must be thenable when order is the last method
+    const mockItemsOrderChain: any = {
       order: vi.fn(() => Promise.resolve({ data: mockItems, error: null })),
     }
+    // Make the chain itself thenable (for when order is the last method)
+    Object.assign(mockItemsOrderChain, {
+      then: (resolve: any) => Promise.resolve({ data: mockItems, error: null }).then(resolve),
+      catch: (reject: any) => Promise.resolve({ data: mockItems, error: null }).catch(reject),
+    })
     const mockItemsEqChain = {
       eq: vi.fn(() => mockItemsOrderChain),
     }

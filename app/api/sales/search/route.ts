@@ -196,7 +196,7 @@ async function searchHandler(request: NextRequest) {
     // Ensure hidden sales are filtered out (safety check)
     const results = (sales || []).filter((sale: any) => sale.moderation_status !== 'hidden_by_admin')
 
-    return ok({ sales: results, data: results })
+    return ok({ data: results })
   } catch (error: any) {
     logger.error('Sales search error', error instanceof Error ? error : new Error(String(error)), withOpId({
       component: 'sales',

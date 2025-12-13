@@ -141,6 +141,7 @@ describe('Items Public Visibility', () => {
     })
 
     // Mock sale query (from sales_v2 view)
+    // Ensure the chain properly resolves when .single() is called
     const mockSaleSingleChain = {
       single: vi.fn().mockResolvedValue({
         data: publishedSaleWithItems,
@@ -153,6 +154,9 @@ describe('Items Public Visibility', () => {
     const mockSaleSelectChain = {
       select: vi.fn(() => mockSaleEqChain),
     }
+    
+    // Ensure mockSupabaseClient.from is properly reset before setting up the mock
+    mockSupabaseClient.from.mockReset()
 
     // Mock items query (from base table via RLS DB)
     const mockItemsOrderChain = {
@@ -269,6 +273,7 @@ describe('Items Public Visibility', () => {
 
     // Mock sale query (from sales_v2 view) - hidden sale can still be fetched
     // (page component blocks it, but getSaleWithItems can return it)
+    mockSupabaseClient.from.mockReset()
     const mockSaleSingleChain = {
       single: vi.fn().mockResolvedValue({
         data: hiddenSale,
@@ -395,6 +400,7 @@ describe('Items Public Visibility', () => {
     }
 
     // Mock sale query
+    mockSupabaseClient.from.mockReset()
     const mockSaleSingleChain = {
       single: vi.fn().mockResolvedValue({
         data: activeSale,
@@ -503,6 +509,7 @@ describe('Items Public Visibility', () => {
     }
 
     // Mock sale query
+    mockSupabaseClient.from.mockReset()
     const mockSaleSingleChain = {
       single: vi.fn().mockResolvedValue({
         data: archivedSale,

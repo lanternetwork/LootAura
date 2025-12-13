@@ -87,18 +87,20 @@
 **Fix (Migration 114):**
 - Created `lootaura_v2.is_sale_publicly_visible()` SECURITY DEFINER function that encapsulates complete public visibility rules:
   - `status IN ('published', 'active')`
-  - `moderation_status = 'visible'`
+  - `moderation_status = 'visible'` (or NULL for backwards compatibility)
   - `archived_at IS NULL`
 - Updated `sales_public_read` policy to use the function for consistency
 - Updated `items_public_read` policy to use the function, eliminating the nested RLS issue
-- Removed view-based workarounds from `lib/data/salesAccess.ts`
+- Removed view-based workarounds from `lib/data/salesAccess.ts`:
+  - Removed unused `getItemsForSale()` function that used `items_v2` view
+  - `getSaleWithItems()` now uses base table directly via RLS-aware client
 - Added regression test (`tests/integration/items.public-visibility.test.ts`) that verifies:
   - Items are returned for published, visible sales to anonymous users
   - Items are NOT returned for hidden sales
   - Items are NOT returned for archived sales
   - Items are returned for active sales
 
-**Security:** The SECURITY DEFINER function has fixed `search_path` and returns only boolean values, preventing data leakage.
+**Security:** The SECURITY DEFINER function has fixed `search_path` (`pg_catalog, public, lootaura_v2`) and returns only boolean values, preventing data leakage. The function is owned by `postgres` (migration runner) and safely bypasses RLS for the visibility check.
 
 ### Debug Endpoints
 

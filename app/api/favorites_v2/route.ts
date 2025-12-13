@@ -21,13 +21,8 @@ export async function GET(_request: NextRequest) {
         { status: 401 }
       )
     }
-    try {
-      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
-      await assertAccountNotLocked(user.id)
-    } catch (error) {
-      if (error instanceof NextResponse) return error
-      throw error
-    }
+    // Note: GET requests are read-only and should NOT be blocked by account locks
+    // Only write operations (POST, PUT, DELETE) should enforce account locks
 
     // Get user's favorites from favorites_v2 table
     const { data: favorites, error } = await supabase
@@ -154,6 +149,13 @@ export async function DELETE(request: NextRequest) {
         { error: 'Authentication required' },
         { status: 401 }
       )
+    }
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      if (error instanceof NextResponse) return error
+      throw error
     }
 
     // Remove favorite from favorites_v2 table

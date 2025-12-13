@@ -320,8 +320,7 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockStatsEqChain),
     }
 
-    // Set up mocks - reset first to ensure clean state
-    mockSupabaseClient.from.mockReset()
+    // Set up mocks
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
         return mockSaleSelectChain
@@ -335,7 +334,6 @@ describe('Items Public Visibility', () => {
       return mockSaleSelectChain
     })
 
-    mockRlsDb.from.mockReset()
     mockRlsDb.from.mockImplementation((table: string) => {
       if (table === 'items') {
         return mockItemsSelectChain
@@ -354,7 +352,6 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockAdminItemsEqChain),
     }
     
-    mockAdminDb.from.mockReset()
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
         // Mock tags query - set up inline like the working test
@@ -445,8 +442,7 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockStatsEqChain),
     }
 
-    // Set up mocks - reset first to ensure clean state
-    mockSupabaseClient.from.mockReset()
+    // Set up mocks
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
         return mockSaleSelectChain
@@ -460,7 +456,6 @@ describe('Items Public Visibility', () => {
       return mockSaleSelectChain
     })
 
-    mockRlsDb.from.mockReset()
     mockRlsDb.from.mockImplementation((table: string) => {
       if (table === 'items') {
         return mockItemsSelectChain
@@ -479,7 +474,6 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockAdminItemsEqChain),
     }
     
-    mockAdminDb.from.mockReset()
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
         // Mock tags query - set up inline like the working test
@@ -567,8 +561,7 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockStatsEqChain),
     }
 
-    // Set up mocks - reset first to ensure clean state
-    mockSupabaseClient.from.mockReset()
+    // Set up mocks
     mockSupabaseClient.from.mockImplementation((table: string) => {
       if (table === 'sales_v2') {
         return mockSaleSelectChain
@@ -582,7 +575,6 @@ describe('Items Public Visibility', () => {
       return mockSaleSelectChain
     })
 
-    mockRlsDb.from.mockReset()
     mockRlsDb.from.mockImplementation((table: string) => {
       if (table === 'items') {
         return mockItemsSelectChain
@@ -601,7 +593,6 @@ describe('Items Public Visibility', () => {
       select: vi.fn(() => mockAdminItemsEqChain),
     }
     
-    mockAdminDb.from.mockReset()
     mockAdminDb.from.mockImplementation((table: string) => {
       if (table === 'sales') {
         // Mock tags query - set up inline like the working test

@@ -358,5 +358,95 @@ The smoke suite uses existing Playwright mocks and helpers:
 
 ---
 
+## CI Starter Harness for Featured Email + Promotions
+
+**Status:** ✅ Completed (2025-01-31)
+
+### Overview
+
+A minimal CI "starter harness" for the Promoted Listings + Weekly Featured Email system has been added to lock in selection/eligibility promises and safety guards before implementing the full feature set.
+
+### Coverage
+
+**Featured Selection Logic Tests (`tests/integration/featured-email/selection.test.ts`):**
+- ✅ Returns exactly 12 sales when enough candidates exist
+- ✅ Excludes recipient-owned sales
+- ✅ Excludes `hidden_by_admin` and archived sales
+- ✅ Respects next-7-days window
+- ✅ Promoted priority rules:
+  - If >=12 promoted nearby → all 12 selected are promoted
+  - If <12 promoted nearby → includes all promoted + remaining are top "high-view" organic candidates
+- ✅ Deterministic selection using seeded randomness (recipient_id + week key)
+
+**Promoted Inclusion Tracking Contract Test (`tests/integration/featured-email/inclusion-tracking.test.ts`):**
+- ✅ Does not double-count unique recipients for the same promotion
+- ✅ Increments total inclusions appropriately
+- ✅ Handles multiple promotions and different weeks correctly
+
+**Payments Disabled Safety Guard (`tests/integration/featured-email/payments-guard.test.ts`):**
+- ✅ Blocks checkout creation when `PAYMENTS_ENABLED` is not set or false
+- ✅ Allows checkout only when `PAYMENTS_ENABLED=true`
+- ✅ Ensures no Stripe calls occur when payments are disabled
+
+**Dry-Run Endpoint (`/api/admin/featured-email/dry-run`):**
+- ✅ Admin-only endpoint for synthetic E2E smoke checks
+- ✅ Returns exactly 12 sales IDs (deterministic fixture data)
+- ✅ Does NOT send email
+- ✅ Does NOT require Stripe
+- ✅ Protected by `ENABLE_DEBUG_ENDPOINTS` flag (disabled by default in production)
+
+### Test Patterns
+
+- Uses deterministic timestamps (Thursday 2025-01-16 09:00:00 UTC base)
+- Seeded randomness for stable test results (recipient_id + week key)
+- Contract tests validate interfaces before full implementation
+- Safety guards ensure no accidental charges
+
+### What It Does NOT Yet Cover
+
+**Not Yet Implemented:**
+- Actual selection algorithm implementation (tests define contract only)
+- Actual inclusion tracking database tables/logic (contract test only)
+- Actual Stripe checkout session creation (guard test only)
+- Full weekly email job processor
+- Email template for featured sales
+- Geographic proximity filtering (nearby sales)
+- View analytics aggregation for organic selection
+- Promotion payment processing
+
+**Removal/Transition Plan:**
+- The dry-run endpoint (`/api/admin/featured-email/dry-run`) is temporary and should be removed or disabled once the full featured email system is implemented and tested.
+- Contract tests will be updated to use actual implementations once they are built.
+
+### Test Execution
+
+Run the starter harness tests:
+```bash
+npm run test -- tests/integration/featured-email/
+```
+
+### Synthetic E2E Smoke Check
+
+The dry-run endpoint can be used in CI synthetic E2E checks:
+```bash
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "https://your-domain.com/api/admin/featured-email/dry-run?recipientId=test-recipient-1"
+```
+
+Expected response:
+```json
+{
+  "ok": true,
+  "recipientId": "test-recipient-1",
+  "selectedSales": [
+    { "id": "test-sale-1", "isPromoted": true },
+    ...
+  ],
+  "count": 12
+}
+```
+
+---
+
 **Note**: This plan is a living document and should be updated as the project evolves.
 

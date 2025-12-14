@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
-import { fromBase } from '@/lib/supabase/fromBase'
+import { fromBase } from '@/lib/supabase/clients'
 
 // Mock next/headers
 vi.mock('next/headers', () => ({

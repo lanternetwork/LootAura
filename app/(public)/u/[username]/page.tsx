@@ -89,7 +89,7 @@ async function fetchProfileData(slug: string) {
       .maybeSingle()
   }
   
-  let profile = prof.data as any
+  const profile = prof.data as any
   // No fallback to base table - profiles_v2 view is the only source for public profile data
   // This ensures anon users cannot access sensitive fields (lock fields, email prefs) from base table
   if (!profile) return null

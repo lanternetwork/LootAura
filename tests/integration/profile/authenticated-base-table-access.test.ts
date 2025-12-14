@@ -147,12 +147,29 @@ describe('Authenticated Profile Flows - Base Table Access', () => {
         single: vi.fn().mockResolvedValue({ data: null, error: null }),
       })
 
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: {
+          id: 'user-123',
+          username: 'testuser',
+          display_name: 'Updated Name',
+          avatar_url: 'https://example.com/avatar.jpg',
+          bio: 'Updated bio',
+          location_city: 'Updated City',
+          location_region: 'Updated Region',
+          created_at: '2024-01-01T00:00:00Z',
+          verified: true,
+          social_links: null,
+        },
+        error: null,
+      })
+
       mockUpdate.mockReturnValue({
         eq: mockEq,
       })
       mockEq.mockReturnValue({
-        select: mockSelect,
-        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        select: vi.fn().mockReturnValue({
+          single: mockSingle,
+        }),
       })
 
       // Simulate profile update
@@ -188,12 +205,21 @@ describe('Authenticated Profile Flows - Base Table Access', () => {
         single: vi.fn().mockResolvedValue({ data: null, error: null }),
       })
 
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: {
+          email_favorites_digest_enabled: true,
+          email_seller_weekly_enabled: false,
+        },
+        error: null,
+      })
+
       mockUpdate.mockReturnValue({
         eq: mockEq,
       })
       mockEq.mockReturnValue({
-        select: mockSelect,
-        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        select: vi.fn().mockReturnValue({
+          single: mockSingle,
+        }),
       })
 
       // Simulate notification preferences update

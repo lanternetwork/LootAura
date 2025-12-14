@@ -5,7 +5,8 @@
  * Does NOT send email. Does NOT require Stripe.
  * 
  * Protected by:
- * - Admin authentication (assertAdminOrThrow)
+ * - Admin authentication (assertAdminOrThrow) OR
+ * - CI secret header (X-LootAura-DryRun-Secret) when ENABLE_DEBUG_ENDPOINTS=true
  * - ENABLE_DEBUG_ENDPOINTS flag (disabled by default in production)
  * 
  * NOTE: This is a temporary debug endpoint for CI synthetic E2E tests.
@@ -26,6 +27,10 @@ export const dynamic = 'force-dynamic'
  * 
  * Query params:
  * - recipientId (optional): Test recipient ID (defaults to 'test-recipient-1')
+ * 
+ * Access methods:
+ * - Admin auth: Requires admin authentication (for Owner manual testing)
+ * - CI secret header: X-LootAura-DryRun-Secret (for CI synthetic E2E tests)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -40,12 +45,43 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Require admin access
-    try {
-      await assertAdminOrThrow(request)
-    } catch {
+    // Check for CI secret header access path
+    const ciSecret = process.env.FEATURED_EMAIL_DRYRUN_SECRET
+    const providedSecret = request.headers.get('X-LootAura-DryRun-Secret')
+
+    let isAuthorized = false
+
+    // Path 1: CI secret header (only when ENABLE_DEBUG_ENDPOINTS=true and secret is configured)
+    if (debugEnabled && ciSecret && providedSecret) {
+      // Use constant-time comparison to prevent timing attacks
+      // Always compare full length to prevent length-based timing leaks
+      const maxLength = Math.max(ciSecret.length, providedSecret.length)
+      let match = true
+      for (let i = 0; i < maxLength; i++) {
+        const secretChar = i < ciSecret.length ? ciSecret[i] : ''
+        const providedChar = i < providedSecret.length ? providedSecret[i] : ''
+        if (secretChar !== providedChar) {
+          match = false
+        }
+      }
+      if (match && ciSecret.length === providedSecret.length) {
+        isAuthorized = true
+      }
+    }
+
+    // Path 2: Admin authentication (for Owner manual testing)
+    if (!isAuthorized) {
+      try {
+        await assertAdminOrThrow(request)
+        isAuthorized = true
+      } catch {
+        // Admin auth failed, continue to check if CI secret was provided
+      }
+    }
+
+    if (!isAuthorized) {
       return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
+        { error: 'Forbidden: Admin access or valid CI secret required' },
         { status: 403 }
       )
     }
@@ -72,22 +108,22 @@ export async function GET(request: NextRequest) {
       return sale
     })
 
-    // Return exactly 12 sales IDs
+    // Return exactly 12 sales IDs (no PII - only sale IDs and promotion status)
     return NextResponse.json({
       ok: true,
-      recipientId,
+      count: sales.length,
       selectedSales: sales.map((s) => ({
         id: s.id,
         isPromoted: s.is_featured,
       })),
-      count: sales.length,
-      message: 'Dry-run selection completed (fixture data)',
+      source: 'fixture',
     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
+    // Log error without exposing secrets or headers
     console.error('[FEATURED_EMAIL_DRY_RUN] Error:', { error: errorMessage })
     return NextResponse.json(
-      { error: 'Internal server error', details: errorMessage },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

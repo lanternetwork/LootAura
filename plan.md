@@ -427,24 +427,52 @@ npm run test -- tests/integration/featured-email/
 
 ### Synthetic E2E Smoke Check
 
-The dry-run endpoint can be used in CI synthetic E2E checks:
-```bash
-curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-  "https://your-domain.com/api/admin/featured-email/dry-run?recipientId=test-recipient-1"
-```
+The dry-run endpoint is integrated into the synthetic E2E workflow (`.github/workflows/synthetic-e2e.yml`).
 
-Expected response:
+**Access Methods:**
+1. **CI Secret Header** (for automated tests):
+   - Requires `ENABLE_DEBUG_ENDPOINTS=true` and `FEATURED_EMAIL_DRYRUN_SECRET` env var
+   - Request must include header: `X-LootAura-DryRun-Secret: <secret>`
+   - Does NOT require admin authentication
+   - Returns fixture data (no real DB queries)
+
+2. **Admin Authentication** (for Owner manual testing):
+   - Requires admin authentication via `assertAdminOrThrow`
+   - Works when `ENABLE_DEBUG_ENDPOINTS=true` OR in non-production environments
+   - Returns fixture data (no real DB queries)
+
+**CI Integration:**
+- The synthetic E2E workflow sets `ENABLE_DEBUG_ENDPOINTS=true` and `FEATURED_EMAIL_DRYRUN_SECRET` from GitHub Actions secrets
+- The workflow validates:
+  - HTTP 200 response
+  - `ok: true`
+  - `count === 12`
+  - `selectedSales.length === 12`
+
+**Expected Response:**
 ```json
 {
   "ok": true,
-  "recipientId": "test-recipient-1",
+  "count": 12,
   "selectedSales": [
     { "id": "test-sale-1", "isPromoted": true },
     ...
   ],
-  "count": 12
+  "source": "fixture"
 }
 ```
+
+**Security:**
+- Endpoint is disabled in production unless `ENABLE_DEBUG_ENDPOINTS=true`
+- CI secret header uses constant-time comparison to prevent timing attacks
+- No PII is returned (only sale IDs and promotion status)
+- Secrets are never logged or exposed in error messages
+
+**Removal Checklist (once full system is implemented):**
+- [ ] Remove `/api/admin/featured-email/dry-run` route
+- [ ] Remove `FEATURED_EMAIL_DRYRUN_SECRET` from GitHub Actions secrets
+- [ ] Remove dry-run step from `synthetic-e2e.yml` or point to real job validation endpoint
+- [ ] Remove `ENABLE_DEBUG_ENDPOINTS` requirement for this endpoint (if still needed for other debug endpoints)
 
 ---
 

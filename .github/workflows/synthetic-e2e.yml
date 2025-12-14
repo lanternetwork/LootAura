@@ -32,6 +32,16 @@ jobs:
           
       - name: Install dependencies
         run: npm install
+      
+      - name: Assert featured-email dry-run secret present
+        run: |
+          if [ -z "${{ secrets.FEATURED_EMAIL_DRYRUN_SECRET }}" ]; then
+            echo "❌ FEATURED_EMAIL_DRYRUN_SECRET is required but not configured in GitHub Actions secrets"
+            echo "Please add FEATURED_EMAIL_DRYRUN_SECRET to the repository secrets."
+            echo "Generate a long random string (e.g., using: openssl rand -hex 32)"
+            exit 1
+          fi
+          echo "✅ FEATURED_EMAIL_DRYRUN_SECRET is configured"
         
       - name: Build application
         run: npm run build
@@ -167,40 +177,36 @@ jobs:
           # Test 5: Featured email dry-run (expects 12)
           echo "Testing featured email dry-run endpoint..."
           DRYRUN_SECRET="${{ secrets.FEATURED_EMAIL_DRYRUN_SECRET }}"
-          if [ -z "$DRYRUN_SECRET" ]; then
-            echo "⚠️ FEATURED_EMAIL_DRYRUN_SECRET not set - skipping dry-run test"
-          else
-            DRYRUN_RESPONSE=$(curl -s -w "\n%{http_code}" \
-              -H "X-LootAura-DryRun-Secret: $DRYRUN_SECRET" \
-              "http://localhost:3000/api/admin/featured-email/dry-run?recipientId=synthetic-recipient")
-            
-            DRYRUN_HTTP_CODE=$(echo "$DRYRUN_RESPONSE" | tail -n1)
-            DRYRUN_BODY=$(echo "$DRYRUN_RESPONSE" | sed '$d')
-            
-            if [ "$DRYRUN_HTTP_CODE" != "200" ]; then
-              echo "❌ Featured email dry-run failed (HTTP $DRYRUN_HTTP_CODE)"
-              echo "Response: $DRYRUN_BODY"
-              exit 1
-            fi
-            
-            DRYRUN_OK=$(echo "$DRYRUN_BODY" | jq -r '.ok' 2>/dev/null)
-            DRYRUN_COUNT=$(echo "$DRYRUN_BODY" | jq -r '.count' 2>/dev/null)
-            DRYRUN_SALES_COUNT=$(echo "$DRYRUN_BODY" | jq -r '.selectedSales | length' 2>/dev/null)
-            
-            if [ "$DRYRUN_OK" != "true" ]; then
-              echo "❌ Featured email dry-run returned ok=false"
-              echo "Response: $DRYRUN_BODY"
-              exit 1
-            fi
-            
-            if [ "$DRYRUN_COUNT" != "12" ] || [ "$DRYRUN_SALES_COUNT" != "12" ]; then
-              echo "❌ Featured email dry-run returned incorrect count (expected 12, got count=$DRYRUN_COUNT, selectedSales.length=$DRYRUN_SALES_COUNT)"
-              echo "Response: $DRYRUN_BODY"
-              exit 1
-            fi
-            
-            echo "✅ Featured email dry-run passed (count: $DRYRUN_COUNT)"
+          DRYRUN_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -H "X-LootAura-DryRun-Secret: $DRYRUN_SECRET" \
+            "http://localhost:3000/api/admin/featured-email/dry-run?recipientId=synthetic-recipient")
+          
+          DRYRUN_HTTP_CODE=$(echo "$DRYRUN_RESPONSE" | tail -n1)
+          DRYRUN_BODY=$(echo "$DRYRUN_RESPONSE" | sed '$d')
+          
+          if [ "$DRYRUN_HTTP_CODE" != "200" ]; then
+            echo "❌ Featured email dry-run failed (HTTP $DRYRUN_HTTP_CODE)"
+            echo "Response: $DRYRUN_BODY"
+            exit 1
           fi
+          
+          DRYRUN_OK=$(echo "$DRYRUN_BODY" | jq -r '.ok' 2>/dev/null)
+          DRYRUN_COUNT=$(echo "$DRYRUN_BODY" | jq -r '.count' 2>/dev/null)
+          DRYRUN_SALES_COUNT=$(echo "$DRYRUN_BODY" | jq -r '.selectedSales | length' 2>/dev/null)
+          
+          if [ "$DRYRUN_OK" != "true" ]; then
+            echo "❌ Featured email dry-run returned ok=false"
+            echo "Response: $DRYRUN_BODY"
+            exit 1
+          fi
+          
+          if [ "$DRYRUN_COUNT" != "12" ] || [ "$DRYRUN_SALES_COUNT" != "12" ]; then
+            echo "❌ Featured email dry-run returned incorrect count (expected 12, got count=$DRYRUN_COUNT, selectedSales.length=$DRYRUN_SALES_COUNT)"
+            echo "Response: $DRYRUN_BODY"
+            exit 1
+          fi
+          
+          echo "✅ Featured email dry-run passed (count: $DRYRUN_COUNT)"
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key' }}
@@ -231,10 +237,6 @@ jobs:
           echo "✅ Share creation: PASSED" >> $GITHUB_STEP_SUMMARY
           echo "✅ Shortlink resolution: PASSED" >> $GITHUB_STEP_SUMMARY
           echo "✅ RLS verification: PASSED" >> $GITHUB_STEP_SUMMARY
-          if [ -n "${{ secrets.FEATURED_EMAIL_DRYRUN_SECRET }}" ]; then
-            echo "✅ Featured email dry-run: PASSED" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ Featured email dry-run: SKIPPED (secret not configured)" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "✅ Featured email dry-run: PASSED" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "All synthetic tests completed successfully." >> $GITHUB_STEP_SUMMARY

@@ -443,6 +443,12 @@ The dry-run endpoint is integrated into the synthetic E2E workflow (`.github/wor
 
 **CI Integration:**
 - The synthetic E2E workflow sets `ENABLE_DEBUG_ENDPOINTS=true` and `FEATURED_EMAIL_DRYRUN_SECRET` from GitHub Actions secrets
+- **Required GitHub Actions Secret:** `FEATURED_EMAIL_DRYRUN_SECRET`
+  - Must be configured in repository secrets for synthetic-e2e workflow to pass
+  - Generate using: `openssl rand -hex 32` (or similar secure random string generator)
+  - Must match what the endpoint expects in CI (used in `X-LootAura-DryRun-Secret` header)
+  - **CI-only secret** - should not be reused elsewhere or exposed
+  - If missing, the synthetic-e2e workflow will fail with a clear error message
 - The workflow validates:
   - HTTP 200 response
   - `ok: true`

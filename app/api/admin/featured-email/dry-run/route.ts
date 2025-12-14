@@ -108,14 +108,11 @@ export async function GET(request: NextRequest) {
       return sale
     })
 
-    // Return exactly 12 sales IDs (no PII - only sale IDs and promotion status)
+    // Return exactly 12 sales IDs (no PII - IDs only)
     return NextResponse.json({
       ok: true,
       count: sales.length,
-      selectedSales: sales.map((s) => ({
-        id: s.id,
-        isPromoted: s.is_featured,
-      })),
+      selectedSales: sales.map((s) => s.id),
       source: 'fixture',
     })
   } catch (error) {

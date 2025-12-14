@@ -453,7 +453,8 @@ The dry-run endpoint is integrated into the synthetic E2E workflow (`.github/wor
   - HTTP 200 response
   - `ok: true`
   - `count === 12`
-  - `selectedSales.length === 12`
+  - `selectedSales` is an array of length 12
+  - All elements in `selectedSales` are non-empty strings (IDs only)
 
 **Expected Response:**
 ```json
@@ -461,12 +462,17 @@ The dry-run endpoint is integrated into the synthetic E2E workflow (`.github/wor
   "ok": true,
   "count": 12,
   "selectedSales": [
-    { "id": "test-sale-1", "isPromoted": true },
+    "test-sale-1",
+    "test-sale-2",
     ...
   ],
   "source": "fixture"
 }
 ```
+
+**Response Shape:**
+- `selectedSales`: Array of sale IDs (strings only, no objects, no PII)
+- No promotion status, titles, owner IDs, or location data
 
 **Security:**
 - Endpoint is disabled in production unless `ENABLE_DEBUG_ENDPOINTS=true`

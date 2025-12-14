@@ -193,6 +193,7 @@ jobs:
           DRYRUN_OK=$(echo "$DRYRUN_BODY" | jq -r '.ok' 2>/dev/null)
           DRYRUN_COUNT=$(echo "$DRYRUN_BODY" | jq -r '.count' 2>/dev/null)
           DRYRUN_SALES_COUNT=$(echo "$DRYRUN_BODY" | jq -r '.selectedSales | length' 2>/dev/null)
+          DRYRUN_IS_ARRAY=$(echo "$DRYRUN_BODY" | jq -r '.selectedSales | type' 2>/dev/null)
           
           if [ "$DRYRUN_OK" != "true" ]; then
             echo "❌ Featured email dry-run returned ok=false"
@@ -200,9 +201,20 @@ jobs:
             exit 1
           fi
           
+          if [ "$DRYRUN_IS_ARRAY" != "array" ]; then
+            echo "❌ Featured email dry-run returned selectedSales that is not an array (type: $DRYRUN_IS_ARRAY)"
+            exit 1
+          fi
+          
           if [ "$DRYRUN_COUNT" != "12" ] || [ "$DRYRUN_SALES_COUNT" != "12" ]; then
             echo "❌ Featured email dry-run returned incorrect count (expected 12, got count=$DRYRUN_COUNT, selectedSales.length=$DRYRUN_SALES_COUNT)"
-            echo "Response: $DRYRUN_BODY"
+            exit 1
+          fi
+          
+          # Verify all elements are non-empty strings
+          DRYRUN_INVALID_IDS=$(echo "$DRYRUN_BODY" | jq -r '.selectedSales[] | select(type != "string" or length == 0)' 2>/dev/null | wc -l)
+          if [ "$DRYRUN_INVALID_IDS" != "0" ]; then
+            echo "❌ Featured email dry-run returned invalid IDs (non-string or empty elements found)"
             exit 1
           fi
           

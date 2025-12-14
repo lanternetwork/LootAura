@@ -23,6 +23,11 @@ export async function GET(req: Request) {
   
   // For archived sales, filter by 1-year retention (archived_at >= now() - 1 year)
   // OR if archived_at is NULL, use date_end >= now() - 1 year as fallback
+  const oneYearAgo = new Date()
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+  // Use ISO timestamp for consistent server/client comparison (not just date string)
+  const oneYearAgoISO = oneYearAgo.toISOString()
+  
   let query = supabase
     .from('sales_v2')
     .select('id, title, cover_url, address, status, owner_id, archived_at, date_end', { count: 'exact' })
@@ -31,23 +36,14 @@ export async function GET(req: Request) {
   
   // Apply 1-year retention filter for archived sales
   if (dbStatus === 'archived') {
-    const oneYearAgo = new Date()
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
-    const oneYearAgoISO = oneYearAgo.toISOString()
-    
-    // Filter: (archived_at >= oneYearAgo OR archived_at IS NULL) AND (date_end >= oneYearAgo OR date_end IS NULL)
-    // Using OR conditions in PostgREST requires a more complex approach
-    // We'll filter in two steps: first by archived_at, then by date_end as fallback
-    query = query.or(`archived_at.gte.${oneYearAgoISO},archived_at.is.null`)
-    
-    // Note: PostgREST doesn't support complex OR with AND easily, so we'll also filter by date_end
-    // The actual filtering will be done after fetching, or we can use a more specific query
-    // For now, we'll fetch and filter client-side, but ideally this should be in SQL
+    // Use OR to match either archived_at or date_end within 1 year
+    // Use ISO timestamp to match client-side filtering logic
+    query = query.or(`archived_at.gte.${oneYearAgoISO},date_end.gte.${oneYearAgoISO}`)
   }
   
   query = query.order('created_at', { ascending: false }).range(from, to)
   
-  const { data, error } = await query
+  const { data, error, count } = await query
   
   if (error) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -95,11 +91,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, code: 'FETCH_ERROR', error: 'Failed to fetch listings' }, { status: 500 })
   }
   
-  // Apply 1-year retention filter for archived sales
+  // For archived sales, the 1-year filter is already applied server-side
+  // But we still need to filter client-side for edge cases (null values, etc.)
   let filteredData = data || []
   if (dbStatus === 'archived') {
-    const oneYearAgo = new Date()
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
     filteredData = filteredData.filter((item: any) => {
       // Keep if archived_at is within 1 year, or if archived_at is null but date_end is within 1 year
       if (item.archived_at) {
@@ -113,10 +108,14 @@ export async function GET(req: Request) {
     })
   }
   
+  // Use count from query if available, otherwise use filtered length
+  // For archived, the count might be approximate due to client-side filtering
+  const totalCount = count !== null ? count : filteredData.length
+  
   return NextResponse.json({
     items: filteredData,
-    total: filteredData.length,
+    total: totalCount,
     page,
-    hasMore: to + 1 < filteredData.length,
+    hasMore: to + 1 < totalCount,
   })
 }

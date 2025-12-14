@@ -24,6 +24,9 @@ import OSMAttributionDiagnostics from '@/components/admin/OSMAttributionDiagnost
 import ItemImagesDiagnostics from '@/components/admin/ItemImagesDiagnostics'
 import JobControls from '@/components/admin/JobControls'
 import EmailDiagnostics from '@/components/admin/EmailDiagnostics'
+import AdminUsersPanel from '@/components/admin/tools/AdminUsersPanel'
+import AdminReportsPanel from '@/components/admin/tools/AdminReportsPanel'
+import ArchiveControlPanel from '@/components/admin/tools/ArchiveControlPanel'
 import { useState, useRef } from 'react'
 
 export default function AdminToolsPageClient() {
@@ -41,6 +44,21 @@ export default function AdminToolsPageClient() {
         </div>
         
         <div className="space-y-8">
+          {/* Archive System Control */}
+          <ArchiveControlPanel />
+
+          {/* Moderation Tools */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Moderation Tools</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Manage user accounts, review sale reports, and moderate content.
+              </p>
+            </div>
+            <AdminUsersPanel />
+            <AdminReportsPanel />
+          </div>
+
           {/* Debug Controls */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold mb-4">Debug Controls</h3>

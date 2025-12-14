@@ -54,6 +54,8 @@ export type Profile = {
   avatar_url?: string
   bio?: string
   created_at?: string
+  is_locked?: boolean
+  lock_reason?: string | null
 }
 
 export type Favorite = {

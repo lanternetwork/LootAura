@@ -1,5 +1,5 @@
 // NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
@@ -10,7 +10,7 @@ import * as Sentry from '@sentry/nextjs'
 
 export const dynamic = 'force-dynamic'
 
-async function updateProfileHandler(request: NextRequest) {
+async function updateProfileHandler(request: NextRequest): Promise<NextResponse> {
   // CSRF protection check
   // Note: Do not log CSRF tokens or cookies (PII/security sensitive)
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -56,6 +56,16 @@ async function updateProfileHandler(request: NextRequest) {
 
     if (authError || !user) {
       return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+    }
+
+    // Check if account is locked
+    try {
+      const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+      await assertAccountNotLocked(user.id)
+    } catch (error) {
+      // assertAccountNotLocked throws NextResponse if locked
+      if (error instanceof NextResponse) return error
+      throw error
     }
 
     let body: any

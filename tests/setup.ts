@@ -259,6 +259,16 @@ const ALLOWED_PATTERNS = [
   
   // Unsubscribe endpoint error logging (app/email/unsubscribe/route.ts)
   /^\[UNSUBSCRIBE\]/, // Expected error logging in unsubscribe endpoint tests - tests/integration/email/unsubscribe.test.ts
+  
+  // Debug logging when NEXT_PUBLIC_DEBUG is enabled (app/sales/[id]/SaleDetailClient.tsx, lib/data/salesAccess.ts)
+  /^\[SALE_DETAIL_CLIENT\]/, // Debug logging from SaleDetailClient when debug mode is enabled - tests/unit/a11y.smoke.test.tsx
+  /^\[ITEMS_DEBUG\]/, // Debug logging from salesAccess when debug mode is enabled - tests/integration/moderation.hidden-sales-visibility.test.ts
+  /^\[ITEMS_QUERY\]/, // Debug logging from salesAccess items query (always-on for diagnosis) - tests/unit/a11y.smoke.test.tsx, tests/integration/*
+  /^\[ItemImage\]/, // Debug logging from ItemImage component when debug mode is enabled - tests/unit/a11y.smoke.test.tsx
+  
+  // CSRF client logging (lib/api/csrfClient.ts)
+  /^\[CSRF_CLIENT\]/, // CSRF client logging - tests/integration/sale.share-button.render.test.tsx, tests/integration/sale.details.*.test.tsx
+  /^\[ITEMS_DIAG\]/, // Items diagnostic logging - lib/data/salesAccess.ts getSaleWithItems
 ]
 
 const isAllowedMessage = (message: string): boolean => {

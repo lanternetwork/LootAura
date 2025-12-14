@@ -8,6 +8,7 @@ export type EmailType =
   | 'weekly_sales_digest'
   | 'seller_weekly_analytics'
   | 'admin_alert'
+  | 'moderation_daily_digest'
 
 export interface EmailSendOptions {
   to: string

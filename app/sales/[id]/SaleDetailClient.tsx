@@ -21,6 +21,7 @@ import { trackSaleViewed, trackFavoriteToggled } from '@/lib/analytics/clarityEv
 import { SaleDetailBannerAd } from '@/components/ads/AdSlots'
 import { toast } from 'react-toastify'
 import { trackAnalyticsEvent } from '@/lib/analytics-client'
+import ReportSaleModal from '@/components/moderation/ReportSaleModal'
 
 // Item image component with error handling
 function ItemImage({ src, alt, className, sizes }: { src: string; alt: string; className?: string; sizes?: string }) {
@@ -124,6 +125,36 @@ interface SaleDetailClientProps {
 }
 
 export default function SaleDetailClient({ sale, displayCategories = [], items = [], nearbySales = [], currentUserRating }: SaleDetailClientProps) {
+  // Debug logging to diagnose items visibility issue (only in debug mode)
+  if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+    console.log('[SALE_DETAIL_CLIENT] Items received', {
+      itemsCount: items.length,
+      items: items.map(i => ({ id: i.id, name: i.name, hasPhoto: !!i.photo })),
+      saleId: sale.id,
+      saleStatus: sale.status,
+    })
+    
+    // Also log the raw items array to see if it's actually empty
+    console.log('[SALE_DETAIL_CLIENT] Raw items array:', items)
+    console.log('[SALE_DETAIL_CLIENT] Items length:', items.length)
+    console.log('[SALE_DETAIL_CLIENT] Items.length === 0?', items.length === 0)
+    
+    // Log each item individually
+    if (items.length > 0) {
+      console.log('[SALE_DETAIL_CLIENT] Items found:', items.length)
+      items.forEach((item, index) => {
+        console.log(`[SALE_DETAIL_CLIENT] Item ${index}:`, {
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          photo: item.photo,
+          hasPhoto: !!item.photo,
+        })
+      })
+    } else {
+      console.warn('[SALE_DETAIL_CLIENT] ⚠️ NO ITEMS RECEIVED - items array is empty!')
+    }
+  }
   const searchParams = useSearchParams()
   const isArchived = sale.status === 'archived'
   
@@ -142,6 +173,7 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   const { data: favoriteSales = [] } = useFavorites()
   const toggleFavorite = useToggleFavorite()
   const [showFullDescription, setShowFullDescription] = useState(false)
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const cover = getSaleCoverUrl(sale)
   const viewTrackedRef = useRef(false)
   const isOptimisticRef = useRef(false)
@@ -526,6 +558,18 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
             <NearbySalesCard nearbySales={nearbySales} />
           </div>
         )}
+
+        {/* Report Sale Link - Mobile */}
+        {currentUser && currentUser.id !== sale.owner_id && (
+          <div className="w-full pt-4 border-t border-gray-200">
+            <button
+              onClick={() => setIsReportModalOpen(true)}
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Report this sale
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Desktop Layout */}
@@ -603,6 +647,18 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
                 </div>
               )}
             </div>
+            
+            {/* Report Sale Link - Desktop */}
+            {currentUser && currentUser.id !== sale.owner_id && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Report this sale
+                </button>
+              </div>
+            )}
             </div>
 
             {/* Sale Details */}
@@ -903,6 +959,15 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
           </div>
         </div>
       </div>
+
+      {/* Report Sale Modal */}
+      {currentUser && currentUser.id !== sale.owner_id && (
+        <ReportSaleModal
+          saleId={sale.id}
+          open={isReportModalOpen}
+          onOpenChange={setIsReportModalOpen}
+        />
+      )}
     </div>
   )
 }

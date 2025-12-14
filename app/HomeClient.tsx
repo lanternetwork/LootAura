@@ -26,7 +26,9 @@ export default function HomeClient({ initialSales, user: _user }: HomeClientProp
       const results = await searchWithLocation(async ({ lat, lng, distanceKm }) => {
         const response = await fetch(`/api/sales/search?lat=${lat}&lng=${lng}&distance=${distanceKm}&limit=12`)
         if (!response.ok) throw new Error('Search failed')
-        return response.json()
+        const data = await response.json()
+        // Extract data array from response object { ok: true, data: [...] }
+        return data.ok && Array.isArray(data.data) ? data.data : []
       })
       
       setSales(results)

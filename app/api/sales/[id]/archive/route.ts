@@ -14,6 +14,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const supabase = createSupabaseServerClient()
   const { data: user } = await supabase.auth.getUser()
   if (!user?.user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  try {
+    const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+    await assertAccountNotLocked(user.user.id)
+  } catch (error) {
+    if (error instanceof NextResponse) return error
+    throw error
+  }
   
   const saleId = params.id
   const body = await req.json().catch(() => ({}))

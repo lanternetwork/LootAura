@@ -48,7 +48,7 @@ export function useProfile() {
       // Use profiles_v2 view instead of direct profiles table to avoid RLS/schema issues
       const { data, error } = await sb
         .from('profiles_v2')
-        .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences')
+        .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, home_zip, preferences, is_locked, lock_reason')
         .eq('id', user.id)
         .maybeSingle()
 

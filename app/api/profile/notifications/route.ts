@@ -1,5 +1,5 @@
 // NOTE: Writes → lootaura_v2.* only. Reads from views allowed. Do not write to views.
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { ok, fail } from '@/lib/http/json'
@@ -19,6 +19,8 @@ export async function GET() {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+  // Note: GET requests are read-only and should NOT be blocked by account locks
+  // Only write operations (POST, PUT, DELETE) should enforce account locks
 
   try {
     // Read from profiles_v2 view
@@ -64,6 +66,13 @@ export async function PUT(request: NextRequest) {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+  try {
+    const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+    await assertAccountNotLocked(user.id)
+  } catch (error) {
+    if (error instanceof NextResponse) return error
+    throw error
+  }
 
   try {
     let body: any

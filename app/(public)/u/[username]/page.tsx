@@ -89,28 +89,9 @@ async function fetchProfileData(slug: string) {
       .maybeSingle()
   }
   
-  let profile = prof.data as any
-  if (!profile) {
-    // Fallback to base table if view has not materialized yet
-    const byTable = await supabase
-      .from('profiles')
-      .select('id, created_at')
-      .eq(isUUID ? 'id' : 'username', slug)
-      .maybeSingle()
-    if (byTable.data) {
-      profile = {
-        id: byTable.data.id,
-        username: isUUID ? null : slug,
-        display_name: null,
-        avatar_url: null,
-        bio: null,
-        location_city: null,
-        location_region: null,
-        created_at: byTable.data.created_at ?? null,
-        verified: false,
-      }
-    }
-  }
+  const profile = prof.data as any
+  // No fallback to base table - profiles_v2 view is the only source for public profile data
+  // This ensures anon users cannot access sensitive fields (lock fields, email prefs) from base table
   if (!profile) return null
   
   const [preferred, ownerStatsResult] = await Promise.all([

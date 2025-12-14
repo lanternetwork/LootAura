@@ -450,17 +450,27 @@ export default function AddressAutocomplete({
   const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
   const isInitialMountRef = useRef<boolean>(true)
   // Capture initial value synchronously on first render (before debounce triggers)
-  const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value : undefined)
+  const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value.trim() : undefined)
   const hasUserInteractedRef = useRef<boolean>(false)
   const hasSuppressedInitialSearchRef = useRef<boolean>(false)
 
   // Update initial value ref if value changes before user interaction (for programmatic updates)
+  // Also ensure we capture the trimmed value for consistent comparison
   useEffect(() => {
     if (isInitialMountRef.current && !hasUserInteractedRef.current && value && value.trim().length > 0) {
+      const trimmedValue = value.trim()
       if (initialValueRef.current === undefined) {
-        initialValueRef.current = value
+        initialValueRef.current = trimmedValue
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[AddressAutocomplete] Captured initial value (late):', value)
+          console.log('[AddressAutocomplete] Captured initial value (late):', trimmedValue)
+        }
+      } else if (initialValueRef.current !== trimmedValue) {
+        // If the value changed programmatically (e.g., from props), update the initial value
+        // This handles cases where the component receives a new initial value
+        initialValueRef.current = trimmedValue
+        hasSuppressedInitialSearchRef.current = false // Reset suppression flag
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[AddressAutocomplete] Updated initial value:', trimmedValue)
         }
       }
     }
@@ -509,14 +519,12 @@ export default function AddressAutocomplete({
     // Check both current value and debounced query to catch all cases
     // This must be the FIRST check to prevent any fetch from starting
     if (!hasUserInteractedRef.current) {
-      if (initialValueRef.current && initialValueRef.current.trim().length > 0) {
-        const initialTrimmed = initialValueRef.current.trim()
-        // Suppress if current value or debounced query matches initial value
+      if (initialValueRef.current && initialValueRef.current.length > 0) {
+        const initialTrimmed = initialValueRef.current
+        // Suppress if current value or debounced query matches initial value (all trimmed for consistency)
         const matchesInitial = 
           currentValueTrimmed === initialTrimmed || 
-          trimmedQuery === initialTrimmed ||
-          value === initialValueRef.current ||
-          (trimmedQuery && trimmedQuery === initialValueRef.current.trim())
+          trimmedQuery === initialTrimmed
         
         if (matchesInitial) {
           if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -547,8 +555,8 @@ export default function AddressAutocomplete({
     
     // If we've already suppressed and value still matches initial, don't search
     if (hasSuppressedInitialSearchRef.current && initialValueRef.current) {
-      const initialTrimmed = initialValueRef.current.trim()
-      if (currentValueTrimmed === initialTrimmed || trimmedQuery === initialTrimmed || (trimmedQuery && trimmedQuery === initialTrimmed)) {
+      const initialTrimmed = initialValueRef.current
+      if (currentValueTrimmed === initialTrimmed || trimmedQuery === initialTrimmed) {
         // Still matches initial - don't search
         // Abort any in-flight requests
         if (abortRef.current) {

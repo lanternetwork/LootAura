@@ -1,4 +1,4 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { upsertSellerRating } from '@/lib/data/ratingsAccess'
 import { Policies } from '@/lib/rateLimit/policies'
@@ -23,6 +23,13 @@ async function postHandler(req: NextRequest) {
       operation: 'auth_check',
     })
     return fail(401, 'AUTH_REQUIRED', 'Authentication required')
+  }
+  try {
+    const { assertAccountNotLocked } = await import('@/lib/auth/accountLock')
+    await assertAccountNotLocked(user.id)
+  } catch (error) {
+    if (error instanceof NextResponse) return error
+    throw error
   }
 
   // Rate limiting check (after auth so we have userId)

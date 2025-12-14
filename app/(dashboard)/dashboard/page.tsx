@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getUserSales, getUserDrafts } from '@/lib/data/salesAccess'
+import { getUserSales, getUserDrafts, getArchivedSalesCount } from '@/lib/data/salesAccess'
 import { getUserProfile, getUserMetrics7d } from '@/lib/data/profileAccess'
 import DashboardClient from './DashboardClient'
 import { createPageMetadata } from '@/lib/metadata'
@@ -30,11 +30,13 @@ export default async function DashboardPage() {
 
   // Fetch all data in parallel via SSR helpers
   // Fetch active sales by default (for Live tab)
-  const [salesResult, draftsResult, profile, metrics] = await Promise.all([
+  // Also fetch archived count for tab badge
+  const [salesResult, draftsResult, profile, metrics, archivedCount] = await Promise.all([
     getUserSales(supabase, user.id, { statusFilter: 'active', limit: 24 }),
     getUserDrafts(supabase, user.id, 12, 0),
     getUserProfile(supabase, user.id),
     getUserMetrics7d(supabase, user.id),
+    getArchivedSalesCount(supabase, user.id),
   ])
 
   const sales = salesResult.data || []
@@ -52,6 +54,7 @@ export default async function DashboardPage() {
       initialDrafts={drafts}
       initialProfile={profile}
       initialMetrics={metrics}
+      initialArchivedCount={archivedCount}
     />
   )
 }

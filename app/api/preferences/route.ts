@@ -8,6 +8,8 @@ export async function GET() {
   const sb = createSupabaseServerClient()
   const { data: { user }, error: authError } = await sb.auth.getUser()
   if (authError || !user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  // Note: GET requests are read-only and should NOT be blocked by account locks
+  // Only write operations (POST, PUT, DELETE) should enforce account locks
 
   // Try to get preferences from user_preferences table
   // If table doesn't exist or query fails, return defaults

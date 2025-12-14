@@ -69,7 +69,7 @@ describe('Authenticated Profile Flows - Base Table Access', () => {
       })
 
       // Simulate account lock check
-      const { data, error } = await fromBase(mockRlsDb, 'profiles')
+      const { data, error } = await fromBase(mockRlsDb as any, 'profiles')
         .select('is_locked')
         .eq('id', 'user-123')
         .maybeSingle()
@@ -107,7 +107,7 @@ describe('Authenticated Profile Flows - Base Table Access', () => {
       })
 
       // Simulate account lock check
-      const { data, error } = await fromBase(mockRlsDb, 'profiles')
+      const { data, error } = await fromBase(mockRlsDb as any, 'profiles')
         .select('is_locked, locked_at, locked_by, lock_reason')
         .eq('id', 'user-123')
         .maybeSingle()
@@ -173,7 +173,7 @@ describe('Authenticated Profile Flows - Base Table Access', () => {
       })
 
       // Simulate profile update
-      const { data, error } = await fromBase(mockRlsDb, 'profiles')
+      const { data, error } = await fromBase(mockRlsDb as any, 'profiles')
         .update({ display_name: 'Updated Name' })
         .eq('id', 'user-123')
         .select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified, social_links')
@@ -223,7 +223,7 @@ describe('Authenticated Profile Flows - Base Table Access', () => {
       })
 
       // Simulate notification preferences update
-      const { data, error } = await fromBase(mockRlsDb, 'profiles')
+      const { data, error } = await fromBase(mockRlsDb as any, 'profiles')
         .update({
           email_favorites_digest_enabled: true,
           email_seller_weekly_enabled: false,

@@ -19,10 +19,11 @@ export async function GET() {
       }, { status: 500 })
     }
 
-    // Test anonymous client
+    // Test anonymous client (use profiles_v2 view, not base table)
+    // Anon should not have SELECT on base lootaura_v2.profiles table
     const anonClient = createClient(supabaseUrl, anonKey)
     const { error: anonError } = await anonClient
-      .from('profiles')
+      .from('profiles_v2')
       .select('count')
       .limit(1)
 

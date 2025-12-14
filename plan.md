@@ -103,6 +103,8 @@
 
 **Security:** The SECURITY DEFINER function has fixed `search_path` (`pg_catalog, public, lootaura_v2`) and returns only boolean values, preventing data leakage. The function is owned by `postgres` (migration runner) and safely bypasses RLS for the visibility check.
 
+**Anon Profiles Access (Migration 118):** Revoked anon SELECT on `lootaura_v2.profiles` base table to reduce exposure of sensitive fields (lock fields, email prefs) to anonymous users. Public profile reads use `profiles_v2` view only (no base table fallbacks). Authenticated users retain SELECT/UPDATE permissions on base table for account lock checks and profile updates.
+
 ### Debug Endpoints
 
 **Admin-Only Debug Routes:**

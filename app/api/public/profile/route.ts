@@ -15,26 +15,8 @@ export async function GET(req: Request) {
     const byId = await supabase.from('profiles_v2').select('id, username, display_name, avatar_url, bio, location_city, location_region, created_at, verified').eq('id', username).maybeSingle()
     profile = byId.data
   }
-  if (!profile) {
-    // Fallback: check base table by id only if the slug is a UUID
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username)
-    const byTable = isUUID
-      ? await supabase.from('profiles').select('id, created_at').eq('id', username).maybeSingle()
-      : { data: null }
-    if (byTable.data) {
-      profile = {
-        id: byTable.data.id,
-        username: null,
-        display_name: null,
-        avatar_url: null,
-        bio: null,
-        location_city: null,
-        location_region: null,
-        created_at: byTable.data.created_at ?? null,
-        verified: false,
-      }
-    }
-  }
+  // No fallback to base table - profiles_v2 view is the only source for public profile data
+  // This ensures anon users cannot access sensitive fields (lock fields, email prefs) from base table
   if (!profile) return NextResponse.json({ error: 'not found' }, { status: 404 })
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') console.log('[PROFILE] get public profile', { username })
   const preferred = await deriveCategories(profile.id).catch(() => [])

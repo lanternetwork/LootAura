@@ -101,5 +101,10 @@ async function metricsHandler(request: NextRequest, { params }: { params: { id: 
   })
 }
 
-export const GET = withRateLimit(metricsHandler, [Policies.SALES_VIEW_30S])
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  return withRateLimit(
+    (req) => metricsHandler(req, { params }),
+    [Policies.SALES_VIEW_30S]
+  )(request)
+}
 

@@ -564,6 +564,12 @@ Milestone 2 builds the data foundations for the Weekly Featured Sales email syst
 - Location filtering (ZIP-based radius) is not yet implemented (fetches all candidates, filters in memory)
 - PostGIS spatial queries will be added in future optimization
 
+**Stabilization Notes:**
+- Migration 122: Fixed `profiles_v2` view to use SECURITY INVOKER (consistent with migration 112)
+- ZIP usage throttling: 24-hour minimum between increments per user per ZIP
+- Dry-run endpoint: Does NOT write inclusion tracking (maintains CI compatibility, does not affect seller reporting)
+- `is_featured` safety: Not settable by public endpoints (only test/admin endpoints set to `false`)
+
 ### ZIP Usage Tracking
 
 **Module:** `lib/data/zipUsage.ts`
@@ -589,6 +595,39 @@ Milestone 2 builds the data foundations for the Weekly Featured Sales email syst
 - Recipient-level rows are NOT readable by sellers (RLS denies all direct access)
 - Only service_role (backend jobs) can access recipient-level data
 - Sellers can only see aggregate counts (`unique_recipients_total`, `total_inclusions_total`)
+
+### Milestone 2 Security Checks
+
+**RLS Policies:**
+- ✅ `profile_zip_usage`: Self-only read/write for authenticated users; service_role full access; no anon access
+- ✅ `featured_inclusions`: Deny all direct access (service_role only); sellers cannot read recipient-level rows
+- ✅ `featured_inclusion_rollups`: Sellers can read aggregates for own sales only (via EXISTS subquery on sales.owner_id); service_role full access; no anon access
+
+**View Security:**
+- ✅ `profiles_v2` view uses SECURITY INVOKER (migration 122); RLS policies on base table apply
+- ⚠️ Email preferences (`email_featured_weekly_enabled`, etc.) are exposed in view but protected by RLS (users can only read their own preferences); consistent with existing `email_favorites_digest_enabled` pattern
+
+**Endpoint Security:**
+- ✅ No endpoint response includes ZIP codes, recipient IDs, or inclusion-tracking data
+- ✅ Dry-run endpoint returns only sale IDs (no PII)
+- ✅ ZIP usage tracking is non-blocking (failures don't break geocoding)
+
+**Cost Discipline:**
+- ✅ ZIP usage writes throttled: at most once per 24 hours per user per ZIP
+- ✅ ZIP usage tracking only for authenticated users
+- ✅ Non-blocking implementation (fire-and-forget)
+
+**Selection Engine Safety:**
+- ✅ `is_featured` is not settable by any public/seller mutation endpoints (only set to `false` in test/admin endpoints)
+- ✅ Selection engine uses `is_featured` as placeholder read flag only
+- ✅ Dry-run endpoint does NOT write inclusion tracking (dry-run does not count toward seller reporting)
+
+**Fairness & Inclusion Tracking:**
+- ✅ Selection engine consults `featured_inclusions` to de-prioritize previously-shown items
+- ✅ Inclusion tracking updates both recipient-level and rollup tables
+- ✅ Unique recipients count: increments once per sale per recipient total (across all weeks)
+- ✅ Total inclusions count: increments per send (sum of `times_shown`)
+- ✅ Selection engine uses service_role (admin client) to read inclusion data (no public exposure)
 
 ### Dry-Run Endpoint Updates
 
@@ -618,6 +657,39 @@ Milestone 2 builds the data foundations for the Weekly Featured Sales email syst
 - Milestone 3: Stripe promotions (payment processing, promotions table)
 - Milestone 4: Weekly email job (scheduled send, email template)
 - Milestone 5: Performance optimization (PostGIS queries, caching)
+
+### Milestone 2 Security Checks
+
+**RLS Policies:**
+- ✅ `profile_zip_usage`: Self-only read/write for authenticated users; service_role full access; no anon access
+- ✅ `featured_inclusions`: Deny all direct access (service_role only); sellers cannot read recipient-level rows
+- ✅ `featured_inclusion_rollups`: Sellers can read aggregates for own sales only (via EXISTS subquery on sales.owner_id); service_role full access; no anon access
+
+**View Security:**
+- ✅ `profiles_v2` view uses SECURITY INVOKER (migration 122); RLS policies on base table apply
+- ⚠️ Email preferences (`email_featured_weekly_enabled`, etc.) are exposed in view but protected by RLS (users can only read their own preferences); consistent with existing `email_favorites_digest_enabled` pattern
+
+**Endpoint Security:**
+- ✅ No endpoint response includes ZIP codes, recipient IDs, or inclusion-tracking data
+- ✅ Dry-run endpoint returns only sale IDs (no PII)
+- ✅ ZIP usage tracking is non-blocking (failures don't break geocoding)
+
+**Cost Discipline:**
+- ✅ ZIP usage writes throttled: at most once per 24 hours per user per ZIP
+- ✅ ZIP usage tracking only for authenticated users
+- ✅ Non-blocking implementation (fire-and-forget)
+
+**Selection Engine Safety:**
+- ✅ `is_featured` is not settable by any public/seller mutation endpoints (only set to `false` in test/admin endpoints)
+- ✅ Selection engine uses `is_featured` as placeholder read flag only
+- ✅ Dry-run endpoint does NOT write inclusion tracking (dry-run does not count toward seller reporting)
+
+**Fairness & Inclusion Tracking:**
+- ✅ Selection engine consults `featured_inclusions` to de-prioritize previously-shown items
+- ✅ Inclusion tracking updates both recipient-level and rollup tables
+- ✅ Unique recipients count: increments once per sale per recipient total (across all weeks)
+- ✅ Total inclusions count: increments per send (sum of `times_shown`)
+- ✅ Selection engine uses service_role (admin client) to read inclusion data (no public exposure)
 
 ### Security & Privacy
 

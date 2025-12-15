@@ -31,13 +31,13 @@ vi.mock('@/lib/supabase/clients', () => ({
   fromBase: (db: any, table: string) => mockFromBase(db, table),
 }))
 
-vi.mock('@/lib/featured-email/selection', () => ({
-  selectFeaturedSales: (...args: any[]) => mockSelectFeaturedSales(...args),
-  getWeekKey: (...args: any[]) => {
-    const { getWeekKey: realGetWeekKey } = require('@/lib/featured-email/selection')
-    return realGetWeekKey(...args)
-  },
-}))
+vi.mock('@/lib/featured-email/selection', async () => {
+  const actual = await vi.importActual('@/lib/featured-email/selection')
+  return {
+    ...actual,
+    selectFeaturedSales: (...args: any[]) => mockSelectFeaturedSales(...args),
+  }
+})
 
 vi.mock('@/lib/data/zipUsage', () => ({
   getPrimaryZip: (...args: any[]) => mockGetPrimaryZip(...args),
@@ -129,11 +129,18 @@ describe('Weekly Featured Sales Cron Job', () => {
   describe('Safety gates', () => {
     it('skips when compute-only mode with empty allowlist (no-op)', async () => {
       const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
-      const result = await processWeeklyFeaturedSalesJob({
-        sendMode: 'compute-only',
-        allowlist: [],
-      })
+      let result
+      try {
+        result = await processWeeklyFeaturedSalesJob({
+          sendMode: 'compute-only',
+          allowlist: [],
+        })
+      } catch (error) {
+        console.error('Error in test:', error)
+        throw error
+      }
 
+      expect(result).toBeDefined()
       expect(result.success).toBe(true)
       expect(result.emailsSent).toBe(0)
       expect(result.recipientsProcessed).toBe(0)

@@ -3,7 +3,6 @@
  * Server-only module for tracking and querying user ZIP code usage
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 
 /**

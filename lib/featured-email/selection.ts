@@ -11,9 +11,7 @@
  * - Deterministic seeded randomness
  */
 
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
-import { getPrimaryZip } from '@/lib/data/zipUsage'
 
 export interface FeaturedSelectionResult {
   selectedSales: string[] // Array of sale IDs
@@ -94,10 +92,10 @@ export async function selectFeaturedSales(
 ): Promise<FeaturedSelectionResult> {
   const {
     recipientProfileId,
-    primaryZip,
+    primaryZip: _primaryZip, // TODO: Use for location filtering in future
     now,
     weekKey,
-    radiusKm = 50,
+    radiusKm: _radiusKm = 50, // TODO: Use for location filtering in future
   } = params
 
   const admin = getAdminDb()
@@ -105,7 +103,7 @@ export async function selectFeaturedSales(
 
   // Step 1: Query candidate sales within next 7 days
   // Filter: published, not archived, not hidden_by_admin, within date range
-  let candidatesQuery = fromBase(admin, 'sales')
+  const candidatesQuery = fromBase(admin, 'sales')
     .select('id, owner_id, lat, lng, is_featured, date_start, date_end')
     .eq('status', 'published')
     .is('archived_at', null)
@@ -192,7 +190,7 @@ export async function selectFeaturedSales(
   const thirtyDaysAgoStr = thirtyDaysAgo.toISOString()
 
   const organicSaleIds = organicCandidates.map((s) => s.id)
-  let viewCountsMap = new Map<string, number>()
+  const viewCountsMap = new Map<string, number>()
 
   if (organicSaleIds.length > 0) {
     // Batch query view counts (limit to avoid query size issues)
@@ -229,7 +227,6 @@ export async function selectFeaturedSales(
   // Step 6: Select exactly 12 sales
   const selected: string[] = []
   let totalPromoted = 0
-  let totalOrganic = 0
 
   // If >=12 promoted, take all 12 from promoted
   if (fairnessAdjustedPromoted.length >= 12) {
@@ -243,7 +240,6 @@ export async function selectFeaturedSales(
     const remaining = 12 - selected.length
     if (remaining > 0 && shuffledOrganic.length > 0) {
       selected.push(...shuffledOrganic.slice(0, remaining).map((s) => s.id))
-      totalOrganic = Math.min(remaining, shuffledOrganic.length)
     }
   }
 

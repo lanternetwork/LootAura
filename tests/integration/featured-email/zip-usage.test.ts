@@ -19,18 +19,16 @@ vi.mock('@/lib/supabase/clients', () => ({
 
 describe('ZIP Usage Tracking', () => {
   const mockAdmin = {} as any
-  const mockFromBase = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getAdminDb).mockReturnValue(mockAdmin)
-    vi.mocked(fromBase).mockReturnValue(mockFromBase as any)
   })
 
   describe('incrementZipUsage', () => {
     it('should insert new ZIP usage for first-time use', async () => {
       // No existing row
-      mockFromBase.mockReturnValueOnce({
+      vi.mocked(fromBase).mockReturnValueOnce({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
@@ -38,17 +36,17 @@ describe('ZIP Usage Tracking', () => {
             }),
           }),
         }),
-      })
+      } as any)
 
       // Insert path
-      mockFromBase.mockReturnValueOnce({
+      vi.mocked(fromBase).mockReturnValueOnce({
         insert: vi.fn().mockResolvedValue({ error: null }),
-      })
+      } as any)
 
       const result = await incrementZipUsage('user-1', '40204')
 
       expect(result.success).toBe(true)
-      expect(mockFromBase).toHaveBeenCalled()
+      expect(fromBase).toHaveBeenCalled()
     })
 
     it('should increment use_count if last_seen_at is >= 24 hours ago', async () => {
@@ -56,7 +54,7 @@ describe('ZIP Usage Tracking', () => {
       yesterday.setUTCHours(yesterday.getUTCHours() - 25) // 25 hours ago
 
       // Existing row with old last_seen_at
-      mockFromBase.mockReturnValueOnce({
+      vi.mocked(fromBase).mockReturnValueOnce({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
@@ -71,17 +69,17 @@ describe('ZIP Usage Tracking', () => {
             }),
           }),
         }),
-      })
+      } as any)
 
       // Update path
       const mockUpdate = vi.fn().mockResolvedValue({ error: null })
-      mockFromBase.mockReturnValueOnce({
+      vi.mocked(fromBase).mockReturnValueOnce({
         update: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue(mockUpdate),
           }),
         }),
-      })
+      } as any)
 
       const result = await incrementZipUsage('user-1', '40204')
 
@@ -94,7 +92,7 @@ describe('ZIP Usage Tracking', () => {
       oneHourAgo.setUTCHours(oneHourAgo.getUTCHours() - 1)
 
       // Existing row with recent last_seen_at
-      mockFromBase.mockReturnValueOnce({
+      vi.mocked(fromBase).mockReturnValueOnce({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             eq: vi.fn().mockReturnValue({
@@ -109,13 +107,13 @@ describe('ZIP Usage Tracking', () => {
             }),
           }),
         }),
-      })
+      } as any)
 
       const result = await incrementZipUsage('user-1', '40204')
 
       expect(result.success).toBe(true)
       // Should not call update (throttled)
-      expect(mockFromBase).toHaveBeenCalledTimes(1) // Only the select
+      expect(fromBase).toHaveBeenCalledTimes(1) // Only the select
     })
 
     it('should reject invalid ZIP format', async () => {
@@ -128,7 +126,7 @@ describe('ZIP Usage Tracking', () => {
 
   describe('getPrimaryZip', () => {
     it('should return ZIP with highest use_count', async () => {
-      mockFromBase.mockReturnValueOnce({
+      vi.mocked(fromBase).mockReturnValueOnce({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             order: vi.fn().mockReturnValue({
@@ -143,7 +141,7 @@ describe('ZIP Usage Tracking', () => {
             }),
           }),
         }),
-      })
+      } as any)
 
       const zip = await getPrimaryZip('user-1')
 
@@ -151,7 +149,7 @@ describe('ZIP Usage Tracking', () => {
     })
 
     it('should return null if no ZIP usage found', async () => {
-      mockFromBase.mockReturnValueOnce({
+      vi.mocked(fromBase).mockReturnValueOnce({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             order: vi.fn().mockReturnValue({
@@ -166,7 +164,7 @@ describe('ZIP Usage Tracking', () => {
             }),
           }),
         }),
-      })
+      } as any)
 
       const zip = await getPrimaryZip('user-1')
 

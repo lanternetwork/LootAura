@@ -84,7 +84,22 @@ async function handleRequest(request: NextRequest) {
       }
     }
 
-    // Task 2: Send favorite sales starting soon emails
+    // Task 2: Expire promotions that have ended
+    try {
+      const expireResult = await expireEndedPromotions(withOpId)
+      results.tasks.expirePromotions = expireResult
+    } catch (error) {
+      logger.error('Expire promotions task failed', error instanceof Error ? error : new Error(String(error)), withOpId({
+        component: 'api/cron/daily',
+        task: 'expire-promotions',
+      }))
+      results.tasks.expirePromotions = {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
+
+    // Task 3: Send favorite sales starting soon emails
     try {
       const emailsEnabled = process.env.LOOTAURA_ENABLE_EMAILS === 'true'
       if (!emailsEnabled) {
@@ -426,6 +441,85 @@ async function sendModerationDailyDigest(
   return {
     ok: true,
     reportCount: reportItems.length,
+  }
+}
+
+async function expireEndedPromotions(
+  withOpId: (context?: any) => any
+): Promise<any> {
+  logger.info('Starting expire promotions task', withOpId({
+    component: 'api/cron/daily',
+    task: 'expire-promotions',
+  }))
+
+  const db = getAdminDb()
+  const now = new Date().toISOString()
+
+  // Find promotions that should be expired:
+  // - status is 'active'
+  // - ends_at < now
+  const { data: expiredPromotions, error: queryError } = await fromBase(db, 'promotions')
+    .select('id, sale_id, ends_at')
+    .eq('status', 'active')
+    .lt('ends_at', now)
+
+  if (queryError) {
+    const errorMessage = queryError && typeof queryError === 'object' && 'message' in queryError
+      ? String(queryError.message)
+      : String(queryError)
+    logger.error('Failed to query promotions for expiry', new Error(errorMessage), withOpId({
+      component: 'api/cron/daily',
+      task: 'expire-promotions',
+      error: queryError,
+    }))
+    throw new Error('Failed to query promotions')
+  }
+
+  if (!expiredPromotions || expiredPromotions.length === 0) {
+    logger.info('No promotions to expire', withOpId({
+      component: 'api/cron/daily',
+      task: 'expire-promotions',
+      count: 0,
+    }))
+    return {
+      ok: true,
+      expiredCount: 0,
+    }
+  }
+
+  // Update all expired promotions to 'expired' status
+  const promotionIds = expiredPromotions.map((p) => p.id)
+  const { error: updateError } = await fromBase(db, 'promotions')
+    .update({
+      status: 'expired',
+      updated_at: now,
+    })
+    .in('id', promotionIds)
+    .eq('status', 'active') // Only update if still active (idempotent)
+
+  if (updateError) {
+    const errorMessage = updateError && typeof updateError === 'object' && 'message' in updateError
+      ? String(updateError.message)
+      : String(updateError)
+    logger.error('Failed to expire promotions', new Error(errorMessage), withOpId({
+      component: 'api/cron/daily',
+      task: 'expire-promotions',
+      error: updateError,
+      count: promotionIds.length,
+    }))
+    throw new Error('Failed to expire promotions')
+  }
+
+  logger.info('Promotions expired successfully', withOpId({
+    component: 'api/cron/daily',
+    task: 'expire-promotions',
+    expiredCount: expiredPromotions.length,
+    promotionIds: expiredPromotions.map((p) => p.id),
+  }))
+
+  return {
+    ok: true,
+    expiredCount: expiredPromotions.length,
   }
 }
 

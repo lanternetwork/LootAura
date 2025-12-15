@@ -104,7 +104,7 @@ export async function selectFeaturedSales(
   // Step 1: Query candidate sales within next 7 days
   // Filter: published, not archived, not hidden_by_admin, within date range
   const candidatesQuery = fromBase(admin, 'sales')
-    .select('id, owner_id, lat, lng, is_featured, date_start, date_end')
+    .select('id, owner_id, lat, lng, date_start, date_end')
     .eq('status', 'published')
     .is('archived_at', null)
     .neq('moderation_status', 'hidden_by_admin')
@@ -139,11 +139,33 @@ export async function selectFeaturedSales(
     }
   }
 
-  // Step 3: Separate promoted and organic sales
-  // NOTE: For now, using is_featured as placeholder for "promoted"
-  // This will be replaced with actual promotions table check in future milestone
-  const promotedCandidates = filteredCandidates.filter((sale) => sale.is_featured === true)
-  const organicCandidates = filteredCandidates.filter((sale) => sale.is_featured !== true)
+  // Step 3: Query active promotions for candidate sales
+  // Active promotion = status='active' AND now ∈ [starts_at, ends_at]
+  const nowStr = now.toISOString()
+  const candidateSaleIds = filteredCandidates.map((s) => s.id)
+  
+  let activePromotionSaleIds = new Set<string>()
+  if (candidateSaleIds.length > 0) {
+    const { data: activePromotions } = await fromBase(admin, 'promotions')
+      .select('sale_id')
+      .eq('status', 'active')
+      .lte('starts_at', nowStr)
+      .gte('ends_at', nowStr)
+      .in('sale_id', candidateSaleIds)
+
+    if (activePromotions) {
+      activePromotionSaleIds = new Set(activePromotions.map((p) => p.sale_id))
+    }
+  }
+
+  // Step 4: Separate promoted and organic sales
+  // Promoted = has active promotion, Organic = no active promotion
+  const promotedCandidates = filteredCandidates.filter((sale) => 
+    activePromotionSaleIds.has(sale.id)
+  )
+  const organicCandidates = filteredCandidates.filter((sale) => 
+    !activePromotionSaleIds.has(sale.id)
+  )
 
   // Step 4: Apply fairness rotation for promoted sales
   // Query existing inclusions for this recipient/week to bias toward least-shown

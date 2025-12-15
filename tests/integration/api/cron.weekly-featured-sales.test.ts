@@ -160,7 +160,6 @@ describe('Weekly Featured Sales Cron Job', () => {
       })
 
       // Mock fromBase to return different results based on table
-      let callCount = 0
       mockFromBase.mockImplementation((db: any, table: string) => {
         if (table === 'profiles') {
           return {
@@ -259,7 +258,6 @@ describe('Weekly Featured Sales Cron Job', () => {
         }),
       })
 
-      const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
       const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
       const result = await processWeeklyFeaturedSalesJob({
         sendMode: 'full-send',

@@ -15,6 +15,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { assertAdminOrThrow } from '@/lib/auth/adminGate'
+import { selectFeaturedSales, getWeekKey } from '@/lib/featured-email/selection'
+import { getPrimaryZip } from '@/lib/data/zipUsage'
 import { makeSale } from '@/tests/_helpers/factories'
 
 export const dynamic = 'force-dynamic'
@@ -87,34 +89,69 @@ export async function GET(request: NextRequest) {
     }
 
     // Get recipient ID from query params (or use default for CI)
-    // Note: recipientId is not used in fixture generation but kept for API consistency
     const { searchParams } = new URL(request.url)
-    const _recipientId = searchParams.get('recipientId') || 'test-recipient-1'
+    const recipientId = searchParams.get('recipientId') || 'test-recipient-1'
 
-    // Generate deterministic fixture data (12 sales)
-    // In real implementation, this would query actual sales from DB
-    // For now, return deterministic test data
     const now = new Date()
-    const sales = Array.from({ length: 12 }, (_, i) => {
-      const sale = makeSale({
-        id: `test-sale-${i + 1}`,
-        owner_id: `test-owner-${i + 1}`,
-        date_start: new Date(now.getTime() + (i + 1) * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split('T')[0],
-        status: 'published',
-        archived_at: null,
-        is_featured: i < 5, // First 5 are promoted
+    const weekKey = getWeekKey(now)
+
+    // Try to use real selection engine if recipient exists and has data
+    // Fall back to fixture mode if no data available (for CI compatibility)
+    let selectedSales: string[] = []
+    let source = 'fixture'
+
+    try {
+      // Get primary ZIP for recipient (if available)
+      const primaryZip = await getPrimaryZip(recipientId)
+
+      // Run real selection engine
+      const result = await selectFeaturedSales({
+        recipientProfileId: recipientId,
+        primaryZip,
+        now,
+        weekKey,
+        radiusKm: 50,
       })
-      return sale
-    })
+
+      if (result.selectedSales.length === 12) {
+        // Real selection succeeded
+        selectedSales = result.selectedSales
+        source = 'real'
+      } else {
+        // Not enough candidates, fall back to fixture
+        source = 'fixture'
+      }
+    } catch (error) {
+      // Selection engine failed, fall back to fixture
+      console.warn('[FEATURED_EMAIL_DRY_RUN] Selection engine failed, using fixture:', error)
+      source = 'fixture'
+    }
+
+    // If fixture mode or selection returned <12, generate deterministic fixture data
+    if (selectedSales.length < 12) {
+      const sales = Array.from({ length: 12 }, (_, i) => {
+        const sale = makeSale({
+          id: `test-sale-${i + 1}`,
+          owner_id: `test-owner-${i + 1}`,
+          date_start: new Date(now.getTime() + (i + 1) * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split('T')[0],
+          status: 'published',
+          archived_at: null,
+          is_featured: i < 5, // First 5 are promoted
+        })
+        return sale
+      })
+      selectedSales = sales.map((s) => s.id)
+      source = 'fixture'
+    }
 
     // Return exactly 12 sales IDs (no PII - IDs only)
     return NextResponse.json({
       ok: true,
-      count: sales.length,
-      selectedSales: sales.map((s) => s.id),
-      source: 'fixture',
+      count: selectedSales.length,
+      selectedSales: selectedSales.slice(0, 12), // Ensure exactly 12
+      source,
     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)

@@ -488,5 +488,154 @@ The dry-run endpoint is integrated into the synthetic E2E workflow (`.github/wor
 
 ---
 
+## Milestone 2: Featured Email Data Foundations
+
+**Status:** ✅ Completed (2025-12-15)
+
+### Overview
+
+Milestone 2 builds the data foundations for the Weekly Featured Sales email system, including ZIP usage tracking, email preferences, inclusion analytics, and a real selection engine. This milestone does NOT implement Stripe promotions or actual email sending yet.
+
+### Data Model
+
+**Migrations:**
+- `119_add_featured_email_foundations.sql`: Creates `profile_zip_usage` table and adds `email_featured_weekly_enabled` column to profiles
+- `120_add_featured_inclusion_tracking.sql`: Creates `featured_inclusions` (recipient-level) and `featured_inclusion_rollups` (sale-level aggregates) tables
+- `121_update_profiles_v2_view_featured_preference.sql`: Updates `profiles_v2` view to include featured email preference
+
+**Tables:**
+1. **`profile_zip_usage`**: Tracks most-used ZIP codes per user
+   - `profile_id`, `zip`, `use_count`, `last_seen_at`
+   - Primary ZIP = highest `use_count`, tie-break by `last_seen_at` DESC
+   - RLS: Self-only read/write for authenticated users
+
+2. **`featured_inclusions`**: Recipient-level exposure tracking (fairness rotation)
+   - `sale_id`, `recipient_profile_id`, `week_key`, `times_shown`, `last_shown_at`
+   - Unique constraint: `(recipient_profile_id, sale_id, week_key)`
+   - RLS: Deny all direct access (service_role only) - privacy protection
+
+3. **`featured_inclusion_rollups`**: Sale-level aggregates (seller reporting)
+   - `sale_id`, `unique_recipients_total`, `total_inclusions_total`, `last_featured_at`
+   - RLS: Sellers can read aggregates for their own sales only
+
+**Preferences:**
+- `email_featured_weekly_enabled` (boolean, default `true`) in `profiles` table
+- Integrated with existing notification preferences pattern
+- Default ON for new users (opt-out model)
+
+### Selection Engine
+
+**Module:** `lib/featured-email/selection.ts`
+
+**Input:**
+- `recipientProfileId`: User profile ID
+- `primaryZip`: Most-used ZIP code (from `profile_zip_usage`)
+- `now`: Current timestamp
+- `weekKey`: ISO week format (e.g., "2025-W03")
+- `radiusKm`: Search radius (default: 50km)
+
+**Output:**
+- `selectedSales`: Array of exactly 12 sale IDs
+- `totalPromoted`: Number of promoted sales selected
+- `totalOrganic`: Number of organic (high-view) sales selected
+
+**Selection Rules:**
+1. **Window**: Next 7 days only (`date_start` within next 7 days)
+2. **Exclusions**:
+   - Recipient's own sales (`owner_id !== recipientProfileId`)
+   - `moderation_status = 'hidden_by_admin'`
+   - `archived_at IS NOT NULL`
+   - `status != 'published'`
+3. **Promoted Priority**:
+   - If >=12 promoted nearby → all 12 selected are promoted
+   - If <12 promoted nearby → includes all promoted + remaining are high-view organic
+4. **Fairness Rotation**:
+   - Promoted sales sorted by least-shown first (using `featured_inclusions.times_shown`)
+   - Tie-break with seeded randomness (seed = `recipientProfileId + weekKey`)
+5. **High-View Backfill**:
+   - Organic sales sorted by view count (last 30 days from `analytics_events_v2`)
+   - Tie-break with seeded randomness
+6. **Deterministic Seeding**:
+   - Uses `seededShuffle()` with `recipientProfileId + weekKey` as seed
+   - Ensures stable results for same recipient/week combination
+
+**Current Limitations:**
+- Uses `is_featured` flag as placeholder for "promoted" (will be replaced with promotions table in future milestone)
+- Location filtering (ZIP-based radius) is not yet implemented (fetches all candidates, filters in memory)
+- PostGIS spatial queries will be added in future optimization
+
+### ZIP Usage Tracking
+
+**Module:** `lib/data/zipUsage.ts`
+
+**Functions:**
+- `incrementZipUsage(profileId, zip)`: Increments use count for a ZIP (rate-limited: max once per 24 hours per user per ZIP)
+- `getPrimaryZip(profileId)`: Returns primary ZIP (highest use_count, tie-break by last_seen_at)
+
+**Integration:**
+- Hooked into `/api/geocoding/zip` endpoint (non-blocking, fire-and-forget)
+- Tracks ZIP usage when authenticated users look up ZIP codes
+- Privacy: No raw lat/lng history stored, only ZIP codes
+
+### Inclusion Tracking
+
+**Module:** `lib/featured-email/inclusionTracking.ts`
+
+**Functions:**
+- `recordInclusions(inclusions[])`: Records featured inclusions (updates both recipient-level and rollup tables)
+- `getInclusionRollup(saleId)`: Returns aggregate metrics for a sale (for seller reporting)
+
+**Privacy:**
+- Recipient-level rows are NOT readable by sellers (RLS denies all direct access)
+- Only service_role (backend jobs) can access recipient-level data
+- Sellers can only see aggregate counts (`unique_recipients_total`, `total_inclusions_total`)
+
+### Dry-Run Endpoint Updates
+
+**Endpoint:** `/api/admin/featured-email/dry-run`
+
+**Changes:**
+- Now uses real selection engine (`selectFeaturedSales`) when data is available
+- Falls back to fixture mode if:
+  - Selection engine returns <12 sales
+  - Selection engine throws an error
+  - No real data available (CI/test environments)
+- Response includes `source: "real" | "fixture"` to indicate which path was used
+- Maintains CI compatibility (always returns 12 IDs)
+
+### What's Still Not Implemented
+
+**Not Yet Implemented:**
+- Stripe promotion payment processing
+- Actual promotions table (using `is_featured` as placeholder)
+- PostGIS spatial queries for ZIP-based radius filtering
+- Full weekly email job processor (scheduled send)
+- Email template for featured sales
+- Geographic proximity filtering optimization
+- Promotion checkout/webhook handlers
+
+**Next Milestones:**
+- Milestone 3: Stripe promotions (payment processing, promotions table)
+- Milestone 4: Weekly email job (scheduled send, email template)
+- Milestone 5: Performance optimization (PostGIS queries, caching)
+
+### Security & Privacy
+
+**RLS Policies:**
+- `profile_zip_usage`: Self-only read/write
+- `featured_inclusions`: Deny all direct access (service_role only)
+- `featured_inclusion_rollups`: Sellers can read aggregates for own sales only
+
+**Data Minimization:**
+- No raw lat/lng history stored (only ZIP codes)
+- No PII in inclusion tracking (only sale IDs and recipient profile IDs)
+- No debug logging of ZIP codes or user identifiers
+
+**Access Control:**
+- Dry-run endpoint requires admin auth OR CI secret header
+- Debug endpoints disabled in production by default (`ENABLE_DEBUG_ENDPOINTS` flag)
+
+---
+
 **Note**: This plan is a living document and should be updated as the project evolves.
 

@@ -55,6 +55,8 @@ export default async function DashboardPage() {
       initialProfile={profile}
       initialMetrics={metrics}
       initialArchivedCount={archivedCount}
+      promotionsEnabled={process.env.PROMOTIONS_ENABLED === 'true'}
+      paymentsEnabled={process.env.PAYMENTS_ENABLED === 'true'}
     />
   )
 }

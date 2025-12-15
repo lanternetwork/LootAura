@@ -18,9 +18,18 @@ interface SalesPanelProps {
   onDraftPublish?: (draftKey: string, saleId: string) => void
   onRetryDrafts?: () => void
   initialArchivedCount?: number // Initial count for archived sales tab badge
+  promotionsEnabled?: boolean
+  paymentsEnabled?: boolean
 }
 
 type TabType = 'live' | 'archived' | 'drafts'
+
+type PromotionStatus = {
+  sale_id: string
+  is_active: boolean
+  ends_at: string | null
+  tier: string | null
+}
 
 export default function SalesPanel({ 
   sales, 
@@ -32,17 +41,64 @@ export default function SalesPanel({
   onDraftPublish,
   onRetryDrafts,
   initialArchivedCount = 0,
+  promotionsEnabled = false,
+  paymentsEnabled = false,
 }: SalesPanelProps) {
   const [localSales, setLocalSales] = useState<Sale[]>(sales)
   const [archivedSales, setArchivedSales] = useState<Sale[]>([])
   const [isLoadingArchived, setIsLoadingArchived] = useState(false)
   const [archivedCount, setArchivedCount] = useState<number>(initialArchivedCount)
   const [activeTab, setActiveTab] = useState<TabType>('live')
+  const [promotionStatuses, setPromotionStatuses] = useState<Record<string, PromotionStatus>>({})
+  const [isLoadingPromotions, setIsLoadingPromotions] = useState(false)
 
   // Sync local sales with prop changes (active sales)
   useEffect(() => {
     setLocalSales(sales)
   }, [sales])
+
+  // Fetch promotion statuses once for current live sales (no N+1)
+  useEffect(() => {
+    if (!promotionsEnabled) {
+      setPromotionStatuses({})
+      return
+    }
+
+    const liveSales = (sales || []).filter((sale) => sale.status === 'published')
+    if (liveSales.length === 0) {
+      setPromotionStatuses({})
+      return
+    }
+
+    const saleIds = liveSales.map((s) => s.id).join(',')
+    setIsLoadingPromotions(true)
+
+    fetch(`/api/promotions/status?sale_ids=${encodeURIComponent(saleIds)}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          return
+        }
+        const json = await res.json().catch(() => null)
+        if (!json || !Array.isArray(json.statuses)) {
+          return
+        }
+        const map: Record<string, PromotionStatus> = {}
+        for (const status of json.statuses as PromotionStatus[]) {
+          if (status?.sale_id) {
+            map[status.sale_id] = status
+          }
+        }
+        setPromotionStatuses(map)
+      })
+      .catch(() => {
+        // Silent failure - promotions are non-critical
+      })
+      .finally(() => {
+        setIsLoadingPromotions(false)
+      })
+    // We only want to refetch when the list of sale IDs changes or gating changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promotionsEnabled, sales.map((s) => s.id).join(',')])
 
   // Prefetch archived sales in the background after a short delay
   // This makes the tab feel faster when clicked
@@ -279,7 +335,15 @@ export default function SalesPanel({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredSales.map((sale) => (
-              <DashboardSaleCard key={sale.id} sale={sale} onDelete={handleSaleDelete} />
+              <DashboardSaleCard
+                key={sale.id}
+                sale={sale}
+                onDelete={handleSaleDelete}
+                promotionsEnabled={promotionsEnabled}
+                paymentsEnabled={paymentsEnabled}
+                promotionStatus={promotionStatuses[sale.id]}
+                isPromotionLoading={isLoadingPromotions}
+              />
             ))}
           </div>
         )}

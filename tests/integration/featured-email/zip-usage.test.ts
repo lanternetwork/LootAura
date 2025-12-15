@@ -71,20 +71,24 @@ describe('ZIP Usage Tracking', () => {
         }),
       } as any)
 
-      // Update path - final chain returns promise
-      const mockUpdateChain = {
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        }),
-      }
+      // Update path - mock the update chain
+      const mockSecondEq = vi.fn().mockResolvedValue({ error: null })
+      const mockFirstEq = vi.fn().mockReturnValue({
+        eq: mockSecondEq,
+      })
+      const mockUpdate = vi.fn().mockReturnValue({
+        eq: mockFirstEq,
+      })
       vi.mocked(fromBase).mockReturnValueOnce({
-        update: vi.fn().mockReturnValue(mockUpdateChain),
+        update: mockUpdate,
       } as any)
 
       const result = await incrementZipUsage('user-1', '40204')
 
       expect(result.success).toBe(true)
-      expect(mockUpdateChain.eq).toHaveBeenCalled()
+      expect(mockUpdate).toHaveBeenCalled()
+      expect(mockFirstEq).toHaveBeenCalled()
+      expect(mockSecondEq).toHaveBeenCalled()
     })
 
     it('should skip increment if last_seen_at is < 24 hours ago (throttle)', async () => {

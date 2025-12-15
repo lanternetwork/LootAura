@@ -597,14 +597,15 @@ describe('Weekly Featured Sales Cron Job', () => {
 describe('GET /api/cron/weekly-featured-sales', () => {
   let handler: (request: NextRequest) => Promise<Response>
   let assertCronAuthorized: ReturnType<typeof vi.fn>
+  let processWeeklyFeaturedSalesJobSpy: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
     vi.clearAllMocks()
     
-    // Mock the job processor for endpoint tests only
-    vi.doMock('@/lib/jobs/processor', () => ({
-      processWeeklyFeaturedSalesJob: mockProcessWeeklyFeaturedSalesJob,
-    }))
+    // Import the job processor and spy on it for endpoint tests
+    const processorModule = await import('@/lib/jobs/processor')
+    processWeeklyFeaturedSalesJobSpy = vi.spyOn(processorModule, 'processWeeklyFeaturedSalesJob')
+    processWeeklyFeaturedSalesJobSpy.mockImplementation(mockProcessWeeklyFeaturedSalesJob)
     
     // Import the handler dynamically after mocks are set up
     const module = await import('@/app/api/cron/weekly-featured-sales/route')
@@ -618,10 +619,6 @@ describe('GET /api/cron/weekly-featured-sales', () => {
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
     process.env.FEATURED_EMAIL_SEND_MODE = 'compute-only'
     process.env.FEATURED_EMAIL_ALLOWLIST = ''
-  })
-
-  afterEach(() => {
-    vi.doUnmock('@/lib/jobs/processor')
   })
 
   it('should return 401 when Authorization header is missing', async () => {
@@ -644,7 +641,7 @@ describe('GET /api/cron/weekly-featured-sales', () => {
     expect(response.status).toBe(401)
     expect(data.ok).toBe(false)
     expect(data.error).toBe('Unauthorized')
-    expect(mockProcessWeeklyFeaturedSalesJob).not.toHaveBeenCalled()
+    expect(processWeeklyFeaturedSalesJobSpy).not.toHaveBeenCalled()
   })
 
   it('should return skipped when FEATURED_EMAIL_ENABLED=false', async () => {
@@ -666,7 +663,7 @@ describe('GET /api/cron/weekly-featured-sales', () => {
     expect(data.ok).toBe(true)
     expect(data.skipped).toBe(true)
     expect(data.featuredEmailEnabled).toBe(false)
-    expect(mockProcessWeeklyFeaturedSalesJob).not.toHaveBeenCalled()
+    expect(processWeeklyFeaturedSalesJobSpy).not.toHaveBeenCalled()
   })
 
   it('should accept GET requests and trigger job when authorized and enabled', async () => {
@@ -678,7 +675,7 @@ describe('GET /api/cron/weekly-featured-sales', () => {
     })
 
     assertCronAuthorized.mockImplementation(() => {})
-    mockProcessWeeklyFeaturedSalesJob.mockResolvedValue({
+    processWeeklyFeaturedSalesJobSpy.mockResolvedValue({
       success: true,
       emailsSent: 0,
       errors: 0,
@@ -691,7 +688,7 @@ describe('GET /api/cron/weekly-featured-sales', () => {
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
     expect(data.job).toBe('weekly-featured-sales')
-    expect(mockProcessWeeklyFeaturedSalesJob).toHaveBeenCalledTimes(1)
+    expect(processWeeklyFeaturedSalesJobSpy).toHaveBeenCalledTimes(1)
   })
 })
 

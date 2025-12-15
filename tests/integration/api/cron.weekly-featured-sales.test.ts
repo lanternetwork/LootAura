@@ -244,20 +244,32 @@ describe('Weekly Featured Sales Cron Job', () => {
         error: null,
       })
 
-      mockFromBase.mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{
-                id: userId,
-                email_featured_weekly_enabled: false, // Disabled
-                email_favorites_digest_enabled: true,
-                email_seller_weekly_enabled: true,
-              }],
-              error: null,
+      // Mock fromBase to return profiles with email_featured_weekly_enabled=false
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{
+                    id: userId,
+                    email_featured_weekly_enabled: false, // Disabled
+                    email_favorites_digest_enabled: true,
+                    email_seller_weekly_enabled: true,
+                  }],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
             }),
           }),
-        }),
+        }
       })
 
       const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
@@ -326,50 +338,62 @@ describe('Weekly Featured Sales Cron Job', () => {
         error: null,
       })
 
-      mockFromBase.mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{
-                id: userId,
-                email_featured_weekly_enabled: true,
-                email_favorites_digest_enabled: true, // Not fully unsubscribed
-                email_seller_weekly_enabled: false,
-              }],
-              error: null,
-            }),
-          }),
-        }),
-      })
-
-      mockGetPrimaryZip.mockResolvedValue('40204')
-      
       const selectedSales = Array.from({ length: 12 }, (_, i) => `sale-${i + 1}`)
       mockSelectFeaturedSales.mockResolvedValue({
         selectedSales,
       })
 
-      mockFromBase.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: selectedSales.map((id, i) => ({
-                id,
-                title: `Sale ${i + 1}`,
-                date_start: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                date_end: null,
-                address_line1: `Address ${i + 1}`,
-                address_city: 'Louisville',
-                address_region: 'KY',
-                cover_image_url: null,
-                status: 'published',
-              })),
-              error: null,
+      // Mock fromBase to return different results based on table
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{
+                    id: userId,
+                    email_featured_weekly_enabled: true,
+                    email_favorites_digest_enabled: true, // Not fully unsubscribed
+                    email_seller_weekly_enabled: false,
+                  }],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === 'sales') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: selectedSales.map((id, i) => ({
+                    id,
+                    title: `Sale ${i + 1}`,
+                    date_start: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    date_end: null,
+                    address_line1: `Address ${i + 1}`,
+                    address_city: 'Louisville',
+                    address_region: 'KY',
+                    cover_image_url: null,
+                    status: 'published',
+                  })),
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
             }),
           }),
-        }),
+        }
       })
 
+      mockGetPrimaryZip.mockResolvedValue('40204')
       mockSendFeaturedSalesEmail.mockResolvedValue({ ok: true })
       mockRecordInclusions.mockResolvedValue({ success: true })
 
@@ -398,20 +422,31 @@ describe('Weekly Featured Sales Cron Job', () => {
         error: null,
       })
 
-      mockFromBase.mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{
-                id: userId,
-                email_featured_weekly_enabled: true,
-                email_favorites_digest_enabled: true,
-                email_seller_weekly_enabled: true,
-              }],
-              error: null,
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{
+                    id: userId,
+                    email_featured_weekly_enabled: true,
+                    email_favorites_digest_enabled: true,
+                    email_seller_weekly_enabled: true,
+                  }],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
             }),
           }),
-        }),
+        }
       })
 
       mockGetPrimaryZip.mockResolvedValue(null) // No primary ZIP
@@ -443,50 +478,61 @@ describe('Weekly Featured Sales Cron Job', () => {
         error: null,
       })
 
-      mockFromBase.mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{
-                id: userId,
-                email_featured_weekly_enabled: true,
-                email_favorites_digest_enabled: true,
-                email_seller_weekly_enabled: true,
-              }],
-              error: null,
-            }),
-          }),
-        }),
-      })
-
-      mockGetPrimaryZip.mockResolvedValue('40204')
-      
       const selectedSales = Array.from({ length: 12 }, (_, i) => `sale-${i + 1}`)
       mockSelectFeaturedSales.mockResolvedValue({
         selectedSales,
       })
 
-      mockFromBase.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: selectedSales.map((id, i) => ({
-                id,
-                title: `Sale ${i + 1}`,
-                date_start: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                date_end: null,
-                address_line1: `Address ${i + 1}`,
-                address_city: 'Louisville',
-                address_region: 'KY',
-                cover_image_url: null,
-                status: 'published',
-              })),
-              error: null,
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{
+                    id: userId,
+                    email_featured_weekly_enabled: true,
+                    email_favorites_digest_enabled: true,
+                    email_seller_weekly_enabled: true,
+                  }],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === 'sales') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: selectedSales.map((id, i) => ({
+                    id,
+                    title: `Sale ${i + 1}`,
+                    date_start: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    date_end: null,
+                    address_line1: `Address ${i + 1}`,
+                    address_city: 'Louisville',
+                    address_region: 'KY',
+                    cover_image_url: null,
+                    status: 'published',
+                  })),
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
             }),
           }),
-        }),
+        }
       })
 
+      mockGetPrimaryZip.mockResolvedValue('40204')
       mockSendFeaturedSalesEmail.mockResolvedValue({ ok: true })
       mockRecordInclusions.mockResolvedValue({ success: true })
 
@@ -528,50 +574,61 @@ describe('Weekly Featured Sales Cron Job', () => {
         error: null,
       })
 
-      mockFromBase.mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{
-                id: userId,
-                email_featured_weekly_enabled: true,
-                email_favorites_digest_enabled: true,
-                email_seller_weekly_enabled: true,
-              }],
-              error: null,
-            }),
-          }),
-        }),
-      })
-
-      mockGetPrimaryZip.mockResolvedValue('40204')
-      
       const selectedSales = Array.from({ length: 12 }, (_, i) => `sale-${i + 1}`)
       mockSelectFeaturedSales.mockResolvedValue({
         selectedSales,
       })
 
-      mockFromBase.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: selectedSales.map((id, i) => ({
-                id,
-                title: `Sale ${i + 1}`,
-                date_start: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                date_end: null,
-                address_line1: `Address ${i + 1}`,
-                address_city: 'Louisville',
-                address_region: 'KY',
-                cover_image_url: null,
-                status: 'published',
-              })),
-              error: null,
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{
+                    id: userId,
+                    email_featured_weekly_enabled: true,
+                    email_favorites_digest_enabled: true,
+                    email_seller_weekly_enabled: true,
+                  }],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === 'sales') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: selectedSales.map((id, i) => ({
+                    id,
+                    title: `Sale ${i + 1}`,
+                    date_start: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    date_end: null,
+                    address_line1: `Address ${i + 1}`,
+                    address_city: 'Louisville',
+                    address_region: 'KY',
+                    cover_image_url: null,
+                    status: 'published',
+                  })),
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
             }),
           }),
-        }),
+        }
       })
 
+      mockGetPrimaryZip.mockResolvedValue('40204')
       mockSendFeaturedSalesEmail.mockResolvedValue({ ok: true })
       mockRecordInclusions.mockResolvedValue({ success: true })
 
@@ -597,7 +654,7 @@ describe('Weekly Featured Sales Cron Job', () => {
 describe('GET /api/cron/weekly-featured-sales', () => {
   let handler: (request: NextRequest) => Promise<Response>
   let assertCronAuthorized: ReturnType<typeof vi.fn>
-  let processWeeklyFeaturedSalesJobSpy: ReturnType<typeof vi.fn>
+  let processWeeklyFeaturedSalesJobSpy: any
 
   beforeEach(async () => {
     vi.clearAllMocks()

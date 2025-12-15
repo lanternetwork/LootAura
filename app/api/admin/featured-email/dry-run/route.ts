@@ -87,8 +87,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Get recipient ID from query params (or use default for CI)
+    // Note: recipientId is not used in fixture generation but kept for API consistency
     const { searchParams } = new URL(request.url)
-    const recipientId = searchParams.get('recipientId') || 'test-recipient-1'
+    const _recipientId = searchParams.get('recipientId') || 'test-recipient-1'
 
     // Generate deterministic fixture data (12 sales)
     // In real implementation, this would query actual sales from DB

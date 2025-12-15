@@ -27,14 +27,19 @@ function getDateString(daysOffset: number): string {
 }
 
 // Helper to create sales with dates in the next 7 days window
+// Accepts test-only properties (viewCount, moderation_status) that aren't part of Sale type
 function createSaleInWindow(
   id: string,
   ownerId: string,
   daysFromNow: number,
-  overrides: Partial<ReturnType<typeof makeSale>> = {}
-): ReturnType<typeof makeSale> {
+  overrides: Partial<ReturnType<typeof makeSale>> & {
+    viewCount?: number
+    moderation_status?: string | null
+  } = {}
+): ReturnType<typeof makeSale> & { viewCount?: number; moderation_status?: string | null } {
   const dateStart = getDateString(daysFromNow)
-  return makeSale({
+  const { viewCount, moderation_status, ...saleOverrides } = overrides
+  const sale = makeSale({
     id,
     owner_id: ownerId,
     date_start: dateStart,
@@ -42,8 +47,10 @@ function createSaleInWindow(
     status: 'published',
     archived_at: null,
     is_featured: false,
-    ...overrides,
+    ...saleOverrides,
   })
+  // Attach test-only properties for use in selection logic
+  return Object.assign(sale, { viewCount, moderation_status })
 }
 
 // Seeded randomness helper for deterministic selection
@@ -80,9 +87,9 @@ interface FeaturedSelectionParams {
     date_end?: string
     status: string
     archived_at?: string | null
-    moderation_status?: string | null
+    moderation_status?: string | null // Test-only property for filtering
     is_featured?: boolean
-    viewCount?: number
+    viewCount?: number // Test-only property for sorting
   }>
   now: Date
   weekKey: string // e.g., "2025-W03" for deterministic seeding

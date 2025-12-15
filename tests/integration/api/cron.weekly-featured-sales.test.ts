@@ -21,11 +21,6 @@ vi.mock('@/lib/auth/cron', () => ({
   assertCronAuthorized: vi.fn(),
 }))
 
-// Mock job processor
-vi.mock('@/lib/jobs/processor', () => ({
-  processWeeklyFeaturedSalesJob: (...args: any[]) => mockProcessWeeklyFeaturedSalesJob(...args),
-}))
-
 vi.mock('@/lib/supabase/clients', () => ({
   getAdminDb: () => mockAdminDb,
   fromBase: (db: any, table: string) => mockFromBase(db, table),
@@ -606,6 +601,11 @@ describe('GET /api/cron/weekly-featured-sales', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     
+    // Mock the job processor for endpoint tests only
+    vi.doMock('@/lib/jobs/processor', () => ({
+      processWeeklyFeaturedSalesJob: mockProcessWeeklyFeaturedSalesJob,
+    }))
+    
     // Import the handler dynamically after mocks are set up
     const module = await import('@/app/api/cron/weekly-featured-sales/route')
     handler = module.GET
@@ -618,6 +618,10 @@ describe('GET /api/cron/weekly-featured-sales', () => {
     process.env.LOOTAURA_ENABLE_EMAILS = 'true'
     process.env.FEATURED_EMAIL_SEND_MODE = 'compute-only'
     process.env.FEATURED_EMAIL_ALLOWLIST = ''
+  })
+
+  afterEach(() => {
+    vi.doUnmock('@/lib/jobs/processor')
   })
 
   it('should return 401 when Authorization header is missing', async () => {

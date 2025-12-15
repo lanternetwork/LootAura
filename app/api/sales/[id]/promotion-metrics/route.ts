@@ -6,7 +6,7 @@
  * Only sale owner or admin can access.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
@@ -40,13 +40,11 @@ async function metricsHandler(request: NextRequest, { params }: { params: { id: 
 
   // Check if user is owner or admin
   const isOwner = sale.owner_id === user.id
-  let isAdmin = false
 
   if (!isOwner) {
     // Check admin status
     try {
       await assertAdminOrThrow(request)
-      isAdmin = true
     } catch {
       return fail(403, 'FORBIDDEN', 'You can only view promotion metrics for your own sales')
     }
@@ -103,5 +101,5 @@ async function metricsHandler(request: NextRequest, { params }: { params: { id: 
   })
 }
 
-export const GET = withRateLimit(Policies.SALES_VIEW_30S, metricsHandler)
+export const GET = withRateLimit(metricsHandler, [Policies.SALES_VIEW_30S])
 

@@ -6,7 +6,7 @@
  * Processes checkout.session.completed, payment_intent events, and refunds.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { getStripeClient, getStripeWebhookSecret } from '@/lib/stripe/client'
 import { logger } from '@/lib/log'
@@ -56,7 +56,7 @@ async function webhookHandler(request: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
   } catch (error) {
-    logger.warn('Stripe webhook signature verification failed', error instanceof Error ? error : new Error(String(error)), {
+    logger.error('Stripe webhook signature verification failed', error instanceof Error ? error : new Error(String(error)), {
       component: 'webhooks/stripe',
       operation: 'verify_signature',
     })

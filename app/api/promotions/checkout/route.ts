@@ -244,5 +244,5 @@ async function checkoutHandler(request: NextRequest) {
   })
 }
 
-export const POST = withRateLimit(Policies.MUTATE_MINUTE, checkoutHandler)
+export const POST = withRateLimit(checkoutHandler, [Policies.MUTATE_MINUTE])
 

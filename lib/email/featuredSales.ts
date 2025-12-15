@@ -8,7 +8,6 @@ import { sendEmail } from './sendEmail'
 import { createUnsubscribeToken, buildUnsubscribeUrl } from './unsubscribeTokens'
 import { FeaturedSalesEmail, buildFeaturedSalesSubject, type FeaturedSaleItem } from './templates/FeaturedSalesEmail'
 import { canSendEmail, recordEmailSend } from './emailLog'
-import { getAdminDb, fromBase } from '@/lib/supabase/clients'
 
 export interface SendFeaturedSalesEmailParams {
   to: string

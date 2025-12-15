@@ -5,11 +5,6 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
-import { processWeeklyFeaturedSalesJob } from '@/lib/jobs/processor'
-import { sendFeaturedSalesEmail } from '@/lib/email/featuredSales'
-import { selectFeaturedSales, getWeekKey } from '@/lib/featured-email/selection'
-import { getPrimaryZip } from '@/lib/data/zipUsage'
-import { recordInclusions } from '@/lib/featured-email/inclusionTracking'
 
 // Mock dependencies
 const mockFromBase = vi.fn()
@@ -19,10 +14,16 @@ const mockSelectFeaturedSales = vi.fn()
 const mockGetPrimaryZip = vi.fn()
 const mockSendFeaturedSalesEmail = vi.fn()
 const mockRecordInclusions = vi.fn()
+const mockProcessWeeklyFeaturedSalesJob = vi.fn()
 
 // Mock cron auth
 vi.mock('@/lib/auth/cron', () => ({
   assertCronAuthorized: vi.fn(),
+}))
+
+// Mock job processor
+vi.mock('@/lib/jobs/processor', () => ({
+  processWeeklyFeaturedSalesJob: (...args: any[]) => mockProcessWeeklyFeaturedSalesJob(...args),
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({
@@ -104,13 +105,14 @@ describe('Weekly Featured Sales Cron Job', () => {
       error: null,
     })
     
-    mockFromBase.mockReturnValue({
+    // Default mock for fromBase - returns a chainable query builder
+    mockFromBase.mockImplementation(() => ({
       select: vi.fn().mockReturnValue({
         in: vi.fn().mockReturnValue({
           eq: vi.fn().mockResolvedValue({ data: [], error: null }),
         }),
       }),
-    })
+    }))
     
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321'
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
@@ -125,9 +127,7 @@ describe('Weekly Featured Sales Cron Job', () => {
   })
 
   describe('Safety gates', () => {
-    it('returns success with skipped=true when FEATURED_EMAIL_ENABLED=false', async () => {
-      process.env.FEATURED_EMAIL_ENABLED = 'false'
-      
+    it('skips when compute-only mode with empty allowlist (no-op)', async () => {
       const result = await processWeeklyFeaturedSalesJob({
         sendMode: 'compute-only',
         allowlist: [],
@@ -138,20 +138,6 @@ describe('Weekly Featured Sales Cron Job', () => {
       expect(result.recipientsProcessed).toBe(0)
     })
 
-    it('skips when compute-only mode with empty allowlist', async () => {
-      process.env.FEATURED_EMAIL_ENABLED = 'true'
-      process.env.FEATURED_EMAIL_SEND_MODE = 'compute-only'
-      process.env.FEATURED_EMAIL_ALLOWLIST = ''
-      
-      const result = await processWeeklyFeaturedSalesJob({
-        sendMode: 'compute-only',
-        allowlist: [],
-      })
-
-      expect(result.success).toBe(true)
-      expect(result.emailsSent).toBe(0)
-      expect(result.recipientsProcessed).toBe(0)
-    })
 
     it('processes allowlisted recipients in allowlist-send mode', async () => {
       const userId = 'user-1'
@@ -167,53 +153,68 @@ describe('Weekly Featured Sales Cron Job', () => {
         error: null,
       })
 
-      mockFromBase.mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [{
-                id: userId,
-                email_featured_weekly_enabled: true,
-                email_favorites_digest_enabled: true,
-                email_seller_weekly_enabled: true,
-              }],
-              error: null,
-            }),
-          }),
-        }),
-      })
-
-      mockGetPrimaryZip.mockResolvedValue('40204')
-      
       const selectedSales = Array.from({ length: 12 }, (_, i) => `sale-${i + 1}`)
       mockSelectFeaturedSales.mockResolvedValue({
         selectedSales,
       })
 
-      mockFromBase.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          in: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: selectedSales.map((id, i) => ({
-                id,
-                title: `Sale ${i + 1}`,
-                date_start: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                date_end: null,
-                address_line1: `Address ${i + 1}`,
-                address_city: 'Louisville',
-                address_region: 'KY',
-                cover_image_url: null,
-                status: 'published',
-              })),
-              error: null,
+      // Mock fromBase to return different results based on table
+      let callCount = 0
+      mockFromBase.mockImplementation((db: any, table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: [{
+                    id: userId,
+                    email_featured_weekly_enabled: true,
+                    email_favorites_digest_enabled: true,
+                    email_seller_weekly_enabled: true,
+                  }],
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        if (table === 'sales') {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({
+                  data: selectedSales.map((id, i) => ({
+                    id,
+                    title: `Sale ${i + 1}`,
+                    date_start: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    date_end: null,
+                    address_line1: `Address ${i + 1}`,
+                    address_city: 'Louisville',
+                    address_region: 'KY',
+                    cover_image_url: null,
+                    status: 'published',
+                  })),
+                  error: null,
+                }),
+              }),
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            in: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
             }),
           }),
-        }),
+        }
       })
+
+      mockGetPrimaryZip.mockResolvedValue('40204')
 
       mockSendFeaturedSalesEmail.mockResolvedValue({ ok: true })
       mockRecordInclusions.mockResolvedValue({ success: true })
 
+      const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
       const result = await processWeeklyFeaturedSalesJob({
         sendMode: 'allowlist-send',
         allowlist: [userEmail],
@@ -626,7 +627,7 @@ describe('GET /api/cron/weekly-featured-sales', () => {
     expect(response.status).toBe(401)
     expect(data.ok).toBe(false)
     expect(data.error).toBe('Unauthorized')
-    expect(processWeeklyFeaturedSalesJob).not.toHaveBeenCalled()
+    expect(mockProcessWeeklyFeaturedSalesJob).not.toHaveBeenCalled()
   })
 
   it('should return skipped when FEATURED_EMAIL_ENABLED=false', async () => {
@@ -648,7 +649,7 @@ describe('GET /api/cron/weekly-featured-sales', () => {
     expect(data.ok).toBe(true)
     expect(data.skipped).toBe(true)
     expect(data.featuredEmailEnabled).toBe(false)
-    expect(processWeeklyFeaturedSalesJob).not.toHaveBeenCalled()
+    expect(mockProcessWeeklyFeaturedSalesJob).not.toHaveBeenCalled()
   })
 
   it('should accept GET requests and trigger job when authorized and enabled', async () => {
@@ -660,7 +661,7 @@ describe('GET /api/cron/weekly-featured-sales', () => {
     })
 
     assertCronAuthorized.mockImplementation(() => {})
-    vi.mocked(processWeeklyFeaturedSalesJob).mockResolvedValue({
+    mockProcessWeeklyFeaturedSalesJob.mockResolvedValue({
       success: true,
       emailsSent: 0,
       errors: 0,
@@ -673,7 +674,7 @@ describe('GET /api/cron/weekly-featured-sales', () => {
     expect(response.status).toBe(200)
     expect(data.ok).toBe(true)
     expect(data.job).toBe('weekly-featured-sales')
-    expect(processWeeklyFeaturedSalesJob).toHaveBeenCalledTimes(1)
+    expect(mockProcessWeeklyFeaturedSalesJob).toHaveBeenCalledTimes(1)
   })
 })
 

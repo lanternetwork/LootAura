@@ -361,10 +361,9 @@ export async function processWeeklyFeaturedSalesJob(
       } catch (error) {
         errors++
         const errorMessage = error instanceof Error ? error.message : String(error)
-        logger.error('Error processing recipient for weekly featured sales', {
+        logger.error('Error processing recipient for weekly featured sales', error instanceof Error ? error : new Error(errorMessage), {
           component: 'jobs/weekly-featured-sales',
           profileId: user.id,
-          error: errorMessage,
         })
       }
     }
@@ -404,9 +403,8 @@ export async function processWeeklyFeaturedSalesJob(
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    logger.error('Weekly featured sales job failed', {
+    logger.error('Weekly featured sales job failed', error instanceof Error ? error : new Error(errorMessage), {
       component: 'jobs/weekly-featured-sales',
-      error: errorMessage,
     })
     return { success: false, error: errorMessage }
   }

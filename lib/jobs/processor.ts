@@ -120,6 +120,299 @@ export async function processJob(job: BaseJob): Promise<{ success: boolean; erro
 }
 
 /**
+ * Weekly Featured Sales Job Payload
+ */
+export interface WeeklyFeaturedSalesJobPayload {
+  sendMode: 'compute-only' | 'allowlist-send' | 'full-send'
+  allowlist: string[] // Comma-separated emails or profile IDs
+}
+
+/**
+ * Process weekly featured sales job
+ * Sends weekly featured sales emails to eligible recipients
+ */
+export async function processWeeklyFeaturedSalesJob(
+  payload: WeeklyFeaturedSalesJobPayload
+): Promise<{ success: boolean; error?: string; emailsSent?: number; errors?: number; recipientsProcessed?: number }> {
+  try {
+    const { sendMode, allowlist } = payload
+    const { logger } = await import('@/lib/log')
+    const { getAdminDb, fromBase } = await import('@/lib/supabase/clients')
+    const { sendFeaturedSalesEmail, convertSaleToFeaturedItem } = await import('@/lib/email/featuredSales')
+    const { selectFeaturedSales, getWeekKey } = await import('@/lib/featured-email/selection')
+    const { getPrimaryZip } = await import('@/lib/data/zipUsage')
+    const { recordInclusions } = await import('@/lib/featured-email/inclusionTracking')
+    const { getUserProfile } = await import('@/lib/data/profileAccess')
+    const admin = getAdminDb()
+
+    const now = new Date()
+    const weekKey = getWeekKey(now)
+
+    logger.info('Processing weekly featured sales job', {
+      component: 'jobs/weekly-featured-sales',
+      sendMode,
+      allowlistCount: allowlist.length,
+      weekKey,
+    })
+
+    // Safety gate: compute-only with empty allowlist = no-op (no inclusions recorded)
+    if (sendMode === 'compute-only' && allowlist.length === 0) {
+      logger.info('Weekly featured sales job skipped - compute-only mode with empty allowlist', {
+        component: 'jobs/weekly-featured-sales',
+        sendMode,
+      })
+      return { success: true, emailsSent: 0, errors: 0, recipientsProcessed: 0 }
+    }
+
+    // Get user emails using Admin API
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE!
+    const { createClient } = await import('@supabase/supabase-js')
+    const adminBase = createClient(url, key, { 
+      auth: { persistSession: false },
+      global: { headers: { 'apikey': key } }
+    })
+
+    // Fetch all users
+    const { data: usersList, error: usersError } = await adminBase.auth.admin.listUsers()
+    
+    if (usersError) {
+      const errorMessage = usersError instanceof Error ? usersError.message : String(usersError)
+      return { success: false, error: `Users query error: ${errorMessage}` }
+    }
+
+    // Filter to users with emails
+    const usersWithEmails = usersList?.users?.filter(u => u.email) || []
+
+    if (usersWithEmails.length === 0) {
+      logger.info('No users found with email addresses', {
+        component: 'jobs/weekly-featured-sales',
+      })
+      return { success: true, emailsSent: 0, errors: 0, recipientsProcessed: 0 }
+    }
+
+    // Fetch user profiles to check preferences
+    // Only include users who have email_featured_weekly_enabled = true (default true)
+    const userIds = usersWithEmails.map(u => u.id)
+    const { data: profiles, error: profilesError } = await fromBase(admin, 'profiles')
+      .select('id, email_featured_weekly_enabled, email_favorites_digest_enabled, email_seller_weekly_enabled')
+      .in('id', userIds)
+      .eq('email_featured_weekly_enabled', true)
+
+    if (profilesError) {
+      logger.warn('Error fetching profiles for notification preferences, proceeding with all users', {
+        component: 'jobs/weekly-featured-sales',
+        error: profilesError.message,
+      })
+    }
+
+    // Create set of eligible profile IDs
+    // Eligible = has email_featured_weekly_enabled = true AND not fully unsubscribed
+    // (not unsubscribed = at least one of email_favorites_digest_enabled or email_seller_weekly_enabled is true)
+    const eligibleProfileIds = new Set<string>()
+    profiles?.forEach(profile => {
+      // Not unsubscribed if at least one email preference is enabled
+      const notUnsubscribed = profile.email_favorites_digest_enabled === true || profile.email_seller_weekly_enabled === true
+      if (notUnsubscribed) {
+        eligibleProfileIds.add(profile.id)
+      }
+    })
+
+    // Filter users to eligible ones
+    const eligibleUsers = usersWithEmails.filter(u => eligibleProfileIds.has(u.id))
+
+    // Apply allowlist filter if in allowlist-send or compute-only mode
+    let recipientsToProcess = eligibleUsers
+    if (sendMode === 'allowlist-send' || sendMode === 'compute-only') {
+      const allowlistSet = new Set(allowlist.map(a => a.toLowerCase().trim()))
+      recipientsToProcess = eligibleUsers.filter(u => {
+        const emailMatch = u.email && allowlistSet.has(u.email.toLowerCase())
+        const idMatch = allowlistSet.has(u.id.toLowerCase())
+        return emailMatch || idMatch
+      })
+    }
+
+    if (recipientsToProcess.length === 0) {
+      logger.info('No eligible recipients found after filtering', {
+        component: 'jobs/weekly-featured-sales',
+        sendMode,
+        allowlistCount: allowlist.length,
+        eligibleUsersCount: eligibleUsers.length,
+      })
+      return { success: true, emailsSent: 0, errors: 0, recipientsProcessed: 0 }
+    }
+
+    logger.info('Processing recipients for weekly featured sales', {
+      component: 'jobs/weekly-featured-sales',
+      totalRecipients: recipientsToProcess.length,
+      sendMode,
+    })
+
+    // Process each recipient
+    let emailsSent = 0
+    let errors = 0
+    const inclusionsToRecord: Array<{ saleId: string; recipientProfileId: string; weekKey: string }> = []
+
+    for (const user of recipientsToProcess) {
+      try {
+        // Get primary ZIP
+        const primaryZip = await getPrimaryZip(user.id)
+        
+        // Skip if no primary ZIP (v1: skip; can add broader fallback later)
+        if (!primaryZip) {
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            logger.info('Skipping recipient - no primary ZIP', {
+              component: 'jobs/weekly-featured-sales',
+              profileId: user.id,
+            })
+          }
+          continue
+        }
+
+        // Select 12 featured sales
+        const selectionResult = await selectFeaturedSales({
+          recipientProfileId: user.id,
+          primaryZip,
+          now,
+          weekKey,
+          radiusKm: 50,
+        })
+
+        if (selectionResult.selectedSales.length !== 12) {
+          logger.warn('Selection returned fewer than 12 sales', {
+            component: 'jobs/weekly-featured-sales',
+            profileId: user.id,
+            selectedCount: selectionResult.selectedSales.length,
+          })
+          // Continue with whatever we got (shouldn't happen in production)
+        }
+
+        // Fetch sale details for email
+        const { data: salesData, error: salesError } = await fromBase(admin, 'sales')
+          .select('id, title, date_start, date_end, address_line1, address_city, address_region, cover_image_url')
+          .in('id', selectionResult.selectedSales)
+          .eq('status', 'published')
+
+        if (salesError || !salesData || salesData.length === 0) {
+          logger.warn('Failed to fetch sale details for email', {
+            component: 'jobs/weekly-featured-sales',
+            profileId: user.id,
+            error: salesError?.message,
+          })
+          errors++
+          continue
+        }
+
+        // Convert to email items
+        const emailItems = salesData.map(convertSaleToFeaturedItem)
+
+        // Get user profile for display name
+        let recipientName: string | null = null
+        try {
+          const profile = await getUserProfile(adminBase, user.id)
+          recipientName = profile?.display_name || null
+        } catch {
+          // Profile fetch failed - continue without display name
+        }
+
+        // Send email (only if not in compute-only mode, or if in compute-only but allowlisted)
+        let emailSent = false
+        if (sendMode === 'full-send' || sendMode === 'allowlist-send' || (sendMode === 'compute-only' && allowlist.length > 0)) {
+          const emailResult = await sendFeaturedSalesEmail({
+            to: user.email!,
+            recipientName,
+            sales: emailItems,
+            profileId: user.id,
+            weekKey,
+          })
+
+          if (emailResult.ok) {
+            emailSent = true
+            emailsSent++
+          } else {
+            errors++
+            logger.warn('Failed to send featured sales email', {
+              component: 'jobs/weekly-featured-sales',
+              profileId: user.id,
+              error: emailResult.error,
+            })
+          }
+        } else {
+          // compute-only mode with empty allowlist - skip sending but log
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            logger.info('Skipping email send (compute-only mode, not in allowlist)', {
+              component: 'jobs/weekly-featured-sales',
+              profileId: user.id,
+            })
+          }
+        }
+
+        // Record inclusions if email was sent (or if in compute-only with allowlist)
+        if (emailSent || (sendMode === 'compute-only' && allowlist.length > 0)) {
+          // Record inclusion for each selected sale
+          selectionResult.selectedSales.forEach(saleId => {
+            inclusionsToRecord.push({
+              saleId,
+              recipientProfileId: user.id,
+              weekKey,
+            })
+          })
+        }
+      } catch (error) {
+        errors++
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        logger.error('Error processing recipient for weekly featured sales', {
+          component: 'jobs/weekly-featured-sales',
+          profileId: user.id,
+          error: errorMessage,
+        })
+      }
+    }
+
+    // Record all inclusions in batch
+    if (inclusionsToRecord.length > 0) {
+      try {
+        const inclusionResult = await recordInclusions(inclusionsToRecord)
+        if (!inclusionResult.success) {
+          logger.warn('Failed to record some inclusions (non-critical)', {
+            component: 'jobs/weekly-featured-sales',
+            error: inclusionResult.error,
+            inclusionCount: inclusionsToRecord.length,
+          })
+        }
+      } catch (error) {
+        logger.warn('Error recording inclusions (non-critical)', {
+          component: 'jobs/weekly-featured-sales',
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
+    logger.info('Weekly featured sales job completed', {
+      component: 'jobs/weekly-featured-sales',
+      emailsSent,
+      errors,
+      recipientsProcessed: recipientsToProcess.length,
+      inclusionsRecorded: inclusionsToRecord.length,
+    })
+
+    return {
+      success: true,
+      emailsSent,
+      errors,
+      recipientsProcessed: recipientsToProcess.length,
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    logger.error('Weekly featured sales job failed', {
+      component: 'jobs/weekly-featured-sales',
+      error: errorMessage,
+    })
+    return { success: false, error: errorMessage }
+  }
+}
+
+/**
  * Process image post-processing job
  */
 async function processImagePostprocessJob(payload: ImagePostprocessJobPayload): Promise<{ success: boolean; error?: string }> {

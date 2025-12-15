@@ -654,8 +654,140 @@ Milestone 2 builds the data foundations for the Weekly Featured Sales email syst
 - Promotion checkout/webhook handlers
 
 **Next Milestones:**
-- Milestone 3: Stripe promotions (payment processing, promotions table)
-- Milestone 4: Weekly email job (scheduled send, email template)
+- Milestone 3: Weekly email job (scheduled send, email template) ✅ **COMPLETE**
+- Milestone 4: Stripe promotions (payment processing, promotions table)
+- Milestone 5: Performance optimization (PostGIS queries, caching)
+
+## Milestone 3: Weekly Featured Sales Email Job
+
+**Status:** ✅ **COMPLETE**
+
+Milestone 3 implements the weekly featured sales email job pipeline with safety gates, recipient selection, email sending, and inclusion tracking writeback. This milestone does NOT implement Stripe promotions yet (still using `is_featured` as placeholder).
+
+### Implementation Summary
+
+**Cron Endpoint:**
+- `/api/cron/weekly-featured-sales` (GET/POST)
+- Protected by `CRON_SECRET` Bearer token authentication
+- Recommended schedule: Weekly on Thursdays at 09:00 UTC
+
+**Safety Gates:**
+- `FEATURED_EMAIL_ENABLED`: Must be `"true"` to run (default: `false`)
+- `FEATURED_EMAIL_SEND_MODE`: 
+  - `"compute-only"` (default): Compute selections and write inclusion tracking ONLY for allowlisted recipients; if allowlist is empty, no-op
+  - `"allowlist-send"`: Send emails only to allowlisted recipients
+  - `"full-send"`: Send to all eligible recipients
+- `FEATURED_EMAIL_ALLOWLIST`: Comma-separated emails or profile IDs (for compute-only/allowlist-send modes)
+
+**Recipient Selection:**
+- Only users with `email_featured_weekly_enabled = true` (default ON)
+- Excludes fully unsubscribed users (both `email_favorites_digest_enabled` and `email_seller_weekly_enabled` are `false`)
+- Must have a deliverable email address
+- Must have a primary ZIP code (v1: skip if no ZIP; broader fallback can be added later)
+- Does not require favorites to receive this email
+
+**Email Template:**
+- `FeaturedSalesEmail` template with 12 sale cards
+- Each card includes: title, date range, address (if available), cover image (if available), "View Sale" button
+- Uses unified unsubscribe footer system
+- Robust to missing images
+
+**Send Pipeline:**
+- Uses existing `sendEmail` infrastructure (Resend integration)
+- Non-blocking error handling (per-recipient errors don't kill the whole job)
+- Returns summarized job result (counts only, no PII)
+- Respects `LOOTAURA_ENABLE_EMAILS` global toggle
+
+**Inclusion Tracking Writeback:**
+- Records inclusion tracking when emails are actually sent
+- Updates both `featured_inclusions` (recipient-level) and `featured_inclusion_rollups` (aggregates)
+- For `compute-only` mode:
+  - If allowlist is set: treats as "sent" for allowlisted recipients (records inclusions)
+  - If allowlist is empty: does NOT record inclusions (no-op)
+- Does NOT record inclusions for dry-run endpoint
+
+**Job Processor:**
+- `processWeeklyFeaturedSalesJob()` in `lib/jobs/processor.ts`
+- Queries eligible recipients, selects 12 sales per recipient, sends emails, records inclusions
+- Handles errors gracefully (continues processing other recipients on failure)
+
+### Rollout Procedure
+
+**Step 1: Deploy with feature disabled**
+- Set `FEATURED_EMAIL_ENABLED=false` (default)
+- Verify cron endpoint returns `skipped: true`
+- No emails sent, no inclusions recorded
+
+**Step 2: Enable compute-only with allowlist**
+- Set `FEATURED_EMAIL_ENABLED=true`
+- Set `FEATURED_EMAIL_SEND_MODE=compute-only`
+- Set `FEATURED_EMAIL_ALLOWLIST=<your-email>`
+- Trigger cron endpoint manually (with `CRON_SECRET`)
+- Verify:
+  - No emails sent (compute-only mode)
+  - Inclusions recorded for allowlisted recipient
+  - Selection engine returns 12 sales
+
+**Step 3: Switch to allowlist-send**
+- Set `FEATURED_EMAIL_SEND_MODE=allowlist-send`
+- Keep `FEATURED_EMAIL_ALLOWLIST=<your-email>`
+- Trigger cron endpoint
+- Verify:
+  - Email received with 12 sales
+  - Unsubscribe link works
+  - Inclusions recorded
+
+**Step 4: Switch to full-send (production)**
+- Set `FEATURED_EMAIL_SEND_MODE=full-send`
+- Clear or remove `FEATURED_EMAIL_ALLOWLIST`
+- Schedule cron job (weekly on Thursdays at 09:00 UTC)
+- Monitor:
+  - Email send counts
+  - Error rates
+  - Inclusion tracking accuracy
+
+### Safety & Privacy
+
+**No PII Leakage:**
+- No ZIP codes, recipient IDs, or inclusion data in endpoint responses
+- No PII in logs (emails, user IDs, tokens)
+- Structured logging only (counts, error messages)
+
+**Opt-Out Respect:**
+- Fully unsubscribed users (both preferences `false`) are excluded
+- Users with `email_featured_weekly_enabled=false` are excluded
+- Unsubscribe link in email footer uses unified system
+
+**Error Handling:**
+- Per-recipient errors don't kill the whole job
+- Errors are logged but don't throw
+- Job returns summary (counts only)
+
+### Testing
+
+**Integration Tests:**
+- Cron auth (missing/invalid `CRON_SECRET` returns 401)
+- Safety gates (`FEATURED_EMAIL_ENABLED=false` returns skipped)
+- Recipient selection (respects preferences, excludes unsubscribed, requires ZIP)
+- Correctness (generates 12 sales, records inclusions)
+- Opt-out behavior (excludes users with preferences disabled)
+
+**Manual Testing:**
+- Set `FEATURED_EMAIL_ENABLED=true` and `FEATURED_EMAIL_SEND_MODE=allowlist-send` in non-prod
+- Add your email to `FEATURED_EMAIL_ALLOWLIST`
+- Trigger cron endpoint manually (with `CRON_SECRET`)
+- Verify email received with 12 sales and working unsubscribe link
+
+### What's Still Not Implemented
+
+**Not Yet Implemented:**
+- Stripe promotion payment processing
+- Actual promotions table (using `is_featured` as placeholder)
+- PostGIS spatial queries for ZIP-based radius filtering (using approximate radius for now)
+- Geographic proximity filtering optimization
+
+**Next Milestones:**
+- Milestone 4: Stripe promotions (payment processing, promotions table)
 - Milestone 5: Performance optimization (PostGIS queries, caching)
 
 ### Milestone 2 Security Checks

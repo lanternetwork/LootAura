@@ -128,6 +128,7 @@ describe('Weekly Featured Sales Cron Job', () => {
 
   describe('Safety gates', () => {
     it('skips when compute-only mode with empty allowlist (no-op)', async () => {
+      const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
       const result = await processWeeklyFeaturedSalesJob({
         sendMode: 'compute-only',
         allowlist: [],
@@ -258,6 +259,8 @@ describe('Weekly Featured Sales Cron Job', () => {
         }),
       })
 
+      const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
+      const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
       const result = await processWeeklyFeaturedSalesJob({
         sendMode: 'full-send',
         allowlist: [],
@@ -298,6 +301,7 @@ describe('Weekly Featured Sales Cron Job', () => {
         }),
       })
 
+      const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
       const result = await processWeeklyFeaturedSalesJob({
         sendMode: 'full-send',
         allowlist: [],
@@ -369,6 +373,7 @@ describe('Weekly Featured Sales Cron Job', () => {
       mockSendFeaturedSalesEmail.mockResolvedValue({ ok: true })
       mockRecordInclusions.mockResolvedValue({ success: true })
 
+      const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
       const result = await processWeeklyFeaturedSalesJob({
         sendMode: 'full-send',
         allowlist: [],
@@ -411,6 +416,7 @@ describe('Weekly Featured Sales Cron Job', () => {
 
       mockGetPrimaryZip.mockResolvedValue(null) // No primary ZIP
 
+      const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
       const result = await processWeeklyFeaturedSalesJob({
         sendMode: 'full-send',
         allowlist: [],
@@ -484,6 +490,7 @@ describe('Weekly Featured Sales Cron Job', () => {
       mockSendFeaturedSalesEmail.mockResolvedValue({ ok: true })
       mockRecordInclusions.mockResolvedValue({ success: true })
 
+      const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
       const result = await processWeeklyFeaturedSalesJob({
         sendMode: 'full-send',
         allowlist: [],
@@ -568,6 +575,7 @@ describe('Weekly Featured Sales Cron Job', () => {
       mockSendFeaturedSalesEmail.mockResolvedValue({ ok: true })
       mockRecordInclusions.mockResolvedValue({ success: true })
 
+      const { processWeeklyFeaturedSalesJob } = await import('@/lib/jobs/processor')
       const result = await processWeeklyFeaturedSalesJob({
         sendMode: 'full-send',
         allowlist: [],

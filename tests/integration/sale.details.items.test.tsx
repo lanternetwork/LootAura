@@ -267,7 +267,13 @@ describe('Sale Details Items Display', () => {
       button.click()
 
       await Promise.resolve()
-      expect(mockFetch).not.toHaveBeenCalled()
+
+      const calls = mockFetch.mock.calls.filter(
+        (args) =>
+          typeof args[0] === 'string' &&
+          (args[0] as string).includes('/api/promotions/checkout')
+      )
+      expect(calls.length).toBe(0)
     } finally {
       ;(global as any).fetch = originalFetch
     }

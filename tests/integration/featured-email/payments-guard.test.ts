@@ -37,10 +37,14 @@ vi.mock('@/lib/supabase/server', () => ({
 // Mock admin DB + fromBase chain for sale and promotions inserts/updates
 const mockFromBase = vi.fn()
 
-vi.mock('@/lib/supabase/clients', () => ({
-  getAdminDb: () => ({} as any),
-  fromBase: (_db: any, table: string) => mockFromBase(_db, table),
-}))
+vi.mock('@/lib/supabase/clients', async () => {
+  const actual = await vi.importActual<any>('@/lib/supabase/clients')
+  return {
+    ...actual,
+    getAdminDb: () => ({} as any),
+    fromBase: (_db: any, table: string) => mockFromBase(_db, table),
+  }
+})
 
 // CSRF check: always succeed
 vi.mock('@/lib/api/csrfCheck', () => ({

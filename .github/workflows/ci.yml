@@ -228,9 +228,8 @@ jobs:
           done
 
       - name: Run integration tests
-        run: npm run test -- tests/integration/
+        run: NODE_OPTIONS='--max-old-space-size=6144' npm run test -- tests/integration/
         env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}

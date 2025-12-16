@@ -66,6 +66,17 @@ describe('Share Redirect Integration', () => {
   })
 
   it('should call notFound for invalid short ID', async () => {
+    // Set up mock to avoid errors when code tries to access database
+    const mockSelect = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        single: vi.fn().mockResolvedValue({
+          data: null,
+          error: null
+        })
+      })
+    })
+    mockSupabase.from.mockReturnValue({ select: mockSelect })
+
     await ShortlinkPage({ params: { id: '' } })
 
     expect(notFound).toHaveBeenCalled()

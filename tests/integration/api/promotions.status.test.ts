@@ -194,6 +194,4 @@ describe('GET /api/promotions/status', () => {
       ['ends_at', 'is_active', 'sale_id', 'tier'].sort()
     )
   })
-}
-
-
+})

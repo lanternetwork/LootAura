@@ -115,6 +115,5 @@ describe('Sell Wizard Promote CTA', () => {
 
     expect(screen.getByTestId('review-feature-toggle')).toBeInTheDocument()
   })
-}
-
+})
 

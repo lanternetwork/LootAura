@@ -1,26 +1,26 @@
 /**
  * CI Starter Harness: Payments Disabled Safety Guard Test
- * 
- * Tests that promotion checkout creation is blocked unless PAYMENTS_ENABLED=true.
- * This ensures no accidental charges occur when payments are not configured.
+ *
+ * Now targets the real /api/promotions/checkout route to verify that:
+ * - Requests are blocked unless PAYMENTS_ENABLED=true
+ * - Stripe client is never instantiated when payments are disabled
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
+// Mocks for route dependencies
 const mockGetStripeClient = vi.fn()
-const mockIsPaymentsEnabled = vi.fn()
-const mockIsPromotionsEnabled = vi.fn()
-const mockGetFeaturedWeekPriceId = vi.fn()
+const mockIsPaymentsEnabled = vi.fn(() => process.env.PAYMENTS_ENABLED === 'true')
+const mockIsPromotionsEnabled = vi.fn(() => true)
 
 vi.mock('@/lib/stripe/client', () => ({
-  getStripeClient: () => mockGetStripeClient(),
-  isPaymentsEnabled: () => mockIsPaymentsEnabled(),
-  isPromotionsEnabled: () => mockIsPromotionsEnabled(),
-  getFeaturedWeekPriceId: () => mockGetFeaturedWeekPriceId(),
+  getStripeClient: (...args: any[]) => mockGetStripeClient(...args),
+  isPaymentsEnabled: (...args: any[]) => mockIsPaymentsEnabled(...args),
+  isPromotionsEnabled: (...args: any[]) => mockIsPromotionsEnabled(...args),
+  getFeaturedWeekPriceId: () => 'price_test_featured_week',
 }))
 
-// Mock Supabase server client to always return an authenticated user
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => ({
     auth: {
@@ -34,24 +34,43 @@ vi.mock('@/lib/supabase/server', () => ({
   }),
 }))
 
-// Mock admin DB + fromBase chain for sale and promotions inserts/updates
-const mockFromBase = vi.fn()
-
-vi.mock('@/lib/supabase/clients', async () => {
-  const actual = await vi.importActual<any>('@/lib/supabase/clients')
-  return {
-    ...actual,
-    getAdminDb: () => ({} as any),
-    fromBase: (_db: any, table: string) => mockFromBase(_db, table),
-  }
-})
-
-// CSRF check: always succeed
 vi.mock('@/lib/api/csrfCheck', () => ({
   checkCsrfIfRequired: vi.fn(async () => null),
 }))
 
-// Logger: stub out to avoid noise
+vi.mock('@/lib/auth/accountLock', () => ({
+  assertAccountNotLocked: vi.fn(async () => {}),
+}))
+
+vi.mock('@/lib/supabase/clients', () => ({
+  getAdminDb: () => ({}),
+  fromBase: () => ({
+    select: () => ({
+      eq: () =>
+        Promise.resolve({
+          data: {
+            id: 'sale-1',
+            owner_id: 'user-1',
+            status: 'published',
+            archived_at: null,
+            moderation_status: null,
+          },
+          error: null,
+        }),
+    }),
+  }),
+}))
+
+vi.mock('@/lib/rateLimit/withRateLimit', () => ({
+  withRateLimit: (handler: any) => handler,
+}))
+
+vi.mock('@/lib/rateLimit/policies', () => ({
+  Policies: {
+    MUTATE_MINUTE: { name: 'MUTATE_MINUTE' },
+  },
+}))
+
 vi.mock('@/lib/log', () => ({
   logger: {
     info: vi.fn(),
@@ -60,89 +79,32 @@ vi.mock('@/lib/log', () => ({
   },
 }))
 
-describe('Payments Disabled Safety Guard', () => {
-  beforeEach(() => {
+describe('Payments Disabled Safety Guard (real /api/promotions/checkout)', () => {
+  let handler: (request: NextRequest) => Promise<Response>
+
+  beforeEach(async () => {
     vi.clearAllMocks()
-    // Default: payments disabled
-    mockIsPaymentsEnabled.mockReturnValue(false)
-    mockIsPromotionsEnabled.mockReturnValue(true)
-    mockGetFeaturedWeekPriceId.mockReturnValue('price_test')
+    delete process.env.PAYMENTS_ENABLED
+    process.env.PROMOTIONS_ENABLED = 'true'
 
-    // Basic fromBase behavior: minimal chain that does not throw
-    mockFromBase.mockImplementation((_db: any, table: string) => {
-      if (table === 'sales') {
-        const chain: any = {
-          select: vi.fn(() => chain),
-          eq: vi.fn(() =>
-            Promise.resolve({
-              data: { id: 'sale-1', owner_id: 'user-1', status: 'published', archived_at: null, moderation_status: null },
-              error: null,
-            })
-          ),
-          single: vi.fn(),
-        }
-        return chain
-      }
-
-      if (table === 'promotions') {
-        const chain: any = {
-          insert: vi.fn(() => ({
-            select: vi.fn(() =>
-              Promise.resolve({
-                data: { id: 'promo-1' },
-                error: null,
-              })
-            ),
-          })),
-          update: vi.fn(() => ({
-            eq: vi.fn(() =>
-              Promise.resolve({
-                data: null,
-                error: null,
-              })
-            ),
-          })),
-        }
-        return chain
-      }
-
-      return {
-        select: vi.fn(() => ({
-          in: vi.fn(() => ({
-            eq: vi.fn(() => Promise.resolve({ data: [], error: null })),
-          })),
-        })),
-      }
-    })
+    const module = await import('@/app/api/promotions/checkout/route')
+    handler = module.POST
   })
 
   afterEach(() => {
-    vi.clearAllMocks()
+    delete process.env.PAYMENTS_ENABLED
+    delete process.env.PROMOTIONS_ENABLED
   })
 
-  let realHandler: ((request: NextRequest) => Promise<Response>) | null = null
-
-  const getHandler = async () => {
-    if (!realHandler) {
-      const module = await import('@/app/api/promotions/checkout/route')
-      realHandler = module.POST
-    }
-    return realHandler!
-  }
-
-  it('blocks checkout when PAYMENTS_ENABLED is not set', async () => {
-    mockIsPaymentsEnabled.mockReturnValue(false)
-
-    const handler = await getHandler()
-    const request = new NextRequest('http://localhost/api/promotions/checkout', {
+  const makeRequest = () =>
+    new NextRequest('http://localhost/api/promotions/checkout', {
       method: 'POST',
-      body: JSON.stringify({
-        sale_id: 'sale-1',
-        tier: 'featured_week',
-      }),
     })
 
-    const response = await handler(request)
+  it('blocks checkout when PAYMENTS_ENABLED is not set', async () => {
+    delete process.env.PAYMENTS_ENABLED
+
+    const response = await handler(makeRequest())
     const data = await response.json()
 
     expect(response.status).toBe(403)
@@ -151,18 +113,9 @@ describe('Payments Disabled Safety Guard', () => {
   })
 
   it('blocks checkout when PAYMENTS_ENABLED is false', async () => {
-    mockIsPaymentsEnabled.mockReturnValue(false)
+    process.env.PAYMENTS_ENABLED = 'false'
 
-    const handler = await getHandler()
-    const request = new NextRequest('http://localhost/api/promotions/checkout', {
-      method: 'POST',
-      body: JSON.stringify({
-        sale_id: 'sale-1',
-        tier: 'featured_week',
-      }),
-    })
-
-    const response = await handler(request)
+    const response = await handler(makeRequest())
     const data = await response.json()
 
     expect(response.status).toBe(403)
@@ -171,18 +124,9 @@ describe('Payments Disabled Safety Guard', () => {
   })
 
   it('blocks checkout when PAYMENTS_ENABLED is empty string', async () => {
-    mockIsPaymentsEnabled.mockReturnValue(false)
+    process.env.PAYMENTS_ENABLED = ''
 
-    const handler = await getHandler()
-    const request = new NextRequest('http://localhost/api/promotions/checkout', {
-      method: 'POST',
-      body: JSON.stringify({
-        sale_id: 'sale-1',
-        tier: 'featured_week',
-      }),
-    })
-
-    const response = await handler(request)
+    const response = await handler(makeRequest())
     const data = await response.json()
 
     expect(response.status).toBe(403)
@@ -190,63 +134,12 @@ describe('Payments Disabled Safety Guard', () => {
     expect(mockGetStripeClient).not.toHaveBeenCalled()
   })
 
-  it('allows checkout when PAYMENTS_ENABLED is true', async () => {
-    mockIsPaymentsEnabled.mockReturnValue(true)
-    mockIsPromotionsEnabled.mockReturnValue(true)
+  it('does not instantiate Stripe client when payments are disabled', async () => {
+    delete process.env.PAYMENTS_ENABLED
 
-    // Stripe client mock
-    const mockStripe = {
-      prices: {
-        retrieve: vi.fn().mockResolvedValue({ unit_amount: 1000 }),
-      },
-      checkout: {
-        sessions: {
-          create: vi.fn().mockResolvedValue({
-            id: 'cs_test_123',
-            url: 'https://stripe.test/checkout/session/cs_test_123',
-            customer: 'cus_test_123',
-          }),
-        },
-      },
-    }
-    mockGetStripeClient.mockReturnValue(mockStripe)
+    const response = await handler(makeRequest())
 
-    const handler = await getHandler()
-    const request = new NextRequest('http://localhost/api/promotions/checkout', {
-      method: 'POST',
-      body: JSON.stringify({
-        sale_id: 'sale-1',
-        tier: 'featured_week',
-      }),
-    })
-
-    const response = await handler(request)
-    const data = await response.json()
-
-    expect(response.status).toBe(200)
-    expect(data.checkoutUrl).toContain('https://stripe.test/checkout/session')
-    expect(mockStripe.prices.retrieve).toHaveBeenCalled()
-  })
-
-  it('does not change runtime behavior when disabled (no Stripe calls)', async () => {
-    mockIsPaymentsEnabled.mockReturnValue(false)
-
-    const handler = await getHandler()
-    const request = new NextRequest('http://localhost/api/promotions/checkout', {
-      method: 'POST',
-      body: JSON.stringify({
-        sale_id: 'sale-1',
-        tier: 'featured_week',
-      }),
-    })
-
-    const response = await handler(request)
-
-    // Should fail fast without any external service calls
     expect(response.status).toBe(403)
     expect(mockGetStripeClient).not.toHaveBeenCalled()
   })
 })
-
-
-

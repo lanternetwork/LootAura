@@ -1870,8 +1870,8 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
-function ReviewStep({ 
-  formData, 
+function ReviewStep({
+  formData,
   photos,
   items,
   onPublish,

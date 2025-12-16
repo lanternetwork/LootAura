@@ -1,16 +1,17 @@
-﻿/**
+/**
  * Integration tests for share redirect functionality
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
 import { notFound, redirect } from 'next/navigation'
 import ShortlinkPage from '@/app/s/[id]/page'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 
-// Mock Next.js navigation
+// Mock Next.js navigation (notFound/redirect throw in real Next.js)
 vi.mock('next/navigation', () => ({
-  notFound: vi.fn(),
+  notFound: vi.fn(() => {
+    throw new Error('NEXT_NOT_FOUND')
+  }),
   redirect: vi.fn()
 }))
 
@@ -31,7 +32,6 @@ describe('Share Redirect Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // Set up the mock properly
     vi.mocked(createSupabaseServerClient).mockReturnValue(mockSupabase as any)
   })
 
@@ -41,7 +41,7 @@ describe('Share Redirect Integration', () => {
 
   it('should redirect to explore page with serialized state', async () => {
     const mockState = {
-      view: { lat: 40.7128, lng: -74.0060, zoom: 12 },
+      view: { lat: 40.7128, lng: -74.006, zoom: 12 },
       filters: { dateRange: 'today', categories: ['furniture'], radius: 50 }
     }
 
@@ -66,19 +66,7 @@ describe('Share Redirect Integration', () => {
   })
 
   it('should call notFound for invalid short ID', async () => {
-    // Set up mock to avoid errors when code tries to access database
-    const mockSelect = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        single: vi.fn().mockResolvedValue({
-          data: null,
-          error: null
-        })
-      })
-    })
-    mockSupabase.from.mockReturnValue({ select: mockSelect })
-
-    await ShortlinkPage({ params: { id: '' } })
-
+    await expect(ShortlinkPage({ params: { id: '' } })).rejects.toThrow('NEXT_NOT_FOUND')
     expect(notFound).toHaveBeenCalled()
   })
 
@@ -93,11 +81,9 @@ describe('Share Redirect Integration', () => {
     })
     mockSupabase.from.mockReturnValue({ select: mockSelect })
 
-    // Suppress expected server-side logging for this error path
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    await ShortlinkPage({ params: { id: 'nonexistent' } })
-
+    await expect(ShortlinkPage({ params: { id: 'nonexistent' } })).rejects.toThrow('NEXT_NOT_FOUND')
     expect(notFound).toHaveBeenCalled()
 
     consoleSpy.mockRestore()
@@ -111,15 +97,12 @@ describe('Share Redirect Integration', () => {
     })
     mockSupabase.from.mockReturnValue({ select: mockSelect })
 
-    // Mock console.error to avoid noise in tests
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    await ShortlinkPage({ params: { id: 'test12345' } })
-
+    await expect(ShortlinkPage({ params: { id: 'test12345' } })).rejects.toThrow('NEXT_NOT_FOUND')
     expect(consoleSpy).toHaveBeenCalled()
     expect(notFound).toHaveBeenCalled()
 
     consoleSpy.mockRestore()
   })
 })
-

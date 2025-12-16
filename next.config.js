@@ -125,6 +125,8 @@ const nextConfig = {
       },
     ]
   },
+  // Transpile Supabase packages to fix ESM/CJS interop issues
+  transpilePackages: ['@supabase/supabase-js', '@supabase/ssr'],
   // Server Actions configuration
   experimental: {
     optimizePackageImports: ['react-virtuoso'],
@@ -139,10 +141,16 @@ const nextConfig = {
       buildActivityPosition: 'bottom-right',
     },
   }),
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname),
+    }
+    // Fix Supabase module resolution issue
+    // Handle ESM modules from @supabase packages
+    // Ensure .mjs files are handled correctly (add to beginning to prioritize)
+    if (!config.resolve.extensions.includes('.mjs')) {
+      config.resolve.extensions.unshift('.mjs')
     }
     // Reduce noisy webpack infra warnings about cache string serialization
     config.infrastructureLogging = {

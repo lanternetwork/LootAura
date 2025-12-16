@@ -127,7 +127,6 @@ export default function SellWizardClient({
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
   const [wantsPromotion, setWantsPromotion] = useState(false)
   const [isPromoting, setIsPromoting] = useState(false)
-  const [promoteDisabledReason, setPromoteDisabledReason] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -1127,7 +1126,6 @@ export default function SellWizardClient({
             loading={loading}
             submitError={submitError}
             promotionsEnabled={promotionsEnabled}
-            paymentsEnabled={paymentsEnabled}
             wantsPromotion={wantsPromotion}
             onTogglePromotion={setWantsPromotion}
           />
@@ -1891,7 +1889,6 @@ function ReviewStep({
   loading: boolean
   submitError?: string | null
   promotionsEnabled?: boolean
-  paymentsEnabled?: boolean
   wantsPromotion?: boolean
   onTogglePromotion?: (next: boolean) => void
 }) {

@@ -194,8 +194,7 @@ describe('Dashboard Client', () => {
       json: async () => ({ statuses: [] }),
     } as any)
 
-    // @ts-expect-error - override global fetch for test
-    global.fetch = mockFetch
+    ;(global as any).fetch = mockFetch
 
     try {
       renderWithQueryClient(
@@ -219,7 +218,7 @@ describe('Dashboard Client', () => {
       )
       expect(calls.length).toBe(1)
     } finally {
-      global.fetch = originalFetch
+      ;(global as any).fetch = originalFetch
     }
   })
 

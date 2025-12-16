@@ -45,8 +45,16 @@ vi.mock('@/lib/supabase/clients', () => ({
   fromBase: () => ({
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
-        single: vi.fn(),
-        maybeSingle: vi.fn(),
+        single: vi.fn().mockResolvedValue({
+          data: {
+            id: 'sale-1',
+            owner_id: 'user-1',
+            status: 'published',
+            archived_at: null,
+            moderation_status: null,
+          },
+          error: null,
+        }),
       })),
     })),
   }),

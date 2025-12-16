@@ -11,13 +11,14 @@ import { NextRequest } from 'next/server'
 
 const mockFromBase = vi.fn()
 const mockAdminDb = vi.fn()
+let currentUser: any = { id: 'user-1', email: 'user@example.test' }
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => ({
     auth: {
       getUser: vi.fn(() =>
         Promise.resolve({
-          data: { user: { id: 'user-1', email: 'user@example.test' } },
+          data: { user: currentUser },
           error: null,
         })
       ),
@@ -49,6 +50,7 @@ describe('GET /api/promotions/status', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    currentUser = { id: 'user-1', email: 'user@example.test' }
 
     // Default fromBase mock returns a simple chainable query for promotions
     mockFromBase.mockImplementation((_db: any, table: string) => {
@@ -87,19 +89,7 @@ describe('GET /api/promotions/status', () => {
   })
 
   it('requires authentication', async () => {
-    // Override supabase auth to simulate unauthenticated user
-    const server = await import('@/lib/supabase/server')
-    vi.spyOn(server, 'createSupabaseServerClient').mockReturnValue({
-      auth: {
-        getUser: vi.fn(() =>
-          Promise.resolve({
-            data: { user: null },
-            error: null,
-          })
-        ),
-      },
-    } as any)
-
+    currentUser = null
     const request = new NextRequest('http://localhost/api/promotions/status?sale_ids=sale-1', {
       method: 'GET',
     })

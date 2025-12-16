@@ -189,7 +189,7 @@ describe('Sale Details Items Display', () => {
   })
 
   it('does not show promote CTA for non-owners when promotions are enabled', () => {
-    mockUseAuth.mockReturnValue({ data: { id: 'someone-else', email: 'other@example.test' } })
+    mockUseAuth.mockReturnValue({ data: { id: 'someone-else', email: 'other@example.test' } } as any)
 
     render(
       <SaleDetailClient 
@@ -204,8 +204,8 @@ describe('Sale Details Items Display', () => {
     expect(screen.queryByTestId('sale-detail-promote-button')).not.toBeInTheDocument()
   })
 
-  it('shows active promote state for owner when promotion is active', () => {
-    mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } })
+  it('shows promote panel for owner when promotions are enabled', () => {
+    mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
 
     render(
       <SaleDetailClient 
@@ -217,9 +217,7 @@ describe('Sale Details Items Display', () => {
       />
     )
 
-    // Simulate status hook having set an active promotion by directly rendering with text
-    // The component uses "Promoted" label when status is active; we assert that label exists
-    expect(screen.getByText(/Promote this sale/i)).toBeInTheDocument()
+    expect(screen.getByText('Promote this sale')).toBeInTheDocument()
   })
 
   it('should display item categories when available', () => {

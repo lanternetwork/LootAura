@@ -122,9 +122,19 @@ interface SaleDetailClientProps {
   items?: SaleItem[]
   nearbySales?: Array<Sale & { distance_m: number }>
   currentUserRating?: number | null
+  promotionsEnabled?: boolean
+  paymentsEnabled?: boolean
 }
 
-export default function SaleDetailClient({ sale, displayCategories = [], items = [], nearbySales = [], currentUserRating }: SaleDetailClientProps) {
+export default function SaleDetailClient({
+  sale,
+  displayCategories = [],
+  items = [],
+  nearbySales = [],
+  currentUserRating,
+  promotionsEnabled = false,
+  paymentsEnabled = false,
+}: SaleDetailClientProps) {
   // Debug logging to diagnose items visibility issue (only in debug mode)
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
     console.log('[SALE_DETAIL_CLIENT] Items received', {
@@ -177,6 +187,11 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
   const cover = getSaleCoverUrl(sale)
   const viewTrackedRef = useRef(false)
   const isOptimisticRef = useRef(false)
+  const [promotionStatus, setPromotionStatus] = useState<{
+    isActive: boolean
+    endsAt: string | null
+  } | null>(null)
+  const [isPromotionLoading, setIsPromotionLoading] = useState(false)
 
   // Track click event for navigation/directions
   const handleNavigationClick = () => {
@@ -227,6 +242,56 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
       day: 'numeric'
     })
   }
+
+  const isOwner = !!currentUser && currentUser.id === sale.owner_id
+
+  // Fetch minimal promotion status for this sale (owner-only, when promotions are enabled)
+  useEffect(() => {
+    if (!promotionsEnabled || !isOwner) {
+      setPromotionStatus(null)
+      return
+    }
+
+    let cancelled = false
+    const fetchStatus = async () => {
+      try {
+        setIsPromotionLoading(true)
+        const res = await fetch(
+          `/api/promotions/status?sale_ids=${encodeURIComponent(sale.id)}`,
+          {
+            credentials: 'include',
+          }
+        )
+        if (!res.ok) {
+          return
+        }
+        const json = await res.json().catch(() => null)
+        if (!json || !Array.isArray(json.statuses)) {
+          return
+        }
+        const status = json.statuses.find((s: any) => s.sale_id === sale.id)
+        if (!cancelled && status) {
+          const isActive = !!status.is_active && !!status.ends_at
+          setPromotionStatus({
+            isActive,
+            endsAt: status.ends_at ?? null,
+          })
+        }
+      } catch {
+        // Silent failure - promotion status is non-critical
+      } finally {
+        if (!cancelled) {
+          setIsPromotionLoading(false)
+        }
+      }
+    }
+
+    fetchStatus()
+
+    return () => {
+      cancelled = true
+    }
+  }, [promotionsEnabled, isOwner, sale.id])
 
   const formatTimeShort = (timeString: string) => {
     const [hours, minutes] = timeString.split(':')
@@ -845,6 +910,135 @@ export default function SaleDetailClient({ sale, displayCategories = [], items =
             currentUserRating={currentUserRating ?? null}
             saleId={sale.id}
           />
+
+          {/* Seller-only Promote panel (desktop/sidebar) */}
+          {promotionsEnabled && isOwner && (
+            <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50 p-4">
+              <h4 className="font-medium text-[#3A2268] mb-1">Promote this sale</h4>
+              {promotionStatus?.isActive ? (
+                <p className="text-sm text-[#3A2268]" data-testid="sale-detail-promote-active">
+                  Promoted
+                  {promotionStatus.endsAt && (
+                    <>
+                      {' '}
+                      • Ends{' '}
+                      {new Date(promotionStatus.endsAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </>
+                  )}
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-[#3A2268] mb-2">
+                    Feature your sale to get extra visibility in weekly emails and discovery.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isPromotionLoading || !paymentsEnabled}
+                    onClick={async () => {
+                      if (!paymentsEnabled) {
+                        toast.info('Promotions are not available right now. Please check back later.')
+                        return
+                      }
+                      if (isPromotionLoading) {
+                        return
+                      }
+                      try {
+                        setIsPromotionLoading(true)
+                        const response = await fetch('/api/promotions/checkout', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            ...getCsrfHeaders(),
+                          },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            sale_id: sale.id,
+                            tier: 'featured_week',
+                          }),
+                        })
+
+                        const data = await response.json().catch(() => ({}))
+
+                        if (!response.ok) {
+                          const code = data?.code
+
+                          if (code === 'PAYMENTS_DISABLED') {
+                            toast.info(
+                              data?.details?.message ||
+                                'Promotions are not available right now. Please check back later.'
+                            )
+                            return
+                          }
+
+                          if (code === 'PROMOTIONS_DISABLED') {
+                            toast.info(
+                              data?.details?.message ||
+                                'Promotions are currently disabled. Please check back later.'
+                            )
+                            return
+                          }
+
+                          if (code === 'ACCOUNT_LOCKED') {
+                            toast.error(
+                              data?.details?.message ||
+                                'Your account is locked. Please contact support if you believe this is an error.'
+                            )
+                            return
+                          }
+
+                          if (code === 'SALE_NOT_ELIGIBLE') {
+                            toast.error(
+                              data?.message ||
+                                'This sale is not eligible for promotion at this time.'
+                            )
+                            return
+                          }
+
+                          toast.error(
+                            data?.message ||
+                              'Failed to start promotion checkout. Please try again.'
+                          )
+                          return
+                        }
+
+                        if (data?.checkoutUrl) {
+                          window.location.href = data.checkoutUrl
+                        } else {
+                          toast.error(
+                            'Unexpected response from promotion checkout. Please try again.'
+                          )
+                        }
+                      } catch (error: any) {
+                        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                          console.error(
+                            '[SALE_DETAIL] Error starting promotion checkout:',
+                            error
+                          )
+                        }
+                        toast.error(
+                          'Failed to start promotion checkout. Please try again.'
+                        )
+                      } finally {
+                        setIsPromotionLoading(false)
+                      }
+                    }}
+                    className="mt-1 inline-flex items-center px-3 py-1.5 text-sm rounded-lg bg-[#3A2268] text-white hover:bg-[#4b2a80] disabled:opacity-60 disabled:cursor-not-allowed"
+                    data-testid="sale-detail-promote-button"
+                  >
+                    {isPromotionLoading
+                      ? 'Starting promotion…'
+                      : paymentsEnabled
+                        ? 'Promote this sale'
+                        : 'Promotions unavailable'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Shopping Tips */}
           <div className="bg-[rgba(147,51,234,0.08)] border border-purple-200 rounded-lg p-4">

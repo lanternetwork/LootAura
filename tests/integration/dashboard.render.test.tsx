@@ -138,6 +138,21 @@ describe('Dashboard Client', () => {
     expect(editProfileLink).toHaveAttribute('href', '/account/edit')
   })
 
+  it('hides Promote CTA when promotions are disabled', () => {
+    const { queryByTestId } = renderWithQueryClient(
+      <DashboardClient
+        initialSales={mockSales}
+        initialDrafts={mockDrafts}
+        initialProfile={mockProfile}
+        initialMetrics={mockMetrics}
+        promotionsEnabled={false}
+        paymentsEnabled={true}
+      />
+    )
+
+    expect(queryByTestId('dashboard-promote-button')).toBeNull()
+  })
+
   it('should render Drafts tab in SalesPanel with draft count', () => {
     const { container } = renderWithQueryClient(
       <DashboardClient
@@ -170,6 +185,42 @@ describe('Dashboard Client', () => {
     expect(container.textContent).toContain('Archived')
     expect(container.textContent).toContain('Drafts')
     expect(container.textContent).toContain('2') // Live sales count
+  })
+
+  it('uses batch status endpoint once for promotion statuses (no N+1)', async () => {
+    const originalFetch = global.fetch
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ statuses: [] }),
+    } as any)
+
+    // @ts-expect-error - override global fetch for test
+    global.fetch = mockFetch
+
+    try {
+      renderWithQueryClient(
+        <DashboardClient
+          initialSales={mockSales}
+          initialDrafts={mockDrafts}
+          initialProfile={mockProfile}
+          initialMetrics={mockMetrics}
+          promotionsEnabled={true}
+          paymentsEnabled={true}
+        />
+      )
+
+      // Wait for batch status call
+      await vi.waitFor(() => {
+        expect(mockFetch).toHaveBeenCalled()
+      })
+
+      const calls = mockFetch.mock.calls.filter(
+        (args) => typeof args[0] === 'string' && (args[0] as string).includes('/api/promotions/status')
+      )
+      expect(calls.length).toBe(1)
+    } finally {
+      global.fetch = originalFetch
+    }
   })
 
   it('should render AnalyticsPanel', () => {

@@ -34,10 +34,18 @@ export default async function SellNewPage() {
     console.warn('[SellNewPage] Failed to get location:', e)
   }
 
+  const promotionsEnabled = process.env.PROMOTIONS_ENABLED === 'true'
+  const paymentsEnabled = process.env.PAYMENTS_ENABLED === 'true'
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Suspense fallback={<SellWizardSkeleton />}>
-        <SellWizardClient userLat={userLat} userLng={userLng} />
+        <SellWizardClient
+          userLat={userLat}
+          userLng={userLng}
+          promotionsEnabled={promotionsEnabled}
+          paymentsEnabled={paymentsEnabled}
+        />
       </Suspense>
     </div>
   )

@@ -56,7 +56,23 @@ const WIZARD_STEPS: WizardStep[] = [
   }
 ]
 
-export default function SellWizardClient({ initialData, isEdit: _isEdit = false, saleId: _saleId, userLat, userLng }: { initialData?: Partial<SaleInput>; isEdit?: boolean; saleId?: string; userLat?: number; userLng?: number }) {
+export default function SellWizardClient({
+  initialData,
+  isEdit: _isEdit = false,
+  saleId: _saleId,
+  userLat,
+  userLng,
+  promotionsEnabled = false,
+  paymentsEnabled = false,
+}: {
+  initialData?: Partial<SaleInput>
+  isEdit?: boolean
+  saleId?: string
+  userLat?: number
+  userLng?: number
+  promotionsEnabled?: boolean
+  paymentsEnabled?: boolean
+}) {
   const router = useRouter()
   const supabase = createSupabaseBrowserClient()
   const [currentStep, setCurrentStep] = useState(0)
@@ -109,6 +125,9 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
+  const [wantsPromotion, setWantsPromotion] = useState(false)
+  const [isPromoting, setIsPromoting] = useState(false)
+  const [promoteDisabledReason, setPromoteDisabledReason] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -1099,7 +1118,20 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
       case STEPS.ITEMS:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
       case STEPS.REVIEW:
-        return <ReviewStep formData={formData} photos={photos} items={items} onPublish={handleSubmit} loading={loading} submitError={submitError} />
+        return (
+          <ReviewStep
+            formData={formData}
+            photos={photos}
+            items={items}
+            onPublish={handleSubmit}
+            loading={loading}
+            submitError={submitError}
+            promotionsEnabled={promotionsEnabled}
+            paymentsEnabled={paymentsEnabled}
+            wantsPromotion={wantsPromotion}
+            onTogglePromotion={setWantsPromotion}
+          />
+        )
       default:
         return null
     }
@@ -1282,6 +1314,108 @@ export default function SellWizardClient({ initialData, isEdit: _isEdit = false,
             setConfirmationModalOpen(false)
           }}
           saleId={createdSaleId}
+          showPromoteCta={promotionsEnabled && wantsPromotion}
+          isPromoting={isPromoting}
+          promoteDisabledReason={
+            promotionsEnabled && wantsPromotion && !paymentsEnabled
+              ? 'Promotions are not available right now. You can try again later from your dashboard.'
+              : null
+          }
+          onPromoteNow={async () => {
+            if (!createdSaleId || !promotionsEnabled) {
+              return
+            }
+
+            if (!paymentsEnabled) {
+              setToastMessage('Promotions are not available right now. Please check back later.')
+              setShowToast(true)
+              return
+            }
+
+            if (isPromoting) {
+              return
+            }
+
+            setIsPromoting(true)
+            try {
+              const response = await fetch('/api/promotions/checkout', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...getCsrfHeaders(),
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                  sale_id: createdSaleId,
+                  tier: 'featured_week',
+                }),
+              })
+
+              const data = await response.json().catch(() => ({}))
+
+              if (!response.ok) {
+                const code = data?.code
+
+                if (code === 'PAYMENTS_DISABLED') {
+                  setToastMessage(
+                    data?.details?.message ||
+                      'Promotions are not available right now. Please check back later.'
+                  )
+                  setShowToast(true)
+                  return
+                }
+
+                if (code === 'PROMOTIONS_DISABLED') {
+                  setToastMessage(
+                    data?.details?.message ||
+                      'Promotions are currently disabled. Please check back later.'
+                  )
+                  setShowToast(true)
+                  return
+                }
+
+                if (code === 'ACCOUNT_LOCKED') {
+                  setToastMessage(
+                    data?.details?.message ||
+                      'Your account is locked. Please contact support if you believe this is an error.'
+                  )
+                  setShowToast(true)
+                  return
+                }
+
+                if (code === 'SALE_NOT_ELIGIBLE') {
+                  setToastMessage(
+                    data?.message || 'This sale is not eligible for promotion at this time.'
+                  )
+                  setShowToast(true)
+                  return
+                }
+
+                setToastMessage(
+                  data?.message || 'Failed to start promotion checkout. Please try again.'
+                )
+                setShowToast(true)
+                return
+              }
+
+              if (data?.checkoutUrl) {
+                window.location.href = data.checkoutUrl
+              } else {
+                setToastMessage(
+                  'Unexpected response from promotion checkout. Please try again.'
+                )
+                setShowToast(true)
+              }
+            } catch (error: any) {
+              if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+                console.error('[SELL_WIZARD] Error starting promotion checkout:', error)
+              }
+              setToastMessage('Failed to start promotion checkout. Please try again.')
+              setShowToast(true)
+            } finally {
+              setIsPromoting(false)
+            }
+          }}
         />
       )}
 
@@ -1738,13 +1872,28 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
-function ReviewStep({ formData, photos, items, onPublish, loading, submitError }: {
-  formData: Partial<SaleInput>,
-  photos: string[],
-  items: Array<{ id?: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>,
-  onPublish: () => void,
-  loading: boolean,
+function ReviewStep({
+  formData,
+  photos,
+  items,
+  onPublish,
+  loading,
+  submitError,
+  promotionsEnabled,
+  paymentsEnabled,
+  wantsPromotion,
+  onTogglePromotion,
+}: {
+  formData: Partial<SaleInput>
+  photos: string[]
+  items: Array<{ id?: string; name: string; price?: number; description?: string; image_url?: string; category?: CategoryValue }>
+  onPublish: () => void
+  loading: boolean
   submitError?: string | null
+  promotionsEnabled?: boolean
+  paymentsEnabled?: boolean
+  wantsPromotion?: boolean
+  onTogglePromotion?: (next: boolean) => void
 }) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -1842,18 +1991,48 @@ function ReviewStep({ formData, photos, items, onPublish, loading, submitError }
         )}
       </div>
 
-      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-        <div className="flex">
-          <svg className="w-5 h-5 text-purple-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div>
-            <h4 className="font-medium text-purple-800">Ready to publish?</h4>
-            <p className="text-sm text-purple-700 mt-1">
-              Your sale will be visible to buyers in your area. You can edit it later from your account.
-            </p>
+      <div className="space-y-3">
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex">
+            <svg className="w-5 h-5 text-purple-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h4 className="font-medium text-purple-800">Ready to publish?</h4>
+              <p className="text-sm text-purple-700 mt-1">
+                Your sale will be visible to buyers in your area. You can edit it later from your account.
+              </p>
+            </div>
           </div>
         </div>
+
+        {promotionsEnabled && (
+          <div className="bg-white border border-purple-200 rounded-lg p-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div>
+                <h4 className="font-medium text-[#3A2268]">Feature your sale</h4>
+                <p className="text-sm text-[#3A2268] mt-1">
+                  Get more visibility by featuring your sale in weekly emails and discovery.
+                </p>
+                <p className="mt-1 text-xs text-[#3A2268]">
+                  You can also promote later from your dashboard.
+                </p>
+              </div>
+              <div className="flex items-center justify-start sm:justify-end">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!wantsPromotion}
+                    onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                    className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
+                    data-testid="review-feature-toggle"
+                  />
+                  <span className="text-sm text-[#3A2268]">Feature this sale</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="mt-6 mb-6">

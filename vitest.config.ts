@@ -23,11 +23,11 @@ export default defineConfig({
     testTimeout: 10000,
     hookTimeout: 10000,
     // Ensure jsdom environment is available to tests
-    // Use worker threads with a single worker to keep memory bounded but avoid child-process flakiness
-    pool: 'threads',
+    // Use forks pool for better memory isolation and stability in CI
+    pool: 'forks',
     // Run tests strictly serially to avoid concurrency spikes on constrained CI runners
     maxConcurrency: 1,
-    // Constrain worker count to a single thread to prevent ERR_WORKER_OUT_OF_MEMORY
+    // Constrain worker count to a single fork to prevent ERR_WORKER_OUT_OF_MEMORY
     maxWorkers: 1,
     minWorkers: 1,
   },

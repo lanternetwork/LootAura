@@ -220,6 +220,59 @@ describe('Sale Details Items Display', () => {
     expect(screen.getByText('Promote this sale')).toBeInTheDocument()
   })
 
+  it('shows active promotion state with ends date when promotion is active', () => {
+    mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
+
+    render(
+      <SaleDetailClient 
+        sale={mockSale} 
+        displayCategories={['furniture']}
+        items={mockItems}
+        promotionsEnabled={true}
+        paymentsEnabled={true}
+        initialPromotionStatus={{
+          isActive: true,
+          endsAt: '2030-01-01T00:00:00.000Z',
+        } as any}
+      />
+    )
+
+    const active = screen.getByTestId('sale-detail-promote-active')
+    expect(active.textContent).toContain('Promoted')
+    expect(active.textContent).toMatch(/Ends/)
+  })
+
+  it('does not call checkout when payments are disabled (seller view)', async () => {
+    mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
+
+    const originalFetch = global.fetch
+    const mockFetch = vi.fn()
+    ;(global as any).fetch = mockFetch
+
+    try {
+      render(
+        <SaleDetailClient 
+          sale={mockSale} 
+          displayCategories={['furniture']}
+          items={mockItems}
+          promotionsEnabled={true}
+          paymentsEnabled={false}
+        />
+      )
+
+      const button = screen.getByTestId('sale-detail-promote-button')
+      expect(button).toBeDisabled()
+
+      // Even if clicked programmatically, paymentsEnabled=false should guard before fetch
+      button.click()
+
+      await Promise.resolve()
+      expect(mockFetch).not.toHaveBeenCalled()
+    } finally {
+      ;(global as any).fetch = originalFetch
+    }
+  })
+
   it('should display item categories when available', () => {
     render(
       <SaleDetailClient 

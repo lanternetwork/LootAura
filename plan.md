@@ -656,7 +656,8 @@ Milestone 2 builds the data foundations for the Weekly Featured Sales email syst
 **Next Milestones:**
 - Milestone 3: Weekly email job (scheduled send, email template) ✅ **COMPLETE**
 - Milestone 4: Stripe promotions (payment processing, promotions table)
-- Milestone 5: Performance optimization (PostGIS queries, caching)
+- Milestone 5A: Seller-facing Promote CTAs (wizard, dashboard, sale detail) ✅ **COMPLETE**
+- Milestone 5B: Performance optimization (PostGIS queries, caching)
 
 ## Milestone 3: Weekly Featured Sales Email Job
 
@@ -782,7 +783,7 @@ Milestone 3 implements the weekly featured sales email job pipeline with safety 
 
 **Not Yet Implemented:**
 - Stripe promotion payment processing
-- Actual promotions table (using `is_featured` as placeholder)
+- Actual promotions table (using `is_featured` as placeholder) **(superseded by Milestone 4)**
 - PostGIS spatial queries for ZIP-based radius filtering (using approximate radius for now)
 - Geographic proximity filtering optimization
 
@@ -841,131 +842,115 @@ Milestone 3 implements the weekly featured sales email job pipeline with safety 
 
 ---
 
-## Milestone 5A: Promote CTAs (Promoted Listings UI)
-
-**Status:** 🚧 In Progress (CTAs + batch status endpoint implemented; tests/docs being added)
-
-### Overview
-
-Milestone 5A surfaces seller-facing “Promote listing” CTAs on top of the Milestone 4 promotions + Stripe infrastructure. The goal is to provide a safe, gated path for sellers to start a promotion, without adding N+1 queries, leaking recipient metrics, or weakening Stripe/webhook safety.
-
-### CTA Locations
-
-- **Sell Wizard (Review step)**
-  - Location: `app/sell/new/SellWizardClient.tsx` → `ReviewStep`.
-  - UI:
-    - Title: **“Feature your sale”**
-    - Copy: “Get more visibility by featuring your sale in weekly emails and discovery.”
-    - Toggle: **“Feature this sale”** (local state only, default OFF).
-    - Note: “You can also promote later from your dashboard.”
-  - Behavior:
-    - The toggle is **purely client-side**: no DB writes and no promotion record creation.
-    - After successful publish, if the toggle was ON and gating allows, the confirmation modal shows a **“Promote now”** button that uses the same checkout flow as the dashboard CTA.
-
-- **Dashboard (Seller-owned sales)**
-  - Location: `DashboardClient` → `SalesPanel` → `DashboardSaleCard`.
-  - UI:
-    - Actions row next to `View` / `Edit` / `Delete`.
-    - When not promoted: **“Promote”** button.
-    - When active: disabled label **“Promoted • Ends <date>”**.
-  - Behavior:
-    - CTA is automatically scoped to the signed-in seller; only seller-owned sales appear in the dashboard list.
-    - Clicking **“Promote”** calls `POST /api/promotions/checkout` with CSRF headers and redirects to `checkoutUrl` on success.
-
-- **Sale Detail Page (Seller view)**
-  - Location: `app/sales/[id]/SaleDetailClient.tsx` sidebar, near `SellerActivityCard`.
-  - UI:
-    - Panel title: **“Promote this sale”**.
-    - Active state: **“Promoted • Ends <date>”** (read-only).
-    - Inactive state: brief description + **“Promote this sale”** button.
-  - Behavior:
-    - CTA is **owner-only**: rendered only when `currentUser.id === sale.owner_id`.
-    - Non-owners and anonymous visitors do not see any promotion controls.
-
-### Gating
-
-- **`PROMOTIONS_ENABLED` – controls visibility**
-  - Server components read `process.env.PROMOTIONS_ENABLED` and pass booleans into clients:
-    - `app/(dashboard)/dashboard/page.tsx` → `DashboardClient`.
-    - `app/sell/new/page.tsx` → `SellWizardClient`.
-    - `app/sales/[id]/page.tsx` → `SaleDetailClient`.
-  - When `PROMOTIONS_ENABLED !== 'true'`:
-    - Sell Wizard “Feature your sale” section is hidden.
-    - Dashboard “Promote” button is not rendered.
-    - Sale detail Promote panel is not rendered.
-
-- **`PAYMENTS_ENABLED` – controls checkout**
-  - Single source of truth remains `lib/stripe/client.isPaymentsEnabled()`.
-  - `app/api/promotions/checkout/route.ts` still fails fast with `403 PAYMENTS_DISABLED` when payments are disabled.
-  - `getStripeClient()` also short-circuits when payments are disabled, ensuring no Stripe calls occur.
-  - UI behavior when `PAYMENTS_ENABLED=false`:
-    - **Dashboard:** Promote button appears (if promotions enabled) but is disabled with label **“Promotions unavailable”** and does not call checkout; if the API still returns `PAYMENTS_DISABLED`, the client shows a friendly message.
-    - **Sell Wizard:** The confirmation modal’s “Promote now” button shows a friendly message and never calls checkout when payments are disabled.
-    - **Sale Detail:** The Promote button is disabled with **“Promotions unavailable”** label and only shows an informational message when clicked; no checkout call is made.
-
-### Batch Status Endpoint (No N+1)
-
-- **Route:** `GET /api/promotions/status?sale_ids=<comma-separated>`
-  - Location: `app/api/promotions/status/route.ts`.
-  - Auth:
-    - Uses `createSupabaseServerClient().auth.getUser()` and returns `401 AUTH_REQUIRED` when unauthenticated.
-  - Ownership:
-    - Non-admins only see promotions for which `owner_profile_id === user.id`.
-    - Admins bypass this filter via `assertAdminOrThrow`.
-  - Response shape (minimal):
-    - Array of `{ sale_id, is_active, ends_at, tier }`.
-    - No owner IDs, emails, recipient IDs, or metrics.
-
-- **Caps & Abuse Protection**
-  - `MAX_SALE_IDS = 100` (after deduplication; extra IDs are dropped).
-  - `MAX_SALE_IDS_PARAM_LENGTH = 4000` to defend against extremely long querystrings.
-  - Invalid or oversized requests return `400 INVALID_REQUEST` without touching Stripe or heavy DB paths.
-
-- **Dashboard usage (no N+1)**
-  - `SalesPanel` computes the list of live sale IDs and calls `/api/promotions/status` **once** per panel render.
-  - Per-card components (`DashboardSaleCard`) receive the pre-fetched status via props and do not perform their own fetches.
-  - CI test enforces that the status endpoint is called once (not per card).
-
-### Rollout Checklist (5A)
-
-1. **Preflight (infra readiness)**
-   - Milestone 4 in place: promotions table, Stripe checkout + webhook, expiry cron.
-   - `/api/promotions/checkout`, `/api/promotions/status`, and `/api/sales/[id]/promotion-metrics` passing CI.
-
-2. **Deploy 5A with CTAs gated OFF**
-   - `PROMOTIONS_ENABLED=false`, `PAYMENTS_ENABLED=false`.
-   - Validate:
-     - No Promote CTAs appear in wizard, dashboard, or sale detail.
-     - `/api/promotions/status` returns 401 for anonymous requests and empty `statuses` for owners with no promotions.
-
-3. **Enable CTAs without payments**
-   - `PROMOTIONS_ENABLED=true`, `PAYMENTS_ENABLED=false`.
-   - Validate:
-     - “Feature your sale” toggle appears on wizard review step; confirmation modal shows “Promote now”, but the flow never calls Stripe checkout and instead shows friendly messages.
-     - Dashboard and sale detail Promote buttons render but are disabled / labeled as unavailable, and no Stripe checkout calls are made.
-
-4. **Enable payments (test keys)**
-   - `PROMOTIONS_ENABLED=true`, `PAYMENTS_ENABLED=true`, Stripe test keys + price ID configured.
-   - Validate:
-     - Dashboard, sale detail, and Sell Wizard “Promote now” flows successfully create Stripe checkout sessions.
-     - Webhooks activate promotions and idempotency table records processed events.
-     - Promotion status surfaces as “Promoted • Ends <date>” in dashboard and sale detail UI.
-
-5. **Production turn-up**
-   - Switch to live Stripe keys with the same flags.
-   - Monitor:
-     - Checkout success/error rates (via Stripe + logs).
-     - `/api/promotions/status` latency and error rates.
-     - No PII leakage in logs or responses.
-
-### Security & Privacy (5A)
-
-- No new debug endpoints were added for promotions.
-- Promotion CTAs are owner-only and authenticated; anonymous users and non-owners cannot trigger checkout.
-- Batch status endpoint is owner/admin only and returns a minimal, non-PII shape.
-- Stripe webhook verification, idempotency, and `PAYMENTS_ENABLED` gating from Milestone 4 remain unchanged.
+**Note**: This plan is a living document and should be updated as the project evolves.
 
 ---
 
-**Note**: This plan is a living document and should be updated as the project evolves.
+## Milestone 5A: Seller-Facing Promote CTAs
+
+**Status:** ✅ **COMPLETE**
+
+Milestone 5A surfaces the existing Stripe promotions infrastructure (Milestone 4) to sellers via gated, low-risk CTAs, without introducing N+1 patterns or leaking recipient-level data.
+
+### CTA Locations
+
+- **Sell Wizard (Review Step)**  
+  - Location: Review/publish step of `SellWizardClient`.  
+  - UI:  
+    - Section title: **“Feature your sale”**  
+    - Copy: “Get more visibility by featuring your sale in weekly emails and discovery.”  
+    - Note: “You can also promote later from your dashboard.”  
+    - Control: Checkbox **“Feature this sale”** (default OFF, local state only).  
+  - Behavior:  
+    - No DB writes when toggled (pure client state).  
+    - On successful publish: Confirmation modal shows an optional **“Promote now”** button when the user opted in and promotions are enabled.  
+    - “Promote now” calls the existing `POST /api/promotions/checkout` endpoint and, on success, redirects the browser to the Stripe `checkoutUrl`.
+
+- **Dashboard (Seller-owned sales)**  
+  - Location: Seller dashboard sales cards (`DashboardSaleCard`).  
+  - UI: Button next to **View / Edit / Delete** actions.  
+  - Behavior:  
+    - When not promoted: **“Promote”** button which starts the same checkout flow as above.  
+    - When actively promoted: Disabled state **“Promoted • Ends <date>”**.  
+    - Uses batched promotion status from `GET /api/promotions/status` (no per-card fetch).
+
+- **Sale Detail (Seller view)**  
+  - Location: Right-hand sidebar under seller controls in `SaleDetailClient`.  
+  - UI:  
+    - Panel header: **“Promote this sale”** (owner-only).  
+    - Active state: Text **“Promoted”** plus optional **“Ends <date>”**.  
+    - Inactive state: Copy explaining that promotion increases visibility plus a **“Promote this sale”** button.  
+  - Behavior:  
+    - Owner-only (compares `sale.owner_id` to `useAuth()` user).  
+    - Reuses the existing checkout endpoint and CSRF helper; no recipient-level metrics are shown.
+
+### Gating
+
+- **PROMOTIONS_ENABLED**  
+  - Server-side env flag; read in server components (`/dashboard`, `/sales/[id]`, `/sell/new`) and passed as props.  
+  - Controls **visibility** of all promotion CTAs (wizard toggle, dashboard Promote button, sale detail panel).  
+  - When `PROMOTIONS_ENABLED !== 'true'`:  
+    - Wizard review section is hidden.  
+    - Dashboard and sale detail promote controls are not rendered.
+
+- **PAYMENTS_ENABLED**  
+  - Server-side env flag; used by `lib/stripe/client` and `app/api/promotions/checkout/route.ts`.  
+  - Controls **ability to start checkout**:  
+    - When `PAYMENTS_ENABLED !== 'true'`, `getStripeClient()` returns `null` and `isPaymentsEnabled()` is false.  
+    - `POST /api/promotions/checkout` fails fast with `403 PAYMENTS_DISABLED` and a user-friendly message; Stripe is never called.  
+    - UI states:  
+      - Dashboard & sale detail buttons render as disabled “Promotions unavailable”.  
+      - Wizard confirmation modal shows a note and surfaces a toast instead of attempting checkout.
+
+### Batch Status Endpoint
+
+- **Route:** `GET /api/promotions/status?sale_ids=<comma-separated>`  
+- **Authentication:**  
+  - Requires Supabase-authenticated user; returns `401 AUTH_REQUIRED` when unauthenticated.  
+  - Non-admin callers are restricted to promotions where `owner_profile_id === user.id`. Admins can query any owner via `assertAdminOrThrow`.
+- **Input Caps & Shape:**  
+  - `MAX_SALE_IDS = 100` and `MAX_SALE_IDS_PARAM_LENGTH = 4000`.  
+  - Excess IDs are truncated; oversize query strings return `400 INVALID_REQUEST`.  
+  - Response:  
+    - `{ statuses: Array<{ sale_id: string; is_active: boolean; ends_at: string | null; tier: string | null }> }`  
+    - `is_active` is computed by checking `status === 'active'` and `ends_at > now`.  
+  - No PII or recipient metrics; only sale-level status for the caller’s own promotions.
+
+### Dashboard N+1 Avoidance
+
+- `SalesPanel` computes the published sales list and calls `GET /api/promotions/status` **once** per set of sale IDs when promotions are enabled.  
+- The returned `statuses` array is mapped into a lookup keyed by `sale_id`, which is then passed down to each `DashboardSaleCard`.  
+- A dedicated integration test asserts that only a single batched request is issued to `/api/promotions/status` per render, preventing N+1 fetches.
+
+### Rollout Checklist
+
+1. **Pre-flight (non-production):**
+   - Ensure Milestone 4 Stripe env vars are configured (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_FEATURED_WEEK`).  
+   - Verify `PROMOTIONS_ENABLED=false` and `PAYMENTS_ENABLED=false` initially.  
+   - Confirm all CTAs are hidden in UI (wizard, dashboard, sale detail) when promotions are disabled.
+
+2. **Enable gated UI only:**
+   - Set `PROMOTIONS_ENABLED=true` while keeping `PAYMENTS_ENABLED=false`.  
+   - Verify:  
+     - Wizard review step shows the **“Feature your sale”** toggle.  
+     - Dashboard and sale detail show disabled promote controls with friendly messaging.  
+     - `POST /api/promotions/checkout` returns `403 PAYMENTS_DISABLED` and Stripe is not called (confirmed by CI tests).
+
+3. **Stripe sandbox verification:**
+   - Set `PAYMENTS_ENABLED=true` in a staging/non-prod environment with Stripe test keys.  
+   - Walk through all CTAs (wizard confirmation, dashboard card, sale detail panel):  
+     - Confirm successful redirect to Stripe Checkout.  
+     - Verify `promotions` records are created with `pending` → `active` transitions via webhook.  
+     - Ensure `GET /api/promotions/status` marks active promotions correctly (`is_active=true`, correct `ends_at`).
+
+4. **Production enablement:**
+   - Set `PROMOTIONS_ENABLED=true` and `PAYMENTS_ENABLED=true` with live Stripe keys.  
+   - Monitor:  
+     - Checkout error rates (Stripe + app logs).  
+     - Promotion status correctness on dashboard and sale detail.  
+     - No PII or secrets in logs/Sentry.
+
+5. **Ongoing Hygiene:**
+   - Keep `/api/promotions/status` response minimal; do not add recipient-level or per-email metrics.  
+   - Maintain tests that guard `PAYMENTS_ENABLED` gating and batch-status caps as a hard safety net in CI.
 

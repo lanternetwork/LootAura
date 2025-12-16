@@ -36,7 +36,7 @@ export default function SalesList({ sales, _mode, viewport, isLoading = false }:
               href="/explore?tab=add"
               className="link-accent font-medium"
             >
-              Post the first sale ->
+              Post the first sale
             </a>
           }
         />
@@ -86,5 +86,6 @@ export default function SalesList({ sales, _mode, viewport, isLoading = false }:
     </div>
   )
 }
+
 
 

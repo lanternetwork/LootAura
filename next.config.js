@@ -152,6 +152,15 @@ const nextConfig = {
     if (!config.resolve.extensions.includes('.mjs')) {
       config.resolve.extensions.unshift('.mjs')
     }
+    // Configure module rules to handle .mjs files as ESM
+    config.module.rules.push({
+      test: /\.mjs$/,
+      include: /node_modules\/@supabase/,
+      type: 'javascript/auto',
+      resolve: {
+        fullySpecified: false,
+      },
+    })
     // Reduce noisy webpack infra warnings about cache string serialization
     config.infrastructureLogging = {
       level: 'error',

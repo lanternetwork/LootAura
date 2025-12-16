@@ -125,6 +125,10 @@ interface SaleDetailClientProps {
   currentUserRating?: number | null
   promotionsEnabled?: boolean
   paymentsEnabled?: boolean
+  initialPromotionStatus?: {
+    isActive: boolean
+    endsAt: string | null
+  } | null
 }
 
 export default function SaleDetailClient({
@@ -135,6 +139,7 @@ export default function SaleDetailClient({
   currentUserRating,
   promotionsEnabled = false,
   paymentsEnabled = false,
+  initialPromotionStatus = null,
 }: SaleDetailClientProps) {
   // Debug logging to diagnose items visibility issue (only in debug mode)
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -191,7 +196,7 @@ export default function SaleDetailClient({
   const [promotionStatus, setPromotionStatus] = useState<{
     isActive: boolean
     endsAt: string | null
-  } | null>(null)
+  } | null>(initialPromotionStatus)
   const [isPromotionLoading, setIsPromotionLoading] = useState(false)
 
   // Track click event for navigation/directions

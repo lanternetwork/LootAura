@@ -1889,6 +1889,7 @@ function ReviewStep({
   loading: boolean
   submitError?: string | null
   promotionsEnabled?: boolean
+  paymentsEnabled?: boolean
   wantsPromotion?: boolean
   onTogglePromotion?: (next: boolean) => void
 }) {

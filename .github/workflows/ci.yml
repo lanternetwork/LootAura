@@ -28,11 +28,11 @@ jobs:
         run: |
           echo "Checking required environment variables..."
           if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ]; then
-            echo "âŒ NEXT_PUBLIC_SUPABASE_URL is missing"
+            echo "âŒ NEXT_PUBLIC_SUPABASE_URL is missing"
             exit 1
           fi
           if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
-            echo "âŒ NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"
+            echo "âŒ NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"
             exit 1
           fi
           echo "âœ… All required environment variables present"
@@ -67,7 +67,7 @@ jobs:
               echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -112,7 +112,7 @@ jobs:
               echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -157,7 +157,7 @@ jobs:
               echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -216,7 +216,7 @@ jobs:
               echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -282,7 +282,7 @@ jobs:
               echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -334,7 +334,7 @@ jobs:
               echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -410,7 +410,7 @@ jobs:
               echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -467,7 +467,7 @@ jobs:
               echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10

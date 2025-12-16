@@ -275,7 +275,7 @@ describe('Sale Details Items Display', () => {
       )
       expect(calls.length).toBe(0)
     } finally {
-      ;(global as any).fetch = originalFetch
+      (global as any).fetch = originalFetch
     }
   })
 

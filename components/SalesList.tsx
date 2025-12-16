@@ -1,3 +1,4 @@
+﻿import { Fragment } from 'react'
 import SaleCard from './SaleCard'
 import EmptyState from './EmptyState'
 import { Sale } from '@/lib/types'
@@ -28,16 +29,16 @@ export default function SalesList({ sales, _mode, viewport, isLoading = false }:
   if (isEmpty || isLoading) {
     if (isEmpty) {
       return (
-        <EmptyState 
-          title="No Sales Found" 
+        <EmptyState
+          title="No Sales Found"
           cta={
-            <a 
-              href="/explore?tab=add" 
+            <a
+              href="/explore?tab=add"
               className="link-accent font-medium"
             >
-              Post the first sale →
+              Post the first sale ->
             </a>
-          } 
+          }
         />
       )
     }
@@ -49,14 +50,14 @@ export default function SalesList({ sales, _mode, viewport, isLoading = false }:
   const hasEnoughContent = sales.length >= MIN_SALES_FOR_ADS
 
   return (
-    <div 
-      className="flex flex-col gap-3 sm:gap-4 md:grid md:grid-cols-1 lg:grid-cols-2" 
-      data-testid="sales-list" 
+    <div
+      className="flex flex-col gap-3 sm:gap-4 md:grid md:grid-cols-1 lg:grid-cols-2"
+      data-testid="sales-list"
       style={{ width: '100%' }}
     >
       {sales.map((sale, index) => (
-        <>
-          <div key={sale.id}>
+        <Fragment key={sale.id}>
+          <div>
             <SaleCard sale={sale} viewport={viewport} />
           </div>
           {/* Show inline ad after every 6th sale (indices 5, 11, 17, etc.) */}
@@ -65,14 +66,13 @@ export default function SalesList({ sales, _mode, viewport, isLoading = false }:
           {/* AdSense Policy: Only show ads when we have at least MIN_SALES_FOR_ADS sales */}
           {(index + 1) % 6 === 0 && index > 0 && hasEnoughContent && (
             <AdsenseGuard hasContent={hasEnoughContent}>
-              <div key={`mobile-ad-${sale.id}`} className="block md:hidden">
+              <div className="block md:hidden">
                 <MobileListInlineAd />
               </div>
-              <div 
-                key={`desktop-ad-${sale.id}`} 
+              <div
                 className="hidden md:block md:col-span-2 lg:col-span-2"
-                style={{ 
-                  width: '100%', 
+                style={{
+                  width: '100%',
                   minWidth: '200px',
                   gridColumn: '1 / -1' // Force full width span
                 }}
@@ -81,8 +81,10 @@ export default function SalesList({ sales, _mode, viewport, isLoading = false }:
               </div>
             </AdsenseGuard>
           )}
-        </>
+        </Fragment>
       ))}
     </div>
   )
 }
+
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Integration tests for share redirect functionality
  */
 
@@ -93,9 +93,14 @@ describe('Share Redirect Integration', () => {
     })
     mockSupabase.from.mockReturnValue({ select: mockSelect })
 
+    // Suppress expected server-side logging for this error path
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
     await ShortlinkPage({ params: { id: 'nonexistent' } })
 
     expect(notFound).toHaveBeenCalled()
+
+    consoleSpy.mockRestore()
   })
 
   it('should handle database errors gracefully', async () => {
@@ -117,3 +122,4 @@ describe('Share Redirect Integration', () => {
     consoleSpy.mockRestore()
   })
 })
+

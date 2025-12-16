@@ -1,4 +1,4 @@
-name: ci
+﻿name: ci
 
 on:
   pull_request:
@@ -28,14 +28,14 @@ jobs:
         run: |
           echo "Checking required environment variables..."
           if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ]; then
-            echo "❌ NEXT_PUBLIC_SUPABASE_URL is missing"
+            echo "âŒ NEXT_PUBLIC_SUPABASE_URL is missing"
             exit 1
           fi
           if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
-            echo "❌ NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"
+            echo "âŒ NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"
             exit 1
           fi
-          echo "✅ All required environment variables present"
+          echo "âœ… All required environment variables present"
 
   lint:
     name: lint
@@ -64,10 +64,10 @@ jobs:
             fi
             
             if [ $? -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
+              echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "❌ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -109,10 +109,10 @@ jobs:
             fi
             
             if [ $? -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
+              echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "❌ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -154,10 +154,10 @@ jobs:
             fi
             
             if [ $? -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
+              echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "❌ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -213,10 +213,10 @@ jobs:
             fi
             
             if [ $? -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
+              echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "❌ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -227,8 +227,24 @@ jobs:
             fi
           done
 
-      - name: Run integration tests
-        run: NODE_OPTIONS='--max-old-space-size=6144' npm run test -- tests/integration/
+      - name: Run integration tests (shard 1/3)
+        run: npm run test -- --shard=1/3 tests/integration/
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
+          NEXT_PUBLIC_DEBUG: 'true'
+
+      - name: Run integration tests (shard 2/3)
+        run: npm run test -- --shard=2/3 tests/integration/
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
+          NEXT_PUBLIC_DEBUG: 'true'
+
+      - name: Run integration tests (shard 3/3)
+        run: npm run test -- --shard=3/3 tests/integration/
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -263,10 +279,10 @@ jobs:
             fi
             
             if [ $? -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
+              echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "❌ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -315,10 +331,10 @@ jobs:
             fi
             
             if [ $? -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
+              echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "❌ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -391,10 +407,10 @@ jobs:
             fi
             
             if [ $? -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
+              echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "❌ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -448,10 +464,10 @@ jobs:
             fi
             
             if [ $? -eq 0 ]; then
-              echo "✅ Dependencies installed successfully"
+              echo "âœ… Dependencies installed successfully"
               break
             else
-              echo "❌ Install attempt $attempt failed"
+              echo "âŒ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -497,3 +513,4 @@ jobs:
             })
 
             console.log(`Emitted ci_completed event for branch: ${branch}, PR: ${prNumber}`)
+

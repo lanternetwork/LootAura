@@ -53,35 +53,57 @@ function normalizeTags(tags: any): string[] {
 }
 
 // Single source of truth for step indexes
+// Note: REVIEW index depends on whether PROMOTE step exists (promotionsEnabled)
+// Use getReviewStepIndex(promotionsEnabled) to get the correct REVIEW index
 const STEPS = {
   DETAILS: 0,
   PHOTOS: 1,
   ITEMS: 2,
-  REVIEW: 3
+  PROMOTE: 3,
+  REVIEW: 4 // When promotionsEnabled=true, REVIEW is 4. When false, REVIEW is 3.
 } as const
 
-const WIZARD_STEPS: WizardStep[] = [
-  {
-    id: 'details',
-    title: 'Sale Details',
-    description: 'Basic information about your sale'
-  },
-  {
-    id: 'photos',
-    title: 'Photos',
-    description: 'Add photos to showcase your items'
-  },
-  {
-    id: 'items',
-    title: 'Items',
-    description: 'List the items you\'re selling'
-  },
-  {
+// Helper to get the correct REVIEW step index based on promotions enabled
+const getReviewStepIndex = (promotionsEnabled: boolean): number => {
+  return promotionsEnabled ? 4 : 3
+}
+
+// Helper to build wizard steps (promote step conditionally included)
+const buildWizardSteps = (promotionsEnabled: boolean): WizardStep[] => {
+  const steps: WizardStep[] = [
+    {
+      id: 'details',
+      title: 'Sale Details',
+      description: 'Basic information about your sale'
+    },
+    {
+      id: 'photos',
+      title: 'Photos',
+      description: 'Add photos to showcase your items'
+    },
+    {
+      id: 'items',
+      title: 'Items',
+      description: 'List the items you\'re selling'
+    }
+  ]
+  
+  if (promotionsEnabled) {
+    steps.push({
+      id: 'promote',
+      title: 'Promote Your Sale',
+      description: 'Get more visibility for your sale'
+    })
+  }
+  
+  steps.push({
     id: 'review',
     title: 'Review',
     description: 'Review and publish your sale'
-  }
-]
+  })
+  
+  return steps
+}
 
 export default function SellWizardClient({
   initialData,
@@ -104,6 +126,8 @@ export default function SellWizardClient({
   // Create the Supabase client once. Re-creating it on every render changes supabase.auth identity,
   // which can trigger auth effects repeatedly and cause render loops (especially in tests).
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
+  // Compute wizard steps based on promotions enabled
+  const wizardSteps = useMemo(() => buildWizardSteps(promotionsEnabled), [promotionsEnabled])
   const [currentStep, setCurrentStep] = useState(0)
   const [user, setUser] = useState<any>(null)
 
@@ -462,7 +486,7 @@ export default function SellWizardClient({
 
         // Restore step: if resume=review, force Review step; otherwise use saved step
         if (isReviewResume) {
-          setCurrentStep(STEPS.REVIEW)
+          setCurrentStep(getReviewStepIndex(promotionsEnabled))
           setToastMessage('Draft restored. Ready to review your sale.')
         } else if (draftToRestore.currentStep !== undefined) {
           setCurrentStep(draftToRestore.currentStep)
@@ -479,7 +503,7 @@ export default function SellWizardClient({
         }
       } else if (isReviewResume) {
         // Draft not found but resume=review - still go to Review step
-        setCurrentStep(STEPS.REVIEW)
+        setCurrentStep(getReviewStepIndex(promotionsEnabled))
         setToastMessage('Draft not found; please review details.')
         setShowToast(true)
       }
@@ -616,7 +640,7 @@ export default function SellWizardClient({
         // Continue anyway - don't block navigation
       }
 
-      // Auth gate: Items (2) → Review (3)
+      // Auth gate: Items (2) → Promote (3) or Review (3/4)
       // Check auth state synchronously to ensure we have the latest value
       if (currentStep === STEPS.ITEMS) {
         const { data: { user: currentUser } } = await supabase.auth.getUser()
@@ -658,7 +682,7 @@ export default function SellWizardClient({
       }
 
       // Normal navigation
-      if (currentStep < WIZARD_STEPS.length - 1) {
+      if (currentStep < wizardSteps.length - 1) {
         setCurrentStep(currentStep + 1)
       }
     } finally {
@@ -867,9 +891,86 @@ export default function SellWizardClient({
       // so getDraftKey() will generate a new one on next access
       draftKeyRef.current = null
 
-      // Show confirmation modal
-      setCreatedSaleId(saleId)
-      setConfirmationModalOpen(true)
+      // Handle promotion checkout if requested
+      if (wantsPromotion && promotionsEnabled) {
+        if (paymentsEnabled) {
+          // Call checkout and redirect to Stripe
+          setIsPromoting(true)
+          try {
+            const response = await fetch('/api/promotions/checkout', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...getCsrfHeaders(),
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                sale_id: saleId,
+                tier: 'featured_week',
+              }),
+            })
+
+            const data = await response.json().catch(() => ({}))
+
+            if (!response.ok) {
+              const code = data?.code
+              if (code === 'PAYMENTS_DISABLED' || code === 'PROMOTIONS_DISABLED') {
+                setToastMessage(data?.details?.message || 'Promotions are not available right now. Please check back later.')
+                setShowToast(true)
+                setWantsPromotion(false) // Reset state
+              } else if (code === 'ACCOUNT_LOCKED') {
+                setToastMessage(data?.details?.message || 'Your account is locked. Please contact support if you believe this is an error.')
+                setShowToast(true)
+                setWantsPromotion(false) // Reset state
+              } else if (code === 'SALE_NOT_ELIGIBLE') {
+                setToastMessage(data?.message || 'This sale is not eligible for promotion at this time.')
+                setShowToast(true)
+                setWantsPromotion(false) // Reset state
+              } else {
+                setToastMessage(data?.message || 'Failed to start promotion checkout. Please try again.')
+                setShowToast(true)
+                setWantsPromotion(false) // Reset state
+              }
+              // Show confirmation modal anyway (sale was published)
+              setCreatedSaleId(saleId)
+              setConfirmationModalOpen(true)
+            } else if (data?.checkoutUrl) {
+              // Redirect to Stripe checkout
+              window.location.href = data.checkoutUrl
+              return // Don't show confirmation modal - user is going to checkout
+            } else {
+              setToastMessage('Unexpected response from promotion checkout. Please try again.')
+              setShowToast(true)
+              setWantsPromotion(false) // Reset state
+              // Show confirmation modal anyway
+              setCreatedSaleId(saleId)
+              setConfirmationModalOpen(true)
+            }
+          } catch (error) {
+            console.error('[SELL_WIZARD] Error calling checkout:', error)
+            setToastMessage('Failed to start promotion checkout. Please try again.')
+            setShowToast(true)
+            setWantsPromotion(false) // Reset state
+            // Show confirmation modal anyway
+            setCreatedSaleId(saleId)
+            setConfirmationModalOpen(true)
+          } finally {
+            setIsPromoting(false)
+          }
+        } else {
+          // Payments disabled - show message and reset state
+          setToastMessage('Promotions aren\'t available yet.')
+          setShowToast(true)
+          setWantsPromotion(false) // Reset state
+          // Show confirmation modal
+          setCreatedSaleId(saleId)
+          setConfirmationModalOpen(true)
+        }
+      } else {
+        // No promotion requested - show confirmation modal
+        setCreatedSaleId(saleId)
+        setConfirmationModalOpen(true)
+      }
     } catch (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.error('Error creating sale:', error)
@@ -878,7 +979,7 @@ export default function SellWizardClient({
     } finally {
       setLoading(false)
     }
-  }, [router, createItemsForSale])
+  }, [router, createItemsForSale, wantsPromotion, promotionsEnabled, paymentsEnabled])
 
   // Auto-resume after login (resume=1 param)
   // If user returns after login and has a draft, auto-publish it
@@ -1043,9 +1144,86 @@ export default function SellWizardClient({
         // The draft is deleted, so autosave won't recreate it anyway
         isPublishingRef.current = false
 
-        // Show confirmation modal
-        setCreatedSaleId(saleId)
-        setConfirmationModalOpen(true)
+        // Handle promotion checkout if requested
+        if (wantsPromotion && promotionsEnabled) {
+          if (paymentsEnabled) {
+            // Call checkout and redirect to Stripe
+            setIsPromoting(true)
+            try {
+              const response = await fetch('/api/promotions/checkout', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...getCsrfHeaders(),
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                  sale_id: saleId,
+                  tier: 'featured_week',
+                }),
+              })
+
+              const data = await response.json().catch(() => ({}))
+
+              if (!response.ok) {
+                const code = data?.code
+                if (code === 'PAYMENTS_DISABLED' || code === 'PROMOTIONS_DISABLED') {
+                  setToastMessage(data?.details?.message || 'Promotions are not available right now. Please check back later.')
+                  setShowToast(true)
+                  setWantsPromotion(false) // Reset state
+                } else if (code === 'ACCOUNT_LOCKED') {
+                  setToastMessage(data?.details?.message || 'Your account is locked. Please contact support if you believe this is an error.')
+                  setShowToast(true)
+                  setWantsPromotion(false) // Reset state
+                } else if (code === 'SALE_NOT_ELIGIBLE') {
+                  setToastMessage(data?.message || 'This sale is not eligible for promotion at this time.')
+                  setShowToast(true)
+                  setWantsPromotion(false) // Reset state
+                } else {
+                  setToastMessage(data?.message || 'Failed to start promotion checkout. Please try again.')
+                  setShowToast(true)
+                  setWantsPromotion(false) // Reset state
+                }
+                // Show confirmation modal anyway (sale was published)
+                setCreatedSaleId(saleId)
+                setConfirmationModalOpen(true)
+              } else if (data?.checkoutUrl) {
+                // Redirect to Stripe checkout
+                window.location.href = data.checkoutUrl
+                return // Don't show confirmation modal - user is going to checkout
+              } else {
+                setToastMessage('Unexpected response from promotion checkout. Please try again.')
+                setShowToast(true)
+                setWantsPromotion(false) // Reset state
+                // Show confirmation modal anyway
+                setCreatedSaleId(saleId)
+                setConfirmationModalOpen(true)
+              }
+            } catch (error) {
+              console.error('[SELL_WIZARD] Error calling checkout:', error)
+              setToastMessage('Failed to start promotion checkout. Please try again.')
+              setShowToast(true)
+              setWantsPromotion(false) // Reset state
+              // Show confirmation modal anyway
+              setCreatedSaleId(saleId)
+              setConfirmationModalOpen(true)
+            } finally {
+              setIsPromoting(false)
+            }
+          } else {
+            // Payments disabled - show message and reset state
+            setToastMessage('Promotions aren\'t available yet.')
+            setShowToast(true)
+            setWantsPromotion(false) // Reset state
+            // Show confirmation modal
+            setCreatedSaleId(saleId)
+            setConfirmationModalOpen(true)
+          }
+        } else {
+          // No promotion requested - show confirmation modal
+          setCreatedSaleId(saleId)
+          setConfirmationModalOpen(true)
+        }
       } catch (error) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
           console.error('[SELL_WIZARD] Error publishing draft:', error)
@@ -1123,20 +1301,36 @@ export default function SellWizardClient({
         return <PhotosStep photos={photos} onUpload={handlePhotoUpload} onRemove={handleRemovePhoto} onReorder={handleReorderPhotos} onSetCover={handleSetCover} />
       case STEPS.ITEMS:
         return <ItemsStep items={items} onAdd={handleAddItem} onUpdate={handleUpdateItem} onRemove={handleRemoveItem} />
-      case STEPS.REVIEW:
+      case STEPS.PROMOTE:
+        if (!promotionsEnabled) {
+          // Should not happen, but fallback to Review if promote step not enabled
+          return null
+        }
         return (
-          <ReviewStep
-            formData={formData}
-            photos={photos}
-            items={items}
-            onPublish={handleSubmit}
-            loading={loading}
-            submitError={submitError}
-            promotionsEnabled={promotionsEnabled}
+          <PromoteStep
             wantsPromotion={wantsPromotion}
             onTogglePromotion={setWantsPromotion}
           />
         )
+      default:
+        // REVIEW step is the last step (index depends on promotionsEnabled)
+        if (currentStep === getReviewStepIndex(promotionsEnabled)) {
+          return (
+            <ReviewStep
+              formData={formData}
+              photos={photos}
+              items={items}
+              onPublish={handleSubmit}
+              loading={loading}
+              submitError={submitError}
+              promotionsEnabled={promotionsEnabled}
+              paymentsEnabled={paymentsEnabled}
+              wantsPromotion={wantsPromotion}
+              onTogglePromotion={setWantsPromotion}
+            />
+          )
+        }
+        return null
       default:
         return null
     }
@@ -1212,7 +1406,7 @@ export default function SellWizardClient({
       <div className="mb-8">
         <div className="flex justify-center">
           <div className="flex space-x-4">
-            {WIZARD_STEPS.map((step, index) => (
+            {wizardSteps.map((step, index) => (
               <div key={step.id} className="flex items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                   index <= currentStep
@@ -1221,7 +1415,7 @@ export default function SellWizardClient({
                 }`}>
                   {index + 1}
                 </div>
-                {index < WIZARD_STEPS.length - 1 && (
+                {index < wizardSteps.length - 1 && (
                   <div className={`w-12 h-0.5 mx-2 ${
                     index < currentStep ? 'bg-[var(--accent-primary)]' : 'bg-gray-200'
                   }`} />
@@ -1233,10 +1427,10 @@ export default function SellWizardClient({
         
         <div className="text-center mt-4">
           <h2 className="text-lg font-semibold text-gray-900">
-            {WIZARD_STEPS[currentStep].title}
+            {wizardSteps[currentStep]?.title || ''}
           </h2>
           <p className="text-gray-600">
-            {WIZARD_STEPS[currentStep].description}
+            {wizardSteps[currentStep]?.description || ''}
           </p>
         </div>
       </div>
@@ -1261,7 +1455,7 @@ export default function SellWizardClient({
           Previous
         </button>
 
-        {currentStep < WIZARD_STEPS.length - 1 ? (
+        {currentStep < wizardSteps.length - 1 ? (
           <button
             onClick={handleNext}
             aria-label="Next step"
@@ -1872,6 +2066,95 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
+function PromoteStep({
+  wantsPromotion,
+  onTogglePromotion,
+}: {
+  wantsPromotion: boolean
+  onTogglePromotion: (next: boolean) => void
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Promote Your Sale</h3>
+        <p className="text-gray-600">Get more visibility and reach more buyers</p>
+      </div>
+
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Value Props */}
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+            <div className="flex items-start">
+              <svg className="w-6 h-6 text-purple-600 mr-3 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Featured in Weekly Emails</h4>
+                <p className="text-sm text-gray-600">Your sale will be highlighted in our weekly email to thousands of local buyers.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+            <div className="flex items-start">
+              <svg className="w-6 h-6 text-purple-600 mr-3 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">Enhanced Discovery</h4>
+                <p className="text-sm text-gray-600">Promoted sales appear first in search results and map views.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+            <div className="flex items-start">
+              <svg className="w-6 h-6 text-purple-600 mr-3 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">More Views & Engagement</h4>
+                <p className="text-sm text-gray-600">Promoted listings typically receive 3x more views and inquiries.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+            <div className="flex items-start">
+              <svg className="w-6 h-6 text-purple-600 mr-3 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-1">7-Day Promotion</h4>
+                <p className="text-sm text-gray-600">Your sale stays promoted for a full week to maximize visibility.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Toggle */}
+        <div className="bg-white border-2 border-purple-300 rounded-lg p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h4 className="text-lg font-semibold text-gray-900 mb-1">Promote this sale</h4>
+              <p className="text-sm text-gray-600">You can always promote later from your dashboard if you change your mind.</p>
+            </div>
+            <label className="ml-6 inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={wantsPromotion}
+                onChange={(e) => onTogglePromotion(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ReviewStep({
   formData,
   photos,
@@ -1880,6 +2163,7 @@ function ReviewStep({
   loading,
   submitError,
   promotionsEnabled,
+  paymentsEnabled,
   wantsPromotion,
   onTogglePromotion,
 }: {
@@ -2006,30 +2290,20 @@ function ReviewStep({
         </div>
 
         {promotionsEnabled && (
-          <div className="bg-white border border-purple-200 rounded-lg p-4">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-              <div>
-                <h4 className="font-medium text-[#3A2268]">Feature your sale</h4>
-                <p className="text-sm text-[#3A2268] mt-1">
-                  Get more visibility by featuring your sale in weekly emails and discovery.
-                </p>
-                <p className="mt-1 text-xs text-[#3A2268]">
-                  You can promote later from your dashboard.
-                </p>
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <label className="inline-flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!wantsPromotion}
+                onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                className="mt-0.5 rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
+                data-testid="review-promote-checkbox"
+              />
+              <div className="flex-1">
+                <span className="text-sm font-medium text-gray-900">Promote this sale</span>
+                <p className="text-xs text-gray-500 mt-0.5">Starts checkout after you publish.</p>
               </div>
-              <div className="flex items-center justify-start sm:justify-end">
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!wantsPromotion}
-                    onChange={(e) => onTogglePromotion?.(e.target.checked)}
-                    className="rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
-                    data-testid="review-feature-toggle"
-                  />
-                  <span className="text-sm text-[#3A2268]">Feature this sale</span>
-                </label>
-              </div>
-            </div>
+            </label>
           </div>
         )}
       </div>
@@ -2043,14 +2317,14 @@ function ReviewStep({
         <button
           onClick={(e) => {
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading })
+              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading, wantsPromotion })
             }
             e.preventDefault()
             e.stopPropagation()
             onPublish()
           }}
           disabled={loading}
-          aria-label="Publish sale"
+          aria-label={wantsPromotion ? 'Checkout & publish' : 'Publish sale'}
           className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
         >
           {loading ? (
@@ -2060,7 +2334,7 @@ function ReviewStep({
             </>
           ) : (
             <>
-              Publish Sale
+              {wantsPromotion ? 'Checkout & publish' : 'Publish Sale'}
               <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>

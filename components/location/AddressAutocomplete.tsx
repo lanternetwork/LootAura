@@ -1289,12 +1289,20 @@ export default function AddressAutocomplete({
     setSelectedIndex(-1)
     // Delay to allow click on suggestion to register
     setTimeout(async () => {
+      const trimmedValue = value?.trim() || ''
+      // Check if value matches initial value (user hasn't edited it)
+      const matchesInitial = initialValueRef.current && trimmedValue === initialValueRef.current && !hasUserInteractedRef.current
+      // Check if value matches committed value (previously selected address)
+      const matchesCommitted = committedValueRef.current && trimmedValue === committedValueRef.current
+      
       // Only geocode if:
       // 1. Dropdown is closed
       // 2. We didn't just select (check both ref and state)
       // 3. Not already geocoding
       // 4. Value is long enough
       // 5. Suppress flag is not active (additional safety check)
+      // 6. Value doesn't match initial value (user hasn't edited it)
+      // 7. Value doesn't match committed value (previously selected address)
       if (
         value && 
         value.length >= 5 && 
@@ -1305,7 +1313,11 @@ export default function AddressAutocomplete({
         !hasJustSelected &&
         !suppressNextFetchRef.current &&
         // If an address was explicitly selected, do not geocode it again on blur.
-        !suppressCommittedSearchRef.current
+        !suppressCommittedSearchRef.current &&
+        // Don't geocode if value matches initial value and user hasn't interacted
+        !matchesInitial &&
+        // Don't geocode if value matches a previously committed selection
+        !matchesCommitted
       ) {
         setIsGeocoding(true)
         try {
@@ -1339,6 +1351,12 @@ export default function AddressAutocomplete({
     // If the current value is a committed selection, do not reopen suggestions.
     // User can type to edit; that will clear the committed suppression.
     if (suppressCommittedSearchRef.current) return
+    
+    const trimmedValue = value?.trim() || ''
+    // Don't open suggestions if value matches initial value and user hasn't interacted
+    const matchesInitial = initialValueRef.current && trimmedValue === initialValueRef.current && !hasUserInteractedRef.current
+    if (matchesInitial) return
+    
     const trimmedQuery = debouncedQuery?.trim() || ''
     const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
     const minLength = isNumericOnly ? 1 : 2

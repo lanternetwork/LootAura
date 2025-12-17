@@ -861,17 +861,37 @@ Milestone 5A adds **seller-facing “Promote listing” CTAs** wired to the Stri
 
 ### CTA Locations
 
-- **Sell Wizard (Review step)**  
-  - Location: Review/Publish step of `SellWizardClient` (`app/sell/new/SellWizardClient.tsx`).  
-  - When `PROMOTIONS_ENABLED=true`, shows a **“Feature your sale”** section with:  
-    - Title: “Feature your sale”  
-    - Copy: “Get more visibility by featuring your sale in weekly emails and discovery.”  
-    - Toggle: “Feature this sale” (local-only `wantsPromotion` state; **no DB writes**).  
-    - Note: “You can promote later from your dashboard.”  
-  - After a successful publish, if the seller opted in and `PROMOTIONS_ENABLED=true`:  
-    - The confirmation modal shows a **“Promote now”** CTA.  
-    - If `PAYMENTS_ENABLED=false`: CTA is disabled with a friendly message and **does not call checkout**.  
-    - If `PAYMENTS_ENABLED=true`: calls `POST /api/promotions/checkout` with CSRF headers and redirects to `checkoutUrl`, with friendly error messages for account-locked / ineligible / disabled cases.
+- **Sell Wizard (Promote step + Review step)**  
+  - **Promote Step** (when `PROMOTIONS_ENABLED=true`):  
+    - Location: Dedicated step immediately before Review in `SellWizardClient` (`app/sell/new/SellWizardClient.tsx`).  
+    - Marketing page with value propositions:  
+      - Featured in Weekly Emails  
+      - Enhanced Discovery  
+      - More Views & Engagement  
+      - 7-Day Promotion  
+    - Toggle: "Promote this sale" (local-only `wantsPromotion` state; **no DB writes**).  
+    - Default: OFF  
+  - **Review Step**:  
+    - When `PROMOTIONS_ENABLED=true`, includes a subtle checkbox:  
+      - Label: "Promote this sale"  
+      - Microcopy: "Starts checkout after you publish."  
+      - Visually secondary, does not distract from publishing  
+    - State sync: Review checkbox reflects same `wantsPromotion` state as Promote step toggle  
+    - Primary CTA labeling:  
+      - If `wantsPromotion=false`: "Publish Sale"  
+      - If `wantsPromotion=true`: "Checkout & publish"  
+  - **Checkout behavior** (when "Checkout & publish" is clicked):  
+    - If `PAYMENTS_ENABLED=true`:  
+      - Publishes sale first, then calls `POST /api/promotions/checkout` with CSRF headers  
+      - Redirects to Stripe `checkoutUrl` on success  
+      - Shows friendly error messages for account-locked / ineligible / disabled cases  
+    - If `PAYMENTS_ENABLED=false`:  
+      - Does not call checkout  
+      - Shows message: "Promotions aren't available yet."  
+      - Resets `wantsPromotion` to `false` so CTA returns to "Publish Sale"  
+  - When `PROMOTIONS_ENABLED=false`:  
+    - Neither Promote step nor Review checkbox appears  
+    - Review step remains unchanged
 
 - **Dashboard (Seller-owned sales)**  
   - Location: Actions row on each seller-owned sale card in the dashboard (`DashboardSaleCard`).  

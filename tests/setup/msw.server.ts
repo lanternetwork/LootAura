@@ -37,6 +37,9 @@ const handlers = [
     })
   }),
   // Relative Next.js routes
+  http.get('/api/geolocation/ip', () => {
+    return HttpResponse.json({ lat: null, lng: null, city: null, state: null }, { status: 200 })
+  }),
   http.get('/api/geocoding/address', ({ request }) => {
     const url = new URL(request.url)
     const address = url.searchParams.get('address') || ''

@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
 
   return withRateLimit(
     postDraftHandler,
-    [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
+    [Policies.DRAFTS_SAVE_MINUTE, Policies.DRAFTS_SAVE_DAILY],
     { userId }
   )(request)
 }

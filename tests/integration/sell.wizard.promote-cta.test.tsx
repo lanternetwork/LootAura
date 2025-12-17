@@ -92,7 +92,7 @@ describe('Sell Wizard Promote CTA', () => {
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
     // Review
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /publish sale/i })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: /publish sale/i })[0]).toBeInTheDocument()
     })
   }
 

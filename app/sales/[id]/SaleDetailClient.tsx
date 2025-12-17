@@ -922,20 +922,25 @@ export default function SaleDetailClient({
             <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50 p-4">
               <h4 className="font-medium text-[#3A2268] mb-1">Promote this sale</h4>
               {promotionStatus?.isActive ? (
-                <p className="text-sm text-[#3A2268]" data-testid="sale-detail-promote-active">
-                  Promoted
+                <div className="text-[#3A2268]" data-testid="sale-detail-promote-active">
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex items-center px-3 py-1.5 text-sm rounded-lg bg-[#3A2268] text-white opacity-60 cursor-not-allowed"
+                  >
+                    Promoted
+                  </button>
                   {promotionStatus.endsAt && (
-                    <>
-                      {' '}
-                      • Ends{' '}
+                    <div className="mt-1 text-xs">
+                      Ends{' '}
                       {new Date(promotionStatus.endsAt).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',
                       })}
-                    </>
+                    </div>
                   )}
-                </p>
+                </div>
               ) : (
                 <>
                   <p className="text-sm text-[#3A2268] mb-2">
@@ -1041,6 +1046,11 @@ export default function SaleDetailClient({
                         ? 'Promote this sale'
                         : 'Promotions unavailable'}
                   </button>
+                  {!paymentsEnabled && (
+                    <p className="mt-2 text-xs text-[#3A2268]">
+                      Promotions are not available right now. You can promote later from your dashboard.
+                    </p>
+                  )}
                 </>
               )}
             </div>

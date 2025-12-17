@@ -51,7 +51,13 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
 
     // Deduplicate and enforce small cap to avoid abuse
-    const saleIds = Array.from(new Set(rawIds)).slice(0, MAX_SALE_IDS)
+    const uniqueIds = Array.from(new Set(rawIds))
+
+    if (uniqueIds.length > MAX_SALE_IDS) {
+      return fail(400, 'INVALID_REQUEST', 'Too many sale IDs')
+    }
+
+    const saleIds = uniqueIds
     if (saleIds.length === 0) {
       return ok({ statuses: [] })
     }

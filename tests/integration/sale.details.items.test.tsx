@@ -262,6 +262,7 @@ describe('Sale Details Items Display', () => {
 
       const button = screen.getByTestId('sale-detail-promote-button')
       expect(button).toBeDisabled()
+      expect(screen.getByText(/Promotions are not available right now\\. You can promote later from your dashboard\\./i)).toBeInTheDocument()
 
       // Even if clicked programmatically, paymentsEnabled=false should guard before fetch
       button.click()
@@ -279,6 +280,22 @@ describe('Sale Details Items Display', () => {
     }
   })
 
+  it('hides promote panel when promotions are disabled (even for owner)', () => {
+    mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
+
+    render(
+      <SaleDetailClient
+        sale={mockSale}
+        displayCategories={['furniture']}
+        items={mockItems}
+        promotionsEnabled={false}
+        paymentsEnabled={true}
+      />
+    )
+
+    expect(screen.queryByTestId('sale-detail-promote-button')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sale-detail-promote-active')).not.toBeInTheDocument()
+  })
   it('should display item categories when available', () => {
     render(
       <SaleDetailClient 

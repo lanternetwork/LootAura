@@ -80,9 +80,9 @@ describe('Sell Wizard Promote CTA', () => {
     await waitFor(() => {
       expect(screen.getByTestId('image-upload')).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByRole('button', { name: /next/i }))
     // handleNext uses a short navigation guard; wait for it to reset before clicking Next again
     await new Promise(resolve => setTimeout(resolve, 600))
+    fireEvent.click(screen.getByRole('button', { name: /next/i }))
     // Items
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /add item/i })).toBeInTheDocument()

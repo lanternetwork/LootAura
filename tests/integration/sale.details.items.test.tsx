@@ -262,7 +262,7 @@ describe('Sale Details Items Display', () => {
 
       const button = screen.getByTestId('sale-detail-promote-button')
       expect(button).toBeDisabled()
-      expect(screen.getByText(/Promotions are not available right now\\. You can promote later from your dashboard\\./i)).toBeInTheDocument()
+      expect(screen.getByText('Promotions are not available right now. You can promote later from your dashboard.')).toBeInTheDocument()
 
       // Even if clicked programmatically, paymentsEnabled=false should guard before fetch
       button.click()

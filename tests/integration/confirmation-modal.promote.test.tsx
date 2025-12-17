@@ -27,7 +27,7 @@ describe('ConfirmationModal promote CTA', () => {
     expect(button).toBeDisabled()
     expect(
       screen.getByText(
-        /Promotions are not available right now\\. You can promote later from your dashboard\\./i
+        'Promotions are not available right now. You can promote later from your dashboard.'
       )
     ).toBeInTheDocument()
 

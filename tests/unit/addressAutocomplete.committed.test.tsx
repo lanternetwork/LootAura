@@ -36,7 +36,6 @@ function Harness(props: { userLat?: number; userLng?: number }) {
 
 describe('AddressAutocomplete (committed selection)', () => {
   beforeEach(() => {
-    vi.useFakeTimers()
     vi.clearAllMocks()
 
     vi.mocked(fetchSuggestions).mockResolvedValue([
@@ -54,7 +53,6 @@ describe('AddressAutocomplete (committed selection)', () => {
 
   afterEach(() => {
     cleanup()
-    vi.useRealTimers()
   })
 
   it('does not refetch or geocode after selecting a suggestion (even when coords arrive later)', async () => {
@@ -63,18 +61,16 @@ describe('AddressAutocomplete (committed selection)', () => {
     const input = screen.getByRole('combobox')
     fireEvent.change(input, { target: { value: '123 ma' } })
 
-    // Allow debounce to trigger fetch
-    vi.advanceTimersByTime(300)
-
-    await waitFor(() => {
-      expect(fetchSuggestions).toHaveBeenCalledTimes(1)
-    })
+    // Allow debounce (250ms) + async state updates to settle.
+    await waitFor(
+      () => {
+        expect(fetchSuggestions).toHaveBeenCalledTimes(1)
+      },
+      { timeout: 2000 }
+    )
 
     const option = await screen.findByRole('option', { name: /123 main st/i })
     fireEvent.mouseDown(option)
-
-    // Selection clears and commits; allow the guard timeout scheduling to settle
-    vi.advanceTimersByTime(10)
 
     await waitFor(() => {
       expect((screen.getByRole('combobox') as HTMLInputElement).value).toBe('123 Main St')
@@ -82,13 +78,14 @@ describe('AddressAutocomplete (committed selection)', () => {
 
     // Simulate late-arriving coords from parent props
     rerender(<Harness userLat={38.25} userLng={-85.75} />)
-    vi.advanceTimersByTime(500)
+    // Give the "coords arrived" effect a chance to run if it would.
+    await new Promise((r) => setTimeout(r, 400))
 
     expect(fetchSuggestions).toHaveBeenCalledTimes(1)
 
     // Blur should not geocode a committed selection
     fireEvent.blur(screen.getByRole('combobox'))
-    vi.advanceTimersByTime(300)
+    await new Promise((r) => setTimeout(r, 300))
     expect(geocodeAddress).not.toHaveBeenCalled()
   })
 })

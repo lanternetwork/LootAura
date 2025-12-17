@@ -1331,8 +1331,6 @@ export default function SellWizardClient({
           )
         }
         return null
-      default:
-        return null
     }
   }
 

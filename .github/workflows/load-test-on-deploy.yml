@@ -5,35 +5,42 @@ on:
     types: [created, success]
 
 jobs:
-  run-on-success:
-    # Only run on successful deployments to main to avoid branch noise.
-    # Note: deployment_status events don't always carry github.ref, so gate purely on deployment state
-    # and use continue-on-error to avoid blocking CI when the event shape is missing fields.
+  determine-url:
+    # deployment_status events don't always carry github.ref, so gate purely on deployment state.
     if: github.event.deployment_status.state == 'success'
-    continue-on-error: true
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
+    outputs:
+      url: ${{ steps.url.outputs.url }}
     steps:
       - name: Determine target URL
         id: url
+        shell: bash
         run: |
-          # Prefer environment_url; fallback to target_url
+          set -euo pipefail
+          # Prefer environment_url; fallback to deployment.payload.web_url; then target_url.
           URL="${{ github.event.deployment_status.environment_url }}"
+          if [ -z "$URL" ]; then
+            URL="${{ github.event.deployment.payload.web_url }}"
+          fi
           if [ -z "$URL" ]; then
             URL="${{ github.event.deployment.target_url }}"
           fi
           if [ -z "$URL" ]; then
             echo "::notice::No deployment URL found; skipping load tests"
-            # Do not fail the workflow when there's no URL (e.g., previewless deployments)
-            echo "url=" >> $GITHUB_OUTPUT
+            echo "url=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
 
-      - name: Call reusable load-test workflow (all scenarios)
-        uses: ./.github/workflows/load-test.yml
-        with:
-          baseURL: ${{ steps.url.outputs.url }}
-          scenario: all
+  run-on-success:
+    needs: determine-url
+    if: needs.determine-url.outputs.url != ''
+    continue-on-error: true
+    uses: ./.github/workflows/load-test.yml
+    with:
+      baseURL: ${{ needs.determine-url.outputs.url }}
+      scenario: all
+    secrets: inherit
 
 

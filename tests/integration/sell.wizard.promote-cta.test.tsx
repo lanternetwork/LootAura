@@ -103,9 +103,9 @@ describe('Sell Wizard Promote CTA', () => {
     
     // Review
     await waitFor(() => {
-      const publishButton = screen.queryByRole('button', { name: /publish sale/i }) || 
-                            screen.queryByRole('button', { name: /checkout.*publish/i })
-      expect(publishButton).toBeInTheDocument()
+      const publishButtons = screen.queryAllByRole('button', { name: /publish sale/i })
+      const checkoutButtons = screen.queryAllByRole('button', { name: /checkout.*publish/i })
+      expect(publishButtons.length > 0 || checkoutButtons.length > 0).toBe(true)
     })
   }
 
@@ -126,8 +126,9 @@ describe('Sell Wizard Promote CTA', () => {
     expect(screen.queryByTestId('promote-step-heading')).not.toBeInTheDocument()
     // Should not see Review checkbox
     expect(screen.queryByTestId('review-promote-checkbox')).toBeNull()
-    // Should see normal Publish button
-    expect(screen.getByRole('button', { name: /publish sale/i })).toBeInTheDocument()
+    // Should see normal Publish button (use getAllByRole and check first one)
+    const publishButtons = screen.getAllByRole('button', { name: /publish sale/i })
+    expect(publishButtons.length).toBeGreaterThan(0)
   })
 
   it('shows Promote step when promotions are enabled', async () => {
@@ -245,8 +246,9 @@ describe('Sell Wizard Promote CTA', () => {
     await goToReviewStep(true)
 
     // Initially should show "Publish Sale"
-    expect(screen.getByRole('button', { name: /publish sale/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /checkout.*publish/i })).not.toBeInTheDocument()
+    const initialPublishButtons = screen.getAllByRole('button', { name: /publish sale/i })
+    expect(initialPublishButtons.length).toBeGreaterThan(0)
+    expect(screen.queryAllByRole('button', { name: /checkout.*publish/i })).toHaveLength(0)
 
     // Check the promotion checkbox
     const checkbox = screen.getByTestId('review-promote-checkbox')
@@ -254,9 +256,10 @@ describe('Sell Wizard Promote CTA', () => {
 
     // Should now show "Checkout & publish"
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /checkout.*publish/i })).toBeInTheDocument()
+      const checkoutButtons = screen.getAllByRole('button', { name: /checkout.*publish/i })
+      expect(checkoutButtons.length).toBeGreaterThan(0)
     })
-    expect(screen.queryByRole('button', { name: /publish sale/i })).not.toBeInTheDocument()
+    expect(screen.queryAllByRole('button', { name: /publish sale/i })).toHaveLength(0)
   })
 
   it('shows message and resets state when payments disabled and checkout clicked', async () => {

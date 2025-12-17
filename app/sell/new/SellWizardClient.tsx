@@ -1464,6 +1464,9 @@ export default function SellWizardClient({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
+        ) : promotionsEnabled && currentStep === getReviewStepIndex(promotionsEnabled) ? (
+          // Review step has its own button with promotion logic, so don't show the main button
+          null
         ) : (
                 <button
                   onClick={(e) => {

@@ -48,20 +48,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-              # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
-            fi
+            npm ci --no-audit --no-fund
             
             if [ $? -eq 0 ]; then
               echo "âœ… Dependencies installed successfully"
@@ -93,20 +87,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-              # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
-            fi
+            npm ci --no-audit --no-fund
             
             if [ $? -eq 0 ]; then
               echo "âœ… Dependencies installed successfully"
@@ -138,20 +126,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-              # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
-            fi
+            npm ci --no-audit --no-fund
             
             if [ $? -eq 0 ]; then
               echo "âœ… Dependencies installed successfully"
@@ -197,20 +179,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-              # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
-            fi
+            npm ci --no-audit --no-fund
             
             if [ $? -eq 0 ]; then
               echo "âœ… Dependencies installed successfully"
@@ -250,20 +226,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-              # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
-            fi
+            npm ci --no-audit --no-fund
             
             if [ $? -eq 0 ]; then
               echo "âœ… Dependencies installed successfully"
@@ -302,20 +272,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-              # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
-            fi
+            npm ci --no-audit --no-fund
             
             if [ $? -eq 0 ]; then
               echo "âœ… Dependencies installed successfully"
@@ -435,20 +399,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-              # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
-            fi
+            npm ci --no-audit --no-fund
             
             if [ $? -eq 0 ]; then
               echo "âœ… Dependencies installed successfully"

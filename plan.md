@@ -4,6 +4,12 @@
 
 ## Webapp Production Readiness / SLOs
 
+## CI / Dependency Management (Lockfile)
+
+- **Canonical package manager**: `npm`
+- **Required lockfile**: `package-lock.json` at the repo root
+- **CI policy**: GitHub Actions uses `npm ci` and `actions/setup-node` npm caching, which requires `package-lock.json`. Deleting or failing to commit the lockfile will cause CI to fail early.
+
 ### Service Level Objectives (SLOs)
 
 #### Map Performance

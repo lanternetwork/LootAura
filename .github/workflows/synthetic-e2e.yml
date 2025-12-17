@@ -27,11 +27,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # Note: cache disabled due to missing package-lock.json
-          # cache: 'npm'
+          cache: 'npm'
           
       - name: Install dependencies
-        run: npm install
+        run: npm ci --no-audit --no-fund
       
       - name: Assert featured-email dry-run secret present
         run: |

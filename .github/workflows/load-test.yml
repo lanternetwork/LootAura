@@ -46,25 +46,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        if: ${{ hashFiles('package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'pnpm-lock.yaml') != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-
-      - name: Setup Node.js (no lockfile cache)
-        if: ${{ hashFiles('package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'pnpm-lock.yaml') == '' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+          # setup-node cache requires a lockfile; this repo may not have one.
+          # Match main CI behavior: only enable npm cache when package-lock.json exists.
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+          if [ -f package-lock.json ]; then
             npm ci --no-audit --no-fund
           else
             # Repo has no lockfile; fall back to npm install so the workflow can run.
             npm install --no-audit --no-fund
+            # Generate package-lock.json for consistency with other CI jobs (and to enable caching on future runs).
+            npm install --package-lock-only
           fi
 
       - name: Show inputs

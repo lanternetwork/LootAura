@@ -867,7 +867,7 @@ Milestone 5A adds **seller-facing “Promote listing” CTAs** wired to the Stri
     - Title: “Feature your sale”  
     - Copy: “Get more visibility by featuring your sale in weekly emails and discovery.”  
     - Toggle: “Feature this sale” (local-only `wantsPromotion` state; **no DB writes**).  
-    - Note: “You can also promote later from your dashboard.”  
+    - Note: “You can promote later from your dashboard.”  
   - After a successful publish, if the seller opted in and `PROMOTIONS_ENABLED=true`:  
     - The confirmation modal shows a **“Promote now”** CTA.  
     - If `PAYMENTS_ENABLED=false`: CTA is disabled with a friendly message and **does not call checkout**.  
@@ -906,16 +906,17 @@ Milestone 5A adds **seller-facing “Promote listing” CTAs** wired to the Stri
     2. **Route-level guard**: `POST /api/promotions/checkout` calls `isPaymentsEnabled()` and returns `403 PAYMENTS_DISABLED` *before* touching Stripe or the database when disabled.  
   - UI behavior when `PAYMENTS_ENABLED=false`:  
     - Dashboard CTA and Sale Detail CTA render as disabled with “Promotions unavailable” copy and never call checkout.  
-    - Sell wizard confirmation modal disables “Promote now” and shows a toast message instead of calling checkout.
+    - Sell wizard confirmation modal disables “Promote now” and shows a friendly message instead of calling checkout.
 
 ### Batch Status Endpoint (No N+1)
 
 - **Endpoint:** `GET /api/promotions/status?sale_ids=<comma-separated>`  
   - Location: `app/api/promotions/status/route.ts`.  
+  - Requires `sale_ids` query param; missing/empty requests return `400 INVALID_REQUEST`.  
   - Auth required (`supabase.auth.getUser()`); non-authenticated requests return `401 AUTH_REQUIRED`.  
   - Non-admin callers only see promotions where `owner_profile_id === user.id`; admins use `assertAdminOrThrow` to bypass the owner filter.  
   - Input safety:  
-    - `MAX_SALE_IDS = 100` (deduplicated and sliced).  
+    - `MAX_SALE_IDS = 100` (deduplicated; requests over the cap return `400 INVALID_REQUEST`).  
     - `MAX_SALE_IDS_PARAM_LENGTH = 4000` (rejects overly long query strings with `400 INVALID_REQUEST`).  
   - Response shape (minimal, no PII):  
     - `{ statuses: Array<{ sale_id, is_active, ends_at, tier }> }`.  
@@ -932,7 +933,7 @@ Milestone 5A adds **seller-facing “Promote listing” CTAs** wired to the Stri
    - Set `PROMOTIONS_ENABLED=false` and `PAYMENTS_ENABLED=false`.  
    - Verify that:  
      - Dashboard, Sell Wizard, and Sale Detail show **no** promotion CTAs.  
-     - `/api/promotions/status` returns `401 AUTH_REQUIRED` for unauthenticated calls and `200` with an empty `statuses` array for authenticated owners.
+     - `/api/promotions/status` returns `401 AUTH_REQUIRED` for unauthenticated calls and `200` with `statuses: []` when none of the requested sales have promotions.
 
 2. **Enable promotions UI only**  
    - Set `PROMOTIONS_ENABLED=true`, keep `PAYMENTS_ENABLED=false`.  

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SaleInput } from '@/lib/data'
 import ImageUploadCard from '@/components/sales/ImageUploadCard'
@@ -74,7 +74,9 @@ export default function SellWizardClient({
   paymentsEnabled?: boolean
 }) {
   const router = useRouter()
-  const supabase = createSupabaseBrowserClient()
+  // Create the Supabase client once. Re-creating it on every render changes supabase.auth identity,
+  // which can trigger auth effects repeatedly and cause render loops (especially in tests).
+  const supabase = useMemo(() => createSupabaseBrowserClient(), [])
   const [currentStep, setCurrentStep] = useState(0)
   const [user, setUser] = useState<any>(null)
   // Normalize tags to ensure it's always an array

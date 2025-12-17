@@ -923,11 +923,16 @@ export default function SellWizardClient({
                 setShowToast(true)
                 setWantsPromotion(false) // Reset state
               } else if (code === 'SALE_NOT_ELIGIBLE') {
-                setToastMessage(data?.message || 'This sale is not eligible for promotion at this time.')
+                setToastMessage(data?.error || 'This sale is not eligible for promotion at this time.')
+                setShowToast(true)
+                setWantsPromotion(false) // Reset state
+              } else if (code === 'STRIPE_ERROR' || code === 'CONFIG_ERROR' || code === 'DATABASE_ERROR') {
+                // Server-side configuration or processing error
+                setToastMessage('Payment processing is temporarily unavailable. Please try again later or contact support.')
                 setShowToast(true)
                 setWantsPromotion(false) // Reset state
               } else {
-                setToastMessage(data?.message || 'Failed to start promotion checkout. Please try again.')
+                setToastMessage(data?.error || 'Failed to start promotion checkout. Please try again.')
                 setShowToast(true)
                 setWantsPromotion(false) // Reset state
               }
@@ -1176,11 +1181,16 @@ export default function SellWizardClient({
                   setShowToast(true)
                   setWantsPromotion(false) // Reset state
                 } else if (code === 'SALE_NOT_ELIGIBLE') {
-                  setToastMessage(data?.message || 'This sale is not eligible for promotion at this time.')
+                  setToastMessage(data?.error || 'This sale is not eligible for promotion at this time.')
+                  setShowToast(true)
+                  setWantsPromotion(false) // Reset state
+                } else if (code === 'STRIPE_ERROR' || code === 'CONFIG_ERROR' || code === 'DATABASE_ERROR') {
+                  // Server-side configuration or processing error
+                  setToastMessage('Payment processing is temporarily unavailable. Please try again later or contact support.')
                   setShowToast(true)
                   setWantsPromotion(false) // Reset state
                 } else {
-                  setToastMessage(data?.message || 'Failed to start promotion checkout. Please try again.')
+                  setToastMessage(data?.error || 'Failed to start promotion checkout. Please try again.')
                   setShowToast(true)
                   setWantsPromotion(false) // Reset state
                 }
@@ -1585,14 +1595,20 @@ export default function SellWizardClient({
 
                 if (code === 'SALE_NOT_ELIGIBLE') {
                   setToastMessage(
-                    data?.message || 'This sale is not eligible for promotion at this time.'
+                    data?.error || 'This sale is not eligible for promotion at this time.'
                   )
                   setShowToast(true)
                   return
                 }
 
+                if (code === 'STRIPE_ERROR' || code === 'CONFIG_ERROR' || code === 'DATABASE_ERROR') {
+                  setToastMessage('Payment processing is temporarily unavailable. Please try again later or contact support.')
+                  setShowToast(true)
+                  return
+                }
+
                 setToastMessage(
-                  data?.message || 'Failed to start promotion checkout. Please try again.'
+                  data?.error || 'Failed to start promotion checkout. Please try again.'
                 )
                 setShowToast(true)
                 return

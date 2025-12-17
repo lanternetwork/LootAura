@@ -116,7 +116,7 @@ export default function ConfirmationModal({
             <button
               type="button"
               onClick={onPromoteNow}
-              disabled={isPromoting || !onPromoteNow}
+              disabled={isPromoting || !onPromoteNow || !!promoteDisabledReason}
               className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
               aria-label="Promote sale now"
               data-testid="confirmation-promote-button"

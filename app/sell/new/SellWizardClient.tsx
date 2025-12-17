@@ -1320,7 +1320,7 @@ export default function SellWizardClient({
           isPromoting={isPromoting}
           promoteDisabledReason={
             promotionsEnabled && wantsPromotion && !paymentsEnabled
-              ? 'Promotions are not available right now. You can try again later from your dashboard.'
+              ? 'Promotions are not available right now. You can promote later from your dashboard.'
               : null
           }
           onPromoteNow={async () => {
@@ -2016,7 +2016,7 @@ function ReviewStep({
                   Get more visibility by featuring your sale in weekly emails and discovery.
                 </p>
                 <p className="mt-1 text-xs text-[#3A2268]">
-                  You can also promote later from your dashboard.
+                  You can promote later from your dashboard.
                 </p>
               </div>
               <div className="flex items-center justify-start sm:justify-end">

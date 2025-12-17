@@ -227,48 +227,12 @@ jobs:
             fi
           done
 
-      - name: Run integration tests (shard 1/6)
-        run: npm run test -- --shard=1/6 tests/integration/
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_DEBUG: 'true'
-
-      - name: Run integration tests (shard 2/6)
-        run: npm run test -- --shard=2/6 tests/integration/
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_DEBUG: 'true'
-
-      - name: Run integration tests (shard 3/6)
-        run: npm run test -- --shard=3/6 tests/integration/
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_DEBUG: 'true'
-
-      - name: Run integration tests (shard 4/6)
-        run: npm run test -- --shard=4/6 tests/integration/
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_DEBUG: 'true'
-
-      - name: Run integration tests (shard 5/6)
-        run: npm run test -- --shard=5/6 tests/integration/
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
-          NEXT_PUBLIC_DEBUG: 'true'
-
-      - name: Run integration tests (shard 6/6)
-        run: npm run test -- --shard=6/6 tests/integration/
+      - name: Run integration tests (sharded)
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            echo "Running integration shard $i/12"
+            npm run test -- --shard=$i/12 tests/integration/
+          done
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

@@ -209,7 +209,7 @@ describe('Sell Wizard Promote CTA', () => {
     })
 
     // Find and toggle the promotion switch on Promote step
-    const promoteToggle = screen.getByRole('checkbox', { name: /promote this sale/i })
+    const promoteToggle = screen.getByTestId('promote-step-toggle')
     expect(promoteToggle).not.toBeChecked()
     fireEvent.click(promoteToggle)
     expect(promoteToggle).toBeChecked()

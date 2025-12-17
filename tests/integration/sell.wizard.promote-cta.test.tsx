@@ -263,8 +263,22 @@ describe('Sell Wizard Promote CTA', () => {
   })
 
   it('shows message and resets state when payments disabled and checkout clicked', async () => {
-    // Mock fetch to prevent actual API calls
-    global.fetch = vi.fn()
+    // Mock fetch to simulate successful sale creation but prevent checkout calls
+    const mockFetch = vi.fn()
+    global.fetch = mockFetch
+    
+    // Mock successful sale creation
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        sale: { id: 'test-sale-id' }
+      })
+    })
+    // Mock items creation (if items exist)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true })
+    })
 
     renderWithQueryClient(
       <SellWizardClient
@@ -287,16 +301,16 @@ describe('Sell Wizard Promote CTA', () => {
     const publishButton = await screen.findByRole('button', { name: /checkout.*publish/i })
     fireEvent.click(publishButton)
 
-    // Should show toast message
+    // Should show toast message (wait for sale creation and toast to appear)
     await waitFor(() => {
       expect(screen.getByText(/promotions aren't available yet/i)).toBeInTheDocument()
-    })
+    }, { timeout: 5000 })
 
-    // Should not call checkout API
-    expect(global.fetch).not.toHaveBeenCalledWith(
-      expect.stringContaining('/api/promotions/checkout'),
-      expect.any(Object)
+    // Should not call checkout API (only sale creation should be called)
+    const checkoutCalls = mockFetch.mock.calls.filter(call => 
+      call[0]?.includes('/api/promotions/checkout')
     )
+    expect(checkoutCalls).toHaveLength(0)
 
     // Checkbox should be unchecked (state reset)
     await waitFor(() => {

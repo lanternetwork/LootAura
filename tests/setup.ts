@@ -64,7 +64,12 @@ vi.mock('next/navigation', () => ({
     refresh: vi.fn(),
     prefetch: vi.fn(),
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: (() => {
+    // Must be stable across renders; returning a new URLSearchParams each render can
+    // trigger infinite useEffect loops in components that include searchParams in deps.
+    const stableSearchParams = new URLSearchParams()
+    return () => stableSearchParams
+  })(),
   usePathname: () => '/',
   useParams: () => ({}),
   notFound: vi.fn(),

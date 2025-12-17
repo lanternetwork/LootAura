@@ -63,6 +63,10 @@ describe('Sell Wizard Promote CTA', () => {
     address: '123 Test St',
     city: 'Test City',
     state: 'TS',
+    // Details step requires lat/lng to be present; in production these come from AddressAutocomplete onPlaceSelected.
+    // This test mocks AddressAutocomplete, so seed coordinates directly to avoid hanging on Next.
+    lat: 38.25,
+    lng: -85.75,
     date_start: '2025-01-01',
     time_start: '09:00',
   }

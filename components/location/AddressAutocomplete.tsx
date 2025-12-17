@@ -458,6 +458,10 @@ export default function AddressAutocomplete({
   const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value.trim() : undefined)
   const hasUserInteractedRef = useRef<boolean>(false)
   const hasSuppressedInitialSearchRef = useRef<boolean>(false)
+  // Tracks whether the most recent value change was driven by explicit user editing intent
+  // (keyboard typing, paste, cut). This helps keep a committed selection stable even if the
+  // browser or other systems update the value without direct typing intent.
+  const userEditIntentRef = useRef<boolean>(false)
 
   // Update initial value ref if value changes before user interaction (for programmatic updates)
   // Also ensure we capture the trimmed value for consistent comparison
@@ -519,23 +523,19 @@ export default function AddressAutocomplete({
     const trimmedQuery = debouncedQuery?.trim() || ''
     const currentValueTrimmed = value?.trim() || ''
 
-    // If a value was just committed via selecting a suggestion, do not auto-search for it again.
-    // This prevents an extra fetch caused by late-arriving coords (or other state changes)
-    // after the user has already picked an address.
-    if (suppressCommittedSearchRef.current && committedValueRef.current) {
-      const committed = committedValueRef.current
-      if (currentValueTrimmed === committed || trimmedQuery === committed) {
-        if (abortRef.current) {
-          abortRef.current.abort()
-          abortRef.current = null
-        }
-        setIsLoading(false)
-        setIsOpen(false)
-        setShowGoogleAttribution(false)
-        setShowFallbackMessage(false)
-        setSuggestions([])
-        return
+    // If the user has already committed a selection, do not auto-search again until they
+    // explicitly edit the field (see `userEditIntentRef` + input onChange).
+    if (suppressCommittedSearchRef.current) {
+      if (abortRef.current) {
+        abortRef.current.abort()
+        abortRef.current = null
       }
+      setIsLoading(false)
+      setIsOpen(false)
+      setShowGoogleAttribution(false)
+      setShowFallbackMessage(false)
+      setSuggestions([])
+      return
     }
 
     // EARLY RETURN: Suppress search if there's an initial value and user hasn't interacted (edit mode)
@@ -962,6 +962,20 @@ export default function AddressAutocomplete({
     if (!trimmedQuery || trimmedQuery.length < minLength) return
     if (!userLat || !userLng) return
     if (lastHadCoordsRef.current) return
+
+    // If a selection is committed, never refetch when coords arrive; this prevents the
+    // "extra search after selection" regression.
+    if (suppressCommittedSearchRef.current) return
+
+    // Respect initial-value suppression in edit flows so late-arriving coords don't pop suggestions.
+    if (!hasUserInteractedRef.current && initialValueRef.current) {
+      const initialTrimmed = initialValueRef.current
+      const currentValueTrimmed = value?.trim() || ''
+      if (trimmedQuery === initialTrimmed || currentValueTrimmed === initialTrimmed) return
+    }
+
+    // If we are currently suppressing fetches due to a just-made selection, skip.
+    if (suppressNextFetchRef.current || justSelectedRef.current || hasJustSelected || isSuppressing) return
     
     const currentId = ++requestIdRef.current
     if (abortRef.current) abortRef.current.abort()
@@ -1210,25 +1224,27 @@ export default function AddressAutocomplete({
       }
       
       // Update the input value to match (use street address for display)
-      // Use setTimeout to ensure parent's onChange completes first and prevent re-query
+      onChange(streetAddress)
+      // Keep focus on input after selection
+      inputRef.current?.focus()
+      // Keep suppress flag active for longer to prevent debounced query and blur geocoding
       setTimeout(() => {
-        onChange(streetAddress)
-        // Keep focus on input after selection
-        inputRef.current?.focus()
-        // Keep suppress flag active for longer to prevent debounced query and blur geocoding
-        setTimeout(() => {
-          suppressNextFetchRef.current = false
-          justSelectedRef.current = false
-          setHasJustSelected(false)
-          setIsSuppressing(false) // Update state for JSX render
-        }, 2000) // Increased to 2 seconds to prevent blur handler from geocoding
-      }, 0)
+        suppressNextFetchRef.current = false
+        justSelectedRef.current = false
+        setHasJustSelected(false)
+        setIsSuppressing(false) // Update state for JSX render
+      }, 2000) // Increased to 2 seconds to prevent blur handler from geocoding
     }
     run()
   }, [onChange, onPlaceSelected, googleSessionToken])
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Track explicit user editing intent so we can reliably clear committed suppression only
+    // when the user actually edits (not on autofill / programmatic updates).
+    const isEditKey = e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete'
+    if (isEditKey) userEditIntentRef.current = true
+
     if (!isOpen || suggestions.length === 0) {
       const trimmedValue = value?.trim() || ''
       const isNumericOnly = /^\d{1,6}$/.test(trimmedValue)
@@ -1268,6 +1284,9 @@ export default function AddressAutocomplete({
     if (!justSelectedRef.current) {
       setGoogleSessionToken(null)
     }
+    // Always close the dropdown on blur; selection clicks prevent blur via onMouseDown.
+    setIsOpen(false)
+    setSelectedIndex(-1)
     // Delay to allow click on suggestion to register
     setTimeout(async () => {
       // Only geocode if:
@@ -1284,7 +1303,9 @@ export default function AddressAutocomplete({
         !isOpen && 
         !justSelectedRef.current && 
         !hasJustSelected &&
-        !suppressNextFetchRef.current
+        !suppressNextFetchRef.current &&
+        // If an address was explicitly selected, do not geocode it again on blur.
+        !suppressCommittedSearchRef.current
       ) {
         setIsGeocoding(true)
         try {
@@ -1315,6 +1336,9 @@ export default function AddressAutocomplete({
   // Handle input focus
   const handleFocus = () => {
     if (!googleSessionToken) setGoogleSessionToken(newSessionToken())
+    // If the current value is a committed selection, do not reopen suggestions.
+    // User can type to edit; that will clear the committed suppression.
+    if (suppressCommittedSearchRef.current) return
     const trimmedQuery = debouncedQuery?.trim() || ''
     const isNumericOnly = /^\d{1,6}$/.test(trimmedQuery)
     const minLength = isNumericOnly ? 1 : 2
@@ -1356,11 +1380,20 @@ export default function AddressAutocomplete({
             if (!suppressNextFetchRef.current) {
               justSelectedRef.current = false
               setHasJustSelected(false)
-              // User is editing the field again; allow searches for the new query.
-              suppressCommittedSearchRef.current = false
-              committedValueRef.current = null
+              // User is editing the field again (explicit edit intent); allow searches for the new query.
+              if (userEditIntentRef.current) {
+                suppressCommittedSearchRef.current = false
+                committedValueRef.current = null
+              }
             }
+            userEditIntentRef.current = false
             onChange(e.target.value)
+          }}
+          onPaste={() => {
+            userEditIntentRef.current = true
+          }}
+          onCut={() => {
+            userEditIntentRef.current = true
           }}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}

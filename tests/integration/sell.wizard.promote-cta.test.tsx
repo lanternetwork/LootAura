@@ -83,9 +83,13 @@ describe('Sell Wizard Promote CTA', () => {
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
     // Items
     await waitFor(() => {
-      expect(screen.getByTestId('image-thumbnails')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /add item/i })).toBeInTheDocument()
     })
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    // Review
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /publish sale/i })).toBeInTheDocument()
+    })
   }
 
   it('hides Feature your sale toggle when promotions are disabled', async () => {

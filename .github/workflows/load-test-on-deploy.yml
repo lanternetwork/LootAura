@@ -36,7 +36,6 @@ jobs:
   run-on-success:
     needs: determine-url
     if: needs.determine-url.outputs.url != ''
-    continue-on-error: true
     uses: ./.github/workflows/load-test.yml
     with:
       baseURL: ${{ needs.determine-url.outputs.url }}

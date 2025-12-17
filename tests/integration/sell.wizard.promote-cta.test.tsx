@@ -94,7 +94,7 @@ describe('Sell Wizard Promote CTA', () => {
     // If promotions enabled, we should see Promote step
     if (promotionsEnabled) {
       await waitFor(() => {
-        expect(screen.getByText(/promote your sale/i)).toBeInTheDocument()
+        expect(screen.getByTestId('promote-step-heading')).toBeInTheDocument()
       })
       // Navigate past Promote step
       await new Promise(resolve => setTimeout(resolve, 600))
@@ -122,8 +122,8 @@ describe('Sell Wizard Promote CTA', () => {
 
     await goToReviewStep(false)
 
-    // Should not see Promote step title
-    expect(screen.queryByText(/promote your sale/i)).not.toBeInTheDocument()
+    // Should not see Promote step heading
+    expect(screen.queryByTestId('promote-step-heading')).not.toBeInTheDocument()
     // Should not see Review checkbox
     expect(screen.queryByTestId('review-promote-checkbox')).toBeNull()
     // Should see normal Publish button
@@ -157,7 +157,7 @@ describe('Sell Wizard Promote CTA', () => {
     
     // Should see Promote step
     await waitFor(() => {
-      expect(screen.getByText(/promote your sale/i)).toBeInTheDocument()
+      expect(screen.getByTestId('promote-step-heading')).toBeInTheDocument()
     })
   })
 
@@ -205,7 +205,7 @@ describe('Sell Wizard Promote CTA', () => {
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
     
     await waitFor(() => {
-      expect(screen.getByText(/promote your sale/i)).toBeInTheDocument()
+      expect(screen.getByTestId('promote-step-heading')).toBeInTheDocument()
     })
 
     // Find and toggle the promotion switch on Promote step

@@ -2074,7 +2074,7 @@ function PromoteStep({
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h3 className="text-2xl font-semibold text-gray-900 mb-2">Promote Your Sale</h3>
+        <h3 className="text-2xl font-semibold text-gray-900 mb-2" data-testid="promote-step-heading">Promote Your Sale</h3>
         <p className="text-gray-600">Get more visibility and reach more buyers</p>
       </div>
 
@@ -2163,7 +2163,7 @@ function ReviewStep({
   loading,
   submitError,
   promotionsEnabled,
-  paymentsEnabled,
+  paymentsEnabled: _paymentsEnabled,
   wantsPromotion,
   onTogglePromotion,
 }: {

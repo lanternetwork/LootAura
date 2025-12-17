@@ -448,6 +448,11 @@ export default function AddressAutocomplete({
   const justSelectedRef = useRef<boolean>(false)
   const [hasJustSelected, setHasJustSelected] = useState(false)
   const [isSuppressing, setIsSuppressing] = useState(false) // State version for JSX render
+  // After a user selects a suggestion, treat the resulting value as "committed" and do not
+  // perform any further suggestion fetches for that exact value (even if coords later appear/change),
+  // unless the user manually edits the input again.
+  const committedValueRef = useRef<string | null>(null)
+  const suppressCommittedSearchRef = useRef<boolean>(false)
   const isInitialMountRef = useRef<boolean>(true)
   // Capture initial value synchronously on first render (before debounce triggers)
   const initialValueRef = useRef<string | undefined>(value && value.trim().length > 0 ? value.trim() : undefined)
@@ -513,6 +518,25 @@ export default function AddressAutocomplete({
   useEffect(() => {
     const trimmedQuery = debouncedQuery?.trim() || ''
     const currentValueTrimmed = value?.trim() || ''
+
+    // If a value was just committed via selecting a suggestion, do not auto-search for it again.
+    // This prevents an extra fetch caused by late-arriving coords (or other state changes)
+    // after the user has already picked an address.
+    if (suppressCommittedSearchRef.current && committedValueRef.current) {
+      const committed = committedValueRef.current
+      if (currentValueTrimmed === committed || trimmedQuery === committed) {
+        if (abortRef.current) {
+          abortRef.current.abort()
+          abortRef.current = null
+        }
+        setIsLoading(false)
+        setIsOpen(false)
+        setShowGoogleAttribution(false)
+        setShowFallbackMessage(false)
+        setSuggestions([])
+        return
+      }
+    }
 
     // EARLY RETURN: Suppress search if there's an initial value and user hasn't interacted (edit mode)
     // This prevents the dropdown from appearing when the page loads with an existing address
@@ -1156,6 +1180,10 @@ export default function AddressAutocomplete({
       justSelectedRef.current = true
       setHasJustSelected(true)
       setIsSuppressing(true) // Update state for JSX render
+
+      // Long-lived suppression for the committed (selected) value until the user edits the field.
+      committedValueRef.current = streetAddress.trim()
+      suppressCommittedSearchRef.current = true
       
       // Close dropdown first
       setIsOpen(false)
@@ -1328,6 +1356,9 @@ export default function AddressAutocomplete({
             if (!suppressNextFetchRef.current) {
               justSelectedRef.current = false
               setHasJustSelected(false)
+              // User is editing the field again; allow searches for the new query.
+              suppressCommittedSearchRef.current = false
+              committedValueRef.current = null
             }
             onChange(e.target.value)
           }}

@@ -85,6 +85,19 @@ export default function DashboardClient({
     }
   }
 
+  // Listen for draft update events and refresh drafts list
+  useEffect(() => {
+    const handleDraftsMutated = () => {
+      // Refresh drafts when they're updated
+      handleRetryDrafts()
+    }
+    
+    window.addEventListener('drafts:mutated', handleDraftsMutated)
+    return () => {
+      window.removeEventListener('drafts:mutated', handleDraftsMutated)
+    }
+  }, [])
+
 
   // If no sales from server, fetch from API (fallback)
   useEffect(() => {

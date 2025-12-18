@@ -58,6 +58,14 @@ export async function saveDraftServer(
     }
 
     const result = await response.json()
+    
+    // Dispatch event to notify dashboard to refresh drafts
+    if (result.ok && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('drafts:mutated', { 
+        detail: { type: 'update', draftKey } 
+      }))
+    }
+    
     return result
   } catch (error) {
     console.error('[DRAFT_CLIENT] Error saving draft:', error)

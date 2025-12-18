@@ -262,7 +262,7 @@ describe('Sell Wizard Promote CTA', () => {
     expect(screen.queryAllByRole('button', { name: /publish sale/i })).toHaveLength(0)
   })
 
-  it('shows message and resets state when payments disabled and checkout clicked', async () => {
+  it('shows error message and keeps checkbox checked when payments disabled and checkout clicked (draft-first flow)', async () => {
     // Mock fetch to simulate successful sale creation but prevent checkout calls
     const mockFetch = vi.fn()
     global.fetch = mockFetch
@@ -283,10 +283,11 @@ describe('Sell Wizard Promote CTA', () => {
         })
       }
       if (urlString.includes('/api/sales') && method === 'POST') {
+        // With draft-first flow, sale is created as draft when promotion is enabled
         return Promise.resolve({
           ok: true,
           json: async () => ({
-            sale: { id: 'test-sale-id' }
+            saleId: 'test-sale-id' // Returns saleId (draft sale created)
           })
         })
       }
@@ -332,29 +333,28 @@ describe('Sell Wizard Promote CTA', () => {
     const publishButton = await screen.findByRole('button', { name: /checkout.*publish/i })
     fireEvent.click(publishButton)
 
-    // Should show toast message (wait for sale creation and toast to appear)
-    // Use a flexible text matcher that checks for the message in any form
+    // Should show error message inline (wait for sale creation as draft and error to appear)
+    // With new draft-first flow, sale is created as draft, error is shown next to toggle
     await waitFor(() => {
-      // Check for toast message using flexible matching
+      // Check for error message in the UI (shown next to promotion toggle)
       const allText = document.body.textContent || ''
       const hasMessage = allText.toLowerCase().includes('promotions aren\'t available yet') ||
                          allText.toLowerCase().includes('promotions are not available')
       
       if (!hasMessage) {
-        throw new Error('Toast message not found in document')
+        throw new Error('Error message not found in document')
       }
     }, { timeout: 10000 })
 
-    // Should not call checkout API (only sale creation should be called)
+    // Should not call checkout API (sale is created as draft, no checkout attempted)
     const checkoutCalls = mockFetch.mock.calls.filter(call => 
       typeof call[0] === 'string' && call[0].includes('/api/promotions/checkout')
     )
     expect(checkoutCalls).toHaveLength(0)
 
-    // Checkbox should be unchecked (state reset)
-    await waitFor(() => {
-      expect(checkbox).not.toBeChecked()
-    })
+    // Checkbox should remain checked (user can see their selection and uncheck manually if needed)
+    // With new draft-first flow, we keep the state so user can retry or uncheck and publish
+    expect(checkbox).toBeChecked()
   })
 })
 

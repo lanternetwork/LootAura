@@ -914,28 +914,29 @@ export default function SellWizardClient({
             if (!response.ok) {
               const code = data?.code
               if (code === 'PAYMENTS_DISABLED' || code === 'PROMOTIONS_DISABLED') {
-                setToastMessage(data?.details?.message || 'Promotions are not available right now. Please check back later.')
+                setToastMessage('Your sale was published successfully! ' + (data?.details?.message || 'Promotions are not available right now. You can promote it later from your dashboard.'))
                 setShowToast(true)
                 setWantsPromotion(false) // Reset state
               } else if (code === 'ACCOUNT_LOCKED') {
-                setToastMessage(data?.details?.message || 'Your account is locked. Please contact support if you believe this is an error.')
+                setToastMessage('Your sale was published successfully! ' + (data?.details?.message || 'Your account is locked. Please contact support if you believe this is an error.'))
                 setShowToast(true)
                 setWantsPromotion(false) // Reset state
               } else if (code === 'SALE_NOT_ELIGIBLE') {
-                setToastMessage(data?.error || 'This sale is not eligible for promotion at this time.')
+                setToastMessage('Your sale was published successfully! ' + (data?.error || 'This sale is not eligible for promotion at this time. You can try promoting it later from your dashboard.'))
                 setShowToast(true)
                 setWantsPromotion(false) // Reset state
               } else if (code === 'STRIPE_ERROR' || code === 'CONFIG_ERROR' || code === 'DATABASE_ERROR') {
                 // Server-side configuration or processing error
-                setToastMessage('Payment processing is temporarily unavailable. Please try again later or contact support.')
+                setToastMessage('Your sale was published successfully! Payment processing is temporarily unavailable. You can promote it later from your dashboard.')
                 setShowToast(true)
                 setWantsPromotion(false) // Reset state
               } else {
-                setToastMessage(data?.error || 'Failed to start promotion checkout. Please try again.')
+                setToastMessage('Your sale was published successfully! ' + (data?.error || 'Failed to start promotion checkout. You can promote it later from your dashboard.'))
                 setShowToast(true)
                 setWantsPromotion(false) // Reset state
               }
               // Show confirmation modal anyway (sale was published)
+              setLoading(false) // Ensure loading is cleared before showing modal
               setCreatedSaleId(saleId)
               setConfirmationModalOpen(true)
             } else if (data?.checkoutUrl) {
@@ -943,19 +944,21 @@ export default function SellWizardClient({
               window.location.href = data.checkoutUrl
               return // Don't show confirmation modal - user is going to checkout
             } else {
-              setToastMessage('Unexpected response from promotion checkout. Please try again.')
+              setToastMessage('Your sale was published successfully! Unexpected response from promotion checkout. You can promote it later from your dashboard.')
               setShowToast(true)
               setWantsPromotion(false) // Reset state
               // Show confirmation modal anyway
+              setLoading(false) // Ensure loading is cleared before showing modal
               setCreatedSaleId(saleId)
               setConfirmationModalOpen(true)
             }
           } catch (error) {
             console.error('[SELL_WIZARD] Error calling checkout:', error)
-            setToastMessage('Failed to start promotion checkout. Please try again.')
+            setToastMessage('Your sale was published successfully! Failed to start promotion checkout. You can promote it later from your dashboard.')
             setShowToast(true)
             setWantsPromotion(false) // Reset state
             // Show confirmation modal anyway
+            setLoading(false) // Ensure loading is cleared before showing modal
             setCreatedSaleId(saleId)
             setConfirmationModalOpen(true)
           } finally {

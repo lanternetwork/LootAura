@@ -106,13 +106,13 @@ export async function POST(request: NextRequest) {
       throw error
     }
 
-    // Get schema-aware table name
-    const schema = getSchema()
-    const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
+    // Use schema-scoped client to write to base table
+    // Write directly to base table since views don't support INSERT/DELETE without INSTEAD OF triggers
+    const db = supabase.schema('lootaura_v2')
 
     // Add favorite
-    const { data: favorite, error } = await supabase
-      .from(favoritesTable)
+    const { data: favorite, error } = await db
+      .from('favorites')
       .insert({
         user_id: user.id,
         sale_id: sale_id
@@ -179,13 +179,13 @@ export async function DELETE(request: NextRequest) {
       throw error
     }
 
-    // Get schema-aware table name
-    const schema = getSchema()
-    const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
+    // Use schema-scoped client to write to base table
+    // Write directly to base table since views don't support INSERT/DELETE without INSTEAD OF triggers
+    const db = supabase.schema('lootaura_v2')
 
     // Remove favorite
-    const { error } = await supabase
-      .from(favoritesTable)
+    const { error } = await db
+      .from('favorites')
       .delete()
       .eq('user_id', user.id)
       .eq('sale_id', sale_id)

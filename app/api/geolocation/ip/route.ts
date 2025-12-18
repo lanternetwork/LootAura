@@ -1,13 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { headers } from 'next/headers'
+import { headers, cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
+    // Check la_loc cookie FIRST - user's explicitly chosen location takes priority
+    const cookieStore = cookies()
+    const saved = cookieStore.get('la_loc')?.value
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        // Only use cookie if it has valid coordinates (not a placeholder with lat:0, lng:0)
+        if (parsed && typeof parsed.lat === 'number' && typeof parsed.lng === 'number' && 
+            parsed.lat !== 0 && parsed.lng !== 0 && !parsed.placeholder) {
+          return NextResponse.json({
+            lat: parsed.lat,
+            lng: parsed.lng,
+            city: parsed.city,
+            state: parsed.state,
+            source: 'cookie'
+          })
+        }
+      } catch (error) {
+        // Invalid JSON in cookie - continue to IP geolocation
+        console.warn('[IP_GEOLOCATION] Invalid location cookie:', error)
+      }
+    }
+
     const headersList = await headers()
     
-    // Try to get location from Vercel IP headers first
+    // Try to get location from Vercel IP headers
     const vercelLat = headersList.get('x-vercel-ip-latitude')
     const vercelLng = headersList.get('x-vercel-ip-longitude')
     const vercelCity = headersList.get('x-vercel-ip-city')

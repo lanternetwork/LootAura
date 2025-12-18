@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
-        if (parsed && typeof parsed.lat === 'number' && typeof parsed.lng === 'number') {
+        // Only use cookie if it has valid coordinates (not a placeholder with lat:0, lng:0)
+        if (parsed && typeof parsed.lat === 'number' && typeof parsed.lng === 'number' && 
+            parsed.lat !== 0 && parsed.lng !== 0 && !parsed.placeholder) {
           return NextResponse.json({ city: parsed.city || undefined, lat: parsed.lat, lng: parsed.lng, source: 'cookie' })
         }
       } catch (error) {

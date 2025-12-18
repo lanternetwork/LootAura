@@ -88,16 +88,55 @@ export default function DashboardClient({
   // Listen for draft update events and refresh drafts list
   useEffect(() => {
     const handleDraftsMutated = () => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[DASHBOARD] Drafts mutated event received, refreshing drafts list')
+      }
       // Refresh drafts when they're updated
       handleRetryDrafts()
     }
     
     window.addEventListener('drafts:mutated', handleDraftsMutated)
+    
+    // Also refresh on page visibility change (when user navigates back to tab/window)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[DASHBOARD] Page became visible, refreshing drafts')
+        }
+        handleRetryDrafts()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // Refresh on window focus (when user switches back to this tab/window)
+    const handleFocus = () => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[DASHBOARD] Window focused, refreshing drafts')
+      }
+      handleRetryDrafts()
+    }
+    window.addEventListener('focus', handleFocus)
+    
     return () => {
       window.removeEventListener('drafts:mutated', handleDraftsMutated)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+
+  // Refresh drafts on mount (in case updates happened during navigation)
+  useEffect(() => {
+    // Small delay to ensure component is fully mounted
+    const timeoutId = setTimeout(() => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[DASHBOARD] Component mounted, refreshing drafts to catch any updates')
+      }
+      handleRetryDrafts()
+    }, 100)
+    
+    return () => clearTimeout(timeoutId)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // If no sales from server, fetch from API (fallback)
   useEffect(() => {

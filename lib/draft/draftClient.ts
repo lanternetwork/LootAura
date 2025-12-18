@@ -61,6 +61,9 @@ export async function saveDraftServer(
     
     // Dispatch event to notify dashboard to refresh drafts
     if (result.ok && typeof window !== 'undefined') {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DRAFT_CLIENT] Dispatching drafts:mutated event for draftKey:', draftKey)
+      }
       window.dispatchEvent(new CustomEvent('drafts:mutated', { 
         detail: { type: 'update', draftKey } 
       }))

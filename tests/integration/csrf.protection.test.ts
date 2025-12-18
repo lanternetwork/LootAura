@@ -28,6 +28,9 @@ const mockSupabaseClient = {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null }),
   },
   from: vi.fn(() => createChainableMock()),
+  schema: vi.fn(() => ({
+    from: vi.fn(() => createChainableMock()),
+  })),
 }
 
 vi.mock('@/lib/supabase/server', () => ({

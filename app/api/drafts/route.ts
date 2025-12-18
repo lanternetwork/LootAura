@@ -45,7 +45,7 @@ export async function GET(_request: NextRequest) {
     // Fetch latest active draft for user (read from base table via schema-scoped client)
     const db = getRlsDb()
     const { data: draft, error } = await fromBase(db, 'sale_drafts')
-      .select('id, payload, updated_at')
+      .select('id, draft_key, payload, updated_at')
       .eq('user_id', user.id)
       .eq('status', 'active')
       .order('updated_at', { ascending: false })
@@ -70,7 +70,7 @@ export async function GET(_request: NextRequest) {
       return ok({ data: null })
     }
 
-    return ok({ data: { id: draft.id, payload: validationResult.data } })
+    return ok({ data: { id: draft.id, draft_key: draft.draft_key, payload: validationResult.data } })
   } catch (e: any) {
     if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/GET] thrown:', e)
     Sentry.captureException(e, { tags: { operation: 'getLatestDraft' } })

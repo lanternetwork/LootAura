@@ -72,7 +72,7 @@ export async function saveDraftServer(
 /**
  * Get latest draft from server (for authenticated users)
  */
-export async function getLatestDraftServer(): Promise<ApiResponse<{ id: string; payload: SaleDraftPayload } | null>> {
+export async function getLatestDraftServer(): Promise<ApiResponse<{ id: string; draft_key: string; payload: SaleDraftPayload } | null>> {
   try {
     const response = await fetch('/api/drafts', {
       method: 'GET',

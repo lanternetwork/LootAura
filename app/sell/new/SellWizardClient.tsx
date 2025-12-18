@@ -14,7 +14,7 @@ import ItemCard from '@/components/sales/ItemCard'
 import Toast from '@/components/sales/Toast'
 import ConfirmationModal from '@/components/sales/ConfirmationModal'
 import type { CategoryValue } from '@/lib/types'
-import { getDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalDraft } from '@/lib/draft/localDraft'
+import { getDraftKey, setDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalDraft } from '@/lib/draft/localDraft'
 import { saveDraftServer, getLatestDraftServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
 import { hashDraftContent } from '@/lib/draft/contentHash'
 import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
@@ -328,6 +328,9 @@ export default function SellWizardClient({
         
         if (timeSinceLastSave >= 10000) {
           setSaveStatus('saving')
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Autosave using draft_key:', draftKeyRef.current)
+          }
           saveDraftServer(payload, draftKeyRef.current)
             .then((result) => {
               // Check again before updating state
@@ -428,8 +431,20 @@ export default function SellWizardClient({
         if (serverResult.ok && serverResult.data?.payload) {
           draftToRestore = serverResult.data.payload
           source = 'server'
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SELL_WIZARD] Found server draft')
+          
+          // CRITICAL: Extract and persist the server draft's draft_key
+          // This ensures all subsequent saves update the SAME draft, not create a new one
+          if (serverResult.data.draft_key) {
+            const serverDraftKey = serverResult.data.draft_key
+            setDraftKey(serverDraftKey) // Persist to localStorage
+            draftKeyRef.current = serverDraftKey // Update ref immediately
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Found server draft, adopted draft_key:', serverDraftKey)
+            }
+          } else {
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.warn('[SELL_WIZARD] Server draft missing draft_key, using existing key')
+            }
           }
         }
       }
@@ -543,7 +558,11 @@ export default function SellWizardClient({
             })
         } else if (source === 'server') {
           // Server draft already exists - hash is already set above
-          // No need to save again
+          // draft_key has been persisted to localStorage and draftKeyRef
+          // No need to save again (draft already exists on server)
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Server draft resumed, draft_key persisted:', draftKeyRef.current)
+          }
         }
 
         // Clear resume flag after a short delay to allow state to settle

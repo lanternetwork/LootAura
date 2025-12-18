@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { getRlsDb, fromBase } from '@/lib/supabase/clients'
 import { checkCsrfIfRequired } from '@/lib/api/csrfCheck'
 import { fail, ok } from '@/lib/http/json'
 import { logger } from '@/lib/log'
@@ -38,10 +39,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return fail(400, 'INVALID_REQUEST', 'Sale ID is required')
   }
 
+  // Get schema-scoped client for base table access
+  const db = getRlsDb()
+
   // Toggle favorite: Try to insert first, if duplicate then delete
-  // This avoids RLS issues with separate check queries
-  const { data: _insertedFavorite, error: insertError } = await supabase
-    .from('favorites_v2')
+  // Write directly to base table since views don't support INSERT/DELETE without INSTEAD OF triggers
+  const { data: _insertedFavorite, error: insertError } = await fromBase(db, 'favorites')
     .insert({ user_id: user.id, sale_id: saleId })
     .select()
     .single()
@@ -54,8 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // If it's a duplicate key error, the favorite exists - delete it (toggle off)
     if (errorCode === '23505' || errorMessage?.includes('duplicate') || errorMessage?.includes('unique')) {
       // Delete the existing favorite
-      const { error: deleteError } = await supabase
-        .from('favorites_v2')
+      const { error: deleteError } = await fromBase(db, 'favorites')
         .delete()
         .eq('user_id', user.id)
         .eq('sale_id', saleId)

@@ -92,9 +92,10 @@ async function checkoutHandler(request: NextRequest) {
     return fail(403, 'FORBIDDEN', 'You can only promote your own sales')
   }
 
-  // Verify sale is eligible (published/active, not archived, not hidden)
-  if (sale.status !== 'published' && sale.status !== 'active') {
-    return fail(400, 'SALE_NOT_ELIGIBLE', 'Sale must be published or active to promote')
+  // Verify sale is eligible (published/active/draft, not archived, not hidden)
+  // Allow draft status for checkout creation (sale will be published after checkout session is created)
+  if (sale.status !== 'published' && sale.status !== 'active' && sale.status !== 'draft') {
+    return fail(400, 'SALE_NOT_ELIGIBLE', 'Sale must be published, active, or draft to promote')
   }
 
   if (sale.archived_at) {

@@ -121,8 +121,9 @@ export async function deleteDraftServer(draftKey: string): Promise<ApiResponse<{
 
 /**
  * Publish draft (transactional: create sale + items, mark draft as published)
+ * If wantsPromotion is true, creates sale as draft first (client must validate checkout and publish separately)
  */
-export async function publishDraftServer(draftKey: string): Promise<ApiResponse<{ saleId: string }>> {
+export async function publishDraftServer(draftKey: string, wantsPromotion?: boolean): Promise<ApiResponse<{ saleId: string }>> {
   try {
     const response = await fetch('/api/drafts/publish', {
       method: 'POST',
@@ -130,7 +131,7 @@ export async function publishDraftServer(draftKey: string): Promise<ApiResponse<
         'Content-Type': 'application/json',
         ...getCsrfHeaders(),
       },
-      body: JSON.stringify({ draftKey }),
+      body: JSON.stringify({ draftKey, wantsPromotion: wantsPromotion || false }),
     })
 
     if (!response.ok) {

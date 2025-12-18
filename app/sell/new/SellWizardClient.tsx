@@ -156,6 +156,7 @@ export default function SellWizardClient({
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
+  const [draftSaleId, setDraftSaleId] = useState<string | null>(null) // Track draft sale ID if promotion fails
   const [wantsPromotion, setWantsPromotion] = useState(false)
   
   // Handler to toggle promotion - clear error when disabling
@@ -808,6 +809,30 @@ export default function SellWizardClient({
     }
   }, [])
 
+  // Helper to publish a draft sale
+  const publishDraftSale = useCallback(async (saleId: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const response = await fetch(`/api/sales/${saleId}/archive`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getCsrfHeaders(),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'published' }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        return { ok: false, error: data.error || 'Failed to publish sale' }
+      }
+
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Failed to publish sale' }
+    }
+  }, [])
+
   // Helper to submit sale payload (used by both handleSubmit and auto-resume)
   const submitSalePayload = useCallback(async (payload: { saleData: any; items: any[] }) => {
     setLoading(true)
@@ -815,7 +840,12 @@ export default function SellWizardClient({
     setPromotionError(null)
 
     try {
-      // Create sale as published (required for promotion checkout validation)
+      // If promotion is enabled, create sale as draft first, then validate checkout, then publish
+      const shouldValidatePromotion = wantsPromotion && promotionsEnabled
+      const salePayload = shouldValidatePromotion
+        ? { ...payload.saleData, status: 'draft' as const }
+        : payload.saleData
+
       const response = await fetch('/api/sales', {
         method: 'POST',
         headers: {
@@ -823,7 +853,7 @@ export default function SellWizardClient({
           ...getCsrfHeaders(),
         },
         credentials: 'include',
-        body: JSON.stringify(payload.saleData),
+        body: JSON.stringify(salePayload),
       })
 
       const result = await response.json()
@@ -866,6 +896,11 @@ export default function SellWizardClient({
         return
       }
 
+      // If sale was created as draft (promotion enabled), track it
+      if (shouldValidatePromotion) {
+        setDraftSaleId(saleId)
+      }
+
       // Create items for the sale
       if (payload.items && payload.items.length > 0) {
         try {
@@ -905,7 +940,7 @@ export default function SellWizardClient({
       // Handle promotion checkout if requested
       if (wantsPromotion && promotionsEnabled) {
         if (paymentsEnabled) {
-          // Validate promotion checkout - if it fails, delete the sale and show error
+          // Create checkout session with draft sale - if it fails, keep sale as draft
           setIsPromoting(true)
           try {
             const response = await fetch('/api/promotions/checkout', {
@@ -924,13 +959,7 @@ export default function SellWizardClient({
             const data = await response.json().catch(() => ({}))
 
             if (!response.ok) {
-              // Promotion failed - delete the published sale
-              await fetch(`/api/sales/${saleId}/delete`, {
-                method: 'DELETE',
-                headers: getCsrfHeaders(),
-                credentials: 'include',
-              }).catch(() => {}) // Ignore delete errors
-              
+              // Promotion failed - keep sale as draft, show error
               const code = data?.code
               let errorMessage = 'Promotion checkout is not available. Please disable promotion to publish your sale.'
               
@@ -947,21 +976,27 @@ export default function SellWizardClient({
               }
               
               setPromotionError(errorMessage)
+              setDraftSaleId(saleId) // Track draft sale ID
               setLoading(false)
               setIsPromoting(false)
-              return // Sale was deleted, don't show confirmation modal
+              // Sale remains as draft - user can retry or uncheck promote and publish
+              return
             } else if (data?.checkoutUrl) {
-              // Redirect to Stripe checkout
+              // Checkout session created successfully - publish the sale, then redirect
+              const publishResult = await publishDraftSale(saleId)
+              if (!publishResult.ok) {
+                // Failed to publish - show error but don't redirect
+                setPromotionError(publishResult.error || 'Failed to publish sale. Please try again.')
+                setLoading(false)
+                setIsPromoting(false)
+                return
+              }
+              
+              // Sale is published, redirect to Stripe checkout
               window.location.href = data.checkoutUrl
               return // Don't show confirmation modal - user is going to checkout
             } else {
-              // Unexpected response - delete the published sale
-              await fetch(`/api/sales/${saleId}/delete`, {
-                method: 'DELETE',
-                headers: getCsrfHeaders(),
-                credentials: 'include',
-              }).catch(() => {}) // Ignore delete errors
-              
+              // Unexpected response - keep sale as draft
               setPromotionError('Unexpected response from promotion checkout. Please disable promotion to publish your sale.')
               setLoading(false)
               setIsPromoting(false)
@@ -969,38 +1004,36 @@ export default function SellWizardClient({
             }
           } catch (error) {
             console.error('[SELL_WIZARD] Error calling checkout:', error)
-            // Try to delete the sale if it exists
-            try {
-              await fetch(`/api/sales/${saleId}/delete`, {
-                method: 'DELETE',
-                headers: getCsrfHeaders(),
-                credentials: 'include',
-              })
-            } catch (deleteError) {
-              // Ignore delete errors
-            }
-            
+            // Keep sale as draft on error
             setPromotionError('Failed to start promotion checkout. Please disable promotion to publish your sale.')
             setLoading(false)
             setIsPromoting(false)
             return
           }
         } else {
-          // Payments disabled - delete the published sale and show error
-          await fetch(`/api/sales/${saleId}/delete`, {
-            method: 'DELETE',
-            headers: getCsrfHeaders(),
-            credentials: 'include',
-          }).catch(() => {}) // Ignore delete errors
-          
+          // Payments disabled - keep sale as draft and show error
           setPromotionError('Promotions aren\'t available yet. Please disable promotion to publish your sale.')
           setLoading(false)
           return
         }
       } else {
-        // No promotion requested - show confirmation modal
-        setCreatedSaleId(saleId)
-        setConfirmationModalOpen(true)
+        // No promotion requested
+        // If we have a draft sale from a previous promotion attempt, publish it instead of creating new
+        if (draftSaleId && !wantsPromotion) {
+          const publishResult = await publishDraftSale(draftSaleId)
+          if (!publishResult.ok) {
+            setSubmitError(publishResult.error || 'Failed to publish sale. Please try again.')
+            setLoading(false)
+            return
+          }
+          setDraftSaleId(null) // Clear draft sale ID
+          setCreatedSaleId(draftSaleId)
+          setConfirmationModalOpen(true)
+        } else {
+          // Normal flow - show confirmation modal
+          setCreatedSaleId(saleId)
+          setConfirmationModalOpen(true)
+        }
       }
     } catch (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -1010,7 +1043,7 @@ export default function SellWizardClient({
     } finally {
       setLoading(false)
     }
-  }, [router, createItemsForSale, wantsPromotion, promotionsEnabled, paymentsEnabled])
+  }, [router, createItemsForSale, wantsPromotion, promotionsEnabled, paymentsEnabled, publishDraftSale])
 
   // Auto-resume after login (resume=1 param)
   // If user returns after login and has a draft, auto-publish it
@@ -1126,7 +1159,7 @@ export default function SellWizardClient({
       draftKeyRef.current = null
 
       try {
-        const result = await publishDraftServer(draftKeyToPublish)
+        const result = await publishDraftServer(draftKeyToPublish, wantsPromotion && promotionsEnabled)
         
         if (!result.ok) {
           if (result.code === 'AUTH_REQUIRED') {
@@ -1176,9 +1209,10 @@ export default function SellWizardClient({
         isPublishingRef.current = false
 
         // Handle promotion checkout if requested
+        // Note: If wantsPromotion was true, sale was created as draft - validate checkout, then publish
         if (wantsPromotion && promotionsEnabled) {
           if (paymentsEnabled) {
-            // Call checkout and redirect to Stripe
+            // Create checkout session with draft sale - if it fails, keep sale as draft
             setIsPromoting(true)
             try {
               const response = await fetch('/api/promotions/checkout', {
@@ -1197,68 +1231,81 @@ export default function SellWizardClient({
               const data = await response.json().catch(() => ({}))
 
               if (!response.ok) {
+                // Promotion failed - keep sale as draft, show error
                 const code = data?.code
+                let errorMessage = 'Promotion checkout is not available. Please disable promotion to publish your sale.'
+                
                 if (code === 'PAYMENTS_DISABLED' || code === 'PROMOTIONS_DISABLED') {
-                  setToastMessage(data?.details?.message || 'Promotions are not available right now. Please check back later.')
-                  setShowToast(true)
-                  setWantsPromotion(false) // Reset state
+                  errorMessage = data?.details?.message || 'Promotions are not available right now. Please disable promotion to publish your sale.'
                 } else if (code === 'ACCOUNT_LOCKED') {
-                  setToastMessage(data?.details?.message || 'Your account is locked. Please contact support if you believe this is an error.')
-                  setShowToast(true)
-                  setWantsPromotion(false) // Reset state
+                  errorMessage = data?.details?.message || 'Your account is locked. Please contact support or disable promotion to publish your sale.'
                 } else if (code === 'SALE_NOT_ELIGIBLE') {
-                  setToastMessage(data?.error || 'This sale is not eligible for promotion at this time.')
-                  setShowToast(true)
-                  setWantsPromotion(false) // Reset state
+                  errorMessage = data?.error || 'This sale is not eligible for promotion. Please disable promotion to publish your sale.'
                 } else if (code === 'STRIPE_ERROR' || code === 'CONFIG_ERROR' || code === 'DATABASE_ERROR') {
-                  // Server-side configuration or processing error
-                  setToastMessage('Payment processing is temporarily unavailable. Please try again later or contact support.')
-                  setShowToast(true)
-                  setWantsPromotion(false) // Reset state
+                  errorMessage = 'Payment processing is temporarily unavailable. Please disable promotion to publish your sale.'
                 } else {
-                  setToastMessage(data?.error || 'Failed to start promotion checkout. Please try again.')
-                  setShowToast(true)
-                  setWantsPromotion(false) // Reset state
+                  errorMessage = data?.error || 'Failed to start promotion checkout. Please disable promotion to publish your sale.'
                 }
-                // Show confirmation modal anyway (sale was published)
-                setCreatedSaleId(saleId)
-                setConfirmationModalOpen(true)
+                
+                setPromotionError(errorMessage)
+                setDraftSaleId(saleId) // Track draft sale ID
+                setLoading(false)
+                setIsPromoting(false)
+                // Sale remains as draft - user can retry or uncheck promote and publish
+                return
               } else if (data?.checkoutUrl) {
-                // Redirect to Stripe checkout
+                // Checkout session created successfully - publish the sale, then redirect
+                const publishResult = await publishDraftSale(saleId)
+                if (!publishResult.ok) {
+                  // Failed to publish - show error but don't redirect
+                  setPromotionError(publishResult.error || 'Failed to publish sale. Please try again.')
+                  setLoading(false)
+                  setIsPromoting(false)
+                  return
+                }
+                
+                // Sale is published, redirect to Stripe checkout
                 window.location.href = data.checkoutUrl
                 return // Don't show confirmation modal - user is going to checkout
               } else {
-                setToastMessage('Unexpected response from promotion checkout. Please try again.')
-                setShowToast(true)
-                setWantsPromotion(false) // Reset state
-                // Show confirmation modal anyway
-                setCreatedSaleId(saleId)
-                setConfirmationModalOpen(true)
+                // Unexpected response - keep sale as draft
+                setPromotionError('Unexpected response from promotion checkout. Please disable promotion to publish your sale.')
+                setLoading(false)
+                setIsPromoting(false)
+                return
               }
             } catch (error) {
               console.error('[SELL_WIZARD] Error calling checkout:', error)
-              setToastMessage('Failed to start promotion checkout. Please try again.')
-              setShowToast(true)
-              setWantsPromotion(false) // Reset state
-              // Show confirmation modal anyway
-              setCreatedSaleId(saleId)
-              setConfirmationModalOpen(true)
-            } finally {
+              // Keep sale as draft on error
+              setPromotionError('Failed to start promotion checkout. Please disable promotion to publish your sale.')
+              setLoading(false)
               setIsPromoting(false)
+              return
             }
           } else {
-            // Payments disabled - show message and reset state
-            setToastMessage('Promotions aren\'t available yet.')
-            setShowToast(true)
-            setWantsPromotion(false) // Reset state
-            // Show confirmation modal
+            // Payments disabled - keep sale as draft and show error
+            setPromotionError('Promotions aren\'t available yet. Please disable promotion to publish your sale.')
+            setLoading(false)
+            return
+          }
+        } else {
+          // No promotion requested
+          // If we have a draft sale from a previous promotion attempt, publish it instead
+          if (draftSaleId && !wantsPromotion) {
+            const publishResult = await publishDraftSale(draftSaleId)
+            if (!publishResult.ok) {
+              setSubmitError(publishResult.error || 'Failed to publish sale. Please try again.')
+              setLoading(false)
+              return
+            }
+            setDraftSaleId(null) // Clear draft sale ID
+            setCreatedSaleId(draftSaleId)
+            setConfirmationModalOpen(true)
+          } else {
+            // Normal flow - show confirmation modal
             setCreatedSaleId(saleId)
             setConfirmationModalOpen(true)
           }
-        } else {
-          // No promotion requested - show confirmation modal
-          setCreatedSaleId(saleId)
-          setConfirmationModalOpen(true)
         }
       } catch (error) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

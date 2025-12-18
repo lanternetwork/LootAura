@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
     }
     
-    const { draftKey } = body
+    const { draftKey, wantsPromotion } = body
 
     if (!draftKey || typeof draftKey !== 'string') {
       return fail(400, 'INVALID_INPUT', 'draftKey is required')
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       cover_image_url: photos && photos.length > 0 ? photos[0] : null,
       images: photos && photos.length > 1 ? photos.slice(1) : null,
       pricing_mode: formData.pricing_mode || 'negotiable',
-      status: 'published',
+      status: wantsPromotion ? 'draft' : 'published', // Create as draft if promotion is requested
       privacy_mode: 'exact', // Required field
       is_featured: false,
       tags: normalizedTags,

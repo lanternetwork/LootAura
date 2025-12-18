@@ -16,6 +16,7 @@ import ConfirmationModal from '@/components/sales/ConfirmationModal'
 import type { CategoryValue } from '@/lib/types'
 import { getDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalDraft } from '@/lib/draft/localDraft'
 import { saveDraftServer, getLatestDraftServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
+import { hashDraftContent } from '@/lib/draft/contentHash'
 import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 import { getCsrfHeaders } from '@/lib/csrf-client'
 
@@ -173,10 +174,12 @@ export default function SellWizardClient({
   const [showToast, setShowToast] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const hasResumedRef = useRef(false)
+  const isResumingRef = useRef(false) // Flag to prevent autosave during resume
   const draftKeyRef = useRef<string | null>(null)
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isPublishingRef = useRef<boolean>(false) // Flag to prevent autosave during/after publish
   const lastServerSaveRef = useRef<number>(0)
+  const lastSavedContentHashRef = useRef<string | null>(null) // Track last saved content hash for deduplication
   const isNavigatingRef = useRef(false)
   const searchParams = useSearchParams()
 
@@ -289,8 +292,8 @@ export default function SellWizardClient({
 
   // Debounced autosave (local + server)
   useEffect(() => {
-    // Don't autosave if we're publishing or have already published
-    if (isPublishingRef.current) {
+    // Don't autosave if we're publishing, have already published, or are currently resuming
+    if (isPublishingRef.current || isResumingRef.current) {
       return
     }
     
@@ -301,19 +304,25 @@ export default function SellWizardClient({
 
     // Set new timeout for debounced save (1.5s)
     autosaveTimeoutRef.current = setTimeout(() => {
-      // Double-check we're not publishing before saving
-      if (isPublishingRef.current) {
+      // Double-check we're not publishing or resuming before saving
+      if (isPublishingRef.current || isResumingRef.current) {
         return
       }
       
       const payload = buildDraftPayload()
       
+      // Compute content hash for deduplication
+      const contentHash = hashDraftContent(payload)
+      
+      // Skip server save if content hasn't changed (client-side deduplication)
+      const shouldSaveToServer = lastSavedContentHashRef.current !== contentHash
+      
       // Always save locally
       saveLocalDraft(payload)
       setSaveStatus('saved')
 
-      // Save to server if authenticated (throttle to max 1x per 10s)
-      if (user && draftKeyRef.current && !isPublishingRef.current) {
+      // Save to server if authenticated, content changed, and throttled (max 1x per 10s)
+      if (user && draftKeyRef.current && !isPublishingRef.current && shouldSaveToServer) {
         const now = Date.now()
         const timeSinceLastSave = now - lastServerSaveRef.current
         
@@ -327,6 +336,7 @@ export default function SellWizardClient({
               }
               if (result.ok) {
                 lastServerSaveRef.current = Date.now()
+                lastSavedContentHashRef.current = contentHash // Update saved hash
                 setSaveStatus('saved')
               } else {
                 setSaveStatus('error')
@@ -358,8 +368,12 @@ export default function SellWizardClient({
       const payload = buildDraftPayload()
       saveLocalDraft(payload)
       if (user && draftKeyRef.current) {
-        // Fire and forget - don't wait for response
-        saveDraftServer(payload, draftKeyRef.current).catch(() => {})
+        // Only save if content changed (deduplication)
+        const contentHash = hashDraftContent(payload)
+        if (lastSavedContentHashRef.current !== contentHash) {
+          // Fire and forget - don't wait for response
+          saveDraftServer(payload, draftKeyRef.current).catch(() => {})
+        }
       }
     }
 
@@ -467,6 +481,7 @@ export default function SellWizardClient({
       // Restore draft if found
       if (draftToRestore) {
         hasResumedRef.current = true
+        isResumingRef.current = true // Prevent autosave during restore
         
         // Restore form data
         if (draftToRestore.formData) {
@@ -506,12 +521,35 @@ export default function SellWizardClient({
 
         setShowToast(true)
 
-        // If user is authenticated and we restored local draft, save to server
+        // Compute and store content hash to prevent immediate no-op save
+        const restoredHash = hashDraftContent(draftToRestore)
+        lastSavedContentHashRef.current = restoredHash
+
+        // If user is authenticated and we restored local draft, save to server only if content differs
         if (user && source === 'local' && draftKeyRef.current) {
-          saveDraftServer(draftToRestore, draftKeyRef.current).catch(() => {
-            // Silent fail - already saved locally
-          })
+          // Check if we need to save (content might have changed since local save)
+          // This will be handled by the server-side deduplication, but we can skip if hash matches
+          // However, since we don't know the server's hash, we'll let the server handle deduplication
+          // Just ensure we don't trigger immediate autosave by setting the flag
+          saveDraftServer(draftToRestore, draftKeyRef.current)
+            .then((result) => {
+              if (result.ok && result.data?.id) {
+                // Update hash after successful save
+                lastSavedContentHashRef.current = restoredHash
+              }
+            })
+            .catch(() => {
+              // Silent fail - already saved locally
+            })
+        } else if (source === 'server') {
+          // Server draft already exists - hash is already set above
+          // No need to save again
         }
+
+        // Clear resume flag after a short delay to allow state to settle
+        setTimeout(() => {
+          isResumingRef.current = false
+        }, 2000)
       } else if (isReviewResume) {
         // Draft not found but resume=review - still go to Review step
         setCurrentStep(getReviewStepIndex(promotionsEnabled))
@@ -680,15 +718,25 @@ export default function SellWizardClient({
         }
       }
 
-      // Fire-and-forget server save (throttled, non-blocking)
+      // Fire-and-forget server save (throttled, non-blocking, only if content changed)
       const { data: { user: currentUser } } = await supabase.auth.getUser()
       if (currentUser && draftKeyRef.current) {
-        const now = Date.now()
-        if (now - lastServerSaveRef.current > 10000) {
-          lastServerSaveRef.current = now
-          saveDraftServer(payload, draftKeyRef.current).catch(() => {
-            // Silent fail - already saved locally
-          })
+        const contentHash = hashDraftContent(payload)
+        const shouldSave = lastSavedContentHashRef.current !== contentHash
+        if (shouldSave) {
+          const now = Date.now()
+          if (now - lastServerSaveRef.current > 10000) {
+            lastServerSaveRef.current = now
+            saveDraftServer(payload, draftKeyRef.current)
+              .then((result) => {
+                if (result.ok) {
+                  lastSavedContentHashRef.current = contentHash
+                }
+              })
+              .catch(() => {
+                // Silent fail - already saved locally
+              })
+          }
         }
       }
 

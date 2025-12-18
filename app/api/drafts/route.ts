@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { ok, fail } from '@/lib/http/json'
+import { hashDraftContent } from '@/lib/draft/contentHash'
 import * as Sentry from '@sentry/nextjs'
 
 export const dynamic = 'force-dynamic'
@@ -134,6 +135,9 @@ async function postDraftHandler(request: NextRequest) {
     const validatedPayload = validationResult.data
     const title = validatedPayload.formData?.title || null
 
+    // Compute content hash for deduplication
+    const contentHash = hashDraftContent(validatedPayload)
+
     // Upsert draft (insert or update by user_id + draft_key)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[DRAFTS] Saving draft:', {
@@ -142,6 +146,7 @@ async function postDraftHandler(request: NextRequest) {
         title,
         hasPayload: !!validatedPayload,
         payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
+        contentHash,
       })
     }
     
@@ -151,21 +156,42 @@ async function postDraftHandler(request: NextRequest) {
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
     const rls = getRlsDb()
     const { data: existingDraft } = await fromBase(rls, 'sale_drafts')
-      .select('id')
+      .select('id, content_hash, updated_at')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
       .eq('status', 'active')
       .maybeSingle()
 
+    // Deduplication: If draft exists and content hash matches, skip update
+    if (existingDraft && existingDraft.content_hash === contentHash) {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DRAFTS] Content unchanged, skipping update:', {
+          draftId: existingDraft.id,
+          draftKey,
+          contentHash,
+        })
+      }
+      // Return existing draft without updating (no-op save)
+      return ok({ 
+        data: { 
+          id: existingDraft.id,
+          deduped: true // Flag to indicate no write occurred
+        } 
+      })
+    }
+
     let draft: any
     let error: any
+    let isUpdate = false
 
     if (existingDraft) {
       // Update existing draft - write to base table using admin client
+      isUpdate = true
       const { data: updatedDraft, error: updateError } = await fromBase(admin, 'sale_drafts')
         .update({
           title,
           payload: validatedPayload,
+          content_hash: contentHash,
           status: 'active',
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
@@ -182,6 +208,7 @@ async function postDraftHandler(request: NextRequest) {
           draft_key: draftKey,
           title,
           payload: validatedPayload,
+          content_hash: contentHash,
           status: 'active',
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
@@ -201,7 +228,7 @@ async function postDraftHandler(request: NextRequest) {
       console.error('[DRAFTS] Draft save succeeded but no draft returned:', {
         draftKey,
         userId: user.id,
-        operation: existingDraft ? 'update' : 'insert',
+        operation: isUpdate ? 'update' : 'insert',
       })
       return fail(500, 'NO_DATA_ERROR', 'Draft save succeeded but no data returned')
     }

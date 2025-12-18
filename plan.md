@@ -975,3 +975,106 @@ Milestone 5A adds **seller-facing “Promote listing” CTAs** wired to the Stri
      - CI tests (including payments-guard + CTA gating + batch-status tests).  
      - Stripe dashboard for checkout/session anomalies.  
      - Application logs for promotion-related errors (without PII).
+
+---
+
+## Draft Deduplication System
+
+**Status:** ✅ Implemented
+
+### Overview
+
+The draft deduplication system prevents unnecessary database writes when draft content hasn't changed. This eliminates draft spam, reduces database load, and ensures deterministic behavior for "Continue draft" and autosave operations.
+
+### Implementation
+
+**Content Hash:**
+- **Column:** `sale_drafts.content_hash` (TEXT, indexed)
+- **Computation:** SHA-256 hash of canonicalized draft payload (excludes meta fields like `currentStep`)
+- **Canonicalization:**
+  - Excludes `currentStep` (UI state, not content)
+  - Normalizes empty strings to undefined
+  - Sorts arrays (tags, photos, items) for consistent ordering
+  - Sorts items by name+category for stable comparison
+  - Removes item IDs from hash (temporary IDs don't represent content changes)
+
+**Server-Side Deduplication (Primary Guard):**
+- **Location:** `POST /api/drafts` (`app/api/drafts/route.ts`)
+- **Behavior:**
+  - Computes content hash of incoming payload
+  - Checks existing draft's `content_hash` if draft exists
+  - If hash matches: returns `200 OK` with `{ id, deduped: true }` **without updating database**
+  - If hash differs or no draft exists: proceeds with normal create/update
+- **Security:** RLS intact; deduplication only applies to user's own drafts
+
+**Client-Side Deduplication (Secondary Guard):**
+- **Location:** `SellWizardClient` (`app/sell/new/SellWizardClient.tsx`)
+- **Behavior:**
+  - Tracks `lastSavedContentHashRef` to memoize last saved hash
+  - Autosave effect skips server save if current hash matches last saved hash
+  - Resume flow sets hash immediately to prevent immediate no-op save
+  - Step navigation and beforeunload saves also check hash before sending
+
+**Continue Draft Flow:**
+- **Behavior:**
+  - Sets `isResumingRef` flag during restore to prevent autosave
+  - Computes and stores content hash of restored draft
+  - Clears resume flag after 2s delay to allow state to settle
+  - If restoring local draft to server, allows server-side deduplication to handle it
+
+### What Counts as "Meaningful Change"
+
+**Included in hash (triggers update):**
+- Form data fields (title, description, address, city, state, zip, lat/lng, dates, times, tags, pricing_mode)
+- Photos array (URLs, order)
+- Items array (name, price, description, image_url, category - but NOT item IDs)
+
+**Excluded from hash (does NOT trigger update):**
+- `currentStep` (UI state only)
+- Item IDs (temporary identifiers, not content)
+
+### Expected Behavior
+
+**Continue Draft:**
+- Clicking "Continue draft" repeatedly without editing: **ONE draft** in database (no duplicates)
+- Making one small edit and moving steps: **same draft updates** (no new draft row)
+
+**No-Op Saves:**
+- Saving identical payload twice: **first save creates/updates, second save returns `deduped: true`**
+- `updated_at` timestamp **not changed** on deduped saves
+- No database write occurs for deduped saves
+
+**Change Detection:**
+- Changing any form field, photo, or item: **hash changes, update occurs**
+- Changing only `currentStep`: **hash unchanged, no update**
+- Reordering items: **hash unchanged** (items sorted by name for consistency)
+
+### Database Schema
+
+**Migration:** `125_add_draft_content_hash.sql`
+- Adds `content_hash TEXT` column to `sale_drafts`
+- Creates index: `(user_id, draft_key, content_hash)` WHERE `status = 'active'`
+- Column comment explains purpose and canonicalization rules
+
+### Tests
+
+**Integration Tests:** `tests/integration/drafts.deduplication.test.ts`
+- ✅ Server-side deduplication (skip update when hash matches)
+- ✅ Update when hash differs
+- ✅ Create new draft when no existing draft
+- ✅ `currentStep` changes don't affect hash
+- ✅ Meaningful field changes do affect hash
+- ✅ Item reordering handled consistently
+
+### Performance & Cost Discipline
+
+- **Zero writes** for step navigation without edits
+- **Zero writes** for "Continue draft" without edits
+- **Reduced DB load** in common path (autosave, step transitions)
+- **Single read + conditional update** pattern (no extra round-trips)
+
+### Security
+
+- **RLS intact:** Deduplication only applies to user's own drafts
+- **No service-role bypass:** Uses existing RLS client for reads, admin client for writes (same pattern as before)
+- **No new tables:** Single column addition to existing `sale_drafts` table

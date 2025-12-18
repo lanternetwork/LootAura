@@ -94,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Insert favorite (view doesn't support upsert, so we use insert)
   // If it already exists, the unique constraint will cause an error which we handle gracefully
-  const { data: insertedFavorite, error: insertError } = await supabase
+  const { data: _insertedFavorite, error: insertError } = await supabase
     .from('favorites_v2')
     .insert({ user_id: user.id, sale_id: saleId })
     .select()

@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import type { Sale } from '@/lib/types'
-import { getAnyFutureWindow, isSalePubliclyVisible } from '@/lib/shared/salesVisibility'
+import { getAnyFutureWindow, isSalePubliclyVisible } from '../../../lib/shared/salesVisibility'
 
 /**
  * GET /api/favorites - Get user favorites

@@ -35,28 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const saleId = resolvedParams.id
 
   if (!saleId) {
-    return NextResponse.json({ error: 'Sale ID is required' }, { status: 400 })
-  }
-
-  // Verify sale exists before favoriting
-  const { data: sale, error: saleError } = await supabase
-    .from('sales_v2')
-    .select('id')
-    .eq('id', saleId)
-    .maybeSingle()
-
-  if (saleError) {
-    logger.error('Error checking sale existence', saleError instanceof Error ? saleError : new Error(String(saleError)), {
-      component: 'sales/favorite',
-      operation: 'check_sale',
-      userId: user.id,
-      saleId,
-    })
-    return fail(400, 'SALE_CHECK_FAILED', 'Failed to verify sale exists')
-  }
-
-  if (!sale) {
-    return fail(404, 'SALE_NOT_FOUND', 'Sale not found')
+    return fail(400, 'INVALID_REQUEST', 'Sale ID is required')
   }
 
   // Toggle favorite in base table through public view
@@ -113,19 +92,37 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return ok({ favorited: false })
   }
 
-  // Insert with upsert to avoid duplicate conflicts if called twice rapidly
-  const { error: upsertError } = await supabase
+  // Insert favorite (view doesn't support upsert, so we use insert)
+  // If it already exists, the unique constraint will cause an error which we handle gracefully
+  const { data: insertedFavorite, error: insertError } = await supabase
     .from('favorites_v2')
-    .upsert({ user_id: user.id, sale_id: saleId }, { onConflict: 'user_id,sale_id', ignoreDuplicates: true })
+    .insert({ user_id: user.id, sale_id: saleId })
+    .select()
+    .single()
 
-  if (upsertError) {
-    const errorMessage = upsertError instanceof Error ? upsertError.message : (upsertError as any)?.message || String(upsertError)
-    logger.error('Error upserting favorite', upsertError instanceof Error ? upsertError : new Error(String(upsertError)), {
+  if (insertError) {
+    // Check if error is due to duplicate (unique constraint violation)
+    const errorCode = (insertError as any)?.code
+    const errorMessage = insertError instanceof Error ? insertError.message : (insertError as any)?.message || String(insertError)
+    
+    // If it's a duplicate key error, the favorite already exists - this is fine, return success
+    if (errorCode === '23505' || errorMessage?.includes('duplicate') || errorMessage?.includes('unique')) {
+      logger.info('Favorite already exists (duplicate insert ignored)', {
+        component: 'sales/favorite',
+        operation: 'add_favorite',
+        userId: user.id,
+        saleId,
+      })
+      return ok({ favorited: true })
+    }
+    
+    // Otherwise, log and return error
+    logger.error('Error inserting favorite', insertError instanceof Error ? insertError : new Error(String(insertError)), {
       component: 'sales/favorite',
       operation: 'add_favorite',
       userId: user.id,
       saleId,
-      errorCode: (upsertError as any)?.code,
+      errorCode,
       errorMessage,
     })
     return fail(400, 'FAVORITE_ADD_FAILED', errorMessage || 'Failed to add favorite')

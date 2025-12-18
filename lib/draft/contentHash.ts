@@ -94,14 +94,35 @@ function canonicalizeDraftPayload(payload: SaleDraftPayload): any {
 }
 
 /**
+ * Recursively sort object keys for stable JSON stringification
+ */
+function sortKeysRecursively(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => sortKeysRecursively(item))
+  }
+  
+  const sorted: any = {}
+  const keys = Object.keys(obj).sort()
+  for (const key of keys) {
+    sorted[key] = sortKeysRecursively(obj[key])
+  }
+  return sorted
+}
+
+/**
  * Create a stable hash of draft content (server-side)
  * Uses Node.js crypto for secure hashing
  */
 export function hashDraftContent(payload: SaleDraftPayload): string {
   const canonical = canonicalizeDraftPayload(payload)
   
-  // Create stable JSON string (sorted keys)
-  const jsonStr = JSON.stringify(canonical, Object.keys(canonical).sort())
+  // Sort keys recursively for stable JSON stringification
+  const sorted = sortKeysRecursively(canonical)
+  const jsonStr = JSON.stringify(sorted)
   
   // Use crypto for hashing (Node.js environment)
   if (typeof require !== 'undefined') {

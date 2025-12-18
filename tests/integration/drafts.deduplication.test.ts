@@ -26,6 +26,7 @@ const mockSupabaseServer = {
 
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseServerClient: () => mockSupabaseServer,
+  createSupabaseWriteClient: () => mockSupabaseServer,
 }))
 
 vi.mock('@/lib/supabase/clients', () => ({

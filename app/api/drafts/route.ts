@@ -264,16 +264,23 @@ async function deleteDraftHandler(request: NextRequest) {
 
     // Mark draft as archived (soft delete) - write to base table using admin client (bypasses RLS, but we've already verified auth)
     const admin = getAdminDb()
-    const { error } = await fromBase(admin, 'sale_drafts')
+    const { data: updatedDrafts, error } = await fromBase(admin, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
       .eq('status', 'active')
+      .select('id') // Select to check if any rows were updated
 
     if (error) {
       console.error('[DRAFTS/DELETE] supabase error:', error)
       Sentry.captureException(error, { tags: { operation: 'deleteDraft' } })
       return fail(500, 'DELETE_ERROR', 'Failed to delete draft', error)
+    }
+
+    // Check if any rows were actually updated
+    if (!updatedDrafts || updatedDrafts.length === 0) {
+      // Draft not found or already archived
+      return fail(404, 'DRAFT_NOT_FOUND', 'Draft not found or already deleted')
     }
 
     return ok({ data: {} })

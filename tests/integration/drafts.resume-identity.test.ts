@@ -99,7 +99,7 @@ describe('Draft Resume Identity', () => {
       error: null,
     })
 
-    // Setup query builder mocks
+    // Setup default query builder mocks (will be overridden in individual tests)
     const createQueryBuilder = () => ({
       select: vi.fn().mockReturnThis(),
       insert: vi.fn().mockReturnThis(),
@@ -111,6 +111,7 @@ describe('Draft Resume Identity', () => {
       maybeSingle: vi.fn(),
     })
 
+    // Reset to default - tests will override as needed
     mockRlsDb.from.mockReturnValue(createQueryBuilder())
     mockAdminDb.from.mockReturnValue(createQueryBuilder())
   })
@@ -181,6 +182,46 @@ describe('Draft Resume Identity', () => {
     expect(getResult.data.draft_key).toBe(originalDraftKey) // CRITICAL: draft_key must be present
 
     // Step 3: Simulate save after making changes (user modifies and saves)
+    // Set up mocks BEFORE creating the request
+    // Mock: Existing draft found (with different content hash)
+    const rlsQueryBuilder3 = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: {
+          id: originalDraftId,
+          content_hash: 'original-hash', // Different hash (content changed)
+          updated_at: '2025-01-01T00:00:00Z',
+        },
+        error: null,
+      }),
+    }
+    mockRlsDb.from.mockReturnValue(rlsQueryBuilder3)
+
+    // Mock: Successful update (NOT insert)
+    // The update chain is: update().eq().select().single()
+    const adminQueryBuilder3 = {
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({
+        data: {
+          id: originalDraftId, // SAME ID
+          draft_key: originalDraftKey, // SAME draft_key
+          title: 'Modified Sale',
+          status: 'active',
+          updated_at: '2025-01-01T01:00:00Z', // Updated timestamp
+        },
+        error: null,
+      }),
+    }
+    // Ensure update().eq() returns the builder for chaining
+    adminQueryBuilder3.update.mockReturnValue(adminQueryBuilder3)
+    adminQueryBuilder3.eq.mockReturnValue(adminQueryBuilder3)
+    adminQueryBuilder3.select.mockReturnValue(adminQueryBuilder3)
+    mockAdminDb.from.mockReturnValue(adminQueryBuilder3)
+
     const saveRequest = new NextRequest('http://localhost/api/drafts', {
       method: 'POST',
       headers: {
@@ -190,31 +231,6 @@ describe('Draft Resume Identity', () => {
         payload: modifiedPayload, // Modified content
         draftKey: originalDraftKey, // SAME draft_key (adopted from resume)
       }),
-    })
-
-    // Mock: Existing draft found (with different content hash)
-    const rlsQueryBuilder3 = mockRlsDb.from()
-    rlsQueryBuilder3.maybeSingle.mockResolvedValue({
-      data: {
-        id: originalDraftId,
-        content_hash: 'original-hash', // Different hash (content changed)
-        updated_at: '2025-01-01T00:00:00Z',
-      },
-      error: null,
-    })
-
-    // Mock: Successful update (NOT insert)
-    const adminQueryBuilder3 = mockAdminDb.from()
-    const updatedDraft = {
-      id: originalDraftId, // SAME ID
-      draft_key: originalDraftKey, // SAME draft_key
-      title: 'Modified Sale',
-      status: 'active',
-      updated_at: '2025-01-01T01:00:00Z', // Updated timestamp
-    }
-    adminQueryBuilder3.single.mockResolvedValue({
-      data: updatedDraft,
-      error: null,
     })
 
     const saveResponse = await POST(saveRequest)

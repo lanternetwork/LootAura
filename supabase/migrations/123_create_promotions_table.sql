@@ -49,12 +49,13 @@ CREATE POLICY promotions_owner_select ON lootaura_v2.promotions
   USING (owner_profile_id = auth.uid());
 
 -- Admins can read all promotions
+-- Note: Admin check uses auth.users.email since profiles table doesn't have email column
 CREATE POLICY promotions_admin_select ON lootaura_v2.promotions
   FOR SELECT
   TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM lootaura_v2.profiles
+      SELECT 1 FROM auth.users
       WHERE id = auth.uid()
       AND email IN (SELECT unnest(string_to_array(current_setting('app.admin_emails', true), ',')))
     )

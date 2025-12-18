@@ -193,7 +193,8 @@ async function postDraftHandler(request: NextRequest) {
           payload: validatedPayload,
           content_hash: contentHash,
           status: 'active',
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          updated_at: new Date().toISOString() // Explicitly update timestamp
         })
         .eq('id', existingDraft.id)
         .select('id, draft_key, title, status, updated_at')

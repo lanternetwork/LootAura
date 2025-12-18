@@ -164,12 +164,8 @@ export default function SellWizardClient({
     if (!enabled) {
       // Clear promotion error when user disables promotion
       setPromotionError(null)
-      // If sale was already created but promotion failed, show confirmation modal now
-      if (createdSaleId && !confirmationModalOpen) {
-        setConfirmationModalOpen(true)
-      }
     }
-  }, [createdSaleId, confirmationModalOpen])
+  }, [])
   const [isPromoting, setIsPromoting] = useState(false)
   const [promotionError, setPromotionError] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
@@ -816,8 +812,10 @@ export default function SellWizardClient({
   const submitSalePayload = useCallback(async (payload: { saleData: any; items: any[] }) => {
     setLoading(true)
     setSubmitError(null)
+    setPromotionError(null)
 
     try {
+      // Create sale as published (required for promotion checkout validation)
       const response = await fetch('/api/sales', {
         method: 'POST',
         headers: {
@@ -907,7 +905,7 @@ export default function SellWizardClient({
       // Handle promotion checkout if requested
       if (wantsPromotion && promotionsEnabled) {
         if (paymentsEnabled) {
-          // Validate promotion checkout - if it fails, show error and don't show confirmation modal
+          // Validate promotion checkout - if it fails, delete the sale and show error
           setIsPromoting(true)
           try {
             const response = await fetch('/api/promotions/checkout', {
@@ -926,6 +924,13 @@ export default function SellWizardClient({
             const data = await response.json().catch(() => ({}))
 
             if (!response.ok) {
+              // Promotion failed - delete the published sale
+              await fetch(`/api/sales/${saleId}/delete`, {
+                method: 'DELETE',
+                headers: getCsrfHeaders(),
+                credentials: 'include',
+              }).catch(() => {}) // Ignore delete errors
+              
               const code = data?.code
               let errorMessage = 'Promotion checkout is not available. Please disable promotion to publish your sale.'
               
@@ -941,36 +946,53 @@ export default function SellWizardClient({
                 errorMessage = data?.error || 'Failed to start promotion checkout. Please disable promotion to publish your sale.'
               }
               
-              // Set promotion error - this will show next to the toggle and prevent confirmation modal
-              // Store saleId so we can show confirmation modal when user disables promotion
-              setCreatedSaleId(saleId)
               setPromotionError(errorMessage)
               setLoading(false)
               setIsPromoting(false)
-              return // Don't show confirmation modal - sale is created but promotion failed
+              return // Sale was deleted, don't show confirmation modal
             } else if (data?.checkoutUrl) {
               // Redirect to Stripe checkout
               window.location.href = data.checkoutUrl
               return // Don't show confirmation modal - user is going to checkout
             } else {
-              // Unexpected response
-              setCreatedSaleId(saleId)
+              // Unexpected response - delete the published sale
+              await fetch(`/api/sales/${saleId}/delete`, {
+                method: 'DELETE',
+                headers: getCsrfHeaders(),
+                credentials: 'include',
+              }).catch(() => {}) // Ignore delete errors
+              
               setPromotionError('Unexpected response from promotion checkout. Please disable promotion to publish your sale.')
               setLoading(false)
               setIsPromoting(false)
-              return // Don't show confirmation modal
+              return
             }
           } catch (error) {
             console.error('[SELL_WIZARD] Error calling checkout:', error)
-            setCreatedSaleId(saleId)
+            // Try to delete the sale if it exists
+            try {
+              await fetch(`/api/sales/${saleId}/delete`, {
+                method: 'DELETE',
+                headers: getCsrfHeaders(),
+                credentials: 'include',
+              })
+            } catch (deleteError) {
+              // Ignore delete errors
+            }
+            
             setPromotionError('Failed to start promotion checkout. Please disable promotion to publish your sale.')
             setLoading(false)
             setIsPromoting(false)
-            return // Don't show confirmation modal
+            return
           }
         } else {
-          // Payments disabled - show error and don't show confirmation modal
-          setCreatedSaleId(saleId)
+          // Payments disabled - delete the published sale and show error
+          await fetch(`/api/sales/${saleId}/delete`, {
+            method: 'DELETE',
+            headers: getCsrfHeaders(),
+            credentials: 'include',
+          }).catch(() => {}) // Ignore delete errors
+          
           setPromotionError('Promotions aren\'t available yet. Please disable promotion to publish your sale.')
           setLoading(false)
           return

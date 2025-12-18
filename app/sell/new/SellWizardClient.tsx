@@ -157,7 +157,21 @@ export default function SellWizardClient({
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false)
   const [createdSaleId, setCreatedSaleId] = useState<string | null>(null)
   const [wantsPromotion, setWantsPromotion] = useState(false)
+  
+  // Handler to toggle promotion - clear error when disabling
+  const handleTogglePromotion = useCallback((enabled: boolean) => {
+    setWantsPromotion(enabled)
+    if (!enabled) {
+      // Clear promotion error when user disables promotion
+      setPromotionError(null)
+      // If sale was already created but promotion failed, show confirmation modal now
+      if (createdSaleId && !confirmationModalOpen) {
+        setConfirmationModalOpen(true)
+      }
+    }
+  }, [createdSaleId, confirmationModalOpen])
   const [isPromoting, setIsPromoting] = useState(false)
+  const [promotionError, setPromotionError] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [showToast, setShowToast] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -893,7 +907,7 @@ export default function SellWizardClient({
       // Handle promotion checkout if requested
       if (wantsPromotion && promotionsEnabled) {
         if (paymentsEnabled) {
-          // Call checkout and redirect to Stripe
+          // Validate promotion checkout - if it fails, show error and don't show confirmation modal
           setIsPromoting(true)
           try {
             const response = await fetch('/api/promotions/checkout', {
@@ -913,65 +927,53 @@ export default function SellWizardClient({
 
             if (!response.ok) {
               const code = data?.code
+              let errorMessage = 'Promotion checkout is not available. Please disable promotion to publish your sale.'
+              
               if (code === 'PAYMENTS_DISABLED' || code === 'PROMOTIONS_DISABLED') {
-                setToastMessage('Your sale was published successfully! ' + (data?.details?.message || 'Promotions are not available right now. You can promote it later from your dashboard.'))
-                setShowToast(true)
-                setWantsPromotion(false) // Reset state
+                errorMessage = data?.details?.message || 'Promotions are not available right now. Please disable promotion to publish your sale.'
               } else if (code === 'ACCOUNT_LOCKED') {
-                setToastMessage('Your sale was published successfully! ' + (data?.details?.message || 'Your account is locked. Please contact support if you believe this is an error.'))
-                setShowToast(true)
-                setWantsPromotion(false) // Reset state
+                errorMessage = data?.details?.message || 'Your account is locked. Please contact support or disable promotion to publish your sale.'
               } else if (code === 'SALE_NOT_ELIGIBLE') {
-                setToastMessage('Your sale was published successfully! ' + (data?.error || 'This sale is not eligible for promotion at this time. You can try promoting it later from your dashboard.'))
-                setShowToast(true)
-                setWantsPromotion(false) // Reset state
+                errorMessage = data?.error || 'This sale is not eligible for promotion. Please disable promotion to publish your sale.'
               } else if (code === 'STRIPE_ERROR' || code === 'CONFIG_ERROR' || code === 'DATABASE_ERROR') {
-                // Server-side configuration or processing error
-                setToastMessage('Your sale was published successfully! Payment processing is temporarily unavailable. You can promote it later from your dashboard.')
-                setShowToast(true)
-                setWantsPromotion(false) // Reset state
+                errorMessage = 'Payment processing is temporarily unavailable. Please disable promotion to publish your sale.'
               } else {
-                setToastMessage('Your sale was published successfully! ' + (data?.error || 'Failed to start promotion checkout. You can promote it later from your dashboard.'))
-                setShowToast(true)
-                setWantsPromotion(false) // Reset state
+                errorMessage = data?.error || 'Failed to start promotion checkout. Please disable promotion to publish your sale.'
               }
-              // Show confirmation modal anyway (sale was published)
-              setLoading(false) // Ensure loading is cleared before showing modal
+              
+              // Set promotion error - this will show next to the toggle and prevent confirmation modal
+              // Store saleId so we can show confirmation modal when user disables promotion
               setCreatedSaleId(saleId)
-              setConfirmationModalOpen(true)
+              setPromotionError(errorMessage)
+              setLoading(false)
+              setIsPromoting(false)
+              return // Don't show confirmation modal - sale is created but promotion failed
             } else if (data?.checkoutUrl) {
               // Redirect to Stripe checkout
               window.location.href = data.checkoutUrl
               return // Don't show confirmation modal - user is going to checkout
             } else {
-              setToastMessage('Your sale was published successfully! Unexpected response from promotion checkout. You can promote it later from your dashboard.')
-              setShowToast(true)
-              setWantsPromotion(false) // Reset state
-              // Show confirmation modal anyway
-              setLoading(false) // Ensure loading is cleared before showing modal
+              // Unexpected response
               setCreatedSaleId(saleId)
-              setConfirmationModalOpen(true)
+              setPromotionError('Unexpected response from promotion checkout. Please disable promotion to publish your sale.')
+              setLoading(false)
+              setIsPromoting(false)
+              return // Don't show confirmation modal
             }
           } catch (error) {
             console.error('[SELL_WIZARD] Error calling checkout:', error)
-            setToastMessage('Your sale was published successfully! Failed to start promotion checkout. You can promote it later from your dashboard.')
-            setShowToast(true)
-            setWantsPromotion(false) // Reset state
-            // Show confirmation modal anyway
-            setLoading(false) // Ensure loading is cleared before showing modal
             setCreatedSaleId(saleId)
-            setConfirmationModalOpen(true)
-          } finally {
+            setPromotionError('Failed to start promotion checkout. Please disable promotion to publish your sale.')
+            setLoading(false)
             setIsPromoting(false)
+            return // Don't show confirmation modal
           }
         } else {
-          // Payments disabled - show message and reset state
-          setToastMessage('Promotions aren\'t available yet.')
-          setShowToast(true)
-          setWantsPromotion(false) // Reset state
-          // Show confirmation modal
+          // Payments disabled - show error and don't show confirmation modal
           setCreatedSaleId(saleId)
-          setConfirmationModalOpen(true)
+          setPromotionError('Promotions aren\'t available yet. Please disable promotion to publish your sale.')
+          setLoading(false)
+          return
         }
       } else {
         // No promotion requested - show confirmation modal
@@ -1321,7 +1323,7 @@ export default function SellWizardClient({
         return (
           <PromoteStep
             wantsPromotion={wantsPromotion}
-            onTogglePromotion={setWantsPromotion}
+            onTogglePromotion={handleTogglePromotion}
           />
         )
       default:
@@ -1338,7 +1340,9 @@ export default function SellWizardClient({
               promotionsEnabled={promotionsEnabled}
               paymentsEnabled={paymentsEnabled}
               wantsPromotion={wantsPromotion}
-              onTogglePromotion={setWantsPromotion}
+              onTogglePromotion={handleTogglePromotion}
+              promotionError={promotionError}
+              isPromoting={isPromoting}
             />
           )
         }
@@ -2187,6 +2191,8 @@ function ReviewStep({
   paymentsEnabled: _paymentsEnabled,
   wantsPromotion,
   onTogglePromotion,
+  promotionError,
+  isPromoting,
 }: {
   formData: Partial<SaleInput>
   photos: string[]
@@ -2198,6 +2204,8 @@ function ReviewStep({
   paymentsEnabled?: boolean
   wantsPromotion?: boolean
   onTogglePromotion?: (next: boolean) => void
+  promotionError?: string | null
+  isPromoting?: boolean
 }) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -2316,17 +2324,21 @@ function ReviewStep({
               <div className="flex-1">
                 <span className="text-sm font-medium text-gray-900">Promote this sale</span>
                 <p className="text-xs text-gray-500 mt-0.5">Starts checkout after you publish.</p>
+                {promotionError && (
+                  <p className="text-xs text-red-600 mt-1 font-medium">{promotionError}</p>
+                )}
               </div>
               <label className="ml-4 inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
                   checked={!!wantsPromotion}
                   onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                  disabled={isPromoting}
                   className="sr-only peer"
                   aria-label="Promote this sale"
                   data-testid="review-promote-checkbox"
                 />
-                <div className="relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+                <div className={`relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600 ${isPromoting ? 'opacity-50 cursor-not-allowed' : ''}`}></div>
               </label>
             </div>
           </div>
@@ -2342,13 +2354,13 @@ function ReviewStep({
         <button
           onClick={(e) => {
             if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading, wantsPromotion })
+              console.log('[SELL_WIZARD] Publish button clicked (ReviewStep)', { loading, disabled: loading || !!promotionError, wantsPromotion, promotionError })
             }
             e.preventDefault()
             e.stopPropagation()
             onPublish()
           }}
-          disabled={loading}
+          disabled={loading || !!promotionError}
           aria-label={wantsPromotion ? 'Checkout & publish' : 'Publish sale'}
           className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-lg"
         >

@@ -5,16 +5,6 @@ import { NextRequest } from 'next/server'
 // but override per-test to control favorites + sales rows.
 
 describe('GET /api/favorites visibility', () => {
-  let GET: (req: NextRequest) => Promise<Response>
-
-  beforeEach(async () => {
-    vi.resetModules()
-
-    // Freshly import the route after resetting modules so it picks up our mocks
-    const route = await import('@/app/api/favorites/route')
-    GET = route.GET
-  })
-
   it('excludes archived/ended/hidden favorites and keeps count in sync', async () => {
     const mockUser = { id: 'user-1' }
 
@@ -66,6 +56,7 @@ describe('GET /api/favorites visibility', () => {
       }),
     }))
 
+    // Set up mock BEFORE importing the route
     vi.doMock('@/lib/supabase/server', () => ({
       createSupabaseServerClient: () => ({
         auth: {
@@ -77,6 +68,11 @@ describe('GET /api/favorites visibility', () => {
         from: mockFrom,
       }),
     }))
+
+    // Reset modules and import route after setting up mock
+    vi.resetModules()
+    const route = await import('@/app/api/favorites/route')
+    const GET = route.GET
 
     const req = new NextRequest('http://localhost/api/favorites', { method: 'GET' })
     const res = await GET(req)
@@ -90,5 +86,7 @@ describe('GET /api/favorites visibility', () => {
     expect(body.count).toBe(1)
   })
 })
+
+
 
 

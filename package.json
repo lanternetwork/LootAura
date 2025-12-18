@@ -76,8 +76,7 @@
     "lucide-react": "^0.263.1",
     "recharts": "^2.12.7",
     "resend": "^4.0.0",
-    "@react-email/components": "^0.0.20",
-    "stripe": "^16.6.0"
+    "@react-email/components": "^0.0.20"
   },
   "devDependencies": {
     "eslint-config-next": "^14.2.15",

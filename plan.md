@@ -1078,3 +1078,51 @@ The draft deduplication system prevents unnecessary database writes when draft c
 - **RLS intact:** Deduplication only applies to user's own drafts
 - **No service-role bypass:** Uses existing RLS client for reads, admin client for writes (same pattern as before)
 - **No new tables:** Single column addition to existing `sale_drafts` table
+
+---
+
+## Favorites Visibility
+
+**Status:** ✅ Implemented
+
+### Overview
+
+Favorites now reuse the same visibility rules as the main sales feed so that archived, ended, and admin-hidden sales never appear in the favorites list.
+
+### Implementation
+
+- **Shared helpers:** `lib/shared/salesVisibility.ts`
+  - `getAnyFutureWindow` computes the "any time in the future" window (today at 00:00 UTC, no upper bound).
+  - `isSaleWithinDateWindow` mirrors `/api/sales` date-window semantics.
+  - `isSalePubliclyVisible` applies status, archived, moderation, and date-window checks.
+- **API:** `GET /api/favorites` (`app/api/favorites/route.ts`)
+  - Reads from `favorites_v2` joined with `sales_v2` via `select('sale_id, sales_v2(*)')`.
+  - Applies `isSalePubliclyVisible` with `getAnyFutureWindow()` to filter out:
+    - Archived sales (`archived_at` set).
+    - Admin-hidden sales (`moderation_status = 'hidden_by_admin'`).
+    - Fully-ended sales (end date/time strictly before today’s window).
+  - Returns a normalized payload: `{ ok: true, sales, count }`.
+- **Client hook:** `useFavorites` (`lib/hooks/useAuth.ts`)
+  - Calls `/api/favorites` and returns the `sales` array directly.
+  - No client-side reimplementation of visibility rules; the server is the single source of truth.
+
+### Behavior
+
+- Favorites page (`/favorites`) now:
+  - Only shows sales that would also appear in the main sales feed.
+  - Uses the same filtered array for:
+    - The count label (`X saved sales`).
+    - The rendered list (`<SalesList sales={favorites} />`).
+- Known repro (favorite created for a sale that ended on 11/23) is resolved:
+  - The ended sale is filtered out by `isSalePubliclyVisible`.
+  - The saved count reflects only currently visible favorites.
+
+### Tests
+
+- `tests/integration/api/favorites.visibility.test.ts`
+  - Seeds favorites joined to two sales:
+    - One fully in the past (ended).
+    - One active in the far future.
+  - Asserts that `GET /api/favorites`:
+    - Returns only the future/active sale in `sales`.
+    - Reports `count === 1` (matches visible list).

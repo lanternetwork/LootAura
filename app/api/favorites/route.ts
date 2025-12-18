@@ -4,7 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getSchema } from '@/lib/supabase/schema'
+import type { Sale } from '@/lib/types'
+import { getAnyFutureWindow, isSalePubliclyVisible } from '@/lib/shared/salesVisibility'
 
 /**
  * GET /api/favorites - Get user favorites
@@ -23,14 +24,11 @@ export async function GET(_request: NextRequest) {
       )
     }
 
-    // Get schema-aware table name
-    const schema = getSchema()
-    const favoritesTable = schema === 'public' ? 'favorites_v2' : 'favorites'
-
-    // Get user's favorites
-    const { data: favorites, error } = await supabase
-      .from(favoritesTable)
-      .select('*')
+    // Always read via public favorites_v2 view joined to sales_v2
+    // This lets us apply the same visibility rules as the main sales feed.
+    const { data, error } = await supabase
+      .from('favorites_v2')
+      .select('sale_id, sales_v2(*)')
       .eq('user_id', user.id)
 
     if (error) {
@@ -41,7 +39,23 @@ export async function GET(_request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ favorites })
+    const favorites = data || []
+
+    // Apply shared visibility rules:
+    // - status / archived / moderation
+    // - "any time in the future" date window (end_date >= today or ongoing)
+    const window = getAnyFutureWindow()
+
+    const visibleSales: Sale[] = favorites
+      .map((row: any) => row.sales_v2 as Sale | null)
+      .filter((sale): sale is Sale => !!sale)
+      .filter((sale) => isSalePubliclyVisible(sale as any, window))
+
+    return NextResponse.json({
+      ok: true,
+      sales: visibleSales,
+      count: visibleSales.length,
+    })
   } catch (error) {
     console.error('Favorites API error:', error)
     return NextResponse.json(

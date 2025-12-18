@@ -845,15 +845,14 @@ export default function SellWizardClient({
         return
       }
 
-      // API returns { ok: true, sale: {...} } or { sale: {...} }
-      const sale = result.sale || result
-      if (!sale || !sale.id) {
+      // API returns { ok: true, saleId: '...' } or { sale: {...} } (legacy format)
+      const saleId = result.saleId || result.sale?.id || result.id
+      if (!saleId) {
         console.error('Invalid sale response:', result)
         setSubmitError('Invalid response from server')
         setLoading(false)
         return
       }
-      const saleId = sale.id
 
       // Create items for the sale
       if (payload.items && payload.items.length > 0) {
@@ -2310,19 +2309,23 @@ function ReviewStep({
 
         {promotionsEnabled && (
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <label className="inline-flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={!!wantsPromotion}
-                onChange={(e) => onTogglePromotion?.(e.target.checked)}
-                className="mt-0.5 rounded border-gray-300 text-[var(--accent-primary)] focus:ring-[var(--accent-primary)]"
-                data-testid="review-promote-checkbox"
-              />
+            <div className="flex items-center justify-between">
               <div className="flex-1">
                 <span className="text-sm font-medium text-gray-900">Promote this sale</span>
                 <p className="text-xs text-gray-500 mt-0.5">Starts checkout after you publish.</p>
               </div>
-            </label>
+              <label className="ml-4 inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!wantsPromotion}
+                  onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                  className="sr-only peer"
+                  aria-label="Promote this sale"
+                  data-testid="review-promote-checkbox"
+                />
+                <div className="relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+              </label>
+            </div>
           </div>
         )}
       </div>

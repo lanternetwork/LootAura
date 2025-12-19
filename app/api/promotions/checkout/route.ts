@@ -80,8 +80,6 @@ async function checkoutHandler(request: NextRequest) {
   const { sale_id, draft_key, tier, start_date } = body
 
   const admin = getAdminDb()
-  let sale: any = null
-  let draft: any = null
 
   // Handle draft_key flow (promotion from draft - new flow)
   if (draft_key) {
@@ -102,7 +100,8 @@ async function checkoutHandler(request: NextRequest) {
       return fail(403, 'FORBIDDEN', 'You can only promote your own drafts')
     }
 
-    draft = draftData
+    // Draft validated and stored (for potential future use)
+    const _draft = draftData
 
     // Validate draft payload completeness
     const { SaleDraftPayloadSchema } = await import('@/lib/validation/saleDraft')
@@ -160,7 +159,8 @@ async function checkoutHandler(request: NextRequest) {
       return fail(400, 'SALE_NOT_ELIGIBLE', 'Hidden sales cannot be promoted')
     }
 
-    sale = saleData
+    // Sale validated and stored (for potential future use)
+    const _sale = saleData
   } else {
     // Should not happen due to schema refinement, but handle gracefully
     return fail(400, 'INVALID_INPUT', 'Either sale_id or draft_key must be provided')

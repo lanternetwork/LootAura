@@ -32,32 +32,59 @@ export default function RecenterButton({
     setIsRecenterLoading(true)
     
     try {
-      // First, try to use existing location if available
-      if (location) {
-        onRecenter({ lat: location.lat, lng: location.lng }, defaultZoom)
+      // Always request fresh browser GPS (never use cached location)
+      let freshLocation: { lat: number; lng: number } | null = null
+      let permissionError: string | null = null
+
+      try {
+        // Request permission and get fresh location
+        if (navigator.geolocation) {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+              resolve,
+              reject,
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // maximumAge: 0 forces fresh location
+            )
+          })
+          
+          freshLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          }
+        } else {
+          permissionError = 'Geolocation is not supported by your browser.'
+        }
+      } catch (error: any) {
+        // Handle permission denied or other errors
+        if (error.code === 1) {
+          permissionError = 'Location access is disabled. You can re-enable it by refreshing the page or signing back in.'
+        } else {
+          permissionError = 'Unable to get your location. Please try again.'
+        }
+        
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.error('[RecenterButton] Geolocation error:', error)
+        }
+      }
+
+      // If permission denied, show error (but don't permanently disable button)
+      if (permissionError) {
+        // TODO: Show inline error message to user
+        // For now, just log it
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.warn('[RecenterButton] Permission error:', permissionError)
+        }
         setIsRecenterLoading(false)
         return
       }
-      
-      // If no location, try to request permission and get location
-      // requestPermission internally calls getLocation which updates the location state
-      const granted = await requestPermission()
-      if (granted) {
-        // requestPermission already calls getLocation internally
-        // The location state will be updated, but since React state updates are async,
-        // we need to wait a bit or check the location after the state updates
-        // For now, we'll call getLocation again to ensure we have the latest location
-        await getLocation()
-        // After getLocation, the location state should be updated
-        // But since it's async, we'll fall through to default if still null
-        // The next time the user clicks, location should be available
+
+      // If we have fresh location, use it
+      if (freshLocation) {
+        onRecenter(freshLocation, defaultZoom)
+        setIsRecenterLoading(false)
+        return
       }
-      
-      // Check location again after async operations (state may have updated)
-      // Note: This is a workaround for async state updates
-      // In practice, if getLocation succeeded, location should be set
-      // But we can't rely on it immediately due to React's async state updates
-      
+
       // Fallback to default center if geolocation not available
       if (defaultCenter) {
         onRecenter(defaultCenter, defaultZoom)
@@ -70,7 +97,7 @@ export default function RecenterButton({
     } finally {
       setIsRecenterLoading(false)
     }
-  }, [location, getLocation, requestPermission, onRecenter, defaultCenter, defaultZoom])
+  }, [onRecenter, defaultCenter, defaultZoom])
 
   return (
     <Tooltip content="Re-center map to your location or default view">

@@ -223,35 +223,103 @@ export default function MobileSalesShell({
   }, [])
 
   // Calculate visibility of recenter button - only show when user location is outside viewport
+  // OR when map center is more than threshold distance from user location
+  const RECENTER_THRESHOLD_METERS = 100 // Show button if map center is >100m from user location
   const shouldShowRecenterButton = useMemo(() => {
-    if (!userLocation || !mapView?.bounds) return false
+    if (!userLocation || !mapView?.center) return false
     
-    const point: [number, number] = [userLocation.lng, userLocation.lat]
-    return !isPointInsideBounds(point, mapView.bounds)
-  }, [userLocation, mapView?.bounds])
+    // Calculate distance between map center and user location
+    const lat1 = mapView.center.lat
+    const lng1 = mapView.center.lng
+    const lat2 = userLocation.lat
+    const lng2 = userLocation.lng
+    
+    // Haversine formula for distance in meters
+    const R = 6371000 // Earth radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    const distanceMeters = R * c
+    
+    // Show button if distance is greater than threshold
+    return distanceMeters > RECENTER_THRESHOLD_METERS
+  }, [userLocation, mapView?.center])
 
-  // Handle re-center - animate map to user location using mapRef
-  const handleRecenter = useCallback(() => {
-    if (!userLocation || !mapRef.current) return
+  // Handle re-center - always request fresh GPS, then animate map to user location
+  const handleRecenter = useCallback(async () => {
+    if (!mapRef.current) return
     
     const map = mapRef.current.getMap?.()
     if (!map) return
+
+    // Always request fresh browser GPS (never use cached location)
+    let freshLocation: { lat: number; lng: number } | null = null
+    let permissionError: string | null = null
+
+    try {
+      // Request permission and get fresh location
+      if (navigator.geolocation) {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // maximumAge: 0 forces fresh location
+          )
+        })
+        
+        freshLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        }
+      } else {
+        permissionError = 'Geolocation is not supported by your browser.'
+      }
+    } catch (error: any) {
+      // Handle permission denied or other errors
+      if (error.code === 1) {
+        permissionError = 'Location access is disabled. You can re-enable it by refreshing the page or signing back in.'
+      } else {
+        permissionError = 'Unable to get your location. Please try again.'
+      }
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[MOBILE_RECENTER] Geolocation error:', error)
+      }
+    }
+
+    // If permission denied, show error (but don't permanently disable button)
+    if (permissionError) {
+      // TODO: Show inline error message to user
+      // For now, just log it
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.warn('[MOBILE_RECENTER] Permission error:', permissionError)
+      }
+      return
+    }
+
+    // If no location obtained, exit
+    if (!freshLocation) {
+      return
+    }
 
     // Default zoom for 10-mile distance (matches distanceToZoom logic)
     const DEFAULT_ZOOM = 12
 
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[MOBILE_RECENTER] Animating to user location:', userLocation, 'zoom:', DEFAULT_ZOOM)
+      console.log('[MOBILE_RECENTER] Animating to fresh user location:', freshLocation, 'zoom:', DEFAULT_ZOOM)
     }
 
     // Calculate bounds for the new viewport (approximate for zoom 12)
     const latRange = 0.11 // ~10 miles at mid-latitudes
-    const lngRange = latRange * Math.cos(userLocation.lat * Math.PI / 180)
+    const lngRange = latRange * Math.cos(freshLocation.lat * Math.PI / 180)
     const newBounds = {
-      west: userLocation.lng - lngRange / 2,
-      south: userLocation.lat - latRange / 2,
-      east: userLocation.lng + lngRange / 2,
-      north: userLocation.lat + latRange / 2
+      west: freshLocation.lng - lngRange / 2,
+      south: freshLocation.lat - latRange / 2,
+      east: freshLocation.lng + lngRange / 2,
+      north: freshLocation.lat + latRange / 2
     }
 
     // Calculate distance to determine appropriate duration
@@ -259,8 +327,8 @@ export default function MobileSalesShell({
     const currentLat = currentCenter.lat
     const currentLng = currentCenter.lng
     const distance = Math.sqrt(
-      Math.pow((userLocation.lat - currentLat) * 111, 2) + 
-      Math.pow((userLocation.lng - currentLng) * 111 * Math.cos(currentLat * Math.PI / 180), 2)
+      Math.pow((freshLocation.lat - currentLat) * 111, 2) + 
+      Math.pow((freshLocation.lng - currentLng) * 111 * Math.cos(currentLat * Math.PI / 180), 2)
     ) // Approximate distance in km
     
     // Use longer duration for longer distances (max 3 seconds for very long distances)
@@ -275,10 +343,16 @@ export default function MobileSalesShell({
       
       // Update viewport state after animation completes
       // This ensures SimpleMap's easeTo doesn't interfere with the flyTo animation
-      onViewportChange({
-        center: userLocation,
+      const newViewport = {
+        center: freshLocation!,
         zoom: DEFAULT_ZOOM,
         bounds: newBounds
+      }
+      onViewportChange(newViewport)
+      
+      // Update MapViewportStore
+      import('@/lib/map/MapViewportStore').then(({ default: MapViewportStore }) => {
+        MapViewportStore.setViewport(newViewport)
       })
     }
 
@@ -287,12 +361,12 @@ export default function MobileSalesShell({
 
     // Animate to user location
     map.flyTo({
-      center: [userLocation.lng, userLocation.lat],
+      center: [freshLocation.lng, freshLocation.lat],
       zoom: DEFAULT_ZOOM,
       duration: duration,
       essential: true
     })
-  }, [userLocation, onViewportChange])
+  }, [onViewportChange])
   
   // Close callout when map is clicked or moved
   const handleMapClick = useCallback(() => {

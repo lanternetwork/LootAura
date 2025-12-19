@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getGeolocationPermissionState, requestGeolocationPermission } from '@/lib/location/client'
-import MapViewportStore from '@/lib/map/MapViewportStore'
 import LocationPermissionDenied from './LocationPermissionDenied'
 
 type PermissionState = 'unknown' | 'granted' | 'denied'
@@ -108,12 +107,6 @@ export default function UnifiedLocationButton({
       const duration = Math.min(3000, Math.max(1000, distance * 50))
 
       const handleMoveEnd = () => {
-        const newViewport = {
-          center: freshLocation,
-          zoom: DEFAULT_ZOOM,
-          bounds: newBounds
-        }
-        MapViewportStore.setViewport(newViewport)
         onRecenter(freshLocation, DEFAULT_ZOOM)
       }
 

@@ -177,13 +177,8 @@ export async function requestGeolocationPermission(): Promise<boolean> {
     throw { code: 'UNKNOWN' as const, message: 'Geolocation is not supported by your browser.' }
   }
 
-  try {
-    await getGeolocationPosition()
-    return true
-  } catch (error) {
-    // Re-throw the error so caller can check error.code
-    throw error
-  }
+  await getGeolocationPosition()
+  return true
 }
 
 /**

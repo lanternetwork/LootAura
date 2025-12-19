@@ -267,8 +267,8 @@ describe('Sale Details Items Display', () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
 
     const originalFetch = global.fetch
-    const mockFetch = vi.fn()
-    (global as any).fetch = mockFetch
+    const mockFetch: ReturnType<typeof vi.fn> = vi.fn()
+    ;(global as any).fetch = mockFetch
 
     try {
       render(

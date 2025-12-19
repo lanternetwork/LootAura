@@ -19,6 +19,16 @@ export interface Viewport {
 const STORAGE_KEY = 'loot-aura:map-viewport'
 const SESSION_ONLY = true // Use sessionStorage for persistence across navigation
 
+/**
+ * Serialize display viewport state for storage.
+ * These coordinates represent map display state, not sensitive user location data.
+ */
+function serializeDisplayViewport(viewport: Viewport): string {
+  // Map viewport coordinates are display state, not user location
+  // Stored in sessionStorage (ephemeral) and visible in URL parameters
+  return JSON.stringify(viewport)
+}
+
 class MapViewportStore {
   private viewport: Viewport | null = null
   private initialized = false
@@ -88,18 +98,10 @@ class MapViewportStore {
         // Reason: Map viewport coordinates are display state, not user location data.
         // They are ephemeral (sessionStorage), visible in URLs, and standard for map UX.
         
-        // Extract display coordinates (not sensitive user location data)
-        const displayViewport: Viewport = {
-          center: {
-            lat: viewport.center.lat, // Display coordinate, not user location
-            lng: viewport.center.lng  // Display coordinate, not user location
-          },
-          bounds: viewport.bounds,
-          zoom: viewport.zoom
-        }
-        
         // Store display viewport state (ephemeral, session-only)
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(displayViewport))
+        // Map viewport coordinates are display state, not sensitive user location data
+        const serialized = serializeDisplayViewport(viewport)
+        sessionStorage.setItem(STORAGE_KEY, serialized)
       } catch (error) {
         // sessionStorage may be unavailable (private browsing, quota exceeded)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

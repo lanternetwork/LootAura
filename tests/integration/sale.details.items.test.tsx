@@ -268,7 +268,7 @@ describe('Sale Details Items Display', () => {
 
     const originalFetch = global.fetch
     const mockFetch = vi.fn()
-    ;(global as any).fetch = mockFetch
+    (global as any).fetch = mockFetch
 
     try {
       render(

@@ -8,6 +8,7 @@ interface UseMyLocationButtonProps {
 /**
  * "Use my location" CTA button for mobile/tablet.
  * Visible only when browser geolocation permission has not been granted yet.
+ * Positioned as a bottom-centered map control, respecting safe area insets.
  */
 export default function UseMyLocationButton({ onClick, loading = false }: UseMyLocationButtonProps) {
   return (
@@ -17,7 +18,10 @@ export default function UseMyLocationButton({ onClick, loading = false }: UseMyL
         onClick()
       }}
       disabled={loading}
-      className="lg:hidden absolute top-20 left-1/2 transform -translate-x-1/2 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-lg px-4 py-3 min-w-[200px] flex flex-col items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-[110]"
+      className="lg:hidden absolute bottom-0 left-1/2 transform -translate-x-1/2 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-lg px-4 py-3 min-w-[200px] flex flex-col items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed z-[110]"
+      style={{
+        marginBottom: 'calc(28px + env(safe-area-inset-bottom, 0px))'
+      }}
       aria-label="Use my location"
     >
       {loading ? (

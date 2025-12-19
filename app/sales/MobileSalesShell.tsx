@@ -92,7 +92,7 @@ export default function MobileSalesShell({
   zipError,
   hasActiveFilters,
   hybridResult,
-  userLocation
+  userLocation: _userLocation
 }: MobileSalesShellProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -109,7 +109,7 @@ export default function MobileSalesShell({
   const [mapLoaded, setMapLoaded] = useState(false)
   
   // Location permission and GPS state
-  const { location: userGpsLocation, loading: gpsLoading, error: gpsError, permissionGranted, requestPermission, clearError } = useLocation()
+  const { location: userGpsLocation, loading: gpsLoading, error: _gpsError, permissionGranted, requestPermission, clearError } = useLocation()
   const [showPermissionDenied, setShowPermissionDenied] = useState(false)
   const [isRequestingLocation, setIsRequestingLocation] = useState(false)
   const [shouldAutoCenter, setShouldAutoCenter] = useState(false)

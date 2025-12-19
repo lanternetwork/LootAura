@@ -80,6 +80,9 @@ class MapViewportStore {
     // Persist to sessionStorage
     if (typeof window !== 'undefined' && SESSION_ONLY) {
       try {
+        // CodeQL [js/clear-text-storage-sensitive-data] - Map viewport coordinates (lat/lng) are not sensitive.
+        // These are map display state values, stored in sessionStorage (cleared on browser close),
+        // and are already visible in URL parameters and map state. This is standard practice for map applications.
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(viewport))
       } catch (error) {
         // sessionStorage may be unavailable (private browsing, quota exceeded)
@@ -147,4 +150,5 @@ class MapViewportStore {
 const store = new MapViewportStore()
 
 export default store
+
 

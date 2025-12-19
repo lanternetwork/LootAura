@@ -200,28 +200,29 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
           .maybeSingle()
 
         if (draftError || !draft) {
-          logger.error('Failed to load draft for webhook', {
+          const error = new Error(`Failed to load draft: ${draftError?.message || 'Draft not found'}`)
+          logger.error('Failed to load draft for webhook', error, {
             component: 'webhooks/stripe',
             operation: 'load_draft',
             draft_key: draftKey,
             promotion_id: promotionId,
-            error: draftError?.message,
           })
-          throw new Error(`Failed to load draft: ${draftError?.message || 'Draft not found'}`)
+          throw error
         }
 
         // Validate draft payload
         const { SaleDraftPayloadSchema } = await import('@/lib/validation/saleDraft')
         const validationResult = SaleDraftPayloadSchema.safeParse(draft.payload)
         if (!validationResult.success) {
-          logger.error('Draft payload validation failed in webhook', {
+          const error = new Error('Draft payload is invalid')
+          logger.error('Draft payload validation failed in webhook', error, {
             component: 'webhooks/stripe',
             operation: 'validate_draft',
             draft_key: draftKey,
             promotion_id: promotionId,
             errors: validationResult.error.issues,
           })
-          throw new Error('Draft payload is invalid')
+          throw error
         }
 
         const payload = validationResult.data
@@ -229,13 +230,14 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
 
         // Validate required fields
         if (!formData.title || !formData.city || !formData.state || !formData.date_start || !formData.time_start || !formData.lat || !formData.lng) {
-          logger.error('Draft missing required fields in webhook', {
+          const error = new Error('Draft is missing required fields')
+          logger.error('Draft missing required fields in webhook', error, {
             component: 'webhooks/stripe',
             operation: 'validate_draft',
             draft_key: draftKey,
             promotion_id: promotionId,
           })
-          throw new Error('Draft is missing required fields')
+          throw error
         }
 
         // Normalize time_start to 30-minute increments
@@ -295,14 +297,14 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
           .single()
 
         if (saleError || !saleRow) {
-          logger.error('Failed to create sale from draft in webhook', {
+          const error = new Error(`Failed to create sale: ${saleError?.message || 'Unknown error'}`)
+          logger.error('Failed to create sale from draft in webhook', error, {
             component: 'webhooks/stripe',
             operation: 'create_sale',
             draft_key: draftKey,
             promotion_id: promotionId,
-            error: saleError?.message,
           })
-          throw new Error(`Failed to create sale: ${saleError?.message || 'Unknown error'}`)
+          throw error
         }
 
         const createdSaleId = saleRow.id
@@ -331,13 +333,13 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
             .insert(itemsPayload)
 
           if (itemsError) {
-            logger.error('Failed to create items from draft in webhook', {
+            const error = itemsError instanceof Error ? itemsError : new Error(String(itemsError))
+            logger.error('Failed to create items from draft in webhook', error, {
               component: 'webhooks/stripe',
               operation: 'create_items',
               draft_key: draftKey,
               promotion_id: promotionId,
               sale_id: createdSaleId,
-              error: itemsError.message,
             })
             // Don't fail - sale is created, items can be added later
           }
@@ -355,14 +357,14 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
           .eq('id', promotionId)
 
         if (updateError) {
-          logger.error('Failed to update promotion with sale_id in webhook', {
+          const error = new Error(`Failed to activate promotion: ${updateError.message}`)
+          logger.error('Failed to update promotion with sale_id in webhook', error, {
             component: 'webhooks/stripe',
             operation: 'update_promotion',
             promotion_id: promotionId,
             sale_id: createdSaleId,
-            error: updateError.message,
           })
-          throw new Error(`Failed to activate promotion: ${updateError.message}`)
+          throw error
         }
 
         // Delete draft after successful sale creation

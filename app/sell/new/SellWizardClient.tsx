@@ -1253,6 +1253,33 @@ export default function SellWizardClient({
           return
         }
 
+        // Handle promotion flow (checkoutUrl returned) vs non-promotion flow (saleId returned)
+        if (wantsPromotion && promotionsEnabled && result.data?.checkoutUrl) {
+          // Promotion flow: Checkout session created, redirect to Stripe
+          // Draft remains intact until webhook success
+          const checkoutUrl = result.data.checkoutUrl
+          
+          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+            console.log('[SELL_WIZARD] Redirecting to checkout for promotion:', {
+              checkoutUrl,
+              sessionId: result.data.sessionId,
+              promotionId: result.data.promotionId,
+            })
+          }
+
+          // Clear local draft (server draft remains until webhook)
+          clearLocalDraft()
+          sessionStorage.removeItem('auth:postLoginRedirect')
+          sessionStorage.removeItem('draft:returnStep')
+          draftKeyRef.current = null
+          isPublishingRef.current = false
+
+          // Redirect to Stripe checkout
+          window.location.href = checkoutUrl
+          return
+        }
+
+        // Non-promotion flow: Sale created immediately
         const saleId = result.data?.saleId
         if (!saleId) {
           setSubmitError('Invalid response from server')
@@ -1275,104 +1302,22 @@ export default function SellWizardClient({
         // The draft is deleted, so autosave won't recreate it anyway
         isPublishingRef.current = false
 
-        // Handle promotion checkout if requested
-        // Note: If wantsPromotion was true, sale was created as draft - validate checkout, then publish
-        if (wantsPromotion && promotionsEnabled) {
-          if (paymentsEnabled) {
-            // Create checkout session with draft sale - if it fails, keep sale as draft
-            setIsPromoting(true)
-            try {
-              const response = await fetch('/api/promotions/checkout', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...getCsrfHeaders(),
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                  sale_id: saleId,
-                  tier: 'featured_week',
-                }),
-              })
-
-              const data = await response.json().catch(() => ({}))
-
-              if (!response.ok) {
-                // Promotion failed - keep sale as draft, show error
-                const code = data?.code
-                let errorMessage = 'Promotion checkout is not available. Please disable promotion to publish your sale.'
-                
-                if (code === 'PAYMENTS_DISABLED' || code === 'PROMOTIONS_DISABLED') {
-                  errorMessage = data?.details?.message || 'Promotions are not available right now. Please disable promotion to publish your sale.'
-                } else if (code === 'ACCOUNT_LOCKED') {
-                  errorMessage = data?.details?.message || 'Your account is locked. Please contact support or disable promotion to publish your sale.'
-                } else if (code === 'SALE_NOT_ELIGIBLE') {
-                  errorMessage = data?.error || 'This sale is not eligible for promotion. Please disable promotion to publish your sale.'
-                } else if (code === 'STRIPE_ERROR' || code === 'CONFIG_ERROR' || code === 'DATABASE_ERROR') {
-                  errorMessage = 'Payment processing is temporarily unavailable. Please disable promotion to publish your sale.'
-                } else {
-                  errorMessage = data?.error || 'Failed to start promotion checkout. Please disable promotion to publish your sale.'
-                }
-                
-                setPromotionError(errorMessage)
-                setDraftSaleId(saleId) // Track draft sale ID
-                setLoading(false)
-                setIsPromoting(false)
-                // Sale remains as draft - user can retry or uncheck promote and publish
-                return
-              } else if (data?.checkoutUrl) {
-                // Checkout session created successfully - publish the sale, then redirect
-                const publishResult = await publishDraftSale(saleId)
-                if (!publishResult.ok) {
-                  // Failed to publish - show error but don't redirect
-                  setPromotionError(publishResult.error || 'Failed to publish sale. Please try again.')
-                  setLoading(false)
-                  setIsPromoting(false)
-                  return
-                }
-                
-                // Sale is published, redirect to Stripe checkout
-                window.location.href = data.checkoutUrl
-                return // Don't show confirmation modal - user is going to checkout
-              } else {
-                // Unexpected response - keep sale as draft
-                setPromotionError('Unexpected response from promotion checkout. Please disable promotion to publish your sale.')
-                setLoading(false)
-                setIsPromoting(false)
-                return
-              }
-            } catch (error) {
-              console.error('[SELL_WIZARD] Error calling checkout:', error)
-              // Keep sale as draft on error
-              setPromotionError('Failed to start promotion checkout. Please disable promotion to publish your sale.')
-              setLoading(false)
-              setIsPromoting(false)
-              return
-            }
-          } else {
-            // Payments disabled - keep sale as draft and show error
-            setPromotionError('Promotions aren\'t available yet. Please disable promotion to publish your sale.')
+        // Non-promotion flow: Sale is published, show confirmation
+        // If we have a draft sale from a previous promotion attempt, publish it instead
+        if (draftSaleId && !wantsPromotion) {
+          const publishResult = await publishDraftSale(draftSaleId)
+          if (!publishResult.ok) {
+            setSubmitError(publishResult.error || 'Failed to publish sale. Please try again.')
             setLoading(false)
             return
           }
+          setDraftSaleId(null) // Clear draft sale ID
+          setCreatedSaleId(draftSaleId)
+          setConfirmationModalOpen(true)
         } else {
-          // No promotion requested
-          // If we have a draft sale from a previous promotion attempt, publish it instead
-          if (draftSaleId && !wantsPromotion) {
-            const publishResult = await publishDraftSale(draftSaleId)
-            if (!publishResult.ok) {
-              setSubmitError(publishResult.error || 'Failed to publish sale. Please try again.')
-              setLoading(false)
-              return
-            }
-            setDraftSaleId(null) // Clear draft sale ID
-            setCreatedSaleId(draftSaleId)
-            setConfirmationModalOpen(true)
-          } else {
-            // Normal flow - show confirmation modal
-            setCreatedSaleId(saleId)
-            setConfirmationModalOpen(true)
-          }
+          // Normal flow - show confirmation modal
+          setCreatedSaleId(saleId)
+          setConfirmationModalOpen(true)
         }
       } catch (error) {
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

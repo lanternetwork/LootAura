@@ -99,6 +99,165 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // CRITICAL: Split logic by wantsPromotion flag
+    if (wantsPromotion) {
+      // Promotion flow: Create checkout session, do NOT create sale, do NOT delete draft
+      // The webhook will be the authority for sale creation
+      
+      // Check if promotions are enabled
+      const { isPromotionsEnabled, isPaymentsEnabled, getStripeClient, getFeaturedWeekPriceId } = await import('@/lib/stripe/client')
+      if (!isPromotionsEnabled() || !isPaymentsEnabled()) {
+        return fail(403, 'PROMOTIONS_DISABLED', 'Promotions are currently disabled')
+      }
+
+      const stripe = getStripeClient()
+      if (!stripe) {
+        const { logger } = await import('@/lib/log')
+        logger.error('Stripe client not available', new Error('Stripe client initialization failed'), {
+          component: 'drafts/publish',
+          operation: 'create_checkout',
+          draftKey,
+          userId: user.id,
+        })
+        return fail(500, 'STRIPE_ERROR', 'Payment processing is temporarily unavailable')
+      }
+
+      const priceId = getFeaturedWeekPriceId()
+      if (!priceId) {
+        const { logger } = await import('@/lib/log')
+        logger.error('Stripe price ID not configured', new Error('STRIPE_PRICE_ID_FEATURED_WEEK not set'), {
+          component: 'drafts/publish',
+          operation: 'create_checkout',
+          draftKey,
+        })
+        return fail(500, 'CONFIG_ERROR', 'Promotion pricing is not configured')
+      }
+
+      // Calculate promotion dates (7 days from now)
+      const startDate = new Date()
+      startDate.setUTCHours(0, 0, 0, 0)
+      const endDate = new Date(startDate)
+      endDate.setUTCDate(endDate.getUTCDate() + 7)
+
+      // Get price amount from Stripe
+      let amountCents = 0
+      try {
+        const price = await stripe.prices.retrieve(priceId)
+        amountCents = price.unit_amount || 0
+      } catch (error) {
+        const { logger } = await import('@/lib/log')
+        logger.error('Failed to retrieve Stripe price', error instanceof Error ? error : new Error(String(error)), {
+          component: 'drafts/publish',
+          operation: 'retrieve_price',
+          price_id: priceId,
+        })
+        return fail(500, 'STRIPE_ERROR', 'Failed to retrieve promotion pricing')
+      }
+
+      // Create promotion record in 'pending' status
+      const admin = getAdminDb()
+      const { data: promotion, error: promotionError } = await fromBase(admin, 'promotions')
+        .insert({
+          sale_id: null, // No sale yet - will be created by webhook
+          owner_profile_id: user.id,
+          status: 'pending',
+          tier: 'featured_week',
+          starts_at: startDate.toISOString(),
+          ends_at: endDate.toISOString(),
+          amount_cents: amountCents,
+          currency: 'usd',
+        })
+        .select()
+        .single()
+
+      if (promotionError || !promotion) {
+        const { logger } = await import('@/lib/log')
+        logger.error('Failed to create promotion record', promotionError instanceof Error ? promotionError : new Error(String(promotionError)), {
+          component: 'drafts/publish',
+          operation: 'create_promotion',
+          draftKey,
+          userId: user.id,
+        })
+        return fail(500, 'DATABASE_ERROR', 'Failed to create promotion record')
+      }
+
+      // Create Stripe Checkout Session with draft_key in metadata
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.com'
+      let checkoutSession
+      try {
+        checkoutSession = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price: priceId,
+              quantity: 1,
+            },
+          ],
+          success_url: `${siteUrl}/sales?promotion=success`,
+          cancel_url: `${siteUrl}/sell/new?resume=review&promotion=canceled`,
+          metadata: {
+            promotion_id: promotion.id,
+            draft_key: draftKey, // CRITICAL: Include draft_key instead of sale_id
+            owner_profile_id: user.id,
+            tier: 'featured_week',
+          },
+          customer_email: user.email || undefined,
+        })
+      } catch (error) {
+        const { logger } = await import('@/lib/log')
+        logger.error('Failed to create Stripe checkout session', error instanceof Error ? error : new Error(String(error)), {
+          component: 'drafts/publish',
+          operation: 'create_checkout_session',
+          promotion_id: promotion.id,
+          draftKey,
+        })
+        // Clean up promotion record
+        await fromBase(admin, 'promotions')
+          .update({ status: 'canceled', canceled_at: new Date().toISOString() })
+          .eq('id', promotion.id)
+        return fail(500, 'STRIPE_ERROR', 'Failed to create checkout session')
+      }
+
+      // Update promotion with checkout session ID
+      const { error: updateError } = await fromBase(admin, 'promotions')
+        .update({
+          stripe_checkout_session_id: checkoutSession.id,
+          stripe_customer_id: checkoutSession.customer as string | null,
+        })
+        .eq('id', promotion.id)
+
+      if (updateError) {
+        const { logger } = await import('@/lib/log')
+        logger.error('Failed to update promotion with checkout session ID', updateError instanceof Error ? updateError : new Error(String(updateError)), {
+          component: 'drafts/publish',
+          operation: 'update_promotion',
+          promotion_id: promotion.id,
+          checkout_session_id: checkoutSession.id,
+        })
+        // Don't fail - checkout session is created, we can update later via webhook
+      }
+
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[DRAFTS/PUBLISH] Checkout session created for promotion:', {
+          draftKey,
+          checkoutUrl: checkoutSession.url,
+          sessionId: checkoutSession.id,
+          promotionId: promotion.id,
+        })
+      }
+
+      // Return checkout URL - draft remains intact, sale will be created by webhook
+      return ok({ 
+        data: { 
+          checkoutUrl: checkoutSession.url,
+          sessionId: checkoutSession.id,
+          promotionId: promotion.id,
+        } 
+      })
+    }
+
+    // Non-promotion flow: Create sale immediately (existing behavior)
     // Normalize time_start to 30-minute increments
     let normalizedTimeStart = formData.time_start
     if (normalizedTimeStart && normalizedTimeStart.includes(':')) {

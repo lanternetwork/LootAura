@@ -143,6 +143,7 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
       const session = event.data.object
       const promotionId = session.metadata?.promotion_id
       const saleId = session.metadata?.sale_id
+      const draftKey = session.metadata?.draft_key
 
       if (!promotionId) {
         logger.warn('Checkout session completed without promotion_id metadata', {
@@ -153,25 +154,287 @@ async function processStripeEvent(event: any, admin: ReturnType<typeof getAdminD
         return
       }
 
-      // Update promotion to active
-      const { error: updateError } = await fromBase(admin, 'promotions')
-        .update({
-          status: 'active',
-          stripe_payment_intent_id: session.payment_intent as string | null,
-          stripe_customer_id: session.customer as string | null,
-          updated_at: new Date().toISOString(),
-        })
+      // Check if promotion already has a sale_id (idempotency check)
+      const { data: existingPromotion } = await fromBase(admin, 'promotions')
+        .select('id, sale_id, status')
         .eq('id', promotionId)
+        .maybeSingle()
 
-      if (updateError) {
-        throw new Error(`Failed to activate promotion: ${updateError.message}`)
+      if (existingPromotion?.sale_id) {
+        // Sale already created - just activate promotion if not already active
+        if (existingPromotion.status !== 'active') {
+          const { error: updateError } = await fromBase(admin, 'promotions')
+            .update({
+              status: 'active',
+              stripe_payment_intent_id: session.payment_intent as string | null,
+              stripe_customer_id: session.customer as string | null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', promotionId)
+
+          if (updateError) {
+            throw new Error(`Failed to activate promotion: ${updateError.message}`)
+          }
+        }
+
+        logger.info('Promotion already has sale, activated promotion', {
+          component: 'webhooks/stripe',
+          operation: 'checkout_completed',
+          promotion_id: promotionId,
+          sale_id: existingPromotion.sale_id,
+          session_id: session.id,
+        })
+        break
       }
 
-      logger.info('Promotion activated via checkout session', {
+      // Handle draft_key flow (new promotion flow - create sale from draft)
+      if (draftKey) {
+        const { getRlsDb } = await import('@/lib/supabase/clients')
+        const rls = getRlsDb()
+
+        // Load draft with RLS
+        const { data: draft, error: draftError } = await fromBase(rls, 'sale_drafts')
+          .select('*')
+          .eq('draft_key', draftKey)
+          .eq('status', 'active')
+          .maybeSingle()
+
+        if (draftError || !draft) {
+          logger.error('Failed to load draft for webhook', {
+            component: 'webhooks/stripe',
+            operation: 'load_draft',
+            draft_key: draftKey,
+            promotion_id: promotionId,
+            error: draftError?.message,
+          })
+          throw new Error(`Failed to load draft: ${draftError?.message || 'Draft not found'}`)
+        }
+
+        // Validate draft payload
+        const { SaleDraftPayloadSchema } = await import('@/lib/validation/saleDraft')
+        const validationResult = SaleDraftPayloadSchema.safeParse(draft.payload)
+        if (!validationResult.success) {
+          logger.error('Draft payload validation failed in webhook', {
+            component: 'webhooks/stripe',
+            operation: 'validate_draft',
+            draft_key: draftKey,
+            promotion_id: promotionId,
+            errors: validationResult.error.issues,
+          })
+          throw new Error('Draft payload is invalid')
+        }
+
+        const payload = validationResult.data
+        const { formData, photos, items } = payload
+
+        // Validate required fields
+        if (!formData.title || !formData.city || !formData.state || !formData.date_start || !formData.time_start || !formData.lat || !formData.lng) {
+          logger.error('Draft missing required fields in webhook', {
+            component: 'webhooks/stripe',
+            operation: 'validate_draft',
+            draft_key: draftKey,
+            promotion_id: promotionId,
+          })
+          throw new Error('Draft is missing required fields')
+        }
+
+        // Normalize time_start to 30-minute increments
+        let normalizedTimeStart = formData.time_start
+        if (normalizedTimeStart && normalizedTimeStart.includes(':')) {
+          const parts = normalizedTimeStart.split(':')
+          const h = parseInt(parts[0] || '0', 10)
+          const m = parseInt(parts[1] || '0', 10)
+          const snapped = Math.round(m / 30) * 30
+          const finalM = snapped === 60 ? 0 : snapped
+          const finalH = snapped === 60 ? (h + 1) % 24 : h
+          normalizedTimeStart = `${String(finalH).padStart(2, '0')}:${String(finalM).padStart(2, '0')}`
+        }
+
+        // Normalize tags
+        const rawTags = (formData as any)?.tags
+        const normalizedTags: string[] = Array.isArray(rawTags)
+          ? rawTags
+              .filter((t: any): t is string => typeof t === 'string')
+              .map((t: string) => t.trim())
+              .filter(Boolean)
+          : typeof rawTags === 'string'
+            ? rawTags
+                .split(',')
+                .map((t: string) => t.trim())
+                .filter(Boolean)
+            : []
+
+        // Build sale payload - create in PUBLISHED state
+        const salePayload = {
+          owner_id: draft.user_id,
+          title: formData.title,
+          description: formData.description || null,
+          address: formData.address || null,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zip_code || null,
+          lat: parseFloat(String(formData.lat)),
+          lng: parseFloat(String(formData.lng)),
+          date_start: formData.date_start,
+          time_start: normalizedTimeStart,
+          date_end: formData.date_end || null,
+          time_end: formData.time_end || null,
+          cover_image_url: photos && photos.length > 0 ? photos[0] : null,
+          images: photos && photos.length > 1 ? photos.slice(1) : null,
+          pricing_mode: formData.pricing_mode || 'negotiable',
+          status: 'published', // CRITICAL: Create in published state
+          privacy_mode: 'exact',
+          is_featured: false,
+          tags: normalizedTags,
+        }
+
+        // Create sale
+        const { data: saleRow, error: saleError } = await fromBase(admin, 'sales')
+          .insert(salePayload)
+          .select('id')
+          .single()
+
+        if (saleError || !saleRow) {
+          logger.error('Failed to create sale from draft in webhook', {
+            component: 'webhooks/stripe',
+            operation: 'create_sale',
+            draft_key: draftKey,
+            promotion_id: promotionId,
+            error: saleError?.message,
+          })
+          throw new Error(`Failed to create sale: ${saleError?.message || 'Unknown error'}`)
+        }
+
+        const createdSaleId = saleRow.id
+
+        // Create items if any
+        if (items && items.length > 0) {
+          const { normalizeItemImages } = await import('@/lib/data/itemImageNormalization')
+          const itemsPayload = items.map((item: any) => {
+            const normalizedImages = normalizeItemImages({
+              image_url: item.image_url,
+              images: item.images,
+            })
+            
+            return {
+              sale_id: createdSaleId,
+              name: item.name,
+              description: item.description || null,
+              price: item.price || null,
+              category: item.category || null,
+              images: normalizedImages.images,
+              image_url: normalizedImages.image_url,
+            }
+          })
+
+          const { error: itemsError } = await fromBase(admin, 'items')
+            .insert(itemsPayload)
+
+          if (itemsError) {
+            logger.error('Failed to create items from draft in webhook', {
+              component: 'webhooks/stripe',
+              operation: 'create_items',
+              draft_key: draftKey,
+              promotion_id: promotionId,
+              sale_id: createdSaleId,
+              error: itemsError.message,
+            })
+            // Don't fail - sale is created, items can be added later
+          }
+        }
+
+        // Update promotion with sale_id and activate
+        const { error: updateError } = await fromBase(admin, 'promotions')
+          .update({
+            sale_id: createdSaleId,
+            status: 'active',
+            stripe_payment_intent_id: session.payment_intent as string | null,
+            stripe_customer_id: session.customer as string | null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', promotionId)
+
+        if (updateError) {
+          logger.error('Failed to update promotion with sale_id in webhook', {
+            component: 'webhooks/stripe',
+            operation: 'update_promotion',
+            promotion_id: promotionId,
+            sale_id: createdSaleId,
+            error: updateError.message,
+          })
+          throw new Error(`Failed to activate promotion: ${updateError.message}`)
+        }
+
+        // Delete draft after successful sale creation
+        const { error: deleteError } = await fromBase(admin, 'sale_drafts')
+          .delete()
+          .eq('id', draft.id)
+          .eq('draft_key', draftKey)
+          .eq('user_id', draft.user_id)
+
+        if (deleteError) {
+          logger.warn('Failed to delete draft after sale creation in webhook (non-critical)', {
+            component: 'webhooks/stripe',
+            operation: 'delete_draft',
+            draft_key: draftKey,
+            promotion_id: promotionId,
+            sale_id: createdSaleId,
+            error: deleteError.message,
+          })
+          // Don't fail - sale is created and promotion is active
+        }
+
+        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+          console.log('[WEBHOOK] Sale created from draft and promotion activated:', {
+            draft_key: draftKey,
+            promotion_id: promotionId,
+            sale_id: createdSaleId,
+            session_id: session.id,
+          })
+        }
+
+        logger.info('Sale created from draft and promotion activated via webhook', {
+          component: 'webhooks/stripe',
+          operation: 'checkout_completed',
+          promotion_id: promotionId,
+          sale_id: createdSaleId,
+          draft_key: draftKey,
+          session_id: session.id,
+        })
+        break
+      }
+
+      // Handle sale_id flow (backward compatibility - existing sales)
+      if (saleId) {
+        // Update promotion to active
+        const { error: updateError } = await fromBase(admin, 'promotions')
+          .update({
+            status: 'active',
+            stripe_payment_intent_id: session.payment_intent as string | null,
+            stripe_customer_id: session.customer as string | null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', promotionId)
+
+        if (updateError) {
+          throw new Error(`Failed to activate promotion: ${updateError.message}`)
+        }
+
+        logger.info('Promotion activated via checkout session (existing sale)', {
+          component: 'webhooks/stripe',
+          operation: 'checkout_completed',
+          promotion_id: promotionId,
+          sale_id: saleId,
+          session_id: session.id,
+        })
+        break
+      }
+
+      // Neither draft_key nor sale_id - log warning
+      logger.warn('Checkout session completed without draft_key or sale_id', {
         component: 'webhooks/stripe',
         operation: 'checkout_completed',
         promotion_id: promotionId,
-        sale_id: saleId,
         session_id: session.id,
       })
       break

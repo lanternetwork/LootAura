@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { getAdminDb, fromBase } from '@/lib/supabase/clients'
+import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { checkCsrfIfRequired } from '@/lib/api/csrfCheck'
 import { assertAccountNotLocked } from '@/lib/auth/accountLock'
 import { withRateLimit } from '@/lib/rateLimit/withRateLimit'
@@ -19,9 +19,12 @@ import { logger } from '@/lib/log'
 import { fail, ok } from '@/lib/http/json'
 
 const checkoutRequestSchema = z.object({
-  sale_id: z.string().uuid(),
+  sale_id: z.string().uuid().optional(), // Optional for backward compatibility (existing sales)
+  draft_key: z.string().uuid().optional(), // Required for promotion flows (new drafts)
   tier: z.enum(['featured_week']).default('featured_week'),
   start_date: z.string().optional(), // ISO date string, defaults to now
+}).refine((data) => data.sale_id || data.draft_key, {
+  message: 'Either sale_id or draft_key must be provided',
 })
 
 export const dynamic = 'force-dynamic'
@@ -74,36 +77,93 @@ async function checkoutHandler(request: NextRequest) {
     return fail(400, 'INVALID_JSON', 'Invalid JSON in request body')
   }
 
-  const { sale_id, tier, start_date } = body
+  const { sale_id, draft_key, tier, start_date } = body
 
-  // Verify sale exists and belongs to user
   const admin = getAdminDb()
-  const { data: sale, error: saleError } = await fromBase(admin, 'sales')
-    .select('id, owner_id, status, archived_at, moderation_status')
-    .eq('id', sale_id)
-    .single()
+  let sale: any = null
+  let draft: any = null
 
-  if (saleError || !sale) {
-    return fail(404, 'SALE_NOT_FOUND', 'Sale not found')
-  }
+  // Handle draft_key flow (promotion from draft - new flow)
+  if (draft_key) {
+    // Verify draft exists and belongs to user
+    const rls = getRlsDb()
+    const { data: draftData, error: draftError } = await fromBase(rls, 'sale_drafts')
+      .select('id, draft_key, user_id, status, payload')
+      .eq('draft_key', draft_key)
+      .eq('status', 'active')
+      .maybeSingle()
 
-  // Verify ownership
-  if (sale.owner_id !== user.id) {
-    return fail(403, 'FORBIDDEN', 'You can only promote your own sales')
-  }
+    if (draftError || !draftData) {
+      return fail(404, 'DRAFT_NOT_FOUND', 'Draft not found')
+    }
 
-  // Verify sale is eligible (published/active/draft, not archived, not hidden)
-  // Allow draft status for checkout creation (sale will be published after checkout session is created)
-  if (sale.status !== 'published' && sale.status !== 'active' && sale.status !== 'draft') {
-    return fail(400, 'SALE_NOT_ELIGIBLE', 'Sale must be published, active, or draft to promote')
-  }
+    // Verify ownership
+    if (draftData.user_id !== user.id) {
+      return fail(403, 'FORBIDDEN', 'You can only promote your own drafts')
+    }
 
-  if (sale.archived_at) {
-    return fail(400, 'SALE_NOT_ELIGIBLE', 'Archived sales cannot be promoted')
-  }
+    draft = draftData
 
-  if (sale.moderation_status === 'hidden_by_admin') {
-    return fail(400, 'SALE_NOT_ELIGIBLE', 'Hidden sales cannot be promoted')
+    // Validate draft payload completeness
+    const { SaleDraftPayloadSchema } = await import('@/lib/validation/saleDraft')
+    const validationResult = SaleDraftPayloadSchema.safeParse(draftData.payload)
+    if (!validationResult.success) {
+      return fail(400, 'DRAFT_INVALID', 'Draft payload is invalid or incomplete')
+    }
+
+    const payload = validationResult.data
+    const { formData } = payload
+
+    // Validate required fields
+    if (!formData.title || !formData.city || !formData.state || !formData.date_start || !formData.time_start) {
+      return fail(400, 'DRAFT_INCOMPLETE', 'Draft is missing required fields')
+    }
+
+    if (!formData.lat || !formData.lng) {
+      return fail(400, 'DRAFT_INCOMPLETE', 'Draft is missing location (lat/lng)')
+    }
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[PROMOTIONS/CHECKOUT] Creating checkout for draft:', {
+        draftKey: draft_key,
+        userId: user.id,
+      })
+    }
+  } 
+  // Handle sale_id flow (promotion from existing sale - backward compatibility)
+  else if (sale_id) {
+    // Verify sale exists and belongs to user
+    const { data: saleData, error: saleError } = await fromBase(admin, 'sales')
+      .select('id, owner_id, status, archived_at, moderation_status')
+      .eq('id', sale_id)
+      .single()
+
+    if (saleError || !saleData) {
+      return fail(404, 'SALE_NOT_FOUND', 'Sale not found')
+    }
+
+    // Verify ownership
+    if (saleData.owner_id !== user.id) {
+      return fail(403, 'FORBIDDEN', 'You can only promote your own sales')
+    }
+
+    // Verify sale is eligible (published/active/draft, not archived, not hidden)
+    if (saleData.status !== 'published' && saleData.status !== 'active' && saleData.status !== 'draft') {
+      return fail(400, 'SALE_NOT_ELIGIBLE', 'Sale must be published, active, or draft to promote')
+    }
+
+    if (saleData.archived_at) {
+      return fail(400, 'SALE_NOT_ELIGIBLE', 'Archived sales cannot be promoted')
+    }
+
+    if (saleData.moderation_status === 'hidden_by_admin') {
+      return fail(400, 'SALE_NOT_ELIGIBLE', 'Hidden sales cannot be promoted')
+    }
+
+    sale = saleData
+  } else {
+    // Should not happen due to schema refinement, but handle gracefully
+    return fail(400, 'INVALID_INPUT', 'Either sale_id or draft_key must be provided')
   }
 
   // Get Stripe client
@@ -152,7 +212,7 @@ async function checkoutHandler(request: NextRequest) {
   // Create promotion record in 'pending' status
   const { data: promotion, error: promotionError } = await fromBase(admin, 'promotions')
     .insert({
-      sale_id,
+      sale_id: sale_id || null, // null for draft_key flows, will be set by webhook
       owner_profile_id: user.id,
       status: 'pending',
       tier,
@@ -187,11 +247,15 @@ async function checkoutHandler(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${siteUrl}/sales/${sale_id}?promotion=success`,
-      cancel_url: `${siteUrl}/sales/${sale_id}?promotion=canceled`,
+      success_url: draft_key 
+        ? `${siteUrl}/sales?promotion=success`
+        : `${siteUrl}/sales/${sale_id}?promotion=success`,
+      cancel_url: draft_key
+        ? `${siteUrl}/sell/new?resume=review&promotion=canceled`
+        : `${siteUrl}/sales/${sale_id}?promotion=canceled`,
       metadata: {
         promotion_id: promotion.id,
-        sale_id,
+        ...(draft_key ? { draft_key } : { sale_id }), // Include draft_key for new flow, sale_id for backward compatibility
         owner_profile_id: user.id,
         tier,
       },

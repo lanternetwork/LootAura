@@ -12,3 +12,8 @@ WHERE status = 'active';
 -- Add comment explaining the column
 COMMENT ON COLUMN lootaura_v2.sale_drafts.content_hash IS 'SHA-256 hash of canonicalized draft payload content (excludes meta fields like currentStep). Used for deduplication to prevent no-op saves.';
 
+
+
+
+
+

@@ -83,8 +83,12 @@ class MapViewportStore {
         // Map viewport coordinates (lat/lng) are not sensitive data - these are map display state values,
         // stored in sessionStorage (cleared on browser close), and are already visible in URL parameters.
         // This is standard practice for map applications.
-        // nosemgrep: js.clear-text-storage-sensitive-data
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(viewport)) // nosemgrep: js.clear-text-storage-sensitive-data
+        // 
+        // CodeQL suppression: js/clear-text-storage-sensitive-data
+        // Reason: Map viewport coordinates are display state, not user location data.
+        // They are ephemeral (sessionStorage), visible in URLs, and standard for map UX.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(viewport))
       } catch (error) {
         // sessionStorage may be unavailable (private browsing, quota exceeded)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

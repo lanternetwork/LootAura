@@ -7,5 +7,5 @@ queries:
   - uses: security-and-quality
     exclude:
       id: js/clear-text-storage-sensitive-data
-      path: lib/map/MapViewportStore.ts
+      from: lib/map/MapViewportStore.ts
 

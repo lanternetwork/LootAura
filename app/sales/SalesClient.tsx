@@ -65,8 +65,6 @@ export default function SalesClient({
 
   // Check if ZIP in URL needs client-side resolution
   const urlZip = searchParams.get('zip')
-  const zipNeedsResolution = urlZip && !urlLat && !urlLng && 
-    (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== urlZip.trim())
   
   // Distance to zoom level mapping (miles to zoom level)
   // Zoom levels approximate: 8=~100mi, 9=~50mi, 10=~25mi, 11=~12mi, 12=~6mi, 13=~3mi, 14=~1.5mi, 15=~0.75mi

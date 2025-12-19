@@ -11,7 +11,6 @@ import MobileRecenterButton from '@/components/location/MobileRecenterButton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
-import { isPointInsideBounds } from '@/lib/map/bounds'
 
 const HEADER_HEIGHT = 64 // px
 

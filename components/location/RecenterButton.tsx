@@ -25,7 +25,7 @@ export default function RecenterButton({
   defaultZoom = 11,
   className = ''
 }: RecenterButtonProps) {
-  const { location, loading, getLocation, requestPermission } = useLocation()
+  const { loading } = useLocation()
   const [isRecenterLoading, setIsRecenterLoading] = useState(false)
 
   const handleRecenter = useCallback(async () => {

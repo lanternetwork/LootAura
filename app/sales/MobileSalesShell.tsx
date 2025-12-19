@@ -7,7 +7,6 @@ import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
-import MobileRecenterButton from '@/components/location/MobileRecenterButton'
 import LocationPermissionDenied from '@/components/location/LocationPermissionDenied'
 import { useLocation } from '@/lib/location/useLocation'
 import { calculateDistance } from '@/lib/location/client'
@@ -251,64 +250,74 @@ export default function MobileSalesShell({
     return () => window.removeEventListener('resize', handleResize)
   }, [])
   
-  const shouldShowRecenterButton = useMemo(() => {
-    // Only show if permission is granted and we have GPS location
-    if (!permissionGranted || !userGpsLocation || !mapView?.center) return false
-    
-    // Calculate distance between map center and user GPS location (in meters)
-    const distanceKm = calculateDistance(
-      mapView.center.lat,
-      mapView.center.lng,
-      userGpsLocation.lat,
-      userGpsLocation.lng
-    )
-    const distanceMeters = distanceKm * 1000
-    
-    // Use appropriate threshold based on breakpoint
-    const threshold = isMobileBreakpoint 
-      ? RECENTER_THRESHOLD_MOBILE_METERS 
-      : RECENTER_THRESHOLD_TABLET_DESKTOP_METERS
-    
-    return distanceMeters > threshold
-  }, [permissionGranted, userGpsLocation, mapView?.center, isMobileBreakpoint])
-  
-  // Show "Use my location" button when permission not granted (mobile/tablet only)
-  const shouldShowUseMyLocationButton = useMemo(() => {
-    // Only on mobile/tablet (< 1024px), and when permission not granted
+  // Unified location button visibility: show if permission not granted OR map not centered
+  const shouldShowLocationButton = useMemo(() => {
+    // Desktop: never show
     if (typeof window !== 'undefined' && window.innerWidth >= 1024) return false
-    return !permissionGranted && !isRequestingLocation
-  }, [permissionGranted, isRequestingLocation])
-
-  // Handle "Use my location" button click - request permission and center map
-  const handleUseMyLocation = useCallback(async () => {
-    setIsRequestingLocation(true)
-    clearError()
-    setShowPermissionDenied(false)
-    setShouldAutoCenter(true) // Flag to auto-center once location is available
     
-    try {
-      // Request permission and get fresh GPS
-      const granted = await requestPermission()
+    // Case 1: Permission not granted - show button to request permission
+    if (!permissionGranted && !isRequestingLocation) return true
+    
+    // Case 2: Permission granted but map not centered - show button to recenter
+    if (permissionGranted && userGpsLocation && mapView?.center) {
+      // Calculate distance between map center and user GPS location (in meters)
+      const distanceKm = calculateDistance(
+        mapView.center.lat,
+        mapView.center.lng,
+        userGpsLocation.lat,
+        userGpsLocation.lng
+      )
+      const distanceMeters = distanceKm * 1000
       
-      if (!granted) {
-        // Permission denied - show inline message
+      // Use appropriate threshold based on breakpoint
+      const threshold = isMobileBreakpoint 
+        ? RECENTER_THRESHOLD_MOBILE_METERS 
+        : RECENTER_THRESHOLD_TABLET_DESKTOP_METERS
+      
+      return distanceMeters > threshold
+    }
+    
+    // Otherwise: hide button
+    return false
+  }, [permissionGranted, userGpsLocation, mapView?.center, isMobileBreakpoint, isRequestingLocation])
+
+  // Unified location button click handler - handles both permission request and recenter
+  const handleLocationButtonClick = useCallback(async () => {
+    // Case 1: Permission not granted - request permission
+    if (!permissionGranted) {
+      setIsRequestingLocation(true)
+      clearError()
+      setShowPermissionDenied(false)
+      setShouldAutoCenter(true) // Flag to auto-center once location is available
+      
+      try {
+        // Request permission and get fresh GPS
+        const granted = await requestPermission()
+        
+        if (!granted) {
+          // Permission denied - show inline message
+          setShowPermissionDenied(true)
+          setIsRequestingLocation(false)
+          setShouldAutoCenter(false)
+          return
+        }
+        
+        // Permission granted - wait for location to be fetched
+        // The useLocation hook will update userGpsLocation automatically
+        // We'll center the map once we have the location (handled in useEffect below)
+        setIsRequestingLocation(false)
+      } catch (error) {
+        console.error('[MOBILE] Error requesting location permission:', error)
         setShowPermissionDenied(true)
         setIsRequestingLocation(false)
         setShouldAutoCenter(false)
-        return
       }
-      
-      // Permission granted - wait for location to be fetched
-      // The useLocation hook will update userGpsLocation automatically
-      // We'll center the map once we have the location (handled in useEffect below)
-      setIsRequestingLocation(false)
-    } catch (error) {
-      console.error('[MOBILE] Error requesting location permission:', error)
-      setShowPermissionDenied(true)
-      setIsRequestingLocation(false)
-      setShouldAutoCenter(false)
+      return
     }
-  }, [requestPermission, clearError])
+    
+    // Case 2: Permission granted - recenter map (use existing handleRecenter logic)
+    await handleRecenter()
+  }, [permissionGranted, requestPermission, clearError, handleRecenter])
   
   // Center map on user GPS location when it becomes available (only if shouldAutoCenter is true)
   useEffect(() => {
@@ -626,22 +635,17 @@ export default function MobileSalesShell({
                 />
               )}
               
-              {/* Re-center Map Button - Bottom Right (Mobile only, viewport-aware) */}
-              <MobileRecenterButton
-                visible={shouldShowRecenterButton}
-                onClick={handleRecenter}
-              />
-              
-              {/* "Use my location" map control - Icon-only, positioned above sales tray button */}
-              {shouldShowUseMyLocationButton && (
+              {/* Unified Location Button - Icon-only, positioned above sales tray button */}
+              {/* Shows when: permission not granted OR (permission granted AND map not centered) */}
+              {shouldShowLocationButton && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    handleUseMyLocation()
+                    handleLocationButtonClick()
                   }}
                   disabled={isRequestingLocation || gpsLoading}
                   className="lg:hidden absolute bottom-[104px] right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Use my location"
+                  aria-label={permissionGranted ? "Recenter map to your location" : "Use my location"}
                 >
                   {isRequestingLocation || gpsLoading ? (
                     <svg className="w-6 h-6 text-gray-700 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">

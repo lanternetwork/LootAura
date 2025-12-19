@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useLocation } from '@/lib/location/useLocation'
 import { Tooltip } from '@/components/ui/Tooltip'
+import MapViewportStore from '@/lib/map/MapViewportStore'
 
 interface RecenterButtonProps {
   /** Callback when re-center is triggered with new center coordinates */
@@ -80,6 +81,24 @@ export default function RecenterButton({
 
       // If we have fresh location, use it
       if (freshLocation) {
+        // Calculate bounds for the viewport
+        const latRange = 0.11 // ~10 miles at mid-latitudes (zoom 12)
+        const lngRange = latRange * Math.cos(freshLocation.lat * Math.PI / 180)
+        const newViewport = {
+          center: freshLocation,
+          zoom: defaultZoom,
+          bounds: {
+            west: freshLocation.lng - lngRange / 2,
+            south: freshLocation.lat - latRange / 2,
+            east: freshLocation.lng + lngRange / 2,
+            north: freshLocation.lat + latRange / 2
+          }
+        }
+        
+        // Update MapViewportStore
+        MapViewportStore.setViewport(newViewport)
+        
+        // Call parent callback
         onRecenter(freshLocation, defaultZoom)
         setIsRecenterLoading(false)
         return

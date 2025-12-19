@@ -8,6 +8,11 @@ import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import MobileRecenterButton from '@/components/location/MobileRecenterButton'
+import UseMyLocationButton from '@/components/location/UseMyLocationButton'
+import LocationPermissionDenied from '@/components/location/LocationPermissionDenied'
+import { useLocation } from '@/lib/location/useLocation'
+import { calculateDistance } from '@/lib/location/client'
+import MapViewportStore from '@/lib/map/MapViewportStore'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
@@ -102,6 +107,12 @@ export default function MobileSalesShell({
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
   const [mapLoaded, setMapLoaded] = useState(false)
+  
+  // Location permission and GPS state
+  const { location: userGpsLocation, loading: gpsLoading, error: gpsError, permissionGranted, requestPermission, clearError } = useLocation()
+  const [showPermissionDenied, setShowPermissionDenied] = useState(false)
+  const [isRequestingLocation, setIsRequestingLocation] = useState(false)
+  const [shouldAutoCenter, setShouldAutoCenter] = useState(false)
   
   // Sync mode to URL params
   useEffect(() => {
@@ -221,32 +232,138 @@ export default function MobileSalesShell({
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
 
-  // Calculate visibility of recenter button - only show when user location is outside viewport
-  // OR when map center is more than threshold distance from user location
-  const RECENTER_THRESHOLD_METERS = 100 // Show button if map center is >100m from user location
+  // Calculate visibility of recenter button
+  // Mobile: 100m threshold, Tablet/Desktop: 250m threshold
+  // Only visible when: permission granted AND user GPS location known AND distance > threshold
+  const RECENTER_THRESHOLD_MOBILE_METERS = 100
+  const RECENTER_THRESHOLD_TABLET_DESKTOP_METERS = 250
+  
+  // Detect if mobile (< 768px) or tablet/desktop (>= 768px)
+  const [isMobileBreakpoint, setIsMobileBreakpoint] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return window.innerWidth < 768
+  })
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileBreakpoint(window.innerWidth < 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+  
   const shouldShowRecenterButton = useMemo(() => {
-    if (!userLocation || !mapView?.center) return false
+    // Only show if permission is granted and we have GPS location
+    if (!permissionGranted || !userGpsLocation || !mapView?.center) return false
     
-    // Calculate distance between map center and user location
-    const lat1 = mapView.center.lat
-    const lng1 = mapView.center.lng
-    const lat2 = userLocation.lat
-    const lng2 = userLocation.lng
+    // Calculate distance between map center and user GPS location (in meters)
+    const distanceKm = calculateDistance(
+      mapView.center.lat,
+      mapView.center.lng,
+      userGpsLocation.lat,
+      userGpsLocation.lng
+    )
+    const distanceMeters = distanceKm * 1000
     
-    // Haversine formula for distance in meters
-    const R = 6371000 // Earth radius in meters
-    const dLat = (lat2 - lat1) * Math.PI / 180
-    const dLng = (lng2 - lng1) * Math.PI / 180
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLng / 2) * Math.sin(dLng / 2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    const distanceMeters = R * c
+    // Use appropriate threshold based on breakpoint
+    const threshold = isMobileBreakpoint 
+      ? RECENTER_THRESHOLD_MOBILE_METERS 
+      : RECENTER_THRESHOLD_TABLET_DESKTOP_METERS
     
-    // Show button if distance is greater than threshold
-    return distanceMeters > RECENTER_THRESHOLD_METERS
-  }, [userLocation, mapView?.center])
+    return distanceMeters > threshold
+  }, [permissionGranted, userGpsLocation, mapView?.center, isMobileBreakpoint])
+  
+  // Show "Use my location" button when permission not granted (mobile/tablet only)
+  const shouldShowUseMyLocationButton = useMemo(() => {
+    // Only on mobile/tablet (< 1024px), and when permission not granted
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) return false
+    return !permissionGranted && !isRequestingLocation
+  }, [permissionGranted, isRequestingLocation])
 
+  // Handle "Use my location" button click - request permission and center map
+  const handleUseMyLocation = useCallback(async () => {
+    setIsRequestingLocation(true)
+    clearError()
+    setShowPermissionDenied(false)
+    setShouldAutoCenter(true) // Flag to auto-center once location is available
+    
+    try {
+      // Request permission and get fresh GPS
+      const granted = await requestPermission()
+      
+      if (!granted) {
+        // Permission denied - show inline message
+        setShowPermissionDenied(true)
+        setIsRequestingLocation(false)
+        setShouldAutoCenter(false)
+        return
+      }
+      
+      // Permission granted - wait for location to be fetched
+      // The useLocation hook will update userGpsLocation automatically
+      // We'll center the map once we have the location (handled in useEffect below)
+      setIsRequestingLocation(false)
+    } catch (error) {
+      console.error('[MOBILE] Error requesting location permission:', error)
+      setShowPermissionDenied(true)
+      setIsRequestingLocation(false)
+      setShouldAutoCenter(false)
+    }
+  }, [requestPermission, clearError])
+  
+  // Center map on user GPS location when it becomes available (only if shouldAutoCenter is true)
+  useEffect(() => {
+    if (shouldAutoCenter && userGpsLocation && mapRef.current && mapView) {
+      const map = mapRef.current.getMap?.()
+      if (!map) return
+      
+      // Reset flag so we don't auto-center again
+      setShouldAutoCenter(false)
+      
+      // Default zoom for 10-mile distance (matches distanceToZoom logic)
+      const DEFAULT_ZOOM = 12
+      const latRange = 0.11 // ~10 miles at mid-latitudes
+      const lngRange = latRange * Math.cos(userGpsLocation.lat * Math.PI / 180)
+      const newBounds = {
+        west: userGpsLocation.lng - lngRange / 2,
+        south: userGpsLocation.lat - latRange / 2,
+        east: userGpsLocation.lng + lngRange / 2,
+        north: userGpsLocation.lat + latRange / 2
+      }
+      
+      // Calculate distance to determine appropriate duration
+      const currentCenter = map.getCenter()
+      const distance = calculateDistance(
+        currentCenter.lat,
+        currentCenter.lng,
+        userGpsLocation.lat,
+        userGpsLocation.lng
+      )
+      const duration = Math.min(3000, Math.max(1000, distance * 50))
+      
+      // Animate to user location
+      map.flyTo({
+        center: [userGpsLocation.lng, userGpsLocation.lat],
+        zoom: DEFAULT_ZOOM,
+        duration: duration,
+        essential: true
+      })
+      
+      // Update viewport after animation
+      const handleMoveEnd = () => {
+        const newViewport = {
+          center: userGpsLocation,
+          zoom: DEFAULT_ZOOM,
+          bounds: newBounds
+        }
+        onViewportChange(newViewport)
+        MapViewportStore.setViewport(newViewport)
+        map.off('moveend', handleMoveEnd)
+      }
+      map.once('moveend', handleMoveEnd)
+    }
+  }, [shouldAutoCenter, userGpsLocation, mapView, onViewportChange])
+  
   // Handle re-center - always request fresh GPS, then animate map to user location
   const handleRecenter = useCallback(async () => {
     if (!mapRef.current) return
@@ -280,6 +397,7 @@ export default function MobileSalesShell({
       // Handle permission denied or other errors
       if (error.code === 1) {
         permissionError = 'Location access is disabled. You can re-enable it by refreshing the page or signing back in.'
+        setShowPermissionDenied(true)
       } else {
         permissionError = 'Unable to get your location. Please try again.'
       }
@@ -291,16 +409,13 @@ export default function MobileSalesShell({
 
     // If permission denied, show error (but don't permanently disable button)
     if (permissionError) {
-      // TODO: Show inline error message to user
-      // For now, just log it
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.warn('[MOBILE_RECENTER] Permission error:', permissionError)
-      }
+      setIsRequestingLocation(false)
       return
     }
 
     // If no location obtained, exit
     if (!freshLocation) {
+      setIsRequestingLocation(false)
       return
     }
 
@@ -350,9 +465,7 @@ export default function MobileSalesShell({
       onViewportChange(newViewport)
       
       // Update MapViewportStore
-      import('@/lib/map/MapViewportStore').then(({ default: MapViewportStore }) => {
-        MapViewportStore.setViewport(newViewport)
-      })
+      MapViewportStore.setViewport(newViewport)
     }
 
     // Add listener before starting animation
@@ -506,6 +619,21 @@ export default function MobileSalesShell({
                   <span className="absolute top-1 right-1 w-2 h-2 bg-[#F4B63A] rounded-full"></span>
                 )}
               </button>
+              
+              {/* "Use my location" CTA - Visible when permission not granted (mobile/tablet only) */}
+              {shouldShowUseMyLocationButton && (
+                <UseMyLocationButton
+                  onClick={handleUseMyLocation}
+                  loading={isRequestingLocation || gpsLoading}
+                />
+              )}
+              
+              {/* Permission denied message - Inline, non-blocking */}
+              {showPermissionDenied && (
+                <LocationPermissionDenied
+                  onDismiss={() => setShowPermissionDenied(false)}
+                />
+              )}
               
               {/* Re-center Map Button - Bottom Right (Mobile only, viewport-aware) */}
               <MobileRecenterButton

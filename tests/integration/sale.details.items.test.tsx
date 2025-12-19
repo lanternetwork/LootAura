@@ -241,7 +241,7 @@ describe('Sale Details Items Display', () => {
         }),
       } as Response)
     )
-    ;(global as any).fetch = mockFetch
+    (global as any).fetch = mockFetch
 
     try {
       render(

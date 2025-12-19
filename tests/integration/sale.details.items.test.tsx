@@ -225,7 +225,7 @@ describe('Sale Details Items Display', () => {
 
     // Mock fetch to return active promotion status
     const originalFetch = global.fetch
-    const mockFetch = vi.fn(() =>
+    const mockFetch: ReturnType<typeof vi.fn> = vi.fn(() =>
       Promise.resolve({
         ok: true,
         json: async () => ({
@@ -241,7 +241,7 @@ describe('Sale Details Items Display', () => {
         }),
       } as Response)
     )
-    (global as any).fetch = mockFetch
+    ;(global as any).fetch = mockFetch
 
     try {
       render(
@@ -259,7 +259,7 @@ describe('Sale Details Items Display', () => {
       expect(active.textContent).toContain('Promoted')
       expect(active.textContent).toMatch(/Ends/)
     } finally {
-      ;(global as any).fetch = originalFetch
+      (global as any).fetch = originalFetch
     }
   })
 
@@ -290,7 +290,7 @@ describe('Sale Details Items Display', () => {
       await Promise.resolve()
 
       const calls = mockFetch.mock.calls.filter(
-        (args) =>
+        (args: any[]) =>
           typeof args[0] === 'string' &&
           (args[0] as string).includes('/api/promotions/checkout')
       )

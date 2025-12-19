@@ -944,7 +944,7 @@ export default function SaleDetailClient({
               ) : (
                 <>
                   <p className="text-sm text-[#3A2268] mb-2">
-                    Feature your sale to get extra visibility in weekly emails and discovery.
+                    Promote your sale to get extra visibility in weekly emails and discovery.
                   </p>
                   <button
                     type="button"

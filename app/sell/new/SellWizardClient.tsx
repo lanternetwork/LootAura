@@ -114,6 +114,7 @@ export default function SellWizardClient({
   userLng,
   promotionsEnabled = false,
   paymentsEnabled = false,
+  promotionPrice,
 }: {
   initialData?: Partial<SaleInput>
   isEdit?: boolean
@@ -122,6 +123,7 @@ export default function SellWizardClient({
   userLng?: number
   promotionsEnabled?: boolean
   paymentsEnabled?: boolean
+  promotionPrice?: string | null
 }) {
   const router = useRouter()
   // Create the Supabase client once. Re-creating it on every render changes supabase.auth identity,
@@ -1405,6 +1407,7 @@ export default function SellWizardClient({
           <PromoteStep
             wantsPromotion={wantsPromotion}
             onTogglePromotion={handleTogglePromotion}
+            promotionPrice={promotionPrice}
           />
         )
       default:
@@ -1424,6 +1427,7 @@ export default function SellWizardClient({
               onTogglePromotion={handleTogglePromotion}
               promotionError={promotionError}
               isPromoting={isPromoting}
+              promotionPrice={promotionPrice}
             />
           )
         }
@@ -2173,10 +2177,14 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
 function PromoteStep({
   wantsPromotion,
   onTogglePromotion,
+  promotionPrice,
 }: {
   wantsPromotion: boolean
   onTogglePromotion: (next: boolean) => void
+  promotionPrice?: string | null
 }) {
+  const priceDisplay = promotionPrice ? `${promotionPrice} for 7 days` : '$X for 7 days'
+  
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
@@ -2193,7 +2201,7 @@ function PromoteStep({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
               <div>
-                <h4 className="font-semibold text-gray-900 mb-1">Featured in Weekly Emails</h4>
+                <h4 className="font-semibold text-gray-900 mb-1">Promoted in Weekly Emails</h4>
                 <p className="text-sm text-gray-600">Your sale will be highlighted in our weekly email to thousands of local buyers.</p>
               </div>
             </div>
@@ -2241,7 +2249,8 @@ function PromoteStep({
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h4 className="text-lg font-semibold text-gray-900 mb-1">Promote this sale</h4>
-              <p className="text-sm text-gray-600">You can always promote later from your dashboard if you change your mind.</p>
+              <p className="text-sm text-gray-600 mb-1">{priceDisplay}</p>
+              <p className="text-sm text-gray-500">You can always promote later from your dashboard if you change your mind.</p>
             </div>
             <label className="ml-6 inline-flex items-center cursor-pointer">
               <input
@@ -2274,6 +2283,7 @@ function ReviewStep({
   onTogglePromotion,
   promotionError,
   isPromoting,
+  promotionPrice,
 }: {
   formData: Partial<SaleInput>
   photos: string[]
@@ -2287,6 +2297,7 @@ function ReviewStep({
   onTogglePromotion?: (next: boolean) => void
   promotionError?: string | null
   isPromoting?: boolean
+  promotionPrice?: string | null
 }) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -2384,47 +2395,31 @@ function ReviewStep({
         )}
       </div>
 
-      <div className="space-y-3">
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <div className="flex">
-            <svg className="w-5 h-5 text-purple-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <h4 className="font-medium text-purple-800">Ready to publish?</h4>
-              <p className="text-sm text-purple-700 mt-1">
-                Your sale will be visible to buyers in your area. You can edit it later from your account.
-              </p>
+      {promotionsEnabled && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <span className="text-sm font-medium text-gray-900">Promote this sale{promotionPrice ? ` (${promotionPrice} for 7 days)` : ' ($X for 7 days)'}</span>
+              <p className="text-xs text-gray-500 mt-0.5">Checkout starts after you publish.</p>
+              {promotionError && (
+                <p className="text-xs text-red-600 mt-1 font-medium">{promotionError}</p>
+              )}
             </div>
+            <label className="ml-4 inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!wantsPromotion}
+                onChange={(e) => onTogglePromotion?.(e.target.checked)}
+                disabled={isPromoting}
+                className="sr-only peer"
+                aria-label="Promote this sale"
+                data-testid="review-promote-checkbox"
+              />
+              <div className={`relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600 ${isPromoting ? 'opacity-50 cursor-not-allowed' : ''}`}></div>
+            </label>
           </div>
         </div>
-
-        {promotionsEnabled && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <span className="text-sm font-medium text-gray-900">Promote this sale</span>
-                <p className="text-xs text-gray-500 mt-0.5">Starts checkout after you publish.</p>
-                {promotionError && (
-                  <p className="text-xs text-red-600 mt-1 font-medium">{promotionError}</p>
-                )}
-              </div>
-              <label className="ml-4 inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={!!wantsPromotion}
-                  onChange={(e) => onTogglePromotion?.(e.target.checked)}
-                  disabled={isPromoting}
-                  className="sr-only peer"
-                  aria-label="Promote this sale"
-                  data-testid="review-promote-checkbox"
-                />
-                <div className={`relative w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600 ${isPromoting ? 'opacity-50 cursor-not-allowed' : ''}`}></div>
-              </label>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
       
       <div className="mt-6 mb-6">
         {submitError && (
@@ -2452,7 +2447,7 @@ function ReviewStep({
             </>
           ) : (
             <>
-              {wantsPromotion ? 'Checkout & publish' : 'Publish Sale'}
+              {wantsPromotion ? 'Checkout & publish' : 'Publish sale'}
               <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>

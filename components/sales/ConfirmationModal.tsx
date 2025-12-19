@@ -99,9 +99,9 @@ export default function ConfirmationModal({
 
         {showPromoteCta && (
           <div className="mb-4 rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm">
-            <div className="font-medium text-purple-900 mb-1">Feature your sale</div>
+            <div className="font-medium text-purple-900 mb-1">Promote your sale</div>
             <p className="text-purple-800">
-              Get more visibility by featuring your sale in weekly emails and discovery.
+              Get more visibility by promoting your sale in weekly emails and discovery.
             </p>
             {promoteDisabledReason && (
               <p className="mt-2 text-xs text-purple-900">

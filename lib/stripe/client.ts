@@ -31,12 +31,8 @@ export function getStripeClient() {
   }
 
   try {
-    // Use eval to avoid bundling stripe when the package is not installed.
-    // This keeps runtime behavior the same (graceful failure when missing)
-    // while preventing build-time module resolution errors in environments
-    // where stripe is not present.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const Stripe = (eval('require') as typeof require)('stripe')
+    // Dynamic import to avoid build errors if stripe package is not installed
+    const Stripe = require('stripe')
     stripeClient = new Stripe(secretKey, {
       apiVersion: '2024-12-18.acacia',
     })

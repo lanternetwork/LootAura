@@ -15,10 +15,10 @@ const mockIsPaymentsEnabled = vi.fn(() => process.env.PAYMENTS_ENABLED === 'true
 const mockIsPromotionsEnabled = vi.fn(() => true)
 
 vi.mock('@/lib/stripe/client', () => ({
-  getStripeClient: (arg?: unknown) => mockGetStripeClient(arg),
-  isPaymentsEnabled: () => mockIsPaymentsEnabled(),
-  isPromotionsEnabled: () => mockIsPromotionsEnabled(),
-  getFeaturedWeekPriceId: vi.fn(() => 'price_test_featured_week'),
+  getStripeClient: (...args: any[]) => mockGetStripeClient(...args),
+  isPaymentsEnabled: (...args: any[]) => mockIsPaymentsEnabled(...args),
+  isPromotionsEnabled: (...args: any[]) => mockIsPromotionsEnabled(...args),
+  getFeaturedWeekPriceId: () => 'price_test_featured_week',
 }))
 
 vi.mock('@/lib/supabase/server', () => ({

@@ -7,10 +7,7 @@ import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
-import LocationPermissionDenied from '@/components/location/LocationPermissionDenied'
-import { useLocation } from '@/lib/location/useLocation'
-import { calculateDistance } from '@/lib/location/client'
-import MapViewportStore from '@/lib/map/MapViewportStore'
+import UnifiedLocationButton from '@/components/location/UnifiedLocationButton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
@@ -90,7 +87,7 @@ export default function MobileSalesShell({
   zipError,
   hasActiveFilters,
   hybridResult,
-  userLocation: _userLocation
+  userLocation
 }: MobileSalesShellProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -105,13 +102,6 @@ export default function MobileSalesShell({
   const [pinPosition, setPinPosition] = useState<{ x: number; y: number } | null>(null)
   const isDraggingRef = useRef<boolean>(false)
   const [mapLoaded, setMapLoaded] = useState(false)
-  
-  // Location permission and GPS state
-  const { location: userGpsLocation, loading: gpsLoading, error: _gpsError, permissionGranted, requestPermission, clearError } = useLocation()
-  const [showPermissionDenied, setShowPermissionDenied] = useState(false)
-  const [isRequestingLocation, setIsRequestingLocation] = useState(false)
-  const [shouldAutoCenter, setShouldAutoCenter] = useState(false)
-  const [permissionExplicitlyDenied, setPermissionExplicitlyDenied] = useState(false)
   
   // Sync mode to URL params
   useEffect(() => {
@@ -231,244 +221,30 @@ export default function MobileSalesShell({
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
 
-  // Calculate visibility of recenter button
-  // Mobile: 100m threshold, Tablet/Desktop: 250m threshold
-  // Only visible when: permission granted AND user GPS location known AND distance > threshold
-  const RECENTER_THRESHOLD_MOBILE_METERS = 100
-  const RECENTER_THRESHOLD_TABLET_DESKTOP_METERS = 250
-  
-  // Detect if mobile (< 768px) or tablet/desktop (>= 768px)
-  const [isMobileBreakpoint, setIsMobileBreakpoint] = useState(() => {
-    if (typeof window === 'undefined') return true
-    return window.innerWidth < 768
-  })
-  
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobileBreakpoint(window.innerWidth < 768)
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-  
-  // Unified location button visibility: show if permission not granted OR map not centered
-  const shouldShowLocationButton = useMemo(() => {
-    // Desktop: never show
-    if (typeof window !== 'undefined' && window.innerWidth >= 1024) return false
-    
-    // Case 1: Permission not granted - show button to request permission
-    if (!permissionGranted && !isRequestingLocation) return true
-    
-    // Case 2: Permission granted but map not centered - show button to recenter
-    if (permissionGranted && userGpsLocation && mapView?.center) {
-      // Calculate distance between map center and user GPS location (in meters)
-      const distanceKm = calculateDistance(
-        mapView.center.lat,
-        mapView.center.lng,
-        userGpsLocation.lat,
-        userGpsLocation.lng
-      )
-      const distanceMeters = distanceKm * 1000
-      
-      // Use appropriate threshold based on breakpoint
-      const threshold = isMobileBreakpoint 
-        ? RECENTER_THRESHOLD_MOBILE_METERS 
-        : RECENTER_THRESHOLD_TABLET_DESKTOP_METERS
-      
-      return distanceMeters > threshold
-    }
-    
-    // Otherwise: hide button
-    return false
-  }, [permissionGranted, userGpsLocation, mapView?.center, isMobileBreakpoint, isRequestingLocation])
-
-  // Handle re-center - always request fresh GPS, then animate map to user location
-  const handleRecenter = useCallback(async () => {
+  // Handle re-center callback for UnifiedLocationButton
+  const handleRecenter = useCallback((location: { lat: number; lng: number }, zoom: number) => {
     if (!mapRef.current) return
     
     const map = mapRef.current.getMap?.()
     if (!map) return
 
-    // Always request fresh browser GPS (never use cached location)
-    let freshLocation: { lat: number; lng: number } | null = null
-    let permissionError: string | null = null
-
-    try {
-      // Request permission and get fresh location
-      if (navigator.geolocation) {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            resolve,
-            reject,
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // maximumAge: 0 forces fresh location
-          )
-        })
-        
-        freshLocation = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        }
-      } else {
-        permissionError = 'Geolocation is not supported by your browser.'
-      }
-    } catch (error: any) {
-      // Handle permission denied or other errors
-      if (error.code === 1) {
-        permissionError = 'Location access is disabled. You can re-enable it by refreshing the page or signing back in.'
-        setPermissionExplicitlyDenied(true)
-      } else {
-        permissionError = 'Unable to get your location. Please try again.'
-      }
-      
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.error('[MOBILE_RECENTER] Geolocation error:', error)
-      }
-    }
-
-    if (permissionError) {
-      setIsRequestingLocation(false)
-      return
-    }
-    if (!freshLocation) {
-      setIsRequestingLocation(false)
-      return
-    }
-
-    const DEFAULT_ZOOM = 12
-    const latRange = 0.11
-    const lngRange = latRange * Math.cos(freshLocation.lat * Math.PI / 180)
+    // Calculate bounds for the new viewport
+    const latRange = 0.11 // ~10 miles at mid-latitudes
+    const lngRange = latRange * Math.cos(location.lat * Math.PI / 180)
     const newBounds = {
-      west: freshLocation.lng - lngRange / 2,
-      south: freshLocation.lat - latRange / 2,
-      east: freshLocation.lng + lngRange / 2,
-      north: freshLocation.lat + latRange / 2
+      west: location.lng - lngRange / 2,
+      south: location.lat - latRange / 2,
+      east: location.lng + lngRange / 2,
+      north: location.lat + latRange / 2
     }
 
-    const currentCenter = map.getCenter()
-    const distance = calculateDistance(currentCenter.lat, currentCenter.lng, freshLocation.lat, freshLocation.lng)
-    const duration = Math.min(3000, Math.max(1000, distance * 50))
-
-    const handleMoveEnd = () => {
-      const newViewport = {
-        center: freshLocation!,
-        zoom: DEFAULT_ZOOM,
-        bounds: newBounds
-      }
-      onViewportChange(newViewport)
-      MapViewportStore.setViewport(newViewport)
-    }
-    map.once('moveend', handleMoveEnd)
-
-    map.flyTo({
-      center: [freshLocation.lng, freshLocation.lat],
-      zoom: DEFAULT_ZOOM,
-      duration: duration,
-      essential: true
+    // Update viewport state
+    onViewportChange({
+      center: location,
+      zoom: zoom,
+      bounds: newBounds
     })
   }, [onViewportChange])
-
-  // Unified location button click handler - handles both permission request and recenter
-  const handleLocationButtonClick = useCallback(async () => {
-    // Case 1: Permission not granted - request permission
-    if (!permissionGranted) {
-      // If permission was previously denied, show message on click
-      if (permissionExplicitlyDenied) {
-        setShowPermissionDenied(true)
-        return
-      }
-      
-      setIsRequestingLocation(true)
-      clearError()
-      setShowPermissionDenied(false)
-      setShouldAutoCenter(true) // Flag to auto-center once location is available
-      
-      try {
-        // Request permission and get fresh GPS
-        const granted = await requestPermission()
-        
-        if (!granted) {
-          // Permission denied - mark as explicitly denied and show message
-          setPermissionExplicitlyDenied(true)
-          setShowPermissionDenied(true)
-          setIsRequestingLocation(false)
-          setShouldAutoCenter(false)
-          return
-        }
-        
-        // Permission granted - clear denied state
-        setPermissionExplicitlyDenied(false)
-        
-        // Wait for location to be fetched
-        // The useLocation hook will update userGpsLocation automatically
-        // We'll center the map once we have the location (handled in useEffect below)
-        setIsRequestingLocation(false)
-      } catch (error) {
-        console.error('[MOBILE] Error requesting location permission:', error)
-        setPermissionExplicitlyDenied(true)
-        setShowPermissionDenied(true)
-        setIsRequestingLocation(false)
-        setShouldAutoCenter(false)
-      }
-      return
-    }
-    
-    // Case 2: Permission granted - recenter map (use existing handleRecenter logic)
-    setPermissionExplicitlyDenied(false) // Clear denied state if permission is granted
-    await handleRecenter()
-  }, [permissionGranted, permissionExplicitlyDenied, requestPermission, clearError, handleRecenter])
-  
-  // Center map on user GPS location when it becomes available (only if shouldAutoCenter is true)
-  useEffect(() => {
-    if (shouldAutoCenter && userGpsLocation && mapRef.current && mapView) {
-      const map = mapRef.current.getMap?.()
-      if (!map) return
-      
-      // Reset flag so we don't auto-center again
-      setShouldAutoCenter(false)
-      
-      // Default zoom for 10-mile distance (matches distanceToZoom logic)
-      const DEFAULT_ZOOM = 12
-      const latRange = 0.11 // ~10 miles at mid-latitudes
-      const lngRange = latRange * Math.cos(userGpsLocation.lat * Math.PI / 180)
-      const newBounds = {
-        west: userGpsLocation.lng - lngRange / 2,
-        south: userGpsLocation.lat - latRange / 2,
-        east: userGpsLocation.lng + lngRange / 2,
-        north: userGpsLocation.lat + latRange / 2
-      }
-      
-      // Calculate distance to determine appropriate duration
-      const currentCenter = map.getCenter()
-      const distance = calculateDistance(
-        currentCenter.lat,
-        currentCenter.lng,
-        userGpsLocation.lat,
-        userGpsLocation.lng
-      )
-      const duration = Math.min(3000, Math.max(1000, distance * 50))
-      
-      // Animate to user location
-      map.flyTo({
-        center: [userGpsLocation.lng, userGpsLocation.lat],
-        zoom: DEFAULT_ZOOM,
-        duration: duration,
-        essential: true
-      })
-      
-      // Update viewport after animation
-      const handleMoveEnd = () => {
-        const newViewport = {
-          center: userGpsLocation,
-          zoom: DEFAULT_ZOOM,
-          bounds: newBounds
-        }
-        onViewportChange(newViewport)
-        MapViewportStore.setViewport(newViewport)
-        map.off('moveend', handleMoveEnd)
-      }
-      map.once('moveend', handleMoveEnd)
-    }
-  }, [shouldAutoCenter, userGpsLocation, mapView, onViewportChange])
   
   // Close callout when map is clicked or moved
   const handleMapClick = useCallback(() => {
@@ -610,44 +386,13 @@ export default function MobileSalesShell({
                 )}
               </button>
               
-              {/* Permission denied message - Inline, non-blocking */}
-              {showPermissionDenied && (
-                <LocationPermissionDenied
-                  onDismiss={() => setShowPermissionDenied(false)}
-                />
-              )}
-              
-              {/* Unified Location Button - Icon-only, positioned above sales tray button */}
-              {/* Shows when: permission not granted OR (permission granted AND map not centered) */}
-              {shouldShowLocationButton && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleLocationButtonClick()
-                  }}
-                  disabled={isRequestingLocation || gpsLoading}
-                  className={`lg:hidden absolute bottom-[152px] right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${permissionExplicitlyDenied ? 'opacity-60' : ''}`}
-                  aria-label={permissionGranted ? "Recenter map to your location" : "Use my location"}
-                >
-                  {isRequestingLocation || gpsLoading ? (
-                    <svg className="w-6 h-6 text-gray-700 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  ) : permissionExplicitlyDenied ? (
-                    // Muted/crossed-out location icon for denied state
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6" stroke="currentColor" opacity="0.6" />
-                    </svg>
-                  ) : (
-                    <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  )}
-                </button>
-              )}
+              {/* Unified Location Control Button - Handles permission, recenter, and denied state */}
+              <UnifiedLocationButton
+                userLocation={userLocation}
+                mapView={mapView}
+                onRecenter={handleRecenter}
+                mapRef={mapRef}
+              />
               
               {/* Mode Toggle FAB - Bottom Right */}
               <button

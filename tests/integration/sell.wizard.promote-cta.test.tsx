@@ -71,8 +71,8 @@ describe('Sell Wizard Promote CTA', () => {
     time_start: '09:00',
   }
 
-  const goToReviewStep = async (promotionsEnabled: boolean = false) => {
-    // Move from Details → Photos → Items → (Promote if enabled) → Review
+  const goToReviewStep = async () => {
+    // Move from Details → Photos → Items → Review
     const nextButton = screen.getByRole('button', { name: /next/i })
     // Details (validated)
     fireEvent.click(nextButton)
@@ -90,26 +90,13 @@ describe('Sell Wizard Promote CTA', () => {
     // handleNext uses a short navigation guard; wait for it to reset before clicking Next again
     await new Promise(resolve => setTimeout(resolve, 600))
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
-    
-    // If promotions enabled, we should see Promote step
-    if (promotionsEnabled) {
-      await waitFor(() => {
-        expect(screen.getByTestId('promote-step-heading')).toBeInTheDocument()
-      })
-      // Navigate past Promote step
-      await new Promise(resolve => setTimeout(resolve, 600))
-      fireEvent.click(screen.getByRole('button', { name: /next/i }))
-    }
-    
     // Review
     await waitFor(() => {
-      const publishButtons = screen.queryAllByRole('button', { name: /publish sale/i })
-      const checkoutButtons = screen.queryAllByRole('button', { name: /checkout.*publish/i })
-      expect(publishButtons.length > 0 || checkoutButtons.length > 0).toBe(true)
+      expect(screen.getAllByRole('button', { name: /publish sale/i })[0]).toBeInTheDocument()
     })
   }
 
-  it('hides Promote step and Review checkbox when promotions are disabled', async () => {
+  it('hides Feature your sale toggle when promotions are disabled', async () => {
     renderWithQueryClient(
       <SellWizardClient
         initialData={baseInitialData}
@@ -120,18 +107,12 @@ describe('Sell Wizard Promote CTA', () => {
       />
     )
 
-    await goToReviewStep(false)
+    await goToReviewStep()
 
-    // Should not see Promote step heading
-    expect(screen.queryByTestId('promote-step-heading')).not.toBeInTheDocument()
-    // Should not see Review checkbox
-    expect(screen.queryByTestId('review-promote-checkbox')).toBeNull()
-    // Should see normal Publish button (use getAllByRole and check first one)
-    const publishButtons = screen.getAllByRole('button', { name: /publish sale/i })
-    expect(publishButtons.length).toBeGreaterThan(0)
+    expect(screen.queryByTestId('review-feature-toggle')).toBeNull()
   })
 
-  it('shows Promote step when promotions are enabled', async () => {
+  it('shows Feature your sale toggle when promotions are enabled', async () => {
     renderWithQueryClient(
       <SellWizardClient
         initialData={baseInitialData}
@@ -142,219 +123,9 @@ describe('Sell Wizard Promote CTA', () => {
       />
     )
 
-    // Navigate to Items step
-    const nextButton = screen.getByRole('button', { name: /next/i })
-    fireEvent.click(nextButton)
-    await waitFor(() => {
-      expect(screen.getByTestId('image-upload')).toBeInTheDocument()
-    })
-    await new Promise(resolve => setTimeout(resolve, 600))
-    fireEvent.click(screen.getByRole('button', { name: /next/i }))
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /add item/i })).toBeInTheDocument()
-    })
-    await new Promise(resolve => setTimeout(resolve, 600))
-    fireEvent.click(screen.getByRole('button', { name: /next/i }))
-    
-    // Should see Promote step
-    await waitFor(() => {
-      expect(screen.getByTestId('promote-step-heading')).toBeInTheDocument()
-    })
-  })
+    await goToReviewStep()
 
-  it('shows subtle checkbox on Review step when promotions are enabled', async () => {
-    renderWithQueryClient(
-      <SellWizardClient
-        initialData={baseInitialData}
-        userLat={38.25}
-        userLng={-85.75}
-        promotionsEnabled={true}
-        paymentsEnabled={true}
-      />
-    )
-
-    await goToReviewStep(true)
-
-    // Should see Review checkbox
-    expect(screen.getByTestId('review-promote-checkbox')).toBeInTheDocument()
-    expect(screen.getByText(/promote this sale/i)).toBeInTheDocument()
-  })
-
-  it('syncs state between Promote step toggle and Review checkbox', async () => {
-    renderWithQueryClient(
-      <SellWizardClient
-        initialData={baseInitialData}
-        userLat={38.25}
-        userLng={-85.75}
-        promotionsEnabled={true}
-        paymentsEnabled={true}
-      />
-    )
-
-    // Navigate to Promote step
-    const nextButton = screen.getByRole('button', { name: /next/i })
-    fireEvent.click(nextButton)
-    await waitFor(() => {
-      expect(screen.getByTestId('image-upload')).toBeInTheDocument()
-    })
-    await new Promise(resolve => setTimeout(resolve, 600))
-    fireEvent.click(screen.getByRole('button', { name: /next/i }))
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /add item/i })).toBeInTheDocument()
-    })
-    await new Promise(resolve => setTimeout(resolve, 600))
-    fireEvent.click(screen.getByRole('button', { name: /next/i }))
-    
-    await waitFor(() => {
-      expect(screen.getByTestId('promote-step-heading')).toBeInTheDocument()
-    })
-
-    // Find and toggle the promotion switch on Promote step
-    const promoteToggle = screen.getByTestId('promote-step-toggle')
-    expect(promoteToggle).not.toBeChecked()
-    fireEvent.click(promoteToggle)
-    expect(promoteToggle).toBeChecked()
-
-    // Navigate to Review step
-    await new Promise(resolve => setTimeout(resolve, 600))
-    fireEvent.click(screen.getByRole('button', { name: /next/i }))
-    
-    await waitFor(() => {
-      expect(screen.getByTestId('review-promote-checkbox')).toBeInTheDocument()
-    })
-
-    // Review checkbox should be checked (state synced)
-    const reviewCheckbox = screen.getByTestId('review-promote-checkbox')
-    expect(reviewCheckbox).toBeChecked()
-
-    // Uncheck on Review step
-    fireEvent.click(reviewCheckbox)
-    expect(reviewCheckbox).not.toBeChecked()
-  })
-
-  it('changes CTA label to "Checkout & publish" when promotion is selected', async () => {
-    renderWithQueryClient(
-      <SellWizardClient
-        initialData={baseInitialData}
-        userLat={38.25}
-        userLng={-85.75}
-        promotionsEnabled={true}
-        paymentsEnabled={true}
-      />
-    )
-
-    await goToReviewStep(true)
-
-    // Initially should show "Publish Sale"
-    const initialPublishButtons = screen.getAllByRole('button', { name: /publish sale/i })
-    expect(initialPublishButtons.length).toBeGreaterThan(0)
-    expect(screen.queryAllByRole('button', { name: /checkout.*publish/i })).toHaveLength(0)
-
-    // Check the promotion checkbox
-    const checkbox = screen.getByTestId('review-promote-checkbox')
-    fireEvent.click(checkbox)
-
-    // Should now show "Checkout & publish"
-    await waitFor(() => {
-      const checkoutButtons = screen.getAllByRole('button', { name: /checkout.*publish/i })
-      expect(checkoutButtons.length).toBeGreaterThan(0)
-    })
-    expect(screen.queryAllByRole('button', { name: /publish sale/i })).toHaveLength(0)
-  })
-
-  it('shows error message and keeps checkbox checked when payments disabled and checkout clicked (draft-first flow)', async () => {
-    // Mock fetch to simulate successful sale creation but prevent checkout calls
-    const mockFetch = vi.fn()
-    global.fetch = mockFetch
-    
-    // Mock may be called for draft operations during navigation, so handle multiple calls
-    // Return successful sale creation for either /api/drafts/publish or /api/sales
-    mockFetch.mockImplementation((url: string | Request | URL, options?: RequestInit) => {
-      const urlString = typeof url === 'string' ? url : url instanceof Request ? url.url : url.toString()
-      const method = options?.method || (url instanceof Request ? url.method : 'GET')
-      
-      if (urlString.includes('/api/drafts/publish') && method === 'POST') {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            ok: true,
-            data: { saleId: 'test-sale-id' }
-          })
-        })
-      }
-      if (urlString.includes('/api/sales') && method === 'POST') {
-        // With draft-first flow, sale is created as draft when promotion is enabled
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            saleId: 'test-sale-id' // Returns saleId (draft sale created)
-          })
-        })
-      }
-      if (urlString.includes('/api/items_v2') && method === 'POST') {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ ok: true })
-        })
-      }
-      if (urlString.includes('/api/drafts') && method === 'POST') {
-        // Draft save operations
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ ok: true })
-        })
-      }
-      // For any other calls (e.g., CSRF, analytics, etc.), return a successful empty response
-      // This prevents the test from failing on unexpected but harmless API calls
-      return Promise.resolve({
-        ok: true,
-        json: async () => ({ ok: true })
-      })
-    })
-
-    renderWithQueryClient(
-      <SellWizardClient
-        initialData={baseInitialData}
-        userLat={38.25}
-        userLng={-85.75}
-        promotionsEnabled={true}
-        paymentsEnabled={false}
-      />
-    )
-
-    await goToReviewStep(true)
-
-    // Check promotion checkbox
-    const checkbox = screen.getByTestId('review-promote-checkbox')
-    fireEvent.click(checkbox)
-    expect(checkbox).toBeChecked()
-
-    // Click "Checkout & publish" button
-    const publishButton = await screen.findByRole('button', { name: /checkout.*publish/i })
-    fireEvent.click(publishButton)
-
-    // Should show error message inline (wait for sale creation as draft and error to appear)
-    // With new draft-first flow, sale is created as draft, error is shown next to toggle
-    await waitFor(() => {
-      // Check for error message in the UI (shown next to promotion toggle)
-      const allText = document.body.textContent || ''
-      const hasMessage = allText.toLowerCase().includes('promotions aren\'t available yet') ||
-                         allText.toLowerCase().includes('promotions are not available')
-      
-      if (!hasMessage) {
-        throw new Error('Error message not found in document')
-      }
-    }, { timeout: 10000 })
-
-    // Should not call checkout API (sale is created as draft, no checkout attempted)
-    const checkoutCalls = mockFetch.mock.calls.filter(call => 
-      typeof call[0] === 'string' && call[0].includes('/api/promotions/checkout')
-    )
-    expect(checkoutCalls).toHaveLength(0)
-
-    // Checkbox should remain checked (user can see their selection and uncheck manually if needed)
-    // With new draft-first flow, we keep the state so user can retry or uncheck and publish
-    expect(checkbox).toBeChecked()
+    expect(screen.getByTestId('review-feature-toggle')).toBeInTheDocument()
   })
 })
 

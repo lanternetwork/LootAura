@@ -27,9 +27,6 @@ export const Policies = {
   SALES_VIEW_HOURLY: { name: 'SALES_VIEW_HOURLY', limit: 800, windowSec: 3600, scope: 'ip' as const },
   MUTATE_MINUTE:     { name: 'MUTATE_MINUTE',     limit: 3,  windowSec: 60, scope: 'user' as const },
   MUTATE_DAILY:      { name: 'MUTATE_DAILY',      limit: 100, windowSec: 86400, scope: 'user' as const },
-  // Draft saves are frequent by design (autosave). Keep them user-scoped, but allow a higher volume than general mutations.
-  DRAFTS_SAVE_MINUTE: { name: 'DRAFTS_SAVE_MINUTE', limit: 12, windowSec: 60, scope: 'user' as const },
-  DRAFTS_SAVE_DAILY:  { name: 'DRAFTS_SAVE_DAILY',  limit: 2500, windowSec: 86400, scope: 'user' as const },
   RATING_MINUTE:     { name: 'RATING_MINUTE',     limit: 10, windowSec: 60, scope: 'user' as const },
   RATING_HOURLY:      { name: 'RATING_HOURLY',    limit: 50, windowSec: 3600, scope: 'user' as const },
   ADMIN_TOOLS:       { name: 'ADMIN_TOOLS',       limit: 3,  windowSec: 30, scope: 'ip' as const },

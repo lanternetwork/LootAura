@@ -28,9 +28,6 @@ const mockSupabaseClient = {
     getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null }),
   },
   from: vi.fn(() => createChainableMock()),
-  schema: vi.fn(() => ({
-    from: vi.fn(() => createChainableMock()),
-  })),
 }
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -140,10 +137,6 @@ describe('CSRF Protection', () => {
       data: { user: { id: 'test-user-id' } },
       error: null,
     })
-    // Reset schema mock to default behavior (returns object with from method)
-    mockSupabaseClient.schema.mockReturnValue({
-      from: vi.fn(() => createChainableMock()),
-    })
   })
 
   describe('POST /api/seller/rating', () => {
@@ -235,7 +228,6 @@ describe('CSRF Protection', () => {
 
     it('accepts POST with valid CSRF token', async () => {
       // Mock successful favorite creation
-      // The favorites route uses supabase.schema('lootaura_v2').from('favorites')
       const mockInsert = vi.fn().mockReturnThis()
       const mockSelect = vi.fn().mockReturnThis()
       const mockSingle = vi.fn().mockResolvedValue({
@@ -243,8 +235,7 @@ describe('CSRF Protection', () => {
         error: null,
       })
       
-      // Create chainable mock for schema().from() chain
-      const schemaFromChain = {
+      mockSupabaseClient.from.mockReturnValue({
         insert: mockInsert,
         select: mockSelect,
         upsert: vi.fn().mockReturnThis(),
@@ -253,15 +244,7 @@ describe('CSRF Protection', () => {
         eq: vi.fn().mockReturnThis(),
         single: mockSingle,
         maybeSingle: vi.fn().mockResolvedValue({ data: {}, error: null }),
-      }
-      
-      // Mock schema().from() chain - schema() returns object with from() method
-      const schemaMock = {
-        from: vi.fn(() => schemaFromChain),
-      }
-      
-      // Reset and configure schema mock
-      mockSupabaseClient.schema.mockReturnValue(schemaMock)
+      })
       
       mockInsert.mockReturnValue({
         select: mockSelect,
@@ -281,10 +264,6 @@ describe('CSRF Protection', () => {
 
       expect(response.status).toBe(200)
       expect(data).toBeDefined()
-      
-      // Verify schema was called with correct schema name
-      expect(mockSupabaseClient.schema).toHaveBeenCalledWith('lootaura_v2')
-      expect(schemaMock.from).toHaveBeenCalledWith('favorites')
     })
   })
 

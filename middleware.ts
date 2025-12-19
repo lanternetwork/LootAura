@@ -250,16 +250,14 @@ export async function middleware(req: NextRequest) {
     return createResponseWithCsrf(response)
   }
   
-  // 5. Bypass auth pages and onboarding pages to prevent redirect loops
+  // 5. Bypass auth pages to prevent redirect loops
   const isAuthPage = 
     pathname === '/login' ||
     pathname === '/signin' ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/auth/');
   
-  const isOnboardingPage = pathname.startsWith('/onboarding/')
-  
-  if (isAuthPage || isOnboardingPage) {
+  if (isAuthPage) {
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log(`[MIDDLEWARE] allowing public access → ${pathname}`);
     }
@@ -339,10 +337,10 @@ export async function middleware(req: NextRequest) {
     console.log('[MIDDLEWARE] Session valid', { event: 'auth-mw', path: pathname, authenticated: true })
   }
 
-  // Onboarding gate: Check if user needs to complete location onboarding
-  // Only applies to interactive pages (not API routes, webhooks, or cron jobs)
-  if (session?.user && !pathname.startsWith('/api/') && !pathname.startsWith('/onboarding/')) {
+  // If user is authenticated, auto-upsert profile on first request
+  if (session?.user) {
     try {
+      // Create a server client for profile operations
       const { createServerSupabaseClient } = await import('@/lib/auth/server-session')
       const supabase = createServerSupabaseClient(cookieStore)
       
@@ -353,29 +351,10 @@ export async function middleware(req: NextRequest) {
           .eq('id', session.user.id)
           .maybeSingle()
 
-        const homeZip = profile?.home_zip as string | undefined
-        
-        // If user doesn't have home_zip, redirect to onboarding
-        if (!homeZip) {
-          // Build redirect URL with original destination
-          const onboardingUrl = new URL('/onboarding/location', req.url)
-          const currentPath = pathname + req.nextUrl.search
-          // Only set redirectTo if it's not already an onboarding/auth page
-          if (!currentPath.startsWith('/onboarding/') && !currentPath.startsWith('/auth/')) {
-            onboardingUrl.searchParams.set('redirectTo', currentPath)
-          }
-          
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[MIDDLEWARE] Redirecting to onboarding:', { userId: session.user.id, redirectTo: currentPath })
-          }
-          
-          const redirectResponse = NextResponse.redirect(onboardingUrl)
-          return createResponseWithCsrf(redirectResponse)
-        }
-
         // Best-effort: if la_loc cookie missing and profile has home_zip, set a placeholder
         // Note: We avoid making HTTP requests in middleware to prevent SSRF
         const hasCookie = !!cookieStore.get('la_loc')?.value
+        const homeZip = profile?.home_zip as string | undefined
         if (!hasCookie && homeZip) {
           // Set a placeholder cookie that will be resolved on the client side
           const placeholderPayload = JSON.stringify({ 
@@ -398,9 +377,9 @@ export async function middleware(req: NextRequest) {
       }
     } catch (error) {
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.error('Error checking onboarding status:', error)
+        console.error('Error upserting profile:', error)
       }
-      // Don't block the request if check fails
+      // Don't block the request if profile creation fails
     }
   }
 

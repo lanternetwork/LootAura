@@ -164,19 +164,26 @@ export function useFavorites() {
     queryFn: async () => {
       if (!user) return []
 
-      const res = await fetch('/api/favorites', {
-        credentials: 'include',
-        cache: 'no-store',
-      })
+      // Step 1: get favorite sale_ids from public view
+      const { data: favRows, error: favErr } = await sb
+        .from('favorites_v2')
+        .select('sale_id')
+        .eq('user_id', user.id)
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'Failed to load favorites')
-      }
+      if (favErr) throw new Error(favErr.message)
 
-      const body = await res.json()
-      const sales = (body.sales || []) as Sale[]
-      return sales
+      const ids = (favRows || []).map((r: any) => r.sale_id)
+      if (ids.length === 0) return []
+
+      // Step 2: fetch sales from public view
+      const { data: salesRows, error: salesErr } = await sb
+        .from('sales_v2')
+        .select('*')
+        .in('id', ids)
+
+      if (salesErr) throw new Error(salesErr.message)
+
+      return salesRows as Sale[]
     },
     enabled: !!user,
   })

@@ -125,10 +125,6 @@ interface SaleDetailClientProps {
   currentUserRating?: number | null
   promotionsEnabled?: boolean
   paymentsEnabled?: boolean
-  initialPromotionStatus?: {
-    isActive: boolean
-    endsAt: string | null
-  } | null
 }
 
 export default function SaleDetailClient({
@@ -139,7 +135,6 @@ export default function SaleDetailClient({
   currentUserRating,
   promotionsEnabled = false,
   paymentsEnabled = false,
-  initialPromotionStatus = null,
 }: SaleDetailClientProps) {
   // Debug logging to diagnose items visibility issue (only in debug mode)
   if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
@@ -196,7 +191,7 @@ export default function SaleDetailClient({
   const [promotionStatus, setPromotionStatus] = useState<{
     isActive: boolean
     endsAt: string | null
-  } | null>(initialPromotionStatus)
+  } | null>(null)
   const [isPromotionLoading, setIsPromotionLoading] = useState(false)
 
   // Track click event for navigation/directions
@@ -922,29 +917,24 @@ export default function SaleDetailClient({
             <div className="mt-4 rounded-lg border border-purple-200 bg-purple-50 p-4">
               <h4 className="font-medium text-[#3A2268] mb-1">Promote this sale</h4>
               {promotionStatus?.isActive ? (
-                <div className="text-[#3A2268]" data-testid="sale-detail-promote-active">
-                  <button
-                    type="button"
-                    disabled
-                    className="inline-flex items-center px-3 py-1.5 text-sm rounded-lg bg-[#3A2268] text-white opacity-60 cursor-not-allowed"
-                  >
-                    Promoted
-                  </button>
+                <p className="text-sm text-[#3A2268]" data-testid="sale-detail-promote-active">
+                  Promoted
                   {promotionStatus.endsAt && (
-                    <div className="mt-1 text-xs">
-                      Ends{' '}
+                    <>
+                      {' '}
+                      • Ends{' '}
                       {new Date(promotionStatus.endsAt).toLocaleDateString('en-US', {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',
                       })}
-                    </div>
+                    </>
                   )}
-                </div>
+                </p>
               ) : (
                 <>
                   <p className="text-sm text-[#3A2268] mb-2">
-                    Promote your sale to get extra visibility in weekly emails and discovery.
+                    Feature your sale to get extra visibility in weekly emails and discovery.
                   </p>
                   <button
                     type="button"
@@ -1046,11 +1036,6 @@ export default function SaleDetailClient({
                         ? 'Promote this sale'
                         : 'Promotions unavailable'}
                   </button>
-                  {!paymentsEnabled && (
-                    <p className="mt-2 text-xs text-[#3A2268]">
-                      Promotions are not available right now. You can promote later from your dashboard.
-                    </p>
-                  )}
                 </>
               )}
             </div>

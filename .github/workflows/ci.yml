@@ -28,14 +28,14 @@ jobs:
         run: |
           echo "Checking required environment variables..."
           if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ]; then
-            echo "âŒ NEXT_PUBLIC_SUPABASE_URL is missing"
+            echo "❌ NEXT_PUBLIC_SUPABASE_URL is missing"
             exit 1
           fi
           if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
-            echo "âŒ NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"
+            echo "❌ NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"
             exit 1
           fi
-          echo "âœ… All required environment variables present"
+          echo "✅ All required environment variables present"
 
   lint:
     name: lint
@@ -48,20 +48,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            npm ci --no-audit --no-fund
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
             
             if [ $? -eq 0 ]; then
-              echo "âœ… Dependencies installed successfully"
+              echo "✅ Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "❌ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -87,20 +93,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            npm ci --no-audit --no-fund
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
             
             if [ $? -eq 0 ]; then
-              echo "âœ… Dependencies installed successfully"
+              echo "✅ Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "❌ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -126,20 +138,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            npm ci --no-audit --no-fund
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
             
             if [ $? -eq 0 ]; then
-              echo "âœ… Dependencies installed successfully"
+              echo "✅ Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "❌ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -179,20 +197,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            npm ci --no-audit --no-fund
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
             
             if [ $? -eq 0 ]; then
-              echo "âœ… Dependencies installed successfully"
+              echo "✅ Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "❌ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -203,17 +227,14 @@ jobs:
             fi
           done
 
-      - name: Run integration tests (sharded)
-        run: |
-          for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24; do
-            echo "Running integration shard $i/24"
-            npm run test -- --shard=$i/24 tests/integration/
-          done
+      - name: Run integration tests
+        run: npm run test -- tests/integration/
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
           NEXT_PUBLIC_DEBUG: 'true'
+
   test-e2e-smoke:
     name: test-e2e-smoke
     runs-on: ubuntu-latest
@@ -226,20 +247,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            npm ci --no-audit --no-fund
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
             
             if [ $? -eq 0 ]; then
-              echo "âœ… Dependencies installed successfully"
+              echo "✅ Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "❌ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -272,20 +299,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            npm ci --no-audit --no-fund
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
             
             if [ $? -eq 0 ]; then
-              echo "âœ… Dependencies installed successfully"
+              echo "✅ Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "❌ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -358,10 +391,10 @@ jobs:
             fi
             
             if [ $? -eq 0 ]; then
-              echo "âœ… Dependencies installed successfully"
+              echo "✅ Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "❌ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -399,20 +432,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
 
       - name: Install dependencies
         run: |
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            npm ci --no-audit --no-fund
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+              # Generate package-lock.json for consistent dependency resolution
+              npm install --package-lock-only
+            fi
             
             if [ $? -eq 0 ]; then
-              echo "âœ… Dependencies installed successfully"
+              echo "✅ Dependencies installed successfully"
               break
             else
-              echo "âŒ Install attempt $attempt failed"
+              echo "❌ Install attempt $attempt failed"
               if [ $attempt -lt 3 ]; then
                 echo "Retrying in 10 seconds..."
                 sleep 10
@@ -458,4 +497,3 @@ jobs:
             })
 
             console.log(`Emitted ci_completed event for branch: ${branch}, PR: ${prNumber}`)
-

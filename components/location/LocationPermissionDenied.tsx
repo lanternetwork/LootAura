@@ -7,6 +7,7 @@ interface LocationPermissionDeniedProps {
 /**
  * Inline message shown when user denies location access.
  * Non-blocking, friendly message that doesn't prevent map usage.
+ * Renders as a bottom toast, not centered.
  */
 export default function LocationPermissionDenied({ onDismiss }: LocationPermissionDeniedProps) {
   return (

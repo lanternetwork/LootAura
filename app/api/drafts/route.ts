@@ -4,7 +4,6 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { getRlsDb, getAdminDb, fromBase } from '@/lib/supabase/clients'
 import { SaleDraftPayloadSchema } from '@/lib/validation/saleDraft'
 import { ok, fail } from '@/lib/http/json'
-import { hashDraftContent } from '@/lib/draft/contentHash'
 import * as Sentry from '@sentry/nextjs'
 
 export const dynamic = 'force-dynamic'
@@ -45,7 +44,7 @@ export async function GET(_request: NextRequest) {
     // Fetch latest active draft for user (read from base table via schema-scoped client)
     const db = getRlsDb()
     const { data: draft, error } = await fromBase(db, 'sale_drafts')
-      .select('id, draft_key, payload, updated_at')
+      .select('id, payload, updated_at')
       .eq('user_id', user.id)
       .eq('status', 'active')
       .order('updated_at', { ascending: false })
@@ -70,7 +69,7 @@ export async function GET(_request: NextRequest) {
       return ok({ data: null })
     }
 
-    return ok({ data: { id: draft.id, draft_key: draft.draft_key, payload: validationResult.data } })
+    return ok({ data: { id: draft.id, payload: validationResult.data } })
   } catch (e: any) {
     if (process.env.NODE_ENV !== 'production') console.error('[DRAFTS/GET] thrown:', e)
     Sentry.captureException(e, { tags: { operation: 'getLatestDraft' } })
@@ -135,9 +134,6 @@ async function postDraftHandler(request: NextRequest) {
     const validatedPayload = validationResult.data
     const title = validatedPayload.formData?.title || null
 
-    // Compute content hash for deduplication
-    const contentHash = hashDraftContent(validatedPayload)
-
     // Upsert draft (insert or update by user_id + draft_key)
     if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
       console.log('[DRAFTS] Saving draft:', {
@@ -146,7 +142,6 @@ async function postDraftHandler(request: NextRequest) {
         title,
         hasPayload: !!validatedPayload,
         payloadKeys: validatedPayload ? Object.keys(validatedPayload) : [],
-        contentHash,
       })
     }
     
@@ -156,45 +151,23 @@ async function postDraftHandler(request: NextRequest) {
     // Check if draft exists first (use RLS for reads to respect user's own drafts)
     const rls = getRlsDb()
     const { data: existingDraft } = await fromBase(rls, 'sale_drafts')
-      .select('id, content_hash, updated_at')
+      .select('id')
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
       .eq('status', 'active')
       .maybeSingle()
 
-    // Deduplication: If draft exists and content hash matches, skip update
-    if (existingDraft && existingDraft.content_hash === contentHash) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[DRAFTS] Content unchanged, skipping update:', {
-          draftId: existingDraft.id,
-          draftKey,
-          contentHash,
-        })
-      }
-      // Return existing draft without updating (no-op save)
-      return ok({ 
-        data: { 
-          id: existingDraft.id,
-          deduped: true // Flag to indicate no write occurred
-        } 
-      })
-    }
-
     let draft: any
     let error: any
-    let isUpdate = false
 
     if (existingDraft) {
       // Update existing draft - write to base table using admin client
-      isUpdate = true
       const { data: updatedDraft, error: updateError } = await fromBase(admin, 'sale_drafts')
         .update({
           title,
           payload: validatedPayload,
-          content_hash: contentHash,
           status: 'active',
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString() // Explicitly update timestamp
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
         .eq('id', existingDraft.id)
         .select('id, draft_key, title, status, updated_at')
@@ -209,7 +182,6 @@ async function postDraftHandler(request: NextRequest) {
           draft_key: draftKey,
           title,
           payload: validatedPayload,
-          content_hash: contentHash,
           status: 'active',
           expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
         })
@@ -229,7 +201,7 @@ async function postDraftHandler(request: NextRequest) {
       console.error('[DRAFTS] Draft save succeeded but no draft returned:', {
         draftKey,
         userId: user.id,
-        operation: isUpdate ? 'update' : 'insert',
+        operation: existingDraft ? 'update' : 'insert',
       })
       return fail(500, 'NO_DATA_ERROR', 'Draft save succeeded but no data returned')
     }
@@ -253,7 +225,7 @@ export async function POST(request: NextRequest) {
 
   return withRateLimit(
     postDraftHandler,
-    [Policies.DRAFTS_SAVE_MINUTE, Policies.DRAFTS_SAVE_DAILY],
+    [Policies.MUTATE_MINUTE, Policies.MUTATE_DAILY],
     { userId }
   )(request)
 }
@@ -292,23 +264,16 @@ async function deleteDraftHandler(request: NextRequest) {
 
     // Mark draft as archived (soft delete) - write to base table using admin client (bypasses RLS, but we've already verified auth)
     const admin = getAdminDb()
-    const { data: updatedDrafts, error } = await fromBase(admin, 'sale_drafts')
+    const { error } = await fromBase(admin, 'sale_drafts')
       .update({ status: 'archived' })
       .eq('user_id', user.id)
       .eq('draft_key', draftKey)
       .eq('status', 'active')
-      .select('id') // Select to check if any rows were updated
 
     if (error) {
       console.error('[DRAFTS/DELETE] supabase error:', error)
       Sentry.captureException(error, { tags: { operation: 'deleteDraft' } })
       return fail(500, 'DELETE_ERROR', 'Failed to delete draft', error)
-    }
-
-    // Check if any rows were actually updated
-    if (!updatedDrafts || updatedDrafts.length === 0) {
-      // Draft not found or already archived
-      return fail(404, 'DRAFT_NOT_FOUND', 'Draft not found or already deleted')
     }
 
     return ok({ data: {} })

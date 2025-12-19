@@ -4,12 +4,6 @@
 
 ## Webapp Production Readiness / SLOs
 
-## CI / Dependency Management (Lockfile)
-
-- **Canonical package manager**: `npm`
-- **Required lockfile**: `package-lock.json` at the repo root
-- **CI policy**: GitHub Actions uses `npm ci` and `actions/setup-node` npm caching, which requires `package-lock.json`. Deleting or failing to commit the lockfile will cause CI to fail early.
-
 ### Service Level Objectives (SLOs)
 
 #### Map Performance
@@ -861,37 +855,17 @@ Milestone 5A adds **seller-facing “Promote listing” CTAs** wired to the Stri
 
 ### CTA Locations
 
-- **Sell Wizard (Promote step + Review step)**  
-  - **Promote Step** (when `PROMOTIONS_ENABLED=true`):  
-    - Location: Dedicated step immediately before Review in `SellWizardClient` (`app/sell/new/SellWizardClient.tsx`).  
-    - Marketing page with value propositions:  
-      - Featured in Weekly Emails  
-      - Enhanced Discovery  
-      - More Views & Engagement  
-      - 7-Day Promotion  
-    - Toggle: "Promote this sale" (local-only `wantsPromotion` state; **no DB writes**).  
-    - Default: OFF  
-  - **Review Step**:  
-    - When `PROMOTIONS_ENABLED=true`, includes a subtle checkbox:  
-      - Label: "Promote this sale"  
-      - Microcopy: "Starts checkout after you publish."  
-      - Visually secondary, does not distract from publishing  
-    - State sync: Review checkbox reflects same `wantsPromotion` state as Promote step toggle  
-    - Primary CTA labeling:  
-      - If `wantsPromotion=false`: "Publish Sale"  
-      - If `wantsPromotion=true`: "Checkout & publish"  
-  - **Checkout behavior** (when "Checkout & publish" is clicked):  
-    - If `PAYMENTS_ENABLED=true`:  
-      - Publishes sale first, then calls `POST /api/promotions/checkout` with CSRF headers  
-      - Redirects to Stripe `checkoutUrl` on success  
-      - Shows friendly error messages for account-locked / ineligible / disabled cases  
-    - If `PAYMENTS_ENABLED=false`:  
-      - Does not call checkout  
-      - Shows message: "Promotions aren't available yet."  
-      - Resets `wantsPromotion` to `false` so CTA returns to "Publish Sale"  
-  - When `PROMOTIONS_ENABLED=false`:  
-    - Neither Promote step nor Review checkbox appears  
-    - Review step remains unchanged
+- **Sell Wizard (Review step)**  
+  - Location: Review/Publish step of `SellWizardClient` (`app/sell/new/SellWizardClient.tsx`).  
+  - When `PROMOTIONS_ENABLED=true`, shows a **“Feature your sale”** section with:  
+    - Title: “Feature your sale”  
+    - Copy: “Get more visibility by featuring your sale in weekly emails and discovery.”  
+    - Toggle: “Feature this sale” (local-only `wantsPromotion` state; **no DB writes**).  
+    - Note: “You can also promote later from your dashboard.”  
+  - After a successful publish, if the seller opted in and `PROMOTIONS_ENABLED=true`:  
+    - The confirmation modal shows a **“Promote now”** CTA.  
+    - If `PAYMENTS_ENABLED=false`: CTA is disabled with a friendly message and **does not call checkout**.  
+    - If `PAYMENTS_ENABLED=true`: calls `POST /api/promotions/checkout` with CSRF headers and redirects to `checkoutUrl`, with friendly error messages for account-locked / ineligible / disabled cases.
 
 - **Dashboard (Seller-owned sales)**  
   - Location: Actions row on each seller-owned sale card in the dashboard (`DashboardSaleCard`).  
@@ -926,17 +900,16 @@ Milestone 5A adds **seller-facing “Promote listing” CTAs** wired to the Stri
     2. **Route-level guard**: `POST /api/promotions/checkout` calls `isPaymentsEnabled()` and returns `403 PAYMENTS_DISABLED` *before* touching Stripe or the database when disabled.  
   - UI behavior when `PAYMENTS_ENABLED=false`:  
     - Dashboard CTA and Sale Detail CTA render as disabled with “Promotions unavailable” copy and never call checkout.  
-    - Sell wizard confirmation modal disables “Promote now” and shows a friendly message instead of calling checkout.
+    - Sell wizard confirmation modal disables “Promote now” and shows a toast message instead of calling checkout.
 
 ### Batch Status Endpoint (No N+1)
 
 - **Endpoint:** `GET /api/promotions/status?sale_ids=<comma-separated>`  
   - Location: `app/api/promotions/status/route.ts`.  
-  - Requires `sale_ids` query param; missing/empty requests return `400 INVALID_REQUEST`.  
   - Auth required (`supabase.auth.getUser()`); non-authenticated requests return `401 AUTH_REQUIRED`.  
   - Non-admin callers only see promotions where `owner_profile_id === user.id`; admins use `assertAdminOrThrow` to bypass the owner filter.  
   - Input safety:  
-    - `MAX_SALE_IDS = 100` (deduplicated; requests over the cap return `400 INVALID_REQUEST`).  
+    - `MAX_SALE_IDS = 100` (deduplicated and sliced).  
     - `MAX_SALE_IDS_PARAM_LENGTH = 4000` (rejects overly long query strings with `400 INVALID_REQUEST`).  
   - Response shape (minimal, no PII):  
     - `{ statuses: Array<{ sale_id, is_active, ends_at, tier }> }`.  
@@ -953,7 +926,7 @@ Milestone 5A adds **seller-facing “Promote listing” CTAs** wired to the Stri
    - Set `PROMOTIONS_ENABLED=false` and `PAYMENTS_ENABLED=false`.  
    - Verify that:  
      - Dashboard, Sell Wizard, and Sale Detail show **no** promotion CTAs.  
-     - `/api/promotions/status` returns `401 AUTH_REQUIRED` for unauthenticated calls and `200` with `statuses: []` when none of the requested sales have promotions.
+     - `/api/promotions/status` returns `401 AUTH_REQUIRED` for unauthenticated calls and `200` with an empty `statuses` array for authenticated owners.
 
 2. **Enable promotions UI only**  
    - Set `PROMOTIONS_ENABLED=true`, keep `PAYMENTS_ENABLED=false`.  
@@ -975,154 +948,3 @@ Milestone 5A adds **seller-facing “Promote listing” CTAs** wired to the Stri
      - CI tests (including payments-guard + CTA gating + batch-status tests).  
      - Stripe dashboard for checkout/session anomalies.  
      - Application logs for promotion-related errors (without PII).
-
----
-
-## Draft Deduplication System
-
-**Status:** ✅ Implemented
-
-### Overview
-
-The draft deduplication system prevents unnecessary database writes when draft content hasn't changed. This eliminates draft spam, reduces database load, and ensures deterministic behavior for "Continue draft" and autosave operations.
-
-### Implementation
-
-**Content Hash:**
-- **Column:** `sale_drafts.content_hash` (TEXT, indexed)
-- **Computation:** SHA-256 hash of canonicalized draft payload (excludes meta fields like `currentStep`)
-- **Canonicalization:**
-  - Excludes `currentStep` (UI state, not content)
-  - Normalizes empty strings to undefined
-  - Sorts arrays (tags, photos, items) for consistent ordering
-  - Sorts items by name+category for stable comparison
-  - Removes item IDs from hash (temporary IDs don't represent content changes)
-
-**Server-Side Deduplication (Primary Guard):**
-- **Location:** `POST /api/drafts` (`app/api/drafts/route.ts`)
-- **Behavior:**
-  - Computes content hash of incoming payload
-  - Checks existing draft's `content_hash` if draft exists
-  - If hash matches: returns `200 OK` with `{ id, deduped: true }` **without updating database**
-  - If hash differs or no draft exists: proceeds with normal create/update
-- **Security:** RLS intact; deduplication only applies to user's own drafts
-
-**Client-Side Deduplication (Secondary Guard):**
-- **Location:** `SellWizardClient` (`app/sell/new/SellWizardClient.tsx`)
-- **Behavior:**
-  - Tracks `lastSavedContentHashRef` to memoize last saved hash
-  - Autosave effect skips server save if current hash matches last saved hash
-  - Resume flow sets hash immediately to prevent immediate no-op save
-  - Step navigation and beforeunload saves also check hash before sending
-
-**Continue Draft Flow:**
-- **Behavior:**
-  - Sets `isResumingRef` flag during restore to prevent autosave
-  - Computes and stores content hash of restored draft
-  - Clears resume flag after 2s delay to allow state to settle
-  - If restoring local draft to server, allows server-side deduplication to handle it
-
-### What Counts as "Meaningful Change"
-
-**Included in hash (triggers update):**
-- Form data fields (title, description, address, city, state, zip, lat/lng, dates, times, tags, pricing_mode)
-- Photos array (URLs, order)
-- Items array (name, price, description, image_url, category - but NOT item IDs)
-
-**Excluded from hash (does NOT trigger update):**
-- `currentStep` (UI state only)
-- Item IDs (temporary identifiers, not content)
-
-### Expected Behavior
-
-**Continue Draft:**
-- Clicking "Continue draft" repeatedly without editing: **ONE draft** in database (no duplicates)
-- Making one small edit and moving steps: **same draft updates** (no new draft row)
-
-**No-Op Saves:**
-- Saving identical payload twice: **first save creates/updates, second save returns `deduped: true`**
-- `updated_at` timestamp **not changed** on deduped saves
-- No database write occurs for deduped saves
-
-**Change Detection:**
-- Changing any form field, photo, or item: **hash changes, update occurs**
-- Changing only `currentStep`: **hash unchanged, no update**
-- Reordering items: **hash unchanged** (items sorted by name for consistency)
-
-### Database Schema
-
-**Migration:** `125_add_draft_content_hash.sql`
-- Adds `content_hash TEXT` column to `sale_drafts`
-- Creates index: `(user_id, draft_key, content_hash)` WHERE `status = 'active'`
-- Column comment explains purpose and canonicalization rules
-
-### Tests
-
-**Integration Tests:** `tests/integration/drafts.deduplication.test.ts`
-- ✅ Server-side deduplication (skip update when hash matches)
-- ✅ Update when hash differs
-- ✅ Create new draft when no existing draft
-- ✅ `currentStep` changes don't affect hash
-- ✅ Meaningful field changes do affect hash
-- ✅ Item reordering handled consistently
-
-### Performance & Cost Discipline
-
-- **Zero writes** for step navigation without edits
-- **Zero writes** for "Continue draft" without edits
-- **Reduced DB load** in common path (autosave, step transitions)
-- **Single read + conditional update** pattern (no extra round-trips)
-
-### Security
-
-- **RLS intact:** Deduplication only applies to user's own drafts
-- **No service-role bypass:** Uses existing RLS client for reads, admin client for writes (same pattern as before)
-- **No new tables:** Single column addition to existing `sale_drafts` table
-
----
-
-## Favorites Visibility
-
-**Status:** ✅ Implemented
-
-### Overview
-
-Favorites now reuse the same visibility rules as the main sales feed so that archived, ended, and admin-hidden sales never appear in the favorites list.
-
-### Implementation
-
-- **Shared helpers:** `lib/shared/salesVisibility.ts`
-  - `getAnyFutureWindow` computes the "any time in the future" window (today at 00:00 UTC, no upper bound).
-  - `isSaleWithinDateWindow` mirrors `/api/sales` date-window semantics.
-  - `isSalePubliclyVisible` applies status, archived, moderation, and date-window checks.
-- **API:** `GET /api/favorites` (`app/api/favorites/route.ts`)
-  - Reads from `favorites_v2` joined with `sales_v2` via `select('sale_id, sales_v2(*)')`.
-  - Applies `isSalePubliclyVisible` with `getAnyFutureWindow()` to filter out:
-    - Archived sales (`archived_at` set).
-    - Admin-hidden sales (`moderation_status = 'hidden_by_admin'`).
-    - Fully-ended sales (end date/time strictly before today’s window).
-  - Returns a normalized payload: `{ ok: true, sales, count }`.
-- **Client hook:** `useFavorites` (`lib/hooks/useAuth.ts`)
-  - Calls `/api/favorites` and returns the `sales` array directly.
-  - No client-side reimplementation of visibility rules; the server is the single source of truth.
-
-### Behavior
-
-- Favorites page (`/favorites`) now:
-  - Only shows sales that would also appear in the main sales feed.
-  - Uses the same filtered array for:
-    - The count label (`X saved sales`).
-    - The rendered list (`<SalesList sales={favorites} />`).
-- Known repro (favorite created for a sale that ended on 11/23) is resolved:
-  - The ended sale is filtered out by `isSalePubliclyVisible`.
-  - The saved count reflects only currently visible favorites.
-
-### Tests
-
-- `tests/integration/api/favorites.visibility.test.ts`
-  - Seeds favorites joined to two sales:
-    - One fully in the past (ended).
-    - One active in the far future.
-  - Asserts that `GET /api/favorites`:
-    - Returns only the future/active sale in `sales`.
-    - Reports `count === 1` (matches visible list).

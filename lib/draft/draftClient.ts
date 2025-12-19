@@ -58,17 +58,6 @@ export async function saveDraftServer(
     }
 
     const result = await response.json()
-    
-    // Dispatch event to notify dashboard to refresh drafts
-    if (result.ok && typeof window !== 'undefined') {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[DRAFT_CLIENT] Dispatching drafts:mutated event for draftKey:', draftKey)
-      }
-      window.dispatchEvent(new CustomEvent('drafts:mutated', { 
-        detail: { type: 'update', draftKey } 
-      }))
-    }
-    
     return result
   } catch (error) {
     console.error('[DRAFT_CLIENT] Error saving draft:', error)
@@ -83,7 +72,7 @@ export async function saveDraftServer(
 /**
  * Get latest draft from server (for authenticated users)
  */
-export async function getLatestDraftServer(): Promise<ApiResponse<{ id: string; draft_key: string; payload: SaleDraftPayload } | null>> {
+export async function getLatestDraftServer(): Promise<ApiResponse<{ id: string; payload: SaleDraftPayload } | null>> {
   try {
     const response = await fetch('/api/drafts', {
       method: 'GET',
@@ -132,13 +121,8 @@ export async function deleteDraftServer(draftKey: string): Promise<ApiResponse<{
 
 /**
  * Publish draft (transactional: create sale + items, mark draft as published)
- * If wantsPromotion is true, creates checkout session and returns checkoutUrl (sale created by webhook)
- * If wantsPromotion is false, creates sale immediately and returns saleId
  */
-export async function publishDraftServer(
-  draftKey: string, 
-  wantsPromotion?: boolean
-): Promise<ApiResponse<{ saleId?: string; checkoutUrl?: string; sessionId?: string; promotionId?: string }>> {
+export async function publishDraftServer(draftKey: string): Promise<ApiResponse<{ saleId: string }>> {
   try {
     const response = await fetch('/api/drafts/publish', {
       method: 'POST',
@@ -146,7 +130,7 @@ export async function publishDraftServer(
         'Content-Type': 'application/json',
         ...getCsrfHeaders(),
       },
-      body: JSON.stringify({ draftKey, wantsPromotion: wantsPromotion || false }),
+      body: JSON.stringify({ draftKey }),
     })
 
     if (!response.ok) {

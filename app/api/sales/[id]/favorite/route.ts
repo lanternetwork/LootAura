@@ -35,84 +35,71 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const saleId = resolvedParams.id
 
   if (!saleId) {
-    return fail(400, 'INVALID_REQUEST', 'Sale ID is required')
+    return NextResponse.json({ error: 'Sale ID is required' }, { status: 400 })
   }
 
-  // Use the same authenticated client, scoped to lootaura_v2 schema for base table access
-  // This ensures we use the same auth session
-  const db = supabase.schema('lootaura_v2')
+  // Toggle favorite in base table through public view
+  // First check if exists
+  const { data: existing, error: checkError } = await supabase
+    .from('favorites_v2')
+    .select('sale_id')
+    .eq('user_id', user.id)
+    .eq('sale_id', saleId)
+    .maybeSingle()
 
-  // Toggle favorite: Try to insert first, if duplicate then delete
-  // Write directly to base table since views don't support INSERT/DELETE without INSTEAD OF triggers
-  const { data: _insertedFavorite, error: insertError } = await db
-    .from('favorites')
-    .insert({ user_id: user.id, sale_id: saleId })
-    .select()
-    .single()
-
-  if (insertError) {
-    // Log full error details for debugging
-    const errorCode = (insertError as any)?.code
-    const errorMessage = insertError instanceof Error ? insertError.message : (insertError as any)?.message || String(insertError)
-    const errorDetails = (insertError as any)?.details || (insertError as any)?.hint || ''
-    const fullError = JSON.stringify(insertError, null, 2)
-    
-    logger.error('Error inserting favorite - full details', insertError instanceof Error ? insertError : new Error(String(insertError)), {
+  if (checkError) {
+    logger.error('Error checking existing favorite', checkError instanceof Error ? checkError : new Error(String(checkError)), {
       component: 'sales/favorite',
-      operation: 'add_favorite',
+      operation: 'check_favorite',
       userId: user.id,
       saleId,
-      errorCode,
-      errorMessage,
-      errorDetails,
-      fullError,
     })
-    
-    // If it's a duplicate key error, the favorite exists - delete it (toggle off)
-    if (errorCode === '23505' || errorMessage?.includes('duplicate') || errorMessage?.includes('unique')) {
-      // Delete the existing favorite
-      const { error: deleteError } = await db
-        .from('favorites')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('sale_id', saleId)
+    return fail(400, 'FAVORITE_CHECK_FAILED', 'Failed to check favorite status')
+  }
 
-      if (deleteError) {
-        const deleteErrorMessage = deleteError instanceof Error ? deleteError.message : (deleteError as any)?.message || String(deleteError)
-        logger.error('Error deleting favorite after duplicate insert', deleteError instanceof Error ? deleteError : new Error(String(deleteError)), {
-          component: 'sales/favorite',
-          operation: 'delete_favorite',
-          userId: user.id,
-          saleId,
-          errorCode: (deleteError as any)?.code,
-          errorMessage: deleteErrorMessage,
-        })
-        return fail(400, 'FAVORITE_DELETE_FAILED', deleteErrorMessage || 'Failed to remove favorite')
-      }
+  if (existing) {
+    // Delete the specific favorite - ensure we only delete this one
+    const { error: deleteError } = await supabase
+      .from('favorites_v2')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('sale_id', saleId)
 
-      logger.info('Favorite removed (toggled off)', {
+    if (deleteError) {
+      logger.error('Error deleting favorite', deleteError instanceof Error ? deleteError : new Error(String(deleteError)), {
         component: 'sales/favorite',
         operation: 'delete_favorite',
         userId: user.id,
         saleId,
       })
-
-      return ok({ favorited: false })
+      return fail(400, 'FAVORITE_DELETE_FAILED', 'Failed to remove favorite')
     }
-    
-    // Otherwise, log and return error
-    logger.error('Error inserting favorite', insertError instanceof Error ? insertError : new Error(String(insertError)), {
+
+    logger.info('Favorite removed', {
+      component: 'sales/favorite',
+      operation: 'delete_favorite',
+      userId: user.id,
+      saleId,
+    })
+
+    return ok({ favorited: false })
+  }
+
+  // Insert with upsert to avoid duplicate conflicts if called twice rapidly
+  const { error: upsertError } = await supabase
+    .from('favorites_v2')
+    .upsert({ user_id: user.id, sale_id: saleId }, { onConflict: 'user_id,sale_id', ignoreDuplicates: true })
+
+  if (upsertError) {
+    logger.error('Error upserting favorite', upsertError instanceof Error ? upsertError : new Error(String(upsertError)), {
       component: 'sales/favorite',
       operation: 'add_favorite',
       userId: user.id,
       saleId,
-      errorCode,
-      errorMessage,
     })
-    return fail(400, 'FAVORITE_ADD_FAILED', errorMessage || 'Failed to add favorite')
+    return fail(400, 'FAVORITE_ADD_FAILED', 'Failed to add favorite')
   }
 
-  // Insert succeeded - favorite was added
   logger.info('Favorite added', {
     component: 'sales/favorite',
     operation: 'add_favorite',

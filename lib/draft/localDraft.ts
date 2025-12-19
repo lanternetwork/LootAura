@@ -47,20 +47,6 @@ export function getDraftKey(): string {
 }
 
 /**
- * Set draft key in localStorage (used when resuming a server draft)
- * This ensures all subsequent saves use the same draft_key as the resumed draft
- */
-export function setDraftKey(draftKey: string): void {
-  if (typeof window === 'undefined') return
-  
-  try {
-    localStorage.setItem(DRAFT_KEY_STORAGE_KEY, draftKey)
-  } catch (error) {
-    console.error('[LOCAL_DRAFT] Error setting draft key:', error)
-  }
-}
-
-/**
  * Save draft to localStorage
  */
 export function saveLocalDraft(payload: SaleDraftPayload): void {

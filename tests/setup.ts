@@ -64,12 +64,7 @@ vi.mock('next/navigation', () => ({
     refresh: vi.fn(),
     prefetch: vi.fn(),
   }),
-  useSearchParams: (() => {
-    // Must be stable across renders; returning a new URLSearchParams each render can
-    // trigger infinite useEffect loops in components that include searchParams in deps.
-    const stableSearchParams = new URLSearchParams()
-    return () => stableSearchParams
-  })(),
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/',
   useParams: () => ({}),
   notFound: vi.fn(),
@@ -117,14 +112,6 @@ vi.mock('@/lib/supabase/client', () => ({
       signInWithPassword: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
-      onAuthStateChange: vi.fn(() => ({
-        data: {
-          subscription: {
-            unsubscribe: vi.fn(),
-          },
-        },
-        error: null,
-      })),
     },
     from: vi.fn(() => {
       const chain: any = {}

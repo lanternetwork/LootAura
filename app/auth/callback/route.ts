@@ -103,43 +103,12 @@ export async function GET(req: Request) {
         // Don't fail the auth flow if profile creation fails
       }
       
-      // Check if user needs onboarding (home_zip is NULL)
-      let finalRedirectTo = redirectTo
-      
+      // Success: user session cookies are automatically set by auth-helpers
       // Prevent redirect loops: never redirect to auth pages
+      let finalRedirectTo = redirectTo
       if (finalRedirectTo.startsWith('/auth/') || finalRedirectTo.startsWith('/login') || finalRedirectTo.startsWith('/signin')) {
         console.warn('[AUTH_CALLBACK] Preventing redirect loop - redirectTo is an auth page, using default:', redirectTo)
         finalRedirectTo = '/sales'
-      }
-      
-      // Check onboarding requirement
-      try {
-        const profileResponse = await fetch(new URL('/api/profile', url.origin), {
-          method: 'GET',
-          headers: {
-            'Cookie': req.headers.get('cookie') || '',
-          },
-        })
-        
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json()
-          const homeZip = profileData.data?.home_zip
-          
-          // If user doesn't have home_zip, redirect to onboarding
-          if (!homeZip) {
-            const onboardingUrl = new URL('/onboarding/location', url.origin)
-            // Preserve original redirectTo if it's not an auth/onboarding page
-            if (!finalRedirectTo.startsWith('/onboarding/') && !finalRedirectTo.startsWith('/auth/')) {
-              onboardingUrl.searchParams.set('redirectTo', finalRedirectTo)
-            }
-            console.log('[AUTH_CALLBACK] User needs onboarding, redirecting to:', onboardingUrl.toString())
-            return NextResponse.redirect(onboardingUrl)
-          }
-        }
-      } catch (onboardingCheckError) {
-        // If onboarding check fails, continue with normal redirect
-        // Don't block auth flow if profile check fails
-        console.log('[AUTH_CALLBACK] Onboarding check failed, continuing with normal redirect:', onboardingCheckError)
       }
       
       // Build redirect URL and ensure it doesn't contain the code parameter

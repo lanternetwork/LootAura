@@ -25,8 +25,6 @@ import {
   MAP_BUFFER_FACTOR,
   MAP_BUFFER_SAFETY_FACTOR
 } from '@/lib/map/bounds'
-import MapViewportStore from '@/lib/map/MapViewportStore'
-import { resolveInitialLocation } from '@/lib/location/LocationArbiter'
 
 // Simplified map-as-source types
 interface MapViewState {
@@ -65,6 +63,8 @@ export default function SalesClient({
 
   // Check if ZIP in URL needs client-side resolution
   const urlZip = searchParams.get('zip')
+  const zipNeedsResolution = urlZip && !urlLat && !urlLng && 
+    (!initialCenter || !initialCenter.label?.zip || initialCenter.label.zip !== urlZip.trim())
   
   // Distance to zoom level mapping (miles to zoom level)
   // Zoom levels approximate: 8=~100mi, 9=~50mi, 10=~25mi, 11=~12mi, 12=~6mi, 13=~3mi, 14=~1.5mi, 15=~0.75mi
@@ -80,96 +80,38 @@ export default function SalesClient({
     return 8 // Default for 100+ miles
   }
 
-  // Map view state - initialized from MapViewportStore or LocationArbiter
-  // MapViewportStore owns the viewport after initialization
+  // Map view state - single source of truth
+  // If ZIP needs resolution, wait before initializing map view to avoid showing wrong location
+  // Otherwise, use effectiveCenter which should have been resolved server-side
   const [mapView, setMapView] = useState<MapViewState | null>(() => {
-    // Check if we have a stored viewport (from previous navigation)
-    const storedViewport = MapViewportStore.getViewport()
-    if (storedViewport) {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[SALES] Restoring viewport from MapViewportStore:', storedViewport)
-      }
-      return storedViewport
+    if (zipNeedsResolution) {
+      // ZIP needs client-side resolution - don't show map yet
+      return null
     }
-
-    // No stored viewport - will be initialized by useEffect below
-    // Return null to indicate we need to resolve initial location
-    return null
+    
+    // Calculate initial zoom from default distance filter (10 miles = zoom 12)
+    // Or use URL zoom if provided, or fallback to 12
+    const defaultDistance = 10 // matches DEFAULT_FILTERS.distance in useFilters
+    const calculatedZoom = urlZoom ? parseFloat(urlZoom) : distanceToZoom(defaultDistance)
+    
+    // Calculate bounds based on zoom level (approximate)
+    // For zoom 12 (10 miles), use approximately 0.11 degree range (roughly 10 miles at mid-latitudes)
+    const zoomLevel = calculatedZoom
+    const latRange = zoomLevel === 12 ? 0.11 : zoomLevel === 10 ? 0.45 : zoomLevel === 11 ? 0.22 : 1.0
+    const lngRange = latRange * (effectiveCenter?.lat ? Math.cos(effectiveCenter.lat * Math.PI / 180) : 1)
+    
+    // ZIP already resolved server-side or no ZIP - show map with correct location
+    return {
+      center: effectiveCenter || { lat: 39.8283, lng: -98.5795 },
+      bounds: { 
+        west: (effectiveCenter?.lng || -98.5795) - lngRange / 2, 
+        south: (effectiveCenter?.lat || 39.8283) - latRange / 2, 
+        east: (effectiveCenter?.lng || -98.5795) + lngRange / 2, 
+        north: (effectiveCenter?.lat || 39.8283) + latRange / 2
+      },
+      zoom: calculatedZoom
+    }
   })
-
-  // Track if we've initialized the viewport (prevents re-initialization)
-  const hasInitializedViewportRef = useRef(false)
-
-  // Initialize viewport on mount (only if not already set from store)
-  useEffect(() => {
-    if (hasInitializedViewportRef.current || mapView !== null) {
-      return // Already initialized or has viewport
-    }
-
-    // Mark as initializing to prevent race conditions
-    hasInitializedViewportRef.current = true
-
-    // Resolve initial location using LocationArbiter
-    const initializeViewport = async () => {
-      try {
-        const initialLocation = await resolveInitialLocation({
-          urlParams: {
-            lat: urlLat || null,
-            lng: urlLng || null,
-            zoom: urlZoom || null,
-            zip: urlZip || null
-          },
-          serverInitialCenter: initialCenter,
-          userHomeZip: undefined, // Will be resolved by server if available
-          defaultZoom: distanceToZoom(10) // 10 miles = zoom 12
-        })
-
-        // Calculate bounds based on zoom level
-        const zoomLevel = initialLocation.zoom
-        const latRange = zoomLevel === 12 ? 0.11 : zoomLevel === 10 ? 0.45 : zoomLevel === 11 ? 0.22 : 1.0
-        const lngRange = latRange * Math.cos(initialLocation.lat * Math.PI / 180)
-
-        const newViewport: MapViewState = {
-          center: { lat: initialLocation.lat, lng: initialLocation.lng },
-          bounds: {
-            west: initialLocation.lng - lngRange / 2,
-            south: initialLocation.lat - latRange / 2,
-            east: initialLocation.lng + lngRange / 2,
-            north: initialLocation.lat + latRange / 2
-          },
-          zoom: initialLocation.zoom
-        }
-
-        // Set viewport state
-        setMapView(newViewport)
-
-        // Save to store
-        MapViewportStore.setViewport(newViewport)
-
-        if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-          console.log('[SALES] Initialized viewport from LocationArbiter:', newViewport)
-        }
-      } catch (error) {
-        console.error('[SALES] Failed to initialize viewport:', error)
-        // Fallback to default
-        const fallbackViewport: MapViewState = {
-          center: { lat: 39.8283, lng: -98.5795 },
-          bounds: {
-            west: -98.5795 - 1.0,
-            south: 39.8283 - 1.0,
-            east: -98.5795 + 1.0,
-            north: 39.8283 + 1.0
-          },
-          zoom: 12
-        }
-        setMapView(fallbackViewport)
-        MapViewportStore.setViewport(fallbackViewport)
-      }
-    }
-
-    initializeViewport()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Only run once on mount - urlLat, urlLng, etc. are stable
 
   // Sales data state - map is source of truth
   // fetchedSales: All sales for the buffered area (larger than viewport)
@@ -559,15 +501,29 @@ export default function SalesClient({
     // Update map view state immediately for live rendering
     // This triggers viewportBounds and visibleSales recomputation via useMemo
     // Do NOT clear selection here - it causes blocking during drag
-    const newViewport: MapViewState = {
-      center,
-      zoom,
-      bounds
-    }
-    
-    setMapView(newViewport)
-    // Update store on every move (live updates)
-    MapViewportStore.setViewport(newViewport)
+    setMapView(prev => {
+      if (!prev) {
+        const radiusKm = 16.09 // 10 miles
+        const latRange = radiusKm / 111.0
+        const lngRange = radiusKm / (111.0 * Math.cos(center.lat * Math.PI / 180))
+        return {
+          center,
+          bounds: {
+            west: center.lng - lngRange,
+            south: center.lat - latRange,
+            east: center.lng + lngRange,
+            north: center.lat + latRange
+          },
+          zoom
+        }
+      }
+      return {
+        ...prev,
+        center,
+        zoom,
+        bounds
+      }
+    })
   }, [])
 
   // Handle viewport changes from SimpleMap (onMoveEnd) - includes fetch decision logic
@@ -599,21 +555,21 @@ export default function SalesClient({
     // This ensures that when pendingBounds is cleared, the map already has the correct zoom
     // This prevents the zoom-out flash that happens when pendingBounds clears
     if (pendingBounds) {
-      const updatedViewport: MapViewState = mapView ? {
-        ...mapView,
-        center,
-        zoom, // Update zoom to match what fitBounds calculated
-        bounds
-      } : {
-        center,
-        bounds,
-        zoom
-      }
-      
-      setMapView(updatedViewport)
-      // Update store even during fitBounds (viewport is still changing)
-      MapViewportStore.setViewport(updatedViewport)
-      
+      setMapView(prev => {
+        if (!prev) {
+          return {
+            center,
+            bounds,
+            zoom
+          }
+        }
+        return {
+          ...prev,
+          center,
+          zoom, // Update zoom to match what fitBounds calculated
+          bounds
+        }
+      })
       // Don't proceed with fetch logic while fitBounds is active
       return
     }
@@ -644,15 +600,30 @@ export default function SalesClient({
     }
 
     // Update map view state
-    const newViewport: MapViewState = {
-      center,
-      zoom,
-      bounds
-    }
-    
-    setMapView(newViewport)
-    // Update store on viewport change (after drag ends, pin click, etc.)
-    MapViewportStore.setViewport(newViewport)
+    setMapView(prev => {
+      if (!prev) {
+        // If mapView is null, create a new view with the provided center
+        const radiusKm = 16.09 // 10 miles
+        const latRange = radiusKm / 111.0
+        const lngRange = radiusKm / (111.0 * Math.cos(center.lat * Math.PI / 180))
+        return {
+          center,
+          bounds: {
+            west: center.lng - lngRange,
+            south: center.lat - latRange,
+            east: center.lng + lngRange,
+            north: center.lat + latRange
+          },
+          zoom
+        }
+      }
+      return {
+        ...prev,
+        center,
+        zoom,
+        bounds
+      }
+    })
 
     // Buffer-based fetch logic: only fetch when viewport exits buffered area
     // Clear existing timer
@@ -745,9 +716,6 @@ export default function SalesClient({
           console.log('[ZIP] New map view:', newView, 'calculatedBounds:', calculatedBounds)
         }
         
-        // Update store
-        MapViewportStore.setViewport(newView)
-        
         // Use fitBounds to ensure exactly 10-mile radius is visible
         // Set bounds immediately - map will apply when loaded
         setPendingBounds(calculatedBounds)
@@ -773,9 +741,6 @@ export default function SalesClient({
       if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
         console.log('[ZIP] Updated map view:', newView, 'calculatedBounds:', calculatedBounds)
       }
-      
-      // Update store
-      MapViewportStore.setViewport(newView)
       
       // Use fitBounds to ensure exactly 10-mile radius is visible
       // Set bounds - map will apply when ready
@@ -873,19 +838,20 @@ export default function SalesClient({
         }
         
         // Update map view with new bounds and zoom
-        const updatedViewport: MapViewState = mapView ? {
-          ...mapView,
-          bounds: newBounds,
-          zoom: newZoom
-        } : {
-          center: { lat: 39.8283, lng: -98.5795 },
-          bounds: newBounds,
-          zoom: newZoom
-        }
-        
-        setMapView(updatedViewport)
-        // Update store
-        MapViewportStore.setViewport(updatedViewport)
+        setMapView(prev => {
+          if (!prev) {
+            return {
+              center: { lat: 39.8283, lng: -98.5795 },
+              bounds: newBounds,
+              zoom: newZoom
+            }
+          }
+          return {
+            ...prev,
+            bounds: newBounds,
+            zoom: newZoom
+          }
+        })
         
         // Use fitBounds to smoothly update the view to show the new distance
         // This prevents the zoom in/out flicker

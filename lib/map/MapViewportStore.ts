@@ -98,12 +98,9 @@ class MapViewportStore {
         // Reason: Map viewport coordinates are display state, not user location data.
         // They are ephemeral (sessionStorage), visible in URLs, and standard for map UX.
         
-        // CodeQL suppression: js/clear-text-storage-sensitive-data
-        // This is user-controlled map viewport UI state (lat/lng coordinates).
-        // Stored in sessionStorage only (ephemeral, cleared on browser close).
-        // Not authentication, payment, or identity data.
-        // Required for map UX persistence across navigation within the same session.
         const serialized = serializeDisplayViewport(viewport)
+        // lgtm[js/clear-text-storage-of-sensitive-information]
+        // Map viewport coordinates are UI state (not user location), stored in sessionStorage only, required for UX persistence.
         sessionStorage.setItem(STORAGE_KEY, serialized)
       } catch (error) {
         // sessionStorage may be unavailable (private browsing, quota exceeded)

@@ -88,14 +88,6 @@ export default function UnifiedLocationButton({
       }
 
       const DEFAULT_ZOOM = 12
-      const latRange = 0.11
-      const lngRange = latRange * Math.cos(freshLocation.lat * Math.PI / 180)
-      const newBounds = {
-        west: freshLocation.lng - lngRange / 2,
-        south: freshLocation.lat - latRange / 2,
-        east: freshLocation.lng + lngRange / 2,
-        north: freshLocation.lat + latRange / 2
-      }
 
       const currentCenter = map.getCenter()
       const currentLat = currentCenter.lat

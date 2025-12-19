@@ -4,7 +4,8 @@ name: "CodeQL Configuration"
 # These are map display state values (lat/lng), stored in sessionStorage,
 # and are already visible in URL parameters. This is standard practice for map applications.
 queries:
-  - exclude:
+  - uses: security-and-quality
+    exclude:
       id: js/clear-text-storage-sensitive-data
       path: lib/map/MapViewportStore.ts
 

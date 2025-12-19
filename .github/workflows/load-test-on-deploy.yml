@@ -4,6 +4,10 @@ on:
   deployment_status:
     types: [created, success]
 
+permissions:
+  contents: read
+  deployments: read
+
 jobs:
   determine-url:
     # deployment_status events don't always carry github.ref, so gate purely on deployment state.

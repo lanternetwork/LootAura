@@ -111,6 +111,7 @@ export default function MobileSalesShell({
   const [showPermissionDenied, setShowPermissionDenied] = useState(false)
   const [isRequestingLocation, setIsRequestingLocation] = useState(false)
   const [shouldAutoCenter, setShouldAutoCenter] = useState(false)
+  const [permissionExplicitlyDenied, setPermissionExplicitlyDenied] = useState(false)
   
   // Sync mode to URL params
   useEffect(() => {
@@ -314,7 +315,7 @@ export default function MobileSalesShell({
       // Handle permission denied or other errors
       if (error.code === 1) {
         permissionError = 'Location access is disabled. You can re-enable it by refreshing the page or signing back in.'
-        setShowPermissionDenied(true)
+        setPermissionExplicitlyDenied(true)
       } else {
         permissionError = 'Unable to get your location. Please try again.'
       }
@@ -370,6 +371,12 @@ export default function MobileSalesShell({
   const handleLocationButtonClick = useCallback(async () => {
     // Case 1: Permission not granted - request permission
     if (!permissionGranted) {
+      // If permission was previously denied, show message on click
+      if (permissionExplicitlyDenied) {
+        setShowPermissionDenied(true)
+        return
+      }
+      
       setIsRequestingLocation(true)
       clearError()
       setShowPermissionDenied(false)
@@ -380,19 +387,24 @@ export default function MobileSalesShell({
         const granted = await requestPermission()
         
         if (!granted) {
-          // Permission denied - show inline message
+          // Permission denied - mark as explicitly denied and show message
+          setPermissionExplicitlyDenied(true)
           setShowPermissionDenied(true)
           setIsRequestingLocation(false)
           setShouldAutoCenter(false)
           return
         }
         
-        // Permission granted - wait for location to be fetched
+        // Permission granted - clear denied state
+        setPermissionExplicitlyDenied(false)
+        
+        // Wait for location to be fetched
         // The useLocation hook will update userGpsLocation automatically
         // We'll center the map once we have the location (handled in useEffect below)
         setIsRequestingLocation(false)
       } catch (error) {
         console.error('[MOBILE] Error requesting location permission:', error)
+        setPermissionExplicitlyDenied(true)
         setShowPermissionDenied(true)
         setIsRequestingLocation(false)
         setShouldAutoCenter(false)
@@ -401,8 +413,9 @@ export default function MobileSalesShell({
     }
     
     // Case 2: Permission granted - recenter map (use existing handleRecenter logic)
+    setPermissionExplicitlyDenied(false) // Clear denied state if permission is granted
     await handleRecenter()
-  }, [permissionGranted, requestPermission, clearError, handleRecenter])
+  }, [permissionGranted, permissionExplicitlyDenied, requestPermission, clearError, handleRecenter])
   
   // Center map on user GPS location when it becomes available (only if shouldAutoCenter is true)
   useEffect(() => {
@@ -613,12 +626,19 @@ export default function MobileSalesShell({
                     handleLocationButtonClick()
                   }}
                   disabled={isRequestingLocation || gpsLoading}
-                  className="lg:hidden absolute bottom-[152px] right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`lg:hidden absolute bottom-[152px] right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${permissionExplicitlyDenied ? 'opacity-60' : ''}`}
                   aria-label={permissionGranted ? "Recenter map to your location" : "Use my location"}
                 >
                   {isRequestingLocation || gpsLoading ? (
                     <svg className="w-6 h-6 text-gray-700 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  ) : permissionExplicitlyDenied ? (
+                    // Muted/crossed-out location icon for denied state
+                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6" stroke="currentColor" opacity="0.6" />
                     </svg>
                   ) : (
                     <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">

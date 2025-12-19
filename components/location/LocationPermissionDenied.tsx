@@ -10,7 +10,7 @@ interface LocationPermissionDeniedProps {
  */
 export default function LocationPermissionDenied({ onDismiss }: LocationPermissionDeniedProps) {
   return (
-    <div className="lg:hidden absolute top-20 left-1/2 transform -translate-x-1/2 pointer-events-auto bg-white shadow-lg rounded-lg p-4 max-w-[320px] z-[110] border border-gray-200">
+    <div className="lg:hidden absolute bottom-24 left-1/2 transform -translate-x-1/2 pointer-events-auto bg-white shadow-lg rounded-lg p-4 max-w-[320px] z-[110] border border-gray-200">
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-0.5">
           <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

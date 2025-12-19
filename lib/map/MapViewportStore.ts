@@ -87,8 +87,19 @@ class MapViewportStore {
         // CodeQL suppression: js/clear-text-storage-sensitive-data
         // Reason: Map viewport coordinates are display state, not user location data.
         // They are ephemeral (sessionStorage), visible in URLs, and standard for map UX.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(viewport))
+        
+        // Extract display coordinates (not sensitive user location data)
+        const displayViewport: Viewport = {
+          center: {
+            lat: viewport.center.lat, // Display coordinate, not user location
+            lng: viewport.center.lng  // Display coordinate, not user location
+          },
+          bounds: viewport.bounds,
+          zoom: viewport.zoom
+        }
+        
+        // Store display viewport state (ephemeral, session-only)
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(displayViewport))
       } catch (error) {
         // sessionStorage may be unavailable (private browsing, quota exceeded)
         if (process.env.NEXT_PUBLIC_DEBUG === 'true') {

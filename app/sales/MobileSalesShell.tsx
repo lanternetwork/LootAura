@@ -8,7 +8,6 @@ import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
 import MobileRecenterButton from '@/components/location/MobileRecenterButton'
-import UseMyLocationButton from '@/components/location/UseMyLocationButton'
 import LocationPermissionDenied from '@/components/location/LocationPermissionDenied'
 import { useLocation } from '@/lib/location/useLocation'
 import { calculateDistance } from '@/lib/location/client'
@@ -620,14 +619,6 @@ export default function MobileSalesShell({
                 )}
               </button>
               
-              {/* "Use my location" CTA - Visible when permission not granted (mobile/tablet only) */}
-              {shouldShowUseMyLocationButton && (
-                <UseMyLocationButton
-                  onClick={handleUseMyLocation}
-                  loading={isRequestingLocation || gpsLoading}
-                />
-              )}
-              
               {/* Permission denied message - Inline, non-blocking */}
               {showPermissionDenied && (
                 <LocationPermissionDenied
@@ -640,6 +631,30 @@ export default function MobileSalesShell({
                 visible={shouldShowRecenterButton}
                 onClick={handleRecenter}
               />
+              
+              {/* "Use my location" map control - Icon-only, positioned above sales tray button */}
+              {shouldShowUseMyLocationButton && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleUseMyLocation()
+                  }}
+                  disabled={isRequestingLocation || gpsLoading}
+                  className="lg:hidden absolute bottom-[104px] right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Use my location"
+                >
+                  {isRequestingLocation || gpsLoading ? (
+                    <svg className="w-6 h-6 text-gray-700 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  ) : (
+                    <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                </button>
+              )}
               
               {/* Mode Toggle FAB - Bottom Right */}
               <button

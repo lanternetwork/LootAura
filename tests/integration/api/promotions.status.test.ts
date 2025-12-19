@@ -166,8 +166,8 @@ describe('GET /api/promotions/status', () => {
 
     // The handler should reject requests with more than 100 unique IDs
     expect(res.status).toBe(400)
-    expect(json.error).toBe('INVALID_REQUEST')
-    expect(json.message).toBe('Too many sale IDs')
+    expect(json.code).toBe('INVALID_REQUEST')
+    expect(json.error).toBe('Too many sale IDs')
   })
 
   it('returns minimal response shape', async () => {

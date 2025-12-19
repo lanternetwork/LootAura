@@ -3,10 +3,6 @@ name: "CodeQL Configuration"
 # Suppress false positive: Map viewport coordinates are not sensitive data
 # These are map display state values (lat/lng), stored in sessionStorage,
 # and are already visible in URL parameters. This is standard practice for map applications.
-paths-ignore:
-  - "lib/map/MapViewportStore.ts"
-
-# Query-specific suppressions
 queries:
   - exclude:
       id: js/clear-text-storage-sensitive-data

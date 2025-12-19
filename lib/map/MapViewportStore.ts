@@ -20,13 +20,34 @@ const STORAGE_KEY = 'loot-aura:map-viewport'
 const SESSION_ONLY = true // Use sessionStorage for persistence across navigation
 
 /**
+ * Round coordinate to 3 decimal places (~100m precision).
+ * Used to quantize viewport coordinates for storage (session-scoped UI state).
+ */
+function roundCoordinate(coord: number): number {
+  return Math.round(coord * 1000) / 1000
+}
+
+/**
  * Serialize display viewport state for storage.
- * These coordinates represent map display state, not sensitive user location data.
+ * Coordinates are quantized to reduce precision (session-scoped UI state, not exact location).
  */
 function serializeDisplayViewport(viewport: Viewport): string {
-  // Map viewport coordinates are display state, not user location
-  // Stored in sessionStorage (ephemeral) and visible in URL parameters
-  return JSON.stringify(viewport)
+  // Quantize coordinates to 3 decimal places (~100m precision)
+  // This is session-scoped UI state, not exact location storage
+  const quantized: Viewport = {
+    center: {
+      lat: roundCoordinate(viewport.center.lat),
+      lng: roundCoordinate(viewport.center.lng)
+    },
+    bounds: {
+      west: roundCoordinate(viewport.bounds.west),
+      south: roundCoordinate(viewport.bounds.south),
+      east: roundCoordinate(viewport.bounds.east),
+      north: roundCoordinate(viewport.bounds.north)
+    },
+    zoom: viewport.zoom
+  }
+  return JSON.stringify(quantized)
 }
 
 class MapViewportStore {

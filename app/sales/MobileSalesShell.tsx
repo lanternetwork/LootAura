@@ -613,7 +613,7 @@ export default function MobileSalesShell({
                     handleLocationButtonClick()
                   }}
                   disabled={isRequestingLocation || gpsLoading}
-                  className="lg:hidden absolute bottom-[168px] right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="lg:hidden absolute bottom-[160px] right-4 pointer-events-auto bg-white hover:bg-gray-50 shadow-lg rounded-full p-3 min-w-[48px] min-h-[48px] flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label={permissionGranted ? "Recenter map to your location" : "Use my location"}
                 >
                   {isRequestingLocation || gpsLoading ? (

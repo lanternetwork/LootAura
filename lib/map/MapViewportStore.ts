@@ -111,17 +111,8 @@ class MapViewportStore {
     // Persist to sessionStorage
     if (typeof window !== 'undefined' && SESSION_ONLY) {
       try {
-        // Map viewport coordinates (lat/lng) are not sensitive data - these are map display state values,
-        // stored in sessionStorage (cleared on browser close), and are already visible in URL parameters.
-        // This is standard practice for map applications.
-        // 
-        // CodeQL suppression: js/clear-text-storage-sensitive-data
-        // Reason: Map viewport coordinates are display state, not user location data.
-        // They are ephemeral (sessionStorage), visible in URLs, and standard for map UX.
-        
+        // Quantize and store viewport (coordinates rounded to 3 decimal places for storage)
         const serialized = serializeDisplayViewport(viewport)
-        // lgtm[js/clear-text-storage-of-sensitive-information]
-        // Map viewport coordinates are UI state (not user location), stored in sessionStorage only, required for UX persistence.
         sessionStorage.setItem(STORAGE_KEY, serialized)
       } catch (error) {
         // sessionStorage may be unavailable (private browsing, quota exceeded)

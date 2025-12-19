@@ -456,41 +456,6 @@ export default function MobileSalesShell({
       map.once('moveend', handleMoveEnd)
     }
   }, [shouldAutoCenter, userGpsLocation, mapView, onViewportChange])
-    
-    // Use longer duration for longer distances (max 3 seconds for very long distances)
-    const duration = Math.min(3000, Math.max(1000, distance * 50))
-
-    // Listen for moveend event to know when flyTo animation completes
-    // Use once() to automatically remove listener after it fires
-    const handleMoveEnd = () => {
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.log('[MOBILE_RECENTER] Animation completed, updating viewport state')
-      }
-      
-      // Update viewport state after animation completes
-      // This ensures SimpleMap's easeTo doesn't interfere with the flyTo animation
-      const newViewport = {
-        center: freshLocation!,
-        zoom: DEFAULT_ZOOM,
-        bounds: newBounds
-      }
-      onViewportChange(newViewport)
-      
-      // Update MapViewportStore
-      MapViewportStore.setViewport(newViewport)
-    }
-
-    // Add listener before starting animation
-    map.once('moveend', handleMoveEnd)
-
-    // Animate to user location
-    map.flyTo({
-      center: [freshLocation.lng, freshLocation.lat],
-      zoom: DEFAULT_ZOOM,
-      duration: duration,
-      essential: true
-    })
-  }, [onViewportChange])
   
   // Close callout when map is clicked or moved
   const handleMapClick = useCallback(() => {

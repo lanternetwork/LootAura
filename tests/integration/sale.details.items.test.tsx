@@ -220,22 +220,47 @@ describe('Sale Details Items Display', () => {
     expect(screen.getByText('Promote this sale')).toBeInTheDocument()
   })
 
-  it('shows active promotion state with ends date when promotion is active', () => {
+  it('shows active promotion state with ends date when promotion is active', async () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
 
-    render(
-      <SaleDetailClient 
-        sale={mockSale} 
-        displayCategories={['furniture']}
-        items={mockItems}
-        promotionsEnabled={true}
-        paymentsEnabled={true}
-      />
+    // Mock fetch to return active promotion status
+    const originalFetch = global.fetch
+    const mockFetch = vi.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          statuses: [
+            {
+              sale_id: 'test-sale-id',
+              is_active: true,
+              ends_at: '2030-01-01T00:00:00.000Z',
+              tier: 'featured_week',
+            },
+          ],
+        }),
+      } as Response)
     )
+    ;(global as any).fetch = mockFetch
 
-    const active = screen.getByTestId('sale-detail-promote-active')
-    expect(active.textContent).toContain('Promoted')
-    expect(active.textContent).toMatch(/Ends/)
+    try {
+      render(
+        <SaleDetailClient 
+          sale={mockSale} 
+          displayCategories={['furniture']}
+          items={mockItems}
+          promotionsEnabled={true}
+          paymentsEnabled={true}
+        />
+      )
+
+      // Wait for the promotion status to be fetched and rendered
+      const active = await screen.findByTestId('sale-detail-promote-active')
+      expect(active.textContent).toContain('Promoted')
+      expect(active.textContent).toMatch(/Ends/)
+    } finally {
+      ;(global as any).fetch = originalFetch
+    }
   })
 
   it('does not call checkout when payments are disabled (seller view)', async () => {

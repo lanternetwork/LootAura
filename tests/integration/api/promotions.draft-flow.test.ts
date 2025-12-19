@@ -112,7 +112,7 @@ describe('Promotion Flow with Drafts', () => {
       error: null,
     })
 
-    // Setup default query builder
+    // Setup default query builder factory
     const createQueryBuilder = () => ({
       select: vi.fn().mockReturnThis(),
       insert: vi.fn().mockReturnThis(),
@@ -125,8 +125,9 @@ describe('Promotion Flow with Drafts', () => {
       maybeSingle: vi.fn(),
     })
 
-    mockRlsDb.from.mockReturnValue(createQueryBuilder())
-    mockAdminDb.from.mockReturnValue(createQueryBuilder())
+    // Default: return a fresh builder for each call
+    mockRlsDb.from.mockImplementation(() => createQueryBuilder())
+    mockAdminDb.from.mockImplementation(() => createQueryBuilder())
 
     // Setup Stripe mocks
     mockStripeClient.prices.retrieve.mockResolvedValue({
@@ -154,7 +155,7 @@ describe('Promotion Flow with Drafts', () => {
       mockRlsDb.from.mockReturnValue(rlsQueryBuilder)
 
       // Setup: Promotion creation
-      const adminQueryBuilder1 = {
+      const promotionInsertBuilder = {
         insert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({
@@ -167,15 +168,37 @@ describe('Promotion Flow with Drafts', () => {
           error: null,
         }),
       }
-      mockAdminDb.from.mockReturnValue(adminQueryBuilder1)
 
       // Setup: Promotion update with checkout session
-      const adminQueryBuilder2 = {
+      const promotionUpdateBuilder = {
         update: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
       }
-      adminQueryBuilder2.update.mockReturnValue(adminQueryBuilder2)
-      adminQueryBuilder2.eq.mockReturnValue(adminQueryBuilder2)
+
+      // Track calls to admin.from
+      let promotionCallCount = 0
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'promotions') {
+          promotionCallCount++
+          if (promotionCallCount === 1) {
+            // First call: insert
+            return promotionInsertBuilder
+          } else {
+            // Subsequent calls: update
+            return promotionUpdateBuilder
+          }
+        }
+        // Return a default builder for other tables
+        return {
+          select: vi.fn().mockReturnThis(),
+          insert: vi.fn().mockReturnThis(),
+          update: vi.fn().mockReturnThis(),
+          delete: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn(),
+          maybeSingle: vi.fn(),
+        }
+      })
 
       // Setup: Stripe checkout session
       mockStripeClient.checkout.sessions.create.mockResolvedValue({
@@ -217,16 +240,12 @@ describe('Promotion Flow with Drafts', () => {
       )
       expect(mockStripeClient.checkout.sessions.create.mock.calls[0][0].metadata.sale_id).toBeUndefined()
 
-      // Verify NO sale was created
-      const saleInsertCalls = mockAdminDb.from.mock.calls.filter(
-        (call) => call[0] === 'sales' && adminQueryBuilder1.insert.mock.calls.length > 0
-      )
-      expect(saleInsertCalls.length).toBe(0)
+      // Verify NO sale was created (check that 'sales' table was never accessed)
+      const saleCalls = mockAdminDb.from.mock.calls.filter((call) => call[0] === 'sales')
+      expect(saleCalls.length).toBe(0)
 
-      // Verify draft was NOT deleted
-      const draftDeleteCalls = mockAdminDb.from.mock.calls.filter(
-        (call) => call[0] === 'sale_drafts' && adminQueryBuilder2.delete
-      )
+      // Verify draft was NOT deleted (check that 'sale_drafts' table was never accessed via admin)
+      const draftDeleteCalls = mockAdminDb.from.mock.calls.filter((call) => call[0] === 'sale_drafts')
       expect(draftDeleteCalls.length).toBe(0)
     })
 
@@ -249,7 +268,7 @@ describe('Promotion Flow with Drafts', () => {
       mockRlsDb.from.mockReturnValue(rlsQueryBuilder)
 
       // Setup: Promotion creation succeeds
-      const adminQueryBuilder1 = {
+      const promotionInsertBuilder = {
         insert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({
@@ -262,20 +281,43 @@ describe('Promotion Flow with Drafts', () => {
           error: null,
         }),
       }
-      mockAdminDb.from.mockReturnValue(adminQueryBuilder1)
+
+      // Setup: Promotion cleanup (cancel promotion on failure)
+      const promotionUpdateBuilder = {
+        update: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+      }
 
       // Setup: Stripe checkout session creation fails
       mockStripeClient.checkout.sessions.create.mockRejectedValue(
         new Error('Stripe API error')
       )
 
-      // Setup: Promotion cleanup (cancel promotion on failure)
-      const adminQueryBuilder2 = {
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-      }
-      adminQueryBuilder2.update.mockReturnValue(adminQueryBuilder2)
-      adminQueryBuilder2.eq.mockReturnValue(adminQueryBuilder2)
+      // Setup admin.from to return different builders based on table and call order
+      const promotionCalls: string[] = []
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'promotions') {
+          promotionCalls.push('promotions')
+          const callIndex = promotionCalls.length - 1
+          if (callIndex === 0) {
+            // First call: insert
+            return promotionInsertBuilder
+          } else {
+            // Second call: update (cancel on failure)
+            return promotionUpdateBuilder
+          }
+        }
+        // Return a default builder for other tables
+        return {
+          select: vi.fn().mockReturnThis(),
+          insert: vi.fn().mockReturnThis(),
+          update: vi.fn().mockReturnThis(),
+          delete: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn(),
+          maybeSingle: vi.fn(),
+        }
+      })
 
       const request = new NextRequest('http://localhost/api/drafts/publish', {
         method: 'POST',
@@ -296,21 +338,19 @@ describe('Promotion Flow with Drafts', () => {
       expect(result.code).toBe('STRIPE_ERROR')
 
       // Verify promotion was canceled
-      expect(adminQueryBuilder2.update).toHaveBeenCalledWith(
+      expect(promotionUpdateBuilder.update).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'canceled',
         })
       )
 
-      // Verify NO sale was created
-      const saleInsertCalls = adminQueryBuilder1.insert.mock.calls.filter(
-        (call: any) => call[0]?.owner_id === mockUser.id
-      )
-      expect(saleInsertCalls.length).toBe(0)
+      // Verify NO sale was created (check that 'sales' table was never accessed)
+      const saleCalls = mockAdminDb.from.mock.calls.filter((call) => call[0] === 'sales')
+      expect(saleCalls.length).toBe(0)
 
-      // Verify draft still exists (not deleted)
-      const draftDeleteCalls = adminQueryBuilder2.delete
-      expect(draftDeleteCalls).not.toHaveBeenCalled()
+      // Verify draft still exists (not deleted - check that 'sale_drafts' table was never accessed via admin)
+      const draftDeleteCalls = mockAdminDb.from.mock.calls.filter((call) => call[0] === 'sale_drafts')
+      expect(draftDeleteCalls.length).toBe(0)
     })
   })
 
@@ -347,7 +387,7 @@ describe('Promotion Flow with Drafts', () => {
       mockRlsDb.from.mockReturnValue(rlsQueryBuilder)
 
       // Setup: Sale creation
-      const adminQueryBuilder1 = {
+      const saleInsertBuilder = {
         insert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({
@@ -358,18 +398,34 @@ describe('Promotion Flow with Drafts', () => {
           error: null,
         }),
       }
-      mockAdminDb.from.mockReturnValue(adminQueryBuilder1)
 
       // Setup: Draft deletion
-      const adminQueryBuilder2 = {
+      const draftDeleteBuilder = {
         delete: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         select: vi.fn().mockResolvedValue({
           data: [{ id: draftId }],
         }),
       }
-      adminQueryBuilder2.delete.mockReturnValue(adminQueryBuilder2)
-      adminQueryBuilder2.eq.mockReturnValue(adminQueryBuilder2)
+
+      // Setup admin.from to return different builders based on table
+      mockAdminDb.from.mockImplementation((table: string) => {
+        if (table === 'sales') {
+          return saleInsertBuilder
+        } else if (table === 'sale_drafts') {
+          return draftDeleteBuilder
+        }
+        // Return a default builder for other tables
+        return {
+          select: vi.fn().mockReturnThis(),
+          insert: vi.fn().mockReturnThis(),
+          update: vi.fn().mockReturnThis(),
+          delete: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn(),
+          maybeSingle: vi.fn(),
+        }
+      })
 
       const request = new NextRequest('http://localhost/api/drafts/publish', {
         method: 'POST',

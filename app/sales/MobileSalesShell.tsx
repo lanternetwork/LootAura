@@ -281,6 +281,91 @@ export default function MobileSalesShell({
     return false
   }, [permissionGranted, userGpsLocation, mapView?.center, isMobileBreakpoint, isRequestingLocation])
 
+  // Handle re-center - always request fresh GPS, then animate map to user location
+  const handleRecenter = useCallback(async () => {
+    if (!mapRef.current) return
+    
+    const map = mapRef.current.getMap?.()
+    if (!map) return
+
+    // Always request fresh browser GPS (never use cached location)
+    let freshLocation: { lat: number; lng: number } | null = null
+    let permissionError: string | null = null
+
+    try {
+      // Request permission and get fresh location
+      if (navigator.geolocation) {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // maximumAge: 0 forces fresh location
+          )
+        })
+        
+        freshLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        }
+      } else {
+        permissionError = 'Geolocation is not supported by your browser.'
+      }
+    } catch (error: any) {
+      // Handle permission denied or other errors
+      if (error.code === 1) {
+        permissionError = 'Location access is disabled. You can re-enable it by refreshing the page or signing back in.'
+        setShowPermissionDenied(true)
+      } else {
+        permissionError = 'Unable to get your location. Please try again.'
+      }
+      
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.error('[MOBILE_RECENTER] Geolocation error:', error)
+      }
+    }
+
+    if (permissionError) {
+      setIsRequestingLocation(false)
+      return
+    }
+    if (!freshLocation) {
+      setIsRequestingLocation(false)
+      return
+    }
+
+    const DEFAULT_ZOOM = 12
+    const latRange = 0.11
+    const lngRange = latRange * Math.cos(freshLocation.lat * Math.PI / 180)
+    const newBounds = {
+      west: freshLocation.lng - lngRange / 2,
+      south: freshLocation.lat - latRange / 2,
+      east: freshLocation.lng + lngRange / 2,
+      north: freshLocation.lat + latRange / 2
+    }
+
+    const currentCenter = map.getCenter()
+    const distance = calculateDistance(currentCenter.lat, currentCenter.lng, freshLocation.lat, freshLocation.lng)
+    const duration = Math.min(3000, Math.max(1000, distance * 50))
+
+    const handleMoveEnd = () => {
+      const newViewport = {
+        center: freshLocation!,
+        zoom: DEFAULT_ZOOM,
+        bounds: newBounds
+      }
+      onViewportChange(newViewport)
+      MapViewportStore.setViewport(newViewport)
+    }
+    map.once('moveend', handleMoveEnd)
+
+    map.flyTo({
+      center: [freshLocation.lng, freshLocation.lat],
+      zoom: DEFAULT_ZOOM,
+      duration: duration,
+      essential: true
+    })
+  }, [onViewportChange])
+
   // Unified location button click handler - handles both permission request and recenter
   const handleLocationButtonClick = useCallback(async () => {
     // Case 1: Permission not granted - request permission
@@ -371,87 +456,6 @@ export default function MobileSalesShell({
       map.once('moveend', handleMoveEnd)
     }
   }, [shouldAutoCenter, userGpsLocation, mapView, onViewportChange])
-  
-  // Handle re-center - always request fresh GPS, then animate map to user location
-  const handleRecenter = useCallback(async () => {
-    if (!mapRef.current) return
-    
-    const map = mapRef.current.getMap?.()
-    if (!map) return
-
-    // Always request fresh browser GPS (never use cached location)
-    let freshLocation: { lat: number; lng: number } | null = null
-    let permissionError: string | null = null
-
-    try {
-      // Request permission and get fresh location
-      if (navigator.geolocation) {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            resolve,
-            reject,
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // maximumAge: 0 forces fresh location
-          )
-        })
-        
-        freshLocation = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        }
-      } else {
-        permissionError = 'Geolocation is not supported by your browser.'
-      }
-    } catch (error: any) {
-      // Handle permission denied or other errors
-      if (error.code === 1) {
-        permissionError = 'Location access is disabled. You can re-enable it by refreshing the page or signing back in.'
-        setShowPermissionDenied(true)
-      } else {
-        permissionError = 'Unable to get your location. Please try again.'
-      }
-      
-      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-        console.error('[MOBILE_RECENTER] Geolocation error:', error)
-      }
-    }
-
-    // If permission denied, show error (but don't permanently disable button)
-    if (permissionError) {
-      setIsRequestingLocation(false)
-      return
-    }
-
-    // If no location obtained, exit
-    if (!freshLocation) {
-      setIsRequestingLocation(false)
-      return
-    }
-
-    // Default zoom for 10-mile distance (matches distanceToZoom logic)
-    const DEFAULT_ZOOM = 12
-
-    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-      console.log('[MOBILE_RECENTER] Animating to fresh user location:', freshLocation, 'zoom:', DEFAULT_ZOOM)
-    }
-
-    // Calculate bounds for the new viewport (approximate for zoom 12)
-    const latRange = 0.11 // ~10 miles at mid-latitudes
-    const lngRange = latRange * Math.cos(freshLocation.lat * Math.PI / 180)
-    const newBounds = {
-      west: freshLocation.lng - lngRange / 2,
-      south: freshLocation.lat - latRange / 2,
-      east: freshLocation.lng + lngRange / 2,
-      north: freshLocation.lat + latRange / 2
-    }
-
-    // Calculate distance to determine appropriate duration
-    const currentCenter = map.getCenter()
-    const currentLat = currentCenter.lat
-    const currentLng = currentCenter.lng
-    const distance = Math.sqrt(
-      Math.pow((freshLocation.lat - currentLat) * 111, 2) + 
-      Math.pow((freshLocation.lng - currentLng) * 111 * Math.cos(currentLat * Math.PI / 180), 2)
-    ) // Approximate distance in km
     
     // Use longer duration for longer distances (max 3 seconds for very long distances)
     const duration = Math.min(3000, Math.max(1000, distance * 50))

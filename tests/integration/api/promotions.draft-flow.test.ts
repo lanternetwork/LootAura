@@ -447,10 +447,10 @@ describe('Promotion Flow with Drafts', () => {
       expect(result.data?.checkoutUrl).toBeUndefined()
 
       // Verify sale was created
-      expect(adminQueryBuilder1.insert).toHaveBeenCalled()
+      expect(saleInsertBuilder.insert).toHaveBeenCalled()
 
       // Verify draft was deleted
-      expect(adminQueryBuilder2.delete).toHaveBeenCalled()
+      expect(draftDeleteBuilder.delete).toHaveBeenCalled()
     })
   })
 })

@@ -231,7 +231,7 @@ describe('Sale Details Items Display', () => {
           ok: true,
           json: async () => ({
             statuses: [{
-              sale_id: 'test-sale-1',
+              sale_id: 'test-sale-id',
               is_active: true,
               ends_at: '2030-01-01T00:00:00.000Z',
             }],

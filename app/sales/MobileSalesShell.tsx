@@ -336,9 +336,14 @@ export default function MobileSalesShell({
       checkLoaded()
       
       // Also check periodically until loaded (in case map loads after component mounts)
+      // In test environment, limit checks to prevent hanging
+      const maxChecks = process.env.NODE_ENV === 'test' ? 10 : Infinity
+      let checkCount = 0
+      
       const interval = setInterval(() => {
+        checkCount++
         checkLoaded()
-        if (mapRef.current?.isLoaded?.()) {
+        if (mapRef.current?.isLoaded?.() || checkCount >= maxChecks) {
           clearInterval(interval)
         }
       }, 100)

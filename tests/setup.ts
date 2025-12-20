@@ -338,3 +338,56 @@ process.on('unhandledRejection', (reason: unknown) => {
   // For other unhandled rejections, let them propagate (Vitest will handle them)
 })
 
+// Diagnostic: Detect open handles after all tests complete
+// This helps identify what's preventing Vitest from exiting
+import { afterAll } from 'vitest'
+
+afterAll(() => {
+  // Wait a bit for cleanup to complete, then check for open handles
+  return new Promise<void>((resolve) => {
+    setTimeout(() => {
+      if (typeof (process as any)._getActiveHandles === 'function') {
+        const handles = (process as any)._getActiveHandles()
+        const requests = (process as any)._getActiveRequests()
+        
+        if (handles.length > 0 || requests.length > 0) {
+          console.error('[TEST_DIAGNOSTIC] Open handles detected after tests:')
+          console.error(`  Handles: ${handles.length}`)
+          handles.forEach((handle: any, i: number) => {
+            const handleInfo: any = {
+              type: handle.constructor?.name || 'Unknown',
+              index: i,
+            }
+            
+            // Check for common handle types
+            if (handle.constructor?.name === 'Timeout') {
+              handleInfo._idleTimeout = handle._idleTimeout
+              handleInfo._idleStart = handle._idleStart
+            } else if (handle.constructor?.name === 'Immediate') {
+              handleInfo._immediateId = handle._immediateId
+            } else if (handle._events) {
+              handleInfo.events = Object.keys(handle._events)
+            }
+            
+            // Try to get stack trace if available
+            if (handle.stack) {
+              handleInfo.stack = handle.stack.split('\n').slice(0, 5).join('\n')
+            }
+            
+            console.error(`    [${i}] ${handle.constructor?.name || 'Unknown'}:`, handleInfo)
+          })
+          console.error(`  Requests: ${requests.length}`)
+          requests.forEach((req: any, i: number) => {
+            console.error(`    [${i}] ${req.constructor?.name || 'Unknown'}:`, {
+              type: req.constructor?.name,
+            })
+          })
+        } else {
+          console.log('[TEST_DIAGNOSTIC] No open handles detected')
+        }
+      }
+      resolve()
+    }, 500) // Wait 500ms for cleanup
+  })
+})
+

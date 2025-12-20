@@ -7,10 +7,11 @@ import MobileSaleCallout from '@/components/sales/MobileSaleCallout'
 import MobileFiltersModal from '@/components/sales/MobileFiltersModal'
 import SalesList from '@/components/SalesList'
 import SaleCardSkeleton from '@/components/SaleCardSkeleton'
-import UnifiedLocationButton from '@/components/location/UnifiedLocationButton'
+import MobileRecenterButton from '@/components/location/MobileRecenterButton'
 import { Sale } from '@/lib/types'
 import { DateRangeType } from '@/lib/hooks/useFilters'
 import { HybridPinsResult } from '@/lib/pins/types'
+import { isPointInsideBounds } from '@/lib/map/bounds'
 
 const HEADER_HEIGHT = 64 // px
 
@@ -221,30 +222,77 @@ export default function MobileSalesShell({
     setMode(prev => prev === 'map' ? 'list' : 'map')
   }, [])
 
-  // Handle re-center callback for UnifiedLocationButton
-  const handleRecenter = useCallback((location: { lat: number; lng: number }, zoom: number) => {
-    if (!mapRef.current) return
+  // Calculate visibility of recenter button - only show when user location is outside viewport
+  const shouldShowRecenterButton = useMemo(() => {
+    if (!userLocation || !mapView?.bounds) return false
+    
+    const point: [number, number] = [userLocation.lng, userLocation.lat]
+    return !isPointInsideBounds(point, mapView.bounds)
+  }, [userLocation, mapView?.bounds])
+
+  // Handle re-center - animate map to user location using mapRef
+  const handleRecenter = useCallback(() => {
+    if (!userLocation || !mapRef.current) return
     
     const map = mapRef.current.getMap?.()
     if (!map) return
 
-    // Calculate bounds for the new viewport
-    const latRange = 0.11 // ~10 miles at mid-latitudes
-    const lngRange = latRange * Math.cos(location.lat * Math.PI / 180)
-    const newBounds = {
-      west: location.lng - lngRange / 2,
-      south: location.lat - latRange / 2,
-      east: location.lng + lngRange / 2,
-      north: location.lat + latRange / 2
+    // Default zoom for 10-mile distance (matches distanceToZoom logic)
+    const DEFAULT_ZOOM = 12
+
+    if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+      console.log('[MOBILE_RECENTER] Animating to user location:', userLocation, 'zoom:', DEFAULT_ZOOM)
     }
 
-    // Update viewport state
-    onViewportChange({
-      center: location,
-      zoom: zoom,
-      bounds: newBounds
+    // Calculate bounds for the new viewport (approximate for zoom 12)
+    const latRange = 0.11 // ~10 miles at mid-latitudes
+    const lngRange = latRange * Math.cos(userLocation.lat * Math.PI / 180)
+    const newBounds = {
+      west: userLocation.lng - lngRange / 2,
+      south: userLocation.lat - latRange / 2,
+      east: userLocation.lng + lngRange / 2,
+      north: userLocation.lat + latRange / 2
+    }
+
+    // Calculate distance to determine appropriate duration
+    const currentCenter = map.getCenter()
+    const currentLat = currentCenter.lat
+    const currentLng = currentCenter.lng
+    const distance = Math.sqrt(
+      Math.pow((userLocation.lat - currentLat) * 111, 2) + 
+      Math.pow((userLocation.lng - currentLng) * 111 * Math.cos(currentLat * Math.PI / 180), 2)
+    ) // Approximate distance in km
+    
+    // Use longer duration for longer distances (max 3 seconds for very long distances)
+    const duration = Math.min(3000, Math.max(1000, distance * 50))
+
+    // Listen for moveend event to know when flyTo animation completes
+    // Use once() to automatically remove listener after it fires
+    const handleMoveEnd = () => {
+      if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+        console.log('[MOBILE_RECENTER] Animation completed, updating viewport state')
+      }
+      
+      // Update viewport state after animation completes
+      // This ensures SimpleMap's easeTo doesn't interfere with the flyTo animation
+      onViewportChange({
+        center: userLocation,
+        zoom: DEFAULT_ZOOM,
+        bounds: newBounds
+      })
+    }
+
+    // Add listener before starting animation
+    map.once('moveend', handleMoveEnd)
+
+    // Animate to user location
+    map.flyTo({
+      center: [userLocation.lng, userLocation.lat],
+      zoom: DEFAULT_ZOOM,
+      duration: duration,
+      essential: true
     })
-  }, [onViewportChange])
+  }, [userLocation, onViewportChange])
   
   // Close callout when map is clicked or moved
   const handleMapClick = useCallback(() => {
@@ -386,12 +434,10 @@ export default function MobileSalesShell({
                 )}
               </button>
               
-              {/* Unified Location Control Button - Handles permission, recenter, and denied state */}
-              <UnifiedLocationButton
-                userLocation={userLocation}
-                mapView={mapView}
-                onRecenter={handleRecenter}
-                mapRef={mapRef}
+              {/* Re-center Map Button - Bottom Right (Mobile only, viewport-aware) */}
+              <MobileRecenterButton
+                visible={shouldShowRecenterButton}
+                onClick={handleRecenter}
               />
               
               {/* Mode Toggle FAB - Bottom Right */}

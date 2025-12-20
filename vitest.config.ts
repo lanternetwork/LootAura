@@ -27,7 +27,8 @@ export default defineConfig({
     // Reduce memory usage
     maxConcurrency: 1,
     // Constrain worker count to prevent OOMs
-    maxWorkers: 4,
+    // Reduced to 2 for CI stability (can be overridden with VITEST_WORKERS env var)
+    maxWorkers: process.env.CI ? 2 : 4,
     minWorkers: 1,
   },
   resolve: {

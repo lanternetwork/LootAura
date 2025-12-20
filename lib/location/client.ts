@@ -144,41 +144,19 @@ export async function checkGeolocationPermission(): Promise<boolean> {
 }
 
 /**
- * Get explicit permission state: 'unknown', 'granted', or 'denied'
- * Note: This does NOT request geolocation - it only checks permission state
- */
-export async function getGeolocationPermissionState(): Promise<'unknown' | 'granted' | 'denied'> {
-  if (!isGeolocationSupported()) {
-    return 'unknown'
-  }
-
-  try {
-    const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
-    if (permission.state === 'granted') {
-      return 'granted'
-    } else if (permission.state === 'denied') {
-      return 'denied'
-    } else {
-      // 'prompt' state means permission hasn't been requested yet
-      return 'unknown'
-    }
-  } catch (error) {
-    // Permission query failed - treat as unknown (not denied)
-    return 'unknown'
-  }
-}
-
-/**
  * Request geolocation permission
- * Returns true if granted, throws LocationError if denied or other error
  */
 export async function requestGeolocationPermission(): Promise<boolean> {
   if (!isGeolocationSupported()) {
-    throw { code: 'UNKNOWN' as const, message: 'Geolocation is not supported by your browser.' }
+    return false
   }
 
-  await getGeolocationPosition()
-  return true
+  try {
+    await getGeolocationPosition()
+    return true
+  } catch (error) {
+    return false
+  }
 }
 
 /**

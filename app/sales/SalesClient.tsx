@@ -1243,7 +1243,7 @@ export default function SalesClient({
     const updatePosition = () => {
       try {
         // Get fresh map instance in case it changed
-        const currentMap = mapRef.current?.getMap?.()
+        const currentMap = desktopMapRef.current?.getMap?.()
         if (!currentMap) return
         
         const point = currentMap.project([selectedPinCoords.lng, selectedPinCoords.lat])
@@ -1258,7 +1258,7 @@ export default function SalesClient({
 
     return () => {
       // Get fresh map instance for cleanup in case map was recreated
-      const currentMap = mapRef.current?.getMap?.()
+      const currentMap = desktopMapRef.current?.getMap?.()
       if (currentMap) {
         currentMap.off('move', updatePosition)
         currentMap.off('zoom', updatePosition)

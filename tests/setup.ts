@@ -277,6 +277,9 @@ const ALLOWED_PATTERNS = [
   // CSRF client logging (lib/api/csrfClient.ts)
   /^\[CSRF_CLIENT\]/, // CSRF client logging - tests/integration/sale.share-button.render.test.tsx, tests/integration/sale.details.*.test.tsx
   /^\[ITEMS_DIAG\]/, // Items diagnostic logging - lib/data/salesAccess.ts getSaleWithItems
+  
+  // Test diagnostic logging (tests/setup.ts)
+  /^\[TEST_DIAGNOSTIC\]/, // Test diagnostic logging for open handles detection
 ]
 
 const isAllowedMessage = (message: string): boolean => {
@@ -340,54 +343,58 @@ process.on('unhandledRejection', (reason: unknown) => {
 
 // Diagnostic: Detect open handles after all tests complete
 // This helps identify what's preventing Vitest from exiting
+// Note: This diagnostic itself uses setTimeout, which will appear as an open handle
+// until it completes. We use setImmediate to check synchronously after a brief delay.
 import { afterAll } from 'vitest'
 
 afterAll(() => {
-  // Wait a bit for cleanup to complete, then check for open handles
-  return new Promise<void>((resolve) => {
-    setTimeout(() => {
-      if (typeof (process as any)._getActiveHandles === 'function') {
-        const handles = (process as any)._getActiveHandles()
-        const requests = (process as any)._getActiveRequests()
-        
-        if (handles.length > 0 || requests.length > 0) {
-          console.error('[TEST_DIAGNOSTIC] Open handles detected after tests:')
-          console.error(`  Handles: ${handles.length}`)
-          handles.forEach((handle: any, i: number) => {
-            const handleInfo: any = {
-              type: handle.constructor?.name || 'Unknown',
-              index: i,
-            }
-            
-            // Check for common handle types
-            if (handle.constructor?.name === 'Timeout') {
-              handleInfo._idleTimeout = handle._idleTimeout
-              handleInfo._idleStart = handle._idleStart
-            } else if (handle.constructor?.name === 'Immediate') {
-              handleInfo._immediateId = handle._immediateId
-            } else if (handle._events) {
-              handleInfo.events = Object.keys(handle._events)
-            }
-            
-            // Try to get stack trace if available
-            if (handle.stack) {
-              handleInfo.stack = handle.stack.split('\n').slice(0, 5).join('\n')
-            }
-            
-            console.error(`    [${i}] ${handle.constructor?.name || 'Unknown'}:`, handleInfo)
+  // Use setImmediate to check after current event loop, but don't wait for it
+  // This allows the diagnostic to run without keeping the process alive
+  if (typeof (process as any)._getActiveHandles === 'function') {
+    setImmediate(() => {
+      const handles = (process as any)._getActiveHandles()
+      const requests = (process as any)._getActiveRequests()
+      
+      // Filter out the setImmediate handle itself and any Timeout handles from this diagnostic
+      const diagnosticHandles = handles.filter((handle: any) => {
+        // Exclude setImmediate handles (they're normal)
+        if (handle.constructor?.name === 'Immediate') return false
+        // Include other handles for reporting
+        return true
+      })
+      
+      if (diagnosticHandles.length > 0 || requests.length > 0) {
+        console.error('[TEST_DIAGNOSTIC] Open handles detected after tests:')
+        console.error(`  Handles: ${diagnosticHandles.length}`)
+        diagnosticHandles.forEach((handle: any, i: number) => {
+          const handleInfo: any = {
+            type: handle.constructor?.name || 'Unknown',
+            index: i,
+          }
+          
+          // Check for common handle types
+          if (handle.constructor?.name === 'Timeout') {
+            handleInfo._idleTimeout = handle._idleTimeout
+            handleInfo._idleStart = handle._idleStart
+          } else if (handle._events) {
+            handleInfo.events = Object.keys(handle._events)
+          }
+          
+          // Try to get stack trace if available
+          if (handle.stack) {
+            handleInfo.stack = handle.stack.split('\n').slice(0, 5).join('\n')
+          }
+          
+          console.error(`    [${i}] ${handle.constructor?.name || 'Unknown'}:`, handleInfo)
+        })
+        console.error(`  Requests: ${requests.length}`)
+        requests.forEach((req: any, i: number) => {
+          console.error(`    [${i}] ${req.constructor?.name || 'Unknown'}:`, {
+            type: req.constructor?.name,
           })
-          console.error(`  Requests: ${requests.length}`)
-          requests.forEach((req: any, i: number) => {
-            console.error(`    [${i}] ${req.constructor?.name || 'Unknown'}:`, {
-              type: req.constructor?.name,
-            })
-          })
-        } else {
-          console.log('[TEST_DIAGNOSTIC] No open handles detected')
-        }
+        })
       }
-      resolve()
-    }, 500) // Wait 500ms for cleanup
-  })
+    })
+  }
 })
 

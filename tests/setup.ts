@@ -112,6 +112,14 @@ vi.mock('@/lib/supabase/client', () => ({
       signInWithPassword: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
+      onAuthStateChange: vi.fn(() => ({
+        data: {
+          subscription: {
+            unsubscribe: vi.fn(),
+          },
+        },
+        error: null,
+      })),
     },
     from: vi.fn(() => {
       const chain: any = {}

@@ -200,8 +200,12 @@ export default function MobileSalesShell({
       // Don't update position during dragging
       if (isDraggingRef.current) return
       
+      // Get fresh map instance in case it changed
+      const currentMap = mapRef.current?.getMap?.()
+      if (!currentMap) return
+      
       try {
-        const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
+        const point = currentMap.project([selectedPinCoords.lng, selectedPinCoords.lat])
         setPinPosition({ x: point.x, y: point.y })
       } catch (error) {
         // Ignore errors during map transitions
@@ -212,8 +216,17 @@ export default function MobileSalesShell({
     map.on('zoom', updatePosition)
     
     return () => {
-      map.off('move', updatePosition)
-      map.off('zoom', updatePosition)
+      // Get fresh map instance for cleanup in case map was recreated
+      const currentMap = mapRef.current?.getMap?.()
+      if (currentMap) {
+        currentMap.off('move', updatePosition)
+        currentMap.off('zoom', updatePosition)
+      }
+      // Also try to clean up from the original map instance
+      if (map && map !== currentMap) {
+        map.off('move', updatePosition)
+        map.off('zoom', updatePosition)
+      }
     }
   }, [selectedPinCoords])
   

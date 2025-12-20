@@ -176,6 +176,54 @@ try {
   (global as any).matchMedia = mockMatchMedia
 } catch {}
 
+// Mock navigator.geolocation to prevent leaks in test environment
+// Geolocation API calls that never resolve/reject can keep the process alive
+if (typeof navigator !== 'undefined') {
+  const mockGeolocation = {
+    getCurrentPosition: vi.fn((success, error, options) => {
+      // Immediately reject in test environment to prevent hanging
+      // Use setImmediate to ensure it's async but resolves immediately
+      setImmediate(() => {
+        if (error) {
+          error({
+            code: 1, // PERMISSION_DENIED
+            message: 'User denied geolocation (test mock)',
+            PERMISSION_DENIED: 1,
+            POSITION_UNAVAILABLE: 2,
+            TIMEOUT: 3,
+          } as GeolocationPositionError)
+        }
+      })
+    }),
+    watchPosition: vi.fn((success, error, options) => {
+      // Return a watch ID that can be cleared
+      const watchId = Math.floor(Math.random() * 1000000)
+      // Immediately reject in test environment
+      setImmediate(() => {
+        if (error) {
+          error({
+            code: 1,
+            message: 'User denied geolocation (test mock)',
+            PERMISSION_DENIED: 1,
+            POSITION_UNAVAILABLE: 2,
+            TIMEOUT: 3,
+          } as GeolocationPositionError)
+        }
+      })
+      return watchId
+    }),
+    clearWatch: vi.fn((watchId) => {
+      // No-op in test environment
+    }),
+  }
+  
+  Object.defineProperty(navigator, 'geolocation', {
+    writable: true,
+    configurable: true,
+    value: mockGeolocation,
+  })
+}
+
 // Console noise guardrail - fail tests on unexpected console output
 const originalConsoleError = console.error
 const originalConsoleWarn = console.warn
@@ -343,17 +391,15 @@ process.on('unhandledRejection', (reason: unknown) => {
 
 // Diagnostic: Detect open handles after all tests complete
 // This helps identify what's preventing Vitest from exiting
-// Note: This diagnostic itself uses setImmediate, which will appear as an open handle
-// until it completes. We filter out Immediate handles from the output.
+// Force exit if handles are detected to fail fast instead of hanging
 afterAll(() => {
-  // Use setImmediate to check after current event loop, but don't wait for it
-  // This allows the diagnostic to run without keeping the process alive
-  if (typeof (process as any)._getActiveHandles === 'function') {
-    setImmediate(() => {
+  // Add a short delay to allow microtasks to settle
+  setTimeout(() => {
+    if (typeof (process as any)._getActiveHandles === 'function') {
       const handles = (process as any)._getActiveHandles()
       const requests = (process as any)._getActiveRequests()
       
-      // Filter out the setImmediate handle itself and any Timeout handles from this diagnostic
+      // Filter out Immediate handles (they're normal and transient)
       const diagnosticHandles = handles.filter((handle: any) => {
         // Exclude setImmediate handles (they're normal)
         if (handle.constructor?.name === 'Immediate') return false
@@ -374,25 +420,44 @@ afterAll(() => {
           if (handle.constructor?.name === 'Timeout') {
             handleInfo._idleTimeout = handle._idleTimeout
             handleInfo._idleStart = handle._idleStart
+            handleInfo._idleNext = handle._idleNext ? 'present' : 'null'
+          } else if (handle.constructor?.name === 'Immediate') {
+            // Skip these - they're normal
+            return
           } else if (handle._events) {
             handleInfo.events = Object.keys(handle._events)
           }
           
           // Try to get stack trace if available
           if (handle.stack) {
-            handleInfo.stack = handle.stack.split('\n').slice(0, 5).join('\n')
+            handleInfo.stack = handle.stack.split('\n').slice(0, 10).join('\n')
           }
           
-          console.error(`[TEST_DIAGNOSTIC]     [${i}] ${handle.constructor?.name || 'Unknown'}:`, handleInfo)
+          // Try to get more info from the handle
+          if (handle._onTimeout) {
+            handleInfo._onTimeout = handle._onTimeout.toString().split('\n').slice(0, 3).join('\n')
+          }
+          
+          console.error(`[TEST_DIAGNOSTIC]     [${i}] ${handle.constructor?.name || 'Unknown'}:`, JSON.stringify(handleInfo, null, 2))
         })
         console.error('[TEST_DIAGNOSTIC]   Requests:', requests.length)
         requests.forEach((req: any, i: number) => {
-          console.error(`[TEST_DIAGNOSTIC]     [${i}] ${req.constructor?.name || 'Unknown'}:`, {
+          const reqInfo: any = {
             type: req.constructor?.name,
-          })
+          }
+          if (req.stack) {
+            reqInfo.stack = req.stack.split('\n').slice(0, 5).join('\n')
+          }
+          console.error(`[TEST_DIAGNOSTIC]     [${i}] ${req.constructor?.name || 'Unknown'}:`, JSON.stringify(reqInfo, null, 2))
         })
+        
+        // Force exit to fail fast instead of hanging
+        console.error('[TEST_DIAGNOSTIC] Forcing exit due to open handles')
+        process.exit(1)
+      } else {
+        console.log('[TEST_DIAGNOSTIC] No open handles detected - process should exit cleanly')
       }
-    })
-  }
+    }
+  }, 100) // 100ms delay to allow microtasks to settle
 })
 

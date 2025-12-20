@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 
-import { vi, afterEach as vitestAfterEach } from 'vitest'
+import { vi, afterEach as vitestAfterEach, afterAll } from 'vitest'
 import makeStableSupabaseClient from './utils/mocks/supabaseServerStable'
 
 // never re-create this per test, keep it stable
@@ -343,10 +343,8 @@ process.on('unhandledRejection', (reason: unknown) => {
 
 // Diagnostic: Detect open handles after all tests complete
 // This helps identify what's preventing Vitest from exiting
-// Note: This diagnostic itself uses setTimeout, which will appear as an open handle
-// until it completes. We use setImmediate to check synchronously after a brief delay.
-import { afterAll } from 'vitest'
-
+// Note: This diagnostic itself uses setImmediate, which will appear as an open handle
+// until it completes. We filter out Immediate handles from the output.
 afterAll(() => {
   // Use setImmediate to check after current event loop, but don't wait for it
   // This allows the diagnostic to run without keeping the process alive
@@ -365,7 +363,7 @@ afterAll(() => {
       
       if (diagnosticHandles.length > 0 || requests.length > 0) {
         console.error('[TEST_DIAGNOSTIC] Open handles detected after tests:')
-        console.error(`  Handles: ${diagnosticHandles.length}`)
+        console.error('[TEST_DIAGNOSTIC]   Handles:', diagnosticHandles.length)
         diagnosticHandles.forEach((handle: any, i: number) => {
           const handleInfo: any = {
             type: handle.constructor?.name || 'Unknown',
@@ -385,11 +383,11 @@ afterAll(() => {
             handleInfo.stack = handle.stack.split('\n').slice(0, 5).join('\n')
           }
           
-          console.error(`    [${i}] ${handle.constructor?.name || 'Unknown'}:`, handleInfo)
+          console.error(`[TEST_DIAGNOSTIC]     [${i}] ${handle.constructor?.name || 'Unknown'}:`, handleInfo)
         })
-        console.error(`  Requests: ${requests.length}`)
+        console.error('[TEST_DIAGNOSTIC]   Requests:', requests.length)
         requests.forEach((req: any, i: number) => {
-          console.error(`    [${i}] ${req.constructor?.name || 'Unknown'}:`, {
+          console.error(`[TEST_DIAGNOSTIC]     [${i}] ${req.constructor?.name || 'Unknown'}:`, {
             type: req.constructor?.name,
           })
         })

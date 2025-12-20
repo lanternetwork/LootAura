@@ -22,8 +22,9 @@ export default defineConfig({
     // Ensure no network calls in tests
     testTimeout: 10000,
     hookTimeout: 10000,
-    // Ensure jsdom environment is available to tests
-    pool: 'threads',
+    // Use forks instead of threads for better memory isolation in CI
+    // Forks provide separate processes with independent memory spaces and better GC
+    pool: process.env.CI ? 'forks' : 'threads',
     // Reduce memory usage
     maxConcurrency: 1,
     // Constrain worker count to prevent OOMs

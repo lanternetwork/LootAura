@@ -391,73 +391,96 @@ process.on('unhandledRejection', (reason: unknown) => {
 
 // Diagnostic: Detect open handles after all tests complete
 // This helps identify what's preventing Vitest from exiting
-// Force exit if handles are detected to fail fast instead of hanging
 afterAll(() => {
-  // Add a short delay to allow microtasks to settle
-  setTimeout(() => {
+  // Use setImmediate to check after current event loop completes
+  setImmediate(() => {
     if (typeof (process as any)._getActiveHandles === 'function') {
       const handles = (process as any)._getActiveHandles()
       const requests = (process as any)._getActiveRequests()
       
-      // Filter out Immediate handles (they're normal and transient)
+      // Log ALL handles for identification (we'll filter diagnostic ones later)
+      console.log('\n[TEST_DIAGNOSTIC] ========================================')
+      console.log('[TEST_DIAGNOSTIC] ACTIVE HANDLES:', handles.length)
+      console.log('[TEST_DIAGNOSTIC] ACTIVE REQUESTS:', requests.length)
+      console.log('[TEST_DIAGNOSTIC] ========================================\n')
+      
+      handles.forEach((handle: any, i: number) => {
+        const handleType = handle.constructor?.name || 'Unknown'
+        const handleInfo: any = {
+          index: i,
+          type: handleType,
+        }
+        
+        // Get detailed info based on handle type
+        if (handleType === 'Timeout') {
+          handleInfo._idleTimeout = handle._idleTimeout
+          handleInfo._idleStart = handle._idleStart
+          handleInfo._idleNext = handle._idleNext ? 'present' : 'null'
+          // Try to get the callback function
+          if (handle._onTimeout) {
+            handleInfo._onTimeout = handle._onTimeout.toString().split('\n').slice(0, 5).join('\n')
+          }
+        } else if (handleType === 'Immediate') {
+          // These are usually fine, but log them anyway
+          handleInfo.note = 'Immediate handle (usually transient)'
+        } else if (handleType === 'Socket' || handleType === 'TCPSocketWrap' || handleType === 'PipeWrap') {
+          handleInfo.readable = handle.readable
+          handleInfo.writable = handle.writable
+          handleInfo.destroyed = handle.destroyed
+        } else if (handleType === 'MessagePort') {
+          handleInfo.note = 'MessagePort (inter-process communication)'
+        } else if (handleType === 'FSWatcher') {
+          handleInfo.note = 'FSWatcher (file system watcher)'
+        } else if (handle._events) {
+          handleInfo.events = Object.keys(handle._events)
+        }
+        
+        // Try to get stack trace if available
+        if (handle.stack) {
+          handleInfo.stack = handle.stack.split('\n').slice(0, 15).join('\n')
+        }
+        
+        // Log the handle
+        console.log(`[TEST_DIAGNOSTIC] Handle [${i}]: ${handleType}`)
+        console.log(JSON.stringify(handleInfo, null, 2))
+        console.log('')
+      })
+      
+      requests.forEach((req: any, i: number) => {
+        const reqType = req.constructor?.name || 'Unknown'
+        const reqInfo: any = {
+          index: i,
+          type: reqType,
+        }
+        if (req.stack) {
+          reqInfo.stack = req.stack.split('\n').slice(0, 10).join('\n')
+        }
+        console.log(`[TEST_DIAGNOSTIC] Request [${i}]: ${reqType}`)
+        console.log(JSON.stringify(reqInfo, null, 2))
+        console.log('')
+      })
+      
+      // Filter out diagnostic handles (Immediate from setImmediate, and our own diagnostic)
       const diagnosticHandles = handles.filter((handle: any) => {
-        // Exclude setImmediate handles (they're normal)
-        if (handle.constructor?.name === 'Immediate') return false
-        // Include other handles for reporting
+        const handleType = handle.constructor?.name || 'Unknown'
+        // Exclude Immediate handles (they're transient)
+        if (handleType === 'Immediate') return false
         return true
       })
       
       if (diagnosticHandles.length > 0 || requests.length > 0) {
-        console.error('[TEST_DIAGNOSTIC] Open handles detected after tests:')
-        console.error('[TEST_DIAGNOSTIC]   Handles:', diagnosticHandles.length)
-        diagnosticHandles.forEach((handle: any, i: number) => {
-          const handleInfo: any = {
-            type: handle.constructor?.name || 'Unknown',
-            index: i,
-          }
-          
-          // Check for common handle types
-          if (handle.constructor?.name === 'Timeout') {
-            handleInfo._idleTimeout = handle._idleTimeout
-            handleInfo._idleStart = handle._idleStart
-            handleInfo._idleNext = handle._idleNext ? 'present' : 'null'
-          } else if (handle.constructor?.name === 'Immediate') {
-            // Skip these - they're normal
-            return
-          } else if (handle._events) {
-            handleInfo.events = Object.keys(handle._events)
-          }
-          
-          // Try to get stack trace if available
-          if (handle.stack) {
-            handleInfo.stack = handle.stack.split('\n').slice(0, 10).join('\n')
-          }
-          
-          // Try to get more info from the handle
-          if (handle._onTimeout) {
-            handleInfo._onTimeout = handle._onTimeout.toString().split('\n').slice(0, 3).join('\n')
-          }
-          
-          console.error(`[TEST_DIAGNOSTIC]     [${i}] ${handle.constructor?.name || 'Unknown'}:`, JSON.stringify(handleInfo, null, 2))
-        })
-        console.error('[TEST_DIAGNOSTIC]   Requests:', requests.length)
-        requests.forEach((req: any, i: number) => {
-          const reqInfo: any = {
-            type: req.constructor?.name,
-          }
-          if (req.stack) {
-            reqInfo.stack = req.stack.split('\n').slice(0, 5).join('\n')
-          }
-          console.error(`[TEST_DIAGNOSTIC]     [${i}] ${req.constructor?.name || 'Unknown'}:`, JSON.stringify(reqInfo, null, 2))
-        })
+        console.error('\n[TEST_DIAGNOSTIC] ⚠️  LEAKED HANDLES DETECTED!')
+        console.error(`[TEST_DIAGNOSTIC]   Non-Immediate Handles: ${diagnosticHandles.length}`)
+        console.error(`[TEST_DIAGNOSTIC]   Active Requests: ${requests.length}`)
+        console.error('[TEST_DIAGNOSTIC] See details above.\n')
         
         // Force exit to fail fast instead of hanging
         console.error('[TEST_DIAGNOSTIC] Forcing exit due to open handles')
         process.exit(1)
       } else {
-        console.log('[TEST_DIAGNOSTIC] No open handles detected - process should exit cleanly')
+        console.log('[TEST_DIAGNOSTIC] ✅ No leaked handles detected - process should exit cleanly\n')
       }
     }
-  }, 100) // 100ms delay to allow microtasks to settle
+  })
 })
 

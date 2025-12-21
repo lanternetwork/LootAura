@@ -211,7 +211,10 @@ export default function SellWizardClient({
     })
 
     return () => {
-      subscription.unsubscribe()
+      // Safely unsubscribe - subscription may be undefined in test environment
+      if (subscription?.unsubscribe) {
+        subscription.unsubscribe()
+      }
     }
   }, [supabase.auth])
 
@@ -1878,6 +1881,7 @@ function ReviewStep({
   loading,
   submitError,
   promotionsEnabled,
+  paymentsEnabled,
   wantsPromotion,
   onTogglePromotion,
 }: {

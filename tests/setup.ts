@@ -348,9 +348,41 @@ process.on('unhandledRejection', unhandledRejectionHandler)
 
 // Clean up the listener after all tests to prevent it from keeping the process alive
 // This is safe because Vitest will have handled all test-related rejections by this point
-if (typeof afterAll !== 'undefined') {
-  afterAll(() => {
-    process.removeListener('unhandledRejection', unhandledRejectionHandler)
-  })
-}
+afterAll(() => {
+  process.removeListener('unhandledRejection', unhandledRejectionHandler)
+  
+  // Diagnostic: Check for leaked handles after all tests complete
+  // This helps identify what's preventing Vitest from exiting
+  if (typeof (process as any)._getActiveHandles === 'function') {
+    setTimeout(() => {
+      const handles = (process as any)._getActiveHandles()
+      const requests = (process as any)._getActiveRequests()
+      
+      // Filter out diagnostic handles (Immediate, our own setTimeout)
+      const leakedHandles = handles.filter((handle: any) => {
+        const handleType = handle.constructor?.name || 'Unknown'
+        // Exclude Immediate handles and our own diagnostic setTimeout
+        if (handleType === 'Immediate') return false
+        if (handleType === 'Timeout' && handle._idleTimeout === -1) return false // Our diagnostic timeout
+        return true
+      })
+      
+      if (leakedHandles.length > 0 || requests.length > 0) {
+        console.log('\n[TEST_DIAGNOSTIC] ========================================')
+        console.log('[TEST_DIAGNOSTIC] LEAKED HANDLES AFTER TESTS:', leakedHandles.length)
+        console.log('[TEST_DIAGNOSTIC] ACTIVE REQUESTS:', requests.length)
+        
+        leakedHandles.forEach((handle: any, i: number) => {
+          const handleType = handle.constructor?.name || 'Unknown'
+          console.log(`[TEST_DIAGNOSTIC] Handle [${i}]: ${handleType}`)
+          if (handleType === 'Socket' || handleType === 'TCPSocketWrap' || handleType === 'PipeWrap') {
+            console.log(`[TEST_DIAGNOSTIC]   - readable: ${handle.readable}, writable: ${handle.writable}, destroyed: ${handle.destroyed}`)
+          }
+        })
+        
+        console.log('[TEST_DIAGNOSTIC] ========================================\n')
+      }
+    }, 100)
+  }
+})
 

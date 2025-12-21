@@ -17,7 +17,7 @@ const memoryStore = new Map<string, WindowCount>()
 const MAX_MEMORY_STORE_SIZE = 10000
 
 // Clean up expired entries every 5 minutes
-// Skip in test environment to prevent handle leaks
+// Guard: Don't run in test environment to prevent leaked handles
 if (process.env.NODE_ENV !== 'test') {
   setInterval(() => {
     const currentTime = Math.floor(Date.now() / 1000)

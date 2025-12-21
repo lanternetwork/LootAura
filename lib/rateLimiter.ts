@@ -16,7 +16,7 @@ interface RateLimitEntry {
 const rateLimitStore = new Map<string, RateLimitEntry>()
 
 // Clean up expired entries periodically
-// Skip in test environment to prevent handle leaks
+// Guard: Don't run in test environment to prevent leaked handles
 if (process.env.NODE_ENV !== 'test') {
   setInterval(() => {
     const now = Date.now()

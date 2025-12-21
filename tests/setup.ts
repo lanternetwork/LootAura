@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 
-import { vi, afterEach as vitestAfterEach } from 'vitest'
+import { vi, afterEach as vitestAfterEach, afterAll } from 'vitest'
 import makeStableSupabaseClient from './utils/mocks/supabaseServerStable'
 
 // never re-create this per test, keep it stable
@@ -328,7 +328,8 @@ vitestAfterEach(async () => {
 
 // Global unhandled rejection handler to catch ZodErrors from env validation during tests
 // These errors are expected in env.test.ts when testing error conditions
-process.on('unhandledRejection', (reason: unknown) => {
+// Note: This listener does NOT keep the process alive - it only handles rejections
+const unhandledRejectionHandler = (reason: unknown) => {
   // Ignore ZodErrors from env validation during tests
   // These are expected when testing error conditions in env.test.ts
   if (reason && typeof reason === 'object' && 'issues' in reason) {
@@ -341,5 +342,15 @@ process.on('unhandledRejection', (reason: unknown) => {
     }
   }
   // For other unhandled rejections, let them propagate (Vitest will handle them)
-})
+}
+
+process.on('unhandledRejection', unhandledRejectionHandler)
+
+// Clean up the listener after all tests to prevent it from keeping the process alive
+// This is safe because Vitest will have handled all test-related rejections by this point
+if (typeof afterAll !== 'undefined') {
+  afterAll(() => {
+    process.removeListener('unhandledRejection', unhandledRejectionHandler)
+  })
+}
 

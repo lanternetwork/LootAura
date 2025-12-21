@@ -226,6 +226,9 @@ afterEach(() => {
   server.resetHandlers()
 })
 
-afterAll(() => {
+afterAll(async () => {
+  // Ensure server is closed to prevent leaked handles
   server.close()
+  // Give MSW a moment to clean up any pending requests
+  await new Promise(resolve => setImmediate(resolve))
 })

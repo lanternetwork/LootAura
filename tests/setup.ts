@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 
-import { vi, afterEach as vitestAfterEach, afterAll } from 'vitest'
+import { vi, afterEach as vitestAfterEach } from 'vitest'
 import makeStableSupabaseClient from './utils/mocks/supabaseServerStable'
 
 // never re-create this per test, keep it stable
@@ -112,14 +112,6 @@ vi.mock('@/lib/supabase/client', () => ({
       signInWithPassword: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
-      onAuthStateChange: vi.fn(() => ({
-        data: {
-          subscription: {
-            unsubscribe: vi.fn(),
-          },
-        },
-        error: null,
-      })),
     },
     from: vi.fn(() => {
       const chain: any = {}
@@ -175,54 +167,6 @@ if (typeof globalThis !== 'undefined') {
 try {
   (global as any).matchMedia = mockMatchMedia
 } catch {}
-
-// Mock navigator.geolocation to prevent leaks in test environment
-// Geolocation API calls that never resolve/reject can keep the process alive
-if (typeof navigator !== 'undefined') {
-  const mockGeolocation = {
-    getCurrentPosition: vi.fn((success, error, options) => {
-      // Immediately reject in test environment to prevent hanging
-      // Use setImmediate to ensure it's async but resolves immediately
-      setImmediate(() => {
-        if (error) {
-          error({
-            code: 1, // PERMISSION_DENIED
-            message: 'User denied geolocation (test mock)',
-            PERMISSION_DENIED: 1,
-            POSITION_UNAVAILABLE: 2,
-            TIMEOUT: 3,
-          } as GeolocationPositionError)
-        }
-      })
-    }),
-    watchPosition: vi.fn((success, error, options) => {
-      // Return a watch ID that can be cleared
-      const watchId = Math.floor(Math.random() * 1000000)
-      // Immediately reject in test environment
-      setImmediate(() => {
-        if (error) {
-          error({
-            code: 1,
-            message: 'User denied geolocation (test mock)',
-            PERMISSION_DENIED: 1,
-            POSITION_UNAVAILABLE: 2,
-            TIMEOUT: 3,
-          } as GeolocationPositionError)
-        }
-      })
-      return watchId
-    }),
-    clearWatch: vi.fn((watchId) => {
-      // No-op in test environment
-    }),
-  }
-  
-  Object.defineProperty(navigator, 'geolocation', {
-    writable: true,
-    configurable: true,
-    value: mockGeolocation,
-  })
-}
 
 // Console noise guardrail - fail tests on unexpected console output
 const originalConsoleError = console.error
@@ -327,7 +271,7 @@ const ALLOWED_PATTERNS = [
   /^\[ITEMS_DIAG\]/, // Items diagnostic logging - lib/data/salesAccess.ts getSaleWithItems
   
   // Test diagnostic logging (tests/setup.ts)
-  /^\[TEST_DIAGNOSTIC\]/, // Test diagnostic logging for open handles detection
+  /^\[TEST_DIAGNOSTIC\]/, // Test diagnostic logging for detecting leaked handles - tests/setup.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {
@@ -387,99 +331,5 @@ process.on('unhandledRejection', (reason: unknown) => {
     }
   }
   // For other unhandled rejections, let them propagate (Vitest will handle them)
-})
-
-// Diagnostic: Detect open handles after all tests complete
-// This helps identify what's preventing Vitest from exiting
-afterAll(() => {
-  // Use setImmediate to check after current event loop completes
-  setImmediate(() => {
-    if (typeof (process as any)._getActiveHandles === 'function') {
-      const handles = (process as any)._getActiveHandles()
-      const requests = (process as any)._getActiveRequests()
-      
-      // Log ALL handles for identification (we'll filter diagnostic ones later)
-      console.log('\n[TEST_DIAGNOSTIC] ========================================')
-      console.log('[TEST_DIAGNOSTIC] ACTIVE HANDLES:', handles.length)
-      console.log('[TEST_DIAGNOSTIC] ACTIVE REQUESTS:', requests.length)
-      console.log('[TEST_DIAGNOSTIC] ========================================\n')
-      
-      handles.forEach((handle: any, i: number) => {
-        const handleType = handle.constructor?.name || 'Unknown'
-        const handleInfo: any = {
-          index: i,
-          type: handleType,
-        }
-        
-        // Get detailed info based on handle type
-        if (handleType === 'Timeout') {
-          handleInfo._idleTimeout = handle._idleTimeout
-          handleInfo._idleStart = handle._idleStart
-          handleInfo._idleNext = handle._idleNext ? 'present' : 'null'
-          // Try to get the callback function
-          if (handle._onTimeout) {
-            handleInfo._onTimeout = handle._onTimeout.toString().split('\n').slice(0, 5).join('\n')
-          }
-        } else if (handleType === 'Immediate') {
-          // These are usually fine, but log them anyway
-          handleInfo.note = 'Immediate handle (usually transient)'
-        } else if (handleType === 'Socket' || handleType === 'TCPSocketWrap' || handleType === 'PipeWrap') {
-          handleInfo.readable = handle.readable
-          handleInfo.writable = handle.writable
-          handleInfo.destroyed = handle.destroyed
-        } else if (handleType === 'MessagePort') {
-          handleInfo.note = 'MessagePort (inter-process communication)'
-        } else if (handleType === 'FSWatcher') {
-          handleInfo.note = 'FSWatcher (file system watcher)'
-        } else if (handle._events) {
-          handleInfo.events = Object.keys(handle._events)
-        }
-        
-        // Try to get stack trace if available
-        if (handle.stack) {
-          handleInfo.stack = handle.stack.split('\n').slice(0, 15).join('\n')
-        }
-        
-        // Log the handle
-        console.log(`[TEST_DIAGNOSTIC] Handle [${i}]: ${handleType}`)
-        console.log(JSON.stringify(handleInfo, null, 2))
-        console.log('')
-      })
-      
-      requests.forEach((req: any, i: number) => {
-        const reqType = req.constructor?.name || 'Unknown'
-        const reqInfo: any = {
-          index: i,
-          type: reqType,
-        }
-        if (req.stack) {
-          reqInfo.stack = req.stack.split('\n').slice(0, 10).join('\n')
-        }
-        console.log(`[TEST_DIAGNOSTIC] Request [${i}]: ${reqType}`)
-        console.log(JSON.stringify(reqInfo, null, 2))
-        console.log('')
-      })
-      
-      // Filter out diagnostic handles (Immediate from setImmediate, and our own diagnostic)
-      const diagnosticHandles = handles.filter((handle: any) => {
-        const handleType = handle.constructor?.name || 'Unknown'
-        // Exclude Immediate handles (they're transient)
-        if (handleType === 'Immediate') return false
-        return true
-      })
-      
-      if (diagnosticHandles.length > 0 || requests.length > 0) {
-        console.warn('\n[TEST_DIAGNOSTIC] ⚠️  Open handles detected after tests')
-        console.warn(`[TEST_DIAGNOSTIC]   Non-Immediate Handles: ${diagnosticHandles.length}`)
-        console.warn(`[TEST_DIAGNOSTIC]   Active Requests: ${requests.length}`)
-        console.warn('[TEST_DIAGNOSTIC] See details above.')
-        console.warn('[TEST_DIAGNOSTIC] If process hangs, these are likely the cause.\n')
-        // Don't force exit - let Vitest handle it naturally
-        // If there's a real leak, the process will hang and we can investigate
-      } else {
-        console.log('[TEST_DIAGNOSTIC] ✅ No leaked handles detected - process should exit cleanly\n')
-      }
-    }
-  })
 })
 

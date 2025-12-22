@@ -348,30 +348,26 @@ process.on('unhandledRejection', unhandledRejectionHandler)
 
 // Clean up the listener after all tests to prevent it from keeping the process alive
 // This is safe because Vitest will have handled all test-related rejections by this point
-afterAll(async () => {
+afterAll(() => {
   if (typeof process.removeListener === 'function') {
     process.removeListener('unhandledRejection', unhandledRejectionHandler)
   } else if (typeof process.off === 'function') {
     process.off('unhandledRejection', unhandledRejectionHandler)
   }
   
-  // Wait for MSW cleanup to complete (it runs in its own afterAll)
-  // Use multiple setImmediate calls to ensure all cleanup completes
-  for (let i = 0; i < 5; i++) {
-    await new Promise(resolve => setImmediate(resolve))
-  }
-  
   // Diagnostic: Check for leaked handles after all tests complete
-  // Run after MSW cleanup has had time to complete
+  // Run synchronously to avoid creating additional async operations
   if (typeof (process as any)._getActiveHandles === 'function') {
     const handles = (process as any)._getActiveHandles()
     const requests = (process as any)._getActiveRequests()
     
-    // Filter out Immediate handles (they're transient)
+    // Filter out Immediate handles and MessagePort handles (from Vitest workers)
     const leakedHandles = handles.filter((handle: any) => {
       const handleType = handle.constructor?.name || 'Unknown'
       // Exclude Immediate handles (they're transient)
       if (handleType === 'Immediate') return false
+      // Exclude MessagePort handles (they're from Vitest worker threads)
+      if (handleType === 'MessagePort') return false
       return true
     })
     

@@ -226,21 +226,12 @@ afterEach(() => {
   server.resetHandlers()
 })
 
-afterAll(async () => {
+afterAll(() => {
   // Ensure server is closed to prevent leaked handles
   // Use both close() and resetHandlers() to ensure complete cleanup
   server.resetHandlers()
   server.close()
   
-  // Force close any remaining connections
-  // MSW might keep connections open, so we need to be more aggressive
-  try {
-    // Give MSW a moment to clean up, but don't wait too long
-    await Promise.race([
-      new Promise(resolve => setImmediate(resolve)),
-      new Promise(resolve => setTimeout(resolve, 100))
-    ])
-  } catch {
-    // Ignore errors during cleanup
-  }
+  // MSW server.close() should close all connections, but if it doesn't,
+  // we need to ensure the process can exit. The server should handle cleanup.
 })

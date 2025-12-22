@@ -1242,11 +1242,7 @@ export default function SalesClient({
 
     const updatePosition = () => {
       try {
-        // Get fresh map instance in case it changed
-        const currentMap = desktopMapRef.current?.getMap?.()
-        if (!currentMap) return
-        
-        const point = currentMap.project([selectedPinCoords.lng, selectedPinCoords.lat])
+        const point = map.project([selectedPinCoords.lng, selectedPinCoords.lat])
         setDesktopPinPosition({ x: point.x, y: point.y })
       } catch (error) {
         // Ignore errors during map transitions
@@ -1257,17 +1253,8 @@ export default function SalesClient({
     map.on('zoom', updatePosition)
 
     return () => {
-      // Get fresh map instance for cleanup in case map was recreated
-      const currentMap = desktopMapRef.current?.getMap?.()
-      if (currentMap) {
-        currentMap.off('move', updatePosition)
-        currentMap.off('zoom', updatePosition)
-      }
-      // Also try to clean up from the original map instance
-      if (map && map !== currentMap) {
-        map.off('move', updatePosition)
-        map.off('zoom', updatePosition)
-      }
+      map.off('move', updatePosition)
+      map.off('zoom', updatePosition)
     }
   }, [selectedPinCoords])
 

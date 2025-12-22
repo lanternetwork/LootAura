@@ -5,15 +5,14 @@ on:
     types: [created, success]
 
 jobs:
-  determine-url:
+  run-on-success:
     # Only run on successful deployments to main to avoid branch noise.
     # Note: deployment_status events don't always carry github.ref, so gate purely on deployment state
     # and use continue-on-error to avoid blocking CI when the event shape is missing fields.
     if: github.event.deployment_status.state == 'success'
     continue-on-error: true
     runs-on: ubuntu-latest
-    outputs:
-      url: ${{ steps.url.outputs.url }}
+    timeout-minutes: 30
     steps:
       - name: Determine target URL
         id: url
@@ -31,12 +30,10 @@ jobs:
           fi
           echo "url=$URL" >> $GITHUB_OUTPUT
 
-  call-load-tests:
-    needs: determine-url
-    if: needs.determine-url.outputs.url != ''
-    uses: ./.github/workflows/load-test.yml
-    with:
-      baseURL: ${{ needs.determine-url.outputs.url }}
-      scenario: all
+      - name: Call reusable load-test workflow (all scenarios)
+        uses: ./.github/workflows/load-test.yml
+        with:
+          baseURL: ${{ steps.url.outputs.url }}
+          scenario: all
 
 

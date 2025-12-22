@@ -22,14 +22,12 @@ export default defineConfig({
     // Ensure no network calls in tests
     testTimeout: 10000,
     hookTimeout: 10000,
-    // Use forks instead of threads for better memory isolation in CI
-    // Forks provide separate processes with independent memory spaces and better GC
-    pool: process.env.CI ? 'forks' : 'threads',
+    // Ensure jsdom environment is available to tests
+    pool: 'threads',
     // Reduce memory usage
     maxConcurrency: 1,
     // Constrain worker count to prevent OOMs
-    // Reduced to 1 for CI stability to minimize memory usage (can be overridden with VITEST_WORKERS env var)
-    maxWorkers: process.env.CI ? 1 : 4,
+    maxWorkers: 4,
     minWorkers: 1,
   },
   resolve: {

@@ -348,44 +348,50 @@ process.on('unhandledRejection', unhandledRejectionHandler)
 
 // Clean up the listener after all tests to prevent it from keeping the process alive
 // This is safe because Vitest will have handled all test-related rejections by this point
-afterAll(() => {
+afterAll(async () => {
   process.removeListener('unhandledRejection', unhandledRejectionHandler)
   
+  // Wait for MSW cleanup to complete (it runs in its own afterAll)
+  // Use multiple setImmediate calls to ensure all cleanup completes
+  for (let i = 0; i < 5; i++) {
+    await new Promise(resolve => setImmediate(resolve))
+  }
+  
   // Diagnostic: Check for leaked handles after all tests complete
-  // Use setImmediate to avoid creating a setTimeout handle that could leak
-  setImmediate(() => {
-    if (typeof (process as any)._getActiveHandles === 'function') {
-      const handles = (process as any)._getActiveHandles()
-      const requests = (process as any)._getActiveRequests()
+  // Run after MSW cleanup has had time to complete
+  if (typeof (process as any)._getActiveHandles === 'function') {
+    const handles = (process as any)._getActiveHandles()
+    const requests = (process as any)._getActiveRequests()
+    
+    // Filter out Immediate handles (they're transient)
+    const leakedHandles = handles.filter((handle: any) => {
+      const handleType = handle.constructor?.name || 'Unknown'
+      // Exclude Immediate handles (they're transient)
+      if (handleType === 'Immediate') return false
+      return true
+    })
+    
+    if (leakedHandles.length > 0 || requests.length > 0) {
+      console.log('\n[TEST_DIAGNOSTIC] ========================================')
+      console.log('[TEST_DIAGNOSTIC] LEAKED HANDLES AFTER TESTS:', leakedHandles.length)
+      console.log('[TEST_DIAGNOSTIC] ACTIVE REQUESTS:', requests.length)
       
-      // Filter out diagnostic handles (Immediate handles are transient)
-      const leakedHandles = handles.filter((handle: any) => {
+      leakedHandles.forEach((handle: any, i: number) => {
         const handleType = handle.constructor?.name || 'Unknown'
-        // Exclude Immediate handles (they're transient)
-        if (handleType === 'Immediate') return false
-        return true
+        console.log(`[TEST_DIAGNOSTIC] Handle [${i}]: ${handleType}`)
+        if (handleType === 'Socket' || handleType === 'TCPSocketWrap' || handleType === 'PipeWrap') {
+          console.log(`[TEST_DIAGNOSTIC]   - readable: ${handle.readable}, writable: ${handle.writable}, destroyed: ${handle.destroyed}`)
+        } else if (handleType === 'Timeout') {
+          console.log(`[TEST_DIAGNOSTIC]   - timeout: ${handle._idleTimeout}, start: ${handle._idleStart}`)
+        } else if (handleType === 'Server' || handleType === 'HTTPServer') {
+          console.log(`[TEST_DIAGNOSTIC]   - server handle (likely MSW)`)
+        }
       })
       
-      if (leakedHandles.length > 0 || requests.length > 0) {
-        console.log('\n[TEST_DIAGNOSTIC] ========================================')
-        console.log('[TEST_DIAGNOSTIC] LEAKED HANDLES AFTER TESTS:', leakedHandles.length)
-        console.log('[TEST_DIAGNOSTIC] ACTIVE REQUESTS:', requests.length)
-        
-        leakedHandles.forEach((handle: any, i: number) => {
-          const handleType = handle.constructor?.name || 'Unknown'
-          console.log(`[TEST_DIAGNOSTIC] Handle [${i}]: ${handleType}`)
-          if (handleType === 'Socket' || handleType === 'TCPSocketWrap' || handleType === 'PipeWrap') {
-            console.log(`[TEST_DIAGNOSTIC]   - readable: ${handle.readable}, writable: ${handle.writable}, destroyed: ${handle.destroyed}`)
-          } else if (handleType === 'Timeout') {
-            console.log(`[TEST_DIAGNOSTIC]   - timeout: ${handle._idleTimeout}, start: ${handle._idleStart}`)
-          }
-        })
-        
-        console.log('[TEST_DIAGNOSTIC] ========================================\n')
-      } else {
-        console.log('[TEST_DIAGNOSTIC] ✅ No leaked handles detected\n')
-      }
+      console.log('[TEST_DIAGNOSTIC] ========================================\n')
+    } else {
+      console.log('[TEST_DIAGNOSTIC] ✅ No leaked handles detected\n')
     }
-  })
+  }
 })
 

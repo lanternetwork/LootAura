@@ -74,8 +74,6 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   const [mapError, setMapError] = useState<string | null>(null)
   const [pinsLoading, setPinsLoading] = useState(false)
   const lastBoundsKey = useRef<string>("")
-  const dragEndTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const isUserDraggingRef = useRef(false)
   
   const token = getMapboxToken()
   
@@ -194,14 +192,9 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     }
     
     const handleDragEnd = () => {
-      // Clear any existing timeout to prevent leaks
-      if (dragEndTimeoutRef.current) {
-        clearTimeout(dragEndTimeoutRef.current)
-      }
       // Small delay to ensure all drag-related state updates complete
-      dragEndTimeoutRef.current = setTimeout(() => {
+      setTimeout(() => {
         isUserDraggingRef.current = false
-        dragEndTimeoutRef.current = null
       }, 100)
     }
     
@@ -209,11 +202,6 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
     map.on('dragend', handleDragEnd)
     
     return () => {
-      // Clear any pending timeout
-      if (dragEndTimeoutRef.current) {
-        clearTimeout(dragEndTimeoutRef.current)
-        dragEndTimeoutRef.current = null
-      }
       map.off('dragstart', handleDragStart)
       map.off('dragend', handleDragEnd)
     }
@@ -358,6 +346,7 @@ const SimpleMap = forwardRef<any, SimpleMapProps>(({
   // Track ongoing animation to cancel it if a new one starts (prevents label flashing)
   const ongoingAnimationRef = useRef<{ cancel: () => void } | null>(null)
   // Track when user is actively dragging/interacting with the map
+  const isUserDraggingRef = useRef<boolean>(false)
   
   const handleLocationClickWrapped = useCallback((locationId: string, lat?: number, lng?: number) => {
     const alreadyCentered = centeredLocationRef.current[locationId]

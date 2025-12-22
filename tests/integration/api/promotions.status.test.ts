@@ -154,7 +154,7 @@ describe('GET /api/promotions/status', () => {
     expect(json.statuses[0].sale_id).toBe('sale-1')
   })
 
-  it('respects MAX_SALE_IDS cap by limiting to 100 unique IDs', async () => {
+  it('respects MAX_SALE_IDS cap by returning 400 for too many IDs', async () => {
     const ids = Array.from({ length: 150 }, (_, i) => `sale-${i + 1}`).join(',')
     const request = new NextRequest(
       `http://localhost/api/promotions/status?sale_ids=${encodeURIComponent(ids)}`,
@@ -164,11 +164,10 @@ describe('GET /api/promotions/status', () => {
     const res = await handler(request)
     const json = await res.json()
 
-    expect(res.status).toBe(200)
-    expect(Array.isArray(json.statuses)).toBe(true)
-    // The handler should have sliced to at most 100 unique IDs
-    // (exact value depends on mocked DB, but we assert it never exceeds 100)
-    expect(json.statuses.length).toBeLessThanOrEqual(100)
+    // The handler should return 400 when there are more than 100 IDs
+    expect(res.status).toBe(400)
+    expect(json.error).toBe('INVALID_REQUEST')
+    expect(json.message).toBe('Too many sale IDs')
   })
 
   it('returns minimal response shape', async () => {

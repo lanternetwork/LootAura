@@ -349,7 +349,11 @@ process.on('unhandledRejection', unhandledRejectionHandler)
 // Clean up the listener after all tests to prevent it from keeping the process alive
 // This is safe because Vitest will have handled all test-related rejections by this point
 afterAll(async () => {
-  process.removeListener('unhandledRejection', unhandledRejectionHandler)
+  if (typeof process.removeListener === 'function') {
+    process.removeListener('unhandledRejection', unhandledRejectionHandler)
+  } else if (typeof process.off === 'function') {
+    process.off('unhandledRejection', unhandledRejectionHandler)
+  }
   
   // Wait for MSW cleanup to complete (it runs in its own afterAll)
   // Use multiple setImmediate calls to ensure all cleanup completes

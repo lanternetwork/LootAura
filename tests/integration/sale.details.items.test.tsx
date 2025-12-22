@@ -230,10 +230,6 @@ describe('Sale Details Items Display', () => {
         items={mockItems}
         promotionsEnabled={true}
         paymentsEnabled={true}
-        initialPromotionStatus={{
-          isActive: true,
-          endsAt: '2030-01-01T00:00:00.000Z',
-        } as any}
       />
     )
 

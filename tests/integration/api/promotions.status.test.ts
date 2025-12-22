@@ -161,9 +161,6 @@ describe('GET /api/promotions/status', () => {
       { method: 'GET' }
     )
 
-    const { default: routeModule } = await import('@/app/api/promotions/status/route')
-    // Ensure we use the real constants indirectly via behavior: response should be OK
-
     const res = await handler(request)
     const json = await res.json()
 

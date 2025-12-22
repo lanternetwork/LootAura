@@ -356,41 +356,45 @@ afterAll(() => {
   }
   
   // Diagnostic: Check for leaked handles after all tests complete
-  // Run synchronously to avoid creating additional async operations
-  if (typeof (process as any)._getActiveHandles === 'function') {
-    const handles = (process as any)._getActiveHandles()
-    const requests = (process as any)._getActiveRequests()
-    
-    // Filter out Immediate handles and MessagePort handles (from Vitest workers)
-    const leakedHandles = handles.filter((handle: any) => {
-      const handleType = handle.constructor?.name || 'Unknown'
-      // Exclude Immediate handles (they're transient)
-      if (handleType === 'Immediate') return false
-      // Exclude MessagePort handles (they're from Vitest worker threads)
-      if (handleType === 'MessagePort') return false
-      return true
-    })
-    
-    if (leakedHandles.length > 0 || requests.length > 0) {
-      console.log('\n[TEST_DIAGNOSTIC] ========================================')
-      console.log('[TEST_DIAGNOSTIC] LEAKED HANDLES AFTER TESTS:', leakedHandles.length)
-      console.log('[TEST_DIAGNOSTIC] ACTIVE REQUESTS:', requests.length)
+  // Only run if explicitly enabled via env var to avoid memory issues
+  // Accessing _getActiveHandles can create references that prevent GC
+  if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true' && typeof (process as any)._getActiveHandles === 'function') {
+    try {
+      const handles = (process as any)._getActiveHandles()
+      const requests = (process as any)._getActiveRequests()
       
-      leakedHandles.forEach((handle: any, i: number) => {
+      // Filter out Immediate handles and MessagePort handles (from Vitest workers)
+      const leakedHandles = handles.filter((handle: any) => {
         const handleType = handle.constructor?.name || 'Unknown'
-        console.log(`[TEST_DIAGNOSTIC] Handle [${i}]: ${handleType}`)
-        if (handleType === 'Socket' || handleType === 'TCPSocketWrap' || handleType === 'PipeWrap') {
-          console.log(`[TEST_DIAGNOSTIC]   - readable: ${handle.readable}, writable: ${handle.writable}, destroyed: ${handle.destroyed}`)
-        } else if (handleType === 'Timeout') {
-          console.log(`[TEST_DIAGNOSTIC]   - timeout: ${handle._idleTimeout}, start: ${handle._idleStart}`)
-        } else if (handleType === 'Server' || handleType === 'HTTPServer') {
-          console.log(`[TEST_DIAGNOSTIC]   - server handle (likely MSW)`)
-        }
+        // Exclude Immediate handles (they're transient)
+        if (handleType === 'Immediate') return false
+        // Exclude MessagePort handles (they're from Vitest worker threads)
+        if (handleType === 'MessagePort') return false
+        return true
       })
       
-      console.log('[TEST_DIAGNOSTIC] ========================================\n')
-    } else {
-      console.log('[TEST_DIAGNOSTIC] ✅ No leaked handles detected\n')
+      if (leakedHandles.length > 0 || requests.length > 0) {
+        console.log('\n[TEST_DIAGNOSTIC] ========================================')
+        console.log('[TEST_DIAGNOSTIC] LEAKED HANDLES AFTER TESTS:', leakedHandles.length)
+        console.log('[TEST_DIAGNOSTIC] ACTIVE REQUESTS:', requests.length)
+        
+        // Only log handle types, not full details to avoid creating references
+        const handleTypes = new Map<string, number>()
+        leakedHandles.forEach((handle: any) => {
+          const handleType = handle.constructor?.name || 'Unknown'
+          handleTypes.set(handleType, (handleTypes.get(handleType) || 0) + 1)
+        })
+        
+        handleTypes.forEach((count, type) => {
+          console.log(`[TEST_DIAGNOSTIC] ${type}: ${count}`)
+        })
+        
+        console.log('[TEST_DIAGNOSTIC] ========================================\n')
+      } else {
+        console.log('[TEST_DIAGNOSTIC] ✅ No leaked handles detected\n')
+      }
+    } catch (error) {
+      // Silently ignore errors in diagnostic code to avoid breaking tests
     }
   }
 })

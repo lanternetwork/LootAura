@@ -237,12 +237,13 @@ afterAll(async () => {
     await server.close()
   } catch (error) {
     // Ignore errors during cleanup - server may already be closed
-    console.log('[TEST_DIAGNOSTIC] MSW server.close() error (ignored):', error)
+    // Only log if diagnostics are enabled to avoid memory issues
+    if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true') {
+      console.log('[TEST_DIAGNOSTIC] MSW server.close() error (ignored):', error)
+    }
   }
   
-  // Force garbage collection of any remaining handles
-  // Use multiple setImmediate calls to ensure all cleanup completes
-  for (let i = 0; i < 3; i++) {
-    await new Promise(resolve => setImmediate(resolve))
-  }
+  // Single setImmediate to allow event loop to process cleanup
+  // Multiple loops can accumulate memory - one is sufficient
+  await new Promise(resolve => setImmediate(resolve))
 })

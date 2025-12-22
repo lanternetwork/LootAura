@@ -233,6 +233,7 @@ afterAll(async () => {
   
   // Close the server and wait for it to complete
   // MSW's close() returns a promise that resolves when cleanup is done
+  // No additional setImmediate needed - MSW handles cleanup internally
   try {
     await server.close()
   } catch (error) {
@@ -242,8 +243,4 @@ afterAll(async () => {
       console.log('[TEST_DIAGNOSTIC] MSW server.close() error (ignored):', error)
     }
   }
-  
-  // Single setImmediate to allow event loop to process cleanup
-  // Multiple loops can accumulate memory - one is sufficient
-  await new Promise(resolve => setImmediate(resolve))
 })

@@ -24,10 +24,10 @@ export default defineConfig({
     hookTimeout: 10000,
     // Ensure jsdom environment is available to tests
     pool: 'threads',
-    // Reduce memory usage
+    // Reduce memory usage - use single worker to prevent OOMs
     maxConcurrency: 1,
-    // Constrain worker count to prevent OOMs - reduce to 2 workers to lower memory per worker
-    maxWorkers: 2,
+    // Use single worker to prevent memory issues across multiple workers
+    maxWorkers: 1,
     minWorkers: 1,
   },
   resolve: {

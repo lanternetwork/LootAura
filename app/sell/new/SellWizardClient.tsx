@@ -1878,7 +1878,7 @@ function ReviewStep({
   loading,
   submitError,
   promotionsEnabled,
-  _paymentsEnabled,
+  paymentsEnabled: _paymentsEnabled,
   wantsPromotion,
   onTogglePromotion,
 }: {

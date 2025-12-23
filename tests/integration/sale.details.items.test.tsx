@@ -260,7 +260,7 @@ describe('Sale Details Items Display', () => {
 
     const active = await screen.findByTestId('sale-detail-promote-active')
     expect(active.textContent).toContain('Promoted')
-    expect(active.textContent).toMatch(/Ends/)
+    expect(active.textContent || '').toContain('Ends')
 
     (global as any).fetch = originalFetch
   })
@@ -269,8 +269,8 @@ describe('Sale Details Items Display', () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
 
     const originalFetch = global.fetch
-    const mockFetch = vi.fn<unknown, unknown[]>()
-    (global as any).fetch = mockFetch
+    const mockFetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+    ;(global as any).fetch = mockFetch
 
     try {
       render(
@@ -291,8 +291,7 @@ describe('Sale Details Items Display', () => {
 
       await Promise.resolve()
 
-      const calls = mockFetch.mock.calls.filter((args: unknown[]) => {
-        const [url] = args
+      const calls = mockFetch.mock.calls.filter(([url]) => {
         return typeof url === 'string' && url.includes('/api/promotions/checkout')
       })
       expect(calls.length).toBe(0)

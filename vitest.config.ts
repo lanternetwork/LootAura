@@ -24,25 +24,8 @@ export default defineConfig({
     hookTimeout: 10000,
     // Ensure jsdom environment is available to tests
     // Use 'forks' pool instead of 'threads' to ensure NODE_OPTIONS (heap size) is inherited by workers
-    // Forks are separate Node.js processes that properly inherit environment variables
+    // Forks are separate Node.js processes that properly inherit environment variables including NODE_OPTIONS
     pool: 'forks',
-    // Explicitly pass heap size to fork workers via execArgv to ensure 16GB heap is applied
-    // This is critical for CI where tests can consume significant memory
-    poolOptions: {
-      forks: {
-        // Hardcode execArgv to ensure heap size is always applied in CI
-        // Parse from NODE_OPTIONS if available, otherwise use CI defaults
-        execArgv: (() => {
-          const nodeOptions = process.env.NODE_OPTIONS
-          if (nodeOptions) {
-            // Split by spaces and filter out empty strings
-            return nodeOptions.split(/\s+/).filter(Boolean)
-          }
-          // Default to 16GB heap for CI if NODE_OPTIONS not set
-          return process.env.CI ? ['--max-old-space-size=16384', '--expose-gc'] : []
-        })(),
-      },
-    },
     // Reduce memory usage
     maxConcurrency: 1,
     // Constrain worker count to prevent OOMs (use 1 worker in CI to reduce memory pressure)

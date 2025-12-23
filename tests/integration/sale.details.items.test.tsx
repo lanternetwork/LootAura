@@ -220,8 +220,33 @@ describe('Sale Details Items Display', () => {
     expect(screen.getByText('Promote this sale')).toBeInTheDocument()
   })
 
-  it('shows active promotion state with ends date when promotion is active', () => {
+  it('shows active promotion state with ends date when promotion is active', async () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
+
+    const originalFetch = global.fetch
+    const mockFetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString()
+      if (url.includes('/api/promotions/status')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              statuses: [
+                {
+                  sale_id: 'test-sale-id',
+                  is_active: true,
+                  ends_at: '2030-01-01T00:00:00.000Z',
+                  tier: 'featured_week',
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+        )
+      }
+      return originalFetch(input as any, init)
+    }) as unknown as typeof fetch
+
+    (global as any).fetch = mockFetch
 
     render(
       <SaleDetailClient 
@@ -230,16 +255,14 @@ describe('Sale Details Items Display', () => {
         items={mockItems}
         promotionsEnabled={true}
         paymentsEnabled={true}
-        initialPromotionStatus={{
-          isActive: true,
-          endsAt: '2030-01-01T00:00:00.000Z',
-        } as any}
       />
     )
 
-    const active = screen.getByTestId('sale-detail-promote-active')
+    const active = await screen.findByTestId('sale-detail-promote-active')
     expect(active.textContent).toContain('Promoted')
     expect(active.textContent).toMatch(/Ends/)
+
+    ;(global as any).fetch = originalFetch
   })
 
   it('does not call checkout when payments are disabled (seller view)', async () => {
@@ -247,7 +270,7 @@ describe('Sale Details Items Display', () => {
 
     const originalFetch = global.fetch
     const mockFetch = vi.fn()
-    ;(global as any).fetch = mockFetch
+    (global as any).fetch = mockFetch
 
     try {
       render(

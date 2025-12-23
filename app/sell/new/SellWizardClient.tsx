@@ -1870,15 +1870,15 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
-function ReviewStep({ 
-  formData, 
+function ReviewStep({
+  formData,
   photos,
   items,
   onPublish,
   loading,
   submitError,
   promotionsEnabled,
-  paymentsEnabled,
+  _paymentsEnabled,
   wantsPromotion,
   onTogglePromotion,
 }: {
@@ -1889,6 +1889,7 @@ function ReviewStep({
   loading: boolean
   submitError?: string | null
   promotionsEnabled?: boolean
+  paymentsEnabled?: boolean
   wantsPromotion?: boolean
   onTogglePromotion?: (next: boolean) => void
 }) {

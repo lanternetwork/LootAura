@@ -13,7 +13,7 @@ import { fail, ok } from '@/lib/http/json'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   // Check if promotions are enabled
   if (!isPromotionsEnabled() || !isPaymentsEnabled()) {
     return fail(403, 'PROMOTIONS_DISABLED', 'Promotions are currently disabled')

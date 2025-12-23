@@ -158,6 +158,8 @@ const STOCK_ITEM_NAMES = [
   'Garden Tools',
 ]
 
+let checkoutMockFetch: ReturnType<typeof vi.fn> | null = null
+
 describe('Sale Details Items Display', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -259,8 +261,9 @@ describe('Sale Details Items Display', () => {
     )
 
     const active = await screen.findByTestId('sale-detail-promote-active')
-    expect(active).toHaveTextContent('Promoted')
-    expect(active).toHaveTextContent(/Ends/)
+    const text = active.textContent || ''
+    expect(text.includes('Promoted')).toBe(true)
+    expect(text.includes('Ends')).toBe(true)
 
     (global as any).fetch = originalFetch
   })
@@ -269,8 +272,8 @@ describe('Sale Details Items Display', () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
 
     const originalFetch = global.fetch
-    const mockFetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-    (global as any).fetch = mockFetch
+    checkoutMockFetch = vi.fn()
+    ;(global as any).fetch = checkoutMockFetch
 
     try {
       render(
@@ -291,7 +294,8 @@ describe('Sale Details Items Display', () => {
 
       await Promise.resolve()
 
-      const calls = mockFetch.mock.calls.filter(([url]) => {
+      const calls = (checkoutMockFetch!.mock.calls as any[]).filter((args: any[]) => {
+        const [url] = args
         return typeof url === 'string' && url.includes('/api/promotions/checkout')
       })
       expect(calls.length).toBe(0)

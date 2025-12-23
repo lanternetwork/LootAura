@@ -228,7 +228,7 @@ jobs:
           done
 
       - name: Run integration tests
-        run: npm run test -- tests/integration/
+        run: npx vitest run tests/integration/
         env:
           NODE_OPTIONS: '--max-old-space-size=20480 --expose-gc'
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

@@ -26,6 +26,23 @@ export default defineConfig({
     // Use 'forks' pool instead of 'threads' to ensure NODE_OPTIONS (heap size) is inherited by workers
     // Forks are separate Node.js processes that properly inherit environment variables including NODE_OPTIONS
     pool: 'forks',
+    // Explicitly pass heap size to fork workers via execArgv to ensure it's applied
+    // This is critical for CI where tests can consume significant memory
+    poolOptions: {
+      forks: {
+        // Parse NODE_OPTIONS from environment and pass as execArgv to ensure heap size is applied
+        // Fallback to 20GB for CI if NODE_OPTIONS is not set
+        execArgv: (() => {
+          const nodeOptions = process.env.NODE_OPTIONS
+          if (nodeOptions) {
+            // Split by spaces and filter out empty strings
+            return nodeOptions.split(/\s+/).filter(Boolean)
+          }
+          // Default to 20GB heap for CI if NODE_OPTIONS not set
+          return process.env.CI ? ['--max-old-space-size=20480', '--expose-gc'] : []
+        })(),
+      },
+    },
     // Reduce memory usage
     maxConcurrency: 1,
     // Constrain worker count to prevent OOMs (use 1 worker in CI to reduce memory pressure)

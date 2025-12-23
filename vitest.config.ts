@@ -26,6 +26,14 @@ export default defineConfig({
     // Use 'forks' pool instead of 'threads' to ensure NODE_OPTIONS (heap size) is inherited by workers
     // Forks are separate Node.js processes that properly inherit environment variables
     pool: 'forks',
+    // Explicitly pass NODE_OPTIONS to fork workers via execArgv to ensure heap size is applied
+    poolOptions: {
+      forks: {
+        execArgv: process.env.NODE_OPTIONS
+          ? process.env.NODE_OPTIONS.split(/\s+/).filter(Boolean)
+          : [],
+      },
+    },
     // Reduce memory usage
     maxConcurrency: 1,
     // Constrain worker count to prevent OOMs (use 1 worker in CI to reduce memory pressure)

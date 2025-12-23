@@ -262,8 +262,12 @@ describe('Sale Details Items Display', () => {
 
     const active = await screen.findByTestId('sale-detail-promote-active')
     const text = active.textContent || ''
-    expect(text.includes('Promoted')).toBe(true)
-    expect(text.includes('Ends')).toBe(true)
+    if (!text.includes('Promoted')) {
+      throw new Error(`Expected promotion banner to include "Promoted", got: "${text}"`)
+    }
+    if (!text.includes('Ends')) {
+      throw new Error(`Expected promotion banner to include "Ends", got: "${text}"`)
+    }
 
     (global as any).fetch = originalFetch
   })
@@ -273,7 +277,7 @@ describe('Sale Details Items Display', () => {
 
     const originalFetch = global.fetch
     checkoutMockFetch = vi.fn()
-    ;(global as any).fetch = checkoutMockFetch
+    (global as any).fetch = checkoutMockFetch
 
     try {
       render(

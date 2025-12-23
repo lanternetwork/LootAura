@@ -227,20 +227,5 @@ afterEach(() => {
 })
 
 afterAll(async () => {
-  // Ensure server is closed to prevent leaked handles
-  // Use both close() and resetHandlers() to ensure complete cleanup
-  server.resetHandlers()
-  
-  // Close the server and wait for it to complete
-  // MSW's close() returns a promise that resolves when cleanup is done
-  // No additional setImmediate needed - MSW handles cleanup internally
-  try {
-    await server.close()
-  } catch (error) {
-    // Ignore errors during cleanup - server may already be closed
-    // Only log if diagnostics are enabled to avoid memory issues
-    if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true') {
-      console.log('[TEST_DIAGNOSTIC] MSW server.close() error (ignored):', error)
-    }
-  }
+  await server.close()
 })

@@ -218,7 +218,7 @@ describe('Dashboard Client', () => {
       )
       expect(calls.length).toBe(1)
     } finally {
-      (global as any).fetch = originalFetch
+      ;(global as any).fetch = originalFetch
     }
   })
 

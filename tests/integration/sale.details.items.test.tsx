@@ -220,41 +220,26 @@ describe('Sale Details Items Display', () => {
     expect(screen.getByText('Promote this sale')).toBeInTheDocument()
   })
 
-  it('shows active promotion state with ends date when promotion is active', async () => {
+  it('shows active promotion state with ends date when promotion is active', () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
 
-    // Mock the promotion status API to return an active promotion
-    const originalFetch = global.fetch
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        statuses: [{
-          sale_id: 'test-sale-id',
-          is_active: true,
-          ends_at: '2030-01-01T00:00:00.000Z',
-          tier: 'featured_week'
-        }]
-      })
-    }) as any
+    render(
+      <SaleDetailClient 
+        sale={mockSale} 
+        displayCategories={['furniture']}
+        items={mockItems}
+        promotionsEnabled={true}
+        paymentsEnabled={true}
+        initialPromotionStatus={{
+          isActive: true,
+          endsAt: '2030-01-01T00:00:00.000Z',
+        } as any}
+      />
+    )
 
-    try {
-      render(
-        <SaleDetailClient 
-          sale={mockSale} 
-          displayCategories={['furniture']}
-          items={mockItems}
-          promotionsEnabled={true}
-          paymentsEnabled={true}
-        />
-      )
-
-      // Wait for the promotion status to load
-      const active = await screen.findByTestId('sale-detail-promote-active')
-      expect(active.textContent).toContain('Promoted')
-      expect(active.textContent).toMatch(/Ends/)
-    } finally {
-      global.fetch = originalFetch
-    }
+    const active = screen.getByTestId('sale-detail-promote-active')
+    expect(active.textContent).toContain('Promoted')
+    expect(active.textContent).toMatch(/Ends/)
   })
 
   it('does not call checkout when payments are disabled (seller view)', async () => {
@@ -290,7 +275,7 @@ describe('Sale Details Items Display', () => {
       )
       expect(calls.length).toBe(0)
     } finally {
-      (global as any).fetch = originalFetch
+      ;(global as any).fetch = originalFetch
     }
   })
 

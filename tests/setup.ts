@@ -112,16 +112,6 @@ vi.mock('@/lib/supabase/client', () => ({
       signInWithPassword: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
-      onAuthStateChange: vi.fn((callback) => {
-        // Return subscription object with unsubscribe method
-        return {
-          data: {
-            subscription: {
-              unsubscribe: vi.fn(),
-            },
-          },
-        }
-      }),
     },
     from: vi.fn(() => {
       const chain: any = {}
@@ -279,9 +269,6 @@ const ALLOWED_PATTERNS = [
   // CSRF client logging (lib/api/csrfClient.ts)
   /^\[CSRF_CLIENT\]/, // CSRF client logging - tests/integration/sale.share-button.render.test.tsx, tests/integration/sale.details.*.test.tsx
   /^\[ITEMS_DIAG\]/, // Items diagnostic logging - lib/data/salesAccess.ts getSaleWithItems
-  
-  // Test diagnostic logging (tests/setup.ts)
-  /^\[TEST_DIAGNOSTIC\]/, // Test diagnostic logging for detecting leaked handles - tests/setup.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {
@@ -328,7 +315,6 @@ vitestAfterEach(async () => {
 
 // Global unhandled rejection handler to catch ZodErrors from env validation during tests
 // These errors are expected in env.test.ts when testing error conditions
-// Note: This listener does NOT keep the process alive - it only handles rejections
 const unhandledRejectionHandler = (reason: unknown) => {
   // Ignore ZodErrors from env validation during tests
   // These are expected when testing error conditions in env.test.ts
@@ -346,56 +332,13 @@ const unhandledRejectionHandler = (reason: unknown) => {
 
 process.on('unhandledRejection', unhandledRejectionHandler)
 
-// Clean up the listener after all tests to prevent it from keeping the process alive
-// This is safe because Vitest will have handled all test-related rejections by this point
+// Clean up the unhandled rejection handler after all tests complete
+// This prevents it from keeping the process alive
 afterAll(() => {
   if (typeof process.removeListener === 'function') {
     process.removeListener('unhandledRejection', unhandledRejectionHandler)
   } else if (typeof process.off === 'function') {
     process.off('unhandledRejection', unhandledRejectionHandler)
-  }
-  
-  // Diagnostic: Check for leaked handles after all tests complete
-  // Only run if explicitly enabled via env var to avoid memory issues
-  // Accessing _getActiveHandles can create references that prevent GC
-  if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true' && typeof (process as any)._getActiveHandles === 'function') {
-    try {
-      const handles = (process as any)._getActiveHandles()
-      const requests = (process as any)._getActiveRequests()
-      
-      // Filter out Immediate handles and MessagePort handles (from Vitest workers)
-      const leakedHandles = handles.filter((handle: any) => {
-        const handleType = handle.constructor?.name || 'Unknown'
-        // Exclude Immediate handles (they're transient)
-        if (handleType === 'Immediate') return false
-        // Exclude MessagePort handles (they're from Vitest worker threads)
-        if (handleType === 'MessagePort') return false
-        return true
-      })
-      
-      if (leakedHandles.length > 0 || requests.length > 0) {
-        console.log('\n[TEST_DIAGNOSTIC] ========================================')
-        console.log('[TEST_DIAGNOSTIC] LEAKED HANDLES AFTER TESTS:', leakedHandles.length)
-        console.log('[TEST_DIAGNOSTIC] ACTIVE REQUESTS:', requests.length)
-        
-        // Only log handle types, not full details to avoid creating references
-        const handleTypes = new Map<string, number>()
-        leakedHandles.forEach((handle: any) => {
-          const handleType = handle.constructor?.name || 'Unknown'
-          handleTypes.set(handleType, (handleTypes.get(handleType) || 0) + 1)
-        })
-        
-        handleTypes.forEach((count, type) => {
-          console.log(`[TEST_DIAGNOSTIC] ${type}: ${count}`)
-        })
-        
-        console.log('[TEST_DIAGNOSTIC] ========================================\n')
-      } else {
-        console.log('[TEST_DIAGNOSTIC] ✅ No leaked handles detected\n')
-      }
-    } catch (error) {
-      // Silently ignore errors in diagnostic code to avoid breaking tests
-    }
   }
 })
 

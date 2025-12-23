@@ -23,10 +23,12 @@ export default defineConfig({
     testTimeout: 10000,
     hookTimeout: 10000,
     // Ensure jsdom environment is available to tests
-    pool: 'threads',
-    // Reduce memory usage - use single worker to prevent OOMs
+    // Use 'forks' pool instead of 'threads' to ensure NODE_OPTIONS (heap size) is inherited by workers
+    // Forks are separate Node.js processes that properly inherit environment variables
+    pool: 'forks',
+    // Reduce memory usage
     maxConcurrency: 1,
-    // Use single worker to prevent memory issues across multiple workers
+    // Constrain worker count to prevent OOMs (use 1 worker in CI to reduce memory pressure)
     maxWorkers: 1,
     minWorkers: 1,
   },

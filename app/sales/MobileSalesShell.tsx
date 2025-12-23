@@ -324,9 +324,6 @@ export default function MobileSalesShell({
   
   // Track when map is loaded
   useEffect(() => {
-    // Guard: Don't run in test environment to prevent leaked handles
-    if (process.env.NODE_ENV === 'test') return
-    
     if (mapRef.current) {
       const checkLoaded = () => {
         const isLoaded = mapRef.current?.isLoaded?.()

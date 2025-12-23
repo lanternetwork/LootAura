@@ -259,8 +259,8 @@ describe('Sale Details Items Display', () => {
     )
 
     const active = await screen.findByTestId('sale-detail-promote-active')
-    expect(active.textContent).toContain('Promoted')
-    expect(active.textContent || '').toContain('Ends')
+    expect(active).toHaveTextContent('Promoted')
+    expect(active).toHaveTextContent(/Ends/)
 
     (global as any).fetch = originalFetch
   })
@@ -270,7 +270,7 @@ describe('Sale Details Items Display', () => {
 
     const originalFetch = global.fetch
     const mockFetch = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
-    ;(global as any).fetch = mockFetch
+    (global as any).fetch = mockFetch
 
     try {
       render(

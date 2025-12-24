@@ -263,12 +263,23 @@ afterAll(async () => {
       const dispatcher = undiciModule.getGlobalDispatcher()
       if (dispatcher) {
         // Try close() method (returns Promise)
+        // Add timeout to prevent hanging if close() never resolves
         if (typeof dispatcher.close === 'function') {
-          await dispatcher.close()
+          await Promise.race([
+            dispatcher.close(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('undici close timeout')), 5000)
+            )
+          ]).catch(() => {
+            // Timeout or error - try destroy() as fallback
+            if (typeof dispatcher.destroy === 'function') {
+              dispatcher.destroy()
+            }
+          })
         }
         // Also try destroy() method if close() doesn't exist
         else if (typeof dispatcher.destroy === 'function') {
-          await dispatcher.destroy()
+          dispatcher.destroy()
         }
       }
     }

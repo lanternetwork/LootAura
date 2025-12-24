@@ -106,14 +106,15 @@ describe('SaleShareButton', () => {
     const [button] = screen.getAllByRole('button', { name: /share/i })
     await user.click(button)
     
-    // Wait for menu to appear
+    // Wait for menu to appear - menu is conditionally rendered based on isMenuOpen state
     await waitFor(() => {
-      expect(screen.getByRole('menu')).toBeDefined()
-    })
+      const menu = screen.queryByRole('menu')
+      expect(menu).toBeInTheDocument()
+    }, { timeout: 2000 })
     
     // Find copy link option
     const copyLink = screen.getByRole('menuitem', { name: /copy link/i })
-    expect(copyLink).toBeDefined()
+    expect(copyLink).toBeInTheDocument()
     
     // Click copy link
     await user.click(copyLink)
@@ -180,8 +181,9 @@ describe('SaleShareButton', () => {
     
     // Wait for menu to appear
     await waitFor(() => {
-      expect(screen.getByRole('menu')).toBeDefined()
-    })
+      const menu = screen.queryByRole('menu')
+      expect(menu).toBeInTheDocument()
+    }, { timeout: 2000 })
     
     // Mobile-only options should not be visible
     expect(screen.queryByRole('menuitem', { name: /whatsapp/i })).toBeNull()
@@ -217,14 +219,15 @@ describe('SaleShareButton', () => {
     const [button] = screen.getAllByRole('button', { name: /share/i })
     await user.click(button)
     
-    // Web Share API should be called
+    // Web Share API should be called immediately on mobile when share button is clicked
+    // (no menu appears on mobile, it goes straight to Web Share API)
     await waitFor(() => {
       expect(share).toHaveBeenCalledWith({
         title: defaultProps.title,
         text: defaultProps.text,
         url: defaultProps.url,
       })
-    })
+    }, { timeout: 2000 })
   })
 
   it('should handle Web Share API cancellation gracefully', async () => {

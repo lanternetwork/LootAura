@@ -643,16 +643,19 @@ if (process.env.CI === 'true' && typeof (process as any)._getActiveHandles === '
   }
 
   // Register on both beforeExit and exit to catch the absolute final state
-  process.once('beforeExit', logFinalHandles)
-  process.once('exit', () => {
-    // Use synchronous logging for exit event
-    try {
-      const handles = (process as any)._getActiveHandles()
-      const requests = (process as any)._getActiveRequests()
-      console.log(`\n[FINAL_DIAG] EXIT EVENT - Handles: ${handles.length}, Requests: ${requests.length}\n`)
-    } catch (e) {
-      // Ignore errors in exit handler
-    }
-  })
+  // Guard against environments where process.on/once might not be available (e.g., jsdom)
+  if (typeof process.once === 'function') {
+    process.once('beforeExit', logFinalHandles)
+    process.once('exit', () => {
+      // Use synchronous logging for exit event
+      try {
+        const handles = (process as any)._getActiveHandles()
+        const requests = (process as any)._getActiveRequests()
+        console.log(`\n[FINAL_DIAG] EXIT EVENT - Handles: ${handles.length}, Requests: ${requests.length}\n`)
+      } catch (e) {
+        // Ignore errors in exit handler
+      }
+    })
+  }
 }
 

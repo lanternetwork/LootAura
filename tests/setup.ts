@@ -375,16 +375,53 @@ afterAll(() => {
         console.log(`[HANDLE_DIAG] HANDLE #${index + 1}`)
         console.log(`[HANDLE_DIAG]   TYPE: ${handleType}`)
         console.log(`[HANDLE_DIAG]   typeof: ${handleTypeOf}`)
+        console.log(`[HANDLE_DIAG]   constructor.name: ${handle.constructor?.name || 'N/A'}`)
         
-        // Get stack trace from handle owner if available
-        if (handle._handle && handle._handle.owner) {
-          const owner = handle._handle.owner
-          if (owner && owner.stack) {
-            console.log(`[HANDLE_DIAG]   STACK TRACE:`)
-            const stackLines = owner.stack.split('\n').slice(0, 10)
-            stackLines.forEach((line: string) => {
-              console.log(`[HANDLE_DIAG]     ${line.trim()}`)
-            })
+        // Log _handle details for Socket handles
+        if (handle._handle) {
+          console.log(`[HANDLE_DIAG]   _handle.constructor.name: ${handle._handle.constructor?.name || 'N/A'}`)
+          if (handle._handle.owner) {
+            const owner = handle._handle.owner
+            console.log(`[HANDLE_DIAG]   _handle.owner.constructor.name: ${owner.constructor?.name || 'N/A'}`)
+            
+            // Check if it's an undici socket
+            if (owner.constructor?.name === 'Client' || owner.constructor?.name === 'Pool') {
+              console.log(`[HANDLE_DIAG]   SOCKET OWNER: undici ${owner.constructor.name}`)
+            }
+            
+            // Check if it's a Supabase client socket
+            if (owner.constructor?.name?.includes('Supabase') || owner.constructor?.name?.includes('PostgREST')) {
+              console.log(`[HANDLE_DIAG]   SOCKET OWNER: Supabase/PostgREST`)
+            }
+            
+            // Check if it's a Next.js fetch socket
+            if (owner.constructor?.name?.includes('Next') || owner.constructor?.name?.includes('Fetch')) {
+              console.log(`[HANDLE_DIAG]   SOCKET OWNER: Next.js fetch`)
+            }
+            
+            if (owner && owner.stack) {
+              console.log(`[HANDLE_DIAG]   STACK TRACE:`)
+              const stackLines = owner.stack.split('\n').slice(0, 15)
+              stackLines.forEach((line: string) => {
+                console.log(`[HANDLE_DIAG]     ${line.trim()}`)
+              })
+            }
+          }
+        }
+        
+        // For Socket handles, check for additional identifying properties
+        if (handleType === 'Socket') {
+          // Check if socket has a client property (undici)
+          if (handle._httpMessage) {
+            console.log(`[HANDLE_DIAG]   _httpMessage.constructor.name: ${handle._httpMessage.constructor?.name || 'N/A'}`)
+          }
+          // Check for agent reference
+          if (handle.agent) {
+            console.log(`[HANDLE_DIAG]   agent.constructor.name: ${handle.agent.constructor?.name || 'N/A'}`)
+          }
+          // Check for client reference (undici)
+          if ((handle as any).client) {
+            console.log(`[HANDLE_DIAG]   client.constructor.name: ${(handle as any).client.constructor?.name || 'N/A'}`)
           }
         }
         

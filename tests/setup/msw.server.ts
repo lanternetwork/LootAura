@@ -253,4 +253,34 @@ afterAll(async () => {
   if (https.globalAgent && typeof https.globalAgent.destroy === 'function') {
     https.globalAgent.destroy()
   }
+
+  // Close undici dispatcher (Node.js 18+ uses undici for fetch)
+  // Undici maintains a global dispatcher that keeps Socket handles alive
+  try {
+    // Check if undici is available (Node.js 18+)
+    const undici = (globalThis as any).undici || (globalThis as any).__undici__
+    if (undici && undici.getGlobalDispatcher) {
+      const dispatcher = undici.getGlobalDispatcher()
+      if (dispatcher && typeof dispatcher.close === 'function') {
+        await dispatcher.close()
+      }
+    }
+    // Also try direct require (undici might be bundled)
+    try {
+      const undiciModule = require('undici')
+      if (undiciModule.getGlobalDispatcher) {
+        const dispatcher = undiciModule.getGlobalDispatcher()
+        if (dispatcher && typeof dispatcher.close === 'function') {
+          await dispatcher.close()
+        }
+      }
+    } catch {
+      // undici not available as module, that's fine
+    }
+  } catch (error) {
+    // Only log if diagnostics are enabled
+    if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true') {
+      console.log('[HANDLE_DIAG] undici dispatcher.close() error (ignored):', error)
+    }
+  }
 })

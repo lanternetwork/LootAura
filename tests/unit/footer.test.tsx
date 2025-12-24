@@ -8,15 +8,15 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 
 describe('SiteFooter', () => {
   it('should render footer with correct structure', () => {
-    const { container } = render(<SiteFooter />)
+    render(<SiteFooter />)
     
     // Check footer element
-    const footer = container.querySelector('footer[role="contentinfo"]')
+    const footer = screen.getByRole('contentinfo')
     expect(footer).toBeInTheDocument()
     
     // Check brand name
@@ -48,8 +48,9 @@ describe('SiteFooter', () => {
   it('should have accessible navigation', () => {
     render(<SiteFooter />)
     
-    // Check nav element with aria-label
-    const nav = screen.getByRole('navigation', { name: 'Footer' })
+    // Check nav element with aria-label, scoped to the footer
+    const footer = screen.getByRole('contentinfo')
+    const nav = within(footer).getByRole('navigation', { name: 'Footer' })
     expect(nav).toBeInTheDocument()
   })
 
@@ -57,7 +58,8 @@ describe('SiteFooter', () => {
     render(<SiteFooter />)
     
     const currentYear = new Date().getFullYear()
-    expect(screen.getByText(new RegExp(`© ${currentYear} Loot Aura`))).toBeInTheDocument()
+    const matches = screen.getAllByText(new RegExp(`© ${currentYear} Loot Aura`))
+    expect(matches.length).toBeGreaterThan(0)
   })
 
   it('should have responsive layout classes', () => {

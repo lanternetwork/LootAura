@@ -146,9 +146,9 @@ describe('Sale Details Categories', () => {
       />
     )
 
-    // Check that categories section is visible
-    const categoriesHeading = screen.getByText('Categories')
-    expect(categoriesHeading).toBeInTheDocument()
+    // Check that categories section is visible (multiple headings may exist for responsive layouts)
+    const categoriesHeadings = screen.getAllByText('Categories')
+    expect(categoriesHeadings.length).toBeGreaterThan(0)
 
     // Check that all expected categories are displayed (both mobile and desktop layouts render categories)
     const furnitureElements = screen.getAllByText('furniture')

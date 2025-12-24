@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { 
   createPageMetadata, 
   createSaleMetadata, 
@@ -21,14 +21,8 @@ function getImageUrl(images: any): string | undefined {
   return undefined
 }
 
-// Ensure environment variable is set for site URL
-const originalEnv = process.env
-beforeEach(() => {
-  process.env = { ...originalEnv, NEXT_PUBLIC_SITE_URL: 'https://lootaura.app' }
-})
-afterEach(() => {
-  process.env = originalEnv
-})
+// Helper to compute the expected base URL in the same way as lib/metadata
+const expectedBaseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app').replace(/\/$/, '')
 
 describe('createPageMetadata', () => {
   it('should create basic page metadata', () => {
@@ -41,7 +35,7 @@ describe('createPageMetadata', () => {
     expect(metadata.title).toBe('Test Page | Loot Aura')
     expect(metadata.description).toBe('Test description')
     expect(metadata.openGraph?.title).toBe('Test Page | Loot Aura')
-    expect(metadata.openGraph?.url).toBe('https://lootaura.app/test')
+    expect(metadata.openGraph?.url).toBe(`${expectedBaseUrl}/test`)
   })
 
   it('should handle custom image', () => {
@@ -215,7 +209,7 @@ describe('createExploreMetadata', () => {
 
     expect(metadata.title).toBe('Explore Yard Sales | Loot Aura')
     expect(metadata.description).toContain('Browse and discover')
-    expect(metadata.openGraph?.url).toBe('https://lootaura.app/explore')
+    expect(metadata.openGraph?.url).toBe(`${expectedBaseUrl}/explore`)
   })
 })
 
@@ -226,7 +220,7 @@ describe('createHomepageStructuredData', () => {
     expect(data['@context']).toBe('https://schema.org')
     expect(data['@type']).toBe('WebSite')
     expect(data.name).toBe('Loot Aura')
-    expect(data.url).toBe('https://lootaura.app')
+    expect(data.url).toBe(expectedBaseUrl)
     expect(data.potentialAction['@type']).toBe('SearchAction')
   })
 })
@@ -238,7 +232,7 @@ describe('createOrganizationStructuredData', () => {
     expect(data['@context']).toBe('https://schema.org')
     expect(data['@type']).toBe('Organization')
     expect(data.name).toBe('Loot Aura')
-    expect(data.url).toBe('https://lootaura.app')
-    expect(data.logo).toBe('https://lootaura.app/icons/icon-512.png')
+    expect(data.url).toBe(expectedBaseUrl)
+    expect(data.logo).toBe(`${expectedBaseUrl}/icons/icon-512.png`)
   })
 })

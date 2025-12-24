@@ -42,7 +42,7 @@ describe('SaleShareButton', () => {
   it('should render share button', () => {
     render(<SaleShareButton {...defaultProps} />)
     
-    const button = screen.getByRole('button', { name: /share/i })
+    const [button] = screen.getAllByRole('button', { name: /share/i })
     expect(button).toBeDefined()
     expect(button).toHaveAttribute('aria-haspopup', 'menu')
   })
@@ -66,7 +66,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const button = screen.getByRole('button', { name: /share/i })
+    const [button] = screen.getAllByRole('button', { name: /share/i })
     await user.click(button)
     
     // Menu should open
@@ -103,7 +103,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const button = screen.getByRole('button', { name: /share/i })
+    const [button] = screen.getAllByRole('button', { name: /share/i })
     await user.click(button)
     
     // Wait for menu to appear
@@ -142,7 +142,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const button = screen.getByRole('button', { name: /share/i })
+    const [button] = screen.getAllByRole('button', { name: /share/i })
     await user.click(button)
     
     // Wait for menu to appear
@@ -175,7 +175,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const button = screen.getByRole('button', { name: /share/i })
+    const [button] = screen.getAllByRole('button', { name: /share/i })
     await user.click(button)
     
     // Wait for menu to appear
@@ -214,7 +214,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const button = screen.getByRole('button', { name: /share/i })
+    const [button] = screen.getAllByRole('button', { name: /share/i })
     await user.click(button)
     
     // Web Share API should be called
@@ -255,7 +255,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const button = screen.getByRole('button', { name: /share/i })
+    const [button] = screen.getAllByRole('button', { name: /share/i })
     await user.click(button)
     
     // Should not log error for AbortError
@@ -292,7 +292,7 @@ describe('SaleShareButton', () => {
       </div>
     )
     
-    const button = screen.getByRole('button', { name: /share/i })
+    const [button] = screen.getAllByRole('button', { name: /share/i })
     await user.click(button)
     
     // Menu should open
@@ -328,7 +328,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const button = screen.getByRole('button', { name: /share/i })
+    const [button] = screen.getAllByRole('button', { name: /share/i })
     await user.click(button)
     
     // Menu should open

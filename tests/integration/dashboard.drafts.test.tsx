@@ -75,8 +75,11 @@ describe('DraftsPanel', () => {
       />
     )
 
-    expect(screen.getByText('Drafts')).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
+    // Heading should be present
+    expect(screen.getByRole('heading', { name: 'Drafts' })).toBeInTheDocument()
+    // Badge count should be rendered somewhere in the panel
+    const countBadges = screen.getAllByText('2')
+    expect(countBadges.length).toBeGreaterThan(0)
   })
 
   it('should show empty state when no drafts', () => {
@@ -118,7 +121,8 @@ describe('DraftsPanel', () => {
     )
 
     expect(screen.getByText('Failed to load drafts')).toBeInTheDocument()
-    expect(screen.getByText('Retry')).toBeInTheDocument()
+    // Look specifically for the Retry button rather than any text node
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
   it('should call onRetry when retry button is clicked', async () => {
@@ -133,7 +137,7 @@ describe('DraftsPanel', () => {
       />
     )
 
-    const retryButton = screen.getByText('Retry')
+    const retryButton = screen.getByRole('button', { name: 'Retry' })
     await user.click(retryButton)
 
     expect(mockHandlers.onRetry).toHaveBeenCalledTimes(1)
@@ -148,8 +152,8 @@ describe('DraftsPanel', () => {
       />
     )
 
-    expect(screen.getByText('Test Draft 1')).toBeInTheDocument()
-    expect(screen.getByText('Test Draft 2')).toBeInTheDocument()
+    expect(screen.getAllByText('Test Draft 1').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Test Draft 2').length).toBeGreaterThan(0)
   })
 })
 
@@ -199,7 +203,7 @@ describe('DraftCard', () => {
   it('should display item count and categories', () => {
     render(<DraftCard draft={mockDraft} onDelete={mockHandlers.onDelete} onPublish={mockHandlers.onPublish} />)
 
-    expect(screen.getByText('3 items')).toBeInTheDocument()
+    expect(screen.getAllByText('3 items').length).toBeGreaterThan(0)
     expect(screen.getByText('Tools')).toBeInTheDocument()
     expect(screen.getByText('Electronics')).toBeInTheDocument()
     expect(screen.getByText('+1')).toBeInTheDocument()

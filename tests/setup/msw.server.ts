@@ -257,30 +257,26 @@ afterAll(async () => {
   // Close undici dispatcher (Node.js 18+ uses undici for fetch)
   // Undici maintains a global dispatcher that keeps Socket handles alive
   try {
-    // Check if undici is available (Node.js 18+)
-    const undici = (globalThis as any).undici || (globalThis as any).__undici__
-    if (undici && undici.getGlobalDispatcher) {
-      const dispatcher = undici.getGlobalDispatcher()
-      if (dispatcher && typeof dispatcher.close === 'function') {
-        await dispatcher.close()
-      }
-    }
-    // Also try direct require (undici might be bundled)
-    try {
-      const undiciModule = require('undici')
-      if (undiciModule.getGlobalDispatcher) {
-        const dispatcher = undiciModule.getGlobalDispatcher()
-        if (dispatcher && typeof dispatcher.close === 'function') {
+    // Try to require undici module (Node.js 18+)
+    const undiciModule = require('undici')
+    if (undiciModule && typeof undiciModule.getGlobalDispatcher === 'function') {
+      const dispatcher = undiciModule.getGlobalDispatcher()
+      if (dispatcher) {
+        // Try close() method (returns Promise)
+        if (typeof dispatcher.close === 'function') {
           await dispatcher.close()
         }
+        // Also try destroy() method if close() doesn't exist
+        else if (typeof dispatcher.destroy === 'function') {
+          await dispatcher.destroy()
+        }
       }
-    } catch {
-      // undici not available as module, that's fine
     }
-  } catch (error) {
-    // Only log if diagnostics are enabled
-    if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true') {
-      console.log('[HANDLE_DIAG] undici dispatcher.close() error (ignored):', error)
+  } catch (error: any) {
+    // undici might not be available or already closed - that's fine
+    // Only log if diagnostics are enabled and it's not a "module not found" error
+    if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true' && error?.code !== 'MODULE_NOT_FOUND') {
+      console.log('[HANDLE_DIAG] undici dispatcher cleanup error (ignored):', error?.message || error)
     }
   }
 })

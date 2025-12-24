@@ -533,3 +533,126 @@ afterAll(() => {
   }
 })
 
+// FINAL DIAGNOSTIC: Run at the VERY END after all tests and hooks complete
+// This runs on process exit events to capture the absolute final state
+if (process.env.CI === 'true' && typeof (process as any)._getActiveHandles === 'function') {
+  const logFinalHandles = () => {
+    try {
+      const handles = (process as any)._getActiveHandles()
+      const requests = (process as any)._getActiveRequests()
+
+      console.log('\n[FINAL_DIAG] ========================================')
+      console.log('[FINAL_DIAG] ABSOLUTE FINAL HANDLE DUMP - PROCESS EXITING')
+      console.log('[FINAL_DIAG] ========================================')
+      console.log(`[FINAL_DIAG] Total Handles: ${handles.length}`)
+      console.log(`[FINAL_DIAG] Total Requests: ${requests.length}`)
+      console.log('[FINAL_DIAG] ========================================\n')
+
+      handles.forEach((handle: any, index: number) => {
+        const handleType = handle.constructor?.name || 'Unknown'
+        
+        console.log(`[FINAL_DIAG] HANDLE #${index + 1}`)
+        console.log(`[FINAL_DIAG]   constructor.name: ${handleType}`)
+        
+        // Log _handle details
+        if (handle._handle) {
+          console.log(`[FINAL_DIAG]   _handle.constructor.name: ${handle._handle.constructor?.name || 'N/A'}`)
+          if (handle._handle.owner) {
+            const owner = handle._handle.owner
+            console.log(`[FINAL_DIAG]   _handle.owner.constructor.name: ${owner.constructor?.name || 'N/A'}`)
+            
+            // Identify owner library
+            const ownerName = owner.constructor?.name || ''
+            if (ownerName === 'Client' || ownerName === 'Pool') {
+              console.log(`[FINAL_DIAG]   OWNER: undici ${ownerName}`)
+            } else if (ownerName.includes('Supabase') || ownerName.includes('PostgREST')) {
+              console.log(`[FINAL_DIAG]   OWNER: Supabase/PostgREST`)
+            } else if (ownerName.includes('Next') || ownerName.includes('Fetch')) {
+              console.log(`[FINAL_DIAG]   OWNER: Next.js fetch`)
+            } else if (ownerName) {
+              console.log(`[FINAL_DIAG]   OWNER: ${ownerName}`)
+            }
+            
+            // Stack trace
+            if (owner.stack) {
+              console.log(`[FINAL_DIAG]   STACK TRACE:`)
+              const stackLines = owner.stack.split('\n').slice(0, 20)
+              stackLines.forEach((line: string) => {
+                console.log(`[FINAL_DIAG]     ${line.trim()}`)
+              })
+            }
+          }
+        }
+        
+        // Socket-specific properties
+        if (handleType === 'Socket') {
+          console.log(`[FINAL_DIAG]   destroyed: ${handle.destroyed !== undefined ? handle.destroyed : 'N/A'}`)
+          console.log(`[FINAL_DIAG]   readable: ${handle.readable !== undefined ? handle.readable : 'N/A'}`)
+          console.log(`[FINAL_DIAG]   writable: ${handle.writable !== undefined ? handle.writable : 'N/A'}`)
+          if (handle.agent) {
+            console.log(`[FINAL_DIAG]   agent.constructor.name: ${handle.agent.constructor?.name || 'N/A'}`)
+          }
+          if (handle._httpMessage) {
+            console.log(`[FINAL_DIAG]   _httpMessage.constructor.name: ${handle._httpMessage.constructor?.name || 'N/A'}`)
+          }
+        }
+        
+        // Timer-specific properties
+        if (handleType === 'Timeout' || handleType === 'Immediate') {
+          if (handle._idleTimeout !== undefined) {
+            console.log(`[FINAL_DIAG]   _idleTimeout: ${handle._idleTimeout}ms`)
+          }
+          if (handle._repeat !== undefined) {
+            console.log(`[FINAL_DIAG]   _repeat: ${handle._repeat}`)
+          }
+        }
+        
+        console.log('[FINAL_DIAG] ---')
+      })
+
+      // Log requests
+      if (requests.length > 0) {
+        console.log(`[FINAL_DIAG] ACTIVE REQUESTS (${requests.length}):`)
+        requests.forEach((req: any, index: number) => {
+          const reqType = req.constructor?.name || 'Unknown'
+          console.log(`[FINAL_DIAG]   REQUEST #${index + 1}: ${reqType}`)
+          if (req._handle && req._handle.owner && req._handle.owner.stack) {
+            const stackLines = req._handle.owner.stack.split('\n').slice(0, 10)
+            stackLines.forEach((line: string) => {
+              console.log(`[FINAL_DIAG]     ${line.trim()}`)
+            })
+          }
+        })
+      }
+
+      // Summary
+      const handleTypes = handles.map((handle: any) => handle.constructor?.name || 'Unknown')
+      const typeCounts = handleTypes.reduce((acc: { [key: string]: number }, type: string) => {
+        acc[type] = (acc[type] || 0) + 1
+        return acc
+      }, {})
+      console.log('\n[FINAL_DIAG] SUMMARY BY TYPE:')
+      Object.entries(typeCounts).forEach(([type, count]) => {
+        console.log(`[FINAL_DIAG]   ${type}: ${count}`)
+      })
+      
+      console.log('\n[FINAL_DIAG] ========================================\n')
+    } catch (e) {
+      console.error('[FINAL_DIAG] ERROR:', e)
+    }
+  }
+
+  // Register on both beforeExit and exit to catch the absolute final state
+  process.once('beforeExit', logFinalHandles)
+  process.once('exit', () => {
+    // Use synchronous logging for exit event
+    try {
+      const handles = (process as any)._getActiveHandles()
+      const requests = (process as any)._getActiveRequests()
+      console.log(`\n[FINAL_DIAG] EXIT EVENT - Handles: ${handles.length}, Requests: ${requests.length}\n`)
+    } catch (e) {
+      // Ignore errors in exit handler
+    }
+  })
+}
+

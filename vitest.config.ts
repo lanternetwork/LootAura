@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const isCI = process.env.CI === 'true'
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -23,9 +25,10 @@ export default defineConfig({
     testTimeout: 10000,
     hookTimeout: 10000,
     // Ensure jsdom environment is available to tests
-    // Use 'forks' pool instead of 'threads' to ensure NODE_OPTIONS (heap size) is inherited by workers
-    // Forks are separate Node.js processes that properly inherit environment variables including NODE_OPTIONS
-    pool: 'forks',
+    // In CI, avoid 'forks' because child_process IPC pipes/sockets can keep the event loop alive
+    // and cause the Vitest process to hang after tests complete. Use a single-threaded pool instead.
+    // Locally, keep 'forks' to preserve existing behavior and NODE_OPTIONS inheritance.
+    pool: isCI ? 'threads' : 'forks',
     // Explicitly pass heap size to fork workers via execArgv to ensure it's applied
     // This is critical for CI where tests can consume significant memory
     poolOptions: {
@@ -41,6 +44,10 @@ export default defineConfig({
           // Default to 20GB heap for CI if NODE_OPTIONS not set
           return process.env.CI ? ['--max-old-space-size=20480', '--expose-gc'] : []
         })(),
+      },
+      threads: {
+        // In CI, run tests in a single thread to avoid additional worker IPC and keep behavior stable
+        singleThread: isCI,
       },
     },
     // Reduce memory usage

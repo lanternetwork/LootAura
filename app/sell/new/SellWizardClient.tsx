@@ -211,7 +211,10 @@ export default function SellWizardClient({
     })
 
     return () => {
-      subscription.unsubscribe()
+      // Safely unsubscribe - subscription might be undefined in test environments
+      if (subscription) {
+        subscription.unsubscribe()
+      }
     }
   }, [supabase.auth])
 

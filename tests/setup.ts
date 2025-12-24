@@ -278,6 +278,9 @@ const ALLOWED_PATTERNS = [
   // CSRF client logging (lib/api/csrfClient.ts)
   /^\[CSRF_CLIENT\]/, // CSRF client logging - tests/integration/sale.share-button.render.test.tsx, tests/integration/sale.details.*.test.tsx
   /^\[ITEMS_DIAG\]/, // Items diagnostic logging - lib/data/salesAccess.ts getSaleWithItems
+  
+  // Handle diagnostic logging (tests/setup.ts)
+  /^\[HANDLE_DIAG\]/, // Handle diagnostic logging for detecting leaked handles - tests/setup.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {
@@ -348,6 +351,85 @@ afterAll(() => {
     process.removeListener('unhandledRejection', unhandledRejectionHandler)
   } else if (typeof process.off === 'function') {
     process.off('unhandledRejection', unhandledRejectionHandler)
+  }
+
+  // Diagnostic: Check for leaked handles after all tests complete
+  // Only run if explicitly enabled via env var to avoid performance/memory overhead
+  if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true' && typeof (process as any)._getActiveHandles === 'function') {
+    try {
+      const handles = (process as any)._getActiveHandles()
+      const requests = (process as any)._getActiveRequests()
+
+      // Filter out Immediate handles and MessagePort handles (from Vitest workers)
+      const leakedHandles = handles.filter((handle: any) => {
+        const handleType = handle.constructor?.name || 'Unknown'
+        if (handleType === 'Immediate' || handleType === 'MessagePort') return false
+        return true
+      })
+
+      if (leakedHandles.length > 0 || requests.length > 0) {
+        console.log('\n[HANDLE_DIAG] ========================================')
+        console.log('[HANDLE_DIAG] LEAKED HANDLES AFTER TESTS:', leakedHandles.length)
+        console.log('[HANDLE_DIAG] ACTIVE REQUESTS:', requests.length)
+
+        // Log each handle with details
+        leakedHandles.forEach((handle: any, index: number) => {
+          const handleType = handle.constructor?.name || 'Unknown'
+          console.log(`[HANDLE_DIAG] Handle ${index + 1}: ${handleType}`)
+          
+          // Try to get stack trace if available
+          if (handle._handle && handle._handle.owner) {
+            const owner = handle._handle.owner
+            if (owner && owner.stack) {
+              console.log(`[HANDLE_DIAG]   Stack: ${owner.stack.split('\n').slice(0, 5).join('\n')}`)
+            }
+          }
+          
+          // Log handle properties that might help identify source
+          if (handle._listeners && handle._listeners.length > 0) {
+            console.log(`[HANDLE_DIAG]   Listeners: ${handle._listeners.length}`)
+          }
+          
+          // For timers, log the delay
+          if (handleType === 'Timeout' || handleType === 'Immediate') {
+            if (handle._idleTimeout !== undefined) {
+              console.log(`[HANDLE_DIAG]   Timeout: ${handle._idleTimeout}ms`)
+            }
+          }
+          
+          // For sockets/streams, log if they're readable/writable
+          if (handle.readable !== undefined) {
+            console.log(`[HANDLE_DIAG]   Readable: ${handle.readable}`)
+          }
+          if (handle.writable !== undefined) {
+            console.log(`[HANDLE_DIAG]   Writable: ${handle.writable}`)
+          }
+        })
+
+        // Log summary of handle types
+        const handleTypes = leakedHandles.map((handle: any) => handle.constructor?.name || 'Unknown')
+        const typeCounts = handleTypes.reduce((acc: { [key: string]: number }, type: string) => {
+          acc[type] = (acc[type] || 0) + 1
+          return acc
+        }, {})
+        console.log('[HANDLE_DIAG] Leaked Handle Types:', typeCounts)
+
+        // Log active requests
+        if (requests.length > 0) {
+          console.log('[HANDLE_DIAG] Active Requests:')
+          requests.forEach((req: any, index: number) => {
+            const reqType = req.constructor?.name || 'Unknown'
+            console.log(`[HANDLE_DIAG]   Request ${index + 1}: ${reqType}`)
+          })
+        }
+
+        console.log('[HANDLE_DIAG] ========================================\n')
+      } else {
+        console.log('[HANDLE_DIAG] ✅ No leaked handles detected\n')
+      }
+    } catch (e) {
+      console.error('[HANDLE_DIAG] Error during handle diagnostic:', e)
+    }
   }
 })
 

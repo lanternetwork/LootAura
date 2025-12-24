@@ -227,5 +227,15 @@ afterEach(() => {
 })
 
 afterAll(async () => {
-  await server.close()
+  server.resetHandlers() // Ensure handlers are reset before closing
+  try {
+    await server.close()
+    // Give MSW a moment to fully clean up internal handles
+    await new Promise(resolve => setImmediate(resolve))
+  } catch (error) {
+    // Only log if diagnostics are enabled to avoid memory issues
+    if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true') {
+      console.log('[HANDLE_DIAG] MSW server.close() error (ignored):', error)
+    }
+  }
 })

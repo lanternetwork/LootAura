@@ -238,4 +238,19 @@ afterAll(async () => {
       console.log('[HANDLE_DIAG] MSW server.close() error (ignored):', error)
     }
   }
+
+  // Close all HTTP agent connections to prevent Socket handle leaks
+  // Node.js HTTP agents maintain keep-alive connections that keep the event loop alive
+  const http = require('http')
+  const https = require('https')
+  
+  // Close all idle connections in HTTP agent
+  if (http.globalAgent && typeof http.globalAgent.destroy === 'function') {
+    http.globalAgent.destroy()
+  }
+  
+  // Close all idle connections in HTTPS agent
+  if (https.globalAgent && typeof https.globalAgent.destroy === 'function') {
+    https.globalAgent.destroy()
+  }
 })

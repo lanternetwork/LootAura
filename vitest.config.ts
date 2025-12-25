@@ -24,9 +24,6 @@ export default defineConfig({
     // Ensure no network calls in tests
     testTimeout: 10000,
     hookTimeout: 10000,
-    // Teardown timeout for cleanup hooks (afterAll, etc.)
-    // This ensures cleanup has time to complete before Vitest exits
-    teardownTimeout: 10000,
     // Ensure jsdom environment is available to tests
     // In CI, avoid 'forks' because child_process IPC pipes/sockets can keep the event loop alive
     // and cause the Vitest process to hang after tests complete. Use a single-threaded pool instead.

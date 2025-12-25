@@ -349,7 +349,7 @@ if (typeof process.on === 'function') {
 
 // Clean up the unhandled rejection handler after all tests complete
 // This prevents it from keeping the process alive
-afterAll(() => {
+afterAll(async () => {
   const isCI = process.env.CI === 'true'
   
   // Remove unhandled rejection handler
@@ -357,6 +357,22 @@ afterAll(() => {
     process.removeListener('unhandledRejection', unhandledRejectionHandler)
   } else if (typeof process.off === 'function') {
     process.off('unhandledRejection', unhandledRejectionHandler)
+  }
+
+  // CI-only: Explicitly shut down esbuild service to prevent orphaned processes
+  // esbuild runs as a long-lived helper process outside Node's event loop and is NOT
+  // visible to handle diagnostics. Vitest/Vite do not reliably shut down esbuild in CI,
+  // causing orphaned esbuild processes that keep CI alive until timeout.
+  if (isCI) {
+    try {
+      const esbuild = await import('esbuild')
+      if (typeof esbuild.stop === 'function') {
+        esbuild.stop()
+        console.log('[CI] esbuild service stopped')
+      }
+    } catch (err) {
+      console.warn('[CI] esbuild stop failed (ignored):', err)
+    }
   }
 
   // In CI: NO diagnostic listeners or timers - they create handles that prevent exit

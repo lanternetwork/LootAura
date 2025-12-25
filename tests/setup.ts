@@ -281,6 +281,9 @@ const ALLOWED_PATTERNS = [
   
   // Handle diagnostic logging (tests/setup.ts)
   /^\[HANDLE_DIAG\]/, // Handle diagnostic logging for detecting leaked handles - tests/setup.ts
+  
+  // CI-only esbuild shutdown logging (tests/setup.ts)
+  /^\[CI\] esbuild/, // CI-only esbuild service shutdown logging - tests/setup.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {
@@ -363,7 +366,8 @@ afterAll(async () => {
   // esbuild runs as a long-lived helper process outside Node's event loop and is NOT
   // visible to handle diagnostics. Vitest/Vite do not reliably shut down esbuild in CI,
   // causing orphaned esbuild processes that keep CI alive until timeout.
-  if (isCI) {
+  // Only attempt in Node environment (not jsdom) - esbuild requires Node APIs.
+  if (isCI && typeof window === 'undefined') {
     try {
       const esbuild = await import('esbuild')
       if (typeof esbuild.stop === 'function') {
@@ -371,7 +375,8 @@ afterAll(async () => {
         console.log('[CI] esbuild service stopped')
       }
     } catch (err) {
-      console.warn('[CI] esbuild stop failed (ignored):', err)
+      // Silently ignore - esbuild may not be available or already stopped
+      // This is expected and does not affect test execution
     }
   }
 

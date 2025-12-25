@@ -59,6 +59,20 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
+      // Module isolation experiment: Replace background workers/monitoring modules with empty stubs
+      // This proves whether module-level background primitives are causing CI hangs
+      '@/lib/performance/queryOptimizer': path.resolve(__dirname, 'tests/stubs/performance.ts'),
+      '@/lib/performance/monitoring': path.resolve(__dirname, 'tests/stubs/performance.ts'),
+      '@/lib/performance': path.resolve(__dirname, 'tests/stubs/performance.ts'),
+      '@/lib/analytics/clarityEvents': path.resolve(__dirname, 'tests/stubs/analytics.ts'),
+      '@/lib/analytics': path.resolve(__dirname, 'tests/stubs/analytics.ts'),
+      '@/lib/telemetry/map': path.resolve(__dirname, 'tests/stubs/telemetry.ts'),
+      '@/lib/telemetry': path.resolve(__dirname, 'tests/stubs/telemetry.ts'),
+      '@/lib/jobs/processor': path.resolve(__dirname, 'tests/stubs/jobs.ts'),
+      '@/lib/jobs/queue': path.resolve(__dirname, 'tests/stubs/jobs.ts'),
+      '@/lib/jobs/redis': path.resolve(__dirname, 'tests/stubs/jobs.ts'),
+      '@/lib/jobs/types': path.resolve(__dirname, 'tests/stubs/jobs.ts'),
+      '@/lib/jobs': path.resolve(__dirname, 'tests/stubs/jobs.ts'),
     },
   },
   define: {

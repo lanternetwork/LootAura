@@ -169,7 +169,7 @@ jobs:
           done
 
       - name: Run unit tests
-        run: npm run test -- tests/unit/
+        run: npx vitest run --teardown-timeout=10000 tests/unit/
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -229,7 +229,7 @@ jobs:
           done
 
       - name: Run integration tests
-        run: npx vitest run tests/integration/
+        run: npx vitest run --teardown-timeout=10000 tests/integration/
         env:
           NODE_OPTIONS: '--max-old-space-size=20480 --expose-gc'
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

@@ -16,8 +16,11 @@ vi.mock('child_process', async (importOriginal) => {
   }
 })
 
-// Mock process.env to make it writable
+// Mock process.env to make it writable, but preserve required env vars from test setup
+// The test setup in tests/setup.ts sets defaults for NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+// We need to preserve those to avoid ZodError when lib/env.ts is imported
 const mockProcessEnv = {
+  ...process.env, // Preserve existing env vars (including defaults from test setup)
   NODE_ENV: 'test',
   VERCEL_ENV: 'test'
 }

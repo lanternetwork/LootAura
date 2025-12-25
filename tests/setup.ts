@@ -342,7 +342,10 @@ const unhandledRejectionHandler = (reason: unknown) => {
   // For other unhandled rejections, let them propagate (Vitest will handle them)
 }
 
-process.on('unhandledRejection', unhandledRejectionHandler)
+// Guard against environments where process.on might not be available (e.g., jsdom)
+if (typeof process.on === 'function') {
+  process.on('unhandledRejection', unhandledRejectionHandler)
+}
 
 // Clean up the unhandled rejection handler after all tests complete
 // This prevents it from keeping the process alive

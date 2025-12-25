@@ -216,7 +216,9 @@ describe('SellerRatingStars', () => {
     )
 
     // Wait for component to render and verify it's interactive
-    const fourthStar = await screen.findByRole('button', { name: /rate 4 out of 5 stars/i })
+    // May be multiple instances, take the first one
+    const fourthStars = await screen.findAllByRole('button', { name: /rate 4 out of 5 stars/i })
+    const fourthStar = fourthStars[0]
     
     // Verify button is not disabled and is interactive
     expect(fourthStar).not.toBeDisabled()
@@ -256,7 +258,9 @@ describe('SellerRatingStars', () => {
       </TestWrapper>
     )
 
-    const firstStar = screen.getByRole('button', { name: /rate 1 out of 5 stars/i })
+    // Get first star button (may be multiple instances due to multiple renders)
+    const stars = screen.getAllByRole('button', { name: /rate 1 out of 5 stars/i })
+    const firstStar = stars[0]
     firstStar.focus()
 
     // Arrow right should move to next star

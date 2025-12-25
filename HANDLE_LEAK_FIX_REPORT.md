@@ -135,3 +135,4 @@ After these fixes:
 - Other `setInterval` calls in `lib/performance/*.ts` are safe as they're only executed when explicitly called, not on module import
 - The fix follows the same pattern already established in `lib/rateLimit/store.ts`
 
+

@@ -227,67 +227,113 @@ afterEach(() => {
 })
 
 afterAll(async () => {
-  server.resetHandlers() // Ensure handlers are reset before closing
-  try {
-    await server.close()
-    // Give MSW a moment to fully clean up internal handles
-    await new Promise(resolve => setImmediate(resolve))
-  } catch (error) {
-    // Only log if diagnostics are enabled to avoid memory issues
-    if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true') {
-      console.log('[HANDLE_DIAG] MSW server.close() error (ignored):', error)
+  const isCI = process.env.CI === 'true'
+  
+  // Reset handlers first
+  server.resetHandlers()
+  
+  // In CI: synchronous cleanup only - no timers, no Promise.race
+  // Locally: allow async cleanup for better error handling
+  if (isCI) {
+    // CI: Synchronous cleanup to prevent handle leaks
+    // Order: MSW server -> undici dispatcher -> http agents
+    
+    // 1. MSW server close (sync - don't await)
+    try {
+      if (typeof server.close === 'function') {
+        server.close()
+      }
+    } catch (error) {
+      // Ignore errors in CI
     }
-  }
-
-  // Close all HTTP agent connections to prevent Socket handle leaks
-  // Node.js HTTP agents maintain keep-alive connections that keep the event loop alive
-  const http = require('http')
-  const https = require('https')
-  
-  // Close all idle connections in HTTP agent
-  if (http.globalAgent && typeof http.globalAgent.destroy === 'function') {
-    http.globalAgent.destroy()
-  }
-  
-  // Close all idle connections in HTTPS agent
-  if (https.globalAgent && typeof https.globalAgent.destroy === 'function') {
-    https.globalAgent.destroy()
-  }
-
-  // Close undici dispatcher (Node.js 18+ uses undici for fetch)
-  // Undici maintains a global dispatcher that keeps Socket handles alive
-  try {
-    // Try to require undici module (Node.js 18+)
-    const undiciModule = require('undici')
-    if (undiciModule && typeof undiciModule.getGlobalDispatcher === 'function') {
-      const dispatcher = undiciModule.getGlobalDispatcher()
-      if (dispatcher) {
-        // Try close() method (returns Promise)
-        // Add timeout to prevent hanging if close() never resolves
-        if (typeof dispatcher.close === 'function') {
-          await Promise.race([
-            dispatcher.close(),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('undici close timeout')), 5000)
-            )
-          ]).catch(() => {
-            // Timeout or error - try destroy() as fallback
-            if (typeof dispatcher.destroy === 'function') {
-              dispatcher.destroy()
-            }
-          })
-        }
-        // Also try destroy() method if close() doesn't exist
-        else if (typeof dispatcher.destroy === 'function') {
-          dispatcher.destroy()
+    
+    // 2. Close undici dispatcher synchronously (use destroy, not close)
+    try {
+      const undiciModule = require('undici')
+      if (undiciModule && typeof undiciModule.getGlobalDispatcher === 'function') {
+        const dispatcher = undiciModule.getGlobalDispatcher()
+        if (dispatcher) {
+          // In CI, use destroy() directly - it's synchronous and doesn't create timers
+          if (typeof dispatcher.destroy === 'function') {
+            dispatcher.destroy()
+          } else if (typeof dispatcher.close === 'function') {
+            // If destroy doesn't exist, try close but don't await (creates handle)
+            dispatcher.close().catch(() => {
+              // Ignore errors
+            })
+          }
         }
       }
+    } catch (error: any) {
+      // Ignore errors in CI
+      if (error?.code !== 'MODULE_NOT_FOUND') {
+        // Silent fail in CI
+      }
     }
-  } catch (error: any) {
-    // undici might not be available or already closed - that's fine
-    // Only log if diagnostics are enabled and it's not a "module not found" error
-    if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true' && error?.code !== 'MODULE_NOT_FOUND') {
-      console.log('[HANDLE_DIAG] undici dispatcher cleanup error (ignored):', error?.message || error)
+    
+    // 3. Close HTTP agents synchronously
+    const http = require('http')
+    const https = require('https')
+    
+    if (http.globalAgent && typeof http.globalAgent.destroy === 'function') {
+      http.globalAgent.destroy()
+    }
+    
+    // 4. Close HTTPS agents synchronously
+    if (https.globalAgent && typeof https.globalAgent.destroy === 'function') {
+      https.globalAgent.destroy()
+    }
+  } else {
+    // Local: Allow async cleanup with proper error handling
+    try {
+      await server.close()
+      // Give MSW a moment to fully clean up internal handles (only locally)
+      await new Promise(resolve => setImmediate(resolve))
+    } catch (error) {
+      // Only log if diagnostics are enabled to avoid memory issues
+      if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true') {
+        console.log('[HANDLE_DIAG] MSW server.close() error (ignored):', error)
+      }
+    }
+
+    // Close all HTTP agent connections to prevent Socket handle leaks
+    const http = require('http')
+    const https = require('https')
+    
+    if (http.globalAgent && typeof http.globalAgent.destroy === 'function') {
+      http.globalAgent.destroy()
+    }
+    
+    if (https.globalAgent && typeof https.globalAgent.destroy === 'function') {
+      https.globalAgent.destroy()
+    }
+
+    // Close undici dispatcher (local: can use async with timeout)
+    try {
+      const undiciModule = require('undici')
+      if (undiciModule && typeof undiciModule.getGlobalDispatcher === 'function') {
+        const dispatcher = undiciModule.getGlobalDispatcher()
+        if (dispatcher) {
+          if (typeof dispatcher.close === 'function') {
+            await Promise.race([
+              dispatcher.close(),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('undici close timeout')), 5000)
+              )
+            ]).catch(() => {
+              if (typeof dispatcher.destroy === 'function') {
+                dispatcher.destroy()
+              }
+            })
+          } else if (typeof dispatcher.destroy === 'function') {
+            dispatcher.destroy()
+          }
+        }
+      }
+    } catch (error: any) {
+      if (process.env.ENABLE_HANDLE_DIAGNOSTICS === 'true' && error?.code !== 'MODULE_NOT_FOUND') {
+        console.log('[HANDLE_DIAG] undici dispatcher cleanup error (ignored):', error?.message || error)
+      }
     }
   }
 })

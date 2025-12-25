@@ -350,15 +350,19 @@ if (typeof process.on === 'function') {
 // Clean up the unhandled rejection handler after all tests complete
 // This prevents it from keeping the process alive
 afterAll(() => {
+  const isCI = process.env.CI === 'true'
+  
+  // Remove unhandled rejection handler
   if (typeof process.removeListener === 'function') {
     process.removeListener('unhandledRejection', unhandledRejectionHandler)
   } else if (typeof process.off === 'function') {
     process.off('unhandledRejection', unhandledRejectionHandler)
   }
 
-  // Diagnostic: Check for leaked handles after all tests complete
-  // Always enabled for CI debugging - provides raw diagnostic data
-  if (typeof (process as any)._getActiveHandles === 'function') {
+  // In CI: NO diagnostic listeners or timers - they create handles that prevent exit
+  // Diagnostic code is removed in CI to ensure clean process exit
+  // Locally: Allow diagnostics for debugging
+  if (!isCI && typeof (process as any)._getActiveHandles === 'function') {
     try {
       const handles = (process as any)._getActiveHandles()
       const requests = (process as any)._getActiveRequests()
@@ -370,295 +374,21 @@ afterAll(() => {
       console.log(`[HANDLE_DIAG] Total Requests: ${requests.length}`)
       console.log('[HANDLE_DIAG] ========================================\n')
 
-      // Log ALL handles with full details
-      handles.forEach((handle: any, index: number) => {
-        const handleType = handle.constructor?.name || 'Unknown'
-        const handleTypeOf = typeof handle
-        
-        console.log(`[HANDLE_DIAG] HANDLE #${index + 1}`)
-        console.log(`[HANDLE_DIAG]   TYPE: ${handleType}`)
-        console.log(`[HANDLE_DIAG]   typeof: ${handleTypeOf}`)
-        console.log(`[HANDLE_DIAG]   constructor.name: ${handle.constructor?.name || 'N/A'}`)
-        
-        // Log _handle details for Socket handles
-        if (handle._handle) {
-          console.log(`[HANDLE_DIAG]   _handle.constructor.name: ${handle._handle.constructor?.name || 'N/A'}`)
-          if (handle._handle.owner) {
-            const owner = handle._handle.owner
-            console.log(`[HANDLE_DIAG]   _handle.owner.constructor.name: ${owner.constructor?.name || 'N/A'}`)
-            
-            // Check if it's an undici socket
-            if (owner.constructor?.name === 'Client' || owner.constructor?.name === 'Pool') {
-              console.log(`[HANDLE_DIAG]   SOCKET OWNER: undici ${owner.constructor.name}`)
-            }
-            
-            // Check if it's a Supabase client socket
-            if (owner.constructor?.name?.includes('Supabase') || owner.constructor?.name?.includes('PostgREST')) {
-              console.log(`[HANDLE_DIAG]   SOCKET OWNER: Supabase/PostgREST`)
-            }
-            
-            // Check if it's a Next.js fetch socket
-            if (owner.constructor?.name?.includes('Next') || owner.constructor?.name?.includes('Fetch')) {
-              console.log(`[HANDLE_DIAG]   SOCKET OWNER: Next.js fetch`)
-            }
-            
-            if (owner && owner.stack) {
-              console.log(`[HANDLE_DIAG]   STACK TRACE:`)
-              const stackLines = owner.stack.split('\n').slice(0, 15)
-              stackLines.forEach((line: string) => {
-                console.log(`[HANDLE_DIAG]     ${line.trim()}`)
-              })
-            }
-          }
-        }
-        
-        // For Socket handles, check for additional identifying properties
-        if (handleType === 'Socket') {
-          // Check if socket has a client property (undici)
-          if (handle._httpMessage) {
-            console.log(`[HANDLE_DIAG]   _httpMessage.constructor.name: ${handle._httpMessage.constructor?.name || 'N/A'}`)
-          }
-          // Check for agent reference
-          if (handle.agent) {
-            console.log(`[HANDLE_DIAG]   agent.constructor.name: ${handle.agent.constructor?.name || 'N/A'}`)
-          }
-          // Check for client reference (undici)
-          if ((handle as any).client) {
-            console.log(`[HANDLE_DIAG]   client.constructor.name: ${(handle as any).client.constructor?.name || 'N/A'}`)
-          }
-        }
-        
-        // Log all relevant properties
-        const props: string[] = []
-        
-        // Timer-specific properties
-        if (handle._idleTimeout !== undefined) {
-          props.push(`_idleTimeout: ${handle._idleTimeout}ms`)
-        }
-        if (handle._repeat !== undefined) {
-          props.push(`_repeat: ${handle._repeat}`)
-        }
-        if (handle._onTimeout !== undefined) {
-          props.push(`_onTimeout: ${typeof handle._onTimeout}`)
-          if (handle._onTimeout && handle._onTimeout.toString) {
-            const funcStr = handle._onTimeout.toString().substring(0, 100)
-            props.push(`_onTimeout code: ${funcStr}...`)
-          }
-        }
-        
-        // Event emitter properties
-        if (handle._listeners !== undefined) {
-          props.push(`_listeners: ${Array.isArray(handle._listeners) ? handle._listeners.length : 'N/A'}`)
-        }
-        if (handle._events !== undefined) {
-          const eventCount = typeof handle._events === 'object' ? Object.keys(handle._events).length : 0
-          props.push(`_events: ${eventCount} event types`)
-        }
-        
-        // Stream/socket properties
-        if (handle.readable !== undefined) {
-          props.push(`readable: ${handle.readable}`)
-        }
-        if (handle.writable !== undefined) {
-          props.push(`writable: ${handle.writable}`)
-        }
-        if (handle.destroyed !== undefined) {
-          props.push(`destroyed: ${handle.destroyed}`)
-        }
-        
-        // Socket-specific
-        if (handle.remoteAddress !== undefined) {
-          props.push(`remoteAddress: ${handle.remoteAddress}`)
-        }
-        if (handle.remotePort !== undefined) {
-          props.push(`remotePort: ${handle.remotePort}`)
-        }
-        
-        // Process-specific
-        if (handle.pid !== undefined) {
-          props.push(`pid: ${handle.pid}`)
-        }
-        
-        if (props.length > 0) {
-          console.log(`[HANDLE_DIAG]   PROPERTIES:`)
-          props.forEach(prop => {
-            console.log(`[HANDLE_DIAG]     ${prop}`)
-          })
-        }
-        
-        // Try to get function source if it's a callback
-        if (handle._onTimeout && handle._onTimeout.stack) {
-          console.log(`[HANDLE_DIAG]   CALLBACK STACK:`)
-          const callbackStack = handle._onTimeout.stack.split('\n').slice(0, 5)
-          callbackStack.forEach((line: string) => {
-            console.log(`[HANDLE_DIAG]     ${line.trim()}`)
-          })
-        }
-        
-        console.log('[HANDLE_DIAG] ---')
-      })
-
-      // Log ALL requests
-      if (requests.length > 0) {
-        console.log(`[HANDLE_DIAG] ACTIVE REQUESTS (${requests.length}):`)
-        requests.forEach((req: any, index: number) => {
-          const reqType = req.constructor?.name || 'Unknown'
-          console.log(`[HANDLE_DIAG]   REQUEST #${index + 1}: ${reqType}`)
-          if (req._handle && req._handle.owner && req._handle.owner.stack) {
-            const stackLines = req._handle.owner.stack.split('\n').slice(0, 5)
-            stackLines.forEach((line: string) => {
-              console.log(`[HANDLE_DIAG]     ${line.trim()}`)
-            })
-          }
-        })
-      }
-
-      // Summary by type
+      // Log summary only (not full details to avoid memory issues)
       const handleTypes = handles.map((handle: any) => handle.constructor?.name || 'Unknown')
       const typeCounts = handleTypes.reduce((acc: { [key: string]: number }, type: string) => {
         acc[type] = (acc[type] || 0) + 1
         return acc
       }, {})
-      console.log('\n[HANDLE_DIAG] SUMMARY BY TYPE:')
+      console.log('[HANDLE_DIAG] SUMMARY BY TYPE:')
       Object.entries(typeCounts).forEach(([type, count]) => {
         console.log(`[HANDLE_DIAG]   ${type}: ${count}`)
       })
       
       console.log('\n[HANDLE_DIAG] ========================================\n')
     } catch (e) {
-      console.error('[HANDLE_DIAG] ERROR during handle diagnostic:', e)
-      if (e instanceof Error && e.stack) {
-        console.error('[HANDLE_DIAG] Stack:', e.stack)
-      }
+      // Ignore errors in diagnostics
     }
-  } else {
-    console.log('[HANDLE_DIAG] process._getActiveHandles() not available\n')
   }
 })
-
-// FINAL DIAGNOSTIC: Run at the VERY END after all tests and hooks complete
-// This runs on process exit events to capture the absolute final state
-if (process.env.CI === 'true' && typeof (process as any)._getActiveHandles === 'function') {
-  const logFinalHandles = () => {
-    try {
-      const handles = (process as any)._getActiveHandles()
-      const requests = (process as any)._getActiveRequests()
-
-      console.log('\n[FINAL_DIAG] ========================================')
-      console.log('[FINAL_DIAG] ABSOLUTE FINAL HANDLE DUMP - PROCESS EXITING')
-      console.log('[FINAL_DIAG] ========================================')
-      console.log(`[FINAL_DIAG] Total Handles: ${handles.length}`)
-      console.log(`[FINAL_DIAG] Total Requests: ${requests.length}`)
-      console.log('[FINAL_DIAG] ========================================\n')
-
-      handles.forEach((handle: any, index: number) => {
-        const handleType = handle.constructor?.name || 'Unknown'
-        
-        console.log(`[FINAL_DIAG] HANDLE #${index + 1}`)
-        console.log(`[FINAL_DIAG]   constructor.name: ${handleType}`)
-        
-        // Log _handle details
-        if (handle._handle) {
-          console.log(`[FINAL_DIAG]   _handle.constructor.name: ${handle._handle.constructor?.name || 'N/A'}`)
-          if (handle._handle.owner) {
-            const owner = handle._handle.owner
-            console.log(`[FINAL_DIAG]   _handle.owner.constructor.name: ${owner.constructor?.name || 'N/A'}`)
-            
-            // Identify owner library
-            const ownerName = owner.constructor?.name || ''
-            if (ownerName === 'Client' || ownerName === 'Pool') {
-              console.log(`[FINAL_DIAG]   OWNER: undici ${ownerName}`)
-            } else if (ownerName.includes('Supabase') || ownerName.includes('PostgREST')) {
-              console.log(`[FINAL_DIAG]   OWNER: Supabase/PostgREST`)
-            } else if (ownerName.includes('Next') || ownerName.includes('Fetch')) {
-              console.log(`[FINAL_DIAG]   OWNER: Next.js fetch`)
-            } else if (ownerName) {
-              console.log(`[FINAL_DIAG]   OWNER: ${ownerName}`)
-            }
-            
-            // Stack trace
-            if (owner.stack) {
-              console.log(`[FINAL_DIAG]   STACK TRACE:`)
-              const stackLines = owner.stack.split('\n').slice(0, 20)
-              stackLines.forEach((line: string) => {
-                console.log(`[FINAL_DIAG]     ${line.trim()}`)
-              })
-            }
-          }
-        }
-        
-        // Socket-specific properties
-        if (handleType === 'Socket') {
-          console.log(`[FINAL_DIAG]   destroyed: ${handle.destroyed !== undefined ? handle.destroyed : 'N/A'}`)
-          console.log(`[FINAL_DIAG]   readable: ${handle.readable !== undefined ? handle.readable : 'N/A'}`)
-          console.log(`[FINAL_DIAG]   writable: ${handle.writable !== undefined ? handle.writable : 'N/A'}`)
-          if (handle.agent) {
-            console.log(`[FINAL_DIAG]   agent.constructor.name: ${handle.agent.constructor?.name || 'N/A'}`)
-          }
-          if (handle._httpMessage) {
-            console.log(`[FINAL_DIAG]   _httpMessage.constructor.name: ${handle._httpMessage.constructor?.name || 'N/A'}`)
-          }
-        }
-        
-        // Timer-specific properties
-        if (handleType === 'Timeout' || handleType === 'Immediate') {
-          if (handle._idleTimeout !== undefined) {
-            console.log(`[FINAL_DIAG]   _idleTimeout: ${handle._idleTimeout}ms`)
-          }
-          if (handle._repeat !== undefined) {
-            console.log(`[FINAL_DIAG]   _repeat: ${handle._repeat}`)
-          }
-        }
-        
-        console.log('[FINAL_DIAG] ---')
-      })
-
-      // Log requests
-      if (requests.length > 0) {
-        console.log(`[FINAL_DIAG] ACTIVE REQUESTS (${requests.length}):`)
-        requests.forEach((req: any, index: number) => {
-          const reqType = req.constructor?.name || 'Unknown'
-          console.log(`[FINAL_DIAG]   REQUEST #${index + 1}: ${reqType}`)
-          if (req._handle && req._handle.owner && req._handle.owner.stack) {
-            const stackLines = req._handle.owner.stack.split('\n').slice(0, 10)
-            stackLines.forEach((line: string) => {
-              console.log(`[FINAL_DIAG]     ${line.trim()}`)
-            })
-          }
-        })
-      }
-
-      // Summary
-      const handleTypes = handles.map((handle: any) => handle.constructor?.name || 'Unknown')
-      const typeCounts = handleTypes.reduce((acc: { [key: string]: number }, type: string) => {
-        acc[type] = (acc[type] || 0) + 1
-        return acc
-      }, {})
-      console.log('\n[FINAL_DIAG] SUMMARY BY TYPE:')
-      Object.entries(typeCounts).forEach(([type, count]) => {
-        console.log(`[FINAL_DIAG]   ${type}: ${count}`)
-      })
-      
-      console.log('\n[FINAL_DIAG] ========================================\n')
-    } catch (e) {
-      console.error('[FINAL_DIAG] ERROR:', e)
-    }
-  }
-
-  // Register on both beforeExit and exit to catch the absolute final state
-  // Guard against environments where process.on/once might not be available (e.g., jsdom)
-  if (typeof process.once === 'function') {
-    process.once('beforeExit', logFinalHandles)
-    process.once('exit', () => {
-      // Use synchronous logging for exit event
-      try {
-        const handles = (process as any)._getActiveHandles()
-        const requests = (process as any)._getActiveRequests()
-        console.log(`\n[FINAL_DIAG] EXIT EVENT - Handles: ${handles.length}, Requests: ${requests.length}\n`)
-      } catch (e) {
-        // Ignore errors in exit handler
-      }
-    })
-  }
-}
 

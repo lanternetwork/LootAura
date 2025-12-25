@@ -107,6 +107,7 @@
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
     "tsx": "^4.7.0",
-    "patch-package": "^8.0.0"
+    "patch-package": "^8.0.0",
+    "wtfnode": "^0.13.0"
   }
 }

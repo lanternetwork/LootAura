@@ -254,14 +254,11 @@ afterAll(async () => {
         const dispatcher = undiciModule.getGlobalDispatcher()
         if (dispatcher) {
           // In CI, use destroy() directly - it's synchronous and doesn't create timers
+          // Do NOT use close() in CI as it returns a Promise and creates handles
           if (typeof dispatcher.destroy === 'function') {
             dispatcher.destroy()
-          } else if (typeof dispatcher.close === 'function') {
-            // If destroy doesn't exist, try close but don't await (creates handle)
-            dispatcher.close().catch(() => {
-              // Ignore errors
-            })
           }
+          // If destroy doesn't exist, we skip cleanup in CI to avoid creating Promise handles
         }
       }
     } catch (error: any) {

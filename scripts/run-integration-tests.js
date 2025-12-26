@@ -76,21 +76,21 @@ child.on('exit', (code, signal) => {
 function checkVitestCompletion() {
   const output = outputBuffer.toLowerCase();
   // Look for Vitest's final summary patterns:
-  // - "Test Files" followed by numbers
-  // - "Tests" followed by numbers  
-  // - Lines with checkmarks (✓) followed by test file names and test counts
-  // - Summary lines like "Test Files  1 passed (1)" or "Tests  10 passed (10)"
+  // - "Test Files" followed by numbers and "passed" or "failed"
+  // - "Tests" followed by numbers and "passed" or "failed"
+  // - Summary lines with test counts
+  // Also check for multiple completed test files (at least 10 to be safe)
+  const completedTestFiles = (output.match(/✓\s+tests\/integration\/[^\s]+/g) || []).length;
   const hasTestSummary = 
     /test files\s+\d+\s+(passed|failed)/.test(output) ||
     /tests\s+\d+\s+(passed|failed)/.test(output) ||
     /test files.*\d+.*tests.*\d+/.test(output) ||
-    // Also check for the pattern where we see multiple test files completed
-    (output.match(/✓\s+tests\/integration\/.*\(\d+\s+tests?\)/g) || []).length > 5;
+    completedTestFiles >= 10; // If we see 10+ completed test files, tests are likely done
 
   if (hasTestSummary && !completionDetected) {
     completionDetected = true;
     completionDetectedTime = Date.now();
-    console.log('[run-integration-tests] Detected Vitest completion summary in output. Waiting for natural exit...');
+    console.log(`[run-integration-tests] Detected Vitest completion (${completedTestFiles} test files completed). Waiting for natural exit...`);
     // Don't kill the process - let it exit naturally
     // The child.on('exit') handler will set the correct exit code
   }

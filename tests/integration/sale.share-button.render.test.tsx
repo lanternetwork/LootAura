@@ -191,10 +191,7 @@ describe('SaleShareButton', () => {
   it('should use Web Share API when available', async () => {
     const user = userEvent.setup()
     
-    // Mock Web Share API
-    const share = vi.fn().mockResolvedValue(undefined)
-    
-    // Mock mobile user agent FIRST (before setting share)
+    // Mock mobile user agent FIRST
     Object.defineProperty(navigator, 'userAgent', {
       writable: true,
       configurable: true,
@@ -207,7 +204,8 @@ describe('SaleShareButton', () => {
       value: 375,
     })
     
-    // Now set navigator.share AFTER user agent is set
+    // Mock Web Share API - must be set before render
+    const share = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'share', {
       writable: true,
       configurable: true,
@@ -216,10 +214,13 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const button = screen.getByRole('button', { name: /share/i })
+    // Wait for component to be ready
+    const button = await screen.findByRole('button', { name: /share/i })
+    
+    // Click the button
     await user.click(button)
     
-    // Web Share API should be called
+    // Web Share API should be called immediately on mobile when Web Share is available
     await waitFor(() => {
       expect(share).toHaveBeenCalledWith({
         title: defaultProps.title,

@@ -55,22 +55,27 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
               if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
                 echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund
-              elif [ ${npm_exit:-0} -ne 0 ]; then
+                npm install --no-audit --no-fund && install_success=1 || install_success=0
+              elif [ ${npm_exit:-0} -eq 0 ]; then
+                install_success=1
+              else
                 echo "$npm_output"
-                exit ${npm_exit}
+                install_success=0
               fi
             else
-              npm install --no-audit --no-fund
+              npm install --no-audit --no-fund && install_success=1 || install_success=0
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only --no-audit --no-fund
+              if [ $install_success -eq 1 ]; then
+                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
+              fi
             fi
             
-            if [ $? -eq 0 ]; then
+            if [ $install_success -eq 1 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -107,22 +112,27 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
               if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
                 echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund
-              elif [ ${npm_exit:-0} -ne 0 ]; then
+                npm install --no-audit --no-fund && install_success=1 || install_success=0
+              elif [ ${npm_exit:-0} -eq 0 ]; then
+                install_success=1
+              else
                 echo "$npm_output"
-                exit ${npm_exit}
+                install_success=0
               fi
             else
-              npm install --no-audit --no-fund
+              npm install --no-audit --no-fund && install_success=1 || install_success=0
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only --no-audit --no-fund
+              if [ $install_success -eq 1 ]; then
+                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
+              fi
             fi
             
-            if [ $? -eq 0 ]; then
+            if [ $install_success -eq 1 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -159,22 +169,27 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
               if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
                 echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund
-              elif [ ${npm_exit:-0} -ne 0 ]; then
+                npm install --no-audit --no-fund && install_success=1 || install_success=0
+              elif [ ${npm_exit:-0} -eq 0 ]; then
+                install_success=1
+              else
                 echo "$npm_output"
-                exit ${npm_exit}
+                install_success=0
               fi
             else
-              npm install --no-audit --no-fund
+              npm install --no-audit --no-fund && install_success=1 || install_success=0
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only --no-audit --no-fund
+              if [ $install_success -eq 1 ]; then
+                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
+              fi
             fi
             
-            if [ $? -eq 0 ]; then
+            if [ $install_success -eq 1 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -225,22 +240,27 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
               if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
                 echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund
-              elif [ ${npm_exit:-0} -ne 0 ]; then
+                npm install --no-audit --no-fund && install_success=1 || install_success=0
+              elif [ ${npm_exit:-0} -eq 0 ]; then
+                install_success=1
+              else
                 echo "$npm_output"
-                exit ${npm_exit}
+                install_success=0
               fi
             else
-              npm install --no-audit --no-fund
+              npm install --no-audit --no-fund && install_success=1 || install_success=0
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only --no-audit --no-fund
+              if [ $install_success -eq 1 ]; then
+                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
+              fi
             fi
             
-            if [ $? -eq 0 ]; then
+            if [ $install_success -eq 1 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -282,22 +302,27 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
               if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
                 echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund
-              elif [ ${npm_exit:-0} -ne 0 ]; then
+                npm install --no-audit --no-fund && install_success=1 || install_success=0
+              elif [ ${npm_exit:-0} -eq 0 ]; then
+                install_success=1
+              else
                 echo "$npm_output"
-                exit ${npm_exit}
+                install_success=0
               fi
             else
-              npm install --no-audit --no-fund
+              npm install --no-audit --no-fund && install_success=1 || install_success=0
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only --no-audit --no-fund
+              if [ $install_success -eq 1 ]; then
+                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
+              fi
             fi
             
-            if [ $? -eq 0 ]; then
+            if [ $install_success -eq 1 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -341,22 +366,27 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
               if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
                 echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund
-              elif [ ${npm_exit:-0} -ne 0 ]; then
+                npm install --no-audit --no-fund && install_success=1 || install_success=0
+              elif [ ${npm_exit:-0} -eq 0 ]; then
+                install_success=1
+              else
                 echo "$npm_output"
-                exit ${npm_exit}
+                install_success=0
               fi
             else
-              npm install --no-audit --no-fund
+              npm install --no-audit --no-fund && install_success=1 || install_success=0
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only --no-audit --no-fund
+              if [ $install_success -eq 1 ]; then
+                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
+              fi
             fi
             
-            if [ $? -eq 0 ]; then
+            if [ $install_success -eq 1 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -424,22 +454,27 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
               if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
                 echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund
-              elif [ ${npm_exit:-0} -ne 0 ]; then
+                npm install --no-audit --no-fund && install_success=1 || install_success=0
+              elif [ ${npm_exit:-0} -eq 0 ]; then
+                install_success=1
+              else
                 echo "$npm_output"
-                exit ${npm_exit}
+                install_success=0
               fi
             else
-              npm install --no-audit --no-fund
+              npm install --no-audit --no-fund && install_success=1 || install_success=0
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only --no-audit --no-fund
+              if [ $install_success -eq 1 ]; then
+                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
+              fi
             fi
             
-            if [ $? -eq 0 ]; then
+            if [ $install_success -eq 1 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -488,22 +523,27 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
+            install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
               if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
                 echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund
-              elif [ ${npm_exit:-0} -ne 0 ]; then
+                npm install --no-audit --no-fund && install_success=1 || install_success=0
+              elif [ ${npm_exit:-0} -eq 0 ]; then
+                install_success=1
+              else
                 echo "$npm_output"
-                exit ${npm_exit}
+                install_success=0
               fi
             else
-              npm install --no-audit --no-fund
+              npm install --no-audit --no-fund && install_success=1 || install_success=0
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only --no-audit --no-fund
+              if [ $install_success -eq 1 ]; then
+                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
+              fi
             fi
             
-            if [ $? -eq 0 ]; then
+            if [ $install_success -eq 1 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else

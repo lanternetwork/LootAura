@@ -56,12 +56,19 @@ jobs:
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
             if [ -f package-lock.json ]; then
-              # Try npm ci first, but fall back to npm install if lock file is out of sync
-              npm ci || npm install
+              npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
+              if [ ${npm_exit:-0} -ne 0 ] && echo "$npm_output" | grep -q "Missing:.*from lock file"; then
+                echo "⚠️ Lock file out of sync, regenerating..."
+                npm install --package-lock-only --no-audit --no-fund
+                npm ci --no-audit --no-fund
+              elif [ ${npm_exit:-0} -ne 0 ]; then
+                echo "$npm_output"
+                exit ${npm_exit}
+              fi
             else
-              npm install
+              npm install --no-audit --no-fund
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
+              npm install --package-lock-only --no-audit --no-fund
             fi
             
             if [ $? -eq 0 ]; then
@@ -102,12 +109,19 @@ jobs:
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
             if [ -f package-lock.json ]; then
-              # Try npm ci first, but fall back to npm install if lock file is out of sync
-              npm ci || npm install
+              npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
+              if [ ${npm_exit:-0} -ne 0 ] && echo "$npm_output" | grep -q "Missing:.*from lock file"; then
+                echo "⚠️ Lock file out of sync, regenerating..."
+                npm install --package-lock-only --no-audit --no-fund
+                npm ci --no-audit --no-fund
+              elif [ ${npm_exit:-0} -ne 0 ]; then
+                echo "$npm_output"
+                exit ${npm_exit}
+              fi
             else
-              npm install
+              npm install --no-audit --no-fund
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
+              npm install --package-lock-only --no-audit --no-fund
             fi
             
             if [ $? -eq 0 ]; then
@@ -148,12 +162,19 @@ jobs:
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
             if [ -f package-lock.json ]; then
-              # Try npm ci first, but fall back to npm install if lock file is out of sync
-              npm ci || npm install
+              npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
+              if [ ${npm_exit:-0} -ne 0 ] && echo "$npm_output" | grep -q "Missing:.*from lock file"; then
+                echo "⚠️ Lock file out of sync, regenerating..."
+                npm install --package-lock-only --no-audit --no-fund
+                npm ci --no-audit --no-fund
+              elif [ ${npm_exit:-0} -ne 0 ]; then
+                echo "$npm_output"
+                exit ${npm_exit}
+              fi
             else
-              npm install
+              npm install --no-audit --no-fund
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
+              npm install --package-lock-only --no-audit --no-fund
             fi
             
             if [ $? -eq 0 ]; then
@@ -172,7 +193,7 @@ jobs:
           done
 
       - name: Run unit tests
-        run: npx vitest run --teardown-timeout=10000 tests/unit/
+        run: npm run test -- tests/unit/
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -191,7 +212,6 @@ jobs:
   test-integration:
     name: test-integration
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     
     steps:
       - name: Checkout repository
@@ -209,12 +229,19 @@ jobs:
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
             if [ -f package-lock.json ]; then
-              # Try npm ci first, but fall back to npm install if lock file is out of sync
-              npm ci || npm install
+              npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
+              if [ ${npm_exit:-0} -ne 0 ] && echo "$npm_output" | grep -q "Missing:.*from lock file"; then
+                echo "⚠️ Lock file out of sync, regenerating..."
+                npm install --package-lock-only --no-audit --no-fund
+                npm ci --no-audit --no-fund
+              elif [ ${npm_exit:-0} -ne 0 ]; then
+                echo "$npm_output"
+                exit ${npm_exit}
+              fi
             else
-              npm install
+              npm install --no-audit --no-fund
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
+              npm install --package-lock-only --no-audit --no-fund
             fi
             
             if [ $? -eq 0 ]; then
@@ -235,7 +262,6 @@ jobs:
       - name: Run integration tests
         run: node scripts/run-integration-tests.js
         env:
-          NODE_OPTIONS: '--max-old-space-size=20480 --expose-gc'
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_SUPABASE_SCHEMA: ${{ secrets.NEXT_PUBLIC_SUPABASE_SCHEMA || 'public' }}
@@ -261,12 +287,19 @@ jobs:
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
             if [ -f package-lock.json ]; then
-              # Try npm ci first, but fall back to npm install if lock file is out of sync
-              npm ci || npm install
+              npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
+              if [ ${npm_exit:-0} -ne 0 ] && echo "$npm_output" | grep -q "Missing:.*from lock file"; then
+                echo "⚠️ Lock file out of sync, regenerating..."
+                npm install --package-lock-only --no-audit --no-fund
+                npm ci --no-audit --no-fund
+              elif [ ${npm_exit:-0} -ne 0 ]; then
+                echo "$npm_output"
+                exit ${npm_exit}
+              fi
             else
-              npm install
+              npm install --no-audit --no-fund
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
+              npm install --package-lock-only --no-audit --no-fund
             fi
             
             if [ $? -eq 0 ]; then
@@ -314,12 +347,19 @@ jobs:
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
             if [ -f package-lock.json ]; then
-              # Try npm ci first, but fall back to npm install if lock file is out of sync
-              npm ci || npm install
+              npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
+              if [ ${npm_exit:-0} -ne 0 ] && echo "$npm_output" | grep -q "Missing:.*from lock file"; then
+                echo "⚠️ Lock file out of sync, regenerating..."
+                npm install --package-lock-only --no-audit --no-fund
+                npm ci --no-audit --no-fund
+              elif [ ${npm_exit:-0} -ne 0 ]; then
+                echo "$npm_output"
+                exit ${npm_exit}
+              fi
             else
-              npm install
+              npm install --no-audit --no-fund
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
+              npm install --package-lock-only --no-audit --no-fund
             fi
             
             if [ $? -eq 0 ]; then
@@ -391,12 +431,19 @@ jobs:
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
             if [ -f package-lock.json ]; then
-              # Try npm ci first, but fall back to npm install if lock file is out of sync
-              npm ci || npm install
+              npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
+              if [ ${npm_exit:-0} -ne 0 ] && echo "$npm_output" | grep -q "Missing:.*from lock file"; then
+                echo "⚠️ Lock file out of sync, regenerating..."
+                npm install --package-lock-only --no-audit --no-fund
+                npm ci --no-audit --no-fund
+              elif [ ${npm_exit:-0} -ne 0 ]; then
+                echo "$npm_output"
+                exit ${npm_exit}
+              fi
             else
-              npm install
+              npm install --no-audit --no-fund
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
+              npm install --package-lock-only --no-audit --no-fund
             fi
             
             if [ $? -eq 0 ]; then
@@ -449,12 +496,19 @@ jobs:
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
             if [ -f package-lock.json ]; then
-              # Try npm ci first, but fall back to npm install if lock file is out of sync
-              npm ci || npm install
+              npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
+              if [ ${npm_exit:-0} -ne 0 ] && echo "$npm_output" | grep -q "Missing:.*from lock file"; then
+                echo "⚠️ Lock file out of sync, regenerating..."
+                npm install --package-lock-only --no-audit --no-fund
+                npm ci --no-audit --no-fund
+              elif [ ${npm_exit:-0} -ne 0 ]; then
+                echo "$npm_output"
+                exit ${npm_exit}
+              fi
             else
-              npm install
+              npm install --no-audit --no-fund
               # Generate package-lock.json for consistent dependency resolution
-              npm install --package-lock-only
+              npm install --package-lock-only --no-audit --no-fund
             fi
             
             if [ $? -eq 0 ]; then

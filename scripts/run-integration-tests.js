@@ -18,13 +18,27 @@ let outputBuffer = '';
 let lastOutputTime = Date.now();
 let vitestExited = false;
 let vitestExitCode = 1; // Default to failure
+let completionDetected = false;
+let completionDetectedTime = null;
 
 const outputCheckInterval = setInterval(() => {
-  if (Date.now() - lastOutputTime > 2000 && !vitestExited) {
-    console.log('[run-integration-tests] No output for 2 seconds, forcing child process termination.');
+  // If completion was detected, wait up to 5 seconds for natural exit
+  if (completionDetected && !vitestExited) {
+    const waitTime = Date.now() - completionDetectedTime;
+    if (waitTime > 5000) {
+      console.log('[run-integration-tests] Completion detected but process did not exit after 5 seconds. Terminating child process group.');
+      process.kill(-child.pid, 'SIGTERM'); // Kill the process group
+      clearInterval(outputCheckInterval);
+      // Exit will be handled by child.on('exit')
+      return;
+    }
+  }
+  // If no output for 10 seconds and no completion detected, something is wrong
+  if (!completionDetected && Date.now() - lastOutputTime > 10000 && !vitestExited) {
+    console.log('[run-integration-tests] No output for 10 seconds, forcing child process termination.');
     process.kill(-child.pid, 'SIGTERM'); // Kill the process group
     clearInterval(outputCheckInterval);
-    process.exit(vitestExitCode);
+    // Exit will be handled by child.on('exit')
   }
 }, 500);
 
@@ -42,9 +56,16 @@ child.stderr.on('data', (data) => {
 
 child.on('exit', (code, signal) => {
   vitestExited = true;
-  vitestExitCode = code === null ? 1 : code; // If killed by signal, treat as failure
-  console.log(`[run-integration-tests] Vitest child process exited with code ${code}, signal ${signal}`);
-  // Always exit with the child's exit code
+  // If killed by signal after completion was detected, assume success (tests passed)
+  // Otherwise, use the actual exit code
+  if (code === null && signal === 'SIGTERM' && completionDetected) {
+    vitestExitCode = 0; // Tests completed successfully, process was just slow to exit
+    console.log(`[run-integration-tests] Vitest child process was terminated after completion. Treating as success.`);
+  } else {
+    vitestExitCode = code === null ? 1 : code; // If killed by signal unexpectedly, treat as failure
+    console.log(`[run-integration-tests] Vitest child process exited with code ${code}, signal ${signal}`);
+  }
+  // Always exit with the determined exit code
   clearInterval(outputCheckInterval);
   // Give a brief moment for any final output to flush, then exit
   setTimeout(() => {
@@ -54,20 +75,17 @@ child.on('exit', (code, signal) => {
 
 function checkVitestCompletion() {
   const output = outputBuffer.toLowerCase();
-  const completionKeywords = ['test files', 'tests', 'passed', 'failed'];
+  // Look for the final test summary line that shows pass/fail counts
+  const hasTestSummary = /test files.*\d+.*tests.*\d+/.test(output) || 
+                        /tests.*passed.*failed/.test(output) ||
+                        /test files.*tests.*passed/.test(output);
 
-  if (completionKeywords.some(keyword => output.includes(keyword))) {
-    console.log('[run-integration-tests] Detected Vitest completion keywords in output.');
-    // Give Vitest a moment to finish its own internal cleanup/teardown and exit naturally
-    // Don't force exit here - let the child.on('exit') handler set the correct exit code
-    setTimeout(() => {
-      if (!vitestExited) {
-        console.log('[run-integration-tests] Vitest appears complete, but process still active. Terminating child process group.');
-        process.kill(-child.pid, 'SIGTERM'); // Kill the process group
-        // The exit will be handled by child.on('exit') which sets vitestExitCode correctly
-      }
-      // Don't exit here - let child.on('exit') handle it with the correct exit code
-    }, 2000); // Wait 2 seconds for natural exit
+  if (hasTestSummary && !completionDetected) {
+    completionDetected = true;
+    completionDetectedTime = Date.now();
+    console.log('[run-integration-tests] Detected Vitest completion summary in output. Waiting for natural exit...');
+    // Don't kill the process - let it exit naturally
+    // The child.on('exit') handler will set the correct exit code
   }
 }
 

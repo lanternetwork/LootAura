@@ -75,32 +75,33 @@ child.on('exit', (code, signal) => {
 });
 
 function checkVitestCompletion() {
-  const output = outputBuffer.toLowerCase();
+  // Don't lowercase - Unicode characters need to match as-is
+  const output = outputBuffer;
   // Look for Vitest's final summary patterns:
   // - "Test Files" followed by numbers and "passed" or "failed"
   // - "Tests" followed by numbers and "passed" or "failed"
   // - Summary lines with test counts
   // Also check for multiple completed test files (at least 20 to be safe, as we have many test files)
-  const completedTestFiles = (output.match(/✓\s+tests\/integration\/[^\s]+/g) || []).length;
-  const failedTestFiles = (output.match(/×\s+tests\/integration\/[^\s]+/g) || []).length;
-  const totalCompleted = completedTestFiles + failedTestFiles;
+  // Match both checkmark (✓) and cross (×) patterns - note that these are Unicode characters
+  const completedTestFiles = (output.match(/[✓×]\s+tests\/integration\/[^\s]+/g) || []).length;
   
   // Check for Vitest's final summary line (appears at the very end)
   // Look for patterns like "Test Files  1 passed (1)" or "Tests  10 passed (10)"
+  // Use case-insensitive matching
   const hasFinalSummary = 
-    /test files\s+\d+\s+(passed|failed)/.test(output) ||
-    /tests\s+\d+\s+(passed|failed)/.test(output) ||
-    /test files.*\d+.*tests.*\d+/.test(output) ||
+    /test files\s+\d+\s+(passed|failed)/i.test(output) ||
+    /tests\s+\d+\s+(passed|failed)/i.test(output) ||
+    /test files.*\d+.*tests.*\d+/i.test(output) ||
     // Also check for the summary format: "Test Files  1 | Tests  10"
-    /test files\s+\d+\s+\|\s+tests\s+\d+/.test(output);
+    /test files\s+\d+\s+\|\s+tests\s+\d+/i.test(output);
   
   // If we see 20+ completed test files OR the final summary, tests are done
-  const hasTestSummary = hasFinalSummary || totalCompleted >= 20;
+  const hasTestSummary = hasFinalSummary || completedTestFiles >= 20;
 
   if (hasTestSummary && !completionDetected) {
     completionDetected = true;
     completionDetectedTime = Date.now();
-    console.log(`[run-integration-tests] Detected Vitest completion (${totalCompleted} test files completed, ${completedTestFiles} passed, ${failedTestFiles} failed). Waiting for natural exit...`);
+    console.log(`[run-integration-tests] Detected Vitest completion (${completedTestFiles} test files completed). Waiting for natural exit...`);
     // Don't kill the process - let it exit naturally
     // The child.on('exit') handler will set the correct exit code
   }

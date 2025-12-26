@@ -75,14 +75,17 @@ child.on('exit', (code, signal) => {
 });
 
 function checkVitestCompletion() {
-  // Don't lowercase - Unicode characters need to match as-is
-  const output = outputBuffer;
+  // Strip ANSI escape codes before matching (they interfere with regex)
+  // ANSI codes are in the format \x1b[...m or [number;number;number m
+  const output = outputBuffer.replace(/\x1b\[[0-9;]*m/g, '').replace(/\[[0-9;]*m/g, '');
+  
   // Look for Vitest's final summary patterns:
   // - "Test Files" followed by numbers and "passed" or "failed"
   // - "Tests" followed by numbers and "passed" or "failed"
   // - Summary lines with test counts
   // Also check for multiple completed test files (at least 20 to be safe, as we have many test files)
   // Match both checkmark (✓) and cross (×) patterns - note that these are Unicode characters
+  // After stripping ANSI codes, the format is: "✓ tests/integration/path.test.ts"
   const completedTestFiles = (output.match(/[✓×]\s+tests\/integration\/[^\s]+/g) || []).length;
   
   // Check for Vitest's final summary line (appears at the very end)

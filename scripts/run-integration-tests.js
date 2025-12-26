@@ -1,113 +1,74 @@
-#!/usr/bin/env node
-/**
- * Hard process boundary wrapper for integration tests in CI
- * 
- * Spawns Vitest in a child process and terminates the process group when tests complete.
- * This ensures deterministic exit without relying on Node event loop cleanup.
- */
+const { spawn } = require('child_process');
+const path = require('path');
 
-const { spawn } = require('child_process')
+const vitestCommand = 'npx';
+const vitestArgs = [
+  'vitest',
+  'run',
+  'tests/integration/',
+];
 
-const vitest = spawn('npx', ['vitest', 'run', 'tests/integration/', '--exclude', 'tests/integration/admin/load-test-api.test.ts'], {
-  stdio: ['inherit', 'pipe', 'pipe'],
-  shell: false,
-  detached: true,
-})
+const child = spawn(vitestCommand, vitestArgs, {
+  stdio: ['inherit', 'pipe', 'pipe'], // Inherit stdin, pipe stdout/stderr
+  detached: true, // Detach the child process
+  shell: true, // Use shell to resolve npx
+});
 
-let lastOutputTime = Date.now()
-let testSummarySeen = false
-let exitCode = 1
+let outputBuffer = '';
+let lastOutputTime = Date.now();
+let vitestExited = false;
+let vitestExitCode = 1; // Default to failure
 
-// Forward stdout to parent's stdout while monitoring
-vitest.stdout?.on('data', (data) => {
-  lastOutputTime = Date.now()
-  process.stdout.write(data)
-  const output = data.toString()
-  
-  // Check for test summary indicators
-  if (output.includes('Test Files') || output.includes('Tests') || output.includes('passed') || output.includes('failed')) {
-    testSummarySeen = true
+const outputCheckInterval = setInterval(() => {
+  if (Date.now() - lastOutputTime > 2000 && !vitestExited) {
+    console.log('[run-integration-tests] No output for 2 seconds, forcing child process termination.');
+    process.kill(-child.pid, 'SIGTERM'); // Kill the process group
+    clearInterval(outputCheckInterval);
+    process.exit(vitestExitCode);
   }
-})
+}, 500);
 
-// Forward stderr to parent's stderr while monitoring
-vitest.stderr?.on('data', (data) => {
-  lastOutputTime = Date.now()
-  process.stderr.write(data)
-  const output = data.toString()
-  
-  // Check for test summary indicators in stderr too
-  if (output.includes('Test Files') || output.includes('Tests') || output.includes('passed') || output.includes('failed')) {
-    testSummarySeen = true
-  }
-})
+child.stdout.on('data', (data) => {
+  process.stdout.write(data); // Forward output
+  outputBuffer += data.toString();
+  lastOutputTime = Date.now();
+  checkVitestCompletion();
+});
 
-// Handle process exit
-vitest.on('exit', (code) => {
-  exitCode = code || 0
-  clearInterval(checkInterval)
-  
-  // Kill the entire process group
-  try {
-    process.kill(-vitest.pid, 'SIGTERM')
-  } catch (err) {
-    // Process group may already be dead - ignore
-  }
-  
-  // Exit with the child's exit code
-  process.exit(exitCode)
-})
+child.stderr.on('data', (data) => {
+  process.stderr.write(data); // Forward output
+  lastOutputTime = Date.now();
+});
 
-// Monitor for completion: if no output for 2 seconds after seeing summary, exit
-const checkInterval = setInterval(() => {
-  const timeSinceLastOutput = Date.now() - lastOutputTime
-  
-  if (testSummarySeen && timeSinceLastOutput > 2000) {
-    clearInterval(checkInterval)
-    
-    // Kill the entire process group
-    try {
-      if (!vitest.killed) {
-        process.kill(-vitest.pid, 'SIGTERM')
+child.on('exit', (code, signal) => {
+  vitestExited = true;
+  vitestExitCode = code === null ? 1 : code; // If killed by signal, treat as failure
+  console.log(`[run-integration-tests] Vitest child process exited with code ${code}, signal ${signal}`);
+  // Always exit with the child's exit code
+  clearInterval(outputCheckInterval);
+  // Give a brief moment for any final output to flush, then exit
+  setTimeout(() => {
+    process.exit(vitestExitCode);
+  }, 200); // Give a moment for any final output to flush
+});
+
+function checkVitestCompletion() {
+  const output = outputBuffer.toLowerCase();
+  const completionKeywords = ['test files', 'tests', 'passed', 'failed'];
+
+  if (completionKeywords.some(keyword => output.includes(keyword))) {
+    console.log('[run-integration-tests] Detected Vitest completion keywords in output.');
+    // Give Vitest a moment to finish its own internal cleanup/teardown and exit naturally
+    // Don't force exit here - let the child.on('exit') handler set the correct exit code
+    setTimeout(() => {
+      if (!vitestExited) {
+        console.log('[run-integration-tests] Vitest appears complete, but process still active. Terminating child process group.');
+        process.kill(-child.pid, 'SIGTERM'); // Kill the process group
+        // The exit will be handled by child.on('exit') which sets vitestExitCode correctly
       }
-    } catch (err) {
-      // Process group may already be dead - ignore
-    }
-    
-    // Exit with the child's exit code
-    process.exit(exitCode)
+      // Don't exit here - let child.on('exit') handle it with the correct exit code
+    }, 2000); // Wait 2 seconds for natural exit
   }
-}, 100)
+}
 
-// Handle errors
-vitest.on('error', (err) => {
-  clearInterval(checkInterval)
-  console.error('Failed to spawn vitest:', err)
-  process.exit(1)
-})
-
-// Ensure cleanup on parent process exit
-process.on('SIGTERM', () => {
-  clearInterval(checkInterval)
-  try {
-    if (!vitest.killed) {
-      process.kill(-vitest.pid, 'SIGTERM')
-    }
-  } catch (err) {
-    // Ignore
-  }
-  process.exit(exitCode)
-})
-
-process.on('SIGINT', () => {
-  clearInterval(checkInterval)
-  try {
-    if (!vitest.killed) {
-      process.kill(-vitest.pid, 'SIGTERM')
-    }
-  } catch (err) {
-    // Ignore
-  }
-  process.exit(exitCode)
-})
 

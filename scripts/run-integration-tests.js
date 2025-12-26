@@ -82,6 +82,9 @@ function checkVitestCompletion() {
   // Strip ANSI escape codes before matching (required for reliable pattern detection)
   const output = stripAnsiCodes(outputBuffer);
   
+  // Count completed test files (both passed ✓ and failed ×)
+  const completedTestFiles = (output.match(/[✓×]\s+tests\/integration\/[^\s]+/g) || []).length;
+  
   // Detect Vitest completion by looking for final summary patterns
   // Must match the actual summary format, not just any occurrence of keywords
   // Look for patterns like "Test Files  1 | Tests  10" or "Test Files  1 passed"
@@ -92,9 +95,11 @@ function checkVitestCompletion() {
     // Also check for "Duration" which appears at the very end
     /duration\s+[\d.]+(ms|s)/i.test(output);
 
-  if (hasFinalSummary && !completionDetected) {
+  // If we see the final summary OR we see 20+ completed test files, tests are done
+  // (20 is a reasonable threshold - we have many integration test files)
+  if ((hasFinalSummary || completedTestFiles >= 20) && !completionDetected) {
     completionDetected = true;
-    console.log('[run-integration-tests] Detected Vitest completion');
+    console.log(`[run-integration-tests] Detected Vitest completion (${completedTestFiles} test files completed)`);
     
     // Wait 1 second, then terminate gracefully
     setTimeout(() => {

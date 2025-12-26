@@ -33,9 +33,10 @@ const outputCheckInterval = setInterval(() => {
       return;
     }
   }
-  // If no output for 10 seconds and no completion detected, something is wrong
-  if (!completionDetected && Date.now() - lastOutputTime > 10000 && !vitestExited) {
-    console.log('[run-integration-tests] No output for 10 seconds, forcing child process termination.');
+  // If no output for 15 seconds and no completion detected, something is wrong
+  // (Increased from 10 to 15 to allow Vitest more time to print final summary)
+  if (!completionDetected && Date.now() - lastOutputTime > 15000 && !vitestExited) {
+    console.log('[run-integration-tests] No output for 15 seconds, forcing child process termination.');
     process.kill(-child.pid, 'SIGTERM'); // Kill the process group
     clearInterval(outputCheckInterval);
     // Exit will be handled by child.on('exit')
@@ -79,19 +80,22 @@ function checkVitestCompletion() {
   // - "Test Files" followed by numbers and "passed" or "failed"
   // - "Tests" followed by numbers and "passed" or "failed"
   // - Summary lines with test counts
-  // Also check for multiple completed test files (at least 15 to be safe, as we have many test files)
+  // Also check for multiple completed test files (at least 20 to be safe, as we have many test files)
   const completedTestFiles = (output.match(/✓\s+tests\/integration\/[^\s]+/g) || []).length;
   const failedTestFiles = (output.match(/×\s+tests\/integration\/[^\s]+/g) || []).length;
   const totalCompleted = completedTestFiles + failedTestFiles;
   
   // Check for Vitest's final summary line (appears at the very end)
+  // Look for patterns like "Test Files  1 passed (1)" or "Tests  10 passed (10)"
   const hasFinalSummary = 
     /test files\s+\d+\s+(passed|failed)/.test(output) ||
     /tests\s+\d+\s+(passed|failed)/.test(output) ||
-    /test files.*\d+.*tests.*\d+/.test(output);
+    /test files.*\d+.*tests.*\d+/.test(output) ||
+    // Also check for the summary format: "Test Files  1 | Tests  10"
+    /test files\s+\d+\s+\|\s+tests\s+\d+/.test(output);
   
-  // If we see 15+ completed test files OR the final summary, tests are done
-  const hasTestSummary = hasFinalSummary || totalCompleted >= 15;
+  // If we see 20+ completed test files OR the final summary, tests are done
+  const hasTestSummary = hasFinalSummary || totalCompleted >= 20;
 
   if (hasTestSummary && !completionDetected) {
     completionDetected = true;

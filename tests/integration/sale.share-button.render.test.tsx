@@ -191,15 +191,8 @@ describe('SaleShareButton', () => {
   it('should use Web Share API when available', async () => {
     const user = userEvent.setup()
     
-    // Mock Web Share API FIRST - must exist before component renders
-    const share = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'share', {
-      writable: true,
-      configurable: true,
-      value: share,
-    })
-    
-    // Mock mobile user agent - must be set before render
+    // Mock mobile user agent FIRST - must be set before component renders
+    // This ensures isMobile() returns true
     Object.defineProperty(navigator, 'userAgent', {
       writable: true,
       configurable: true,
@@ -210,6 +203,15 @@ describe('SaleShareButton', () => {
       writable: true,
       configurable: true,
       value: 375,
+    })
+    
+    // Mock Web Share API - must exist before component renders
+    // This ensures isWebShareAvailable() returns true
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', {
+      writable: true,
+      configurable: true,
+      value: share,
     })
 
     render(<SaleShareButton {...defaultProps} />)

@@ -2,26 +2,20 @@
  * Unit tests for PinsOverlay rendering
  */
 
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import PinsOverlay from '@/components/location/PinsOverlay'
 import { PinPoint } from '@/lib/pins/types'
 
-// Mock clustering utilities – we only care that the overlay renders safely,
-// not the exact clustering algorithm. The underlying implementation is tested elsewhere.
-vi.mock('@/lib/pins/clustering', () => {
-  const getClustersForViewport = vi.fn(() => [])
-  const buildClusterIndex = vi.fn(() => ({
-    getClusters: vi.fn(() => []),
-  }))
-  const isClusteringEnabled = vi.fn(() => true)
-
-  return {
-    buildClusterIndex,
-    getClustersForViewport,
-    isClusteringEnabled,
-  }
-})
+// Mock the clustering module at the top level
+vi.mock('@/lib/pins/clustering', () => ({
+  buildClusterIndex: vi.fn(() => 'mock-cluster-index'),
+  getClustersForViewport: vi.fn(() => [
+    { id: 1, count: 3, lat: 38.2527, lng: -85.7585, expandToZoom: 12 },
+    { id: 2, count: 1, lat: 40.7128, lng: -74.0060, expandToZoom: 15 }
+  ]),
+  isClusteringEnabled: vi.fn(() => true)
+}))
 
 // Mock react-map-gl
 vi.mock('react-map-gl', () => ({
@@ -35,6 +29,14 @@ vi.mock('react-map-gl', () => ({
       {children}
     </div>
   )
+}))
+
+// Mock clustering utilities
+vi.mock('@/lib/pins/clustering', () => ({
+  buildClusterIndex: vi.fn(() => ({
+    getClusters: vi.fn(() => [])
+  })),
+  getClustersForViewport: vi.fn(() => [])
 }))
 
 // Mock ClusterMarker and PinMarker
@@ -85,6 +87,10 @@ describe('PinsOverlay Rendering', () => {
     vi.clearAllMocks()
   })
 
+  afterEach(() => {
+    cleanup()
+  })
+
   describe('with clustering disabled', () => {
     it('should render individual pin markers for each sale', () => {
       render(<PinsOverlay {...defaultProps} isClusteringEnabled={false} />)
@@ -108,9 +114,7 @@ describe('PinsOverlay Rendering', () => {
       render(<PinsOverlay {...defaultProps} sales={[]} isClusteringEnabled={false} />)
       
       const pinMarkers = screen.queryAllByTestId('pin-marker')
-      // Rendering with an empty sales array should not crash; we don't enforce
-      // a strict count here because the component may render placeholder markers.
-      expect(pinMarkers.length).toBeGreaterThanOrEqual(0)
+      expect(pinMarkers).toHaveLength(0)
     })
   })
 
@@ -135,13 +139,9 @@ describe('PinsOverlay Rendering', () => {
       render(<PinsOverlay {...defaultProps} isClusteringEnabled={true} />)
       
       // Wait for the debounced viewport to be set
-      // Note: Due to test isolation, there may be markers from previous renders
-      // We check that clustering is working, not that markers are exactly 0
       await waitFor(() => {
         const pinMarkers = screen.queryAllByTestId('pin-marker')
-        // When clustering is enabled, individual pins should not be rendered
-        // (they may appear briefly during initialization, so we allow a small number)
-        expect(pinMarkers.length).toBeLessThanOrEqual(3)
+        expect(pinMarkers).toHaveLength(0)
       }, { timeout: 500 })
     })
 
@@ -150,11 +150,8 @@ describe('PinsOverlay Rendering', () => {
       const emptyProps = { ...defaultProps, sales: [] }
       render(<PinsOverlay {...emptyProps} isClusteringEnabled={true} />)
       
-      // Due to test isolation, there may be markers from previous renders
-      // The important thing is that the component doesn't crash
       const clusterMarkers = screen.queryAllByTestId('cluster')
-      // Allow for test isolation artifacts
-      expect(clusterMarkers.length).toBeLessThanOrEqual(2)
+      expect(clusterMarkers).toHaveLength(0)
     })
   })
 
@@ -164,12 +161,11 @@ describe('PinsOverlay Rendering', () => {
       
       render(<PinsOverlay {...defaultProps} mapRef={nullMapRef} isClusteringEnabled={true} />)
       
-      // Should not crash - due to test isolation, there may be markers from previous renders
+      // Should not crash and should render nothing
       const clusterMarkers = screen.queryAllByTestId('cluster')
       const pinMarkers = screen.queryAllByTestId('pin-marker')
-      // The important thing is the component doesn't crash with null ref
-      expect(clusterMarkers.length).toBeLessThanOrEqual(2)
-      expect(pinMarkers.length).toBeLessThanOrEqual(6)
+      expect(clusterMarkers).toHaveLength(0)
+      expect(pinMarkers).toHaveLength(0)
     })
 
     it('should handle map ref without getMap method', () => {
@@ -177,12 +173,11 @@ describe('PinsOverlay Rendering', () => {
       
       render(<PinsOverlay {...defaultProps} mapRef={invalidMapRef} isClusteringEnabled={true} />)
       
-      // Should not crash - due to test isolation, there may be markers from previous renders
+      // Should not crash and should render nothing
       const clusterMarkers = screen.queryAllByTestId('cluster')
       const pinMarkers = screen.queryAllByTestId('pin-marker')
-      // The important thing is the component doesn't crash with invalid ref
-      expect(clusterMarkers.length).toBeLessThanOrEqual(2)
-      expect(pinMarkers.length).toBeLessThanOrEqual(6)
+      expect(clusterMarkers).toHaveLength(0)
+      expect(pinMarkers).toHaveLength(0)
     })
   })
 

@@ -75,10 +75,17 @@ child.on('exit', (code, signal) => {
 
 function checkVitestCompletion() {
   const output = outputBuffer.toLowerCase();
-  // Look for the final test summary line that shows pass/fail counts
-  const hasTestSummary = /test files.*\d+.*tests.*\d+/.test(output) || 
-                        /tests.*passed.*failed/.test(output) ||
-                        /test files.*tests.*passed/.test(output);
+  // Look for Vitest's final summary patterns:
+  // - "Test Files" followed by numbers
+  // - "Tests" followed by numbers  
+  // - Lines with checkmarks (✓) followed by test file names and test counts
+  // - Summary lines like "Test Files  1 passed (1)" or "Tests  10 passed (10)"
+  const hasTestSummary = 
+    /test files\s+\d+\s+(passed|failed)/.test(output) ||
+    /tests\s+\d+\s+(passed|failed)/.test(output) ||
+    /test files.*\d+.*tests.*\d+/.test(output) ||
+    // Also check for the pattern where we see multiple test files completed
+    (output.match(/✓\s+tests\/integration\/.*\(\d+\s+tests?\)/g) || []).length > 5;
 
   if (hasTestSummary && !completionDetected) {
     completionDetected = true;

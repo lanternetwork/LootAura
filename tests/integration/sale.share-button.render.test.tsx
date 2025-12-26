@@ -42,7 +42,7 @@ describe('SaleShareButton', () => {
   it('should render share button', () => {
     render(<SaleShareButton {...defaultProps} />)
     
-    const [button] = screen.getAllByRole('button', { name: /share/i })
+    const button = screen.getByRole('button', { name: /share/i })
     expect(button).toBeDefined()
     expect(button).toHaveAttribute('aria-haspopup', 'menu')
   })
@@ -66,7 +66,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const [button] = screen.getAllByRole('button', { name: /share/i })
+    const button = screen.getByRole('button', { name: /share/i })
     await user.click(button)
     
     // Menu should open
@@ -103,18 +103,17 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const [button] = screen.getAllByRole('button', { name: /share/i })
+    const button = screen.getByRole('button', { name: /share/i })
     await user.click(button)
     
-    // Wait for menu to appear - menu is conditionally rendered based on isMenuOpen state
+    // Wait for menu to appear
     await waitFor(() => {
-      const menu = screen.queryByRole('menu')
-      expect(menu).toBeInTheDocument()
-    }, { timeout: 2000 })
+      expect(screen.getByRole('menu')).toBeDefined()
+    })
     
     // Find copy link option
     const copyLink = screen.getByRole('menuitem', { name: /copy link/i })
-    expect(copyLink).toBeInTheDocument()
+    expect(copyLink).toBeDefined()
     
     // Click copy link
     await user.click(copyLink)
@@ -143,7 +142,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const [button] = screen.getAllByRole('button', { name: /share/i })
+    const button = screen.getByRole('button', { name: /share/i })
     await user.click(button)
     
     // Wait for menu to appear
@@ -176,14 +175,13 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const [button] = screen.getAllByRole('button', { name: /share/i })
+    const button = screen.getByRole('button', { name: /share/i })
     await user.click(button)
     
     // Wait for menu to appear
     await waitFor(() => {
-      const menu = screen.queryByRole('menu')
-      expect(menu).toBeInTheDocument()
-    }, { timeout: 2000 })
+      expect(screen.getByRole('menu')).toBeDefined()
+    })
     
     // Mobile-only options should not be visible
     expect(screen.queryByRole('menuitem', { name: /whatsapp/i })).toBeNull()
@@ -195,13 +193,8 @@ describe('SaleShareButton', () => {
     
     // Mock Web Share API
     const share = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'share', {
-      writable: true,
-      configurable: true,
-      value: share,
-    })
     
-    // Mock mobile user agent
+    // Mock mobile user agent FIRST (before setting share)
     Object.defineProperty(navigator, 'userAgent', {
       writable: true,
       configurable: true,
@@ -213,21 +206,27 @@ describe('SaleShareButton', () => {
       configurable: true,
       value: 375,
     })
+    
+    // Now set navigator.share AFTER user agent is set
+    Object.defineProperty(navigator, 'share', {
+      writable: true,
+      configurable: true,
+      value: share,
+    })
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const [button] = screen.getAllByRole('button', { name: /share/i })
+    const button = screen.getByRole('button', { name: /share/i })
     await user.click(button)
     
-    // Web Share API should be called immediately on mobile when share button is clicked
-    // (no menu appears on mobile, it goes straight to Web Share API)
+    // Web Share API should be called
     await waitFor(() => {
       expect(share).toHaveBeenCalledWith({
         title: defaultProps.title,
         text: defaultProps.text,
         url: defaultProps.url,
       })
-    }, { timeout: 2000 })
+    }, { timeout: 3000 })
   })
 
   it('should handle Web Share API cancellation gracefully', async () => {
@@ -258,7 +257,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const [button] = screen.getAllByRole('button', { name: /share/i })
+    const button = screen.getByRole('button', { name: /share/i })
     await user.click(button)
     
     // Should not log error for AbortError
@@ -295,7 +294,7 @@ describe('SaleShareButton', () => {
       </div>
     )
     
-    const [button] = screen.getAllByRole('button', { name: /share/i })
+    const button = screen.getByRole('button', { name: /share/i })
     await user.click(button)
     
     // Menu should open
@@ -331,7 +330,7 @@ describe('SaleShareButton', () => {
 
     render(<SaleShareButton {...defaultProps} />)
     
-    const [button] = screen.getAllByRole('button', { name: /share/i })
+    const button = screen.getByRole('button', { name: /share/i })
     await user.click(button)
     
     // Menu should open

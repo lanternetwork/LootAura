@@ -366,8 +366,8 @@ afterAll(async () => {
   // esbuild runs as a long-lived helper process outside Node's event loop and is NOT
   // visible to handle diagnostics. Vitest/Vite do not reliably shut down esbuild in CI,
   // causing orphaned esbuild processes that keep CI alive until timeout.
-  // Only attempt in Node environment (not jsdom) - esbuild requires Node APIs.
-  if (isCI && typeof window === 'undefined') {
+  // Attempt shutdown regardless of environment - esbuild service runs in Node process.
+  if (isCI) {
     try {
       const esbuild = await import('esbuild')
       if (typeof esbuild.stop === 'function') {

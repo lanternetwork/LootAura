@@ -23,6 +23,7 @@ let completionDetected = false;
 // Strip ANSI escape codes from output (required for regex matching)
 // ANSI codes interfere with pattern detection in colored terminal output
 function stripAnsiCodes(text) {
+  // eslint-disable-next-line no-control-regex
   return text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 }
 
@@ -56,7 +57,16 @@ child.stderr.on('data', (data) => {
 
 child.on('exit', (code, signal) => {
   vitestExited = true;
-  vitestExitCode = code === null ? 1 : code; // Use actual exit code, or 1 if killed unexpectedly
+  // If we detected completion and killed the process, try to infer success from output
+  // Otherwise use the actual exit code
+  if (code === null && signal === 'SIGTERM' && completionDetected) {
+    // Check if there were any test failures in the output
+    const output = stripAnsiCodes(outputBuffer);
+    const hasFailures = /\bfailed\b.*\d+/i.test(output) && !/test files.*0.*failed/i.test(output);
+    vitestExitCode = hasFailures ? 1 : 0;
+  } else {
+    vitestExitCode = code === null ? 1 : code;
+  }
   clearInterval(outputCheckInterval);
   // Give a brief moment for any final output to flush, then exit
   setTimeout(() => {
@@ -72,17 +82,17 @@ function checkVitestCompletion() {
   // Strip ANSI escape codes before matching (required for reliable pattern detection)
   const output = stripAnsiCodes(outputBuffer);
   
-  // Detect Vitest completion by looking for summary keywords in cleaned output
-  // Vitest prints these at the end of test runs, regardless of pass/fail
-  const hasCompletionKeywords = 
-    /test files/i.test(output) ||
-    /\btests\b/i.test(output) ||
-    /\bpassed\b/i.test(output) ||
-    /\bfailed\b/i.test(output) ||
-    /\bsnapshots\b/i.test(output) ||
-    /\bduration\b/i.test(output);
+  // Detect Vitest completion by looking for final summary patterns
+  // Must match the actual summary format, not just any occurrence of keywords
+  // Look for patterns like "Test Files  1 | Tests  10" or "Test Files  1 passed"
+  const hasFinalSummary = 
+    /test files\s+\d+\s*[|]\s*tests\s+\d+/i.test(output) ||
+    /test files\s+\d+\s+(passed|failed)/i.test(output) ||
+    /tests\s+\d+\s+(passed|failed)/i.test(output) ||
+    // Also check for "Duration" which appears at the very end
+    /duration\s+[\d.]+(ms|s)/i.test(output);
 
-  if (hasCompletionKeywords && !completionDetected) {
+  if (hasFinalSummary && !completionDetected) {
     completionDetected = true;
     console.log('[run-integration-tests] Detected Vitest completion');
     

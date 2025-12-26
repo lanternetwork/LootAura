@@ -58,14 +58,16 @@ jobs:
             install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
-              if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
-                echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              elif [ ${npm_exit:-0} -eq 0 ]; then
-                install_success=1
+              if [ ${npm_exit:-0} -ne 0 ]; then
+                if echo "$npm_output" | grep -qiE "(Missing:.*from lock file|can only install packages when.*package-lock|lock file|sync)"; then
+                  echo "⚠️ Lock file out of sync, using npm install to regenerate..."
+                  npm install --no-audit --no-fund && install_success=1 || install_success=0
+                else
+                  echo "$npm_output"
+                  install_success=0
+                fi
               else
-                echo "$npm_output"
-                install_success=0
+                install_success=1
               fi
             else
               npm install --no-audit --no-fund && install_success=1 || install_success=0
@@ -115,14 +117,16 @@ jobs:
             install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
-              if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
-                echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              elif [ ${npm_exit:-0} -eq 0 ]; then
-                install_success=1
+              if [ ${npm_exit:-0} -ne 0 ]; then
+                if echo "$npm_output" | grep -qiE "(Missing:.*from lock file|can only install packages when.*package-lock|lock file|sync)"; then
+                  echo "⚠️ Lock file out of sync, using npm install to regenerate..."
+                  npm install --no-audit --no-fund && install_success=1 || install_success=0
+                else
+                  echo "$npm_output"
+                  install_success=0
+                fi
               else
-                echo "$npm_output"
-                install_success=0
+                install_success=1
               fi
             else
               npm install --no-audit --no-fund && install_success=1 || install_success=0
@@ -172,14 +176,16 @@ jobs:
             install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
-              if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
-                echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              elif [ ${npm_exit:-0} -eq 0 ]; then
-                install_success=1
+              if [ ${npm_exit:-0} -ne 0 ]; then
+                if echo "$npm_output" | grep -qiE "(Missing:.*from lock file|can only install packages when.*package-lock|lock file|sync)"; then
+                  echo "⚠️ Lock file out of sync, using npm install to regenerate..."
+                  npm install --no-audit --no-fund && install_success=1 || install_success=0
+                else
+                  echo "$npm_output"
+                  install_success=0
+                fi
               else
-                echo "$npm_output"
-                install_success=0
+                install_success=1
               fi
             else
               npm install --no-audit --no-fund && install_success=1 || install_success=0
@@ -243,14 +249,16 @@ jobs:
             install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
-              if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
-                echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              elif [ ${npm_exit:-0} -eq 0 ]; then
-                install_success=1
+              if [ ${npm_exit:-0} -ne 0 ]; then
+                if echo "$npm_output" | grep -qiE "(Missing:.*from lock file|can only install packages when.*package-lock|lock file|sync)"; then
+                  echo "⚠️ Lock file out of sync, using npm install to regenerate..."
+                  npm install --no-audit --no-fund && install_success=1 || install_success=0
+                else
+                  echo "$npm_output"
+                  install_success=0
+                fi
               else
-                echo "$npm_output"
-                install_success=0
+                install_success=1
               fi
             else
               npm install --no-audit --no-fund && install_success=1 || install_success=0
@@ -305,14 +313,16 @@ jobs:
             install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
-              if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
-                echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              elif [ ${npm_exit:-0} -eq 0 ]; then
-                install_success=1
+              if [ ${npm_exit:-0} -ne 0 ]; then
+                if echo "$npm_output" | grep -qiE "(Missing:.*from lock file|can only install packages when.*package-lock|lock file|sync)"; then
+                  echo "⚠️ Lock file out of sync, using npm install to regenerate..."
+                  npm install --no-audit --no-fund && install_success=1 || install_success=0
+                else
+                  echo "$npm_output"
+                  install_success=0
+                fi
               else
-                echo "$npm_output"
-                install_success=0
+                install_success=1
               fi
             else
               npm install --no-audit --no-fund && install_success=1 || install_success=0
@@ -369,14 +379,16 @@ jobs:
             install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
-              if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
-                echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              elif [ ${npm_exit:-0} -eq 0 ]; then
-                install_success=1
+              if [ ${npm_exit:-0} -ne 0 ]; then
+                if echo "$npm_output" | grep -qiE "(Missing:.*from lock file|can only install packages when.*package-lock|lock file|sync)"; then
+                  echo "⚠️ Lock file out of sync, using npm install to regenerate..."
+                  npm install --no-audit --no-fund && install_success=1 || install_success=0
+                else
+                  echo "$npm_output"
+                  install_success=0
+                fi
               else
-                echo "$npm_output"
-                install_success=0
+                install_success=1
               fi
             else
               npm install --no-audit --no-fund && install_success=1 || install_success=0
@@ -457,14 +469,16 @@ jobs:
             install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
-              if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
-                echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              elif [ ${npm_exit:-0} -eq 0 ]; then
-                install_success=1
+              if [ ${npm_exit:-0} -ne 0 ]; then
+                if echo "$npm_output" | grep -qiE "(Missing:.*from lock file|can only install packages when.*package-lock|lock file|sync)"; then
+                  echo "⚠️ Lock file out of sync, using npm install to regenerate..."
+                  npm install --no-audit --no-fund && install_success=1 || install_success=0
+                else
+                  echo "$npm_output"
+                  install_success=0
+                fi
               else
-                echo "$npm_output"
-                install_success=0
+                install_success=1
               fi
             else
               npm install --no-audit --no-fund && install_success=1 || install_success=0
@@ -526,14 +540,16 @@ jobs:
             install_success=0
             if [ -f package-lock.json ]; then
               npm_output=$(npm ci --no-audit --no-fund 2>&1) || npm_exit=$?
-              if [ ${npm_exit:-0} -ne 0 ] && (echo "$npm_output" | grep -q "Missing:.*from lock file" || echo "$npm_output" | grep -q "can only install packages when your package.json and package-lock.json"); then
-                echo "⚠️ Lock file out of sync, using npm install to regenerate..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              elif [ ${npm_exit:-0} -eq 0 ]; then
-                install_success=1
+              if [ ${npm_exit:-0} -ne 0 ]; then
+                if echo "$npm_output" | grep -qiE "(Missing:.*from lock file|can only install packages when.*package-lock|lock file|sync)"; then
+                  echo "⚠️ Lock file out of sync, using npm install to regenerate..."
+                  npm install --no-audit --no-fund && install_success=1 || install_success=0
+                else
+                  echo "$npm_output"
+                  install_success=0
+                fi
               else
-                echo "$npm_output"
-                install_success=0
+                install_success=1
               fi
             else
               npm install --no-audit --no-fund && install_success=1 || install_success=0

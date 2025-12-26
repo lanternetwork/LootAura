@@ -89,6 +89,9 @@ describe('sendSellerWeeklyAnalyticsEmail', () => {
   })
 
   it('should not send email if all metrics are zero', async () => {
+    // Set DEBUG to enable logging
+    process.env.NEXT_PUBLIC_DEBUG = 'true'
+    
     const zeroMetrics = {
       totalViews: 0,
       totalSaves: 0,

@@ -8,21 +8,19 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 
 describe('SiteFooter', () => {
   it('should render footer with correct structure', () => {
-    render(<SiteFooter />)
+    const { container } = render(<SiteFooter />)
     
-    // Check footer element (may be multiple instances, take first)
-    const footers = screen.getAllByRole('contentinfo')
-    expect(footers.length).toBeGreaterThan(0)
-    const footer = footers[0]
+    // Check footer element
+    const footer = container.querySelector('footer[role="contentinfo"]')
+    expect(footer).toBeInTheDocument()
     
-    // Check brand name (may appear multiple times)
-    const brandNames = screen.getAllByText('Loot Aura')
-    expect(brandNames.length).toBeGreaterThan(0)
+    // Check brand name
+    expect(screen.getByText('Loot Aura')).toBeInTheDocument()
     
     // Check description
     expect(screen.getByText(/Map-first yard sale finder/)).toBeInTheDocument()
@@ -31,13 +29,16 @@ describe('SiteFooter', () => {
   it('should render all navigation links with correct hrefs', () => {
     render(<SiteFooter />)
     
-    // Check About link (may be multiple instances)
-    const aboutLinks = screen.getAllByRole('link', { name: 'About' })
-    expect(aboutLinks.length).toBeGreaterThan(0)
-    expect(aboutLinks[0]).toHaveAttribute('href', '/about')
+    // Check About link
+    const aboutLink = screen.getByRole('link', { name: 'About' })
+    expect(aboutLink).toBeInTheDocument()
+    expect(aboutLink).toHaveAttribute('href', '/about')
     
-    // Check Privacy Policy link
-    const privacyLink = screen.getByRole('link', { name: 'Privacy Policy' })
+    // Check Privacy Policy link - may appear multiple times due to test isolation
+    const privacyLinks = screen.getAllByRole('link', { name: 'Privacy Policy' })
+    expect(privacyLinks.length).toBeGreaterThan(0)
+    // Verify at least one has the correct href
+    const privacyLink = privacyLinks.find(link => link.getAttribute('href') === '/privacy')
     expect(privacyLink).toBeInTheDocument()
     expect(privacyLink).toHaveAttribute('href', '/privacy')
     
@@ -50,11 +51,8 @@ describe('SiteFooter', () => {
   it('should have accessible navigation', () => {
     render(<SiteFooter />)
     
-    // Check nav element with aria-label, scoped to the footer (may be multiple footers)
-    const footers = screen.getAllByRole('contentinfo')
-    expect(footers.length).toBeGreaterThan(0)
-    const footer = footers[0]
-    const nav = within(footer).getByRole('navigation', { name: 'Footer' })
+    // Check nav element with aria-label
+    const nav = screen.getByRole('navigation', { name: 'Footer' })
     expect(nav).toBeInTheDocument()
   })
 
@@ -62,8 +60,7 @@ describe('SiteFooter', () => {
     render(<SiteFooter />)
     
     const currentYear = new Date().getFullYear()
-    const matches = screen.getAllByText(new RegExp(`© ${currentYear} Loot Aura`))
-    expect(matches.length).toBeGreaterThan(0)
+    expect(screen.getByText(new RegExp(`© ${currentYear} Loot Aura`))).toBeInTheDocument()
   })
 
   it('should have responsive layout classes', () => {

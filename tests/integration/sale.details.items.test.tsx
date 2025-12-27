@@ -223,10 +223,11 @@ describe('Sale Details Items Display', () => {
   it('shows active promotion state with ends date when promotion is active', async () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
 
-    // Mock fetch to return active promotion status
+    // Mock fetch to return active promotion status (matching API response format)
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
+        ok: true,
         statuses: [{
           sale_id: mockSale.id,
           is_active: true,

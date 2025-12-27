@@ -10,9 +10,6 @@
  * With `vmMemoryLimit: 2GB`, workers are recycled after ~10-15 test files.
  * This hook runs during worker shutdown, ensuring cleanup before the next
  * worker starts with a fresh heap.
- * 
- * Combined with `sequence.hooks: 'stack'`, hooks unwind properly between
- * files, allowing GC to reclaim memory between worker cycles.
  */
 
 import { afterAll } from 'vitest'

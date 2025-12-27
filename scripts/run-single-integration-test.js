@@ -25,13 +25,19 @@ const absolutePath = path.isAbsolute(testFile) ? testFile : path.resolve(process
 console.log(`Running: ${absolutePath}`)
 
 // Run vitest with --pool=forks --maxWorkers=1 (no workers, single process)
-// Increase heap size to 12GB to handle memory-intensive tests
+// Increase heap size to 16GB to handle memory-intensive tests
+// Merge with existing NODE_OPTIONS if present
+const existingNodeOptions = process.env.NODE_OPTIONS || ''
+const nodeOptions = existingNodeOptions
+  ? `${existingNodeOptions} --max-old-space-size=16384`
+  : '--max-old-space-size=16384'
+
 const vitestProcess = spawn('npx', ['vitest', 'run', absolutePath, '--pool=forks', '--maxWorkers=1'], {
   stdio: 'inherit',
   shell: true,
   env: {
     ...process.env,
-    NODE_OPTIONS: '--max-old-space-size=12288',
+    NODE_OPTIONS: nodeOptions,
   },
 })
 

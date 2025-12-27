@@ -103,13 +103,14 @@ process.env.SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || 'test-s
 process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app'
 process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@example.com'
 
-// Supabase client mock - module-level object literal
+// Supabase client mock - module-level constant object literal
 // This ensures auth.getUser() ALWAYS resolves immediately, preventing navigation hangs
 // The same instance is returned on every createSupabaseBrowserClient() call
+// Immune to vi.clearAllMocks() because it uses no spies or mock functions
 // @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/supabase/client', () => {
-  // Single client instance created once at module level
-  const mockClient = {
+  // Module-level constant - created once, never changes, no closures, no dynamic state
+  const MOCK_CLIENT = {
     auth: {
       getUser: () => Promise.resolve({ data: { user: { id: 'test-user' } }, error: null }),
       onAuthStateChange: () => ({
@@ -136,7 +137,7 @@ vi.mock('@/lib/supabase/client', () => {
   }
   
   return {
-    createSupabaseBrowserClient: () => mockClient,
+    createSupabaseBrowserClient: () => MOCK_CLIENT,
   }
 })
 

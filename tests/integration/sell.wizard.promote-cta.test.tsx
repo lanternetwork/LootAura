@@ -79,10 +79,8 @@ describe('Sell Wizard Promote CTA', () => {
     // Move from Details → Photos → Items → Review
     // Details (validated)
     await user.click(screen.getByRole('button', { name: /next/i }))
-    // Photos
-    await waitFor(() => {
-      expect(screen.getByTestId('image-upload')).toBeInTheDocument()
-    })
+    // Photos - await progression with findByTestId
+    await screen.findByTestId('image-upload')
     // handleNext uses a short navigation guard; wait for it to reset before clicking Next again
     await new Promise(resolve => setTimeout(resolve, 600))
     await user.click(screen.getByRole('button', { name: /next/i }))

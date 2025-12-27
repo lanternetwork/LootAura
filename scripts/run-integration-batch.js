@@ -4,7 +4,7 @@
  * 
  * Usage: node scripts/run-integration-batch.js [batchSize]
  * 
- * Enumerates tests/integration/**/*.test.*
+ * Enumerates tests/integration/ recursively for .test.ts and .test.tsx files
  * Sorts files
  * Runs N files sequentially (default: 2)
  * If ANY file fails → exit immediately

@@ -114,9 +114,18 @@ vi.mock('@/lib/supabase/client', () => {
   const getUserResult = { data: { user: { id: 'test-user' } }, error: null }
   const getUserPromise = Promise.resolve(getUserResult)
   
-  // Create a stable mock function that always resolves
-  const stableGetUser = vi.fn(() => getUserPromise)
-  stableGetUser.mockResolvedValue(getUserResult)
+  // Create a base function that always returns the promise
+  // This function will work even if vi.clearAllMocks() clears mock implementations
+  const baseGetUser = () => getUserPromise
+  
+  // Wrap it in a vi.fn() for call tracking, but ensure the base function always works
+  const createGetUser = () => {
+    const fn = vi.fn(baseGetUser)
+    fn.mockResolvedValue(getUserResult)
+    return fn
+  }
+  
+  const stableGetUser = createGetUser()
   
   const stableOnAuthStateChange = vi.fn(() => ({
     data: {
@@ -131,15 +140,10 @@ vi.mock('@/lib/supabase/client', () => {
   
   return {
     createSupabaseBrowserClient: () => {
-      // Re-establish mockResolvedValue and ensure the function always returns a promise
+      // Re-establish the mock implementation to ensure it always resolves
       // This prevents hangs even if clearAllMocks() was called
+      stableGetUser.mockImplementation(baseGetUser)
       stableGetUser.mockResolvedValue(getUserResult)
-      // Override the function implementation to always return the promise
-      // This ensures it works even if the mock was cleared
-      const originalImplementation = stableGetUser.getMockImplementation()
-      if (!originalImplementation || originalImplementation() !== getUserPromise) {
-        stableGetUser.mockImplementation(() => getUserPromise)
-      }
       return {
         auth: {
           getUser: stableGetUser, // Reuse the same mock function instance

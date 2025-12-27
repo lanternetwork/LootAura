@@ -110,9 +110,13 @@ process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@examp
 // @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/supabase/client', () => {
   // Create stable mock functions that always resolve predictably
-  // Use mockResolvedValue to ensure the function always returns a resolved promise
+  // Use a function that always returns a resolved promise, even after clearAllMocks()
   const getUserResult = { data: { user: { id: 'test-user' } }, error: null }
-  const stableGetUser = vi.fn().mockResolvedValue(getUserResult)
+  const getUserPromise = Promise.resolve(getUserResult)
+  
+  // Create a stable mock function that always resolves
+  const stableGetUser = vi.fn(() => getUserPromise)
+  stableGetUser.mockResolvedValue(getUserResult)
   
   const stableOnAuthStateChange = vi.fn(() => ({
     data: {
@@ -127,9 +131,15 @@ vi.mock('@/lib/supabase/client', () => {
   
   return {
     createSupabaseBrowserClient: () => {
-      // Re-establish mockResolvedValue if it was cleared by clearAllMocks()
-      // This ensures getUser() always resolves, preventing test hangs
+      // Re-establish mockResolvedValue and ensure the function always returns a promise
+      // This prevents hangs even if clearAllMocks() was called
       stableGetUser.mockResolvedValue(getUserResult)
+      // Override the function implementation to always return the promise
+      // This ensures it works even if the mock was cleared
+      const originalImplementation = stableGetUser.getMockImplementation()
+      if (!originalImplementation || originalImplementation() !== getUserPromise) {
+        stableGetUser.mockImplementation(() => getUserPromise)
+      }
       return {
         auth: {
           getUser: stableGetUser, // Reuse the same mock function instance

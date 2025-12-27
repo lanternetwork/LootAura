@@ -2,8 +2,8 @@
  * Unit tests for PinsOverlay rendering
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, waitFor, cleanup } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import PinsOverlay from '@/components/location/PinsOverlay'
 import { PinPoint } from '@/lib/pins/types'
 
@@ -85,10 +85,6 @@ describe('PinsOverlay Rendering', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    cleanup()
   })
 
   describe('with clustering disabled', () => {

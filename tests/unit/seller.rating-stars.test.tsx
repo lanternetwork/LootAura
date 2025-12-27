@@ -83,21 +83,17 @@ describe('SellerRatingStars', () => {
 
   it('displays rating summary text', () => {
     render(
-      <TestWrapper>
-        <SellerRatingStars
-          sellerId="seller-123"
-          avgRating={4.5}
-          ratingsCount={10}
-          currentUserRating={null}
-          isSeller={false}
-        />
-      </TestWrapper>
+      <SellerRatingStars
+        sellerId="seller-123"
+        avgRating={4.5}
+        ratingsCount={10}
+        currentUserRating={null}
+        isSeller={false}
+      />
     )
 
-    const ratingTexts = screen.getAllByText('4.5')
-    expect(ratingTexts.length).toBeGreaterThan(0)
-    const ratingsTexts = screen.getAllByText('(10 ratings)')
-    expect(ratingsTexts.length).toBeGreaterThan(0)
+    expect(screen.getByText('4.5')).toBeInTheDocument()
+    expect(screen.getByText('(10 ratings)')).toBeInTheDocument()
   })
 
   it('displays "No ratings yet" when ratings count is 0', () => {
@@ -133,13 +129,6 @@ describe('SellerRatingStars', () => {
   })
 
   it('makes stars read-only when user is the seller', () => {
-    // Treat the user as the seller so ratings should be read-only
-    mockUseAuth.mockReturnValue({
-      data: { id: 'seller-123' },
-      isLoading: false,
-      error: null,
-    })
-
     render(
       <TestWrapper>
         <SellerRatingStars
@@ -153,17 +142,10 @@ describe('SellerRatingStars', () => {
     )
 
     const stars = screen.getAllByRole('button', { name: /rate \d out of 5 stars/i })
-    // Should have exactly 5 star buttons (one for each rating level)
-    expect(stars.length).toBeGreaterThanOrEqual(5)
-    // Take only the first 5 to avoid issues with multiple renders
-    const firstFiveStars = stars.slice(0, 5)
-
-    // Clicking stars when the user is the seller must NOT trigger rating API calls
-    firstFiveStars.forEach((star) => {
-      fireEvent.click(star)
+    stars.forEach((star) => {
+      expect(star).toBeDisabled()
+      expect(star).toHaveAttribute('tabIndex', '-1')
     })
-
-    expect(mockFetch).not.toHaveBeenCalled()
   })
 
   it('calls API when star is clicked', async () => {
@@ -216,9 +198,7 @@ describe('SellerRatingStars', () => {
     )
 
     // Wait for component to render and verify it's interactive
-    // May be multiple instances, take the first one
-    const fourthStars = await screen.findAllByRole('button', { name: /rate 4 out of 5 stars/i })
-    const fourthStar = fourthStars[0]
+    const fourthStar = await screen.findByRole('button', { name: /rate 4 out of 5 stars/i })
     
     // Verify button is not disabled and is interactive
     expect(fourthStar).not.toBeDisabled()
@@ -258,9 +238,7 @@ describe('SellerRatingStars', () => {
       </TestWrapper>
     )
 
-    // Get first star button (may be multiple instances due to multiple renders)
-    const stars = screen.getAllByRole('button', { name: /rate 1 out of 5 stars/i })
-    const firstStar = stars[0]
+    const firstStar = screen.getByRole('button', { name: /rate 1 out of 5 stars/i })
     firstStar.focus()
 
     // Arrow right should move to next star

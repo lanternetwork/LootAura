@@ -158,8 +158,6 @@ const STOCK_ITEM_NAMES = [
   'Garden Tools',
 ]
 
-let checkoutMockFetch: ReturnType<typeof vi.fn> | null = null
-
 describe('Sale Details Items Display', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -222,33 +220,8 @@ describe('Sale Details Items Display', () => {
     expect(screen.getByText('Promote this sale')).toBeInTheDocument()
   })
 
-  it('shows active promotion state with ends date when promotion is active', async () => {
+  it('shows active promotion state with ends date when promotion is active', () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
-
-    const originalFetch = global.fetch
-    const mockFetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = input.toString()
-      if (url.includes('/api/promotions/status')) {
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              statuses: [
-                {
-                  sale_id: 'test-sale-id',
-                  is_active: true,
-                  ends_at: '2030-01-01T00:00:00.000Z',
-                  tier: 'featured_week',
-                },
-              ],
-            }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-          )
-        )
-      }
-      return originalFetch(input as any, init)
-    }) as unknown as typeof fetch
-
-    (global as any).fetch = mockFetch
 
     render(
       <SaleDetailClient 
@@ -257,27 +230,24 @@ describe('Sale Details Items Display', () => {
         items={mockItems}
         promotionsEnabled={true}
         paymentsEnabled={true}
+        initialPromotionStatus={{
+          isActive: true,
+          endsAt: '2030-01-01T00:00:00.000Z',
+        } as any}
       />
     )
 
-    const active = await screen.findByTestId('sale-detail-promote-active')
-    const text = active.textContent || ''
-    if (!text.includes('Promoted')) {
-      throw new Error(`Expected promotion banner to include "Promoted", got: "${text}"`)
-    }
-    if (!text.includes('Ends')) {
-      throw new Error(`Expected promotion banner to include "Ends", got: "${text}"`)
-    }
-
-    (global as any).fetch = originalFetch
+    const active = screen.getByTestId('sale-detail-promote-active')
+    expect(active.textContent).toContain('Promoted')
+    expect(active.textContent).toMatch(/Ends/)
   })
 
   it('does not call checkout when payments are disabled (seller view)', async () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
 
     const originalFetch = global.fetch
-    checkoutMockFetch = vi.fn()
-    ;(global as any).fetch = checkoutMockFetch
+    const mockFetch = vi.fn()
+    ;(global as any).fetch = mockFetch
 
     try {
       render(
@@ -298,13 +268,14 @@ describe('Sale Details Items Display', () => {
 
       await Promise.resolve()
 
-      const calls = (checkoutMockFetch!.mock.calls as any[]).filter((args: any[]) => {
-        const [url] = args
-        return typeof url === 'string' && url.includes('/api/promotions/checkout')
-      })
+      const calls = mockFetch.mock.calls.filter(
+        (args) =>
+          typeof args[0] === 'string' &&
+          (args[0] as string).includes('/api/promotions/checkout')
+      )
       expect(calls.length).toBe(0)
     } finally {
-      (global as any).fetch = originalFetch
+      ;(global as any).fetch = originalFetch
     }
   })
 

@@ -105,6 +105,10 @@ describe('sendSellerWeeklyAnalyticsEmail', () => {
     expect(result.ok).toBe(false)
     expect(result.error).toBe('No metrics to report')
     expect(sendEmail).not.toHaveBeenCalled()
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      '[EMAIL_SELLER_ANALYTICS] Skipping email - no metrics:',
+      expect.any(Object)
+    )
     expect(consoleErrorSpy).not.toHaveBeenCalled()
   })
 

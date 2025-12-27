@@ -31,9 +31,6 @@ playwright/.cache/
 *.log
 logs/
 smoke-test-log.txt
-*_logs.txt
-*_results.txt
-experiment_*.txt
 
 # Runtime data
 pids

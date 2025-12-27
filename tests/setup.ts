@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 
-import { vi, afterEach as vitestAfterEach, afterAll } from 'vitest'
+import { vi, afterEach as vitestAfterEach } from 'vitest'
 import makeStableSupabaseClient from './utils/mocks/supabaseServerStable'
 
 // never re-create this per test, keep it stable
@@ -112,15 +112,6 @@ vi.mock('@/lib/supabase/client', () => ({
       signInWithPassword: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),
-      onAuthStateChange: vi.fn((_callback: any) => {
-        return {
-          data: {
-            subscription: {
-              unsubscribe: vi.fn(),
-            },
-          },
-        }
-      }),
     },
     from: vi.fn(() => {
       const chain: any = {}
@@ -278,12 +269,6 @@ const ALLOWED_PATTERNS = [
   // CSRF client logging (lib/api/csrfClient.ts)
   /^\[CSRF_CLIENT\]/, // CSRF client logging - tests/integration/sale.share-button.render.test.tsx, tests/integration/sale.details.*.test.tsx
   /^\[ITEMS_DIAG\]/, // Items diagnostic logging - lib/data/salesAccess.ts getSaleWithItems
-  
-  // Handle diagnostic logging (tests/setup.ts)
-  /^\[HANDLE_DIAG\]/, // Handle diagnostic logging for detecting leaked handles - tests/setup.ts
-  
-  // CI-only esbuild shutdown logging (tests/setup.ts)
-  /^\[CI\] esbuild/, // CI-only esbuild service shutdown logging - tests/setup.ts
 ]
 
 const isAllowedMessage = (message: string): boolean => {
@@ -330,7 +315,7 @@ vitestAfterEach(async () => {
 
 // Global unhandled rejection handler to catch ZodErrors from env validation during tests
 // These errors are expected in env.test.ts when testing error conditions
-const unhandledRejectionHandler = (reason: unknown) => {
+process.on('unhandledRejection', (reason: unknown) => {
   // Ignore ZodErrors from env validation during tests
   // These are expected when testing error conditions in env.test.ts
   if (reason && typeof reason === 'object' && 'issues' in reason) {
@@ -343,73 +328,5 @@ const unhandledRejectionHandler = (reason: unknown) => {
     }
   }
   // For other unhandled rejections, let them propagate (Vitest will handle them)
-}
-
-// Guard against environments where process.on might not be available (e.g., jsdom)
-if (typeof process.on === 'function') {
-  process.on('unhandledRejection', unhandledRejectionHandler)
-}
-
-// Clean up the unhandled rejection handler after all tests complete
-// This prevents it from keeping the process alive
-afterAll(async () => {
-  const isCI = process.env.CI === 'true'
-  
-  // Remove unhandled rejection handler
-  if (typeof process.removeListener === 'function') {
-    process.removeListener('unhandledRejection', unhandledRejectionHandler)
-  } else if (typeof process.off === 'function') {
-    process.off('unhandledRejection', unhandledRejectionHandler)
-  }
-
-  // CI-only: Explicitly shut down esbuild service to prevent orphaned processes
-  // esbuild runs as a long-lived helper process outside Node's event loop and is NOT
-  // visible to handle diagnostics. Vitest/Vite do not reliably shut down esbuild in CI,
-  // causing orphaned esbuild processes that keep CI alive until timeout.
-  // Attempt shutdown regardless of environment - esbuild service runs in Node process.
-  if (isCI) {
-    try {
-      const esbuild = await import('esbuild')
-      if (typeof esbuild.stop === 'function') {
-        esbuild.stop()
-        console.log('[CI] esbuild service stopped')
-      }
-    } catch (err) {
-      // Silently ignore - esbuild may not be available or already stopped
-      // This is expected and does not affect test execution
-    }
-  }
-
-  // In CI: NO diagnostic listeners or timers - they create handles that prevent exit
-  // Diagnostic code is removed in CI to ensure clean process exit
-  // Locally: Allow diagnostics for debugging
-  if (!isCI && typeof (process as any)._getActiveHandles === 'function') {
-    try {
-      const handles = (process as any)._getActiveHandles()
-      const requests = (process as any)._getActiveRequests()
-
-      console.log('\n[HANDLE_DIAG] ========================================')
-      console.log('[HANDLE_DIAG] RAW HANDLE DUMP AFTER ALL TESTS COMPLETE')
-      console.log('[HANDLE_DIAG] ========================================')
-      console.log(`[HANDLE_DIAG] Total Handles: ${handles.length}`)
-      console.log(`[HANDLE_DIAG] Total Requests: ${requests.length}`)
-      console.log('[HANDLE_DIAG] ========================================\n')
-
-      // Log summary only (not full details to avoid memory issues)
-      const handleTypes = handles.map((handle: any) => handle.constructor?.name || 'Unknown')
-      const typeCounts = handleTypes.reduce((acc: { [key: string]: number }, type: string) => {
-        acc[type] = (acc[type] || 0) + 1
-        return acc
-      }, {})
-      console.log('[HANDLE_DIAG] SUMMARY BY TYPE:')
-      Object.entries(typeCounts).forEach(([type, count]) => {
-        console.log(`[HANDLE_DIAG]   ${type}: ${count}`)
-      })
-      
-      console.log('\n[HANDLE_DIAG] ========================================\n')
-    } catch (e) {
-      // Ignore errors in diagnostics
-    }
-  }
 })
 

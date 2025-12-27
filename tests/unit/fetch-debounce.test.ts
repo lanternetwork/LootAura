@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 // Mock fetch function
 const mockFetch = vi.fn()
@@ -8,10 +8,6 @@ describe('Fetch Debounce', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mockFetch.mockClear()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
   })
 
   it('should debounce fetch calls with 200ms delay', () => {

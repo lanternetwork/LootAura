@@ -244,7 +244,6 @@ export function startPerformanceMonitoring() {
 }
 
 // Initialize performance monitoring
-// Guard: Don't run in test environment to prevent leaked handles
-if (typeof window === 'undefined' && process.env.NODE_ENV !== 'test') {
+if (typeof window === 'undefined') {
   startPerformanceMonitoring()
 }

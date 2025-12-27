@@ -16,17 +16,14 @@ interface RateLimitEntry {
 const rateLimitStore = new Map<string, RateLimitEntry>()
 
 // Clean up expired entries periodically
-// Guard: Don't run in test environment to prevent leaked handles
-if (process.env.NODE_ENV !== 'test') {
-  setInterval(() => {
-    const now = Date.now()
-    for (const [key, entry] of rateLimitStore.entries()) {
-      if (now > entry.resetTime) {
-        rateLimitStore.delete(key)
-      }
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, entry] of rateLimitStore.entries()) {
+    if (now > entry.resetTime) {
+      rateLimitStore.delete(key)
     }
-  }, 60000) // Clean up every minute
-}
+  }
+}, 60000) // Clean up every minute
 
 export function checkRateLimit(key: string, limit: number, windowMs: number): boolean {
   const now = Date.now()

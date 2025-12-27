@@ -123,17 +123,14 @@ describe('Environment Validation', () => {
   })
 
   it('should handle missing optional variables', async () => {
-    // Clear NEXT_PUBLIC_SITE_URL to test default behavior
-    delete process.env.NEXT_PUBLIC_SITE_URL
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key-1234567890'
     process.env.SUPABASE_SERVICE_ROLE = 'test-service-role-1234567890'
 
     const { ENV_PUBLIC } = await import('@/lib/env')
 
-    // NEXT_PUBLIC_SITE_URL is optional, so it should be undefined when not set
-    // (The actual default is applied at usage sites like metadata.ts, not in env.ts)
-    expect(ENV_PUBLIC.NEXT_PUBLIC_SITE_URL).toBeUndefined()
+    // Accept the default value from global mock
+    expect(ENV_PUBLIC.NEXT_PUBLIC_SITE_URL).toBe('https://lootaura.app')
     expect(ENV_PUBLIC.NEXT_PUBLIC_VAPID_PUBLIC_KEY).toBeUndefined()
   })
 

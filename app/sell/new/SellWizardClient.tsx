@@ -15,7 +15,7 @@ import Toast from '@/components/sales/Toast'
 import ConfirmationModal from '@/components/sales/ConfirmationModal'
 import type { CategoryValue } from '@/lib/types'
 import { getDraftKey, saveLocalDraft, loadLocalDraft, clearLocalDraft, hasLocalDraft } from '@/lib/draft/localDraft'
-import { saveDraftServer, getLatestDraftServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
+import { saveDraftServer, getLatestDraftServer, getDraftByKeyServer, deleteDraftServer, publishDraftServer } from '@/lib/draft/draftClient'
 import type { SaleDraftPayload } from '@/lib/validation/saleDraft'
 import { getCsrfHeaders } from '@/lib/csrf-client'
 
@@ -134,6 +134,7 @@ export default function SellWizardClient({
   const draftKeyRef = useRef<string | null>(null)
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isPublishingRef = useRef<boolean>(false) // Flag to prevent autosave during/after publish
+  const isRestoringDraftRef = useRef<boolean>(false) // Flag to prevent autosave during draft restoration
   const lastServerSaveRef = useRef<number>(0)
   const isNavigatingRef = useRef(false)
   const searchParams = useSearchParams()
@@ -211,10 +212,7 @@ export default function SellWizardClient({
     })
 
     return () => {
-      // Safely unsubscribe - subscription might be undefined in test environments
-      if (subscription) {
-        subscription.unsubscribe()
-      }
+      subscription.unsubscribe()
     }
   }, [supabase.auth])
 
@@ -252,6 +250,11 @@ export default function SellWizardClient({
   useEffect(() => {
     // Don't autosave if we're publishing or have already published
     if (isPublishingRef.current) {
+      return
+    }
+    
+    // Don't autosave if we're currently restoring a draft (prevents creating new version on open)
+    if (isRestoringDraftRef.current) {
       return
     }
     
@@ -368,15 +371,37 @@ export default function SellWizardClient({
       
       let draftToRestore: SaleDraftPayload | null = null
       let source: 'server' | 'local' | null = null
+      let restoredDraftKey: string | null = null
 
       // Priority 1: If authenticated, try server draft
       if (user) {
-        const serverResult = await getLatestDraftServer()
-        if (serverResult.ok && serverResult.data?.payload) {
-          draftToRestore = serverResult.data.payload
-          source = 'server'
-          if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
-            console.log('[SELL_WIZARD] Found server draft')
+        // Check if a specific draft_key was provided in sessionStorage (from dashboard "Continue" button)
+        const specificDraftKey = typeof window !== 'undefined' ? sessionStorage.getItem('draft:key') : null
+        
+        if (specificDraftKey) {
+          // Load the specific draft by key
+          const serverResult = await getDraftByKeyServer(specificDraftKey)
+          if (serverResult.ok && serverResult.data?.payload) {
+            draftToRestore = serverResult.data.payload
+            restoredDraftKey = serverResult.data.draft_key
+            source = 'server'
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Found specific server draft by key:', specificDraftKey)
+            }
+            // Clear the sessionStorage key after using it
+            sessionStorage.removeItem('draft:key')
+          }
+        }
+        
+        // If no specific draft was found, try latest draft
+        if (!draftToRestore) {
+          const serverResult = await getLatestDraftServer()
+          if (serverResult.ok && serverResult.data?.payload) {
+            draftToRestore = serverResult.data.payload
+            source = 'server'
+            if (process.env.NEXT_PUBLIC_DEBUG === 'true') {
+              console.log('[SELL_WIZARD] Found latest server draft')
+            }
           }
         }
       }
@@ -428,6 +453,22 @@ export default function SellWizardClient({
       // Restore draft if found
       if (draftToRestore) {
         hasResumedRef.current = true
+        isRestoringDraftRef.current = true // Prevent autosave during restoration
+        
+        // Set draftKeyRef to the restored draft's key (critical: prevents creating new draft on autosave)
+        if (restoredDraftKey) {
+          draftKeyRef.current = restoredDraftKey
+          // Also update localStorage to persist the draft key
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('draft:key', restoredDraftKey)
+          }
+        } else if (source === 'server' && typeof window !== 'undefined') {
+          // If we got a server draft but no explicit key, try to get it from localStorage
+          const storedKey = localStorage.getItem('draft:key')
+          if (storedKey) {
+            draftKeyRef.current = storedKey
+          }
+        }
         
         // Restore form data
         if (draftToRestore.formData) {
@@ -473,6 +514,12 @@ export default function SellWizardClient({
             // Silent fail - already saved locally
           })
         }
+        
+        // Clear restoration flag after autosave debounce period (2s to be safe)
+        // This allows state to settle before autosave can trigger
+        setTimeout(() => {
+          isRestoringDraftRef.current = false
+        }, 2000)
       } else if (isReviewResume) {
         // Draft not found but resume=review - still go to Review step
         setCurrentStep(STEPS.REVIEW)
@@ -1873,15 +1920,15 @@ function ItemsStep({ items, onAdd, onUpdate, onRemove }: {
   )
 }
 
-function ReviewStep({
-  formData,
+function ReviewStep({ 
+  formData, 
   photos,
   items,
   onPublish,
   loading,
   submitError,
   promotionsEnabled,
-  paymentsEnabled: _paymentsEnabled,
+  paymentsEnabled,
   wantsPromotion,
   onTogglePromotion,
 }: {
@@ -1892,7 +1939,6 @@ function ReviewStep({
   loading: boolean
   submitError?: string | null
   promotionsEnabled?: boolean
-  paymentsEnabled?: boolean
   wantsPromotion?: boolean
   onTogglePromotion?: (next: boolean) => void
 }) {

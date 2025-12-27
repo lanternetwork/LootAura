@@ -240,12 +240,8 @@ describe('Accessibility Smoke Tests', () => {
       )
 
       await waitFor(() => {
-        // Wizard may render multiple instances (mobile/desktop), so use getAllByRole
-        // getAllByRole with name matcher already verifies accessible name
-        const nextButtons = screen.getAllByRole('button', { name: /next/i })
-        expect(nextButtons.length).toBeGreaterThan(0)
-        // Verify at least one exists and is accessible
-        expect(nextButtons[0]).toBeInTheDocument()
+        const nextButton = screen.getByRole('button', { name: /next/i })
+        expect(nextButton).toBeDefined()
       })
     })
 
@@ -259,13 +255,9 @@ describe('Accessibility Smoke Tests', () => {
       )
 
       await waitFor(() => {
-        // Wizard may render multiple instances (mobile/desktop), so use getAllByRole
-        // Previous button should exist (may be disabled on first step, but still accessible)
-        // getAllByRole with name matcher already verifies accessible name
-        const previousButtons = screen.getAllByRole('button', { name: /previous/i })
-        expect(previousButtons.length).toBeGreaterThan(0)
-        // Verify at least one exists and is accessible
-        expect(previousButtons[0]).toBeInTheDocument()
+        // Previous button should exist (may be disabled on first step)
+        const previousButton = screen.getByRole('button', { name: /previous/i })
+        expect(previousButton).toBeDefined()
       })
     })
 
@@ -284,12 +276,8 @@ describe('Accessibility Smoke Tests', () => {
 
       await waitFor(() => {
         // Verify wizard renders with accessible navigation
-        // Wizard may render multiple instances (mobile/desktop), so use getAllByRole
-        // getAllByRole with name matcher already verifies accessible name
-        const nextButtons = screen.getAllByRole('button', { name: /next/i })
-        expect(nextButtons.length).toBeGreaterThan(0)
-        // Verify at least one exists and is accessible
-        expect(nextButtons[0]).toBeInTheDocument()
+        const nextButton = screen.getByRole('button', { name: /next/i })
+        expect(nextButton).toBeDefined()
       })
     })
   })

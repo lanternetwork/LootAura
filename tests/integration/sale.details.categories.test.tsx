@@ -146,9 +146,9 @@ describe('Sale Details Categories', () => {
       />
     )
 
-    // Check that categories section is visible (multiple headings may exist for responsive layouts)
-    const categoriesHeadings = screen.getAllByText('Categories')
-    expect(categoriesHeadings.length).toBeGreaterThan(0)
+    // Check that categories section is visible
+    const categoriesHeading = screen.getByText('Categories')
+    expect(categoriesHeading).toBeInTheDocument()
 
     // Check that all expected categories are displayed (both mobile and desktop layouts render categories)
     const furnitureElements = screen.getAllByText('furniture')
@@ -235,11 +235,8 @@ describe('Sale Details Categories', () => {
       />
     )
 
-    // Categories section heading may appear in multiple responsive layouts,
-    // but the important thing is that no category chips are rendered when displayCategories is empty
-    // Check that no category chips exist (they would be rendered by CategoryChips component)
-    const categoryChips = screen.queryAllByRole('button', { name: /furniture|toys|garden|electronics/i })
-    expect(categoryChips.length).toBe(0)
+    // Categories section should not be rendered
+    expect(screen.queryByText('Categories')).not.toBeInTheDocument()
   })
 
   it('should handle duplicate categories (union)', async () => {

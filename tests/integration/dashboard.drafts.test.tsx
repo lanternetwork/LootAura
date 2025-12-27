@@ -75,11 +75,8 @@ describe('DraftsPanel', () => {
       />
     )
 
-    // Heading should be present
-    expect(screen.getByRole('heading', { name: 'Drafts' })).toBeInTheDocument()
-    // Badge count should be rendered somewhere in the panel
-    const countBadges = screen.getAllByText('2')
-    expect(countBadges.length).toBeGreaterThan(0)
+    expect(screen.getByText('Drafts')).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
   })
 
   it('should show empty state when no drafts', () => {
@@ -121,9 +118,7 @@ describe('DraftsPanel', () => {
     )
 
     expect(screen.getByText('Failed to load drafts')).toBeInTheDocument()
-    // Look for the Retry button by aria-label or text content
-    const retryButton = screen.getByRole('button', { name: /retry/i })
-    expect(retryButton).toBeInTheDocument()
+    expect(screen.getByText('Retry')).toBeInTheDocument()
   })
 
   it('should call onRetry when retry button is clicked', async () => {
@@ -138,10 +133,8 @@ describe('DraftsPanel', () => {
       />
     )
 
-    // May be multiple retry buttons due to multiple renders, take the first one
-    const retryButtons = screen.getAllByRole('button', { name: /retry/i })
-    expect(retryButtons.length).toBeGreaterThan(0)
-    await user.click(retryButtons[0])
+    const retryButton = screen.getByText('Retry')
+    await user.click(retryButton)
 
     expect(mockHandlers.onRetry).toHaveBeenCalledTimes(1)
   })
@@ -155,8 +148,8 @@ describe('DraftsPanel', () => {
       />
     )
 
-    expect(screen.getAllByText('Test Draft 1').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Test Draft 2').length).toBeGreaterThan(0)
+    expect(screen.getByText('Test Draft 1')).toBeInTheDocument()
+    expect(screen.getByText('Test Draft 2')).toBeInTheDocument()
   })
 })
 
@@ -206,39 +199,31 @@ describe('DraftCard', () => {
   it('should display item count and categories', () => {
     render(<DraftCard draft={mockDraft} onDelete={mockHandlers.onDelete} onPublish={mockHandlers.onPublish} />)
 
-    expect(screen.getAllByText('3 items').length).toBeGreaterThan(0)
-    const toolsElements = screen.getAllByText('Tools')
-    expect(toolsElements.length).toBeGreaterThan(0)
-    const electronicsElements = screen.getAllByText('Electronics')
-    expect(electronicsElements.length).toBeGreaterThan(0)
-    // +1 may appear multiple times
-    const plusOneElements = screen.getAllByText('+1')
-    expect(plusOneElements.length).toBeGreaterThan(0)
+    expect(screen.getByText('3 items')).toBeInTheDocument()
+    expect(screen.getByText('Tools')).toBeInTheDocument()
+    expect(screen.getByText('Electronics')).toBeInTheDocument()
+    expect(screen.getByText('+1')).toBeInTheDocument()
   })
 
   it('should show date range when available', () => {
     render(<DraftCard draft={mockDraft} onDelete={mockHandlers.onDelete} onPublish={mockHandlers.onPublish} />)
 
-    // Date range should be displayed (may appear multiple times in different formats)
-    const dateTexts = screen.getAllByText(/1\/15\/2025/)
-    expect(dateTexts.length).toBeGreaterThan(0)
+    // Date range should be displayed
+    const dateText = screen.getByText(/1\/15\/2025/)
+    expect(dateText).toBeInTheDocument()
   })
 
   it('should show Continue button', () => {
     render(<DraftCard draft={mockDraft} onDelete={mockHandlers.onDelete} onPublish={mockHandlers.onPublish} />)
 
-    const continueButtons = screen.getAllByText('Continue')
-    expect(continueButtons.length).toBeGreaterThan(0)
+    expect(screen.getByText('Continue')).toBeInTheDocument()
   })
 
   it('should show Publish and Delete buttons', () => {
     render(<DraftCard draft={mockDraft} onDelete={mockHandlers.onDelete} onPublish={mockHandlers.onPublish} />)
 
-    const publishButtons = screen.getAllByText('Publish')
-    expect(publishButtons.length).toBeGreaterThan(0)
-    // Delete buttons may appear multiple times (one per draft card)
-    const deleteButtons = screen.getAllByLabelText(/Delete/)
-    expect(deleteButtons.length).toBeGreaterThan(0)
+    expect(screen.getByText('Publish')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Delete/)).toBeInTheDocument()
   })
 })
 

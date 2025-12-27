@@ -3,8 +3,8 @@
  */
 
 import React from 'react'
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, waitFor, cleanup } from '@testing-library/react'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SaleShareButton from '@/components/share/SaleShareButton'
 
@@ -37,10 +37,6 @@ describe('SaleShareButton', () => {
     delete (window.navigator as any).share
     // Reset navigator.clipboard
     delete (window.navigator as any).clipboard
-  })
-
-  afterEach(() => {
-    cleanup()
   })
 
   it('should render share button', () => {
@@ -195,8 +191,15 @@ describe('SaleShareButton', () => {
   it('should use Web Share API when available', async () => {
     const user = userEvent.setup()
     
-    // Mock mobile user agent FIRST - must be set before component renders
-    // This ensures isMobile() returns true
+    // Mock Web Share API
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', {
+      writable: true,
+      configurable: true,
+      value: share,
+    })
+    
+    // Mock mobile user agent
     Object.defineProperty(navigator, 'userAgent', {
       writable: true,
       configurable: true,
@@ -208,32 +211,20 @@ describe('SaleShareButton', () => {
       configurable: true,
       value: 375,
     })
-    
-    // Mock Web Share API - must exist before component renders
-    // This ensures isWebShareAvailable() returns true
-    const share = vi.fn().mockResolvedValue(undefined)
-    Object.defineProperty(navigator, 'share', {
-      writable: true,
-      configurable: true,
-      value: share,
-    })
 
     render(<SaleShareButton {...defaultProps} />)
     
-    // Wait for component to be ready
-    const button = await screen.findByRole('button', { name: /share/i })
-    
-    // Click the button - on mobile with Web Share available, this should call navigator.share
+    const button = screen.getByRole('button', { name: /share/i })
     await user.click(button)
     
-    // Web Share API should be called immediately on mobile when Web Share is available
+    // Web Share API should be called
     await waitFor(() => {
       expect(share).toHaveBeenCalledWith({
         title: defaultProps.title,
         text: defaultProps.text,
         url: defaultProps.url,
       })
-    }, { timeout: 3000 })
+    })
   })
 
   it('should handle Web Share API cancellation gracefully', async () => {
@@ -335,12 +326,9 @@ describe('SaleShareButton', () => {
       value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     })
 
-    const { container } = render(<SaleShareButton {...defaultProps} />)
+    render(<SaleShareButton {...defaultProps} />)
     
-    // Use getAllByRole to handle multiple buttons (test isolation issue)
-    const buttons = screen.getAllByRole('button', { name: /share/i })
-    expect(buttons.length).toBeGreaterThan(0)
-    const button = buttons[0] // Use the first button from the rendered component
+    const button = screen.getByRole('button', { name: /share/i })
     await user.click(button)
     
     // Menu should open

@@ -55,24 +55,15 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            install_success=0
             if [ -f package-lock.json ]; then
-              if npm ci --no-audit --no-fund 2>&1; then
-                install_success=1
-              else
-                npm_exit=$?
-                echo "⚠️ npm ci failed (exit code: ${npm_exit}), falling back to npm install..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm ci
             else
-              npm install --no-audit --no-fund && install_success=1 || install_success=0
+              npm install
               # Generate package-lock.json for consistent dependency resolution
-              if [ $install_success -eq 1 ]; then
-                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm install --package-lock-only
             fi
             
-            if [ $install_success -eq 1 ]; then
+            if [ $? -eq 0 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -109,24 +100,15 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            install_success=0
             if [ -f package-lock.json ]; then
-              if npm ci --no-audit --no-fund 2>&1; then
-                install_success=1
-              else
-                npm_exit=$?
-                echo "⚠️ npm ci failed (exit code: ${npm_exit}), falling back to npm install..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm ci
             else
-              npm install --no-audit --no-fund && install_success=1 || install_success=0
+              npm install
               # Generate package-lock.json for consistent dependency resolution
-              if [ $install_success -eq 1 ]; then
-                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm install --package-lock-only
             fi
             
-            if [ $install_success -eq 1 ]; then
+            if [ $? -eq 0 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -147,7 +129,6 @@ jobs:
   test-unit:
     name: test-unit
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     
     steps:
       - name: Checkout repository
@@ -164,24 +145,15 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            install_success=0
             if [ -f package-lock.json ]; then
-              if npm ci --no-audit --no-fund 2>&1; then
-                install_success=1
-              else
-                npm_exit=$?
-                echo "⚠️ npm ci failed (exit code: ${npm_exit}), falling back to npm install..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm ci
             else
-              npm install --no-audit --no-fund && install_success=1 || install_success=0
+              npm install
               # Generate package-lock.json for consistent dependency resolution
-              if [ $install_success -eq 1 ]; then
-                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm install --package-lock-only
             fi
             
-            if [ $install_success -eq 1 ]; then
+            if [ $? -eq 0 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -216,7 +188,6 @@ jobs:
   test-integration:
     name: test-integration
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     
     steps:
       - name: Checkout repository
@@ -233,24 +204,15 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            install_success=0
             if [ -f package-lock.json ]; then
-              if npm ci --no-audit --no-fund 2>&1; then
-                install_success=1
-              else
-                npm_exit=$?
-                echo "⚠️ npm ci failed (exit code: ${npm_exit}), falling back to npm install..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm ci
             else
-              npm install --no-audit --no-fund && install_success=1 || install_success=0
+              npm install
               # Generate package-lock.json for consistent dependency resolution
-              if [ $install_success -eq 1 ]; then
-                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm install --package-lock-only
             fi
             
-            if [ $install_success -eq 1 ]; then
+            if [ $? -eq 0 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -266,7 +228,7 @@ jobs:
           done
 
       - name: Run integration tests
-        run: node scripts/run-integration-tests.js
+        run: npm run test -- tests/integration/
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -292,24 +254,15 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            install_success=0
             if [ -f package-lock.json ]; then
-              if npm ci --no-audit --no-fund 2>&1; then
-                install_success=1
-              else
-                npm_exit=$?
-                echo "⚠️ npm ci failed (exit code: ${npm_exit}), falling back to npm install..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm ci
             else
-              npm install --no-audit --no-fund && install_success=1 || install_success=0
+              npm install
               # Generate package-lock.json for consistent dependency resolution
-              if [ $install_success -eq 1 ]; then
-                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm install --package-lock-only
             fi
             
-            if [ $install_success -eq 1 ]; then
+            if [ $? -eq 0 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -338,7 +291,6 @@ jobs:
   build:
     name: build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -354,24 +306,15 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            install_success=0
             if [ -f package-lock.json ]; then
-              if npm ci --no-audit --no-fund 2>&1; then
-                install_success=1
-              else
-                npm_exit=$?
-                echo "⚠️ npm ci failed (exit code: ${npm_exit}), falling back to npm install..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm ci
             else
-              npm install --no-audit --no-fund && install_success=1 || install_success=0
+              npm install
               # Generate package-lock.json for consistent dependency resolution
-              if [ $install_success -eq 1 ]; then
-                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm install --package-lock-only
             fi
             
-            if [ $install_success -eq 1 ]; then
+            if [ $? -eq 0 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -439,24 +382,15 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            install_success=0
             if [ -f package-lock.json ]; then
-              if npm ci --no-audit --no-fund 2>&1; then
-                install_success=1
-              else
-                npm_exit=$?
-                echo "⚠️ npm ci failed (exit code: ${npm_exit}), falling back to npm install..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm ci
             else
-              npm install --no-audit --no-fund && install_success=1 || install_success=0
+              npm install
               # Generate package-lock.json for consistent dependency resolution
-              if [ $install_success -eq 1 ]; then
-                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm install --package-lock-only
             fi
             
-            if [ $install_success -eq 1 ]; then
+            if [ $? -eq 0 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else
@@ -505,24 +439,15 @@ jobs:
           # Retry logic for network issues
           for attempt in 1 2 3; do
             echo "Install attempt $attempt/3..."
-            install_success=0
             if [ -f package-lock.json ]; then
-              if npm ci --no-audit --no-fund 2>&1; then
-                install_success=1
-              else
-                npm_exit=$?
-                echo "⚠️ npm ci failed (exit code: ${npm_exit}), falling back to npm install..."
-                npm install --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm ci
             else
-              npm install --no-audit --no-fund && install_success=1 || install_success=0
+              npm install
               # Generate package-lock.json for consistent dependency resolution
-              if [ $install_success -eq 1 ]; then
-                npm install --package-lock-only --no-audit --no-fund && install_success=1 || install_success=0
-              fi
+              npm install --package-lock-only
             fi
             
-            if [ $install_success -eq 1 ]; then
+            if [ $? -eq 0 ]; then
               echo "✅ Dependencies installed successfully"
               break
             else

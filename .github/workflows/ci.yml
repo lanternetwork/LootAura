@@ -185,16 +185,16 @@ jobs:
             test-results.xml
             coverage/
 
-  # Integration tests are memory-bound (~8GB per process).
-  # Sharding ensures each job runs <=12 files to avoid OOM.
+  # Integration tests are memory-spiky.
+  # We hard-cap each job to ≤3 files to prevent OOM.
+  # This is intentional and required for stability.
   test-integration:
-    name: test-integration (shard ${{ matrix.shard }}/${{ matrix.total }})
+    name: test-integration (shard ${{ matrix.shard }}/18)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-        total: [12]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     
     steps:
       - name: Checkout repository
@@ -235,8 +235,10 @@ jobs:
           done
 
       - name: Run integration tests
-        run: npm run test -- tests/integration/ --shard=${{ matrix.shard }}/${{ matrix.total }}
+        run: node scripts/run-integration-shard.js
         env:
+          SHARD_INDEX: ${{ matrix.shard }}
+          SHARD_COUNT: 18
           NODE_OPTIONS: '--max-old-space-size=8192 --expose-gc'
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

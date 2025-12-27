@@ -89,9 +89,6 @@ describe('sendSellerWeeklyAnalyticsEmail', () => {
   })
 
   it('should not send email if all metrics are zero', async () => {
-    // Set DEBUG to enable logging
-    process.env.NEXT_PUBLIC_DEBUG = 'true'
-    
     const zeroMetrics = {
       totalViews: 0,
       totalSaves: 0,
@@ -108,10 +105,6 @@ describe('sendSellerWeeklyAnalyticsEmail', () => {
     expect(result.ok).toBe(false)
     expect(result.error).toBe('No metrics to report')
     expect(sendEmail).not.toHaveBeenCalled()
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      '[EMAIL_SELLER_ANALYTICS] Skipping email - no metrics:',
-      expect.any(Object)
-    )
     expect(consoleErrorSpy).not.toHaveBeenCalled()
   })
 

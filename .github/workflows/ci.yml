@@ -185,6 +185,8 @@ jobs:
             test-results.xml
             coverage/
 
+  # Integration tests are memory-bound (~8GB per process).
+  # Sharding ensures each job runs <=12 files to avoid OOM.
   test-integration:
     name: test-integration (shard ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest

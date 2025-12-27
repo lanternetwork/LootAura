@@ -103,57 +103,40 @@ process.env.SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || 'test-s
 process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app'
 process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@example.com'
 
-// Supabase client mock used by tests
-// Use a hard module-level test double (stable object literal) instead of vi.fn() mocks
-// This ensures auth.getUser() ALWAYS returns a resolved Promise, even after vi.clearAllMocks()
-// The same instance is reused across all renders - no per-render recreation
+// Supabase client mock - module-level frozen object literal
+// This ensures auth.getUser() ALWAYS resolves immediately, preventing navigation hangs
+// The same frozen instance is returned on every createSupabaseBrowserClient() call
 // @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/supabase/client', () => {
-  // Create a stable result object that never changes
-  const getUserResult = { data: { user: { id: 'test-user' } }, error: null }
-  
-  // Create a plain function (NOT vi.fn()) that always returns a NEW resolved promise
-  // This is immune to vi.clearAllMocks() because it's not a mock function
-  // Each call returns a fresh promise to avoid any potential promise reuse issues
-  const stableGetUser = () => Promise.resolve(getUserResult)
-  
-  // Create stable object literal for auth methods
-  // Use plain functions, not vi.fn(), to avoid clearAllMocks() issues
-  const stableAuth = {
-    getUser: stableGetUser,
-    onAuthStateChange: () => ({
-      data: {
-        subscription: {
-          unsubscribe: () => {},
+  // Single frozen client instance created once at module level
+  const mockClient = Object.freeze({
+    auth: Object.freeze({
+      getUser: () => Promise.resolve({ data: { user: { id: 'test-user' } }, error: null }),
+      onAuthStateChange: () => ({
+        data: {
+          subscription: {
+            unsubscribe: () => {},
+          },
         },
-      },
+      }),
+      signInWithPassword: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
+      signUp: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
+      signOut: async () => ({ error: null }),
     }),
-    signInWithPassword: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
-    signUp: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
-    signOut: async () => ({ error: null }),
-  }
-  
-  // Create stable database chain builder
-  const createDbChain = () => {
-    const chain: any = {}
-    chain.select = () => chain
-    chain.insert = (rows: any[]) => ({ data: rows, error: null })
-    chain.update = () => chain
-    chain.delete = () => chain
-    chain.eq = () => chain
-    chain.single = async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null })
-    return chain
-  }
-  
-  // Create the stable client instance once at module level
-  // This same instance is returned every time createSupabaseBrowserClient() is called
-  const stableClient = {
-    auth: stableAuth,
-    from: () => createDbChain(),
-  }
+    from: () => {
+      const chain: any = {}
+      chain.select = () => chain
+      chain.insert = (rows: any[]) => ({ data: rows, error: null })
+      chain.update = () => chain
+      chain.delete = () => chain
+      chain.eq = () => chain
+      chain.single = async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
+      return chain
+    },
+  })
   
   return {
-    createSupabaseBrowserClient: () => stableClient,
+    createSupabaseBrowserClient: () => mockClient,
   }
 })
 

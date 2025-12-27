@@ -104,66 +104,56 @@ process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://
 process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@example.com'
 
 // Supabase client mock used by tests
-// Create stable mock functions that are reused across all client instances
-// This prevents hanging when createSupabaseBrowserClient() is called multiple times (e.g., on re-renders)
-// The mock functions are resilient to vi.clearAllMocks() - they always resolve predictably
+// Use a hard module-level test double (stable object literal) instead of vi.fn() mocks
+// This ensures auth.getUser() ALWAYS returns a resolved Promise, even after vi.clearAllMocks()
+// The same instance is reused across all renders - no per-render recreation
 // @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/supabase/client', () => {
-  // Create stable mock functions that always resolve predictably
-  // Use a function that always returns a resolved promise, even after clearAllMocks()
+  // Create a stable resolved promise that never changes
   const getUserResult = { data: { user: { id: 'test-user' } }, error: null }
   const getUserPromise = Promise.resolve(getUserResult)
   
-  // Create a base function that always returns the promise
-  // This function will work even if vi.clearAllMocks() clears mock implementations
-  const baseGetUser = () => getUserPromise
+  // Create a plain function (NOT vi.fn()) that always returns the resolved promise
+  // This is immune to vi.clearAllMocks() because it's not a mock function
+  const stableGetUser = () => getUserPromise
   
-  // Wrap it in a vi.fn() for call tracking, but ensure the base function always works
-  const createGetUser = () => {
-    const fn = vi.fn(baseGetUser)
-    fn.mockResolvedValue(getUserResult)
-    return fn
+  // Create stable object literal for auth methods
+  // Use plain functions, not vi.fn(), to avoid clearAllMocks() issues
+  const stableAuth = {
+    getUser: stableGetUser,
+    onAuthStateChange: () => ({
+      data: {
+        subscription: {
+          unsubscribe: () => {},
+        },
+      },
+    }),
+    signInWithPassword: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
+    signUp: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
+    signOut: async () => ({ error: null }),
   }
   
-  const stableGetUser = createGetUser()
+  // Create stable database chain builder
+  const createDbChain = () => {
+    const chain: any = {}
+    chain.select = () => chain
+    chain.insert = (rows: any[]) => ({ data: rows, error: null })
+    chain.update = () => chain
+    chain.delete = () => chain
+    chain.eq = () => chain
+    chain.single = async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null })
+    return chain
+  }
   
-  const stableOnAuthStateChange = vi.fn(() => ({
-    data: {
-      subscription: {
-        unsubscribe: vi.fn(),
-      },
-    },
-  }))
-  const stableSignInWithPassword = vi.fn()
-  const stableSignUp = vi.fn()
-  const stableSignOut = vi.fn()
+  // Create the stable client instance once at module level
+  // This same instance is returned every time createSupabaseBrowserClient() is called
+  const stableClient = {
+    auth: stableAuth,
+    from: () => createDbChain(),
+  }
   
   return {
-    createSupabaseBrowserClient: () => {
-      // Re-establish the mock implementation to ensure it always resolves
-      // This prevents hangs even if clearAllMocks() was called
-      stableGetUser.mockImplementation(baseGetUser)
-      stableGetUser.mockResolvedValue(getUserResult)
-      return {
-        auth: {
-          getUser: stableGetUser, // Reuse the same mock function instance
-          onAuthStateChange: stableOnAuthStateChange,
-          signInWithPassword: stableSignInWithPassword,
-          signUp: stableSignUp,
-          signOut: stableSignOut,
-        },
-        from: vi.fn(() => {
-          const chain: any = {}
-          chain.select = vi.fn(() => chain)
-          chain.insert = vi.fn((rows: any[]) => ({ data: rows, error: null }))
-          chain.update = vi.fn(() => chain)
-          chain.delete = vi.fn(() => chain)
-          chain.eq = vi.fn(() => chain)
-          chain.single = vi.fn(async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
-          return chain
-        }),
-      }
-    },
+    createSupabaseBrowserClient: () => stableClient,
   }
 })
 

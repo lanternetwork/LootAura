@@ -4,7 +4,6 @@ if (!process.env.CI) {
 }
 
 const { spawn } = require('child_process');
-const path = require('path');
 
 const vitestCommand = 'npx';
 const vitestArgs = [
@@ -102,7 +101,7 @@ function checkVitestCompletion() {
     /duration\s+[\d.]+(ms|s)/i.test(output);
 
   // If we see the final summary OR we see 20+ completed test files, tests are done
-  // (20 is a reasonable threshold - we have many integration test files)
+  // (20 is a fallback threshold; actual count: 87 files. Summary patterns are primary detection method)
   if ((hasFinalSummary || completedTestFiles >= 20) && !completionDetected) {
     completionDetected = true;
     console.log('[wrapper] termination_reason=completion_detected');

@@ -26,8 +26,8 @@ export default defineConfig({
     pool: 'threads',
     // Reduce memory usage
     maxConcurrency: 1,
-    // Constrain worker count to prevent OOMs (reduced from 4 to 2 for CI stability)
-    maxWorkers: 2,
+    // Constrain worker count to prevent OOMs (reduced to 1 for CI stability)
+    maxWorkers: 1,
     minWorkers: 1,
   },
   resolve: {

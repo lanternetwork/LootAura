@@ -55,6 +55,8 @@ const renderWithQueryClient = (component: React.ReactElement) => {
 
 describe('Sell Wizard Promote CTA', () => {
   beforeEach(() => {
+    // Clear mocks but preserve the Supabase mock's resolved values
+    // The Supabase mock from tests/setup.ts must remain functional
     vi.clearAllMocks()
   })
 
@@ -90,10 +92,14 @@ describe('Sell Wizard Promote CTA', () => {
     // handleNext uses a short navigation guard; wait for it to reset before clicking Next again
     await new Promise(resolve => setTimeout(resolve, 600))
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
-    // Review
+    // Review - wait for the step to change by checking for Review step content
+    // The Review step renders "Review Your Sale" heading, which is more reliable than waiting for the button
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /publish sale/i })[0]).toBeInTheDocument()
+      expect(screen.getByText('Review Your Sale')).toBeInTheDocument()
     })
+    // Now verify the Publish Sale button exists
+    const buttons = screen.queryAllByRole('button', { name: /publish sale/i })
+    expect(buttons.length).toBeGreaterThan(0)
   }
 
   it('hides Feature your sale toggle when promotions are disabled', async () => {

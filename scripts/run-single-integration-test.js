@@ -4,7 +4,7 @@
  * 
  * Usage: node scripts/run-single-integration-test.js <file>
  * 
- * Runs: vitest run <file> --runInBand
+ * Runs: vitest run <file> --pool=forks --maxWorkers=1
  * Inherits stdio and exits with Vitest's exit code.
  */
 
@@ -24,8 +24,8 @@ const absolutePath = path.isAbsolute(testFile) ? testFile : path.resolve(process
 
 console.log(`Running: ${absolutePath}`)
 
-// Run vitest with --runInBand (no workers, single process)
-const vitestProcess = spawn('npx', ['vitest', 'run', absolutePath, '--runInBand'], {
+// Run vitest with --pool=forks --maxWorkers=1 (no workers, single process)
+const vitestProcess = spawn('npx', ['vitest', 'run', absolutePath, '--pool=forks', '--maxWorkers=1'], {
   stdio: 'inherit',
   shell: true,
   env: {

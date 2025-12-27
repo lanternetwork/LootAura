@@ -32,9 +32,6 @@ export default defineConfig({
     maxWorkers: 1,
     minWorkers: 1,
     vmMemoryLimit: 2 * 1024 * 1024 * 1024,
-    sequence: {
-      hooks: 'stack',
-    },
   },
   resolve: {
     alias: {

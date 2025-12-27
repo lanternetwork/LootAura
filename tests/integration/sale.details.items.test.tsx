@@ -4,7 +4,7 @@
 
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import SaleDetailClient from '@/app/sales/[id]/SaleDetailClient'
 import { getSaleWithItems } from '@/lib/data/salesAccess'
 import type { SaleItem } from '@/lib/types'
@@ -220,8 +220,22 @@ describe('Sale Details Items Display', () => {
     expect(screen.getByText('Promote this sale')).toBeInTheDocument()
   })
 
-  it('shows active promotion state with ends date when promotion is active', () => {
+  it('shows active promotion state with ends date when promotion is active', async () => {
     mockUseAuth.mockReturnValue({ data: { id: 'test-owner-id', email: 'owner@example.test' } } as any)
+
+    // Mock fetch to return active promotion status
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        statuses: [{
+          sale_id: mockSale.id,
+          is_active: true,
+          ends_at: '2030-01-01T00:00:00.000Z',
+          tier: 'featured_week',
+        }],
+      }),
+    })
+    ;(global as any).fetch = mockFetch
 
     render(
       <SaleDetailClient 
@@ -233,7 +247,8 @@ describe('Sale Details Items Display', () => {
       />
     )
 
-    const active = screen.getByTestId('sale-detail-promote-active')
+    // Wait for the promotion status to be fetched and rendered
+    const active = await screen.findByTestId('sale-detail-promote-active')
     expect(active.textContent).toContain('Promoted')
     expect(active.textContent).toMatch(/Ends/)
   })

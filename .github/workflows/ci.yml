@@ -186,8 +186,13 @@ jobs:
             coverage/
 
   test-integration:
-    name: test-integration
+    name: test-integration (shard ${{ matrix.shard }}/${{ matrix.total }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+        total: [2]
     
     steps:
       - name: Checkout repository
@@ -228,7 +233,7 @@ jobs:
           done
 
       - name: Run integration tests
-        run: npm run test -- tests/integration/
+        run: npm run test -- tests/integration/ --shard=${{ matrix.shard }}/${{ matrix.total }}
         env:
           NODE_OPTIONS: '--max-old-space-size=8192 --expose-gc'
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}

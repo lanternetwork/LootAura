@@ -53,11 +53,8 @@ export async function GET(request: NextRequest) {
     // Deduplicate and enforce small cap to avoid abuse
     const uniqueIds = Array.from(new Set(rawIds))
 
-    if (uniqueIds.length > MAX_SALE_IDS) {
-      return fail(400, 'INVALID_REQUEST', 'Too many sale IDs')
-    }
-
-    const saleIds = uniqueIds
+    // Slice to MAX_SALE_IDS if more than the limit (instead of returning error)
+    const saleIds = uniqueIds.slice(0, MAX_SALE_IDS)
     if (saleIds.length === 0) {
       return ok({ statuses: [] })
     }

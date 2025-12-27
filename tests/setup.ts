@@ -109,6 +109,13 @@ vi.mock('@/lib/supabase/client', () => ({
   createSupabaseBrowserClient: () => ({
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }),
+      onAuthStateChange: vi.fn(() => ({
+        data: {
+          subscription: {
+            unsubscribe: vi.fn(),
+          },
+        },
+      })),
       signInWithPassword: vi.fn(),
       signUp: vi.fn(),
       signOut: vi.fn(),

@@ -35,12 +35,6 @@ export default defineConfig({
     // With 8GB heap limit, this ensures workers are recycled after ~10-15 test files
     // Each recycled worker starts with a fresh heap, preventing cumulative growth
     vmMemoryLimit: 2 * 1024 * 1024 * 1024, // 2GB in bytes (aggressive recycling)
-    // Configure sequence to ensure hooks unwind properly between test files
-    // 'stack' ensures hooks are properly unwound, allowing GC to reclaim memory
-    sequence: {
-      hooks: 'stack', // Stack-based hook execution ensures proper unwinding
-      setupFiles: 'list', // Run setup files in order
-    },
   },
   resolve: {
     alias: {

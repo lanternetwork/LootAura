@@ -1,3 +1,8 @@
+// CI-only wrapper script - must not be executed locally
+if (!process.env.CI) {
+  throw new Error('run-integration-tests.js must only be executed in CI');
+}
+
 const { spawn } = require('child_process');
 const path = require('path');
 
@@ -34,6 +39,7 @@ const outputCheckInterval = setInterval(() => {
   }
   // If no output for 15 seconds and no completion detected, something is wrong
   if (Date.now() - lastOutputTime > 15000 && !vitestExited) {
+    console.log('[wrapper] termination_reason=inactivity_timeout');
     console.log('[run-integration-tests] No output for 15 seconds, forcing child process termination.');
     process.kill(-child.pid, 'SIGTERM'); // Kill the process group
     clearInterval(outputCheckInterval);
@@ -99,6 +105,7 @@ function checkVitestCompletion() {
   // (20 is a reasonable threshold - we have many integration test files)
   if ((hasFinalSummary || completedTestFiles >= 20) && !completionDetected) {
     completionDetected = true;
+    console.log('[wrapper] termination_reason=completion_detected');
     console.log(`[run-integration-tests] Detected Vitest completion (${completedTestFiles} test files completed)`);
     
     // Wait 1 second, then terminate gracefully

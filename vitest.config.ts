@@ -9,6 +9,7 @@ export default defineConfig({
     setupFiles: [
       path.resolve(__dirname, 'tests/setup/msw.server.ts'),
       path.resolve(__dirname, 'tests/setup.ts'),
+      path.resolve(__dirname, 'tests/setup/teardown.ts'),
     ],
     globals: true,
     exclude: [
@@ -30,6 +31,16 @@ export default defineConfig({
     // Constrain worker count to prevent OOMs (reduced to 1 for CI stability)
     maxWorkers: 1,
     minWorkers: 1,
+    // Aggressively recycle workers when memory exceeds 2GB to prevent OOM
+    // With 8GB heap limit, this ensures workers are recycled after ~10-15 test files
+    // Each recycled worker starts with a fresh heap, preventing cumulative growth
+    vmMemoryLimit: 2 * 1024 * 1024 * 1024, // 2GB in bytes (aggressive recycling)
+    // Configure sequence to ensure hooks unwind properly between test files
+    // 'stack' ensures hooks are properly unwound, allowing GC to reclaim memory
+    sequence: {
+      hooks: 'stack', // Stack-based hook execution ensures proper unwinding
+      setupFiles: 'list', // Run setup files in order
+    },
   },
   resolve: {
     alias: {

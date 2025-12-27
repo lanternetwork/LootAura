@@ -103,14 +103,14 @@ process.env.SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE || 'test-s
 process.env.NEXT_PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://lootaura.app'
 process.env.NOMINATIM_APP_EMAIL = process.env.NOMINATIM_APP_EMAIL || 'test@example.com'
 
-// Supabase client mock - module-level frozen object literal
+// Supabase client mock - module-level object literal
 // This ensures auth.getUser() ALWAYS resolves immediately, preventing navigation hangs
-// The same frozen instance is returned on every createSupabaseBrowserClient() call
+// The same instance is returned on every createSupabaseBrowserClient() call
 // @ts-ignore vitest mock hoisting in test env
 vi.mock('@/lib/supabase/client', () => {
-  // Single frozen client instance created once at module level
-  const mockClient = Object.freeze({
-    auth: Object.freeze({
+  // Single client instance created once at module level
+  const mockClient = {
+    auth: {
       getUser: () => Promise.resolve({ data: { user: { id: 'test-user' } }, error: null }),
       onAuthStateChange: () => ({
         data: {
@@ -122,7 +122,7 @@ vi.mock('@/lib/supabase/client', () => {
       signInWithPassword: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
       signUp: async () => ({ data: { user: { id: 'test-user' } }, error: null }),
       signOut: async () => ({ error: null }),
-    }),
+    },
     from: () => {
       const chain: any = {}
       chain.select = () => chain
@@ -133,7 +133,7 @@ vi.mock('@/lib/supabase/client', () => {
       chain.single = async () => ({ data: { id: 'test-id', owner_id: 'test-user' }, error: null }))
       return chain
     },
-  })
+  }
   
   return {
     createSupabaseBrowserClient: () => mockClient,
